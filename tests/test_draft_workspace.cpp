@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <string>
 #include <vector>
@@ -32,6 +33,29 @@ struct TempDir {
     ~TempDir() {
         std::error_code ec;
         std::filesystem::remove_all(path, ec);
+    }
+};
+
+// Makes a fixture's project root unwritable in a platform-independent way: the
+// path becomes a regular file while the original directory is kept beside it.
+// Destruction restores the directory before TempDir performs its cleanup.
+struct TemporarilyUnavailableProjectRoot {
+    std::filesystem::path original;
+    std::filesystem::path relocated;
+
+    explicit TemporarilyUnavailableProjectRoot(const std::filesystem::path& path) : original(path) {
+        relocated = original;
+        relocated += "_relocated";
+        std::filesystem::rename(original, relocated);
+        std::ofstream blocker(original, std::ios::binary | std::ios::trunc);
+        blocker << "not a directory";
+    }
+
+    ~TemporarilyUnavailableProjectRoot() {
+        std::error_code ec;
+        std::filesystem::remove(original, ec);
+        ec.clear();
+        std::filesystem::rename(relocated, original, ec);
     }
 };
 
@@ -474,6 +498,75 @@ TEST(DraftWorkspace, APinnedIdentityCollisionIsNotSilentlyRenumbered) {
     EXPECT_EQ(FindElement(result.working_model, "G2"), nullptr)
         << "a conflicting draft must not be replayed against the authoritative document";
     EXPECT_EQ(IdentityFor(fixture.store, group, "$sub"), "G2");
+}
+
+TEST(DraftWorkspace, ReplacingOperationsRehearsesWithEveryReusedIdentityStillPinned) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string shown_identity = IdentityFor(fixture.store, group, "$sub");
+    ASSERT_EQ(shown_identity, "G2");
+
+    // The full authoritative document now reveals that the published identity
+    // is occupied. Replacement must rehearse with G2 still pinned and refuse;
+    // rehearsing after clearing it would silently try G3, pass, then restore the
+    // conflicting G2 into the real workspace.
+    fixture.store.SetAuthoritativeIdentities({"G1", shown_identity});
+    std::string error;
+    EXPECT_FALSE(fixture.store.ReplaceOperations(
+        group,
+        {CreateClaimOp("$sub", "Identified hazards are mitigated."), SupportOp("$sub", "G1")},
+        fixture.accepted,
+        error));
+    EXPECT_NE(error.find("already used"), std::string::npos) << error;
+
+    const core::drafts::DraftChangeGroup* unchanged = fixture.store.workspace()->FindGroup(group);
+    ASSERT_NE(unchanged, nullptr);
+    ASSERT_EQ(unchanged->operations.size(), 2u);
+    EXPECT_EQ(unchanged->operations.front().text, "Hazards are mitigated.");
+    EXPECT_EQ(IdentityFor(fixture.store, group, "$sub"), shown_identity);
+}
+
+TEST(DraftWorkspace, MaterializationFailsClosedWhenNewIdentitiesCannotBePersisted) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(IdentityFor(fixture.store, group, "$sub").empty()) << "the first materialization allocates it";
+
+    {
+        TemporarilyUnavailableProjectRoot unavailable(fixture.dir.path);
+        const core::drafts::DraftMaterializationResult& failed = fixture.store.Materialize(fixture.accepted, 1);
+        EXPECT_FALSE(failed.success);
+        EXPECT_NE(failed.error.find("persist"), std::string::npos) << failed.error;
+        EXPECT_EQ(failed.working_model.elements.size(), fixture.accepted.elements.size());
+        EXPECT_TRUE(IdentityFor(fixture.store, group, "$sub").empty())
+            << "an identity that was not saved must not remain published in memory";
+    }
+
+    // The failure is not cached. Once storage is available, the next frame can
+    // allocate, persist, and publish the same draft normally.
+    const core::drafts::DraftMaterializationResult& retried = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(retried.success) << retried.error;
+    const std::string persisted_identity = IdentityFor(fixture.store, group, "$sub");
+    ASSERT_FALSE(persisted_identity.empty());
+
+    std::vector<std::filesystem::path> workspace_files;
+    for (const std::filesystem::directory_entry& entry :
+         std::filesystem::recursive_directory_iterator(fixture.dir.path / ".af" / "drafts")) {
+        if (entry.is_regular_file() && entry.path().filename() == "workspace.json")
+            workspace_files.push_back(entry.path());
+    }
+    ASSERT_EQ(workspace_files.size(), 1u) << "the successful retry must write exactly one recovery workspace";
+
+    const std::expected<std::string, std::string> stored_json = core::ReadTextFile(workspace_files.front());
+    ASSERT_TRUE(stored_json.has_value()) << stored_json.error();
+    core::drafts::DraftWorkspace stored;
+    std::string error;
+    ASSERT_TRUE(core::drafts::DeserializeDraftWorkspace(stored_json.value(), stored, error)) << error;
+    const core::drafts::DraftChangeGroup* stored_group = stored.FindGroup(group);
+    ASSERT_NE(stored_group, nullptr);
+    EXPECT_EQ(stored_group->generated_ids.at("$sub"), persisted_identity);
 }
 
 TEST(DraftWorkspace, ExtendingAGroupDoesNotRenameWhatItAlreadyCreated) {
@@ -928,6 +1021,19 @@ TEST(DraftWorkspace, PromotionCompilesEveryGroupIntoOneProposal) {
     ASSERT_EQ(compiled.source_labels.size(), 2u);
     EXPECT_EQ(compiled.source_labels[0], "Claude Code");
     EXPECT_EQ(compiled.source_labels[1], "SCCG AI Review");
+}
+
+TEST(DraftWorkspace, PromotionAuthorKeepsLabelsThatAreSubstringsOfOtherLabels) {
+    Fixture fixture;
+    const std::string long_label = fixture.BeginGroup("AI review", "SCCG AI Review");
+    fixture.Stage(long_label, {UpdateTextOp("G1", "Clarified by the review.")});
+    const std::string short_label = fixture.BeginGroup("AI follow-up", "AI");
+    fixture.Stage(short_label, {UpdateTextOp("G1", "Clarified by both contributors.")});
+
+    EXPECT_EQ(core::drafts::DraftPromotionAuthor(*fixture.store.workspace(), {long_label, short_label}),
+              "SCCG AI Review, AI");
+    EXPECT_EQ(core::drafts::DraftPromotionAuthor(*fixture.store.workspace(), {short_label, long_label, short_label}),
+              "AI, SCCG AI Review");
 }
 
 TEST(DraftWorkspace, PromotionKeepsTheIdentitiesTheDraftWasShownUnder) {

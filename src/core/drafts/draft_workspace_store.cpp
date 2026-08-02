@@ -268,12 +268,23 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
     const std::vector<reviews::PatchOperation> previous_operations = group->operations;
     const std::map<std::string, std::string> previous_identities = group->generated_ids;
 
+    std::map<std::string, std::string> retained_identities;
+    for (const auto& [create_ref, id] : previous_identities) {
+        const bool reused = std::any_of(operations.begin(), operations.end(), [&](const reviews::PatchOperation& op) {
+            return op.create_ref.has_value() && op.create_ref.value() == create_ref;
+        });
+        if (reused)
+            retained_identities[create_ref] = id;
+    }
+
     // Replacing drops the identities the old operations pinned. Any `create_ref`
     // the new operations reuse keeps its element id, so an author who rewords a
     // creation does not rename the element an agent was already told about;
-    // anything it no longer creates releases its id.
+    // anything it no longer creates releases its id. The retained set is present
+    // during rehearsal as well as after it: rehearsing with different identities
+    // from the real workspace would validate a model we never intend to publish.
     group->operations.clear();
-    group->generated_ids.clear();
+    group->generated_ids = retained_identities;
     if (!CanStageOperations(workspace, accepted, group_id, operations, error, authoritative_identities_)) {
         group->operations = previous_operations;
         group->generated_ids = previous_identities;
@@ -281,14 +292,7 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
     }
 
     group->operations = operations;
-    for (const auto& [create_ref, id] : previous_identities) {
-        for (const reviews::PatchOperation& operation : group->operations) {
-            if (operation.create_ref.has_value() && operation.create_ref.value() == create_ref) {
-                group->generated_ids[create_ref] = id;
-                break;
-            }
-        }
-    }
+    group->generated_ids = std::move(retained_identities);
     group->updated_utc = NowUtcString();
     ++workspace.working_revision;
     RecordEvent("operations_replaced", group_id, std::to_string(operations.size()) + " operations");
@@ -473,6 +477,7 @@ DraftWorkspaceStore::MaterializeSnapshot(const core::AssuranceCase& accepted, st
     }
 
     std::shared_ptr<DraftMaterializationResult> next = std::make_shared<DraftMaterializationResult>();
+    bool cacheable = true;
 
     if (workspace_.has_value() && workspace_->state != DraftWorkspaceState::NeedsRebase) {
         std::string conflicting_identity;
@@ -518,19 +523,31 @@ DraftWorkspaceStore::MaterializeSnapshot(const core::AssuranceCase& accepted, st
         next->success = true;
         next->working_model = accepted;
     } else {
+        const DraftWorkspace before_materialization = workspace_.value();
         *next = MaterializeDraft(workspace_.value(), accepted, authoritative_identities_);
+        workspace_->state = next->success ? DraftWorkspaceState::Active : DraftWorkspaceState::Blocked;
         if (next->allocated_identities) {
             // Allocated once, then replayed forever. Persisting here is what
             // makes that true across a restart -- without it the next run would
             // allocate again and rename every proposed element.
             std::string save_error;
-            Save(save_error);
+            if (!Save(save_error)) {
+                // The materializer mutates the workspace as it pins ids. Roll
+                // those allocations back if their durable write failed: an id
+                // that exists only in memory has not been allocated once, and a
+                // later retry must allocate and persist before publishing it.
+                workspace_ = before_materialization;
+                workspace_->state = DraftWorkspaceState::Blocked;
+                *next = DraftMaterializationResult{};
+                next->working_model = accepted;
+                next->error = "Could not persist newly allocated draft identities: " + save_error;
+                cacheable = false;
+            }
         }
-        workspace_->state = next->success ? DraftWorkspaceState::Active : DraftWorkspaceState::Blocked;
     }
 
     materialization_ = std::move(next);
-    materialization_valid_ = true;
+    materialization_valid_ = cacheable;
     materialized_accepted_revision_ = accepted_revision;
     materialized_workspace_revision_ = revision();
     return materialization_;

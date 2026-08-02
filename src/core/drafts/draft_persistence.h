@@ -49,9 +49,10 @@ std::filesystem::path DraftWorkspaceDirectory(const std::filesystem::path& proje
 std::filesystem::path DraftWorkspacePath(const std::filesystem::path& project_root, const std::string& argument_key);
 std::filesystem::path DraftEventsPath(const std::filesystem::path& project_root, const std::string& argument_key);
 
-// Atomically writes the workspace and appends any events not yet on disk.
-// Temporary file plus rename, through the same safe-write utility SACM autosave
-// and manifest writes use, so a crash mid-save cannot leave a truncated draft.
+// Atomically rewrites the event log from `workspace.events`, then atomically
+// writes the authoritative workspace snapshot. Temporary file plus rename uses
+// the same safe-write utility as SACM autosave and manifest writes, so a crash
+// mid-save cannot leave either file truncated.
 bool SaveDraftWorkspace(const std::filesystem::path& project_root,
                         const std::string& argument_key,
                         const DraftWorkspace& workspace,

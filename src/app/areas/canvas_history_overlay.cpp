@@ -413,7 +413,7 @@ void DraftViewModeButton(ui::UiState& ui_state, ui::DraftViewMode mode, const st
     // The active mode is marked by its label, not only by its tint. A reader who
     // cannot distinguish the tint still has to be able to tell which argument
     // they are looking at -- that is the whole job of this control.
-    const std::string text = (active ? "\xe2\x97\x8f " : "") + label;
+    const std::string text = (active ? "● " : "") + label;
     if (active) {
         const ui::Theme& theme = ui::GetTheme();
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(theme.accent));

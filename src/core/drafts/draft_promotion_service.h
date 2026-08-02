@@ -39,6 +39,13 @@ struct CompiledDraftPromotion {
     std::vector<std::string> source_labels;
 };
 
+// Human-readable, exactly deduplicated attribution for selected groups.
+// Labels are compared as complete values: "AI" and "SCCG AI Review" name two
+// contributors and must both survive into the audited promotion command.
+std::string DraftPromotionAuthor(const DraftWorkspace& workspace,
+                                 const std::vector<std::string>& group_ids,
+                                 const std::string& fallback = "Working draft");
+
 // Compiles every active group in `workspace`.
 //
 // `create_ref` values are namespaced per group before concatenation: two sources

@@ -1090,6 +1090,9 @@ msgstr "新規 J3377 CAE 登録簿"
 msgid "New Project File"
 msgstr "新規プロジェクトファイル"
 
+msgid "New {0}"
+msgstr "新規：{0}"
+
 msgid "No"
 msgstr "いいえ"
 

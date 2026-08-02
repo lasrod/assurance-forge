@@ -30,6 +30,24 @@ void NamespaceElementRef(const std::string& group_id, std::optional<reviews::Ele
 
 } // namespace
 
+std::string DraftPromotionAuthor(const DraftWorkspace& workspace,
+                                 const std::vector<std::string>& group_ids,
+                                 const std::string& fallback) {
+    std::vector<std::string> labels;
+    for (const std::string& group_id : group_ids) {
+        const DraftChangeGroup* group = workspace.FindGroup(group_id);
+        if (group == nullptr || group->source_label.empty())
+            continue;
+        if (std::find(labels.begin(), labels.end(), group->source_label) == labels.end())
+            labels.push_back(group->source_label);
+    }
+
+    std::string author;
+    for (const std::string& label : labels)
+        author += (author.empty() ? "" : ", ") + label;
+    return author.empty() ? fallback : author;
+}
+
 CompiledDraftPromotion CompileWorkspacePromotion(const DraftWorkspace& workspace, const std::string& author_name) {
     std::vector<std::string> every_active;
     for (const DraftChangeGroup* group : workspace.ActiveGroups())

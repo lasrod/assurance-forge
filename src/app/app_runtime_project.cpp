@@ -1584,16 +1584,7 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         return false;
     }
 
-    std::string author;
-    for (const std::string& group_id : group_ids) {
-        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
-        if (group == nullptr || group->source_label.empty())
-            continue;
-        if (author.find(group->source_label) == std::string::npos)
-            author += (author.empty() ? "" : ", ") + group->source_label;
-    }
-    if (author.empty())
-        author = "Working draft";
+    const std::string author = core::drafts::DraftPromotionAuthor(*workspace, group_ids);
 
     // Everything that can refuse, refuses here -- before the accepted model is
     // touched at all.

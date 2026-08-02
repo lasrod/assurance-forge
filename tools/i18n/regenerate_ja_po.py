@@ -135,6 +135,7 @@ TRANSLATIONS = {
     "Delete": "削除",
     "Remove": "除去",
     "Remove {0}": "{0}を除去",
+    "New {0}": "新規：{0}",
     "Support": "支持関係",
     "Promotion is awaiting durable SACM completion.": "プロモーションは SACM への確実な保存完了を待っています。",
     "Promotion is recorded, but the accepted SACM file is not yet confirmed. The draft is retained and cannot be edited or discarded.":

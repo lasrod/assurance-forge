@@ -513,7 +513,7 @@ void DrawDraftChangeDecoration(ImDrawList* draw_list,
         // not exist. The inspector carries the ordered history.
         label = "MULTIPLE CHANGES";
     } else if (!decoration.source_label.empty()) {
-        label += " \xc2\xb7 " + decoration.source_label;
+        label += " · " + decoration.source_label;
     }
 
     DrawProposedChangeBorder(draw_list, top_left, bottom_right, circular, zoom, color, dashed);
@@ -576,10 +576,10 @@ void DrawDraftEdgeDecoration(ImDrawList* draw_list,
     if (removed) {
         label = ui::i18n::trf("Remove {0}", decoration.contextual ? AF_TR("Context") : AF_TR("Support"));
     } else {
-        label = decoration.contextual ? "NEW CONTEXT" : "NEW SUPPORT";
+        label = ui::i18n::trf("New {0}", decoration.contextual ? AF_TR("Context") : AF_TR("Support"));
     }
     if (!decoration.source_label.empty())
-        label += " \xc2\xb7 " + decoration.source_label;
+        label += " · " + decoration.source_label;
     DrawProposedChangeBadge(draw_list, midpoint, zoom, removed ? theme.danger : theme.accent, label.c_str());
 }
 
