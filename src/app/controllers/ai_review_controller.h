@@ -46,6 +46,7 @@ public:
                                  const std::string& selected_element_id,
                                  const std::string& review_profile_id);
     void StartPendingRequest();
+    void MarkPendingRequestIncludesWorkingDraft();
     void PollTask();
     void CancelPendingRequest();
     bool WaitForCompletion(std::chrono::milliseconds timeout) const;
@@ -76,6 +77,8 @@ private:
     std::string pending_review_profile_name_;
     std::unordered_set<std::string> pending_review_scope_element_ids_;
     std::vector<std::string> pending_guideline_ids_;
+    std::string pending_review_run_id_;
+    std::string pending_review_model_hash_;
     std::string last_raw_response_;
     std::string last_parse_error_;
     bool show_debug_modal_ = false;

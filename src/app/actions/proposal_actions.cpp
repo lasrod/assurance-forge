@@ -9,7 +9,6 @@
 #include "core/element_factory.h"
 #include "core/sacm_argument_sync.h"
 #include "core/project_service.h"
-#include "core/reviews/review_proposal_factory.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/string_utils.h"
 #include "core/time_utils.h"
@@ -36,7 +35,6 @@ namespace app::actions {
 
 using core::NowUtcString;
 using core::TrimWhitespace;
-using core::reviews::BuildDraftReviewProposal;
 using detail::ApplyProposalPreviewVisualState;
 using detail::CreatedElementRef;
 using detail::CreateOperationFor;
@@ -388,28 +386,45 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
     return true;
 }
 
-void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSuggestion>& suggestions) {
-    if (suggestions.empty())
+void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& event) {
+    if (event.suggestions.empty())
         return;
-    if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "AI found proposed text, but a project and SACM file must be open to save proposals.");
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "AI found suggested text, but no assurance case is open for the working draft.");
         return;
     }
 
-    core::AssuranceProject& project = state_.app_state.current_project.value();
-    const parser::AssuranceCase& model = state_.app_state.loaded_case.value();
-    size_t saved_count = 0;
-    for (const AiReviewProposalSuggestion& suggestion : suggestions) {
+    const parser::AssuranceCase& accepted = state_.app_state.loaded_case.value();
+    const core::drafts::DraftMaterializationResult& materialized =
+        state_.draft_workspace.Materialize(accepted, state_.app_state.case_revision);
+    if (!materialized.success) {
+        SetStatus(state_,
+                  "AI review completed, but its suggested changes could not be added because the working "
+                  "draft could not be materialized: " +
+                      materialized.error);
+        return;
+    }
+    const parser::AssuranceCase& working = materialized.working_model;
+    if (!event.reviewed_model_hash.empty() &&
+        event.reviewed_model_hash != core::reviews::ComputeModelSemanticHash(working)) {
+        SetStatus(state_,
+                  "AI review completed, but its suggested changes were not added because the working draft "
+                  "changed while the review was running. Run the review again.");
+        return;
+    }
+
+    size_t staged_count = 0;
+    for (const AiReviewProposalSuggestion& suggestion : event.suggestions) {
         const std::string suggested_text = TrimWhitespace(suggestion.suggested_text);
         if (suggested_text.empty())
             continue;
 
         std::optional<core::reviews::ReviewItem> item =
             state_.review_controller->GetItemById(suggestion.review_item_id);
-        if (!item.has_value() || item->proposal_id.has_value())
+        if (!item.has_value() || !item->draft_group_ids.empty())
             continue;
 
-        const parser::SacmElement* anchor = parser::FindElementByIdOrGidValue(model, item->element_id);
+        const parser::SacmElement* anchor = parser::FindElementByIdOrGidValue(working, item->element_id);
         if (!anchor)
             continue;
 
@@ -417,9 +432,22 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
         if (TrimWhitespace(text_target.current_text) == suggested_text)
             continue;
 
-        core::reviews::ReviewProposal proposal = BuildDraftReviewProposal(*item, model, *anchor);
-        proposal.author_name = "AI Review";
-        proposal.summary = "AI suggested replacement text for " + anchor->id + ".";
+        core::drafts::DraftGroupRequest request;
+        request.title = item->title.empty() ? "AI suggested change" : item->title;
+        request.summary = "AI suggested replacement text for " + anchor->id + ".";
+        request.rationale = item->message;
+        request.source = core::drafts::DraftSource::SccgAiReview;
+        request.source_label = event.review_profile_name.empty() ? "SCCG AI Review" : event.review_profile_name;
+        request.source_session_id = event.review_run_id;
+        request.guideline_ids = item->guideline_ids;
+        request.review_item_ids = {item->id};
+
+        std::string error;
+        const std::string group_id = state_.draft_workspace.BeginGroup(request, accepted, error);
+        if (group_id.empty()) {
+            SetStatus(state_, "AI suggested change could not be added to the working draft: " + error);
+            continue;
+        }
 
         core::reviews::PatchOperation operation;
         operation.type = core::reviews::PatchOperationType::UpdateElementText;
@@ -427,29 +455,30 @@ void ProposalActions::CreateAiGenerated(const std::vector<AiReviewProposalSugges
         operation.field = text_target.field;
         operation.old_value = text_target.current_text;
         operation.new_value = suggested_text;
-        proposal.operations.push_back(std::move(operation));
-
-        core::ProjectFileEntry entry;
-        std::string error;
-        if (!core::ProjectService::SaveReviewProposalFile(
-                project, proposal.id, core::reviews::SerializeReviewProposal(proposal), entry, error)) {
-            SetStatus(state_, "AI proposal save failed: " + error);
+        if (!state_.draft_workspace.StageOperations(group_id, {operation}, accepted, error)) {
+            std::string reject_error;
+            state_.draft_workspace.RejectGroup(group_id, reject_error);
+            SetStatus(state_, "AI suggested change could not be staged in the working draft: " + error);
             continue;
         }
-
-        if (!state_.review_controller->SetProposal(item->id, proposal.id)) {
-            std::string cleanup_error;
-            core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
-            SetStatus(state_, "AI proposal link update failed.");
+        if (!state_.draft_workspace.MarkGroupReady(group_id, error)) {
+            SetStatus(state_, "AI suggested change was staged but could not be marked ready: " + error);
             continue;
         }
-        ++saved_count;
+        if (!state_.review_controller->AddDraftGroup(item->id, group_id)) {
+            std::string reject_error;
+            state_.draft_workspace.RejectGroup(group_id, reject_error);
+            SetStatus(state_, "AI suggested change could not be linked to its review finding.");
+            continue;
+        }
+        ++staged_count;
     }
 
-    if (saved_count > 0) {
-        core::ProjectService::RefreshFileStatus(project);
+    if (staged_count > 0) {
+        state_.tree_needs_rebuild = true;
         SetStatus(state_,
-                  "AI generated " + std::to_string(saved_count) + " proposed change(s). Review before applying.");
+                  "AI added " + std::to_string(staged_count) +
+                      " suggested change(s) to the working draft. Review them before accepting.");
     }
 }
 

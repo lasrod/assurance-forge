@@ -1392,14 +1392,19 @@
       "status": "supported",
       "evidence": [
         "src/ai/ai_claim_review.cpp",
+        "src/app/actions/ai_review_actions.cpp",
+        "src/app/actions/proposal_actions.cpp",
         "src/app/controllers/ai_review_controller.cpp",
-        "src/app/app_runtime_ai.cpp"
+        "src/app/app_runtime_ai.cpp",
+        "src/ui/gsn/gsn_badges.cpp"
       ],
       "tests": [
         "tests/test_ai_claim_review.cpp",
-        "tests/test_ai_review_controller.cpp"
+        "tests/test_ai_review_controller.cpp",
+        "tests/test_ai_review_actions.cpp",
+        "tests/test_ui_state.cpp"
       ],
-      "notes": "One `AI Review` action selects the unique SCCG 0.6 profile for the selected GSN role: claim, strategy, evidence, assumption, justification, context, or challenge. Selection fails closed if the catalog has no match or more than one match; contextual artifacts are not misclassified as evidence and counter elements use the challenge profile."
+      "notes": "One `AI Review` action selects the unique SCCG 0.6 profile for the selected GSN role: claim, strategy, evidence, assumption, justification, context, or challenge. It reviews the complete integrated working draft, not only accepted SACM. Suggested corrections become independently reviewable SCCG draft groups linked to their finding and guideline; they are refused if the draft changed while the request ran. A successful no-findings result persists as a green check badge after the spinner stops. Selection fails closed if the catalog has no match or more than one match."
     },
     {
       "id": "AF-AI-007",
@@ -1514,10 +1519,20 @@
       "id": "AF-AI-014",
       "area": "AI",
       "name": "One integrated working draft per argument file",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "Replaces the two independent proposal mechanisms — an in-memory `ChangeSet` per MCP connection (AF-AI-009) and one persisted `ReviewProposal` file per review item (AF-METH-004) — with a single workspace per argument, holding ordered change groups from MCP, SCCG AI review, the user, and imported legacy proposals, materialized into one complete assurance case. The core domain, deterministic materialization, once-only identity allocation and `.af/drafts` recovery exist and are tested, but **no user-facing path reaches them yet**, which is why this is `planned` and cites nothing: the matrix records what a user can do, and today a user can do none of it. Raised only when the end-to-end acceptance scenario passes in the running application. See ADR 0009, ADR 0010 and docs/architecture/integrated-draft-workspace-plan.md."
+      "status": "prototype",
+      "evidence": [
+        "src/core/drafts/draft_workspace.cpp",
+        "src/core/drafts/draft_workspace_store.cpp",
+        "src/app/actions/ai_review_actions.cpp",
+        "src/app/actions/proposal_actions.cpp",
+        "src/app/app_runtime.cpp",
+        "src/app/app_runtime_project.cpp"
+      ],
+      "tests": [
+        "tests/test_draft_workspace.cpp",
+        "tests/test_ai_review_actions.cpp"
+      ],
+      "notes": "One persisted workspace per argument now materializes ordered changes from MCP, SCCG AI review, and human draft editing over accepted SACM. SCCG review reads that combined model and writes suggested corrections back as attributed groups; accepted SACM remains unchanged until human promotion. Kept at prototype while the merged workspace UX and end-to-end source combinations receive stability testing. See ADR 0009, ADR 0010 and docs/architecture/integrated-draft-workspace-plan.md."
     },
     {
       "id": "AF-AI-015",

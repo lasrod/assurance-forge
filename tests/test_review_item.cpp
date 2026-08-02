@@ -50,6 +50,7 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     item.severity = "warning";
     item.reviewer_name = "Case Reviewer";
     item.guideline_ids = {"CL.1", "AR.2"};
+    item.draft_group_ids = {"draft-group-1", "draft-group-2"};
     item.source = core::reviews::ReviewItemSource::AIReview;
     item.status = core::reviews::ReviewItemStatus::Resolved;
     item.proposal_id = "proposal-0001";
@@ -67,6 +68,7 @@ TEST(ReviewItemTest, RoundTripsReviewItemsJson) {
     EXPECT_EQ(items[0].proposal_id, item.proposal_id);
     EXPECT_EQ(items[0].reviewer_name, item.reviewer_name);
     EXPECT_EQ(items[0].guideline_ids, item.guideline_ids);
+    EXPECT_EQ(items[0].draft_group_ids, item.draft_group_ids);
     EXPECT_EQ(items[0].source, core::reviews::ReviewItemSource::AIReview);
     EXPECT_EQ(items[0].status, core::reviews::ReviewItemStatus::Resolved);
 }
@@ -130,6 +132,7 @@ TEST(ReviewItemTest, DeserializesOldReviewItemsWithoutGuidelineIds) {
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0].id, "review-legacy");
     EXPECT_TRUE(items[0].guideline_ids.empty());
+    EXPECT_TRUE(items[0].draft_group_ids.empty());
     EXPECT_TRUE(states.empty());
 }
 

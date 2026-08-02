@@ -66,6 +66,16 @@ void EndAiReviewSpinner(UiState& ui_state, const std::string& element_id) {
     }
 }
 
+void SyncAiReviewSuccessMarkers(UiState& ui_state, const core::reviews::ElementReviewStateMap& review_states) {
+    ui_state.ai_review_success_markers.clear();
+    for (const auto& [element_id, outcome] : review_states) {
+        if (element_id.empty() || !outcome.ai_ok || outcome.failed)
+            continue;
+        ui_state.ai_review_success_markers.emplace(
+            element_id, AiReviewSuccessMarker{outcome.review_profile_name, outcome.last_review_message});
+    }
+}
+
 void FocusProblemInPanel(UiState& ui_state, const std::string& problem_id, const std::string& element_id) {
     if (problem_id.empty()) {
         ui_state.selected_problem_id.clear();

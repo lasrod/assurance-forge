@@ -234,6 +234,7 @@ void AppRuntime::RenderFrame(bool& done) {
         core::perf::ScopedTimer s("app.problem_badges");
         ui::GetUiState().element_badge_summaries =
             core::BuildElementBadgeSummaries(impl_->problems_manager.GetProblems());
+        ui::SyncAiReviewSuccessMarkers(ui::GetUiState(), impl_->review_controller->ElementReviewStates());
     }
 
     const frame::AppLayoutRegions regions = frame::RenderAppShell(*impl_, menu_height, kPanelFlags);

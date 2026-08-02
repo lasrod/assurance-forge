@@ -32,4 +32,8 @@ void DrawProblemBadge(ImDrawList* draw_list,
 // co-exist with a problem badge for the same element.
 void DrawAiSpinnerBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom);
 
+// Draw a persistent successful-review check badge. The marker is derived from
+// saved review state rather than the transient completion event.
+void DrawAiSuccessBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom, const AiReviewSuccessMarker& marker);
+
 } // namespace ui::gsn

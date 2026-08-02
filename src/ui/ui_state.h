@@ -3,6 +3,7 @@
 #include "core/changesets/change_set.h"
 #include "core/drafts/draft_change_index.h"
 #include "core/problems/problem_attention.h"
+#include "core/reviews/review_item.h"
 #include "core/sacm_model.h"
 #include "ui/confidence_model.h"
 
@@ -14,6 +15,11 @@
 #include <vector>
 
 namespace ui {
+
+struct AiReviewSuccessMarker {
+    std::string review_profile_name;
+    std::string message;
+};
 
 enum class CenterView {
     ProjectOverview,
@@ -152,6 +158,11 @@ struct UiState {
     // spinner overlay distinct from the problem alert badge.
     std::unordered_set<std::string> ai_review_running_element_ids;
 
+    // Persisted successful AI outcomes rendered as green check badges. Unlike
+    // the transient spinner, these are rebuilt from ReviewController state, so
+    // reopening a project still tells the user that the review completed.
+    std::unordered_map<std::string, AiReviewSuccessMarker> ai_review_success_markers;
+
     // Session-only confidence prototype state. Persistence and propagation are
     // intentionally deferred until the feature model is proven in the UI.
     std::unordered_map<std::string, ElementConfidence> confidence_states;
@@ -264,6 +275,8 @@ void BeginAiReviewSpinner(UiState& ui_state,
 // Clears the AI-running flag for `element_id`. The resulting alert badge (if
 // any) is driven entirely by the ProblemsManager snapshot.
 void EndAiReviewSpinner(UiState& ui_state, const std::string& element_id);
+
+void SyncAiReviewSuccessMarkers(UiState& ui_state, const core::reviews::ElementReviewStateMap& review_states);
 
 // Requests that the Problems panel scroll to and select the row that matches
 // `problem_id`. Sets selection fields and the focus / open one-shot flags.

@@ -112,8 +112,11 @@ sequenceDiagram
     participant Runner as ai::AiTaskRunner
     participant Parser as ai::ParseAiReviewResponse
     participant Problems as ProblemsManager
+    participant Draft as DraftWorkspaceStore
 
-    UI->>Controller: BeginReviewForSelection(case, tree, element_id)
+    UI->>Draft: materialize working model
+    Draft-->>UI: working case + tree
+    UI->>Controller: BeginReviewForSelection(working case, tree, element_id)
     Controller->>Catalog: select unique profile for element role
     Controller->>Builder: build selected, parent, and children payload
     Controller->>Data: collect profile-required data packages
@@ -123,8 +126,9 @@ sequenceDiagram
     Controller->>Controller: PollTask() each frame
     Runner-->>Controller: AiResponse
     Controller->>Parser: ParseAiReviewResponse(response, element_id)
-    Parser-->>Controller: ProblemItem[]
+    Parser-->>Controller: findings + suggested text
     Controller->>Problems: AddOrUpdateProblem(problem)
+    Controller-->>Draft: stage ready SCCG correction groups
 ```
 
 Controllers should stay thin. Core rules belong in `src/core`, parser rules in `src/parser`, SACM round-trip rules in `src/sacm`, and provider-specific AI behavior in `src/ai`.

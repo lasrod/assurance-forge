@@ -100,6 +100,9 @@ msgstr "AI レビュー OK"
 msgid "AI review OK is set by AI review outcomes."
 msgstr "AI レビュー OK は AI レビューの結果によって設定されます。"
 
+msgid "AI review completed with no findings."
+msgstr "AI レビューが完了し、指摘事項はありませんでした。"
+
 msgid "AI review in progress."
 msgstr "AI レビューを実行中です。"
 
@@ -1392,6 +1395,9 @@ msgstr "問題"
 
 msgid "Problems"
 msgstr "問題"
+
+msgid "Profile: {0}"
+msgstr "プロファイル: {0}"
 
 msgid "Project Details"
 msgstr "プロジェクト詳細"

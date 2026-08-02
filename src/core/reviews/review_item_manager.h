@@ -37,6 +37,7 @@ public:
                                                   const std::string& id_prefix);
     bool SetProposal(const std::string& review_item_id, const std::string& proposal_id);
     bool ClearProposal(const std::string& review_item_id);
+    bool AddDraftGroup(const std::string& review_item_id, const std::string& group_id);
     bool SetElementReviewState(const std::string& element_id, ElementReviewState state);
     bool ClearElementReviewState(const std::string& element_id);
 

@@ -1,5 +1,7 @@
 #include "ui/ui_state.h"
 
+#include "core/reviews/review_item.h"
+
 #include <gtest/gtest.h>
 
 TEST(UiStateAiSpinnerTest, BeginAddsRunningElementAndScope) {
@@ -84,4 +86,24 @@ TEST(UiStateFocusProblemTest, EmptyProblemIdClearsPendingFlags) {
     EXPECT_TRUE(state.selected_problem_element_id.empty());
     EXPECT_FALSE(state.problems_panel_focus_pending);
     EXPECT_FALSE(state.problems_panel_open_pending);
+}
+
+TEST(UiStateAiReviewOutcomeTest, SuccessfulReviewsProducePersistentCanvasMarkers) {
+    ui::UiState state;
+    core::reviews::ElementReviewStateMap outcomes;
+    outcomes["G1"].ai_ok = true;
+    outcomes["G1"].review_profile_name = "Claim review";
+    outcomes["G1"].last_review_message = "AI review completed with no findings.";
+    outcomes["G2"].failed = true;
+
+    ui::SyncAiReviewSuccessMarkers(state, outcomes);
+
+    ASSERT_EQ(state.ai_review_success_markers.size(), 1u);
+    EXPECT_EQ(state.ai_review_success_markers.at("G1").review_profile_name, "Claim review");
+    EXPECT_EQ(state.ai_review_success_markers.at("G1").message, "AI review completed with no findings.");
+    EXPECT_EQ(state.ai_review_success_markers.count("G2"), 0u);
+
+    outcomes["G1"].ai_ok = false;
+    ui::SyncAiReviewSuccessMarkers(state, outcomes);
+    EXPECT_TRUE(state.ai_review_success_markers.empty());
 }

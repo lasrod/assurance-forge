@@ -3,6 +3,7 @@
 #include "ai/ai_provider.h"
 #include "ai/secret_store.h"
 #include "app/review_problem_sync.h"
+#include "core/reviews/review_proposal.h"
 
 #include <chrono>
 #include <gtest/gtest.h>
@@ -418,6 +419,11 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFindings);
     EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
     ASSERT_EQ(harness.proposal_suggestion_events.size(), 1u);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].review_profile_id, "claim_review");
+    EXPECT_EQ(harness.proposal_suggestion_events[0].review_profile_name, "Claim review");
+    EXPECT_FALSE(harness.proposal_suggestion_events[0].review_run_id.empty());
+    EXPECT_EQ(harness.proposal_suggestion_events[0].reviewed_model_hash,
+              core::reviews::ComputeModelSemanticHash(assurance_case));
     ASSERT_EQ(harness.proposal_suggestion_events[0].suggestions.size(), 1u);
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].review_item_id, comments[0].id);
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "claim-1");

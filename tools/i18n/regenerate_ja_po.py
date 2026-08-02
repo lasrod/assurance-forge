@@ -377,7 +377,9 @@ TRANSLATIONS = {
     "AI Debug": "AI デバッグ",
     "AI Review": "AI レビュー",
     "AI review in progress.": "AI レビューを実行中です。",
+    "AI review completed with no findings.": "AI レビューが完了し、指摘事項はありませんでした。",
     "AI review is already running.": "AI レビューは既に実行中です。",
+    "Profile: {0}": "プロファイル: {0}",
     "AI review OK": "AI レビュー OK",
     "AI review OK is set by AI review outcomes.": "AI レビュー OK は AI レビューの結果によって設定されます。",
     # MCP change sets: what a connected AI client is proposing, and the

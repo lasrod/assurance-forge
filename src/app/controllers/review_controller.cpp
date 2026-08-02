@@ -226,6 +226,13 @@ bool ReviewController::ClearProposal(const std::string& item_id) {
     return true;
 }
 
+bool ReviewController::AddDraftGroup(const std::string& item_id, const std::string& group_id) {
+    if (!manager_.AddDraftGroup(item_id, group_id))
+        return false;
+    MarkDirty();
+    return true;
+}
+
 bool ReviewController::SetManualReviewOk(const std::string& element_id,
                                          bool manual_ok,
                                          const std::string& reviewer_name,

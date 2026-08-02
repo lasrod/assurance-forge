@@ -25,6 +25,9 @@ struct ReviewItem {
     std::string severity;
     std::string reviewer_name;
     std::vector<std::string> guideline_ids;
+    // Unified draft groups that implement suggested corrections for this
+    // finding. `proposal_id` remains readable during legacy migration only.
+    std::vector<std::string> draft_group_ids;
     ReviewItemSource source = ReviewItemSource::Manual;
     ReviewItemStatus status = ReviewItemStatus::Open;
     std::optional<std::string> proposal_id;
