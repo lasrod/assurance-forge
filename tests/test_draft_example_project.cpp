@@ -2,12 +2,15 @@
 #include "core/drafts/draft_persistence.h"
 #include "core/drafts/draft_workspace_store.h"
 #include "core/drafts/draft_promotion_service.h"
+#include "core/project_file_io.h"
+#include "core/project_service.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/sacm_argument_sync.h"
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 
@@ -25,19 +28,24 @@
 
 namespace {
 
-std::filesystem::path ExampleProjectRoot() {
+std::filesystem::path ExampleProjectsRoot() {
     // Walk up from the test binary until the repository's examples directory
     // appears, so this works from the build tree and from a source checkout.
     std::filesystem::path directory = std::filesystem::current_path();
     for (int depth = 0; depth < 8; ++depth) {
-        const std::filesystem::path candidate = directory / "examples" / "projects" / "kitchen-blender-draft";
-        if (std::filesystem::exists(candidate / "af.proj"))
+        const std::filesystem::path candidate = directory / "examples" / "projects";
+        if (std::filesystem::exists(candidate / "kitchen-blender" / "af.proj"))
             return candidate;
         if (!directory.has_parent_path() || directory.parent_path() == directory)
             break;
         directory = directory.parent_path();
     }
     return {};
+}
+
+std::filesystem::path ExampleProjectRoot(const std::string& name = "kitchen-blender-draft") {
+    const std::filesystem::path projects = ExampleProjectsRoot();
+    return projects.empty() ? std::filesystem::path{} : projects / name;
 }
 
 } // namespace
@@ -104,6 +112,79 @@ TEST(DraftExampleProject, OpensActiveAndMaterializesWhatItAdvertises) {
         }
     }
     EXPECT_TRUE(has_added_relationship) << "NEW SUPPORT edge from the MCP group's claim to G5";
+}
+
+TEST(DraftExampleProject, EveryScenarioKeepsTheAcceptedBlenderBaselineByteIdentical) {
+    const std::filesystem::path projects = ExampleProjectsRoot();
+    if (projects.empty()) {
+        GTEST_SKIP() << "examples/projects not found";
+    }
+
+    const std::expected<std::string, std::string> baseline =
+        core::ReadTextFile(projects / "kitchen-blender" / "arguments" / "main.sacm");
+    ASSERT_TRUE(baseline.has_value()) << baseline.error();
+
+    for (const std::string& scenario : {"kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
+        const std::expected<std::string, std::string> accepted =
+            core::ReadTextFile(projects / scenario / "arguments" / "main.sacm");
+        ASSERT_TRUE(accepted.has_value()) << scenario << ": " << accepted.error();
+        EXPECT_EQ(accepted.value(), baseline.value())
+            << scenario << " must carry proposals only in .af/drafts, never in accepted SACM";
+    }
+}
+
+TEST(DraftExampleProject, EveryBlenderManifestOpensWithoutProjectHealthWarnings) {
+    const std::filesystem::path projects = ExampleProjectsRoot();
+    if (projects.empty()) {
+        GTEST_SKIP() << "examples/projects not found";
+    }
+
+    for (const std::string& name : {"kitchen-blender", "kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
+        core::AssuranceProject project;
+        core::ProjectLoadReport report;
+        std::string error;
+        ASSERT_TRUE(core::ProjectService::OpenProject(projects / name / "af.proj", project, report, error))
+            << name << ": " << error;
+        EXPECT_FALSE(report.has_failures()) << name;
+        EXPECT_TRUE(report.warnings.empty()) << name << " carries a stale file hash in af.proj";
+        for (const core::ProjectFileEntry& file : project.files)
+            EXPECT_EQ(file.state, core::ProjectFileState::Clean) << name << ": " << file.relativePath;
+    }
+}
+
+TEST(DraftExampleProject, DeletionScenarioMarksTheElementWithoutChangingTheAcceptedBaseline) {
+    const std::filesystem::path root = ExampleProjectRoot("kitchen-blender-deletion-draft");
+    if (root.empty() || !std::filesystem::exists(root / "af.proj")) {
+        GTEST_SKIP() << "examples/projects/kitchen-blender-deletion-draft not found";
+    }
+
+    core::AppState state;
+    const std::filesystem::path argument = root / "arguments" / "main.sacm";
+    ASSERT_TRUE(state.load_file(argument.string())) << state.status_message;
+    ASSERT_TRUE(state.loaded_case.has_value());
+    const std::string accepted_hash = core::reviews::ComputeModelSemanticHash(state.loaded_case.value());
+
+    core::drafts::DraftWorkspaceStore store;
+    store.SetProjectRoot(root);
+    std::string error;
+    ASSERT_TRUE(store.Open(argument, state.loaded_case.value(), error)) << error;
+    ASSERT_TRUE(store.has_workspace());
+    ASSERT_EQ(store.workspace()->state, core::drafts::DraftWorkspaceState::Active);
+
+    const core::drafts::DraftMaterializationResult& result = store.Materialize(state.loaded_case.value(), 1);
+    ASSERT_TRUE(result.success) << result.error;
+    const core::drafts::DraftElementEntry* deleted = result.change_index.Find("G10");
+    ASSERT_NE(deleted, nullptr);
+    EXPECT_EQ(deleted->change, core::drafts::DraftElementChange::Removed);
+
+    const auto contains_g10 = [](const core::AssuranceCase& model) {
+        return std::any_of(model.elements.begin(), model.elements.end(), [](const core::SacmElement& element) {
+            return element.id == "G10";
+        });
+    };
+    EXPECT_TRUE(contains_g10(state.loaded_case.value()));
+    EXPECT_FALSE(contains_g10(result.working_model));
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(state.loaded_case.value()), accepted_hash);
 }
 
 TEST(DraftExampleProject, LeavesTheAcceptedArgumentUntouched) {
