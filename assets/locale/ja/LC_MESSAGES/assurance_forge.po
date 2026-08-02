@@ -1519,6 +1519,9 @@ msgstr "関係を削除"
 msgid "Remove the SACM-backed ACP metadata from its target."
 msgstr "対象から SACM ベースの ACP メタデータを除去します。"
 
+msgid "Remove {0}"
+msgstr "{0}を除去"
+
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
 
@@ -1767,6 +1770,9 @@ msgstr "戦略 {0} が関係 {1} の端点として接続されています。�
 
 msgid "Summary:"
 msgstr "要約:"
+
+msgid "Support"
+msgstr "支持関係"
 
 msgid "Target element: {0}"
 msgstr "対象要素: {0}"

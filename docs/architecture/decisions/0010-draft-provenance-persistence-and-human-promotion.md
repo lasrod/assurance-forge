@@ -1,6 +1,6 @@
 # 0010. Draft provenance, persistence, and human-controlled promotion
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-02
 - Deciders: Assurance Forge maintainers
 - Supersedes in part: ADR 0008's "Change sets are held in memory" consequence
@@ -118,8 +118,38 @@ to "the goal you just created" would break between frames.
 The workspace therefore records the `create_ref` → element-id map on the first
 successful materialization and every later materialization uses
 `ApplyProposalWithIds`, the replay variant that already exists for the audit log.
-Identities are drawn from the same generator the accepted model uses and are
-re-checked for collision at promotion.
+Identities are drawn from one allocator over the complete authoritative SACM
+document plus every identity reserved by an active draft group. UI projections
+are not an ID authority because they intentionally omit some document elements.
+
+Promotion re-checks identity ownership but never silently chooses a replacement
+for an identity already shown to a user or client. A collision means the draft
+baseline or reservation set changed incorrectly; promotion is blocked and an
+explicit rebase/remap operation must update the identity and every reference to
+it atomically.
+
+Patch-local `create_ref` values are unique within a group. Interactive editing
+must allocate a new reference for every creation rather than reusing a constant
+such as `$new`.
+
+### Positional preconditions and conflict detection
+
+Workspace revision prevents a source from staging against a working graph it
+has not read, but it is not sufficient for later rejection, replacement or
+partial promotion. Each operation therefore records the semantic state it was
+authored against: expected field value or element hash for updates/removals, and
+expected existence/non-existence for relationships and creations.
+
+Materialization of the original ordered stack verifies those preconditions.
+Rebase verifies them again against the prospective prefix. An operation that can
+still execute by ID but no longer has the meaning it was authored against is a
+conflict, not a successful rebase. Conflicts name the group, operation and
+expected/actual state and leave both the accepted baseline and workspace
+unchanged.
+
+Groups remain the atomic review unit. The UI must disclose every element and
+relationship a selected group changes; an element-level action cannot imply it
+accepts only that element when the group also changes others.
 
 ### Dependencies
 
@@ -139,6 +169,11 @@ materializes the selected result against the accepted baseline, materializes the
 remaining groups against the *prospective* new baseline, and validates both.
 **If either fails, promotion is refused and the accepted SACM is not touched.**
 
+Promotion preflight uses the exact authoritative document projection, operation
+interpreter and predetermined identities used by commit. Testing a UI-filtered
+parser copy and committing through a different library bridge is not a valid
+preflight.
+
 Promotion then compiles the selected groups into one `ReviewProposal` and
 dispatches a single audited `ApplyProposalCommand` — the same path an interactive
 edit takes, which is what keeps promotion replayable, undoable, and attributed.
@@ -147,6 +182,16 @@ group IDs, the rationale, and the guideline and review-item references.
 
 Partial promotion is atomic. After it succeeds, promoted groups leave the active
 workspace for history and the remaining groups stay visible, rebased.
+
+The accepted SACM write, audit transaction and workspace transition form one
+recoverable transaction. A failure before the audit/SACM commit changes nothing.
+A failure after the audit commit is recovery state, not an ordinary refusal: the
+workspace snapshot remains available and reopening deterministically completes
+or rolls back the transition. A post-commit semantic comparison is a diagnostic
+assertion, never the first point at which a mismatched promotion is discovered.
+
+Only `Ready` groups are promotable. A `Building` group may be materialized for
+author feedback but Accept All cannot commit work its author has not submitted.
 
 A user action directed at one element or relationship resolves to the smallest
 dependency-safe set of groups that produces the visible state, and the actual
@@ -175,8 +220,25 @@ restored and the banner shown. If it differs, the workspace enters `NeedsRebase`
 and **operations are not replayed silently**. The user may inspect, attempt a
 rebase, export the recovery data, or discard.
 
+The same base-hash rule is enforced while the application is running. An
+accepted revision change cannot continue materializing against an obsolete base
+hash merely because the workspace has not been closed and reopened.
+
 Because drafts are autosaved recovery state, closing the application never forces
 a decision. Work resumes later.
+
+### Failure-atomic workspace mutation
+
+Every workspace mutation is prepared on a copy, persisted atomically, and only
+then published in memory. If persistence fails, the caller receives an error and
+the previously published workspace and working snapshot remain intact. This
+applies equally to group creation, staging/replacement, ready/reject transitions,
+identity pinning, promotion cleanup and discard.
+
+`workspace.json` is the recovery authority. The event log may be reconstructed
+from it or lag with an explicit diagnostic, but failure to update the event log
+must not produce an in-memory state that differs silently from the recoverable
+workspace.
 
 ### Legacy migration
 

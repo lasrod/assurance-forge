@@ -73,9 +73,18 @@ bool GroupNeedsIdentities(const DraftChangeGroup& group) {
 bool ApplyGroup(DraftChangeGroup& group,
                 core::AssuranceCase& model,
                 const std::unordered_set<std::string>& reserved,
+                const std::unordered_set<std::string>& authoritative_identities,
                 bool& allocated_identities,
                 std::string& error) {
     const reviews::ReviewProposal proposal = ProposalForGroup(group);
+
+    for (const auto& [create_ref, id] : group.generated_ids) {
+        if (authoritative_identities.count(id) == 0)
+            continue;
+        error = "Draft identity " + id + " for " + create_ref +
+                " is already used by the authoritative SACM document. Rebase the draft before accepting it.";
+        return false;
+    }
 
     if (GroupNeedsIdentities(group)) {
         std::map<std::string, std::string> identities = group.generated_ids;
@@ -127,7 +136,9 @@ void CollectFindings(DraftMaterializationResult& result) {
 
 } // namespace
 
-DraftMaterializationResult MaterializeDraft(DraftWorkspace& workspace, const core::AssuranceCase& accepted) {
+DraftMaterializationResult MaterializeDraft(DraftWorkspace& workspace,
+                                            const core::AssuranceCase& accepted,
+                                            const std::unordered_set<std::string>& authoritative_identities) {
     DraftMaterializationResult result;
     // On failure the caller gets the accepted argument back, not a model with
     // some groups applied. A partially-applied safety argument shown as if it
@@ -140,7 +151,8 @@ DraftMaterializationResult MaterializeDraft(DraftWorkspace& workspace, const cor
         return result;
     }
 
-    const std::unordered_set<std::string> reserved = PinnedIdentities(workspace);
+    std::unordered_set<std::string> reserved = PinnedIdentities(workspace);
+    reserved.insert(authoritative_identities.begin(), authoritative_identities.end());
 
     core::AssuranceCase working = accepted;
     DraftChangeIndex index;
@@ -155,7 +167,7 @@ DraftMaterializationResult MaterializeDraft(DraftWorkspace& workspace, const cor
 
         const core::AssuranceCase before = working;
         std::string error;
-        if (!ApplyGroup(*group, working, reserved, result.allocated_identities, error)) {
+        if (!ApplyGroup(*group, working, reserved, authoritative_identities, result.allocated_identities, error)) {
             result.error = error;
             result.failing_group_id = group->id;
             return result;
@@ -176,7 +188,8 @@ bool CanStageOperations(const DraftWorkspace& workspace,
                         const core::AssuranceCase& accepted,
                         const std::string& group_id,
                         const std::vector<reviews::PatchOperation>& operations,
-                        std::string& error) {
+                        std::string& error,
+                        const std::unordered_set<std::string>& authoritative_identities) {
     // Rehearsed on a copy, so a refusal costs nothing and an acceptance leaves
     // no identities pinned by a staging attempt that the caller may still
     // reject.
@@ -188,7 +201,7 @@ bool CanStageOperations(const DraftWorkspace& workspace,
     }
     group->operations.insert(group->operations.end(), operations.begin(), operations.end());
 
-    const DraftMaterializationResult result = MaterializeDraft(rehearsal, accepted);
+    const DraftMaterializationResult result = MaterializeDraft(rehearsal, accepted, authoritative_identities);
     if (!result.success) {
         error = result.error;
         return false;

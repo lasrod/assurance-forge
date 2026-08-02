@@ -101,7 +101,8 @@ CompiledDraftPromotion CompileSelectedPromotion(const DraftWorkspace& workspace,
 DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
                                       const core::AssuranceCase& accepted,
                                       const std::vector<std::string>& selection,
-                                      const std::string& author_name) {
+                                      const std::string& author_name,
+                                      const std::unordered_set<std::string>& authoritative_identities) {
     DraftPromotionPlan plan;
     if (selection.empty()) {
         plan.error = "Nothing was selected to accept.";
@@ -131,7 +132,7 @@ DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
         if (group.active() && promoting.count(group.id) == 0)
             group.state = DraftGroupState::Rejected;
     }
-    const DraftMaterializationResult promoted = MaterializeDraft(selected_only, accepted);
+    const DraftMaterializationResult promoted = MaterializeDraft(selected_only, accepted, authoritative_identities);
     if (!promoted.success) {
         plan.error = promoted.error;
         return plan;
@@ -154,7 +155,8 @@ DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
         }
     }
     if (has_remainder) {
-        const DraftMaterializationResult rebased = MaterializeDraft(remainder, promoted.working_model);
+        const DraftMaterializationResult rebased =
+            MaterializeDraft(remainder, promoted.working_model, authoritative_identities);
         if (!rebased.success) {
             plan.error = "The rest of the draft cannot be rebased onto this result: " + rebased.error;
             return plan;

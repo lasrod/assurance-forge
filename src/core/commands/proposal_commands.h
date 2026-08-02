@@ -14,6 +14,17 @@
 // identities via `ApplyProposalWithIds`.
 namespace core::commands {
 
+// Runs the exact library-primary proposal path on an isolated clone. Promotion
+// uses this before touching the live document, then compares the committed
+// library projection with `out_model`. This is intentionally not the legacy
+// patch preview: the bridge projection/reload is part of the behavior being
+// rehearsed, and historically it was where accepted draft content disappeared.
+bool PreflightProposalAgainstLibrary(const sacm_adapter::LibraryDocument& document,
+                                     const reviews::ReviewProposal& proposal,
+                                     const std::map<std::string, std::string>& predetermined_ids,
+                                     parser::AssuranceCase& out_model,
+                                     std::string& error);
+
 class ApplyProposalCommand final : public ICommand {
 public:
     explicit ApplyProposalCommand(reviews::ReviewProposal proposal) : proposal_(std::move(proposal)) {}

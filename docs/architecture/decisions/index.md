@@ -49,5 +49,5 @@ to point at the replacement. This keeps the decision history intact.
 | [0006](0006-sacm-23-independent-library.md) | SACM 2.3 as an independent reusable library | Accepted |
 | [0007](0007-mcp-server-consent.md) | Explicit consent for sharing assurance cases over MCP | Accepted (superseded in part by 0009) |
 | [0008](0008-one-owner-for-the-open-project.md) | One owner for the open project | Accepted (superseded in part by 0009, 0010) |
-| [0009](0009-one-integrated-working-draft-per-argument.md) | One integrated working draft per argument file | Proposed |
-| [0010](0010-draft-provenance-persistence-and-human-promotion.md) | Draft provenance, persistence, and human-controlled promotion | Proposed |
+| [0009](0009-one-integrated-working-draft-per-argument.md) | One integrated working draft per argument file | Accepted |
+| [0010](0010-draft-provenance-persistence-and-human-promotion.md) | Draft provenance, persistence, and human-controlled promotion | Accepted |

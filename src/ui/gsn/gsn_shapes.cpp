@@ -3,6 +3,7 @@
 #include "core/perf/frame_profiler.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
@@ -562,17 +563,24 @@ void DrawDraftEdgeDecoration(ImDrawList* draw_list,
                              ImVec2 midpoint,
                              float zoom,
                              const DraftEdgeDecoration& decoration) {
-    if (!decoration.added) {
+    if (decoration.change != core::drafts::DraftElementChange::Added &&
+        decoration.change != core::drafts::DraftElementChange::Removed) {
         return;
     }
     // Drawn on the edge, not inferred from the nodes at either end. A support
     // relationship the draft adds changes what the argument claims to have
     // shown, and a reviewer reading two node badges cannot see that.
     const Theme& theme = GetTheme();
-    std::string label = decoration.contextual ? "NEW CONTEXT" : "NEW SUPPORT";
+    const bool removed = decoration.change == core::drafts::DraftElementChange::Removed;
+    std::string label;
+    if (removed) {
+        label = ui::i18n::trf("Remove {0}", decoration.contextual ? AF_TR("Context") : AF_TR("Support"));
+    } else {
+        label = decoration.contextual ? "NEW CONTEXT" : "NEW SUPPORT";
+    }
     if (!decoration.source_label.empty())
         label += " \xc2\xb7 " + decoration.source_label;
-    DrawProposedChangeBadge(draw_list, midpoint, zoom, theme.accent, label.c_str());
+    DrawProposedChangeBadge(draw_list, midpoint, zoom, removed ? theme.danger : theme.accent, label.c_str());
 }
 
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {

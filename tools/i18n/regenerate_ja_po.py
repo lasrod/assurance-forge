@@ -134,6 +134,8 @@ TRANSLATIONS = {
     "Create": "作成",
     "Delete": "削除",
     "Remove": "除去",
+    "Remove {0}": "{0}を除去",
+    "Support": "支持関係",
     "Close": "閉じる",
     "Load": "読み込み",
     "Later": "後で",

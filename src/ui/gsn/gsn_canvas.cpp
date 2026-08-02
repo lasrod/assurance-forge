@@ -205,9 +205,13 @@ void DrawGsnNode(const GsnNode& node,
     }
 
     // If this node is marked for pending removal, override the fill with a
-    // strong red tint so the user can see exactly what will be removed.
+    // strong red tint so the user can see exactly what will be removed. Draft
+    // deletion tombstones use the same unmistakable treatment.
+    const auto draft_status = ui_state.draft_element_status.find(node.id);
+    const bool draft_removed = draft_status != ui_state.draft_element_status.end() &&
+                               draft_status->second.change == core::drafts::DraftElementChange::Removed;
     const bool marked_for_removal = ui_state.marked_for_removal.count(node.id) > 0;
-    if (marked_for_removal) {
+    if (marked_for_removal || draft_removed) {
         fill_color = GetTheme().danger;
     }
 

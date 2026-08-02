@@ -20,8 +20,10 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace core::drafts {
@@ -72,6 +74,15 @@ public:
 
     std::uint64_t revision() const {
         return workspace_.has_value() ? workspace_->working_revision : 0;
+    }
+
+    // The complete id domain from the authoritative SACM document, including
+    // packages and utility elements omitted by the canvas projection. New draft
+    // ids are allocated against this set so promotion never discovers a hidden
+    // collision after an identity has already been shown to a user or agent.
+    void SetAuthoritativeIdentities(std::unordered_set<std::string> identities);
+    const std::unordered_set<std::string>& authoritative_identities() const {
+        return authoritative_identities_;
     }
 
     // Opens a change group and returns its id, or an empty string on failure.
@@ -128,6 +139,13 @@ public:
     // Identities allocated by this call are persisted before it returns.
     const DraftMaterializationResult& Materialize(const core::AssuranceCase& accepted, std::uint64_t accepted_revision);
 
+    // Immutable published snapshot for UI/frame consumers. A caller that keeps
+    // this handle may continue rendering it after the workspace is mutated or
+    // discarded; invalidation publishes a replacement later and never destroys
+    // a snapshot still in use.
+    std::shared_ptr<const DraftMaterializationResult> MaterializeSnapshot(const core::AssuranceCase& accepted,
+                                                                          std::uint64_t accepted_revision);
+
     // Forces the next `Materialize` to recompute. Needed when the accepted model
     // changed in place without the caller's revision token moving.
     void InvalidateMaterialization();
@@ -142,8 +160,9 @@ private:
     std::filesystem::path argument_file_;
     std::filesystem::path project_relative_argument_file_;
     std::optional<DraftWorkspace> workspace_;
+    std::unordered_set<std::string> authoritative_identities_;
 
-    DraftMaterializationResult materialization_;
+    std::shared_ptr<DraftMaterializationResult> materialization_ = std::make_shared<DraftMaterializationResult>();
     bool materialization_valid_ = false;
     std::uint64_t materialized_workspace_revision_ = 0;
     std::uint64_t materialized_accepted_revision_ = 0;

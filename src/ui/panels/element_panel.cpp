@@ -315,7 +315,7 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
     ImGui::SameLine();
     ImGui::BeginDisabled(callbacks == nullptr || !callbacks->reject_groups);
     if (ImGui::Button(AF_TR("Reject this change").c_str()) && callbacks && callbacks->reject_groups)
-        callbacks->reject_groups(detail.closure_group_ids);
+        callbacks->reject_groups(detail.contributing_group_ids);
     ImGui::EndDisabled();
 
     if (blocked) {

@@ -17,6 +17,7 @@
 
 #include <map>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace core::drafts {
@@ -82,6 +83,7 @@ struct DraftPromotionPlan {
 DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
                                       const core::AssuranceCase& accepted,
                                       const std::vector<std::string>& selection,
-                                      const std::string& author_name);
+                                      const std::string& author_name,
+                                      const std::unordered_set<std::string>& authoritative_identities = {});
 
 } // namespace core::drafts

@@ -33,6 +33,7 @@
 #include "export/gsn_svg_exporter.h"
 #include "imgui.h"
 #include "parser/model_utils.h"
+#include "sacm_adapter/case_projection.h"
 #include "sacm/sacm_package_tree.h"
 #include "sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -43,6 +44,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <string>
@@ -1333,6 +1335,49 @@ bool AttachesAsContext(core::NewElementKind kind) {
            kind == core::NewElementKind::Justification;
 }
 
+void ReplaceCreateRef(std::optional<core::reviews::ElementRef>& element,
+                      const std::string& before,
+                      const std::string& after) {
+    if (element.has_value() && element->create_ref == before)
+        element->create_ref = after;
+}
+
+std::vector<core::reviews::PatchOperation>
+MakeHumanCreateRefsUnique(const core::drafts::DraftChangeGroup& group,
+                          const std::vector<core::reviews::PatchOperation>& operations) {
+    std::set<std::string> used;
+    for (const core::reviews::PatchOperation& operation : group.operations) {
+        if (operation.create_ref.has_value())
+            used.insert(operation.create_ref.value());
+    }
+
+    std::vector<core::reviews::PatchOperation> normalized = operations;
+    std::map<std::string, std::string> replacements;
+    for (const core::reviews::PatchOperation& operation : operations) {
+        if (!operation.create_ref.has_value() || used.count(operation.create_ref.value()) == 0)
+            continue;
+        const std::string& before = operation.create_ref.value();
+        std::string after;
+        for (std::uint64_t suffix = group.operations.size() + 1;; ++suffix) {
+            after = before + "_" + std::to_string(suffix);
+            if (used.insert(after).second)
+                break;
+        }
+        replacements.emplace(before, std::move(after));
+    }
+
+    for (core::reviews::PatchOperation& operation : normalized) {
+        for (const auto& [before, after] : replacements) {
+            if (operation.create_ref == before)
+                operation.create_ref = after;
+            ReplaceCreateRef(operation.element, before, after);
+            ReplaceCreateRef(operation.source, before, after);
+            ReplaceCreateRef(operation.target, before, after);
+        }
+    }
+    return normalized;
+}
+
 } // namespace
 
 bool AppRuntime::DraftEditingActive() const {
@@ -1375,7 +1420,13 @@ bool AppRuntime::StageHumanDraftOperations(const std::string& title,
             return false;
     }
 
-    if (!impl_->draft_workspace.StageOperations(group_id, operations, impl_->app_state.loaded_case.value(), error))
+    std::vector<core::reviews::PatchOperation> normalized = operations;
+    if (const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace()) {
+        if (const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id))
+            normalized = MakeHumanCreateRefsUnique(*group, operations);
+    }
+
+    if (!impl_->draft_workspace.StageOperations(group_id, normalized, impl_->app_state.loaded_case.value(), error))
         return false;
     impl_->tree_needs_rebuild = true;
     return true;
@@ -1542,9 +1593,25 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     // Everything that can refuse, refuses here -- before the accepted model is
     // touched at all.
     const core::drafts::DraftPromotionPlan plan =
-        core::drafts::PlanDraftPromotion(*workspace, impl_->app_state.loaded_case.value(), group_ids, author);
+        core::drafts::PlanDraftPromotion(*workspace,
+                                         impl_->app_state.loaded_case.value(),
+                                         group_ids,
+                                         author,
+                                         impl_->draft_workspace.authoritative_identities());
     if (!plan.ok) {
         error = plan.error;
+        return false;
+    }
+
+    const bool library_primary_promotion =
+        impl_->command_bus != nullptr && impl_->app_state.library_document != nullptr;
+    parser::AssuranceCase authoritative_preflight;
+    if (library_primary_promotion &&
+        !core::commands::PreflightProposalAgainstLibrary(*impl_->app_state.library_document,
+                                                         plan.compiled.proposal,
+                                                         plan.compiled.identities,
+                                                         authoritative_preflight,
+                                                         error)) {
         return false;
     }
 
@@ -1555,22 +1622,30 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         return false;
     }
 
-    // The accepted model must now *be* what was planned. Checked rather than
-    // assumed, because a command that reports success is not the same thing as
-    // an argument that contains the change: the apply runs through the library
-    // bridge, which reloads the document from a package projection, and an
-    // element that reaches no package is dropped on the way.
+    // The authoritative library must now be exactly what the isolated bridge
+    // rehearsal produced. Checked rather than assumed, because a command that
+    // reports success is not the same thing as an argument that contains the
+    // change: the bridge reloads the document from a package projection, and an
+    // element that reaches no package can be dropped on the way.
     //
     // This is not hypothetical. Accepting the shipped example reported success,
     // removed the draft, and wrote a file with none of the accepted changes in
     // it -- the created claim gone and the reworded goal unchanged. The draft was
     // the only copy of that work.
     //
-    // So the draft stays until the result is verified. A promotion that cannot be
-    // confirmed leaves the user with their unaccepted work and a message, which
-    // is recoverable; deleting it is not.
-    const std::string produced = core::reviews::ComputeModelSemanticHash(impl_->app_state.loaded_case.value());
-    const std::string expected = core::reviews::ComputeModelSemanticHash(plan.promoted_model);
+    // Do not compare the live `loaded_case` on this path: library-primary edits
+    // intentionally rederive that UI projection at the next frame boundary, so
+    // it still describes the pre-promotion case here. That stale comparison was
+    // why a successful Accept All was reported as a mismatch. The draft stays
+    // until the authoritative result is verified; deleting the only remaining
+    // copy of unaccepted work is not recoverable.
+    const parser::AssuranceCase produced_model = library_primary_promotion
+                                                     ? sacm_adapter::project_case(*impl_->app_state.library_document)
+                                                     : impl_->app_state.loaded_case.value();
+    const parser::AssuranceCase& expected_model =
+        library_primary_promotion ? authoritative_preflight : plan.promoted_model;
+    const std::string produced = core::reviews::ComputeModelSemanticHash(produced_model);
+    const std::string expected = core::reviews::ComputeModelSemanticHash(expected_model);
     if (produced != expected) {
         error = "The accepted argument does not match what was about to be accepted, so the draft has been kept. "
                 "Undo this change and report it: the promotion path dropped part of the result.";
@@ -1582,7 +1657,7 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     // Promoted groups leave the active workspace; the rest stay visible against
     // the new baseline. The base hash moves with it, or the next open would call
     // the draft stale against an argument the user just accepted into.
-    if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, impl_->app_state.loaded_case.value(), error)) {
+    if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) {
         impl_->app_state.status_message = "Accepted, but the draft could not be updated: " + error;
     }
     impl_->app_state.mark_dirty();

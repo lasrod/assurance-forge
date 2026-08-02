@@ -164,6 +164,10 @@ void AppRuntime::RenderFrame(bool& done) {
         // kept reading the accepted case while the rest of the application had
         // moved to the working model is exactly the split that made one view of
         // a change set show eighty staged elements and another show none.
+        // Release the previous immutable owner only at this frame boundary.
+        // Accept/discard in the preceding frame could invalidate the store while
+        // later panels still held pointers into that published snapshot.
+        impl_->draft_frame_materialization.reset();
         impl_->draft_canvas_view = impl_->app_state.loaded_case.has_value() ? &CurrentCanvasView() : nullptr;
         // Every frame, not with the derived views.
         //

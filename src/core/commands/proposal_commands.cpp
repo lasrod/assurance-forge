@@ -3,8 +3,41 @@
 #include "core/commands/library_bridge.h"
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/sacm_argument_sync.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 
 namespace core::commands {
+
+bool PreflightProposalAgainstLibrary(const sacm_adapter::LibraryDocument& document,
+                                     const reviews::ReviewProposal& proposal,
+                                     const std::map<std::string, std::string>& predetermined_ids,
+                                     parser::AssuranceCase& out_model,
+                                     std::string& error) {
+    error.clear();
+    const sacm_adapter::SaveOutcome serialized = sacm_adapter::save_document(document);
+    if (!serialized.ok) {
+        error = "Could not clone the authoritative SACM document for promotion preflight: " +
+                sacm_adapter::summarize_load_diagnostics(serialized.diagnostics);
+        return false;
+    }
+
+    sacm_adapter::LibraryDocument rehearsal;
+    if (!sacm_adapter::reload_document(rehearsal, serialized.xml)) {
+        error = "Could not reload the authoritative SACM document for promotion preflight.";
+        return false;
+    }
+
+    parser::AssuranceCase scratch_model;
+    sacm::AssuranceCasePackage scratch_package;
+    CommandContext context{scratch_model, scratch_package, &rehearsal};
+    ApplyProposalCommand command(proposal, predetermined_ids);
+    audit::AuditEvent unused_event;
+    if (!command.Apply(context, unused_event, error))
+        return false;
+
+    out_model = sacm_adapter::project_case(rehearsal);
+    return true;
+}
 
 bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     // ApplyProposal is a compound patch on the parser model with no library

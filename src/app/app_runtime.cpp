@@ -41,6 +41,7 @@
 #include "core/terminology_scope_service.h"
 #include "core/time_utils.h"
 #include "imgui.h"
+#include "sacm_adapter/case_projection.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -563,16 +564,21 @@ const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
         return accepted;
     }
 
-    const core::drafts::DraftMaterializationResult& result =
-        impl_->draft_workspace.Materialize(accepted, impl_->app_state.case_revision);
-    if (!result.success) {
+    const std::shared_ptr<const core::drafts::DraftMaterializationResult> result =
+        impl_->draft_workspace.MaterializeSnapshot(accepted, impl_->app_state.case_revision);
+    // The canvas publishes a raw pointer for the duration of the frame. Keep
+    // the immutable owner here so accepting or discarding the workspace from a
+    // banner rendered earlier in that frame cannot free the model underneath
+    // the remaining panels.
+    impl_->draft_frame_materialization = result;
+    if (!result->success) {
         // A draft that cannot be materialized shows the accepted argument, not a
         // partially applied one. The failure is reported against the group that
         // caused it; what must not happen is a half-applied safety argument
         // rendered as though it were the proposal.
         return accepted;
     }
-    return result.working_model;
+    return result->working_model;
 }
 
 const parser::AssuranceCase& AppRuntime::CurrentCanvasView() {
@@ -587,13 +593,21 @@ const parser::AssuranceCase& AppRuntime::CurrentCanvasView() {
         return impl_->app_state.loaded_case.value();
     case ui::DraftViewMode::ChangesOnly: {
         const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+        impl_->draft_presentation_view = working;
+        impl_->draft_presentation_view.elements.insert(
+            impl_->draft_presentation_view.elements.end(), index.removed.begin(), index.removed.end());
         // Rebuilt only when the draft or the accepted model moved, which is the
         // same condition that invalidates the tree below it.
-        impl_->draft_changes_only_view = core::drafts::BuildChangesOnlyView(working, index);
+        impl_->draft_changes_only_view = core::drafts::BuildChangesOnlyView(impl_->draft_presentation_view, index);
         return impl_->draft_changes_only_view;
     }
-    case ui::DraftViewMode::WorkingDraft:
-        break;
+    case ui::DraftViewMode::WorkingDraft: {
+        const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+        impl_->draft_presentation_view = working;
+        impl_->draft_presentation_view.elements.insert(
+            impl_->draft_presentation_view.elements.end(), index.removed.begin(), index.removed.end());
+        return impl_->draft_presentation_view;
+    }
     }
     return working;
 }
@@ -644,6 +658,14 @@ void AppRuntime::RefreshDraftDecorations() {
                 break;
             }
         }
+        if (element == nullptr && entry->change == core::drafts::DraftElementChange::Removed) {
+            for (const parser::SacmElement& candidate : index.removed) {
+                if (candidate.id == element_id) {
+                    element = &candidate;
+                    break;
+                }
+            }
+        }
         const bool is_relationship =
             element != nullptr && (element->type == "assertedinference" || element->type == "assertedcontext" ||
                                    element->type == "assertedevidence");
@@ -654,11 +676,12 @@ void AppRuntime::RefreshDraftDecorations() {
             ui_state.draft_element_status.emplace(element_id, std::move(decoration));
             continue;
         }
-        if (entry->change != core::drafts::DraftElementChange::Added)
+        if (entry->change != core::drafts::DraftElementChange::Added &&
+            entry->change != core::drafts::DraftElementChange::Removed)
             continue;
 
         ui::DraftEdgeDecoration edge;
-        edge.added = true;
+        edge.change = entry->change;
         edge.contextual = element->type == "assertedcontext";
         edge.source_label = decoration.source_label;
         // The renderer keys an edge by parent-then-child, and SACM puts the
@@ -756,6 +779,7 @@ void AppRuntime::RefreshSelectedDraftDetail() {
     // the moment the button is pressed, so the user sees the real acceptance set
     // before they commit rather than after.
     const std::vector<std::string> contributors = index.ContributingGroupIds(selected);
+    detail.contributing_group_ids = contributors;
     detail.closure_group_ids = core::drafts::DependencyClosure(*workspace, contributors);
     for (const std::string& group_id : detail.closure_group_ids) {
         if (std::find(contributors.begin(), contributors.end(), group_id) != contributors.end())
@@ -769,7 +793,11 @@ void AppRuntime::RefreshSelectedDraftDetail() {
         detail.blocked_reason = AF_TR("The argument changed since this draft was written.");
     } else {
         const core::drafts::DraftPromotionPlan plan =
-            core::drafts::PlanDraftPromotion(*workspace, impl_->app_state.loaded_case.value(), contributors, "preview");
+            core::drafts::PlanDraftPromotion(*workspace,
+                                             impl_->app_state.loaded_case.value(),
+                                             contributors,
+                                             "preview",
+                                             impl_->draft_workspace.authoritative_identities());
         if (!plan.ok)
             detail.blocked_reason = plan.error;
     }
@@ -792,6 +820,16 @@ void AppRuntime::SyncDraftWorkspace() {
                                            : std::filesystem::path{};
     const std::filesystem::path argument =
         impl_->app_state.loaded_case.has_value() ? impl_->app_state.loaded_file_path : std::filesystem::path{};
+
+    std::unordered_set<std::string> authoritative_identities;
+    if (impl_->app_state.library_document) {
+        for (const sacm_adapter::DocumentElement& element :
+             sacm_adapter::list_document_elements(*impl_->app_state.library_document)) {
+            if (!element.id.empty())
+                authoritative_identities.insert(element.id);
+        }
+    }
+    impl_->draft_workspace.SetAuthoritativeIdentities(std::move(authoritative_identities));
 
     if (root == impl_->draft_workspace_root && argument == impl_->draft_workspace_argument) {
         return;

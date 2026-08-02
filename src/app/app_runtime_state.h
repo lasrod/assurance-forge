@@ -224,6 +224,11 @@ struct AppRuntimeState {
     // Scratch for the "changes only" view mode, so the canvas can hold a
     // reference to it across the frame the way it does the other views.
     parser::AssuranceCase draft_changes_only_view;
+    // Display-only copy of the working model with deletion tombstones restored.
+    // Removed elements stay absent from the semantic working model used by
+    // checks and promotion; the canvas needs the old nodes and relationships in
+    // order to show what the draft proposes to remove.
+    parser::AssuranceCase draft_presentation_view;
     // The workspace revision the canvas was last built against. Draft mutation
     // is deliberately not a model mutation and marks nothing dirty, so this is
     // what turns a staged group into a repaint.
@@ -234,6 +239,11 @@ struct AppRuntimeState {
     // case while the rest of the application has moved to the working model.
     // Null before the first frame; falls back to the accepted case.
     const parser::AssuranceCase* draft_canvas_view = nullptr;
+    // Owns the materialized model backing `draft_canvas_view` for the entire
+    // frame. Draft accept/discard can invalidate the store while ImGui is still
+    // rendering; retaining this immutable snapshot prevents the canvas and
+    // inspector from dereferencing freed materialization storage.
+    std::shared_ptr<const core::drafts::DraftMaterializationResult> draft_frame_materialization;
     // Element ids the draft adds. The argument-package canvas filters by SACM
     // package ownership, and a proposed element belongs to no package at all --
     // so without this list the ownership filter drops every one of them and

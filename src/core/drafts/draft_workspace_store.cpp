@@ -38,7 +38,13 @@ void DraftWorkspaceStore::Close() {
 
 void DraftWorkspaceStore::InvalidateMaterialization() {
     materialization_valid_ = false;
-    materialization_ = DraftMaterializationResult{};
+}
+
+void DraftWorkspaceStore::SetAuthoritativeIdentities(std::unordered_set<std::string> identities) {
+    if (authoritative_identities_ == identities)
+        return;
+    authoritative_identities_ = std::move(identities);
+    InvalidateMaterialization();
 }
 
 std::string DraftWorkspaceStore::ArgumentKey() const {
@@ -191,7 +197,7 @@ bool DraftWorkspaceStore::StageOperations(const std::string& group_id,
     // Rehearsed before it is kept. A group holding a patch that cannot be
     // materialized would take the whole working model down with it, and the
     // canvas has to be able to draw the draft at any moment.
-    if (!CanStageOperations(workspace, accepted, group_id, operations, error))
+    if (!CanStageOperations(workspace, accepted, group_id, operations, error, authoritative_identities_))
         return false;
 
     group->operations.insert(group->operations.end(), operations.begin(), operations.end());
@@ -235,7 +241,7 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
     // anything it no longer creates releases its id.
     group->operations.clear();
     group->generated_ids.clear();
-    if (!CanStageOperations(workspace, accepted, group_id, operations, error)) {
+    if (!CanStageOperations(workspace, accepted, group_id, operations, error, authoritative_identities_)) {
         group->operations = previous_operations;
         group->generated_ids = previous_identities;
         return false;
@@ -348,35 +354,79 @@ bool DraftWorkspaceStore::DiscardWorkspace(std::string& error) {
     return DeleteDraftWorkspace(project_root_, key, error);
 }
 
-const DraftMaterializationResult& DraftWorkspaceStore::Materialize(const core::AssuranceCase& accepted,
-                                                                   std::uint64_t accepted_revision) {
+std::shared_ptr<const DraftMaterializationResult>
+DraftWorkspaceStore::MaterializeSnapshot(const core::AssuranceCase& accepted, std::uint64_t accepted_revision) {
     if (materialization_valid_ && materialized_accepted_revision_ == accepted_revision &&
         materialized_workspace_revision_ == revision()) {
         return materialization_;
     }
 
+    std::shared_ptr<DraftMaterializationResult> next = std::make_shared<DraftMaterializationResult>();
+
+    if (workspace_.has_value() && workspace_->state != DraftWorkspaceState::NeedsRebase) {
+        std::string conflicting_identity;
+        for (const DraftChangeGroup* group : workspace_->ActiveGroups()) {
+            for (const auto& generated : group->generated_ids) {
+                if (authoritative_identities_.count(generated.second) > 0) {
+                    conflicting_identity = generated.second;
+                    break;
+                }
+            }
+            if (!conflicting_identity.empty())
+                break;
+        }
+        if (!conflicting_identity.empty()) {
+            workspace_->state = DraftWorkspaceState::NeedsRebase;
+            ++workspace_->working_revision;
+            RecordEvent("identity_conflict",
+                        {},
+                        "Draft identity " + conflicting_identity + " is already used by the authoritative document");
+            std::string save_error;
+            Save(save_error);
+        }
+    }
+
+    if (workspace_.has_value() && workspace_->state != DraftWorkspaceState::NeedsRebase &&
+        !workspace_->base_model_hash.empty() &&
+        workspace_->base_model_hash != reviews::ComputeModelSemanticHash(accepted)) {
+        // Open() catches changes made while the argument was closed. This check
+        // catches the equally important case where the accepted argument changes
+        // while its draft remains open. Replaying against the new model would
+        // turn ordinary drift into misleading patch or duplicate-id failures.
+        workspace_->state = DraftWorkspaceState::NeedsRebase;
+        ++workspace_->working_revision;
+        RecordEvent("baseline_changed", {}, "Accepted argument changed while the draft was open");
+        std::string save_error;
+        Save(save_error);
+    }
+
     if (!workspace_.has_value() || workspace_->state == DraftWorkspaceState::NeedsRebase) {
         // A workspace awaiting a rebase contributes nothing to what the user
         // sees. The accepted argument is shown, unmodified, until they decide.
-        materialization_ = DraftMaterializationResult{};
-        materialization_.success = true;
-        materialization_.working_model = accepted;
+        next->success = true;
+        next->working_model = accepted;
     } else {
-        materialization_ = MaterializeDraft(workspace_.value(), accepted);
-        if (materialization_.allocated_identities) {
+        *next = MaterializeDraft(workspace_.value(), accepted, authoritative_identities_);
+        if (next->allocated_identities) {
             // Allocated once, then replayed forever. Persisting here is what
             // makes that true across a restart -- without it the next run would
             // allocate again and rename every proposed element.
             std::string save_error;
             Save(save_error);
         }
-        workspace_->state = materialization_.success ? DraftWorkspaceState::Active : DraftWorkspaceState::Blocked;
+        workspace_->state = next->success ? DraftWorkspaceState::Active : DraftWorkspaceState::Blocked;
     }
 
+    materialization_ = std::move(next);
     materialization_valid_ = true;
     materialized_accepted_revision_ = accepted_revision;
     materialized_workspace_revision_ = revision();
     return materialization_;
+}
+
+const DraftMaterializationResult& DraftWorkspaceStore::Materialize(const core::AssuranceCase& accepted,
+                                                                   std::uint64_t accepted_revision) {
+    return *MaterializeSnapshot(accepted, accepted_revision);
 }
 
 } // namespace core::drafts

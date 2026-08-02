@@ -37,13 +37,13 @@ struct DraftNodeDecoration {
     bool multiple_contributions = false;
 };
 
-// How the canvas marks one relationship the working draft adds.
+// How the canvas marks one relationship the working draft adds or removes.
 //
 // A changed support relationship can alter the meaning of an argument more than
 // a reworded claim can, so this is drawn on the edge itself rather than left to
 // be inferred from two node badges at either end.
 struct DraftEdgeDecoration {
-    bool added = false;
+    core::drafts::DraftElementChange change = core::drafts::DraftElementChange::Unchanged;
     bool contextual = false;
     std::string source_label;
 };
@@ -83,6 +83,10 @@ struct DraftElementDetailView {
     // the panel being broken.
     std::vector<DraftFieldChangeView> field_changes;
     std::vector<DraftContributionView> contributions;
+    // Groups that actually change this element. Rejection applies to these,
+    // never to the dependency closure used by acceptance: rejecting a child
+    // edit must not also reject the parent creation it depended on.
+    std::vector<std::string> contributing_group_ids;
     // The groups accepting this element would actually promote: the contributing
     // groups closed over their dependencies.
     std::vector<std::string> closure_group_ids;

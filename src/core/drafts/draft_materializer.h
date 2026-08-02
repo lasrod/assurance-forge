@@ -23,6 +23,7 @@
 #include "core/sccg/staged_checks.h"
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace core::drafts {
@@ -67,7 +68,9 @@ struct DraftMaterializationResult {
 // the group. Every materialization after that replays those identities through
 // `ReviewProposalPatchService::ApplyProposalWithIds` rather than generating new
 // ones. Check `allocated_identities` and persist when it is set.
-DraftMaterializationResult MaterializeDraft(DraftWorkspace& workspace, const core::AssuranceCase& accepted);
+DraftMaterializationResult MaterializeDraft(DraftWorkspace& workspace,
+                                            const core::AssuranceCase& accepted,
+                                            const std::unordered_set<std::string>& authoritative_identities = {});
 
 // Whether `operations` can be applied on top of everything already active in
 // `workspace`. Used at staging time so a group never holds a patch that cannot
@@ -79,6 +82,7 @@ bool CanStageOperations(const DraftWorkspace& workspace,
                         const core::AssuranceCase& accepted,
                         const std::string& group_id,
                         const std::vector<reviews::PatchOperation>& operations,
-                        std::string& error);
+                        std::string& error,
+                        const std::unordered_set<std::string>& authoritative_identities = {});
 
 } // namespace core::drafts

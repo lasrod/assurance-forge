@@ -1,6 +1,6 @@
 # 0009. One integrated working draft per argument file
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-02
 - Deciders: Assurance Forge maintainers
 - Supersedes in part: ADR 0007's "its only write surface is `ReviewProposal`
@@ -58,11 +58,30 @@ attributable change groups originating from MCP clients, SCCG AI review, importe
 legacy proposals, and the user's own draft edits. Assurance Forge materializes
 those groups, in workspace order, into **one complete working assurance case**.
 
-### One authoritative view
+### Canonical baseline, working snapshot, and presentation snapshot
 
-An application-level resolver returns the materialized working model when a draft
-workspace is active and materializes, and the accepted model otherwise. The
-following read through it and no longer read the accepted model directly:
+The SACM library document is the authoritative accepted baseline. Draft
+materialization and promotion use the same complete editable projection of that
+document, before UI-only hiding, synthetic placement, package filtering or
+terminology display rewriting. An ID that exists anywhere in the authoritative
+document exists for allocation and collision purposes even when the UI does not
+normally draw it.
+
+Materialization publishes an immutable **working snapshot**: the complete
+accepted baseline with the ordered active draft groups applied. A published
+snapshot remains alive for the whole frame and for every consumer holding it;
+invalidating a draft marks a later snapshot for rebuilding and never destroys
+the model currently being rendered.
+
+The canvas and inspector may derive a separate **presentation snapshot** from
+the working snapshot. It can reinsert removed nodes and relationships as
+explicit tombstones so proposed deletion is visible and selectable. Tombstones
+are display state only: validation, MCP reads, SCCG review, export, hashing and
+promotion never consume the presentation snapshot.
+
+An application-level resolver returns the working snapshot when a draft
+workspace is active and materializes, and the accepted projection otherwise.
+The following read through it and no longer read the accepted model directly:
 
 - GSN canvas and Argument Navigator.
 - Element and relationship inspectors.
@@ -115,14 +134,35 @@ model and therefore cannot express that; they are retained only for imported
 legacy proposals, where they mean what they always meant. Group-level staleness
 inside a workspace is the workspace revision.
 
-### Editing while a draft is active
+### Human editing is explicit; AI editing is always drafted
 
-When a draft workspace is active, model-affecting interactive edits enter a
-human-authored draft group. Assurance Forge will not maintain a second,
-independently changing accepted editing surface underneath an active draft. The
-user returns to ordinary accepted-case editing by promoting or discarding the
-draft. Navigation, comments, review-item status, preferences and non-argument
-metadata are unaffected.
+Drafting is optional for a human and mandatory for MCP and SCCG AI. With no
+active workspace, interactive edits target the accepted case through the normal
+audited command path. With an active workspace, the UI exposes an explicit edit
+target:
+
+- **Edit accepted case** shows the accepted-baseline view and dispatches ordinary
+  audited commands.
+- **Edit working draft** shows the working view and records operations in an
+  attributable human draft group.
+
+Changing the view alone never changes the edit target, and the application never
+silently redirects an accepted edit into a draft or writes an accepted edit
+underneath a working-draft view. An element that exists only in the draft cannot
+be edited in accepted mode.
+
+An accepted edit while a workspace exists is preflighted against a clone of the
+authoritative baseline and the draft is rebased onto the prospective result. If
+the edit would invalidate an operation precondition or make the remainder
+unmaterializable, the edit is refused before the accepted SACM, audit log or
+workspace changes. A later recovery workflow may offer an explicit
+accept-edit-and-mark-draft-`NeedsRebase` choice, but that is never the implicit
+fallback.
+
+Operations the draft vocabulary cannot express remain available in accepted
+mode subject to that same preflight. In draft mode they are visibly disabled
+with the reason; they never bypass the workspace. Navigation, comments,
+review-item status, preferences and non-argument metadata are unaffected.
 
 ### The workspace follows the open argument
 
@@ -178,6 +218,11 @@ carries that classification.
   is now in the interactive loop rather than in a preview nobody was waiting on.
 - A materialization failure must be non-destructive: the accepted model is
   untouched and the failure is reported against the group that caused it.
+- A frame renders one immutable working/presentation snapshot. Accepting,
+  rejecting or discarding a draft during that frame cannot invalidate pointers
+  held by another panel.
+- Human authors can choose direct accepted editing without weakening the rule
+  that AI-authored changes require explicit human promotion.
 - ADR 0007 remains authoritative for consent and for the rule that an agent
   cannot apply its own work. Its statement that the server's only write surface
   is saved `ReviewProposal` drafts is replaced.

@@ -134,6 +134,16 @@ an agent's reference to what it just created. Record `create_ref` → id on the
 first successful materialization; use `ApplyProposalWithIds` — the existing
 replay variant — for every materialization after that.
 
+Allocation sees the complete authoritative library document and every identity
+reserved anywhere in the workspace. The UI projection is not an allocation
+domain. Promotion never repairs a collision by silently renaming an identity
+that has already been published; collision triggers explicit rebase/remap.
+
+**Operations carry positional semantic preconditions.** Workspace revision
+prevents stale staging, while expected field/element/relationship state prevents
+an earlier group rejection or accepted-case edit from changing the meaning of a
+later operation during rebase.
+
 ## 5. Materialization
 
 `DraftMaterializer` takes the accepted projection, applies active groups in
@@ -162,15 +172,19 @@ revision or the accepted model changes. Budget for it: reuse the
 revision-comparison caching already in `workbench_area.cpp`, and measure on a
 large argument before Phase 2 exits.
 
-## 6. One authoritative view
+## 6. Authoritative baseline and immutable views
 
 ```cpp
-const parser::AssuranceCase& AppRuntime::CurrentArgumentView() const;
+std::shared_ptr<const parser::AssuranceCase> AppRuntime::CurrentArgumentSnapshot() const;
 ```
 
-Working model when a workspace is active and materializes; accepted model
-otherwise. Everything in ADR 0009's list reads through it. Export, the audit
-baseline and the canonical model hash do not.
+The SACM library document is the authoritative accepted baseline. Draft
+materialization and promotion start from the same full editable projection. The
+returned working snapshot is immutable and remains alive for the whole frame. A
+display-only presentation snapshot can add deletion tombstones for the canvas
+and inspector. Everything in ADR 0009's list reads the working snapshot; only
+presentation consumes tombstones. Export, the audit baseline and the canonical
+model hash use the accepted library document.
 
 Delete the "newest open change set is the one drawn" rule in
 `AppRuntime::RefreshAgentChangePreview` — there is no longer anything to choose
@@ -264,6 +278,11 @@ promotable right now. Selecting a row focuses its changes on the canvas.
 The inspector shows accepted value, working value, ordered contribution history
 with source and rationale, dependencies, and the per-change actions.
 
+The draft banner also carries an explicit **Edit accepted case / Edit working
+draft** target. Accepted mode uses ordinary audited commands and preflights a
+rebase of any active draft. Draft mode stages human operations. MCP and SCCG AI
+have no accepted edit target.
+
 Every new string goes through `AF_TR` / `trf`, gets an entry in
 `tools/i18n/regenerate_ja_po.py`, and `python tools/i18n/check_catalog.py` passes
 before push.
@@ -284,6 +303,10 @@ either fails → compile to one `ReviewProposal` → dispatch one audited
 **Accept all:** whole-draft validation → summary of every addition, edit,
 removal and relationship change → explicit confirmation → one audited command →
 clear workspace → one undo boundary.
+
+Only submitted (`Ready`) groups participate in promotion. `Building` groups stay
+visible but are named as still being authored and keep Accept All disabled or are
+excluded with an explicit summary.
 
 **Reject:** remove from materialization, identify dependents, offer cascade or
 leave them `NeedsAttention`, rebuild immediately.
@@ -371,7 +394,7 @@ paths. Kept: patch operations, preview logic useful to `DraftMaterializer`,
 |---|---|---|
 | **0 — Decisions** | ADR 0009, ADR 0010, supersession notes on 0007/0008, index and nav, planned matrix rows, this invariant list. | Terms unambiguous; retained guarantees listed. **Done.** |
 | **1 — Core domain** | `core::drafts`, deterministic materialization, combined checks, atomic `.af/drafts` persistence, `.af/.gitignore`, base-hash recovery. | Accepted bytes unchanged while groups are built; restart restores the same working graph and revision; two conflicting groups report one combined problem naming the failing group. |
-| **2 — Unified view** | `CurrentArgumentView()`, canvas/navigator/search/inspectors on the working model, banner, view toggle, element and relationship decorations, accept-all and discard. | One integrated graph on screen; accept-all is one audited undoable transaction; discard leaves the `.sacm` byte-identical; materialization cost measured on a large argument. |
+| **2 — Unified view** | Immutable working and presentation snapshots, canvas/navigator/search/inspectors on the working model, banner, view and edit-target toggles, element and relationship additions/deletions, accept-all and discard. | One integrated graph on screen; a same-frame accept/discard cannot invalidate any panel reference; deletions remain visible and selectable; discard leaves the `.sacm` byte-identical; materialization cost measured on a large argument. |
 | **3 — MCP** | Working-model reads, revision-checked group tools, event polling, compatibility aliases, protocol and bridge tests. | One agent creates, inspects, revises and develops earlier changes across calls; a user or SCCG edit refuses a stale call with the current revision; registry test proves no promote tool exists. |
 | **4 — SCCG review** | Review reads the working model; suggestions become review-linked groups; cross-source dependencies; consent preview text. | MCP changes then SCCG review appear in one graph; SCCG reports a problem introduced only by the combination; no new proposal files. |
 | **5 — Selective acceptance** | Dependency graph, accept/reject selected, cascade, element-level closure, atomic rebase, promotion snapshot and two-stack undo. | A wording edit accepts alone; a new branch cannot accept without its nodes and relationships; remaining changes stay visible and valid; promotion refused before mutation when the remainder cannot rebase; undoing a promotion restores model and workspace together. |
@@ -381,6 +404,19 @@ paths. Kept: patch operations, preview logic useful to `DraftMaterializer`,
 
 **Core** — the ten invariants in §3, each with a test whose failure has been
 observed by breaking the behaviour deliberately.
+
+**Snapshot lifetime** — hold the frame's working/presentation snapshot, discard
+or promote the workspace, and continue reading every held element safely; the
+new snapshot appears only at the next publication point.
+
+**Canonical baseline and IDs** — a document element hidden from the ordinary UI
+still reserves its ID; materialization and real command-bus promotion produce
+the same semantic document; a live accepted revision change enters rebase rather
+than colliding during replay.
+
+**Conflict preconditions** — reject or replace an earlier wording group and
+prove a later edit authored against it conflicts instead of applying by ID;
+accepted-mode human editing preflights the same rule.
 
 **Dependencies** — edit depends on creation; relationship depends on both
 endpoints; SCCG edit depends on MCP creation; rejecting a parent finds every

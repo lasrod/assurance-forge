@@ -224,6 +224,48 @@ TEST(DraftWorkspace, DiscardLeavesTheAcceptedModelByteIdentical) {
     EXPECT_FALSE(fixture.store.has_workspace());
 }
 
+TEST(DraftWorkspace, PublishedFrameSnapshotSurvivesDiscard) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+
+    const std::shared_ptr<const core::drafts::DraftMaterializationResult> frame =
+        fixture.store.MaterializeSnapshot(fixture.accepted, 1);
+    ASSERT_TRUE(frame->success) << frame->error;
+    const std::string shown_id = IdentityFor(fixture.store, group, "$sub");
+    ASSERT_NE(FindElement(frame->working_model, shown_id), nullptr);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.DiscardWorkspace(error)) << error;
+    EXPECT_FALSE(fixture.store.has_workspace());
+
+    // A banner click happens before the canvas and inspector finish rendering
+    // the frame. The published model must remain readable until those consumers
+    // release it even though the workspace itself is already gone.
+    EXPECT_NE(FindElement(frame->working_model, shown_id), nullptr);
+    EXPECT_TRUE(frame->success);
+}
+
+TEST(DraftWorkspace, PublishedFrameSnapshotSurvivesPromotionCleanup) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+
+    const std::shared_ptr<const core::drafts::DraftMaterializationResult> frame =
+        fixture.store.MaterializeSnapshot(fixture.accepted, 1);
+    ASSERT_TRUE(frame->success) << frame->error;
+    const std::string shown_id = IdentityFor(fixture.store, group, "$sub");
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.RemovePromotedGroups({group}, frame->working_model, error)) << error;
+    EXPECT_FALSE(fixture.store.has_workspace());
+
+    // Successful Accept All removes the last active group in the same frame.
+    // The old working snapshot is still the one that frame's canvas owns.
+    EXPECT_NE(FindElement(frame->working_model, shown_id), nullptr);
+    EXPECT_TRUE(frame->success);
+}
+
 // --------------------------------------------------------------------------
 // Invariant 3: one argument file has at most one active workspace.
 // --------------------------------------------------------------------------
@@ -359,6 +401,41 @@ TEST(DraftWorkspace, AProposedElementKeepsItsIdentityWhenAnotherGroupIsAdded) {
     EXPECT_EQ(IdentityFor(fixture.store, first_group, "$sub"), identity);
     EXPECT_NE(IdentityFor(fixture.store, second_group, "$other"), identity);
     EXPECT_NE(FindElement(result.working_model, identity), nullptr);
+}
+
+TEST(DraftWorkspace, AllocationReservesIdsHiddenFromTheCanvasProjection) {
+    Fixture fixture;
+    // G2 represents an authoritative package/utility identity that the flat
+    // accepted canvas model does not contain. Allocation must still see it.
+    fixture.store.SetAuthoritativeIdentities({"G1", "G2"});
+
+    const std::string group = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(IdentityFor(fixture.store, group, "$sub"), "G3");
+    EXPECT_NE(FindElement(result.working_model, "G3"), nullptr);
+}
+
+TEST(DraftWorkspace, APinnedIdentityCollisionIsNotSilentlyRenumbered) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    ASSERT_EQ(IdentityFor(fixture.store, group, "$sub"), "G2");
+
+    // Discovering that G2 exists in the full SACM document after it has been
+    // published is a rebase conflict. Picking G3 here would break every agent
+    // and UI reference that already names the proposed element as G2.
+    fixture.store.SetAuthoritativeIdentities({"G1", "G2"});
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 1);
+    EXPECT_TRUE(result.success);
+    ASSERT_NE(fixture.store.workspace(), nullptr);
+    EXPECT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::NeedsRebase);
+    EXPECT_EQ(FindElement(result.working_model, "G2"), nullptr)
+        << "a conflicting draft must not be replayed against the authoritative document";
+    EXPECT_EQ(IdentityFor(fixture.store, group, "$sub"), "G2");
 }
 
 TEST(DraftWorkspace, ExtendingAGroupDoesNotRenameWhatItAlreadyCreated) {
@@ -614,6 +691,31 @@ TEST(DraftWorkspace, ARejectedGroupLeavesTheWorkingModel) {
     EXPECT_EQ(fixture.store.workspace()->groups.size(), 1u);
 }
 
+TEST(DraftWorkspace, ARemovalKeepsAnUnmodifiedPresentationTombstone) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Remove G1");
+
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    core::reviews::ElementRef element;
+    element.existing_id = "G1";
+    remove.element = element;
+    fixture.Stage(group, {remove});
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(FindElement(result.working_model, "G1"), nullptr)
+        << "deleted elements must stay absent from the semantic working model";
+
+    const core::drafts::DraftElementEntry* entry = result.change_index.Find("G1");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->change, core::drafts::DraftElementChange::Removed);
+    ASSERT_EQ(result.change_index.removed.size(), 1u);
+    EXPECT_EQ(result.change_index.removed.front().id, "G1");
+    EXPECT_EQ(result.change_index.removed.front().content, fixture.accepted.elements.front().content)
+        << "the canvas tombstone must show the accepted content, not synthesize a replacement";
+}
+
 // --------------------------------------------------------------------------
 // Recovery.
 // --------------------------------------------------------------------------
@@ -641,6 +743,29 @@ TEST(DraftWorkspace, AChangedBaselineEntersNeedsRebaseAndReplaysNothing) {
     EXPECT_EQ(core::reviews::ComputeModelSemanticHash(result.working_model),
               core::reviews::ComputeModelSemanticHash(changed));
 
+    EXPECT_FALSE(fixture.store.StageOperations(group, {UpdateTextOp("G1", "More.")}, changed, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(DraftWorkspace, AChangedOpenBaselineEntersNeedsRebaseBeforeReplay) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Clarify G1");
+    fixture.Stage(group, {UpdateTextOp("G1", "Clarified.")});
+
+    // The accepted argument can change through a direct human edit while the
+    // project remains open. Open() is not called again in that workflow, so the
+    // materialization boundary must enforce the same base-hash invariant.
+    core::AssuranceCase changed = fixture.accepted;
+    changed.elements.push_back(Strategy("S1", "Argue over hazards."));
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(changed, 2);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_NE(fixture.store.workspace(), nullptr);
+    EXPECT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::NeedsRebase);
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(result.working_model),
+              core::reviews::ComputeModelSemanticHash(changed));
+
+    std::string error;
     EXPECT_FALSE(fixture.store.StageOperations(group, {UpdateTextOp("G1", "More.")}, changed, error));
     EXPECT_FALSE(error.empty());
 }
