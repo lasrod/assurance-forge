@@ -1509,6 +1509,33 @@
       "notes": "An agent applying a standard records which clause a claim answers in the claim description, because the element model has no citation field. That is a trace a human can read but not one a tool can follow, filter or check for coverage. A first-class citation would be a SACM modelling decision, not an MCP one."
     },
     {
+      "id": "AF-AI-014",
+      "area": "AI",
+      "name": "One integrated working draft per argument file",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Replaces the two independent proposal mechanisms — an in-memory `ChangeSet` per MCP connection (AF-AI-009) and one persisted `ReviewProposal` file per review item (AF-METH-004) — with a single workspace per argument, holding ordered change groups from MCP, SCCG AI review, the user, and imported legacy proposals, materialized into one complete assurance case. The core domain, deterministic materialization, once-only identity allocation and `.af/drafts` recovery exist and are tested, but **no user-facing path reaches them yet**, which is why this is `planned` and cites nothing: the matrix records what a user can do, and today a user can do none of it. Raised only when the end-to-end acceptance scenario passes in the running application. See ADR 0009, ADR 0010 and docs/architecture/integrated-draft-workspace-plan.md."
+    },
+    {
+      "id": "AF-AI-015",
+      "area": "AI",
+      "name": "Dependency-aware selective promotion of draft changes",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`."
+    },
+    {
+      "id": "AF-AI-016",
+      "area": "AI",
+      "name": "Draft recovery across restart",
+      "status": "planned",
+      "evidence": [],
+      "tests": [],
+      "notes": "Unaccepted work survives closing the application, stored under `.af/drafts/` and reconstructed from the accepted baseline plus its change groups — never as SACM, which has no assertion state meaning \"AI-proposed and not accepted\". A stored draft whose base hash no longer matches the argument enters `NeedsRebase` and replays nothing. `.af/` is generated with a `.gitignore` so unaccepted AI-authored argument text does not reach a colleague through version control."
+    },
+    {
       "id": "AF-PLAT-001",
       "area": "PLAT",
       "name": "Project model, load and save",
