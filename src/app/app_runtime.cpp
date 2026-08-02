@@ -868,7 +868,16 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // until phase 3 moves it onto draft groups. Stacking it on the working model
     // rather than on the accepted one means a connected client's staged work is
     // at least drawn against the draft it is really landing in.
-    const parser::AssuranceCase& working = CurrentCanvasView();
+    // The whole working argument, never the view-mode narrowing.
+    //
+    // Everything derived here is shared: the Argument Navigator, the tree edit
+    // index, the register views and the Problems pipeline all read it. Feeding
+    // them `CurrentCanvasView()` meant selecting "changes only" collapsed the
+    // navigator to a handful of nodes and the project counts with it -- the
+    // application believing the safety case had shrunk to whatever the canvas
+    // happened to be showing. A view mode is a statement about the canvas, not
+    // about the argument.
+    const parser::AssuranceCase& working = CurrentArgumentView();
     RefreshDraftDecorations();
     const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 

@@ -1,7 +1,10 @@
 #include "core/app_state.h"
 #include "core/drafts/draft_persistence.h"
 #include "core/drafts/draft_workspace_store.h"
+#include "core/drafts/draft_promotion_service.h"
 #include "core/reviews/review_proposal.h"
+#include "core/reviews/review_proposal_patch_service.h"
+#include "core/sacm_argument_sync.h"
 
 #include <gtest/gtest.h>
 
@@ -124,4 +127,57 @@ TEST(DraftExampleProject, LeavesTheAcceptedArgumentUntouched) {
     // argument is the same argument afterwards, which is the property the whole
     // design rests on.
     EXPECT_EQ(core::reviews::ComputeModelSemanticHash(state.loaded_case.value()), before);
+}
+
+// Accepting the whole draft must leave a safety case, not take it away.
+//
+// Reported from the running application: pressing "Accept all" returned the app
+// to the welcome screen. The `.sacm` on disk was byte-identical afterwards, and
+// the draft recovery data was gone -- the signature of the promotion reporting
+// success and then something downstream throwing, because `RenderFrame` resets
+// `loaded_case` when the derived-view rebuild raises. Losing the argument from
+// the screen is the worst failure this feature can have, so it is pinned here.
+TEST(DraftExampleProject, PromotingTheWholeDraftKeepsTheArgument) {
+    const std::filesystem::path root = ExampleProjectRoot();
+    if (root.empty()) {
+        GTEST_SKIP() << "examples/projects/kitchen-blender-draft not found";
+    }
+    const std::filesystem::path argument = root / "arguments" / "main.sacm";
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(argument.string())) << state.status_message;
+    ASSERT_TRUE(state.loaded_case.has_value());
+    ASSERT_TRUE(state.sacm_package.has_value());
+    const std::size_t accepted_elements = state.loaded_case->elements.size();
+
+    core::drafts::DraftWorkspaceStore store;
+    store.SetProjectRoot(root);
+    std::string error;
+    ASSERT_TRUE(store.Open(argument, state.loaded_case.value(), error)) << error;
+    ASSERT_TRUE(store.has_workspace());
+    ASSERT_TRUE(store.Materialize(state.loaded_case.value(), 1).success);
+
+    const core::drafts::CompiledDraftPromotion compiled =
+        core::drafts::CompileWorkspacePromotion(*store.workspace(), "Working draft");
+    ASSERT_TRUE(compiled.success) << compiled.error;
+
+    // Exactly what `ApplyProposalCommand` does: apply with the draft's pinned
+    // identities, then mirror the mutated parser model into the SACM package the
+    // serializer and the canvas read from.
+    core::AssuranceCase promoted = state.loaded_case.value();
+    const core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ApplyProposalResult applied =
+        service.ApplyProposalWithIds(compiled.proposal, promoted, compiled.identities);
+    ASSERT_TRUE(applied.success) << applied.error;
+    EXPECT_GT(promoted.elements.size(), accepted_elements) << "the draft adds a claim and a relationship";
+
+    sacm::AssuranceCasePackage package = state.sacm_package.value();
+    core::RebuildSacmArgumentPackageFromParser(promoted, package);
+
+    // The elements the draft proposed have to survive the round trip into the
+    // package, or the promoted argument is missing exactly what was accepted.
+    std::size_t claims = 0;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages)
+        claims += argument_package.claims.size();
+    EXPECT_GT(claims, 0u) << "the package still holds the argument after promotion";
 }
