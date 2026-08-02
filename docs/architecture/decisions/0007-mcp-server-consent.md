@@ -3,6 +3,12 @@
 - Status: Accepted
 - Date: 2026-07-27
 - Deciders: Assurance Forge maintainers
+- Superseded in part by:
+  [ADR 0009](0009-one-integrated-working-draft-per-argument.md) — the write
+  surface described below as "`ReviewProposal` drafts" becomes the integrated
+  draft workspace. The consent gate, its fail-closed behaviour, the
+  `returns_case_content` classification and the rule that the server never
+  applies its own changes are unchanged and still govern the new tools.
 
 ## Context
 

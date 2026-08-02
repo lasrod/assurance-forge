@@ -78,6 +78,7 @@ nav:
       - Controllers: architecture/controllers.md
       - Project Storage: architecture/project-storage.md
       - Review and AI: architecture/review-ai.md
+      - Integrated Draft Workspace (planned): architecture/integrated-draft-workspace-plan.md
       - Decisions (ADRs):
           - Overview: architecture/decisions/index.md
           - ADR Template: architecture/decisions/adr-template.md
@@ -89,6 +90,8 @@ nav:
           - 0006 SACM 2.3 as an independent reusable library: architecture/decisions/0006-sacm-23-independent-library.md
           - 0007 Explicit consent for sharing over MCP: architecture/decisions/0007-mcp-server-consent.md
           - 0008 One owner for the open project: architecture/decisions/0008-one-owner-for-the-open-project.md
+          - 0009 One integrated working draft per argument file: architecture/decisions/0009-one-integrated-working-draft-per-argument.md
+          - 0010 Draft provenance, persistence and human promotion: architecture/decisions/0010-draft-provenance-persistence-and-human-promotion.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md
