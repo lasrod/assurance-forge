@@ -30,6 +30,8 @@
 #include "core/acp/assurance_claim_point.h"
 #include "core/app_state.h"
 #include "core/derived_views.h"
+#include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
@@ -655,6 +657,83 @@ void AppRuntime::RefreshDraftDecorations() {
     }
 }
 
+namespace {
+
+std::string ElementDisplayText(const parser::AssuranceCase& model, const std::string& element_id) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.id != element_id)
+            continue;
+        if (!element.content.empty())
+            return element.content;
+        if (!element.description.empty())
+            return element.description;
+        return element.name;
+    }
+    return {};
+}
+
+} // namespace
+
+void AppRuntime::RefreshSelectedDraftDetail() {
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.draft_selected_detail = ui::DraftElementDetailView{};
+
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    const std::string& selected = ui_state.selected_element_id;
+    if (workspace == nullptr || !workspace->has_active_groups() || selected.empty() ||
+        !impl_->app_state.loaded_case.has_value()) {
+        return;
+    }
+
+    const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+    const core::drafts::DraftElementEntry* entry = index.Find(selected);
+    if (entry == nullptr || entry->change == core::drafts::DraftElementChange::Unchanged)
+        return;
+
+    ui::DraftElementDetailView& detail = ui_state.draft_selected_detail;
+    detail.present = true;
+    detail.element_id = selected;
+    detail.change = entry->change;
+    detail.accepted_text = ElementDisplayText(impl_->app_state.loaded_case.value(), selected);
+    detail.working_text = ElementDisplayText(CurrentArgumentView(), selected);
+
+    for (const core::drafts::DraftElementContribution& contribution : entry->contributions) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(contribution.group_id);
+        if (group == nullptr)
+            continue;
+        ui::DraftContributionView view;
+        view.group_id = group->id;
+        view.title = group->title;
+        view.source_label = group->source_label.empty() ? std::string(core::drafts::DraftSourceToString(group->source))
+                                                        : group->source_label;
+        view.rationale = group->rationale;
+        view.change = contribution.change;
+        detail.contributions.push_back(std::move(view));
+    }
+
+    // What accepting this element would actually promote. Computed here, not at
+    // the moment the button is pressed, so the user sees the real acceptance set
+    // before they commit rather than after.
+    const std::vector<std::string> contributors = index.ContributingGroupIds(selected);
+    detail.closure_group_ids = core::drafts::DependencyClosure(*workspace, contributors);
+    for (const std::string& group_id : detail.closure_group_ids) {
+        if (std::find(contributors.begin(), contributors.end(), group_id) != contributors.end())
+            continue;
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group != nullptr)
+            detail.also_accepts_titles.push_back(group->title.empty() ? group->id : group->title);
+    }
+
+    if (workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase) {
+        detail.blocked_reason = AF_TR("The argument changed since this draft was written.");
+    } else {
+        const core::drafts::DraftPromotionPlan plan =
+            core::drafts::PlanDraftPromotion(*workspace, impl_->app_state.loaded_case.value(), contributors, "preview");
+        if (!plan.ok)
+            detail.blocked_reason = plan.error;
+    }
+}
+
 const core::drafts::DraftChangeIndex& AppRuntime::CurrentDraftChangeIndex() {
     static const core::drafts::DraftChangeIndex kEmpty;
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
@@ -750,6 +829,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // at least drawn against the draft it is really landing in.
     const parser::AssuranceCase& working = CurrentCanvasView();
     RefreshDraftDecorations();
+    RefreshSelectedDraftDetail();
     const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 
     const sacm::AssuranceCasePackage* sacm_package =

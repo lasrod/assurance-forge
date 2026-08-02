@@ -4,6 +4,7 @@
 #include "core/reviews/review_proposal.h"
 #include "core/time_utils.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace core::drafts {
@@ -298,6 +299,40 @@ bool DraftWorkspaceStore::RejectGroup(const std::string& group_id, std::string& 
     ++workspace_->working_revision;
     RecordEvent("group_rejected", group_id, group->title);
     InvalidateMaterialization();
+    return Save(error);
+}
+
+bool DraftWorkspaceStore::RemovePromotedGroups(const std::vector<std::string>& group_ids,
+                                               const core::AssuranceCase& new_accepted,
+                                               std::string& error) {
+    error.clear();
+    if (!workspace_.has_value())
+        return true;
+
+    DraftWorkspace& workspace = workspace_.value();
+    for (const std::string& group_id : group_ids) {
+        const auto removed = std::remove_if(workspace.groups.begin(),
+                                            workspace.groups.end(),
+                                            [&](const DraftChangeGroup& group) { return group.id == group_id; });
+        workspace.groups.erase(removed, workspace.groups.end());
+    }
+
+    // Rebased: the accepted argument these groups were written against is the
+    // one the promotion just produced.
+    workspace.base_model_hash = reviews::ComputeModelSemanticHash(new_accepted);
+    ++workspace.working_revision;
+    RecordEvent("groups_promoted", {}, std::to_string(group_ids.size()) + " groups");
+    InvalidateMaterialization();
+
+    // Nothing left to recover, so the recovery data goes rather than lingering
+    // as an empty draft that the banner would have to explain.
+    if (!workspace.has_active_groups()) {
+        const std::string key = ArgumentKey();
+        workspace_.reset();
+        if (project_root_.empty())
+            return true;
+        return DeleteDraftWorkspace(project_root_, key, error);
+    }
     return Save(error);
 }
 

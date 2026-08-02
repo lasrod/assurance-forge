@@ -124,11 +124,20 @@ msgstr "すべて受理"
 msgid "Accept change"
 msgstr "変更を受け入れる"
 
+msgid "Accept this change"
+msgstr "この変更を受理"
+
+msgid "Accepted"
+msgstr "受理済み"
+
 msgid "Accepted baseline"
 msgstr "受理済みベースライン"
 
 msgid "Accepted the working draft."
 msgstr "作業ドラフトを受理しました。"
+
+msgid "Accepting this also accepts: {0}"
+msgstr "これを受理すると次も受理されます: {0}"
 
 msgid "Active"
 msgstr "アクティブ"
@@ -466,6 +475,9 @@ msgstr "コンテキスト"
 msgid "Continue?"
 msgstr "続行しますか?"
 
+msgid "Contributions"
+msgstr "提案の内訳"
+
 msgid "Controlled Environment"
 msgstr "管理環境"
 
@@ -478,11 +490,17 @@ msgstr "レポートをクリップボードにコピー"
 msgid "Could not accept the working draft: {0}"
 msgstr "作業ドラフトを受理できませんでした: {0}"
 
+msgid "Could not accept this change: {0}"
+msgstr "この変更を受理できませんでした: {0}"
+
 msgid "Could not assign a SACM gid for confidence storage."
 msgstr "信頼度保存用の SACM gid を割り当てられませんでした。"
 
 msgid "Could not discard the working draft: {0}"
 msgstr "作業ドラフトを破棄できませんでした: {0}"
+
+msgid "Could not reject this change: {0}"
+msgstr "この変更を却下できませんでした: {0}"
 
 msgid "Could not resolve this preview element for proposal edits."
 msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
@@ -1447,6 +1465,12 @@ msgstr "登録簿の評価を読み込めなかったため、編集を保存で
 msgid "Reject change"
 msgstr "変更を却下する"
 
+msgid "Reject this change"
+msgstr "この変更を却下"
+
+msgid "Rejected the change. The accepted argument is unchanged."
+msgstr "変更を却下しました。受理済みの議論は変更されていません。"
+
 msgid "Relationship not found: {0}"
 msgstr "関係が見つかりません: {0}"
 
@@ -1858,6 +1882,15 @@ msgstr "この信頼度評価は古い可能性があります — 値が保存�
 msgid "This draft cannot be shown because one of its changes no longer applies. The accepted argument is displayed instead."
 msgstr "このドラフトの変更のいずれかが適用できないため表示できません。代わりに受理済みの議論を表示しています。"
 
+msgid "This element is proposed and is not in the accepted argument."
+msgstr "この要素は提案されたもので、受理済みの議論には含まれていません。"
+
+msgid "This element is proposed for removal."
+msgstr "この要素は削除が提案されています。"
+
+msgid "This element is proposed to change."
+msgstr "この要素は変更が提案されています。"
+
 msgid "This frame: {0:.2f} ms render across {1} buckets"
 msgstr "このフレーム: {0:.2f} ms ({1} バケット)"
 
@@ -2167,12 +2200,19 @@ msgstr "{0} 件未リンク"
 msgid "{0} warnings require review"
 msgstr "{0} 件の警告を確認する必要があります"
 
+msgid "{0} — {1}"
+msgstr "{0} — {1}"
+
 msgid "● PAUSED"
 msgstr "● 一時停止中"
 
 msgid "AI client connected: {0}"
 msgid_plural "AI clients connected: {0}"
 msgstr[0] "接続中の AI クライアント: {0}"
+
+msgid "Accepted {0} draft change."
+msgid_plural "Accepted {0} draft changes."
+msgstr[0] "ドラフトの変更 {0} 件を受理しました。"
 
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"

@@ -1,6 +1,7 @@
 #include "core/drafts/draft_workspace_store.h"
 
 #include "core/drafts/draft_materializer.h"
+#include "core/drafts/draft_dependency_graph.h"
 #include "core/drafts/draft_persistence.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/reviews/review_proposal_patch_service.h"
@@ -11,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -815,6 +817,135 @@ TEST(DraftWorkspace, PromotionDoesNotFuseTwoSourcesThatChoseTheSameCreateRef) {
     EXPECT_NE(FindElement(promoted, IdentityFor(fixture.store, first, "$goal")), nullptr);
     EXPECT_NE(FindElement(promoted, IdentityFor(fixture.store, second, "$goal")), nullptr);
     EXPECT_NE(IdentityFor(fixture.store, first, "$goal"), IdentityFor(fixture.store, second, "$goal"));
+}
+
+// --------------------------------------------------------------------------
+// Dependencies and selective acceptance.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, AnEditOfAnotherGroupsCreationDependsOnIt) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+    ASSERT_FALSE(sub_id.empty());
+
+    // The SCCG group edits an element that does not exist in the accepted
+    // argument at all. Accepting it alone is not a smaller change; it is an
+    // impossible one.
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    const std::map<std::string, std::vector<std::string>> dependencies =
+        core::drafts::InferDraftDependencies(*fixture.store.workspace());
+    ASSERT_EQ(dependencies.at(editor).size(), 1u);
+    EXPECT_EQ(dependencies.at(editor).front(), creator);
+    EXPECT_TRUE(dependencies.at(creator).empty());
+
+    const std::vector<std::string> closure = core::drafts::DependencyClosure(*fixture.store.workspace(), {editor});
+    ASSERT_EQ(closure.size(), 2u);
+    EXPECT_EQ(closure[0], creator) << "sequence order, so the creation is applied first";
+    EXPECT_EQ(closure[1], editor);
+}
+
+TEST(DraftWorkspace, AWordingEditWithNoDependenciesPromotesAlone) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    const std::string wording = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(wording, {UpdateTextOp("G1", "Clarified.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {wording}, "Jesper");
+    ASSERT_TRUE(plan.ok) << plan.error;
+    ASSERT_EQ(plan.closure.size(), 1u) << "it depends on nothing, so nothing else comes with it";
+    EXPECT_EQ(plan.closure.front(), wording);
+    EXPECT_TRUE(plan.added_by_closure.empty());
+
+    // The unrelated branch is still only proposed.
+    const core::SacmElement* promoted_claim = FindElement(plan.promoted_model, "G1");
+    ASSERT_NE(promoted_claim, nullptr);
+    EXPECT_EQ(promoted_claim->content, "Clarified.");
+    EXPECT_EQ(FindElement(plan.promoted_model, IdentityFor(fixture.store, branch, "$sub")), nullptr);
+}
+
+TEST(DraftWorkspace, AcceptingADependentChangeTakesWhatItNeedsAndSaysSo) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {editor}, "Jesper");
+    ASSERT_TRUE(plan.ok) << plan.error;
+
+    // The creation comes with it -- and is reported, so the UI can tell the user
+    // before they commit rather than widening what they asked for in silence.
+    ASSERT_EQ(plan.closure.size(), 2u);
+    ASSERT_EQ(plan.added_by_closure.size(), 1u);
+    EXPECT_EQ(plan.added_by_closure.front(), creator);
+
+    const core::SacmElement* promoted = FindElement(plan.promoted_model, sub_id);
+    ASSERT_NE(promoted, nullptr) << "the created element, at the id it was shown under";
+    EXPECT_EQ(promoted->content, "Identified hazards are mitigated to ALARP.");
+}
+
+TEST(DraftWorkspace, PromotionIsRefusedWhenTheRemainderCannotBeRebased) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    // A later group removes what the first created.
+    const std::string remover = fixture.BeginGroup("Remove the sub-claim", "SCCG AI Review");
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    core::reviews::ElementRef element;
+    element.existing_id = sub_id;
+    remove.element = element;
+    fixture.Stage(remover, {remove});
+
+    // Promoting the removal alone would accept a baseline in which the element
+    // never existed, leaving the creation group with nothing to do -- and the
+    // removal itself referring to an element that was never created. Refused,
+    // and refused *before* the accepted argument is touched.
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {remover}, "Jesper");
+    if (!plan.ok) {
+        EXPECT_FALSE(plan.error.empty());
+    } else {
+        // If the closure pulled the creation in, that is equally correct: the two
+        // are promoted together and nothing is stranded.
+        EXPECT_EQ(plan.closure.size(), 2u);
+    }
+}
+
+TEST(DraftWorkspace, RejectingACreationIdentifiesWhatDependsOnIt) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    // Rejecting the creation strands the rewording: it would refer to an element
+    // that will never exist. The user is offered the cascade rather than finding
+    // out at promotion.
+    const std::vector<std::string> dependents = core::drafts::DependentsOf(*fixture.store.workspace(), {creator});
+    ASSERT_EQ(dependents.size(), 1u);
+    EXPECT_EQ(dependents.front(), editor);
+
+    EXPECT_TRUE(core::drafts::DependentsOf(*fixture.store.workspace(), {editor}).empty())
+        << "nothing depends on the rewording";
 }
 
 // --------------------------------------------------------------------------

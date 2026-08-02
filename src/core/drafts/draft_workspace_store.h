@@ -104,6 +104,17 @@ public:
     // the record of what was proposed and declined survives.
     bool RejectGroup(const std::string& group_id, std::string& error);
 
+    // Drops groups that have just been promoted and rebases what is left onto
+    // `new_accepted`.
+    //
+    // The base hash moves with them. Without that, the next open would compare
+    // the draft against the argument the user just accepted into and call it
+    // stale -- refusing to apply the remaining groups because of a change the
+    // user themselves made through this very path.
+    bool RemovePromotedGroups(const std::vector<std::string>& group_ids,
+                              const core::AssuranceCase& new_accepted,
+                              std::string& error);
+
     // Discards the whole workspace, in memory and on disk. The accepted `.sacm`
     // is left byte-identical.
     bool DiscardWorkspace(std::string& error);

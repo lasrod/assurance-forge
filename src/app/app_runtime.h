@@ -204,6 +204,11 @@ private:
     // the working draft. Run with the derived views, from the same change index.
     void RefreshDraftDecorations();
 
+    // Rebuilds what the inspector shows for the selected element: the accepted
+    // and working text, the ordered contributions, and the dependency closure
+    // accepting it would actually take.
+    void RefreshSelectedDraftDetail();
+
 public:
     // The draft workspace for the argument that is open, or null when there is
     // no draft. Read-only: only `AppRuntime` mutates it, which is what keeps
@@ -255,6 +260,16 @@ private:
     // with one undo boundary and one audit record naming every contributing
     // source. Only a person reaches this -- there is no tool that does.
     bool PromoteWorkingDraft(std::string& error);
+
+    // Accepts a dependency-closed selection of draft groups.
+    //
+    // The closure is computed and both halves are materialized -- the selection
+    // against the accepted baseline, the remainder against the result -- before
+    // anything is written. If either fails, nothing is.
+    bool PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
+
+    // Rejects a selection and everything left dangling by it.
+    bool RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
 
     // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
     // because nothing in the draft was ever applied to it.

@@ -46,4 +46,42 @@ struct CompiledDraftPromotion {
 // nothing coordinates the names two clients pick.
 CompiledDraftPromotion CompileWorkspacePromotion(const DraftWorkspace& workspace, const std::string& author_name);
 
+// Compiles the named groups only, in sequence order.
+//
+// The caller is expected to have closed `group_ids` over dependencies already --
+// this does not do it, because widening a selection silently is the failure the
+// closure exists to prevent, and the widening has to be shown to the user before
+// it happens rather than performed inside a compile step.
+CompiledDraftPromotion CompileSelectedPromotion(const DraftWorkspace& workspace,
+                                                const std::vector<std::string>& group_ids,
+                                                const std::string& author_name);
+
+// Whether promoting `group_ids` would leave a coherent argument, checked before
+// anything is written.
+struct DraftPromotionPlan {
+    bool ok = false;
+    std::string error;
+    // The groups that will actually be promoted: the selection closed over its
+    // dependencies. Shown to the user before they commit.
+    std::vector<std::string> closure;
+    // Groups in the closure that the user did not pick, so the UI can say "this
+    // also accepts ..." rather than quietly taking more than was asked for.
+    std::vector<std::string> added_by_closure;
+    // The accepted argument as it would be after promotion.
+    core::AssuranceCase promoted_model;
+    CompiledDraftPromotion compiled;
+};
+
+// Materializes the selection against the accepted baseline **and** the remaining
+// groups against the prospective new baseline, and reports whether both hold.
+//
+// Both halves matter. A selection that applies cleanly can still leave the rest
+// of the draft referring to something it removed, and discovering that after the
+// accepted SACM had changed would mean a safety argument mutated into a state
+// nobody chose. So this runs first and promotion is refused on failure.
+DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
+                                      const core::AssuranceCase& accepted,
+                                      const std::vector<std::string>& selection,
+                                      const std::string& author_name);
+
 } // namespace core::drafts

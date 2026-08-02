@@ -48,6 +48,40 @@ struct DraftEdgeDecoration {
     std::string source_label;
 };
 
+// One group's contribution to the selected element, for the inspector.
+struct DraftContributionView {
+    std::string group_id;
+    std::string title;
+    std::string source_label;
+    std::string rationale;
+    core::drafts::DraftElementChange change = core::drafts::DraftElementChange::Unchanged;
+};
+
+// What the working draft does to the element the user has selected.
+//
+// Published for the selection only rather than for every element: this is what a
+// reviewer reads before deciding, and computing it for a whole argument every
+// frame would be work nobody asked for.
+struct DraftElementDetailView {
+    bool present = false;
+    std::string element_id;
+    core::drafts::DraftElementChange change = core::drafts::DraftElementChange::Unchanged;
+    // What the accepted argument says today, and what the draft would make it
+    // say. Shown side by side, because "what changed" is the question and a
+    // reviewer should not have to switch views to answer it.
+    std::string accepted_text;
+    std::string working_text;
+    std::vector<DraftContributionView> contributions;
+    // The groups accepting this element would actually promote: the contributing
+    // groups closed over their dependencies.
+    std::vector<std::string> closure_group_ids;
+    // Titles of the groups in the closure the user did not point at, so the UI
+    // can say what else is coming rather than quietly taking more than asked.
+    std::vector<std::string> also_accepts_titles;
+    // Why this element cannot be accepted on its own right now, if it cannot.
+    std::string blocked_reason;
+};
+
 // Which version of the argument the canvas draws while a draft workspace holds
 // unaccepted changes.
 enum class DraftViewMode {
@@ -149,6 +183,9 @@ struct UiState {
     // addresses a relationship by its endpoints and never by id. Keying on the
     // endpoints gives the canvas a handle that survives a rebuild.
     std::unordered_map<std::string, DraftEdgeDecoration> draft_edge_status;
+
+    // What the draft does to the selected element, refreshed each frame.
+    DraftElementDetailView draft_selected_detail;
 
     // Which version of the argument the canvas is showing while a working draft
     // is active (ADR 0009).

@@ -17,6 +17,10 @@ namespace app::areas {
 
 struct InspectorAreaCallbacks {
     std::function<void()> render_proposal_element_editor;
+    // Accept or reject the working-draft change on the selected element. Both
+    // receive the dependency closure the inspector displayed, never a wider set.
+    std::function<void(const std::vector<std::string>&)> accept_draft_groups;
+    std::function<void(const std::vector<std::string>&)> reject_draft_groups;
     std::function<void(const std::string&, const std::string&)> define_terminology_term;
     std::function<void(const std::string&, const std::string&)> link_existing_terminology_term;
     std::function<void(const std::string&, const core::TerminologyPackageRef&, const core::TerminologyTermRef&)>

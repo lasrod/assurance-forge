@@ -21,6 +21,7 @@
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/timeline/timeline_widget.h"
+#include "ui/theme.h"
 #include "ui/ui_state.h"
 
 #include "imgui.h"
@@ -414,13 +415,15 @@ void DraftViewModeButton(ui::UiState& ui_state, ui::DraftViewMode mode, const st
     // they are looking at -- that is the whole job of this control.
     const std::string text = (active ? "\xe2\x97\x8f " : "") + label;
     if (active) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.30f, 0.36f, 0.48f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.36f, 0.43f, 0.56f, 1.0f));
+        const ui::Theme& theme = ui::GetTheme();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(theme.accent));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::ColorConvertU32ToFloat4(theme.accent_hover));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::InkOn(theme.accent)));
     }
     if (ImGui::Button((text + id).c_str()))
         ui_state.draft_view_mode = mode;
     if (active)
-        ImGui::PopStyleColor(2);
+        ImGui::PopStyleColor(3);
 }
 
 } // namespace
@@ -437,13 +440,21 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     const bool needs_rebase = workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase;
     const bool blocked = workspace->state == core::drafts::DraftWorkspaceState::Blocked;
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg,
-                          needs_rebase || blocked ? IM_COL32(96, 64, 16, 255) : IM_COL32(32, 44, 72, 255));
+    // Derived from the theme rather than fixed, or the banner is legible in one
+    // theme and not the other -- and the light theme is exactly where a dark
+    // hardcoded tint leaves the text unreadable. `InkOn` picks the ink that has
+    // contrast against whatever background the tint produced.
+    const ui::Theme& theme = ui::GetTheme();
+    const ImU32 banner_bg =
+        ui::LerpColor(theme.surface_1, needs_rebase || blocked ? theme.attention : theme.accent, 0.18f);
+    const ImU32 banner_ink = ui::InkOn(banner_bg);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(banner_ink));
     ImGui::BeginChild("##working_draft_banner", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 4.2f), true);
 
     // Stated in words, not implied by a tint. This is the line that stops a
     // proposal being read as the accepted safety argument.
-    ImGui::TextColored(ImVec4(0.72f, 0.82f, 1.0f, 1.0f),
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(banner_ink),
                        "%s",
                        ui::i18n::trnf("WORKING DRAFT — {0} unaccepted change",
                                       "WORKING DRAFT — {0} unaccepted changes",
@@ -501,7 +512,7 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     }
 
     ImGui::EndChild();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(2);
     ImGui::Spacing();
 }
 

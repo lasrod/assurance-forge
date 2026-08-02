@@ -257,6 +257,10 @@ void RenderInspectorArea(AppRuntimeState& state,
             }
         }
 
+        ui::panels::ElementDraftCallbacks draft_callbacks;
+        draft_callbacks.accept_groups = callbacks.accept_draft_groups;
+        draft_callbacks.reject_groups = callbacks.reject_draft_groups;
+
         if (ui::panels::ShowElementPanel(loaded_case,
                                          sacm_package,
                                          &terminology_callbacks,
@@ -264,6 +268,7 @@ void RenderInspectorArea(AppRuntimeState& state,
                                          &text_edit_callbacks,
                                          &history_callbacks,
                                          &translation_review_callbacks,
+                                         &draft_callbacks,
                                          inspector_read_only)) {
             if (state.confidence_controller && loaded_case) {
                 const bool confidence_changed = state.confidence_controller->RefreshStaleFlags(*loaded_case);

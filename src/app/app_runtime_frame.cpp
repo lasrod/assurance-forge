@@ -410,6 +410,25 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::InspectorAreaCallbacks inspector_callbacks{
         [this, &proposal_editor_callbacks]() { areas::RenderProposalElementEditor(*impl_, proposal_editor_callbacks); },
+        [this](const std::vector<std::string>& group_ids) {
+            std::string error;
+            if (PromoteDraftGroups(group_ids, error)) {
+                SetStatus(ui::i18n::trnf("Accepted {0} draft change.",
+                                         "Accepted {0} draft changes.",
+                                         static_cast<int>(group_ids.size()),
+                                         group_ids.size()));
+            } else {
+                SetStatus(ui::i18n::trf("Could not accept this change: {0}", error));
+            }
+        },
+        [this](const std::vector<std::string>& group_ids) {
+            std::string error;
+            if (RejectDraftGroups(group_ids, error)) {
+                SetStatus(AF_TR("Rejected the change. The accepted argument is unchanged."));
+            } else {
+                SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
+            }
+        },
         [this](const std::string& element_id, const std::string& term_value) {
             BeginQuickDefineTerminologyTerm(element_id, term_value);
         },

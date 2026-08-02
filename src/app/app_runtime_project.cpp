@@ -14,6 +14,7 @@
 #include "app/structure_problem_sync.h"
 #include "app/translation_review_sync.h"
 #include "core/translation_review_store.h"
+#include "core/drafts/draft_dependency_graph.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
@@ -1350,6 +1351,82 @@ bool AppRuntime::PromoteWorkingDraft(std::string& error) {
             "Accepted, but the draft recovery data could not be removed: " + discard_error;
     }
     impl_->app_state.mark_dirty();
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+    error.clear();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || group_ids.empty()) {
+        error = "There is nothing to accept.";
+        return false;
+    }
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+    if (workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase) {
+        error = "The argument changed since this draft was written. Inspect or discard it first.";
+        return false;
+    }
+
+    std::string author;
+    for (const std::string& group_id : group_ids) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group == nullptr || group->source_label.empty())
+            continue;
+        if (author.find(group->source_label) == std::string::npos)
+            author += (author.empty() ? "" : ", ") + group->source_label;
+    }
+    if (author.empty())
+        author = "Working draft";
+
+    // Everything that can refuse, refuses here -- before the accepted model is
+    // touched at all.
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*workspace, impl_->app_state.loaded_case.value(), group_ids, author);
+    if (!plan.ok) {
+        error = plan.error;
+        return false;
+    }
+
+    core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(*impl_, command, author);
+    if (!outcome.success) {
+        error = outcome.error;
+        return false;
+    }
+
+    // Promoted groups leave the active workspace; the rest stay visible against
+    // the new baseline. The base hash moves with it, or the next open would call
+    // the draft stale against an argument the user just accepted into.
+    if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, impl_->app_state.loaded_case.value(), error)) {
+        impl_->app_state.status_message = "Accepted, but the draft could not be updated: " + error;
+    }
+    impl_->app_state.mark_dirty();
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+    error.clear();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || group_ids.empty()) {
+        error = "There is nothing to reject.";
+        return false;
+    }
+
+    // A group whose creations another group edits cannot be rejected alone: the
+    // second would refer to an element that will never exist. Both go.
+    std::vector<std::string> rejecting = group_ids;
+    for (const std::string& dependent : core::drafts::DependentsOf(*workspace, group_ids))
+        rejecting.push_back(dependent);
+
+    for (const std::string& group_id : rejecting) {
+        if (!impl_->draft_workspace.RejectGroup(group_id, error))
+            return false;
+    }
     impl_->tree_needs_rebuild = true;
     return true;
 }

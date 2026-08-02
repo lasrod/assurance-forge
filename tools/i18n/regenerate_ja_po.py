@@ -265,6 +265,18 @@ TRANSLATIONS = {
     "Could not accept the working draft: {0}": "作業ドラフトを受理できませんでした: {0}",
     "Discarded the working draft. The accepted argument is unchanged.": "作業ドラフトを破棄しました。受理済みの議論は変更されていません。",
     "Could not discard the working draft: {0}": "作業ドラフトを破棄できませんでした: {0}",
+    "This element is proposed and is not in the accepted argument.": "この要素は提案されたもので、受理済みの議論には含まれていません。",
+    "This element is proposed to change.": "この要素は変更が提案されています。",
+    "This element is proposed for removal.": "この要素は削除が提案されています。",
+    "Accepted": "受理済み",
+    "Contributions": "提案の内訳",
+    "{0} — {1}": "{0} — {1}",
+    "Accepting this also accepts: {0}": "これを受理すると次も受理されます: {0}",
+    "Accept this change": "この変更を受理",
+    "Reject this change": "この変更を却下",
+    "Rejected the change. The accepted argument is unchanged.": "変更を却下しました。受理済みの議論は変更されていません。",
+    "Could not accept this change: {0}": "この変更を受理できませんでした: {0}",
+    "Could not reject this change: {0}": "この変更を却下できませんでした: {0}",
     "The replayed audit history does not reproduce the on-disk SACM. This usually means edits were applied through a path that did not record transactions. Pinned historical views may be inaccurate.": "再生された監査履歴がディスク上の SACM を再現できません。通常、これはトランザクションを記録しない経路で編集が適用されたことを意味します。固定された履歴ビューは正確でない可能性があります。",
     "replay={0}  on_disk={1}": "再生={0}  ディスク={1}",
     "Reconcile audit log…": "監査ログを再構築…",
@@ -883,6 +895,7 @@ TRANSLATIONS = {
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
     ("WORKING DRAFT — {0} unaccepted change", "WORKING DRAFT — {0} unaccepted changes"): ["作業ドラフト — 未受理の変更 {0} 件"],
+    ("Accepted {0} draft change.", "Accepted {0} draft changes."): ["ドラフトの変更 {0} 件を受理しました。"],
     ("{0} element", "{0} elements"): ["{0} 要素"],
     ("{0} open finding", "{0} open findings"): ["未解決の指摘 {0} 件"],
     ("{0} item needs attention", "{0} items need attention"):

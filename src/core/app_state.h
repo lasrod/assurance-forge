@@ -83,6 +83,14 @@ struct AppState {
     bool save_file(const std::string& file_path);
     bool save_current_document();
     bool save_project();
+    // Brings `af.proj`'s recorded hashes for one tracked file back in line with
+    // what is on disk, and writes the manifest.
+    //
+    // Called after saving, because saving is what makes the recorded hash wrong.
+    // A project that reports its own save as an external modification trains the
+    // user to dismiss the one warning that would tell them a colleague had
+    // changed a safety argument underneath them.
+    bool refresh_tracked_file_hashes(const std::filesystem::path& file_path);
     void mark_dirty();
 
     bool create_empty_project(const std::string& project_name, const std::string& parent_location);
