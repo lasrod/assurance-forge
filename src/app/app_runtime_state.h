@@ -221,6 +221,19 @@ struct AppRuntimeState {
     // elements -- and this is how the runtime notices the argument changed.
     std::filesystem::path draft_workspace_argument;
     std::filesystem::path draft_workspace_root;
+    // Scratch for the "changes only" view mode, so the canvas can hold a
+    // reference to it across the frame the way it does the other views.
+    parser::AssuranceCase draft_changes_only_view;
+    // The workspace revision the canvas was last built against. Draft mutation
+    // is deliberately not a model mutation and marks nothing dirty, so this is
+    // what turns a staged group into a repaint.
+    std::uint64_t draft_revision_drawn = 0;
+    // The argument the canvas should draw this frame, published by
+    // `AppRuntime::SyncDraftWorkspace` so the UI areas do not each have to
+    // resolve it -- and so none of them can quietly keep reading the accepted
+    // case while the rest of the application has moved to the working model.
+    // Null before the first frame; falls back to the accepted case.
+    const parser::AssuranceCase* draft_canvas_view = nullptr;
     // The store revision the canvas was last built against. Staging is not a
     // model mutation and so marks nothing dirty; comparing this each frame is
     // what turns an agent's staged operation into a repaint.

@@ -563,6 +563,29 @@ const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
     return result.working_model;
 }
 
+const parser::AssuranceCase& AppRuntime::CurrentCanvasView() {
+    const parser::AssuranceCase& working = CurrentArgumentView();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups() || !impl_->app_state.loaded_case.has_value()) {
+        return working;
+    }
+
+    switch (ui::GetUiState().draft_view_mode) {
+    case ui::DraftViewMode::AcceptedBaseline:
+        return impl_->app_state.loaded_case.value();
+    case ui::DraftViewMode::ChangesOnly: {
+        const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+        // Rebuilt only when the draft or the accepted model moved, which is the
+        // same condition that invalidates the tree below it.
+        impl_->draft_changes_only_view = core::drafts::BuildChangesOnlyView(working, index);
+        return impl_->draft_changes_only_view;
+    }
+    case ui::DraftViewMode::WorkingDraft:
+        break;
+    }
+    return working;
+}
+
 const core::drafts::DraftChangeIndex& AppRuntime::CurrentDraftChangeIndex() {
     static const core::drafts::DraftChangeIndex kEmpty;
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
@@ -656,7 +679,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // until phase 3 moves it onto draft groups. Stacking it on the working model
     // rather than on the accepted one means a connected client's staged work is
     // at least drawn against the draft it is really landing in.
-    const parser::AssuranceCase& working = CurrentArgumentView();
+    const parser::AssuranceCase& working = CurrentCanvasView();
     const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 
     const sacm::AssuranceCasePackage* sacm_package =

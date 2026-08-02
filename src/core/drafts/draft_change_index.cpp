@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace core::drafts {
 namespace {
@@ -153,6 +154,80 @@ void FinalizeChangeIndex(DraftChangeIndex& index,
     std::sort(index.removed.begin(),
               index.removed.end(),
               [](const core::SacmElement& left, const core::SacmElement& right) { return left.id < right.id; });
+}
+
+namespace {
+
+bool IsRelationship(const core::SacmElement& element) {
+    return element.type == "assertedinference" || element.type == "assertedcontext" ||
+           element.type == "assertedevidence";
+}
+
+// Every endpoint a relationship touches: SACM puts the premise in `source_refs`,
+// the conclusion in `target_refs`, and a strategy in `reasoning_ref`.
+std::vector<std::string> Endpoints(const core::SacmElement& relationship) {
+    std::vector<std::string> ids = relationship.source_refs;
+    ids.insert(ids.end(), relationship.target_refs.begin(), relationship.target_refs.end());
+    if (!relationship.reasoning_ref.empty())
+        ids.push_back(relationship.reasoning_ref);
+    return ids;
+}
+
+} // namespace
+
+core::AssuranceCase BuildChangesOnlyView(const core::AssuranceCase& working, const DraftChangeIndex& index) {
+    std::unordered_set<std::string> included;
+    for (const std::string& id : index.ChangedElementIds())
+        included.insert(id);
+    if (included.empty())
+        return working;
+
+    // Walk upward to the root: anything an included element supports or gives
+    // context to is included too. Repeated to a fixpoint because the path may be
+    // several steps long, and bounded by the element count because each pass
+    // either adds something or stops.
+    bool grew = true;
+    while (grew) {
+        grew = false;
+        for (const core::SacmElement& element : working.elements) {
+            if (!IsRelationship(element))
+                continue;
+            const bool from_included = std::any_of(element.source_refs.begin(),
+                                                   element.source_refs.end(),
+                                                   [&](const std::string& id) { return included.count(id) > 0; }) ||
+                                       (!element.reasoning_ref.empty() && included.count(element.reasoning_ref) > 0);
+            if (!from_included)
+                continue;
+            for (const std::string& target : element.target_refs) {
+                if (included.insert(target).second)
+                    grew = true;
+            }
+        }
+    }
+
+    core::AssuranceCase view;
+    view.id = working.id;
+    view.name = working.name;
+    view.description = working.description;
+    view.acps = working.acps;
+    for (const core::SacmElement& element : working.elements) {
+        if (IsRelationship(element)) {
+            const std::vector<std::string> endpoints = Endpoints(element);
+            const bool all_present =
+                !endpoints.empty() && std::all_of(endpoints.begin(), endpoints.end(), [&](const std::string& id) {
+                    return included.count(id) > 0;
+                });
+            // A relationship with an endpoint outside the view would render as a
+            // dangling edge, which reads as a structural defect the argument does
+            // not have.
+            if (all_present)
+                view.elements.push_back(element);
+            continue;
+        }
+        if (included.count(element.id) > 0)
+            view.elements.push_back(element);
+    }
+    return view;
 }
 
 } // namespace core::drafts

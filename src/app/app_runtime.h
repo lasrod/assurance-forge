@@ -226,6 +226,16 @@ public:
     // no draft is active. Valid for the same window as `CurrentArgumentView`.
     const core::drafts::DraftChangeIndex& CurrentDraftChangeIndex();
 
+    // What the *canvas* draws, which is the user's view-mode choice applied to
+    // `CurrentArgumentView`.
+    //
+    // Deliberately separate. The view mode is a display preference; validation,
+    // the checks and connected reads must not follow it, or switching to
+    // "accepted baseline" to compare would quietly stop reporting the problems
+    // the draft introduces. A rule about the argument is a property of the
+    // argument, not of the part of it someone happens to be looking at.
+    const parser::AssuranceCase& CurrentCanvasView();
+
 private:
     // Accepts an agent's change set: the one point where staged work becomes a
     // real edit. Goes through `ApplyProposalCommand`, so it is audited, undoable

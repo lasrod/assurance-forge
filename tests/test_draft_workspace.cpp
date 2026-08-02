@@ -690,6 +690,45 @@ TEST(DraftWorkspace, SerializationRoundTripsGroupsAndIdentities) {
 }
 
 // --------------------------------------------------------------------------
+// The "changes only" view mode.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, ChangesOnlyKeepsThePathFromEachChangeToTheRoot) {
+    Fixture fixture;
+    // A deeper baseline, so there is a path to lose.
+    fixture.accepted.elements.push_back(Strategy("S1", "Argue over identified hazards."));
+    fixture.accepted.elements.push_back(Claim("G2", "Hazard H1 is mitigated.", true));
+    fixture.accepted.elements.push_back(Claim("G3", "Hazard H2 is mitigated.", true));
+    fixture.accepted.elements.push_back(Supports("R1", "S1", "G1"));
+    fixture.accepted.elements.push_back(Supports("R2", "G2", "S1"));
+    fixture.accepted.elements.push_back(Supports("R3", "G3", "S1"));
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    const std::string group = fixture.BeginGroup("Clarify one leaf");
+    fixture.Stage(group, {UpdateTextOp("G2", "Hazard H1 is mitigated by the redundant channel.")});
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(result.success) << result.error;
+
+    const core::AssuranceCase view = core::drafts::BuildChangesOnlyView(result.working_model, result.change_index);
+
+    // The changed claim, and the argument above it. A claim shown without the
+    // strategy that introduces it and the goal it serves is not reviewable.
+    EXPECT_NE(FindElement(view, "G2"), nullptr);
+    EXPECT_NE(FindElement(view, "S1"), nullptr);
+    EXPECT_NE(FindElement(view, "G1"), nullptr);
+    EXPECT_NE(FindElement(view, "R2"), nullptr);
+    EXPECT_NE(FindElement(view, "R1"), nullptr);
+
+    // The untouched sibling is not part of this change and is left out.
+    EXPECT_EQ(FindElement(view, "G3"), nullptr);
+    // ...and so is the relationship that would otherwise dangle from it, which
+    // would read as a structural defect the argument does not have.
+    EXPECT_EQ(FindElement(view, "R3"), nullptr);
+}
+
+// --------------------------------------------------------------------------
 // Promotion: compiling the draft into one thing the ordinary apply path takes.
 // --------------------------------------------------------------------------
 

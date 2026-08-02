@@ -135,12 +135,36 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     {
+        // The draft view mode and the draft itself both change what the canvas
+        // should draw, and neither is a model mutation, so neither marks
+        // anything dirty on its own. Comparing them here is what turns "show me
+        // the accepted baseline" and an agent's staged group into a repaint --
+        // the same defect the change-set store's revision counter exists to
+        // avoid, where an agent's work stayed invisible until something
+        // unrelated happened to rebuild the tree.
+        ui::UiState& ui_state = ui::GetUiState();
+        static ui::DraftViewMode last_draft_view_mode = ui::DraftViewMode::WorkingDraft;
+        const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+        if (ui_state.draft_view_mode != last_draft_view_mode || draft_revision != impl_->draft_revision_drawn) {
+            impl_->tree_needs_rebuild = true;
+            last_draft_view_mode = ui_state.draft_view_mode;
+            impl_->draft_revision_drawn = draft_revision;
+        }
+    }
+
+    {
         // After the bridge, for the same reason the bridge runs before the
         // derived views: a connected client can switch which argument file is
         // open, and a workspace still pointing at the previous one would
         // decorate this argument's identically-named elements.
         core::perf::ScopedTimer s("app.draft_workspace");
         SyncDraftWorkspace();
+        // Published once per frame so every UI area reads the same argument.
+        // Resolved here rather than in each area because an area that quietly
+        // kept reading the accepted case while the rest of the application had
+        // moved to the working model is exactly the split that made one view of
+        // a change set show eighty staged elements and another show none.
+        impl_->draft_canvas_view = impl_->app_state.loaded_case.has_value() ? &CurrentCanvasView() : nullptr;
     }
 
     {

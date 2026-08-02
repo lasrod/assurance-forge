@@ -159,10 +159,16 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
     } else {
         actions = MakeCanvasContextActions(callbacks);
     }
-    const parser::AssuranceCase* visible_case =
-        state.IsProposalCanvasActive()
-            ? &state.proposal_controller->preview_model
+    // The working argument, not the accepted one, unless a proposal canvas has
+    // taken the surface over. `draft_canvas_view` is the frame's single answer
+    // to "which argument is on screen"; falling back to the accepted case covers
+    // the first frame, before it has been published.
+    const parser::AssuranceCase* accepted_or_working =
+        state.draft_canvas_view != nullptr
+            ? state.draft_canvas_view
             : (state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr);
+    const parser::AssuranceCase* visible_case =
+        state.IsProposalCanvasActive() ? &state.proposal_controller->preview_model : accepted_or_working;
     ui_state.proposal_canvas_active = state.IsProposalCanvasActive();
     const sacm::AssuranceCasePackage* terminology_package =
         state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
@@ -205,22 +211,29 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
     const std::uint64_t change_set_revision = state.agent_change_sets.revision();
+    // Folded into the change-set revision so the per-package cache is
+    // invalidated by a draft mutation or a view-mode switch as well. Without it
+    // the tab keeps drawing the argument it built before the draft moved.
+    const std::uint64_t draft_revision =
+        state.draft_workspace.revision() * 8u + static_cast<std::uint64_t>(ui::GetUiState().draft_view_mode);
     const ui::UiState& ui_state_for_lang = ui::GetUiState();
-    const bool inputs_match =
-        cache.valid && cache.case_revision == current_revision && cache.change_set_revision == change_set_revision &&
-        cache.argument_package_id == argument_package->id && cache.argument_package_gid == argument_package->gid &&
-        cache.tab_title == tab.title && cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
-        cache.secondary_language == ui_state_for_lang.active_secondary_lang;
+    const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
+                              cache.change_set_revision == CombineRevisions(change_set_revision, draft_revision) &&
+                              cache.argument_package_id == argument_package->id &&
+                              cache.argument_package_gid == argument_package->gid && cache.tab_title == tab.title &&
+                              cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
+                              cache.secondary_language == ui_state_for_lang.active_secondary_lang;
 
     if (!inputs_match) {
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_visible_case");
-            cache.visible_case = BuildArgumentPackageCanvasCase(state.app_state.loaded_case.value(),
-                                                                state.agent_preview_case,
-                                                                state.agent_preview_added_ids,
-                                                                state.app_state.projected_package(),
-                                                                *argument_package,
-                                                                tab.title);
+            cache.visible_case = BuildArgumentPackageCanvasCase(
+                state.draft_canvas_view != nullptr ? *state.draft_canvas_view : state.app_state.loaded_case.value(),
+                state.agent_preview_case,
+                state.agent_preview_added_ids,
+                state.app_state.projected_package(),
+                *argument_package,
+                tab.title);
         }
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_assurance_tree");
@@ -229,7 +242,7 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
             core::ApplyTreeDisplayOrder(cache.visible_tree, state.tree_display_order);
         }
         cache.case_revision = current_revision;
-        cache.change_set_revision = change_set_revision;
+        cache.change_set_revision = CombineRevisions(change_set_revision, draft_revision);
         cache.argument_package_id = argument_package->id;
         cache.argument_package_gid = argument_package->gid;
         cache.tab_title = tab.title;

@@ -89,4 +89,17 @@ void FinalizeChangeIndex(DraftChangeIndex& index,
                          const core::AssuranceCase& accepted,
                          const core::AssuranceCase& working);
 
+// The working model narrowed to what the draft touches, plus the argument path
+// above it.
+//
+// A bare list of changed elements is unreadable: a claim means nothing without
+// the goal it supports and the strategy that introduces it. So every changed
+// element keeps its ancestors up to the root, and the relationships between
+// everything included come with them.
+//
+// Display only. Validation and the checks always run over the whole working
+// model -- a rule about the argument is a property of the argument, not of the
+// part of it someone happens to be looking at.
+core::AssuranceCase BuildChangesOnlyView(const core::AssuranceCase& working, const DraftChangeIndex& index);
+
 } // namespace core::drafts
