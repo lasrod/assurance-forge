@@ -228,7 +228,11 @@ Result GetDraftStatus(const DraftContext& context) {
         for (const core::drafts::DraftChangeGroup* group : workspace->ActiveGroups())
             groups.push_back(GroupJson(*group));
     }
-    payload["groups"] = std::move(groups);
+    payload["groups"] = groups;
+    // One migration release keeps the previous response key as well as the new
+    // vocabulary. This lets existing clients move from list_change_sets to
+    // get_draft_status without treating every persisted group as missing.
+    payload["change_sets"] = std::move(groups);
     AddWorkspaceEnvelope(context, payload);
     return Result::Ok(std::move(payload));
 }

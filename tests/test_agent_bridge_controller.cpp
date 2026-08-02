@@ -232,6 +232,35 @@ TEST_F(AgentBridgeControllerTest, ShowsAConnectedClientToTheApplication) {
     EXPECT_FALSE(connected[0].connected_utc.empty());
 }
 
+TEST_F(AgentBridgeControllerTest, RefusesHelloUntilAStableSessionIdIsProvided) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+
+    bridge::Request missing = Say(bridge::kHelloOperation, token, 1);
+    missing.args = nlohmann::json{{"client", "assurance-forge-mcp"}};
+    const bridge::Response missing_response = Exchange(*client, missing);
+    EXPECT_FALSE(missing_response.ok);
+    EXPECT_EQ(missing_response.error_code, bridge::error_code::kBadRequest);
+    EXPECT_NE(missing_response.error_message.find("session"), std::string::npos);
+
+    bridge::Request empty = Say(bridge::kHelloOperation, token, 2);
+    empty.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", ""}};
+    const bridge::Response empty_response = Exchange(*client, empty);
+    EXPECT_FALSE(empty_response.ok);
+    EXPECT_EQ(empty_response.error_code, bridge::error_code::kBadRequest);
+
+    bridge::Request valid = Say(bridge::kHelloOperation, token, 3);
+    valid.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", "stable-session-3"}};
+    EXPECT_TRUE(Exchange(*client, valid).ok);
+    ASSERT_EQ(controller.connections().size(), 1u);
+    EXPECT_EQ(controller.connections()[0].session_id, "stable-session-3");
+}
+
 // The token lives in the user's own runtime directory. A local process that did
 // not read it is not the adapter this application published for.
 TEST_F(AgentBridgeControllerTest, RefusesAConnectionWithTheWrongToken) {

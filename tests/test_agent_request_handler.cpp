@@ -276,6 +276,32 @@ TEST(AgentRequestHandler, HumanDraftMutationMakesAnMcpRevisionStale) {
     EXPECT_EQ(stale.result["current_working_revision"], drafts.revision());
 }
 
+TEST(AgentRequestHandler, LegacyListChangeSetsReturnsChangeSetsAlias) {
+    TempDir workspace{UniqueTempPath("legacy-list-change-sets")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "Legacy MCP client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 9;
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_set", {{"title", "Legacy group"}, {"expected_working_revision", 0}}), context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+
+    const bridge::Response listed = app::HandleAgentRequest(MakeRequest("list_change_sets"), context);
+    ASSERT_FALSE(listed.result.value("isError", true)) << listed.result.dump();
+    ASSERT_TRUE(listed.result.contains("groups"));
+    ASSERT_TRUE(listed.result.contains("change_sets"));
+    EXPECT_EQ(listed.result["change_sets"], listed.result["groups"]);
+    ASSERT_EQ(listed.result["change_sets"].size(), 1u);
+    EXPECT_EQ(listed.result["change_sets"][0]["change_set_id"], begun.result["change_set_id"]);
+}
+
 // A domain failure is a successful response carrying `isError`, not a transport
 // failure. The distinction matters: a model that sees a faulted connection stops,
 // where one that sees a tool error corrects itself and tries again.

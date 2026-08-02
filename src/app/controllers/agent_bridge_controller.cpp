@@ -248,14 +248,18 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
         }
 
         if (request.op == bridge::kHelloOperation) {
+            const nlohmann::json::const_iterator session = request.args.find("session");
+            if (session == request.args.end() || !session->is_string() || session->get<std::string>().empty()) {
+                connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
+                    request.id, bridge::error_code::kBadRequest, "Hello requires a non-empty session id.")));
+                continue;
+            }
+
             const nlohmann::json::const_iterator client = request.args.find("client");
             if (client != request.args.end() && client->is_string()) {
                 descriptor.client_label = client->get<std::string>();
             }
-            const nlohmann::json::const_iterator session = request.args.find("session");
-            if (session != request.args.end() && session->is_string()) {
-                descriptor.session_id = session->get<std::string>();
-            }
+            descriptor.session_id = session->get<std::string>();
             UpdateConnectionIdentity(descriptor.id, descriptor.client_label, descriptor.session_id);
             initialized = true;
             connection->WriteMessage(
