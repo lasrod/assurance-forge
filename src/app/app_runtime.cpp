@@ -40,6 +40,7 @@
 #include "core/time_utils.h"
 #include "imgui.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/sacm_viewer_panel.h"
@@ -538,6 +539,41 @@ const core::drafts::DraftWorkspace* AppRuntime::CurrentDraftWorkspace() const {
     return impl_->draft_workspace.workspace();
 }
 
+const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
+    static const parser::AssuranceCase kEmpty;
+    if (!impl_->app_state.loaded_case.has_value()) {
+        return kEmpty;
+    }
+    const parser::AssuranceCase& accepted = impl_->app_state.loaded_case.value();
+
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups()) {
+        return accepted;
+    }
+
+    const core::drafts::DraftMaterializationResult& result =
+        impl_->draft_workspace.Materialize(accepted, impl_->app_state.case_revision);
+    if (!result.success) {
+        // A draft that cannot be materialized shows the accepted argument, not a
+        // partially applied one. The failure is reported against the group that
+        // caused it; what must not happen is a half-applied safety argument
+        // rendered as though it were the proposal.
+        return accepted;
+    }
+    return result.working_model;
+}
+
+const core::drafts::DraftChangeIndex& AppRuntime::CurrentDraftChangeIndex() {
+    static const core::drafts::DraftChangeIndex kEmpty;
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups() || !impl_->app_state.loaded_case.has_value()) {
+        return kEmpty;
+    }
+    const core::drafts::DraftMaterializationResult& result =
+        impl_->draft_workspace.Materialize(impl_->app_state.loaded_case.value(), impl_->app_state.case_revision);
+    return result.success ? result.change_index : kEmpty;
+}
+
 void AppRuntime::SyncDraftWorkspace() {
     const std::filesystem::path root = impl_->app_state.current_project.has_value()
                                            ? impl_->app_state.current_project->rootPath
@@ -608,13 +644,20 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
         return;
     }
 
-    // While a connected AI client has a change set open, the canvas draws the
-    // *preview* -- the argument as it would be if the user accepted -- with each
-    // touched node marked. That is what makes the agent's work visible where it
-    // lands, rather than as a list of operations beside the diagram. The
-    // committed model is untouched; nothing here is saved.
-    const parser::AssuranceCase& committed = *impl_->app_state.loaded_case;
-    const parser::AssuranceCase& ac = RefreshAgentChangePreview(committed);
+    // Everything derived below is built from the *working* argument: the
+    // accepted case with every active draft group applied. That is what makes a
+    // proposal visible where it lands rather than as a list of operations beside
+    // the diagram, and it is why two proposals are evaluated against each other
+    // rather than each against the accepted model (ADR 0009).
+    //
+    // The accepted case is untouched; nothing here is saved.
+    //
+    // The change-set preview still layers on top, because MCP writes change sets
+    // until phase 3 moves it onto draft groups. Stacking it on the working model
+    // rather than on the accepted one means a connected client's staged work is
+    // at least drawn against the draft it is really landing in.
+    const parser::AssuranceCase& working = CurrentArgumentView();
+    const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 
     const sacm::AssuranceCasePackage* sacm_package =
         impl_->app_state.has_projected_package() ? &impl_->app_state.projected_package() : nullptr;
@@ -751,6 +794,22 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
             RestoreTerminologySuggestion(element_id, term);
         },
         [this]() { impl_->pending_reconcile_audit_store = true; },
+        [this]() {
+            std::string error;
+            if (PromoteWorkingDraft(error)) {
+                SetStatus(AF_TR("Accepted the working draft."));
+            } else {
+                SetStatus(ui::i18n::trf("Could not accept the working draft: {0}", error));
+            }
+        },
+        [this]() {
+            std::string error;
+            if (DiscardWorkingDraft(error)) {
+                SetStatus(AF_TR("Discarded the working draft. The accepted argument is unchanged."));
+            } else {
+                SetStatus(ui::i18n::trf("Could not discard the working draft: {0}", error));
+            }
+        },
     };
 }
 
@@ -820,8 +879,14 @@ void AppRuntime::SyncAcpProblems() {
 }
 
 void AppRuntime::SyncStructureProblems() {
-    const parser::AssuranceCase* model =
-        impl_->app_state.loaded_case.has_value() ? &impl_->app_state.loaded_case.value() : nullptr;
+    // Structural validation, cycle detection and GSN well-formedness run over the
+    // *working* argument, not the accepted one (ADR 0009).
+    //
+    // This is the half of the design that pays for itself: a strategy left
+    // developing into nothing because one proposal removed the only child
+    // another proposal added is invisible in either proposal alone. Checking the
+    // combination is how it is seen before someone accepts it rather than after.
+    const parser::AssuranceCase* model = impl_->app_state.loaded_case.has_value() ? &CurrentArgumentView() : nullptr;
     app::SyncStructureProblems(impl_->problems_manager, model);
 }
 

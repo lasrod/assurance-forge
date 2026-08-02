@@ -14,6 +14,7 @@
 #include "app/structure_problem_sync.h"
 #include "app/translation_review_sync.h"
 #include "core/translation_review_store.h"
+#include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/audit/replay_verifier.h"
@@ -1280,6 +1281,83 @@ bool AppRuntime::RejectAgentChangeSet(const std::string& change_set_id, std::str
     if (!impl_->agent_change_sets.Discard(change_set_id, error)) {
         return false;
     }
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::PromoteWorkingDraft(std::string& error) {
+    error.clear();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups()) {
+        error = "There is no working draft to accept.";
+        return false;
+    }
+    if (!impl_->app_state.loaded_case.has_value()) {
+        error = "No assurance case is loaded.";
+        return false;
+    }
+    if (workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase) {
+        error = "The argument changed since this draft was written. Inspect or discard it first.";
+        return false;
+    }
+
+    // Refused before anything is written if the draft does not materialize. The
+    // accepted argument is not touched by a promotion that cannot complete.
+    const core::drafts::DraftMaterializationResult& materialized =
+        impl_->draft_workspace.Materialize(impl_->app_state.loaded_case.value(), impl_->app_state.case_revision);
+    if (!materialized.success) {
+        error = materialized.error;
+        return false;
+    }
+
+    const core::drafts::CompiledDraftPromotion compiled =
+        core::drafts::CompileWorkspacePromotion(*workspace, "Working draft");
+    if (!compiled.success) {
+        error = compiled.error;
+        return false;
+    }
+
+    // Attributed to everyone who contributed, not to "system". A reader of the
+    // audit log a year later needs to know an AI wrote part of this argument and
+    // which one; that is the single most useful thing the log can tell them.
+    std::string author;
+    for (const std::string& label : compiled.source_labels) {
+        if (!author.empty())
+            author += ", ";
+        author += label;
+    }
+    if (author.empty())
+        author = "Working draft";
+
+    // One command, so one audit transaction and one undo boundary for the whole
+    // promotion. The same audited path an edit made with the mouse takes -- no
+    // draft-specific mutation exists, which is what guarantees a draft cannot do
+    // anything the application could not.
+    core::commands::ApplyProposalCommand command(compiled.proposal, compiled.identities);
+    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(*impl_, command, author);
+    if (!outcome.success) {
+        error = outcome.error;
+        return false;
+    }
+
+    std::string discard_error;
+    if (!impl_->draft_workspace.DiscardWorkspace(discard_error)) {
+        // The argument is already promoted and correct; only the recovery file
+        // is left behind. Reported rather than swallowed, because a stale draft
+        // directory would come back as `NeedsRebase` on the next open and read as
+        // unaccepted work that is in fact accepted.
+        impl_->app_state.status_message =
+            "Accepted, but the draft recovery data could not be removed: " + discard_error;
+    }
+    impl_->app_state.mark_dirty();
+    impl_->tree_needs_rebuild = true;
+    return true;
+}
+
+bool AppRuntime::DiscardWorkingDraft(std::string& error) {
+    error.clear();
+    if (!impl_->draft_workspace.DiscardWorkspace(error))
+        return false;
     impl_->tree_needs_rebuild = true;
     return true;
 }

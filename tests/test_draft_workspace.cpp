@@ -2,6 +2,8 @@
 
 #include "core/drafts/draft_materializer.h"
 #include "core/drafts/draft_persistence.h"
+#include "core/drafts/draft_promotion_service.h"
+#include "core/reviews/review_proposal_patch_service.h"
 #include "core/project_file_io.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal.h"
@@ -685,6 +687,95 @@ TEST(DraftWorkspace, SerializationRoundTripsGroupsAndIdentities) {
     EXPECT_EQ(restored.groups.front().source_label, original.groups.front().source_label);
     EXPECT_EQ(restored.groups.front().operations.size(), original.groups.front().operations.size());
     EXPECT_EQ(restored.groups.front().generated_ids, original.groups.front().generated_ids);
+}
+
+// --------------------------------------------------------------------------
+// Promotion: compiling the draft into one thing the ordinary apply path takes.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, PromotionCompilesEveryGroupIntoOneProposal) {
+    Fixture fixture;
+    const std::string first = fixture.BeginGroup("Add a decomposition");
+    fixture.Stage(first, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    const std::string second = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(second, {UpdateTextOp("G1", "Clarified.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    const core::drafts::CompiledDraftPromotion compiled =
+        core::drafts::CompileWorkspacePromotion(*fixture.store.workspace(), "Jesper");
+    ASSERT_TRUE(compiled.success) << compiled.error;
+
+    // One proposal, one command, one audit transaction, one undo boundary.
+    EXPECT_EQ(compiled.proposal.operations.size(), 3u);
+    ASSERT_EQ(compiled.group_ids.size(), 2u);
+    EXPECT_EQ(compiled.group_ids[0], first);
+    EXPECT_EQ(compiled.group_ids[1], second);
+
+    // Every contributor named, so the audit record can say an AI wrote part of
+    // this and which one.
+    ASSERT_EQ(compiled.source_labels.size(), 2u);
+    EXPECT_EQ(compiled.source_labels[0], "Claude Code");
+    EXPECT_EQ(compiled.source_labels[1], "SCCG AI Review");
+}
+
+TEST(DraftWorkspace, PromotionKeepsTheIdentitiesTheDraftWasShownUnder) {
+    Fixture fixture;
+    const std::string first = fixture.BeginGroup("First branch");
+    fixture.Stage(first, {CreateClaimOp("$a", "Hazards are mitigated."), SupportOp("$a", "G1")});
+    const std::string second = fixture.BeginGroup("Second branch", "SCCG AI Review");
+    fixture.Stage(second, {CreateClaimOp("$b", "Residual risk is accepted."), SupportOp("$b", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    // Reject the first, so the second's pinned id is no longer the one a fresh
+    // allocation would choose. This is the case where promotion would renumber.
+    std::string error;
+    ASSERT_TRUE(fixture.store.RejectGroup(first, error)) << error;
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 2).success);
+    const std::string shown = IdentityFor(fixture.store, second, "$b");
+    ASSERT_FALSE(shown.empty());
+
+    const core::drafts::CompiledDraftPromotion compiled =
+        core::drafts::CompileWorkspacePromotion(*fixture.store.workspace(), "Jesper");
+    ASSERT_TRUE(compiled.success) << compiled.error;
+
+    // Applied with the draft's own identities, the promoted element keeps the id
+    // the reviewer read and the agent was told. Element ids reach reports and
+    // conversations; renumbering them at the moment of acceptance would quietly
+    // invalidate both.
+    core::AssuranceCase promoted = fixture.accepted;
+    const core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ApplyProposalResult result =
+        service.ApplyProposalWithIds(compiled.proposal, promoted, compiled.identities);
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_NE(FindElement(promoted, shown), nullptr);
+}
+
+TEST(DraftWorkspace, PromotionDoesNotFuseTwoSourcesThatChoseTheSameCreateRef) {
+    Fixture fixture;
+    // Nothing coordinates the patch-local names two clients pick, and `$goal` is
+    // the obvious choice for both. Concatenating without namespacing would make
+    // one element out of two proposed claims -- and silently, because the result
+    // still applies.
+    const std::string first = fixture.BeginGroup("One client's branch");
+    fixture.Stage(first, {CreateClaimOp("$goal", "Hazards are mitigated."), SupportOp("$goal", "G1")});
+    const std::string second = fixture.BeginGroup("Another client's branch", "SCCG AI Review");
+    fixture.Stage(second, {CreateClaimOp("$goal", "Residual risk is accepted."), SupportOp("$goal", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    const core::drafts::CompiledDraftPromotion compiled =
+        core::drafts::CompileWorkspacePromotion(*fixture.store.workspace(), "Jesper");
+    ASSERT_TRUE(compiled.success) << compiled.error;
+    EXPECT_EQ(compiled.identities.size(), 2u) << "two proposed claims, two identities";
+
+    core::AssuranceCase promoted = fixture.accepted;
+    const core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ApplyProposalResult result =
+        service.ApplyProposalWithIds(compiled.proposal, promoted, compiled.identities);
+    ASSERT_TRUE(result.success) << result.error;
+
+    EXPECT_NE(FindElement(promoted, IdentityFor(fixture.store, first, "$goal")), nullptr);
+    EXPECT_NE(FindElement(promoted, IdentityFor(fixture.store, second, "$goal")), nullptr);
+    EXPECT_NE(IdentityFor(fixture.store, first, "$goal"), IdentityFor(fixture.store, second, "$goal"));
 }
 
 // --------------------------------------------------------------------------

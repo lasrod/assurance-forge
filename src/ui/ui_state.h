@@ -23,6 +23,20 @@ enum class CenterView {
     TerminologyPackage,
 };
 
+// Which version of the argument the canvas draws while a draft workspace holds
+// unaccepted changes.
+enum class DraftViewMode {
+    // The accepted argument with every active change group applied. What an
+    // agent reads and what the checks run over.
+    WorkingDraft,
+    // The argument exactly as accepted, so a reviewer can see what they have
+    // now rather than what is being proposed.
+    AcceptedBaseline,
+    // The working draft restricted to what the draft touches, plus enough
+    // surrounding argument to understand it.
+    ChangesOnly,
+};
+
 enum class ProblemFilter {
     All,
     Validation,
@@ -94,6 +108,16 @@ struct UiState {
     // Review panel can agree on which one is being shown.
     std::string agent_change_set_id;
     std::string agent_change_set_title;
+
+    // Which version of the argument the canvas is showing while a working draft
+    // is active (ADR 0009).
+    //
+    // The user must always be able to answer "is this the accepted argument or a
+    // proposal?" without inferring it from badges, so the draft banner names the
+    // mode in words and this switches it. Defaults to the working draft: a draft
+    // exists because someone is working on it, and hiding it would make the
+    // banner the only evidence anything is pending.
+    DraftViewMode draft_view_mode = DraftViewMode::WorkingDraft;
 
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;

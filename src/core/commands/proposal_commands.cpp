@@ -16,7 +16,12 @@ bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     const LibraryBridgeMutator mutate =
         [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         reviews::ReviewProposalPatchService patch_service;
-        reviews::ApplyProposalResult result = patch_service.ApplyProposal(proposal_, model);
+        // With predetermined ids this is the same replay path the audit log uses,
+        // so a promoted draft element keeps the id it was shown under. Without
+        // them it allocates, which is what an ordinary proposal has always done.
+        reviews::ApplyProposalResult result =
+            predetermined_ids_.empty() ? patch_service.ApplyProposal(proposal_, model)
+                                       : patch_service.ApplyProposalWithIds(proposal_, model, predetermined_ids_);
         if (!result.success) {
             err = result.error;
             return false;

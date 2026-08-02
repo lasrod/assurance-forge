@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/app_events.h"
+#include "core/drafts/draft_change_index.h"
 #include "core/drafts/draft_workspace.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_item.h"
@@ -205,12 +206,45 @@ public:
     // ADR 0008's single-owner rule true of draft state as well as of SACM.
     const core::drafts::DraftWorkspace* CurrentDraftWorkspace() const;
 
+    // **The one authoritative view of the argument.**
+    //
+    // The working model when a draft workspace is active and materializes, the
+    // accepted model otherwise. The canvas, navigator, inspectors, search,
+    // placement suggestions, validation and -- from phase 3 -- connected MCP
+    // reads all read through this, so a proposal is never evaluated against a
+    // different version of the argument than the one beside it (ADR 0009).
+    //
+    // Export, the audit baseline and the canonical model hash deliberately do
+    // **not**: those are properties of what a human accepted.
+    //
+    // Non-const because it materializes on demand and caches the result. The
+    // reference is valid until the next mutation of the workspace or the
+    // accepted model, which for every caller means "this frame".
+    const parser::AssuranceCase& CurrentArgumentView();
+
+    // What the draft does to each element, and which groups did it. Empty when
+    // no draft is active. Valid for the same window as `CurrentArgumentView`.
+    const core::drafts::DraftChangeIndex& CurrentDraftChangeIndex();
+
 private:
     // Accepts an agent's change set: the one point where staged work becomes a
     // real edit. Goes through `ApplyProposalCommand`, so it is audited, undoable
     // and attributed like any other change. Only a person reaches this.
     bool AcceptAgentChangeSet(const std::string& change_set_id, std::string& error);
     bool RejectAgentChangeSet(const std::string& change_set_id, std::string& error);
+
+    // Accepts every active group in the working draft: the one point where
+    // proposed work becomes accepted argument.
+    //
+    // Compiles the groups into a single `ReviewProposal` and dispatches one
+    // audited `ApplyProposalCommand`, so the whole promotion is one transaction
+    // with one undo boundary and one audit record naming every contributing
+    // source. Only a person reaches this -- there is no tool that does.
+    bool PromoteWorkingDraft(std::string& error);
+
+    // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
+    // because nothing in the draft was ever applied to it.
+    bool DiscardWorkingDraft(std::string& error);
 
 private:
     bool EnsureConfidenceStorage();

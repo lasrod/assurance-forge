@@ -198,6 +198,10 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     // replay-divergence verdict.
     RenderCanvasAutosaveErrorBanner(state);
 
+    // Above the canvas on every package tab, because the canvas below it may be
+    // drawing claims no human has accepted and the user has to be able to tell.
+    RenderWorkingDraftBanner(state, callbacks);
+
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
     const std::uint64_t current_revision = state.app_state.case_revision;
     const std::uint64_t change_set_revision = state.agent_change_sets.revision();

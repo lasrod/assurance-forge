@@ -250,6 +250,21 @@ TRANSLATIONS = {
     "Audit log divergence detected": "監査ログの不一致を検出しました",
     "Audit store error: {0}": "監査ストアのエラー: {0}",
     "Autosave write failed": "自動保存の書き込みに失敗しました",
+    # ===== Working draft (ADR 0009 / ADR 0010) =====
+    "Sources: {0}": "提案元: {0}",
+    "The argument changed since this draft was written, so none of it is being applied. Inspect or discard it before continuing.": "このドラフトの作成後に議論が変更されたため、いずれも適用されていません。続行する前に内容を確認するか破棄してください。",
+    "This draft cannot be shown because one of its changes no longer applies. The accepted argument is displayed instead.": "このドラフトの変更のいずれかが適用できないため表示できません。代わりに受理済みの議論を表示しています。",
+    "Working draft": "作業ドラフト",
+    "Accepted baseline": "受理済みベースライン",
+    "Changes only": "変更のみ",
+    "Accept all": "すべて受理",
+    "Discard draft": "ドラフトを破棄",
+    "The argument changed since this draft was written.": "このドラフトの作成後に議論が変更されました。",
+    "One of this draft's changes no longer applies.": "このドラフトの変更のいずれかが適用できなくなっています。",
+    "Accepted the working draft.": "作業ドラフトを受理しました。",
+    "Could not accept the working draft: {0}": "作業ドラフトを受理できませんでした: {0}",
+    "Discarded the working draft. The accepted argument is unchanged.": "作業ドラフトを破棄しました。受理済みの議論は変更されていません。",
+    "Could not discard the working draft: {0}": "作業ドラフトを破棄できませんでした: {0}",
     "The replayed audit history does not reproduce the on-disk SACM. This usually means edits were applied through a path that did not record transactions. Pinned historical views may be inaccurate.": "再生された監査履歴がディスク上の SACM を再現できません。通常、これはトランザクションを記録しない経路で編集が適用されたことを意味します。固定された履歴ビューは正確でない可能性があります。",
     "replay={0}  on_disk={1}": "再生={0}  ディスク={1}",
     "Reconcile audit log…": "監査ログを再構築…",
@@ -867,6 +882,7 @@ TRANSLATIONS = {
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
+    ("WORKING DRAFT — {0} unaccepted change", "WORKING DRAFT — {0} unaccepted changes"): ["作業ドラフト — 未受理の変更 {0} 件"],
     ("{0} element", "{0} elements"): ["{0} 要素"],
     ("{0} open finding", "{0} open findings"): ["未解決の指摘 {0} 件"],
     ("{0} item needs attention", "{0} items need attention"):
