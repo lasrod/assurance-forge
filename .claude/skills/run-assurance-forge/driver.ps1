@@ -37,7 +37,7 @@
 
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('launch', 'shot', 'click', 'scroll', 'key', 'state', 'quit', 'batch')]
+    [ValidateSet('launch', 'shot', 'click', 'rclick', 'scroll', 'key', 'state', 'quit', 'batch')]
     [string]$Action,
 
     [string]$Out,
@@ -130,6 +130,16 @@ public class AfDriver {
         mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); // LEFTDOWN
         System.Threading.Thread.Sleep(90);
         mouse_event(0x0004, 0, 0, 0, IntPtr.Zero); // LEFTUP
+    }
+
+    // The canvas context menu is the only way to add an element, so a driver
+    // without this cannot exercise authoring at all.
+    public static void RightClickScreen(int x, int y) {
+        SetCursorPos(x, y);
+        System.Threading.Thread.Sleep(180);
+        mouse_event(0x0008, 0, 0, 0, IntPtr.Zero); // RIGHTDOWN
+        System.Threading.Thread.Sleep(90);
+        mouse_event(0x0010, 0, 0, 0, IntPtr.Zero); // RIGHTUP
     }
 
     // ImGui routes wheel input to whatever is under the cursor, so the pointer
@@ -308,6 +318,19 @@ function Invoke-Click($handle, [int]$px, [int]$py, [int]$pause) {
     return "clicked ($px,$py)"
 }
 
+function Invoke-RightClick($handle, [int]$px, [int]$py, [int]$pause) {
+    [void][AfDriver]::RaiseIfNeeded($handle)
+    $rect = Get-Rect $handle
+    $screenX = $rect.Left + $px
+    $screenY = $rect.Top + $py
+    if ($screenX -ge $rect.Right -or $screenY -ge $rect.Bottom) {
+        throw "($px,$py) is outside the window ($($rect.Right - $rect.Left)x$($rect.Bottom - $rect.Top))"
+    }
+    [AfDriver]::RightClickScreen($screenX, $screenY)
+    Start-Sleep -Milliseconds $pause
+    return "right-clicked ($px,$py)"
+}
+
 switch ($Action) {
 
     'launch' { Start-App $Width $Height }
@@ -331,6 +354,13 @@ switch ($Action) {
         if (-not $process) { throw "app is not running; -Action launch first" }
         if ($X -lt 0 -or $Y -lt 0) { throw "-X and -Y are required (window-relative)" }
         Invoke-Click $process.MainWindowHandle $X $Y $WaitMs
+    }
+
+    'rclick' {
+        $process = Get-AppProcess
+        if (-not $process) { throw "app is not running; -Action launch first" }
+        if ($X -lt 0 -or $Y -lt 0) { throw "-X and -Y are required (window-relative)" }
+        Invoke-RightClick $process.MainWindowHandle $X $Y $WaitMs
     }
 
     'scroll' {
@@ -412,6 +442,10 @@ switch ($Action) {
                     'click' {
                         if ($handle -eq [IntPtr]::Zero) { $handle = Resolve-Handle }
                         $log += Invoke-Click $handle ([int]$positional[0]) ([int]$positional[1]) $pause
+                    }
+                    'rclick' {
+                        if ($handle -eq [IntPtr]::Zero) { $handle = Resolve-Handle }
+                        $log += Invoke-RightClick $handle ([int]$positional[0]) ([int]$positional[1]) $pause
                     }
                     'scroll' {
                         if ($handle -eq [IntPtr]::Zero) { $handle = Resolve-Handle }

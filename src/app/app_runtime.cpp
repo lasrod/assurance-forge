@@ -602,6 +602,7 @@ void AppRuntime::RefreshDraftDecorations() {
     ui::UiState& ui_state = ui::GetUiState();
     ui_state.draft_element_status.clear();
     ui_state.draft_edge_status.clear();
+    impl_->draft_added_ids.clear();
 
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || !workspace->has_active_groups())
@@ -646,6 +647,9 @@ void AppRuntime::RefreshDraftDecorations() {
         const bool is_relationship =
             element != nullptr && (element->type == "assertedinference" || element->type == "assertedcontext" ||
                                    element->type == "assertedevidence");
+        if (entry->change == core::drafts::DraftElementChange::Added)
+            impl_->draft_added_ids.push_back(element_id);
+
         if (!is_relationship) {
             ui_state.draft_element_status.emplace(element_id, std::move(decoration));
             continue;
@@ -669,17 +673,43 @@ void AppRuntime::RefreshDraftDecorations() {
 
 namespace {
 
-std::string ElementDisplayText(const parser::AssuranceCase& model, const std::string& element_id) {
+const parser::SacmElement* FindElementById(const parser::AssuranceCase& model, const std::string& element_id) {
     for (const parser::SacmElement& element : model.elements) {
-        if (element.id != element_id)
-            continue;
-        if (!element.content.empty())
-            return element.content;
-        if (!element.description.empty())
-            return element.description;
-        return element.name;
+        if (element.id == element_id)
+            return &element;
     }
-    return {};
+    return nullptr;
+}
+
+// The fields that actually differ, rather than one field chosen in advance.
+//
+// An element has a name, a content and a description, and a draft may touch any
+// of them. Picking one to display showed "accepted" and "working draft" as the
+// same text whenever the edit was to a different field -- which reads as the
+// panel being broken rather than as the edit being elsewhere.
+void CollectFieldChanges(const parser::SacmElement* accepted,
+                         const parser::SacmElement* working,
+                         std::vector<ui::DraftFieldChangeView>& out) {
+    struct Field {
+        const char* label;
+        std::string parser::SacmElement::* member;
+    };
+    const Field fields[] = {
+        {"Name", &parser::SacmElement::name},
+        {"Content", &parser::SacmElement::content},
+        {"Description", &parser::SacmElement::description},
+    };
+    for (const Field& field : fields) {
+        const std::string before = accepted != nullptr ? accepted->*(field.member) : std::string{};
+        const std::string after = working != nullptr ? working->*(field.member) : std::string{};
+        if (before == after)
+            continue;
+        ui::DraftFieldChangeView change;
+        change.field_label = AF_TR(field.label);
+        change.accepted = before;
+        change.working = after;
+        out.push_back(std::move(change));
+    }
 }
 
 } // namespace
@@ -704,8 +734,9 @@ void AppRuntime::RefreshSelectedDraftDetail() {
     detail.present = true;
     detail.element_id = selected;
     detail.change = entry->change;
-    detail.accepted_text = ElementDisplayText(impl_->app_state.loaded_case.value(), selected);
-    detail.working_text = ElementDisplayText(CurrentArgumentView(), selected);
+    CollectFieldChanges(FindElementById(impl_->app_state.loaded_case.value(), selected),
+                        FindElementById(CurrentArgumentView(), selected),
+                        detail.field_changes);
 
     for (const core::drafts::DraftElementContribution& contribution : entry->contributions) {
         const core::drafts::DraftChangeGroup* group = workspace->FindGroup(contribution.group_id);

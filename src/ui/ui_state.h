@@ -48,6 +48,13 @@ struct DraftEdgeDecoration {
     std::string source_label;
 };
 
+// One field the working draft changes on the selected element.
+struct DraftFieldChangeView {
+    std::string field_label;
+    std::string accepted;
+    std::string working;
+};
+
 // One group's contribution to the selected element, for the inspector.
 struct DraftContributionView {
     std::string group_id;
@@ -66,11 +73,15 @@ struct DraftElementDetailView {
     bool present = false;
     std::string element_id;
     core::drafts::DraftElementChange change = core::drafts::DraftElementChange::Unchanged;
-    // What the accepted argument says today, and what the draft would make it
-    // say. Shown side by side, because "what changed" is the question and a
-    // reviewer should not have to switch views to answer it.
-    std::string accepted_text;
-    std::string working_text;
+    // Per field, what the accepted argument says today and what the draft would
+    // make it say -- for the fields that actually differ.
+    //
+    // Per field rather than one blob, because an element has a name, a content
+    // and a description and a draft may touch any of them. Showing one chosen
+    // field for every change displayed "accepted" and "working draft" as
+    // identical text whenever the edit was to a different field, which reads as
+    // the panel being broken.
+    std::vector<DraftFieldChangeView> field_changes;
     std::vector<DraftContributionView> contributions;
     // The groups accepting this element would actually promote: the contributing
     // groups closed over their dependencies.

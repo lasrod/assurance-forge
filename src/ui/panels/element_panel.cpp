@@ -260,16 +260,15 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
     }
     ImGui::TextWrapped("%s", ui::i18n::tr(change_label).c_str());
 
-    if (detail.change == core::drafts::DraftElementChange::Modified) {
-        // Side by side, because "what changed" is the question a reviewer is
-        // actually asking and switching to the accepted-baseline view to answer
-        // it loses the place they were reading.
-        InspectorFieldLabel(AF_TR("Accepted"));
-        ImGui::TextWrapped("%s",
-                           detail.accepted_text.empty() ? AF_TR("(empty)").c_str() : detail.accepted_text.c_str());
+    // Side by side and per field, because "what changed" is the question a
+    // reviewer is actually asking, and switching to the accepted-baseline view
+    // to answer it loses the place they were reading.
+    for (const DraftFieldChangeView& change : detail.field_changes) {
+        InspectorFieldLabel(ui::i18n::trf("{0} — accepted", change.field_label));
+        ImGui::TextWrapped("%s", change.accepted.empty() ? AF_TR("(empty)").c_str() : change.accepted.c_str());
         ImGui::Dummy(ImVec2(0.0f, 2.0f));
-        InspectorFieldLabel(AF_TR("Working draft"));
-        ImGui::TextWrapped("%s", detail.working_text.empty() ? AF_TR("(empty)").c_str() : detail.working_text.c_str());
+        InspectorFieldLabel(ui::i18n::trf("{0} — working draft", change.field_label));
+        ImGui::TextWrapped("%s", change.working.empty() ? AF_TR("(empty)").c_str() : change.working.c_str());
         ImGui::Dummy(ImVec2(0.0f, 4.0f));
     }
 

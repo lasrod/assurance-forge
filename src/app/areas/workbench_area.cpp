@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -224,13 +225,27 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
                               cache.show_secondary_language == ui_state_for_lang.show_secondary_language &&
                               cache.secondary_language == ui_state_for_lang.active_secondary_lang;
 
+    // A draft has to be projected as a *preview*, even with no change set open.
+    //
+    // The package canvas filters by SACM package ownership, and a proposed
+    // element belongs to no package at all -- so the plain ownership filter
+    // drops every one of them and draws the accepted argument back, which from
+    // the outside is indistinguishable from the add having done nothing. That is
+    // exactly what "new elements cannot be added" looked like.
+    std::optional<parser::AssuranceCase> draft_preview_model;
+    if (!state.agent_preview_case.has_value() && !state.draft_added_ids.empty() && state.draft_canvas_view != nullptr) {
+        draft_preview_model = *state.draft_canvas_view;
+    }
+    std::vector<std::string> preview_added_ids = state.agent_preview_added_ids;
+    preview_added_ids.insert(preview_added_ids.end(), state.draft_added_ids.begin(), state.draft_added_ids.end());
+
     if (!inputs_match) {
         {
             core::perf::ScopedTimer perf_scope("app.wb.build_visible_case");
             cache.visible_case = BuildArgumentPackageCanvasCase(
                 state.draft_canvas_view != nullptr ? *state.draft_canvas_view : state.app_state.loaded_case.value(),
-                state.agent_preview_case,
-                state.agent_preview_added_ids,
+                state.agent_preview_case.has_value() ? state.agent_preview_case : draft_preview_model,
+                preview_added_ids,
                 state.app_state.projected_package(),
                 *argument_package,
                 tab.title);

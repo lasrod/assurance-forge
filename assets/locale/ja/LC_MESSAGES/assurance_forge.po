@@ -2227,6 +2227,12 @@ msgstr "{0} 件未リンク"
 msgid "{0} warnings require review"
 msgstr "{0} 件の警告を確認する必要があります"
 
+msgid "{0} — accepted"
+msgstr "{0} — 受理済み"
+
+msgid "{0} — working draft"
+msgstr "{0} — 作業ドラフト"
+
 msgid "{0} — {1}"
 msgstr "{0} — {1}"
 

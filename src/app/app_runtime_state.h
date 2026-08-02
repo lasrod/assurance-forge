@@ -234,6 +234,12 @@ struct AppRuntimeState {
     // case while the rest of the application has moved to the working model.
     // Null before the first frame; falls back to the accepted case.
     const parser::AssuranceCase* draft_canvas_view = nullptr;
+    // Element ids the draft adds. The argument-package canvas filters by SACM
+    // package ownership, and a proposed element belongs to no package at all --
+    // so without this list the ownership filter drops every one of them and
+    // draws the accepted argument back, which is indistinguishable from the add
+    // having done nothing.
+    std::vector<std::string> draft_added_ids;
     // The model the inspector edits while a draft is active: its own copy of the
     // working argument, so the panel's in-place edits cannot scribble on the
     // materializer's cache. Refreshed on the revisions below.
