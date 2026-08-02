@@ -13,9 +13,9 @@
 // `ai::AiTaskRunner` and `AppRuntime::PollAiReviewTask` already use for provider
 // calls, for the same reason.
 //
-// Nothing here writes a project file. Reads answer from the live model; changes
-// go through a change set and the command bus, so an agent's edit is audited,
-// undoable and attributable exactly like one made with the mouse.
+// Nothing here interprets or directly writes assurance data. Reads answer from
+// the live working model; draft mutations are revision-checked on the frame
+// thread and human promotion remains the ordinary audited command path.
 
 #include "bridge/protocol.h"
 #include "bridge/transport.h"
@@ -41,6 +41,10 @@ struct AgentConnection {
     // From the adapter's handshake, e.g. "claude-ai 0.1.0". Used for
     // attribution on anything the connection produces.
     std::string client_label;
+    // Random identity minted by the adapter process. Unlike the application's
+    // numeric connection id, it cannot collide with a persisted draft group
+    // after an application restart.
+    std::string session_id;
     std::string connected_utc;
 };
 
@@ -98,7 +102,7 @@ private:
     // Protocol version, token and handshake ordering, checked on the connection
     // thread so the frame thread only ever sees requests worth running.
     bool CheckEnvelope(const bridge::Request& request, bool initialized, bridge::Response& refusal) const;
-    void MarkInitialized(std::uint64_t id, const std::string& client_label);
+    void UpdateConnectionIdentity(std::uint64_t id, const std::string& client_label, const std::string& session_id);
     void ForgetConnection(std::uint64_t id);
 
     std::unique_ptr<bridge::Listener> listener_;

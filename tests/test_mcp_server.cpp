@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -172,6 +174,23 @@ TEST(McpServer, ToolsListAdvertisesEveryBuiltinToolWithASchema) {
         EXPECT_TRUE(tool["name"].is_string());
         EXPECT_FALSE(tool["description"].get<std::string>().empty());
         EXPECT_EQ(tool["inputSchema"]["type"], "object");
+    }
+}
+
+TEST(McpServer, RegistryPublishesDraftGroupsButNeverPromotion) {
+    EXPECT_NE(mcp::FindTool("get_draft_status"), nullptr);
+    EXPECT_NE(mcp::FindTool("begin_change_group"), nullptr);
+    EXPECT_NE(mcp::FindTool("stage_operations"), nullptr);
+    EXPECT_NE(mcp::FindTool("submit_change_group"), nullptr);
+
+    for (const mcp::ToolDefinition& tool : mcp::BuiltinTools()) {
+        std::string name = tool.name;
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char value) {
+            return static_cast<char>(std::tolower(value));
+        });
+        EXPECT_EQ(name.find("accept"), std::string::npos) << tool.name;
+        EXPECT_EQ(name.find("apply"), std::string::npos) << tool.name;
+        EXPECT_EQ(name.find("promote"), std::string::npos) << tool.name;
     }
 }
 
@@ -415,7 +434,7 @@ TEST(McpServer, CarriesSccgGuidanceInsideEachPrompt) {
     // The guidance itself, quoted from the catalog rather than paraphrased.
     EXPECT_NE(text.find("CL.1"), std::string::npos);
     // And the standing reminder that staging is not editing.
-    EXPECT_NE(text.find("not editing the safety case"), std::string::npos) << text;
+    EXPECT_NE(text.find("not editing the accepted safety case"), std::string::npos) << text;
 }
 
 TEST(McpServer, ReportsAnUnknownPrompt) {

@@ -48,6 +48,9 @@ inline constexpr const char* kInternal = "internal";
 // The handshake operation. Must be the first request on a connection; every
 // other operation is refused with `not_initialized` until it succeeds.
 inline constexpr const char* kHelloOperation = "hello";
+// Updates the client label after MCP initialize supplies the real client name
+// and version. Handled on the connection thread like hello, not by domain code.
+inline constexpr const char* kIdentifyOperation = "identify";
 
 struct Request {
     int protocol = kProtocolVersion;

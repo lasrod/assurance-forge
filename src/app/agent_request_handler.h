@@ -15,7 +15,8 @@
 
 #include "bridge/protocol.h"
 #include "core/app_state.h"
-#include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_workspace.h"
+#include "core/drafts/draft_workspace_store.h"
 
 #include <cstdint>
 #include <functional>
@@ -23,13 +24,19 @@
 
 namespace app {
 
+struct AgentArgumentView {
+    const parser::AssuranceCase* model = nullptr;
+    const core::drafts::DraftWorkspace* workspace = nullptr;
+    bool is_working_draft = false;
+};
+
 // Reported to a connecting client in the handshake so a mismatch between the
 // application and the adapter can be described in terms a user recognises.
 // Tracks `mcp::kServerVersion`: the two binaries ship together.
 inline constexpr const char* kAppVersion = "0.1.0";
 
-// What the handler is allowed to touch. Reads only, for now: writes arrive with
-// change sets and need the command bus.
+// What the handler is allowed to touch. Connected writes reach only the
+// integrated draft store; accepted edits and promotion stay in AppRuntime.
 struct AgentRequestContext {
     const core::AppState& state;
     // How this project was addressed, echoed back so a client can confirm it is
@@ -44,12 +51,19 @@ struct AgentRequestContext {
     // cannot honour it.
     std::function<bool(const std::string& relative_path, std::string& error)> open_case_file;
 
-    // The change sets being built against this project. Null when there is no
-    // project, in which case every change operation is refused.
-    core::changesets::ChangeSetStore* change_sets = nullptr;
-    // Which connection is asking, so an agent's operations reach its own change
-    // set rather than another client's.
+    // Which connection is asking, so an agent may modify its own groups without
+    // being allowed to rewrite another contributor's work.
     std::uint64_t connection_id = 0;
+    std::string source_session_id;
+
+    // The one integrated workspace for the argument currently open. Null for a
+    // standalone SACM file, where MCP remains read-only.
+    core::drafts::DraftWorkspaceStore* draft_workspace = nullptr;
+
+    // Re-evaluated for every request, and again after open_case_file. This keeps
+    // a switch from returning the previous file's draft and lets the runtime
+    // restore the target argument's workspace before answering.
+    std::function<AgentArgumentView()> current_argument_view;
 };
 
 bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentRequestContext& context);

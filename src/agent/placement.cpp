@@ -91,7 +91,7 @@ struct Candidate {
 } // namespace
 
 Result SuggestPlacement(const ReadContext& context, const nlohmann::json& arguments) {
-    if (!context.state.loaded_case.has_value()) {
+    if (context.argument() == nullptr) {
         return Result::Error("No assurance case is loaded for this project.");
     }
 
@@ -110,7 +110,7 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
         limit = std::clamp(limit_argument->get<int>(), 1, kMaxSuggestions);
     }
 
-    const parser::AssuranceCase& model = context.state.loaded_case.value();
+    const parser::AssuranceCase& model = *context.argument();
     const core::AssuranceTree tree = core::AssuranceTree::Build(model);
 
     std::map<std::string, const parser::SacmElement*> by_id;
@@ -191,14 +191,15 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
         });
     }
 
-    return Result::Ok(nlohmann::json{
-        {"topic", topic},
-        {"suggestions", std::move(suggestions)},
-        {"note",
-         "Ranked by term overlap and structural fit, not by understanding. Read the paths and the "
-         "sibling claims and decide for yourself; if nothing here is the right home, say so rather "
-         "than attaching to the best of a bad set."},
-    });
+    return ReadResult(context,
+                      nlohmann::json{
+                          {"topic", topic},
+                          {"suggestions", std::move(suggestions)},
+                          {"note",
+                           "Ranked by term overlap and structural fit, not by understanding. Read the paths and the "
+                           "sibling claims and decide for yourself; if nothing here is the right home, say so rather "
+                           "than attaching to the best of a bad set."},
+                      });
 }
 
 } // namespace agent

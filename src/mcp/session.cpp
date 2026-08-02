@@ -41,8 +41,9 @@ bool LooksLikeAssuranceCaseFile(const std::filesystem::path& path) {
     return extension == ".sacm" || extension == ".xml";
 }
 
-// Reads only. Anything that changes a safety case needs a command bus, an audit
-// log and a human to accept it -- so it is available exactly where those are.
+// Reads only. The offline copy never opens the application's integrated draft,
+// because it cannot show unaccepted changes to a human or serialize concurrent
+// contributors through the workspace revision.
 bool IsOfflineOperation(const std::string& op) {
     return op == "get_case_overview" || op == "find_elements" || op == "get_element" || op == "get_argument_tree" ||
            op == "list_case_files" || op == "open_case_file" || op == "suggest_placement";
@@ -63,6 +64,26 @@ bool Session::consent_granted() const {
 }
 
 Session::~Session() = default;
+
+void Session::set_client_label(std::string label) {
+    client_label_ = std::move(label);
+    if (!connected() || connection_ == nullptr)
+        return;
+
+    bridge::Request identify;
+    identify.id = next_request_id_++;
+    identify.op = bridge::kIdentifyOperation;
+    identify.token = token_;
+    identify.args = nlohmann::json{{"client", client_label_}};
+
+    std::string reply;
+    // A failed identity refresh is treated like any other lost bridge
+    // connection by the next tool call. Initialization itself still succeeds,
+    // so the MCP client receives the actionable connection error on use rather
+    // than a malformed initialize response.
+    if (!connection_->WriteMessage(bridge::EncodeRequest(identify)) || !connection_->ReadMessage(reply))
+        return;
+}
 
 bool Session::ConnectToApplication(std::string& error) {
     bridge::EndpointRecord record;
@@ -87,7 +108,8 @@ bool Session::ConnectToApplication(std::string& error) {
     hello.id = next_request_id_++;
     hello.op = bridge::kHelloOperation;
     hello.token = token_;
-    hello.args = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp" : client_label_}};
+    hello.args = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp" : client_label_},
+                                {"session", session_id_}};
 
     std::string reply;
     if (!connection_->WriteMessage(bridge::EncodeRequest(hello)) || !connection_->ReadMessage(reply)) {
@@ -148,6 +170,7 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     std::unique_ptr<Session> session(new Session());
     session->project_path_ = config.project_path;
     session->settings_path_ = config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
+    session->session_id_ = bridge::GenerateToken();
 
     // The running application first. It has the argument the user is looking at,
     // including edits that have not reached disk, so any copy this process could
@@ -214,10 +237,11 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
         result.is_error = true;
         result.needs_application = true;
         result.payload = nlohmann::json{{"error",
-                                         "This needs Assurance Forge to be running with the project open. Changing a "
-                                         "safety case goes through the same audited, undoable path as an edit made in "
-                                         "the application, and a human accepts it there -- none of which exists in a "
-                                         "headless process. Open the project in Assurance Forge and reconnect."}};
+                                         "This needs Assurance Forge to be running with the project open. The running "
+                                         "application is the sole owner of the integrated draft, shows every staged "
+                                         "change to the user, and enforces revision checks between contributors. A "
+                                         "headless copy cannot safely do that. Open the project in Assurance Forge and "
+                                         "reconnect."}};
         return result;
     }
 

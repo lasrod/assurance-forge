@@ -2,9 +2,10 @@
 
 // The tool surface Assurance Forge exposes over MCP.
 //
-// Every tool in this slice is READ-ONLY. The write surface (proposal drafts a
-// human accepts) is a later phase; nothing here mutates the model, the audit
-// store, or any file.
+// Read tools return either accepted SACM (offline) or the running application's
+// integrated working draft. Draft tools mutate only the application's persisted
+// recovery workspace: never accepted SACM, the audit log, or the command stack.
+// No tool applies, accepts or promotes; the registry test enforces that boundary.
 
 #include <nlohmann/json.hpp>
 

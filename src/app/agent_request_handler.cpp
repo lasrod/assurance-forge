@@ -7,6 +7,13 @@
 namespace app {
 namespace {
 
+agent::ReadContext CurrentReadContext(const AgentRequestContext& context) {
+    AgentArgumentView view;
+    if (context.current_argument_view)
+        view = context.current_argument_view();
+    return agent::ReadContext{context.state, context.project_path, view.model, view.workspace, view.is_working_draft};
+}
+
 // A read operation reports "no case" or "unknown element" as a *tool* failure,
 // not a transport failure: the model reading it should adjust and try again,
 // rather than see the connection fault on something it can fix. The bridge
@@ -23,8 +30,7 @@ bridge::Response FromAgentResult(std::uint64_t id, const agent::Result& result) 
 // alternative, which is an agent silently reasoning about a document nobody is
 // looking at -- the fault that made an earlier design propose changes against
 // the wrong file.
-agent::Result
-OpenCaseFile(const agent::ReadContext& read, const nlohmann::json& args, const AgentRequestContext& context) {
+agent::Result OpenCaseFile(const nlohmann::json& args, const AgentRequestContext& context) {
     if (!context.state.current_project.has_value()) {
         return agent::Result::Error("This is a standalone SACM file, so there is nothing to switch between.");
     }
@@ -42,19 +48,22 @@ OpenCaseFile(const agent::ReadContext& read, const nlohmann::json& args, const A
         return agent::Result::Error(error);
     }
     // Re-read so the caller sees the case it moved to, not the one it left.
-    return agent::GetCaseOverview(read);
+    return agent::GetCaseOverview(CurrentReadContext(context));
 }
 
-bool IsChangeOperation(const std::string& op) {
-    return op == "begin_change_set" || op == "stage_operations" || op == "unstage_operations" ||
-           op == "describe_change_set" || op == "submit_change_set" || op == "discard_change_set" ||
+bool IsDraftOperation(const std::string& op) {
+    return op == "get_draft_status" || op == "begin_change_group" || op == "begin_change_set" ||
+           op == "stage_operations" || op == "replace_change_group" || op == "remove_change_group" ||
+           op == "describe_change_group" || op == "describe_change_set" || op == "submit_change_group" ||
+           op == "submit_change_set" || op == "describe_working_draft" || op == "get_draft_events" ||
+           op == "close_change_group" || op == "unstage_operations" || op == "discard_change_set" ||
            op == "list_change_sets";
 }
 
 } // namespace
 
 bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentRequestContext& context) {
-    const agent::ReadContext read{context.state, context.project_path};
+    const agent::ReadContext read = CurrentReadContext(context);
 
     if (request.op == "get_case_overview") {
         return FromAgentResult(request.id, agent::GetCaseOverview(read));
@@ -75,37 +84,44 @@ bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentR
         return FromAgentResult(request.id, agent::SuggestPlacement(read, request.args));
     }
     if (request.op == "open_case_file") {
-        return FromAgentResult(request.id, OpenCaseFile(read, request.args, context));
+        return FromAgentResult(request.id, OpenCaseFile(request.args, context));
     }
 
-    if (IsChangeOperation(request.op)) {
-        if (context.change_sets == nullptr) {
+    if (IsDraftOperation(request.op)) {
+        if (context.draft_workspace == nullptr) {
             return FromAgentResult(request.id,
                                    agent::Result::Error("This is a standalone SACM file rather than a project, so "
                                                         "there is nowhere to record a proposed change."));
         }
-        const agent::ChangeContext change{
-            context.state, *context.change_sets, context.connection_id, context.client_label};
+        const agent::DraftContext draft{context.state,
+                                        *context.draft_workspace,
+                                        context.connection_id,
+                                        context.client_label,
+                                        context.source_session_id};
 
-        if (request.op == "begin_change_set") {
-            return FromAgentResult(request.id, agent::BeginChangeSet(change, request.args));
+        if (request.op == "get_draft_status" || request.op == "list_change_sets") {
+            return FromAgentResult(request.id, agent::GetDraftStatus(draft));
         }
+        if (request.op == "begin_change_group" || request.op == "begin_change_set")
+            return FromAgentResult(request.id, agent::BeginChangeGroup(draft, request.args));
         if (request.op == "stage_operations") {
-            return FromAgentResult(request.id, agent::StageOperations(change, request.args));
+            return FromAgentResult(request.id, agent::StageDraftOperations(draft, request.args));
         }
-        if (request.op == "unstage_operations") {
-            return FromAgentResult(request.id, agent::UnstageOperations(change, request.args));
-        }
-        if (request.op == "describe_change_set") {
-            return FromAgentResult(request.id, agent::DescribeChangeSet(change, request.args));
-        }
-        if (request.op == "submit_change_set") {
-            return FromAgentResult(request.id, agent::SubmitChangeSet(change, request.args));
-        }
-        if (request.op == "discard_change_set") {
-            return FromAgentResult(request.id, agent::DiscardChangeSet(change, request.args));
-        }
-        return FromAgentResult(request.id, agent::ListChangeSets(change));
+        if (request.op == "replace_change_group")
+            return FromAgentResult(request.id, agent::ReplaceChangeGroup(draft, request.args));
+        if (request.op == "remove_change_group" || request.op == "discard_change_set")
+            return FromAgentResult(request.id, agent::RemoveChangeGroup(draft, request.args));
+        if (request.op == "describe_change_group" || request.op == "describe_change_set")
+            return FromAgentResult(request.id, agent::DescribeChangeGroup(draft, request.args));
+        if (request.op == "submit_change_group" || request.op == "submit_change_set")
+            return FromAgentResult(request.id, agent::SubmitChangeGroup(draft, request.args));
+        if (request.op == "describe_working_draft")
+            return FromAgentResult(request.id, agent::DescribeWorkingDraft(draft));
+        if (request.op == "get_draft_events")
+            return FromAgentResult(request.id, agent::GetDraftEvents(draft, request.args));
+        if (request.op == "close_change_group")
+            return FromAgentResult(request.id, agent::CloseChangeGroup(draft, request.args));
+        return FromAgentResult(request.id, agent::UnstageDraftOperations(draft, request.args));
     }
 
     return bridge::MakeError(request.id,
