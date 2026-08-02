@@ -3,8 +3,10 @@
 #include "app/app_runtime_state.h"
 #include "app/frame/app_layout_regions.h"
 #include "imgui.h"
-#include "ui/fonts.h"
 #include "ui/i18n/localization.h"
+#include "ui/widgets/panel_header.h"
+
+#include "hello_imgui/icons_font_awesome_4.h"
 
 namespace app::areas {
 namespace {
@@ -41,9 +43,10 @@ void RenderArgumentNavigatorArea(AppRuntimeState& state,
                                  const ArgumentNavigatorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
-    ui::fonts::Push(ui::fonts::Role::Title);
-    ImGui::Begin((AF_TR("Argument Navigator") + "###" + kArgumentNavigatorTitle).c_str(), nullptr, panel_flags);
-    ui::fonts::Pop();
+    ImGui::Begin((AF_TR("Argument Navigator") + "###" + kArgumentNavigatorTitle).c_str(),
+                 nullptr,
+                 panel_flags | ImGuiWindowFlags_NoTitleBar);
+    ui::widgets::PanelHeader(ICON_FA_SITEMAP, AF_TR("Argument Navigator"));
 
     const bool proposal_canvas_active = state.IsProposalCanvasActive();
     ui::ElementContextActions actions = MakeNavigatorContextActions(state, callbacks);

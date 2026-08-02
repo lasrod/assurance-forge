@@ -72,13 +72,13 @@ std::string NormalizeThemeName(std::string_view value) {
 void ApplySharedStyle() {
     ImGuiStyle& style = ImGui::GetStyle();
 
-    style.WindowRounding = 8.0f;
-    style.ChildRounding = 8.0f;
-    style.FrameRounding = 6.0f;
-    style.PopupRounding = 8.0f;
+    style.WindowRounding = 7.0f;
+    style.ChildRounding = 7.0f;
+    style.FrameRounding = 5.0f;
+    style.PopupRounding = 7.0f;
     style.ScrollbarRounding = 8.0f;
-    style.GrabRounding = 6.0f;
-    style.TabRounding = 6.0f;
+    style.GrabRounding = 5.0f;
+    style.TabRounding = 5.0f;
 
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 0.0f;
@@ -86,17 +86,21 @@ void ApplySharedStyle() {
     style.FrameBorderSize = 0.0f;
     style.TabBorderSize = 0.0f;
 
-    style.WindowPadding = ImVec2(10.0f, 10.0f);
-    style.FramePadding = ImVec2(10.0f, 6.0f);
-    style.CellPadding = ImVec2(8.0f, 5.0f);
-    style.ItemSpacing = ImVec2(8.0f, 6.0f);
+    style.WindowPadding = ImVec2(12.0f, 10.0f);
+    style.FramePadding = ImVec2(10.0f, 5.0f);
+    style.CellPadding = ImVec2(10.0f, 6.0f);
+    style.ItemSpacing = ImVec2(8.0f, 7.0f);
     style.ItemInnerSpacing = ImVec2(6.0f, 5.0f);
-    style.IndentSpacing = 14.0f;
-    style.ScrollbarSize = 13.0f;
-    style.GrabMinSize = 11.0f;
+    style.IndentSpacing = 15.0f;
+    style.ScrollbarSize = 12.0f;
+    style.GrabMinSize = 12.0f;
 
-    style.TabBarBorderSize = 0.0f;
-    style.TabBarOverlineSize = 0.0f;
+    style.DisabledAlpha = 0.48f;
+    style.WindowMenuButtonPosition = ImGuiDir_None;
+    style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
+    style.SelectableTextAlign = ImVec2(0.0f, 0.5f);
+    style.TabBarBorderSize = 1.0f;
+    style.TabBarOverlineSize = 2.0f;
     style.TabCloseButtonMinWidthUnselected = 0.0f;
     style.SeparatorTextBorderSize = 0.0f;
     style.DockingSeparatorSize = 1.0f;
@@ -105,23 +109,23 @@ void ApplySharedStyle() {
 void ApplyDarkColors() {
     ImVec4* colors = ImGui::GetStyle().Colors;
 
-    const ImVec4 bg = Color(0x0E, 0x12, 0x18);
-    const ImVec4 panel = Color(0x13, 0x18, 0x20);
-    const ImVec4 panel_hover = Color(0x1F, 0x26, 0x32);
-    const ImVec4 control = Color(0x1B, 0x23, 0x2F);
-    const ImVec4 control_hover = Color(0x25, 0x32, 0x44);
-    const ImVec4 control_active = Color(0x33, 0x4D, 0x6C);
-    const ImVec4 accent = Color(0x42, 0x85, 0xCC);
-    const ImVec4 accent_hover = Color(0x5B, 0x9B, 0xDD);
-    const ImVec4 text = Color(0xE6, 0xEA, 0xF2);
-    const ImVec4 text_muted = Color(0x94, 0xA6, 0xB8);
-    const ImVec4 border = Color(0x2A, 0x38, 0x4A, 0x8A);
+    const ImVec4 bg = Color(0x0B, 0x0F, 0x14);
+    const ImVec4 panel = Color(0x11, 0x17, 0x20);
+    const ImVec4 panel_hover = Color(0x19, 0x23, 0x31);
+    const ImVec4 control = Color(0x18, 0x21, 0x2D);
+    const ImVec4 control_hover = Color(0x22, 0x30, 0x44);
+    const ImVec4 control_active = Color(0x2D, 0x45, 0x64);
+    const ImVec4 accent = Color(0x4C, 0x8D, 0xFF);
+    const ImVec4 accent_hover = Color(0x6A, 0xA2, 0xFF);
+    const ImVec4 text = Color(0xE8, 0xED, 0xF5);
+    const ImVec4 text_muted = Color(0x8B, 0x99, 0xAC);
+    const ImVec4 border = Color(0x2A, 0x36, 0x48, 0xA0);
 
     colors[ImGuiCol_Text] = text;
     colors[ImGuiCol_TextDisabled] = text_muted;
     colors[ImGuiCol_WindowBg] = bg;
     colors[ImGuiCol_ChildBg] = panel;
-    colors[ImGuiCol_PopupBg] = Color(0x16, 0x1C, 0x26);
+    colors[ImGuiCol_PopupBg] = Color(0x14, 0x1B, 0x25);
     colors[ImGuiCol_Border] = border;
     colors[ImGuiCol_BorderShadow] = Color(0, 0, 0, 0);
     colors[ImGuiCol_FrameBg] = control;
@@ -130,8 +134,8 @@ void ApplyDarkColors() {
     colors[ImGuiCol_TitleBg] = bg;
     colors[ImGuiCol_TitleBgActive] = panel;
     colors[ImGuiCol_TitleBgCollapsed] = bg;
-    colors[ImGuiCol_MenuBarBg] = Color(0x11, 0x16, 0x1E);
-    colors[ImGuiCol_ScrollbarBg] = Color(0x0B, 0x0F, 0x15);
+    colors[ImGuiCol_MenuBarBg] = Color(0x0E, 0x13, 0x1A);
+    colors[ImGuiCol_ScrollbarBg] = Color(0x0B, 0x0F, 0x14);
     colors[ImGuiCol_ScrollbarGrab] = Color(0x2A, 0x36, 0x46);
     colors[ImGuiCol_ScrollbarGrabHovered] = Color(0x36, 0x46, 0x5A);
     colors[ImGuiCol_ScrollbarGrabActive] = Color(0x48, 0x5E, 0x76);
@@ -141,9 +145,9 @@ void ApplyDarkColors() {
     colors[ImGuiCol_Button] = control;
     colors[ImGuiCol_ButtonHovered] = control_hover;
     colors[ImGuiCol_ButtonActive] = control_active;
-    colors[ImGuiCol_Header] = Color(0x25, 0x39, 0x52, 0xC8);
-    colors[ImGuiCol_HeaderHovered] = Color(0x30, 0x4C, 0x70, 0xDD);
-    colors[ImGuiCol_HeaderActive] = Color(0x3A, 0x5F, 0x8F, 0xEE);
+    colors[ImGuiCol_Header] = Color(0x24, 0x3B, 0x5D, 0xC8);
+    colors[ImGuiCol_HeaderHovered] = Color(0x2B, 0x4A, 0x76, 0xDD);
+    colors[ImGuiCol_HeaderActive] = Color(0x34, 0x5C, 0x93, 0xEE);
     colors[ImGuiCol_Separator] = Color(0x2A, 0x38, 0x4A, 0x70);
     colors[ImGuiCol_SeparatorHovered] = Color(0x42, 0x85, 0xCC, 0xAA);
     colors[ImGuiCol_SeparatorActive] = accent;
@@ -151,9 +155,9 @@ void ApplyDarkColors() {
     colors[ImGuiCol_ResizeGripHovered] = Color(0x42, 0x85, 0xCC, 0x72);
     colors[ImGuiCol_ResizeGripActive] = Color(0x5B, 0x9B, 0xDD, 0xA8);
     colors[ImGuiCol_Tab] = panel;
-    colors[ImGuiCol_TabHovered] = control_hover;
-    colors[ImGuiCol_TabSelected] = panel_hover;
-    colors[ImGuiCol_TabSelectedOverline] = Color(0x42, 0x85, 0xCC, 0x00);
+    colors[ImGuiCol_TabHovered] = Color(0x22, 0x30, 0x44);
+    colors[ImGuiCol_TabSelected] = Color(0x1B, 0x29, 0x3B);
+    colors[ImGuiCol_TabSelectedOverline] = Color(0x4C, 0x8D, 0xFF, 0xE8);
     colors[ImGuiCol_TabDimmed] = Color(0x0F, 0x14, 0x1C);
     colors[ImGuiCol_TabDimmedSelected] = Color(0x19, 0x20, 0x2B);
     colors[ImGuiCol_TabDimmedSelectedOverline] = Color(0x42, 0x85, 0xCC, 0x00);
@@ -173,17 +177,17 @@ void ApplyDarkColors() {
 void ApplyLightColors() {
     ImVec4* colors = ImGui::GetStyle().Colors;
 
-    const ImVec4 bg = Color(0xFB, 0xFC, 0xFD);
-    const ImVec4 panel = Color(0xF2, 0xF5, 0xF9);
-    const ImVec4 panel_hover = Color(0xE6, 0xE9, 0xF0);
-    const ImVec4 control = Color(0xE9, 0xEE, 0xF5);
-    const ImVec4 control_hover = Color(0xD8, 0xE5, 0xF5);
-    const ImVec4 control_active = Color(0xB9, 0xD0, 0xEC);
-    const ImVec4 accent = Color(0x29, 0x6B, 0xB8);
-    const ImVec4 accent_hover = Color(0x3C, 0x7E, 0xCB);
-    const ImVec4 text = Color(0x17, 0x1C, 0x22);
-    const ImVec4 text_muted = Color(0x6B, 0x75, 0x85);
-    const ImVec4 border = Color(0xD9, 0xE1, 0xEC, 0xB8);
+    const ImVec4 bg = Color(0xF5, 0xF7, 0xFA);
+    const ImVec4 panel = Color(0xFF, 0xFF, 0xFF);
+    const ImVec4 panel_hover = Color(0xEF, 0xF3, 0xF8);
+    const ImVec4 control = Color(0xF0, 0xF3, 0xF7);
+    const ImVec4 control_hover = Color(0xE3, 0xEC, 0xF8);
+    const ImVec4 control_active = Color(0xCF, 0xDF, 0xF4);
+    const ImVec4 accent = Color(0x23, 0x67, 0xC9);
+    const ImVec4 accent_hover = Color(0x31, 0x75, 0xD8);
+    const ImVec4 text = Color(0x18, 0x20, 0x2B);
+    const ImVec4 text_muted = Color(0x66, 0x73, 0x86);
+    const ImVec4 border = Color(0xD5, 0xDD, 0xE8, 0xD0);
 
     colors[ImGuiCol_Text] = text;
     colors[ImGuiCol_TextDisabled] = text_muted;
@@ -198,8 +202,8 @@ void ApplyLightColors() {
     colors[ImGuiCol_TitleBg] = panel;
     colors[ImGuiCol_TitleBgActive] = panel;
     colors[ImGuiCol_TitleBgCollapsed] = panel;
-    colors[ImGuiCol_MenuBarBg] = Color(0xF6, 0xF8, 0xFB);
-    colors[ImGuiCol_ScrollbarBg] = Color(0xF2, 0xF5, 0xF9);
+    colors[ImGuiCol_MenuBarBg] = Color(0xFA, 0xFB, 0xFD);
+    colors[ImGuiCol_ScrollbarBg] = Color(0xF5, 0xF7, 0xFA);
     colors[ImGuiCol_ScrollbarGrab] = Color(0xC5, 0xCF, 0xDC);
     colors[ImGuiCol_ScrollbarGrabHovered] = Color(0xAC, 0xBA, 0xCA);
     colors[ImGuiCol_ScrollbarGrabActive] = Color(0x93, 0xA5, 0xB8);
@@ -209,19 +213,19 @@ void ApplyLightColors() {
     colors[ImGuiCol_Button] = control;
     colors[ImGuiCol_ButtonHovered] = control_hover;
     colors[ImGuiCol_ButtonActive] = control_active;
-    colors[ImGuiCol_Header] = Color(0xD8, 0xE8, 0xFA, 0xD8);
-    colors[ImGuiCol_HeaderHovered] = Color(0xC8, 0xDD, 0xF6, 0xE6);
-    colors[ImGuiCol_HeaderActive] = Color(0xB9, 0xD0, 0xEC, 0xF0);
+    colors[ImGuiCol_Header] = Color(0xD9, 0xE7, 0xF8, 0xD8);
+    colors[ImGuiCol_HeaderHovered] = Color(0xC9, 0xDD, 0xF6, 0xE6);
+    colors[ImGuiCol_HeaderActive] = Color(0xB8, 0xD0, 0xEF, 0xF0);
     colors[ImGuiCol_Separator] = Color(0xD9, 0xE1, 0xEC, 0xA0);
     colors[ImGuiCol_SeparatorHovered] = Color(0x29, 0x6B, 0xB8, 0x88);
     colors[ImGuiCol_SeparatorActive] = accent;
     colors[ImGuiCol_ResizeGrip] = Color(0x29, 0x6B, 0xB8, 0x28);
     colors[ImGuiCol_ResizeGripHovered] = Color(0x29, 0x6B, 0xB8, 0x5E);
     colors[ImGuiCol_ResizeGripActive] = Color(0x29, 0x6B, 0xB8, 0x90);
-    colors[ImGuiCol_Tab] = panel;
+    colors[ImGuiCol_Tab] = bg;
     colors[ImGuiCol_TabHovered] = Color(0xC8, 0xDD, 0xF6);
-    colors[ImGuiCol_TabSelected] = Color(0xD6, 0xE8, 0xFB);
-    colors[ImGuiCol_TabSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0xCC);
+    colors[ImGuiCol_TabSelected] = Color(0xDC, 0xE9, 0xFA);
+    colors[ImGuiCol_TabSelectedOverline] = Color(0x23, 0x67, 0xC9, 0xE8);
     colors[ImGuiCol_TabDimmed] = Color(0xEA, 0xEF, 0xF5);
     colors[ImGuiCol_TabDimmedSelected] = Color(0xE2, 0xEC, 0xF8);
     colors[ImGuiCol_TabDimmedSelectedOverline] = Color(0x29, 0x6B, 0xB8, 0x99);
@@ -242,23 +246,23 @@ Theme MakeTheme(AppTheme app_theme) {
     Theme t{};
 
     if (app_theme == AppTheme::Light) {
-        t.bg_app = PackedColor(0xFB, 0xFC, 0xFD);
-        t.surface_1 = PackedColor(0xF2, 0xF5, 0xF9);
-        t.surface_2 = PackedColor(0xE6, 0xE9, 0xF0);
-        t.surface_3 = PackedColor(0xD8, 0xE5, 0xF5);
+        t.bg_app = PackedColor(0xF5, 0xF7, 0xFA);
+        t.surface_1 = PackedColor(0xFF, 0xFF, 0xFF);
+        t.surface_2 = PackedColor(0xF0, 0xF3, 0xF7);
+        t.surface_3 = PackedColor(0xE3, 0xEC, 0xF8);
 
-        t.border = PackedColor(0xD9, 0xE1, 0xEC);
-        t.border_strong = PackedColor(0xB7, 0xC4, 0xD3);
+        t.border = PackedColor(0xD5, 0xDD, 0xE8);
+        t.border_strong = PackedColor(0xB5, 0xC2, 0xD2);
 
-        t.text_primary = PackedColor(0x17, 0x1C, 0x22);
-        t.text_secondary = PackedColor(0x5D, 0x68, 0x78);
-        t.text_muted = PackedColor(0x7C, 0x86, 0x96);
-        t.ink_dark = PackedColor(0x17, 0x1C, 0x22);
+        t.text_primary = PackedColor(0x18, 0x20, 0x2B);
+        t.text_secondary = PackedColor(0x55, 0x62, 0x74);
+        t.text_muted = PackedColor(0x75, 0x82, 0x94);
+        t.ink_dark = PackedColor(0x18, 0x20, 0x2B);
         t.ink_darker = PackedColor(0x0F, 0x14, 0x1A);
 
-        t.accent = PackedColor(0x29, 0x6B, 0xB8);
-        t.accent_hover = PackedColor(0x3C, 0x7E, 0xCB);
-        t.accent_pressed = PackedColor(0x1F, 0x58, 0x9D);
+        t.accent = PackedColor(0x23, 0x67, 0xC9);
+        t.accent_hover = PackedColor(0x31, 0x75, 0xD8);
+        t.accent_pressed = PackedColor(0x1A, 0x53, 0xA8);
         t.success = PackedColor(0x2F, 0x8A, 0x52);
         t.warning = PackedColor(0xB8, 0x72, 0x18);
         t.danger = PackedColor(0xC8, 0x3E, 0x3E);
@@ -284,27 +288,27 @@ Theme MakeTheme(AppTheme app_theme) {
         t.edge_group1 = WithAlpha(t.text_secondary, 0.82f);
         t.edge_group2 = WithAlpha(t.accent, 0.68f);
 
-        t.canvas_bg = PackedColor(0xFF, 0xFF, 0xFF);
+        t.canvas_bg = PackedColor(0xF8, 0xFA, 0xFD);
         t.canvas_grid_minor = WithAlpha(t.border, 0.70f);
         t.canvas_grid_major = WithAlpha(t.border_strong, 0.65f);
     } else {
-        t.bg_app = PackedColor(0x0E, 0x12, 0x18);
-        t.surface_1 = PackedColor(0x13, 0x18, 0x20);
-        t.surface_2 = PackedColor(0x1B, 0x23, 0x2F);
-        t.surface_3 = PackedColor(0x25, 0x32, 0x44);
+        t.bg_app = PackedColor(0x0B, 0x0F, 0x14);
+        t.surface_1 = PackedColor(0x11, 0x17, 0x20);
+        t.surface_2 = PackedColor(0x18, 0x21, 0x2D);
+        t.surface_3 = PackedColor(0x22, 0x30, 0x44);
 
-        t.border = PackedColor(0x2A, 0x38, 0x4A);
-        t.border_strong = PackedColor(0x3A, 0x4D, 0x66);
+        t.border = PackedColor(0x2A, 0x36, 0x48);
+        t.border_strong = PackedColor(0x3C, 0x50, 0x6B);
 
-        t.text_primary = PackedColor(0xE6, 0xEA, 0xF2);
-        t.text_secondary = PackedColor(0x94, 0xA6, 0xB8);
-        t.text_muted = PackedColor(0x6D, 0x7D, 0x8F);
+        t.text_primary = PackedColor(0xE8, 0xED, 0xF5);
+        t.text_secondary = PackedColor(0x9A, 0xA8, 0xBA);
+        t.text_muted = PackedColor(0x6F, 0x7E, 0x91);
         t.ink_dark = PackedColor(0x1A, 0x1F, 0x2A);
         t.ink_darker = PackedColor(0x0E, 0x11, 0x16);
 
-        t.accent = PackedColor(0x42, 0x85, 0xCC);
-        t.accent_hover = PackedColor(0x5B, 0x9B, 0xDD);
-        t.accent_pressed = PackedColor(0x31, 0x67, 0xA3);
+        t.accent = PackedColor(0x4C, 0x8D, 0xFF);
+        t.accent_hover = PackedColor(0x6A, 0xA2, 0xFF);
+        t.accent_pressed = PackedColor(0x37, 0x70, 0xCC);
         t.success = PackedColor(0x59, 0xC2, 0x7A);
         t.warning = PackedColor(0xE3, 0xA5, 0x43);
         t.danger = PackedColor(0xE8, 0x66, 0x66);

@@ -11,12 +11,14 @@
 #include "core/commands/gid_commands.h"
 #include "core/confidence/confidence_store.h"
 #include "parser/model_utils.h"
-#include "ui/fonts.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/acp_panel.h"
 #include "ui/panels/element_panel.h"
 #include "ui/panels/relationship_panel.h"
 #include "ui/ui_state.h"
+#include "ui/widgets/panel_header.h"
+
+#include "hello_imgui/icons_font_awesome_4.h"
 
 #include <algorithm>
 #include <string>
@@ -29,9 +31,10 @@ void RenderInspectorArea(AppRuntimeState& state,
                          const InspectorAreaCallbacks& callbacks) {
     ImGui::SetNextWindowPos(region.pos);
     ImGui::SetNextWindowSize(region.size);
-    ui::fonts::Push(ui::fonts::Role::Title);
-    ImGui::Begin((AF_TR("Element Properties") + "###Element Properties").c_str(), nullptr, panel_flags);
-    ui::fonts::Pop();
+    ImGui::Begin((AF_TR("Element Properties") + "###Element Properties").c_str(),
+                 nullptr,
+                 panel_flags | ImGuiWindowFlags_NoTitleBar);
+    ui::widgets::PanelHeader(ICON_FA_INFO_CIRCLE, AF_TR("Element Properties"));
 
     if (state.proposal_controller->creator_active) {
         if (callbacks.render_proposal_element_editor)

@@ -1,5 +1,6 @@
 #include "ui/panels/project_overview_panel.h"
 
+#include "ui/fonts.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
@@ -52,13 +53,27 @@ bool DrawMetricCard(const MetricCard& card, float width) {
 
     DrawText(draw_list, ImVec2(position.x + 16.0f, position.y + 14.0f), card.accent, card.icon);
     DrawText(draw_list, ImVec2(position.x + 42.0f, position.y + 14.0f), theme.text_secondary, card.title);
-    draw_list->AddText(ImGui::GetFont(),
-                       ImGui::GetFontSize() * 1.45f,
-                       ImVec2(position.x + 16.0f, position.y + 45.0f),
-                       theme.text_primary,
-                       card.value.c_str());
+    {
+        ui::fonts::Scoped strong(ui::fonts::Role::BodyStrong);
+        draw_list->AddText(ImGui::GetFont(),
+                           ImGui::GetFontSize() * 1.35f,
+                           ImVec2(position.x + 16.0f, position.y + 45.0f),
+                           theme.text_primary,
+                           card.value.c_str());
+    }
     DrawText(draw_list, ImVec2(position.x + 16.0f, position.y + 87.0f), theme.text_muted, card.detail);
     return clicked;
+}
+
+void SectionHeading(const char* icon, const std::string& title) {
+    const ui::Theme& theme = ui::GetTheme();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(theme.accent), "%s", icon);
+    ImGui::SameLine();
+    {
+        ui::fonts::Scoped strong(ui::fonts::Role::BodyStrong);
+        ImGui::TextUnformatted(title.c_str());
+    }
+    ImGui::Separator();
 }
 
 void AttentionRow(
@@ -90,17 +105,25 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 18.0f));
     ImGui::BeginChild("##project_overview_content", ImVec2(0.0f, 0.0f), false);
 
-    ImGui::SetWindowFontScale(1.35f);
-    ImGui::TextUnformatted(project.name.c_str());
-    ImGui::SetWindowFontScale(1.0f);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(theme.surface_2));
+    ImGui::BeginChild("##project_hero", ImVec2(0.0f, 104.0f), true, ImGuiWindowFlags_NoScrollbar);
+    {
+        ui::fonts::Scoped title(ui::fonts::Role::Title);
+        ImGui::TextUnformatted(project.name.c_str());
+    }
     if (!project.description.empty())
         ImGui::TextWrapped("%s", project.description.c_str());
-    if (!model.active_case_name.empty())
-        ImGui::TextDisabled("%s", ui::i18n::trf("Active assurance case: {0}", model.active_case_name).c_str());
+    if (!model.active_case_name.empty()) {
+        ui::fonts::Scoped caption(ui::fonts::Role::Caption);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(theme.text_secondary),
+                           "%s",
+                           ui::i18n::trf("Active assurance case: {0}", model.active_case_name).c_str());
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
-    ImGui::TextUnformatted(AF_TR("Project Readiness").c_str());
-    ImGui::Separator();
+    SectionHeading(ICON_FA_TASKS, AF_TR("Project Readiness"));
     ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
     const std::string argument_detail = summary.undeveloped == 0
@@ -161,8 +184,7 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
     }
 
     ImGui::Dummy(ImVec2(0.0f, 18.0f));
-    ImGui::TextUnformatted(AF_TR("Needs Attention").c_str());
-    ImGui::Separator();
+    SectionHeading(ICON_FA_EXCLAMATION_CIRCLE, AF_TR("Needs Attention"));
     ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
     bool has_attention = false;
@@ -211,8 +233,7 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
     }
 
     ImGui::Dummy(ImVec2(0.0f, 18.0f));
-    ImGui::TextUnformatted(AF_TR("Project Details").c_str());
-    ImGui::Separator();
+    SectionHeading(ICON_FA_INFO_CIRCLE, AF_TR("Project Details"));
     ImGui::TextDisabled("%s", ui::i18n::trf("Project files: {0}", project.files.size()).c_str());
     ImGui::TextDisabled("%s", ui::i18n::trf("Generated reports: {0}", summary.exported_reports).c_str());
     ImGui::TextDisabled("%s", project.rootPath.string().c_str());

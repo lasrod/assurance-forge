@@ -57,7 +57,9 @@ TEST(AppTheme, AppliesReadableFloatingWindowAndTreeStyle) {
     EXPECT_FLOAT_EQ(style.PopupBorderSize, 1.0f);
     EXPECT_FLOAT_EQ(style.ChildBorderSize, 0.0f);
     EXPECT_FLOAT_EQ(style.FrameBorderSize, 0.0f);
-    EXPECT_FLOAT_EQ(style.IndentSpacing, 14.0f);
+    EXPECT_FLOAT_EQ(style.IndentSpacing, 15.0f);
+    EXPECT_FLOAT_EQ(style.TabBarOverlineSize, 2.0f);
+    EXPECT_EQ(style.WindowMenuButtonPosition, ImGuiDir_None);
 
     ImGui::DestroyContext();
 }

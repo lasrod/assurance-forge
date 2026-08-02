@@ -976,6 +976,9 @@ msgstr "中カリング"
 msgid "Message"
 msgstr "メッセージ"
 
+msgid "Method"
+msgstr "方式"
+
 msgid "Method: {0}"
 msgstr "方式: {0}"
 

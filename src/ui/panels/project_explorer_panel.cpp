@@ -3,6 +3,7 @@
 #include "ui/fonts.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+#include "ui/widgets/panel_header.h"
 #include "ui/widgets/text_ellipsis.h"
 
 #include "hello_imgui/icons_font_awesome_4.h"
@@ -10,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -573,16 +575,28 @@ void RenderAdvanced(const ProjectExplorerPanelModel& model, const ProjectExplore
 
 void RenderProjectHeader(const ProjectExplorerPanelModel& model) {
     const core::AssuranceProject& project = *model.project;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().surface_2));
+    const ui::Theme& theme = ui::GetTheme();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(theme.surface_2));
     ImGui::BeginChild("##case_header", ImVec2(0.0f, 66.0f), true, ImGuiWindowFlags_NoScrollbar);
-    // ICON_FA_CERTIFICATE, not ICON_FA_SHIELD_ALT: the latter is a FontAwesome 5
-    // name that the bundled 4.x font has no glyph for, so it rendered as the
-    // missing-glyph box rather than an icon.
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent), "%s", ICON_FA_CERTIFICATE);
-    ImGui::SameLine();
+
+    constexpr float kIconSize = 26.0f;
+    const ImVec2 icon_position = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("##project_icon", ImVec2(kIconSize, kIconSize));
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(icon_position,
+                             ImVec2(icon_position.x + kIconSize, icon_position.y + kIconSize),
+                             ui::WithAlpha(theme.accent, 0.14f),
+                             theme.rounding_ui);
+    const ImVec2 icon_text_size = ImGui::CalcTextSize(ICON_FA_CUBE);
+    draw_list->AddText(ImVec2(std::round(icon_position.x + (kIconSize - icon_text_size.x) * 0.5f),
+                              std::round(icon_position.y + (kIconSize - icon_text_size.y) * 0.5f) - 1.0f),
+                       theme.accent,
+                       ICON_FA_CUBE);
+    ImGui::SameLine(0.0f, 8.0f);
+    ImGui::BeginGroup();
     {
         ui::fonts::Scoped strong(ui::fonts::Role::BodyStrong);
-        ImGui::TextWrapped("%s", project.name.c_str());
+        ImGui::TextUnformatted(project.name.c_str());
     }
 
     // Attention needs to look different from "all clear" — both were TextDisabled,
@@ -603,6 +617,7 @@ void RenderProjectHeader(const ProjectExplorerPanelModel& model) {
                     .c_str());
         }
     }
+    ImGui::EndGroup();
     ImGui::EndChild();
     ImGui::PopStyleColor();
 }
@@ -645,9 +660,10 @@ void ShowProjectExplorerPanel(float width,
                               const ProjectExplorerPanelCallbacks& callbacks) {
     ImGui::SetNextWindowPos(ImVec2(0.0f, top_y));
     ImGui::SetNextWindowSize(ImVec2(width, height));
-    ui::fonts::Push(ui::fonts::Role::Title);
-    ImGui::Begin((AF_TR("Case Explorer") + "###" + kCaseExplorerTitle).c_str(), nullptr, panel_flags);
-    ui::fonts::Pop();
+    ImGui::Begin((AF_TR("Case Explorer") + "###" + kCaseExplorerTitle).c_str(),
+                 nullptr,
+                 panel_flags | ImGuiWindowFlags_NoTitleBar);
+    ui::widgets::PanelHeader(ICON_FA_COMPASS, AF_TR("Case Explorer"));
 
     if (ImGui::BeginChild("CaseExplorerTree", ImVec2(0.0f, 0.0f), false)) {
         if (model.project) {
