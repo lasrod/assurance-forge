@@ -382,6 +382,7 @@ add_executable(tests
     tests/test_agent_request_handler.cpp
     tests/test_agent_bridge_controller.cpp
     tests/test_change_sets.cpp
+    tests/test_draft_workspace.cpp
     tests/test_agent_change_canvas.cpp
     tests/test_change_set_acceptance.cpp
     tests/test_sccg_staged_checks.cpp
