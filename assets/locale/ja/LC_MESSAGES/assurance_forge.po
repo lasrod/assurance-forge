@@ -16,6 +16,9 @@ msgstr " (プレビューするにはパッケージキャンバスを開いて�
 msgid " | Showing {0} of {1} (filtered)"
 msgstr " | {0} / {1} 件を表示 (フィルター適用)"
 
+msgid "\"{0}\" cannot be edited while a working draft is active."
+msgstr "作業ドラフトが有効な間は「{0}」を編集できません。"
+
 msgid "% Frame"
 msgstr "% フレーム"
 
@@ -501,6 +504,9 @@ msgstr "信頼度保存用の SACM gid を割り当てられませんでした�
 
 msgid "Could not discard the working draft: {0}"
 msgstr "作業ドラフトを破棄できませんでした: {0}"
+
+msgid "Could not record the edit in the draft: {0}"
+msgstr "ドラフトに編集を記録できませんでした: {0}"
 
 msgid "Could not reject this change: {0}"
 msgstr "この変更を却下できませんでした: {0}"
@@ -1947,6 +1953,9 @@ msgstr "トランザクション: {0}   |   現在: Tx {1} / {2}"
 
 msgid "Translation Language"
 msgstr "翻訳言語"
+
+msgid "Translations cannot be edited while a working draft is active. Accept or discard the draft first."
+msgstr "作業ドラフトが有効な間は翻訳を編集できません。先にドラフトを受理または破棄してください。"
 
 msgid "Type"
 msgstr "種別"

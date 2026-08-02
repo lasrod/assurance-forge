@@ -1,9 +1,11 @@
 #pragma once
 
+#include "core/sacm_model.h"
 #include "core/terminology_package_service.h"
 #include "imgui.h"
 
 #include <functional>
+#include <vector>
 #include <string>
 
 namespace app {
@@ -19,6 +21,11 @@ struct InspectorAreaCallbacks {
     std::function<void()> render_proposal_element_editor;
     // Accept or reject the working-draft change on the selected element. Both
     // receive the dependency closure the inspector displayed, never a wider set.
+    // The model the panel shows and edits. While a draft is active this is the
+    // *working* argument, so an element another draft group created can be
+    // selected and inspected at all -- reading the accepted model made those
+    // report "Element not found", which is every element the draft adds.
+    std::function<parser::AssuranceCase*()> inspector_model;
     std::function<void(const std::vector<std::string>&)> accept_draft_groups;
     std::function<void(const std::vector<std::string>&)> reject_draft_groups;
     std::function<void(const std::string&, const std::string&)> define_terminology_term;

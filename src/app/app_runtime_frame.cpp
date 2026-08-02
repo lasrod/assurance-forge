@@ -418,6 +418,7 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::InspectorAreaCallbacks inspector_callbacks{
         [this, &proposal_editor_callbacks]() { areas::RenderProposalElementEditor(*impl_, proposal_editor_callbacks); },
+        [this]() { return InspectorModel(); },
         [this](const std::vector<std::string>& group_ids) {
             std::string error;
             if (PromoteDraftGroups(group_ids, error)) {
@@ -466,6 +467,14 @@ void AppRuntime::RenderFrame(bool& done) {
                const std::string& new_value) {
             if (!impl_->app_state.loaded_case.has_value())
                 return;
+            // Into the draft when there is one, for the same reason adding a
+            // child is: the panel is showing the working argument, and an edit
+            // applied to the accepted model underneath it changes something the
+            // user is not looking at.
+            if (CommitTextEditAsDraft(element_id, field_token, language, new_value)) {
+                impl_->events.Emit(TreeDirtyEvent{});
+                return;
+            }
             const bool committed = impl_->element_edit_controller->CommitElementTextEdit(
                 *impl_, element_id, field_token, language, original_value, new_value);
             if (committed) {

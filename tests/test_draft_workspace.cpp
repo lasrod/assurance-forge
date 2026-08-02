@@ -820,6 +820,62 @@ TEST(DraftWorkspace, PromotionDoesNotFuseTwoSourcesThatChoseTheSameCreateRef) {
 }
 
 // --------------------------------------------------------------------------
+// A human's own edits while a draft is active.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, AHumanEditOfADraftCreatedElementStaysInTheDraft) {
+    Fixture fixture;
+    const std::string baseline_hash = core::reviews::ComputeModelSemanticHash(fixture.accepted);
+
+    // An agent proposes a claim. It exists only in the working model -- the
+    // accepted argument has never heard of it.
+    const std::string mcp_group = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(mcp_group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, mcp_group, "$sub");
+    ASSERT_FALSE(sub_id.empty());
+    ASSERT_EQ(FindElement(fixture.accepted, sub_id), nullptr) << "not in the accepted argument";
+
+    // The user rewords it. This is the case the accepted-model edit path could
+    // not handle at all: the element it names does not exist there, so the edit
+    // either failed or landed on something else.
+    std::string error;
+    const std::string human_group = fixture.store.BeginGroup(
+        [] {
+            core::drafts::DraftGroupRequest request;
+            request.title = "My edits";
+            request.source = core::drafts::DraftSource::Human;
+            request.source_label = "Jesper";
+            return request;
+        }(),
+        fixture.accepted,
+        error);
+    ASSERT_FALSE(human_group.empty()) << error;
+    ASSERT_TRUE(fixture.store.StageOperations(
+        human_group, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")}, fixture.accepted, error))
+        << error;
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(result.success) << result.error;
+    const core::SacmElement* working = FindElement(result.working_model, sub_id);
+    ASSERT_NE(working, nullptr);
+    EXPECT_EQ(working->content, "Identified hazards are mitigated to ALARP.");
+
+    // And the accepted argument is untouched by any of it.
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(fixture.accepted), baseline_hash);
+    EXPECT_EQ(FindElement(fixture.accepted, sub_id), nullptr);
+
+    // The human edit is attributed to the person, not folded into the agent's
+    // group: a reviewer needs to see that a human touched an AI's proposal.
+    const core::drafts::DraftElementEntry* entry = result.change_index.Find(sub_id);
+    ASSERT_NE(entry, nullptr);
+    const std::vector<std::string> contributors = result.change_index.ContributingGroupIds(sub_id);
+    ASSERT_EQ(contributors.size(), 2u);
+    EXPECT_EQ(contributors[0], mcp_group);
+    EXPECT_EQ(contributors[1], human_group);
+}
+
+// --------------------------------------------------------------------------
 // Dependencies and selective acceptance.
 // --------------------------------------------------------------------------
 

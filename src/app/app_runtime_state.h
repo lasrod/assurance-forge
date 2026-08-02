@@ -234,6 +234,13 @@ struct AppRuntimeState {
     // case while the rest of the application has moved to the working model.
     // Null before the first frame; falls back to the accepted case.
     const parser::AssuranceCase* draft_canvas_view = nullptr;
+    // The model the inspector edits while a draft is active: its own copy of the
+    // working argument, so the panel's in-place edits cannot scribble on the
+    // materializer's cache. Refreshed on the revisions below.
+    parser::AssuranceCase inspector_model;
+    bool inspector_model_valid = false;
+    std::uint64_t inspector_model_draft_revision = 0;
+    std::uint64_t inspector_model_case_revision = 0;
     // The store revision the canvas was last built against. Staging is not a
     // model mutation and so marks nothing dirty; comparing this each frame is
     // what turns an agent's staged operation into a repaint.

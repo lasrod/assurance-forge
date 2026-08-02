@@ -233,6 +233,22 @@ private:
     bool AddTopGoalAsDraft();
     bool RemoveSelectedAsDraft(core::RemoveMode mode);
 
+    // Routes a finished text edit into the draft. Returns false when no draft is
+    // active, so the caller falls through to the ordinary audited command.
+    bool CommitTextEditAsDraft(const std::string& element_id,
+                               const std::string& field_token,
+                               const std::string& language,
+                               const std::string& new_value);
+
+    // The model the inspector edits: the working argument while a draft is
+    // active, the accepted one otherwise.
+    //
+    // Held as its own copy rather than handed the materializer's cache, because
+    // the panel edits the element in place for immediate feedback and the cache
+    // is regenerated from the draft on the next materialization. The in-place
+    // edit is provisional; the staged operation is what makes it real.
+    parser::AssuranceCase* InspectorModel();
+
 public:
     // The draft workspace for the argument that is open, or null when there is
     // no draft. Read-only: only `AppRuntime` mutates it, which is what keeps

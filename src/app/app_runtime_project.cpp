@@ -1504,6 +1504,65 @@ bool AppRuntime::RemoveSelectedAsDraft(core::RemoveMode mode) {
     return true;
 }
 
+bool AppRuntime::CommitTextEditAsDraft(const std::string& element_id,
+                                       const std::string& field_token,
+                                       const std::string& language,
+                                       const std::string& new_value) {
+    if (!DraftEditingActive())
+        return false;
+    if (element_id.empty())
+        return false;
+
+    // The operation vocabulary writes the primary language only:
+    // `UpdateElementText` sets the field and its `en` entry, and carries no
+    // language of its own. A secondary-language edit therefore cannot be
+    // expressed as a draft change, and silently writing it into the accepted
+    // argument underneath the draft is the defect this whole routing exists to
+    // stop. Refused, with the reason -- extending the vocabulary is its own
+    // decision, like the missing move operation.
+    if (!language.empty() && language != "en") {
+        SetStatus(AF_TR("Translations cannot be edited while a working draft is active. "
+                        "Accept or discard the draft first."));
+        return true;
+    }
+    if (field_token != "name" && field_token != "content" && field_token != "description") {
+        SetStatus(ui::i18n::trf("\"{0}\" cannot be edited while a working draft is active.", field_token));
+        return true;
+    }
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    core::reviews::ElementRef element;
+    element.existing_id = element_id;
+    update.element = element;
+    update.field = field_token;
+    update.new_value = new_value;
+
+    std::string error;
+    if (!StageHumanDraftOperations(AF_TR("My edits"), {update}, error))
+        SetStatus(ui::i18n::trf("Could not record the edit in the draft: {0}", error));
+    return true;
+}
+
+parser::AssuranceCase* AppRuntime::InspectorModel() {
+    if (!impl_->app_state.loaded_case.has_value())
+        return nullptr;
+    if (!DraftEditingActive())
+        return &impl_->app_state.loaded_case.value();
+
+    // Refreshed on the same key the materialization is cached under, so this
+    // copy is made when something actually changed rather than every frame.
+    const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+    if (!impl_->inspector_model_valid || impl_->inspector_model_draft_revision != draft_revision ||
+        impl_->inspector_model_case_revision != impl_->app_state.case_revision) {
+        impl_->inspector_model = CurrentArgumentView();
+        impl_->inspector_model_draft_revision = draft_revision;
+        impl_->inspector_model_case_revision = impl_->app_state.case_revision;
+        impl_->inspector_model_valid = true;
+    }
+    return &impl_->inspector_model;
+}
+
 bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
     error.clear();
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
