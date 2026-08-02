@@ -586,6 +586,75 @@ const parser::AssuranceCase& AppRuntime::CurrentCanvasView() {
     return working;
 }
 
+void AppRuntime::RefreshDraftDecorations() {
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.draft_element_status.clear();
+    ui_state.draft_edge_status.clear();
+
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || !workspace->has_active_groups())
+        return;
+    // In "accepted baseline" the canvas is deliberately showing what the user
+    // has now. Marking it up with what is proposed would contradict the mode
+    // they just selected.
+    if (ui::GetUiState().draft_view_mode == ui::DraftViewMode::AcceptedBaseline)
+        return;
+
+    const core::drafts::DraftChangeIndex& index = CurrentDraftChangeIndex();
+    const parser::AssuranceCase& working = CurrentArgumentView();
+
+    for (const std::string& element_id : index.ChangedElementIds()) {
+        const core::drafts::DraftElementEntry* entry = index.Find(element_id);
+        if (entry == nullptr)
+            continue;
+
+        const std::vector<std::string> contributors = index.ContributingGroupIds(element_id);
+        ui::DraftNodeDecoration decoration;
+        decoration.change = entry->change;
+        decoration.multiple_contributions = contributors.size() > 1;
+        if (!contributors.empty()) {
+            const core::drafts::DraftChangeGroup* group = workspace->FindGroup(contributors.back());
+            if (group != nullptr) {
+                decoration.source_label = group->source_label.empty()
+                                              ? std::string(core::drafts::DraftSourceToString(group->source))
+                                              : group->source_label;
+            }
+        }
+
+        // Relationships are elements in the model, so they arrive here mixed in
+        // with the claims. Split them out: an edge is marked on the edge, keyed
+        // by its endpoints, because its own id is not stable across a rebuild.
+        const parser::SacmElement* element = nullptr;
+        for (const parser::SacmElement& candidate : working.elements) {
+            if (candidate.id == element_id) {
+                element = &candidate;
+                break;
+            }
+        }
+        const bool is_relationship =
+            element != nullptr && (element->type == "assertedinference" || element->type == "assertedcontext" ||
+                                   element->type == "assertedevidence");
+        if (!is_relationship) {
+            ui_state.draft_element_status.emplace(element_id, std::move(decoration));
+            continue;
+        }
+        if (entry->change != core::drafts::DraftElementChange::Added)
+            continue;
+
+        ui::DraftEdgeDecoration edge;
+        edge.added = true;
+        edge.contextual = element->type == "assertedcontext";
+        edge.source_label = decoration.source_label;
+        // The renderer keys an edge by parent-then-child, and SACM puts the
+        // premise in `source_refs` and the conclusion in `target_refs`, so the
+        // parent is the target.
+        const std::string child = !element->source_refs.empty() ? element->source_refs.front() : element->reasoning_ref;
+        if (child.empty() || element->target_refs.empty())
+            continue;
+        ui_state.draft_edge_status.emplace(element->target_refs.front() + "\x1f" + child, edge);
+    }
+}
+
 const core::drafts::DraftChangeIndex& AppRuntime::CurrentDraftChangeIndex() {
     static const core::drafts::DraftChangeIndex kEmpty;
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
@@ -680,6 +749,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // rather than on the accepted one means a connected client's staged work is
     // at least drawn against the draft it is really landing in.
     const parser::AssuranceCase& working = CurrentCanvasView();
+    RefreshDraftDecorations();
     const parser::AssuranceCase& ac = RefreshAgentChangePreview(working);
 
     const sacm::AssuranceCasePackage* sacm_package =

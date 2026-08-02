@@ -200,6 +200,10 @@ private:
     // this argument's identically-named elements.
     void SyncDraftWorkspace();
 
+    // Rebuilds the per-element and per-relationship markers the canvas draws for
+    // the working draft. Run with the derived views, from the same change index.
+    void RefreshDraftDecorations();
+
 public:
     // The draft workspace for the argument that is open, or null when there is
     // no draft. Read-only: only `AppRuntime` mutates it, which is what keeps

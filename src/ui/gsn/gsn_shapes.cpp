@@ -428,6 +428,16 @@ void DrawProposedChangeBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom,
 
 } // namespace
 
+namespace {
+
+// The border half of a proposed-change decoration, shared by the change-set path
+// and the working draft so the two cannot drift into looking different for the
+// same kind of change.
+void DrawProposedChangeBorder(
+    ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, bool circular, float zoom, ImU32 color, bool dashed);
+
+} // namespace
+
 void DrawProposedChangeDecoration(ImDrawList* draw_list,
                                   ImVec2 top_left,
                                   ImVec2 bottom_right,
@@ -439,7 +449,6 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list,
     }
 
     const Theme& theme = GetTheme();
-    const float scale = DpiScale() * zoom;
 
     ImU32 color = theme.accent;
     const char* label = "NEW";
@@ -462,6 +471,59 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list,
         return;
     }
 
+    DrawProposedChangeBorder(draw_list, top_left, bottom_right, circular, zoom, color, dashed);
+    DrawProposedChangeBadge(draw_list, top_left, zoom, color, label);
+}
+
+void DrawDraftChangeDecoration(ImDrawList* draw_list,
+                               ImVec2 top_left,
+                               ImVec2 bottom_right,
+                               bool circular,
+                               float zoom,
+                               const DraftNodeDecoration& decoration) {
+    if (decoration.change == core::drafts::DraftElementChange::Unchanged) {
+        return;
+    }
+
+    const Theme& theme = GetTheme();
+    ImU32 color = theme.accent;
+    std::string label = "NEW";
+    bool dashed = true;
+    switch (decoration.change) {
+    case core::drafts::DraftElementChange::Added:
+        break;
+    case core::drafts::DraftElementChange::Modified:
+        label = "EDIT";
+        dashed = false;
+        break;
+    case core::drafts::DraftElementChange::Removed:
+        color = theme.danger;
+        label = "REMOVE";
+        break;
+    case core::drafts::DraftElementChange::Unchanged:
+        return;
+    }
+
+    // "NEW · MCP" rather than "NEW". A reviewer deciding whether to accept a
+    // change to a safety argument needs to know an AI wrote it, and which one --
+    // that is a different question from whether it is proposed at all.
+    if (decoration.multiple_contributions) {
+        // Naming one source when several contributed would imply the others do
+        // not exist. The inspector carries the ordered history.
+        label = "MULTIPLE CHANGES";
+    } else if (!decoration.source_label.empty()) {
+        label += " \xc2\xb7 " + decoration.source_label;
+    }
+
+    DrawProposedChangeBorder(draw_list, top_left, bottom_right, circular, zoom, color, dashed);
+    DrawProposedChangeBadge(draw_list, top_left, zoom, color, label.c_str());
+}
+
+namespace {
+
+void DrawProposedChangeBorder(
+    ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, bool circular, float zoom, ImU32 color, bool dashed) {
+    const float scale = DpiScale() * zoom;
     const float thickness = std::max(2.0f, 2.4f * scale);
     const float pad = 3.0f * scale;
 
@@ -492,8 +554,25 @@ void DrawProposedChangeDecoration(ImDrawList* draw_list,
         };
         DrawDashedPath(draw_list, corners, 4, /*closed=*/true, color, thickness, 6.0f * scale, 4.0f * scale);
     }
+}
 
-    DrawProposedChangeBadge(draw_list, top_left, zoom, color, label);
+} // namespace
+
+void DrawDraftEdgeDecoration(ImDrawList* draw_list,
+                             ImVec2 midpoint,
+                             float zoom,
+                             const DraftEdgeDecoration& decoration) {
+    if (!decoration.added) {
+        return;
+    }
+    // Drawn on the edge, not inferred from the nodes at either end. A support
+    // relationship the draft adds changes what the argument claims to have
+    // shown, and a reviewer reading two node badges cannot see that.
+    const Theme& theme = GetTheme();
+    std::string label = decoration.contextual ? "NEW CONTEXT" : "NEW SUPPORT";
+    if (!decoration.source_label.empty())
+        label += " \xc2\xb7 " + decoration.source_label;
+    DrawProposedChangeBadge(draw_list, midpoint, zoom, theme.accent, label.c_str());
 }
 
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {

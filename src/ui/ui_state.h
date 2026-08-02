@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "core/changesets/change_set.h"
+#include "core/drafts/draft_change_index.h"
 #include "core/problems/problem_attention.h"
 #include "core/sacm_model.h"
 #include "ui/confidence_model.h"
@@ -21,6 +22,30 @@ enum class CenterView {
     EvidenceRegister,
     PackageDetails,
     TerminologyPackage,
+};
+
+// How the canvas marks one element the working draft touches.
+struct DraftNodeDecoration {
+    core::drafts::DraftElementChange change = core::drafts::DraftElementChange::Unchanged;
+    // The source that last touched it -- "Claude Code", "SCCG AI Review", a
+    // person's name. Shown on the badge, because "this is proposed" and "an AI
+    // proposed this" are different things to a reviewer.
+    std::string source_label;
+    // More than one group contributed. The badge says so rather than naming one
+    // of them and implying the others do not exist; the inspector has the
+    // ordered history.
+    bool multiple_contributions = false;
+};
+
+// How the canvas marks one relationship the working draft adds.
+//
+// A changed support relationship can alter the meaning of an argument more than
+// a reworded claim can, so this is drawn on the edge itself rather than left to
+// be inferred from two node badges at either end.
+struct DraftEdgeDecoration {
+    bool added = false;
+    bool contextual = false;
+    std::string source_label;
 };
 
 // Which version of the argument the canvas draws while a draft workspace holds
@@ -108,6 +133,22 @@ struct UiState {
     // Review panel can agree on which one is being shown.
     std::string agent_change_set_id;
     std::string agent_change_set_title;
+
+    // What the working draft does to each element, and who did it, so the canvas
+    // can mark a proposed change where it lands rather than beside the diagram.
+    //
+    // Keyed by element id. Empty in the ordinary case, which costs a hash of
+    // nothing per node.
+    std::unordered_map<std::string, DraftNodeDecoration> draft_element_status;
+
+    // The same for relationships, keyed by `parent_id \x1f child_id` -- the
+    // renderer's own edge key -- rather than by the relationship's element id.
+    //
+    // Deliberate: relationship ids are generated during materialization and are
+    // not pinned the way element ids are, because the operation vocabulary
+    // addresses a relationship by its endpoints and never by id. Keying on the
+    // endpoints gives the canvas a handle that survives a rebuild.
+    std::unordered_map<std::string, DraftEdgeDecoration> draft_edge_status;
 
     // Which version of the argument the canvas is showing while a working draft
     // is active (ADR 0009).
