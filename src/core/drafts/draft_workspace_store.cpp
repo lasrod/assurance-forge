@@ -73,18 +73,39 @@ bool DraftWorkspaceStore::Open(const std::filesystem::path& argument_file,
     }
 
     const std::string accepted_hash = reviews::ComputeModelSemanticHash(accepted);
-    if (!stored.base_model_hash.empty() && stored.base_model_hash != accepted_hash) {
+    stored.argument_file = argument_file;
+    workspace_ = std::move(stored);
+
+    if (workspace_->pending_promotion.has_value()) {
+        const DraftPendingPromotion pending = workspace_->pending_promotion.value();
+        if (accepted_hash == pending.expected_model_hash) {
+            return RemovePromotedGroups(pending.group_ids, accepted, error);
+        }
+        if (accepted_hash == workspace_->base_model_hash) {
+            return CancelPromotion(error);
+        }
+        workspace_->state = DraftWorkspaceState::NeedsRebase;
+        if (!Save(error))
+            return false;
+        return true;
+    }
+
+    if (!workspace_->has_active_groups()) {
+        workspace_.reset();
+        std::string cleanup_error;
+        DeleteDraftWorkspace(project_root_, ArgumentKey(), cleanup_error);
+        return true;
+    }
+
+    if (!workspace_->base_model_hash.empty() && workspace_->base_model_hash != accepted_hash) {
         // The argument moved underneath the draft. Nothing is replayed: the user
         // is offered inspect, rebase, export or discard, and until they choose,
         // the draft is inert rather than quietly applied to a document it was
         // not written for.
-        stored.state = DraftWorkspaceState::NeedsRebase;
-    } else if (stored.state == DraftWorkspaceState::NeedsRebase) {
-        stored.state = DraftWorkspaceState::Active;
+        workspace_->state = DraftWorkspaceState::NeedsRebase;
+    } else if (workspace_->state == DraftWorkspaceState::NeedsRebase) {
+        workspace_->state = DraftWorkspaceState::Active;
     }
-    stored.argument_file = argument_file;
-
-    workspace_ = std::move(stored);
     return true;
 }
 
@@ -135,6 +156,10 @@ std::string DraftWorkspaceStore::BeginGroup(const DraftGroupRequest& request,
     // is no draft, and `has_workspace()` says so -- an agent that connects and
     // reads must not be told there is unaccepted work when there is none.
     DraftWorkspace& workspace = EnsureWorkspace(accepted);
+    if (workspace.pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion. Resolve it before adding more changes.";
+        return {};
+    }
     if (workspace.state == DraftWorkspaceState::NeedsRebase) {
         error = "The argument changed since this draft was written. Rebase or discard it before adding to it.";
         return {};
@@ -176,6 +201,10 @@ bool DraftWorkspaceStore::StageOperations(const std::string& group_id,
         return false;
     }
     DraftWorkspace& workspace = workspace_.value();
+    if (workspace.pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion. Resolve it before adding more changes.";
+        return false;
+    }
     if (workspace.state == DraftWorkspaceState::NeedsRebase) {
         error = "The argument changed since this draft was written. Rebase or discard it before adding to it.";
         return false;
@@ -218,6 +247,10 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
         return false;
     }
     DraftWorkspace& workspace = workspace_.value();
+    if (workspace.pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion. Resolve it before changing it.";
+        return false;
+    }
     if (workspace.state == DraftWorkspaceState::NeedsRebase) {
         error = "The argument changed since this draft was written. Rebase or discard it before changing it.";
         return false;
@@ -269,6 +302,10 @@ bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id, std::strin
         error = "There is no draft workspace for this argument.";
         return false;
     }
+    if (workspace_->pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion.";
+        return false;
+    }
     DraftChangeGroup* group = workspace_->FindGroup(group_id);
     if (group == nullptr) {
         error = "No draft change group with id " + group_id + ".";
@@ -292,6 +329,10 @@ bool DraftWorkspaceStore::RejectGroup(const std::string& group_id, std::string& 
         error = "There is no draft workspace for this argument.";
         return false;
     }
+    if (workspace_->pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion and cannot be rejected.";
+        return false;
+    }
     DraftChangeGroup* group = workspace_->FindGroup(group_id);
     if (group == nullptr) {
         error = "No draft change group with id " + group_id + ".";
@@ -308,6 +349,61 @@ bool DraftWorkspaceStore::RejectGroup(const std::string& group_id, std::string& 
     return Save(error);
 }
 
+bool DraftWorkspaceStore::BeginPromotion(const std::vector<std::string>& group_ids,
+                                         const core::AssuranceCase& expected_accepted,
+                                         std::string& error) {
+    error.clear();
+    if (!workspace_.has_value() || group_ids.empty()) {
+        error = "There is no draft selection to promote.";
+        return false;
+    }
+    if (workspace_->pending_promotion.has_value()) {
+        error = "A draft promotion is already awaiting durable completion.";
+        return false;
+    }
+    for (const std::string& group_id : group_ids) {
+        const DraftChangeGroup* group = workspace_->FindGroup(group_id);
+        if (group == nullptr || !group->active()) {
+            error = "Draft group " + group_id + " is not active and cannot be promoted.";
+            return false;
+        }
+    }
+
+    const DraftWorkspace previous = workspace_.value();
+    DraftPendingPromotion pending;
+    pending.group_ids = group_ids;
+    pending.expected_model_hash = reviews::ComputeModelSemanticHash(expected_accepted);
+    pending.started_utc = NowUtcString();
+    workspace_->pending_promotion = std::move(pending);
+    workspace_->state = DraftWorkspaceState::Promoting;
+    ++workspace_->working_revision;
+    RecordEvent("promotion_started", {}, std::to_string(group_ids.size()) + " groups");
+    if (!Save(error)) {
+        workspace_ = previous;
+        return false;
+    }
+    InvalidateMaterialization();
+    return true;
+}
+
+bool DraftWorkspaceStore::CancelPromotion(std::string& error) {
+    error.clear();
+    if (!workspace_.has_value() || !workspace_->pending_promotion.has_value())
+        return true;
+
+    const DraftWorkspace previous = workspace_.value();
+    workspace_->pending_promotion.reset();
+    workspace_->state = DraftWorkspaceState::Active;
+    ++workspace_->working_revision;
+    RecordEvent("promotion_cancelled", {}, "Accepted SACM remained at the draft baseline");
+    if (!Save(error)) {
+        workspace_ = previous;
+        return false;
+    }
+    InvalidateMaterialization();
+    return true;
+}
+
 bool DraftWorkspaceStore::RemovePromotedGroups(const std::vector<std::string>& group_ids,
                                                const core::AssuranceCase& new_accepted,
                                                std::string& error) {
@@ -315,6 +411,7 @@ bool DraftWorkspaceStore::RemovePromotedGroups(const std::vector<std::string>& g
     if (!workspace_.has_value())
         return true;
 
+    const DraftWorkspace previous = workspace_.value();
     DraftWorkspace& workspace = workspace_.value();
     for (const std::string& group_id : group_ids) {
         const auto removed = std::remove_if(workspace.groups.begin(),
@@ -326,26 +423,40 @@ bool DraftWorkspaceStore::RemovePromotedGroups(const std::vector<std::string>& g
     // Rebased: the accepted argument these groups were written against is the
     // one the promotion just produced.
     workspace.base_model_hash = reviews::ComputeModelSemanticHash(new_accepted);
+    workspace.pending_promotion.reset();
+    workspace.state = DraftWorkspaceState::Active;
     ++workspace.working_revision;
     RecordEvent("groups_promoted", {}, std::to_string(group_ids.size()) + " groups");
     InvalidateMaterialization();
 
-    // Nothing left to recover, so the recovery data goes rather than lingering
-    // as an empty draft that the banner would have to explain.
+    // Persist the finalized state before deleting recovery files. If directory
+    // cleanup fails, the durable fallback is an empty finalized workspace, not
+    // the old promotion marker and not resurrected operations.
+    if (!Save(error)) {
+        workspace_ = previous;
+        return false;
+    }
+
     if (!workspace.has_active_groups()) {
         const std::string key = ArgumentKey();
         workspace_.reset();
-        if (project_root_.empty())
-            return true;
-        return DeleteDraftWorkspace(project_root_, key, error);
+        if (!project_root_.empty()) {
+            std::string cleanup_error;
+            DeleteDraftWorkspace(project_root_, key, cleanup_error);
+        }
+        return true;
     }
-    return Save(error);
+    return true;
 }
 
 bool DraftWorkspaceStore::DiscardWorkspace(std::string& error) {
     error.clear();
     if (!workspace_.has_value())
         return true;
+    if (workspace_->pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion and cannot be discarded.";
+        return false;
+    }
     const std::string key = ArgumentKey();
     workspace_.reset();
     InvalidateMaterialization();
@@ -400,7 +511,8 @@ DraftWorkspaceStore::MaterializeSnapshot(const core::AssuranceCase& accepted, st
         Save(save_error);
     }
 
-    if (!workspace_.has_value() || workspace_->state == DraftWorkspaceState::NeedsRebase) {
+    if (!workspace_.has_value() || workspace_->state == DraftWorkspaceState::NeedsRebase ||
+        workspace_->state == DraftWorkspaceState::Promoting) {
         // A workspace awaiting a rebase contributes nothing to what the user
         // sees. The accepted argument is shown, unmodified, until they decide.
         next->success = true;

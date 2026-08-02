@@ -133,6 +133,13 @@ std::string SerializeDraftWorkspace(const DraftWorkspace& workspace) {
     root["working_revision"] = workspace.working_revision;
     root["next_sequence"] = workspace.next_sequence;
     root["state"] = DraftWorkspaceStateToString(workspace.state);
+    if (workspace.pending_promotion.has_value()) {
+        nlohmann::json pending;
+        pending["group_ids"] = workspace.pending_promotion->group_ids;
+        pending["expected_model_hash"] = workspace.pending_promotion->expected_model_hash;
+        pending["started_utc"] = workspace.pending_promotion->started_utc;
+        root["pending_promotion"] = std::move(pending);
+    }
     root["groups"] = nlohmann::json::array();
     for (const DraftChangeGroup& group : workspace.groups)
         root["groups"].push_back(GroupToJson(group));
@@ -149,7 +156,7 @@ bool DeserializeDraftWorkspace(const std::string& content, DraftWorkspace& works
             return false;
         }
         const std::string schema = root.value("schema", "");
-        if (schema != kDraftWorkspaceSchema) {
+        if (schema != kDraftWorkspaceSchema && schema != kDraftWorkspaceSchemaV1) {
             // Refused rather than read on a best-effort basis. A draft read
             // through the wrong schema is a draft quietly altered, and the whole
             // point of this file is that unaccepted work is not altered by
@@ -168,6 +175,26 @@ bool DeserializeDraftWorkspace(const std::string& content, DraftWorkspace& works
         if (!state.empty() && !DraftWorkspaceStateFromString(state, workspace.state)) {
             error = "Draft workspace has an unknown state: " + state;
             return false;
+        }
+
+        if (root.contains("pending_promotion")) {
+            const nlohmann::json& pending = root["pending_promotion"];
+            if (!pending.is_object()) {
+                error = "Draft workspace pending promotion is not an object.";
+                return false;
+            }
+            DraftPendingPromotion promotion;
+            for (const auto& value : pending.value("group_ids", nlohmann::json::array())) {
+                if (value.is_string())
+                    promotion.group_ids.push_back(value.get<std::string>());
+            }
+            promotion.expected_model_hash = pending.value("expected_model_hash", "");
+            promotion.started_utc = pending.value("started_utc", "");
+            if (promotion.group_ids.empty() || promotion.expected_model_hash.empty()) {
+                error = "Draft workspace pending promotion is incomplete.";
+                return false;
+            }
+            workspace.pending_promotion = std::move(promotion);
         }
 
         const nlohmann::json groups = root.value("groups", nlohmann::json::array());
@@ -224,16 +251,11 @@ bool SaveDraftWorkspace(const std::filesystem::path& project_root,
         return false;
     }
 
-    const std::expected<void, std::string> written =
-        WriteTextFileAtomic(DraftWorkspacePath(project_root, argument_key), SerializeDraftWorkspace(workspace));
-    if (!written.has_value()) {
-        error = written.error();
-        return false;
-    }
-
-    // The event log is rewritten whole rather than appended to. It is bounded by
-    // the workspace's own lifetime and small, and a single atomic write cannot
-    // leave the log disagreeing with the workspace it describes.
+    // The event log is secondary evidence; workspace.json is the recovery source
+    // of truth. Write events first and the workspace last so a false return never
+    // means the authoritative workspace was already advanced behind the caller's
+    // back. A failed final workspace write may leave an extra event, but never
+    // loses or prematurely accepts draft operations.
     std::ostringstream events;
     for (const DraftEvent& event : workspace.events)
         events << EventToJson(event).dump() << '\n';
@@ -241,6 +263,13 @@ bool SaveDraftWorkspace(const std::filesystem::path& project_root,
         WriteTextFileAtomic(DraftEventsPath(project_root, argument_key), events.str());
     if (!events_written.has_value()) {
         error = events_written.error();
+        return false;
+    }
+
+    const std::expected<void, std::string> written =
+        WriteTextFileAtomic(DraftWorkspacePath(project_root, argument_key), SerializeDraftWorkspace(workspace));
+    if (!written.has_value()) {
+        error = written.error();
         return false;
     }
     return true;

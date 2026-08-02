@@ -115,6 +115,14 @@ public:
     // the record of what was proposed and declined survives.
     bool RejectGroup(const std::string& group_id, std::string& error);
 
+    // Durably records promotion intent before the accepted SACM/audit command
+    // runs. While pending, draft operations are inert. Recovery can then decide
+    // from the accepted-model hash whether to finalize or cancel after a crash.
+    bool BeginPromotion(const std::vector<std::string>& group_ids,
+                        const core::AssuranceCase& expected_accepted,
+                        std::string& error);
+    bool CancelPromotion(std::string& error);
+
     // Drops groups that have just been promoted and rebases what is left onto
     // `new_accepted`.
     //

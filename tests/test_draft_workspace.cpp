@@ -266,6 +266,44 @@ TEST(DraftWorkspace, PublishedFrameSnapshotSurvivesPromotionCleanup) {
     EXPECT_TRUE(frame->success);
 }
 
+TEST(DraftWorkspace, PendingPromotionIsInertAndCancelsWhenAcceptedFileStayedAtBaseline) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Clarify G1");
+    fixture.Stage(group, {UpdateTextOp("G1", "Clarified.")});
+    const core::AssuranceCase promoted = fixture.store.Materialize(fixture.accepted, 1).working_model;
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.BeginPromotion({group}, promoted, error)) << error;
+    ASSERT_NE(fixture.store.workspace(), nullptr);
+    EXPECT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::Promoting);
+    EXPECT_TRUE(fixture.store.workspace()->pending_promotion.has_value());
+    const core::drafts::DraftMaterializationResult& inert = fixture.store.Materialize(fixture.accepted, 1);
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(inert.working_model),
+              core::reviews::ComputeModelSemanticHash(fixture.accepted));
+    EXPECT_FALSE(fixture.store.DiscardWorkspace(error));
+
+    fixture.store.Close();
+    ASSERT_TRUE(fixture.store.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    ASSERT_NE(fixture.store.workspace(), nullptr);
+    EXPECT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::Active);
+    EXPECT_FALSE(fixture.store.workspace()->pending_promotion.has_value());
+    EXPECT_NE(fixture.store.workspace()->FindGroup(group), nullptr);
+}
+
+TEST(DraftWorkspace, PendingPromotionFinalizesWhenAcceptedFileHasExpectedResult) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Clarify G1");
+    fixture.Stage(group, {UpdateTextOp("G1", "Clarified.")});
+    const core::AssuranceCase promoted = fixture.store.Materialize(fixture.accepted, 1).working_model;
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.BeginPromotion({group}, promoted, error)) << error;
+    fixture.store.Close();
+
+    ASSERT_TRUE(fixture.store.Open(fixture.argument_file, promoted, error)) << error;
+    EXPECT_FALSE(fixture.store.has_workspace()) << "recovery should finish cleanup, not replay accepted operations";
+}
+
 // --------------------------------------------------------------------------
 // Invariant 3: one argument file has at most one active workspace.
 // --------------------------------------------------------------------------
@@ -797,6 +835,10 @@ TEST(DraftWorkspace, SerializationRoundTripsGroupsAndIdentities) {
     const std::string group = fixture.BeginGroup("Add a decomposition");
     fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
     fixture.store.Materialize(fixture.accepted, 1);
+    const core::AssuranceCase promoted = fixture.store.Materialize(fixture.accepted, 1).working_model;
+
+    std::string begin_error;
+    ASSERT_TRUE(fixture.store.BeginPromotion({group}, promoted, begin_error)) << begin_error;
 
     const core::drafts::DraftWorkspace& original = *fixture.store.workspace();
     core::drafts::DraftWorkspace restored;
@@ -814,6 +856,10 @@ TEST(DraftWorkspace, SerializationRoundTripsGroupsAndIdentities) {
     EXPECT_EQ(restored.groups.front().source_label, original.groups.front().source_label);
     EXPECT_EQ(restored.groups.front().operations.size(), original.groups.front().operations.size());
     EXPECT_EQ(restored.groups.front().generated_ids, original.groups.front().generated_ids);
+    ASSERT_TRUE(restored.pending_promotion.has_value());
+    EXPECT_EQ(restored.state, core::drafts::DraftWorkspaceState::Promoting);
+    EXPECT_EQ(restored.pending_promotion->group_ids, original.pending_promotion->group_ids);
+    EXPECT_EQ(restored.pending_promotion->expected_model_hash, original.pending_promotion->expected_model_hash);
 }
 
 // --------------------------------------------------------------------------

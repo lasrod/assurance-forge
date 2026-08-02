@@ -37,7 +37,8 @@ namespace core::drafts {
 // Bumped when the stored shape changes in a way an older reader cannot handle.
 // A workspace whose schema is unknown is reported rather than guessed at: a
 // draft silently misread is a draft silently altered.
-constexpr const char* kDraftWorkspaceSchema = "assurance-forge.draft-workspace.v1";
+constexpr const char* kDraftWorkspaceSchemaV1 = "assurance-forge.draft-workspace.v1";
+constexpr const char* kDraftWorkspaceSchema = "assurance-forge.draft-workspace.v2";
 
 std::string SerializeDraftWorkspace(const DraftWorkspace& workspace);
 bool DeserializeDraftWorkspace(const std::string& content, DraftWorkspace& workspace, std::string& error);

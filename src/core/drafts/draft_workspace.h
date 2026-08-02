@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -64,6 +65,10 @@ bool DraftGroupStateFromString(const std::string& value, DraftGroupState& state)
 
 enum class DraftWorkspaceState {
     Active,
+    // Promotion intent is durably recorded, but cleanup has not yet confirmed
+    // that the accepted SACM file contains it. Active groups are inert here so
+    // they cannot be applied twice over the prospective accepted result.
+    Promoting,
     // The accepted argument changed underneath the draft. Operations are never
     // replayed silently in this state.
     NeedsRebase,
@@ -149,6 +154,15 @@ struct DraftEvent {
     std::string created_utc;
 };
 
+// Recovery marker spanning the audit/SACM commit and draft cleanup. Written
+// before promotion touches the accepted document and removed only after the
+// expected accepted-model hash is durable.
+struct DraftPendingPromotion {
+    std::vector<std::string> group_ids;
+    std::string expected_model_hash;
+    std::string started_utc;
+};
+
 // At most one of these exists per argument file.
 struct DraftWorkspace {
     std::string id;
@@ -179,6 +193,8 @@ struct DraftWorkspace {
     std::uint64_t next_sequence = 1;
 
     DraftWorkspaceState state = DraftWorkspaceState::Active;
+
+    std::optional<DraftPendingPromotion> pending_promotion;
 
     std::vector<DraftChangeGroup> groups;
     std::vector<DraftEvent> events;

@@ -791,6 +791,8 @@ void AppRuntime::RefreshSelectedDraftDetail() {
 
     if (workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase) {
         detail.blocked_reason = AF_TR("The argument changed since this draft was written.");
+    } else if (workspace->state == core::drafts::DraftWorkspaceState::Promoting) {
+        detail.blocked_reason = AF_TR("Promotion is awaiting durable SACM completion.");
     } else {
         const core::drafts::DraftPromotionPlan plan =
             core::drafts::PlanDraftPromotion(*workspace,

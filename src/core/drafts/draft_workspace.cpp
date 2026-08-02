@@ -37,6 +37,7 @@ struct WorkspaceStateName {
 
 constexpr WorkspaceStateName kWorkspaceStateNames[] = {
     {DraftWorkspaceState::Active, "active"},
+    {DraftWorkspaceState::Promoting, "promoting"},
     {DraftWorkspaceState::NeedsRebase, "needs_rebase"},
     {DraftWorkspaceState::Blocked, "blocked"},
     {DraftWorkspaceState::Closed, "closed"},

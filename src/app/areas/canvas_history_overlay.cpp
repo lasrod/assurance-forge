@@ -439,6 +439,7 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     ui::UiState& ui_state = ui::GetUiState();
     const bool needs_rebase = workspace->state == core::drafts::DraftWorkspaceState::NeedsRebase;
     const bool blocked = workspace->state == core::drafts::DraftWorkspaceState::Blocked;
+    const bool promoting = workspace->state == core::drafts::DraftWorkspaceState::Promoting;
 
     // Derived from the theme rather than fixed, or the banner is legible in one
     // theme and not the other -- and the light theme is exactly where a dark
@@ -446,7 +447,7 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     // contrast against whatever background the tint produced.
     const ui::Theme& theme = ui::GetTheme();
     const ImU32 banner_bg =
-        ui::LerpColor(theme.surface_1, needs_rebase || blocked ? theme.attention : theme.accent, 0.18f);
+        ui::LerpColor(theme.surface_1, needs_rebase || blocked || promoting ? theme.attention : theme.accent, 0.18f);
     const ImU32 banner_ink = ui::InkOn(banner_bg);
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(banner_ink));
@@ -476,6 +477,11 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
                            AF_TR("This draft cannot be shown because one of its changes no longer applies. "
                                  "The accepted argument is displayed instead.")
                                .c_str());
+    } else if (promoting) {
+        ImGui::TextWrapped("%s",
+                           AF_TR("Promotion is recorded, but the accepted SACM file is not yet confirmed. "
+                                 "The draft is retained and cannot be edited or discarded.")
+                               .c_str());
     }
 
     DraftViewModeButton(ui_state, ui::DraftViewMode::WorkingDraft, AF_TR("Working draft"), "##draft_view_working");
@@ -492,7 +498,7 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     // Promotion is disabled rather than hidden while the draft is not in a state
     // to be accepted, and the reason is on the tooltip. A button that silently
     // does nothing was the reported defect in the change-set flow it replaces.
-    const bool promotable = !needs_rebase && !blocked;
+    const bool promotable = !needs_rebase && !blocked && !promoting;
     ImGui::BeginDisabled(!promotable);
     if (ImGui::Button((AF_TR("Accept all") + "##draft_accept_all").c_str())) {
         if (callbacks.promote_working_draft)
@@ -500,16 +506,19 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     }
     ImGui::EndDisabled();
     if (!promotable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("%s",
-                          needs_rebase ? AF_TR("The argument changed since this draft was written.").c_str()
-                                       : AF_TR("One of this draft's changes no longer applies.").c_str());
+        const std::string reason = needs_rebase ? AF_TR("The argument changed since this draft was written.")
+                                   : promoting  ? AF_TR("Promotion is awaiting durable SACM completion.")
+                                                : AF_TR("One of this draft's changes no longer applies.");
+        ImGui::SetTooltip("%s", reason.c_str());
     }
 
     ImGui::SameLine();
+    ImGui::BeginDisabled(promoting);
     if (ImGui::Button((AF_TR("Discard draft") + "##draft_discard").c_str())) {
         if (callbacks.discard_working_draft)
             callbacks.discard_working_draft();
     }
+    ImGui::EndDisabled();
 
     ImGui::EndChild();
     ImGui::PopStyleColor(2);

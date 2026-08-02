@@ -34,6 +34,7 @@
 #include "imgui.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "sacm/sacm_package_tree.h"
 #include "sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -1383,7 +1384,7 @@ MakeHumanCreateRefsUnique(const core::drafts::DraftChangeGroup& group,
 bool AppRuntime::DraftEditingActive() const {
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     return workspace != nullptr && workspace->has_active_groups() &&
-           workspace->state != core::drafts::DraftWorkspaceState::NeedsRebase;
+           workspace->state == core::drafts::DraftWorkspaceState::Active;
 }
 
 bool AppRuntime::StageHumanDraftOperations(const std::string& title,
@@ -1578,6 +1579,10 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         error = "The argument changed since this draft was written. Inspect or discard it first.";
         return false;
     }
+    if (workspace->state == core::drafts::DraftWorkspaceState::Promoting) {
+        error = "This promotion is awaiting durable SACM completion. Resolve the autosave problem first.";
+        return false;
+    }
 
     std::string author;
     for (const std::string& group_id : group_ids) {
@@ -1605,6 +1610,16 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
 
     const bool library_primary_promotion =
         impl_->command_bus != nullptr && impl_->app_state.library_document != nullptr;
+    std::string authoritative_before_xml;
+    if (library_primary_promotion) {
+        const sacm_adapter::SaveOutcome before = sacm_adapter::save_document(*impl_->app_state.library_document);
+        if (!before.ok) {
+            error = "Could not snapshot the authoritative SACM document before promotion: " +
+                    sacm_adapter::summarize_load_diagnostics(before.diagnostics);
+            return false;
+        }
+        authoritative_before_xml = before.xml;
+    }
     parser::AssuranceCase authoritative_preflight;
     if (library_primary_promotion &&
         !core::commands::PreflightProposalAgainstLibrary(*impl_->app_state.library_document,
@@ -1615,10 +1630,30 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         return false;
     }
 
+    if (!impl_->draft_workspace.BeginPromotion(plan.closure, plan.promoted_model, error))
+        return false;
+
     core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
     const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(*impl_, command, author);
     if (!outcome.success) {
-        error = outcome.error;
+        const std::string dispatch_error = outcome.error;
+        std::string rollback_error;
+        if (library_primary_promotion &&
+            !sacm_adapter::reload_document(*impl_->app_state.library_document, authoritative_before_xml)) {
+            rollback_error = " The in-memory SACM document could not be restored; reopen the project before editing.";
+        }
+        impl_->rederive_views_from_library = library_primary_promotion;
+        impl_->tree_needs_rebuild = true;
+        std::string cancel_error;
+        impl_->draft_workspace.CancelPromotion(cancel_error);
+        error = dispatch_error + rollback_error;
+        if (!cancel_error.empty())
+            error += " Draft recovery could not clear its promotion marker: " + cancel_error;
+        return false;
+    }
+    if (!outcome.sacm_written) {
+        error = "The promotion was recorded in the audit log, but the accepted SACM file was not written. "
+                "The draft is retained in a pending state until recovery confirms the file.";
         return false;
     }
 

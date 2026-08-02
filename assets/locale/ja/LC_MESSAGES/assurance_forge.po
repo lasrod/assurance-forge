@@ -1417,6 +1417,12 @@ msgstr "プロジェクト名"
 msgid "Projected confidence"
 msgstr "投影信頼度"
 
+msgid "Promotion is awaiting durable SACM completion."
+msgstr "プロモーションは SACM への確実な保存完了を待っています。"
+
+msgid "Promotion is recorded, but the accepted SACM file is not yet confirmed. The draft is retained and cannot be edited or discarded."
+msgstr "プロモーションは記録されましたが、承認済み SACM ファイルへの保存はまだ確認されていません。ドラフトは保持され、編集または破棄できません。"
+
 msgid "Prompt"
 msgstr "プロンプト"
 
