@@ -40,6 +40,10 @@ void AppRuntime::BeginAiReviewForSelection() {
     actions::AiReviewActions(*impl_).BeginForSelection();
 }
 
+void AppRuntime::RunAiReviewForSelection() {
+    actions::AiReviewActions(*impl_).RunForSelection();
+}
+
 void AppRuntime::RunAiReviewForSelection(const std::string& review_profile_id) {
     actions::AiReviewActions(*impl_).RunForSelection(review_profile_id);
 }
@@ -55,8 +59,34 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
     const core::TreeNode* selected_node = core::FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
     const bool review_running = impl_->ai.review_controller->IsReviewRunning();
 
-    if (!ImGui::BeginMenu(AF_TR("AI Review").c_str()))
-        return;
+    controllers::AiReviewGuidelineSelection profile_selection;
+    if (impl_->guideline_catalog.has_value() && selected_element) {
+        profile_selection =
+            controllers::SelectReviewProfileForElement(*impl_->guideline_catalog, *selected_element, selected_node);
+    }
+
+    const bool ai_review_enabled =
+        !review_running && loaded_case && selected_element && impl_->guideline_catalog.has_value() &&
+        profile_selection.review_profile != nullptr && profile_selection.error_message.empty();
+    std::string ai_review_tooltip;
+    if (review_running)
+        ai_review_tooltip = AF_TR("AI review is already running.");
+    else if (!loaded_case)
+        ai_review_tooltip = AF_TR("Open an assurance case before running SCCG profile reviews.");
+    else if (!selected_element)
+        ai_review_tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
+    else if (!impl_->guideline_catalog.has_value())
+        ai_review_tooltip = impl_->guideline_catalog_error.empty() ? AF_TR("SCCG profiles unavailable.")
+                                                                   : impl_->guideline_catalog_error;
+    else if (!profile_selection.error_message.empty())
+        ai_review_tooltip = profile_selection.error_message;
+    else if (profile_selection.review_profile)
+        ai_review_tooltip =
+            profile_selection.review_profile->display_name + "\n\n" + profile_selection.review_profile->description;
+
+    if (ImGui::MenuItem(AF_TR("AI Review").c_str(), nullptr, false, ai_review_enabled))
+        RunAiReviewForSelection();
+    DrawTooltipIfHovered(ai_review_tooltip);
 
     const bool has_project = impl_->app_state.current_project.has_value();
     const bool manual_ok_enabled = !review_running && has_project && loaded_case && selected_element;
@@ -76,39 +106,6 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
         SetManualReviewOk(ui_state.selected_element_id, true);
     }
     DrawTooltipIfHovered(manual_ok_tooltip);
-    ImGui::Separator();
-
-    if (!impl_->guideline_catalog.has_value()) {
-        ImGui::TextDisabled("%s", AF_TR("SCCG profiles unavailable.").c_str());
-        if (!impl_->guideline_catalog_error.empty() && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", impl_->guideline_catalog_error.c_str());
-        ImGui::EndMenu();
-        return;
-    }
-
-    for (const parser::ReviewProfile& profile : impl_->guideline_catalog->document.review_profiles) {
-        const bool compatible =
-            selected_element && ai::IsReviewProfileCompatibleWithElement(profile, *selected_element, selected_node);
-        const bool enabled = !review_running && loaded_case && selected_element && compatible;
-        std::string tooltip = profile.description;
-        if (review_running)
-            tooltip = AF_TR("AI review is already running.");
-        else if (!loaded_case)
-            tooltip = AF_TR("Open an assurance case before running SCCG profile reviews.");
-        else if (!selected_element)
-            tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
-        else if (!compatible)
-            tooltip = profile.description + "\n\n" + AF_TR("This profile does not apply to the selected element type.");
-
-        ImGui::PushID(profile.id.c_str());
-        if (ImGui::MenuItem(profile.display_name.c_str(), nullptr, false, enabled)) {
-            RunAiReviewForSelection(profile.id);
-        }
-        DrawTooltipIfHovered(tooltip);
-        ImGui::PopID();
-    }
-
-    ImGui::EndMenu();
 }
 
 void AppRuntime::StartPendingAiReviewRequest() {

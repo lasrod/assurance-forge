@@ -1388,16 +1388,18 @@
     {
       "id": "AF-AI-006",
       "area": "AI",
-      "name": "SCCG-guided AI claim review",
+      "name": "SCCG-guided AI element review",
       "status": "supported",
       "evidence": [
-        "src/ai/ai_claim_review.cpp"
+        "src/ai/ai_claim_review.cpp",
+        "src/app/controllers/ai_review_controller.cpp",
+        "src/app/app_runtime_ai.cpp"
       ],
       "tests": [
         "tests/test_ai_claim_review.cpp",
         "tests/test_ai_review_controller.cpp"
       ],
-      "notes": ""
+      "notes": "One `AI Review` action selects the unique SCCG 0.6 profile for the selected GSN role: claim, strategy, evidence, assumption, justification, context, or challenge. Selection fails closed if the catalog has no match or more than one match; contextual artifacts are not misclassified as evidence and counter elements use the challenge profile."
     },
     {
       "id": "AF-AI-007",

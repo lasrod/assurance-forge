@@ -14,8 +14,6 @@
 namespace app::controllers {
 namespace {
 
-constexpr const char* kDefaultClaimReviewProfileId = "claim_wording_review";
-
 using core::NowUtcString;
 using core::reviews::TruncateForProblemMessage;
 
@@ -167,20 +165,27 @@ AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCa
     return selection;
 }
 
-AiReviewGuidelineSelection SelectClaimReviewGuidelines(const core::GuidelineCatalog& guideline_catalog) {
-    AiReviewGuidelineSelection selection;
-    selection.review_profile = guideline_catalog.document.FindReviewProfileById(kDefaultClaimReviewProfileId);
-    selection.guidelines = selection.review_profile
-                               ? guideline_catalog.document.FindGuidelinesByReviewProfile(kDefaultClaimReviewProfileId)
-                               : guideline_catalog.document.FindGuidelinesByCategory("CL");
-
-    if (selection.review_profile && selection.guidelines.empty()) {
-        selection.error_message = std::string("SCCG catalog contains review profile '") + kDefaultClaimReviewProfileId +
-                                  "' but it references no valid guidelines.";
-    } else if (selection.guidelines.empty()) {
-        selection.error_message = "No SCCG guidelines were found for AI review.";
+AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCatalog& guideline_catalog,
+                                                         const parser::SacmElement& element,
+                                                         const core::TreeNode* node) {
+    const parser::ReviewProfile* match = nullptr;
+    for (const parser::ReviewProfile& profile : guideline_catalog.document.review_profiles) {
+        if (!ai::IsReviewProfileCompatibleWithElement(profile, element, node))
+            continue;
+        if (match != nullptr) {
+            AiReviewGuidelineSelection selection;
+            selection.error_message = "More than one SCCG review profile applies to the selected element type: '" +
+                                      match->display_name + "' and '" + profile.display_name + "'.";
+            return selection;
+        }
+        match = &profile;
     }
-    return selection;
+    if (match == nullptr) {
+        AiReviewGuidelineSelection selection;
+        selection.error_message = "No SCCG review profile applies to the selected element type.";
+        return selection;
+    }
+    return SelectReviewProfileGuidelines(guideline_catalog, match->id);
 }
 
 AiReviewController::AiReviewController(AppEvents& events,
@@ -197,7 +202,7 @@ AiReviewController::AiReviewController(AppEvents& events,
 void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* assurance_case,
                                                  const core::AssuranceTree& current_tree,
                                                  const std::string& selected_element_id) {
-    BeginReviewForSelection(assurance_case, current_tree, selected_element_id, kDefaultClaimReviewProfileId);
+    BeginReviewForSelection(assurance_case, current_tree, selected_element_id, {});
 }
 
 void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* assurance_case,
@@ -306,10 +311,10 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
+    const core::TreeNode* selected_node = core::FindTreeNode(current_tree, selected_element_id);
     AiReviewGuidelineSelection guideline_selection =
-        review_profile_id == kDefaultClaimReviewProfileId
-            ? SelectClaimReviewGuidelines(guideline_catalog)
-            : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
+        review_profile_id.empty() ? SelectReviewProfileForElement(guideline_catalog, *selected_element, selected_node)
+                                  : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
 
     if (!guideline_selection.error_message.empty()) {
         ReplaceAiReviewWithSingleItem(review_controller_,
@@ -339,9 +344,8 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     if (guideline_selection.review_profile &&
-        !ai::IsReviewProfileCompatibleWithElement(*guideline_selection.review_profile,
-                                                  *selected_element,
-                                                  core::FindTreeNode(current_tree, selected_element_id))) {
+        !ai::IsReviewProfileCompatibleWithElement(
+            *guideline_selection.review_profile, *selected_element, selected_node)) {
         const std::string message = "SCCG review profile '" + guideline_selection.review_profile->display_name +
                                     "' does not apply to the selected element type.";
         problems_manager_.AddOrUpdateProblem(

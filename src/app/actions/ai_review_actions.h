@@ -14,6 +14,7 @@ public:
 
     void BeginForSelection();
     void BeginForSelection(const std::string& review_profile_id);
+    void RunForSelection();
     void RunForSelection(const std::string& review_profile_id);
     void StartPendingRequest();
     void PollTask();

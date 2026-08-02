@@ -24,11 +24,12 @@ nlohmann::json ReviewElementToJson(const AiReviewElement& element) {
     };
 }
 
-AiReviewElement MakeReviewElement(const parser::SacmElement& element, const std::string& role) {
+AiReviewElement
+MakeReviewElement(const parser::SacmElement& element, const std::string& role, const core::TreeNode* node = nullptr) {
     AiReviewElement review_element;
     review_element.role = role;
     review_element.id = element.id;
-    review_element.type = AiReviewElementType(element);
+    review_element.type = AiReviewElementType(element, node);
     review_element.name = element.name;
     review_element.content = element.content;
     review_element.description = element.description;
@@ -43,7 +44,7 @@ void AddChildIfPresent(const parser::AssuranceCase& assurance_case,
     const parser::SacmElement* child = FindSacmElement(assurance_case, child_node->id);
     if (!child)
         return;
-    children.push_back(MakeReviewElement(*child, "child"));
+    children.push_back(MakeReviewElement(*child, "child", child_node));
 }
 
 nlohmann::json StringVectorToJson(const std::vector<std::string>& values) {
@@ -184,7 +185,7 @@ ElementDataToJson(const parser::SacmElement& element, const std::string& role, c
     return {
         {"role", role},
         {"element_id", element.id},
-        {"element_type", AiReviewElementType(element)},
+        {"element_type", AiReviewElementType(element, node)},
         {"sccg_applies_to", StringVectorToJson(SccgAppliesToNamesForElement(element, node))},
         {"raw_type", element.type},
         {"name", element.name},
@@ -281,7 +282,27 @@ bool IsSupportedAiReviewElement(const parser::SacmElement& element) {
            element.type == "artifactreference" || element.type == "expression";
 }
 
-std::string AiReviewElementType(const parser::SacmElement& element) {
+std::string AiReviewElementType(const parser::SacmElement& element, const core::TreeNode* node) {
+    if (node && node->is_counter_source)
+        return "GSN Counter Claim / SACM " + (element.type.empty() ? std::string("Element") : element.type);
+    if (node) {
+        switch (node->role) {
+        case core::NodeRole::Claim:
+            return "GSN Goal / SACM Claim";
+        case core::NodeRole::Strategy:
+            return "GSN Strategy / SACM ArgumentReasoning";
+        case core::NodeRole::Solution:
+            return "GSN Solution / SACM ArtifactReference";
+        case core::NodeRole::Context:
+            return "GSN Context / SACM ArtifactReference";
+        case core::NodeRole::Assumption:
+            return "GSN Assumption / SACM Claim";
+        case core::NodeRole::Justification:
+            return "GSN Justification / SACM Claim";
+        case core::NodeRole::Other:
+            break;
+        }
+    }
     if (element.type == "claim") {
         if (element.assertion_declaration == "assumed")
             return "GSN Assumption / SACM Claim";
@@ -298,6 +319,47 @@ std::string AiReviewElementType(const parser::SacmElement& element) {
 
 std::vector<std::string> SccgAppliesToNamesForElement(const parser::SacmElement& element, const core::TreeNode* node) {
     std::vector<std::string> names;
+    if (node && node->is_counter_source) {
+        AddMappedName(names, "GSN Counter Claim");
+        AddMappedName(names, "CAE Defeater");
+        return names;
+    }
+    if (node) {
+        switch (node->role) {
+        case core::NodeRole::Claim:
+            AddMappedName(names, "GSN Goal");
+            AddMappedName(names, "SACM Claim");
+            AddMappedName(names, "CAE Claim");
+            return names;
+        case core::NodeRole::Strategy:
+            AddMappedName(names, "GSN Strategy");
+            AddMappedName(names, "SACM ArgumentReasoning");
+            AddMappedName(names, "CAE Argument");
+            return names;
+        case core::NodeRole::Solution:
+            AddMappedName(names, "GSN Solution");
+            AddMappedName(names, "SACM ArtifactReference");
+            AddMappedName(names, "CAE Evidence");
+            return names;
+        case core::NodeRole::Context:
+            AddMappedName(names, "GSN Context");
+            AddMappedName(names, "SACM ArtifactReference");
+            AddMappedName(names, "CAE Context");
+            return names;
+        case core::NodeRole::Assumption:
+            AddMappedName(names, "GSN Assumption");
+            AddMappedName(names, "SACM Claim");
+            AddMappedName(names, "CAE Assumption");
+            return names;
+        case core::NodeRole::Justification:
+            AddMappedName(names, "GSN Justification");
+            AddMappedName(names, "SACM Claim");
+            AddMappedName(names, "CAE Warrant");
+            return names;
+        case core::NodeRole::Other:
+            break;
+        }
+    }
     if (element.type == "claim") {
         if (element.assertion_declaration == "assumed" || (node && node->role == core::NodeRole::Assumption)) {
             AddMappedName(names, "GSN Assumption");
@@ -308,7 +370,7 @@ std::vector<std::string> SccgAppliesToNamesForElement(const parser::SacmElement&
         if (element.assertion_declaration == "justification" || (node && node->role == core::NodeRole::Justification)) {
             AddMappedName(names, "GSN Justification");
             AddMappedName(names, "SACM Claim");
-            AddMappedName(names, "CAE Justification");
+            AddMappedName(names, "CAE Warrant");
             return names;
         }
         AddMappedName(names, "GSN Goal");
@@ -320,13 +382,10 @@ std::vector<std::string> SccgAppliesToNamesForElement(const parser::SacmElement&
         AddMappedName(names, "GSN Strategy");
         AddMappedName(names, "SACM ArgumentReasoning");
         AddMappedName(names, "CAE Argument");
-        AddMappedName(names, "CAE Justification");
         return names;
     }
     if (element.type == "artifact" || element.type == "artifactreference" || element.type == "expression" ||
         (node && node->role == core::NodeRole::Solution)) {
-        if (node && node->group == core::ElementGroup::Group2)
-            AddMappedName(names, "GSN Context");
         AddMappedName(names, "GSN Solution");
         AddMappedName(names, "SACM ArtifactReference");
         AddMappedName(names, "CAE Evidence");
@@ -363,14 +422,14 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
         return false;
     }
 
-    AiReviewPayload payload;
-    payload.selected = MakeReviewElement(*selected, "selected");
-
     const core::TreeNode* selected_node = core::FindTreeNode(tree, selected_element_id);
+    AiReviewPayload payload;
+    payload.selected = MakeReviewElement(*selected, "selected", selected_node);
+
     if (selected_node && selected_node->parent) {
         const parser::SacmElement* parent = FindSacmElement(assurance_case, selected_node->parent->id);
         if (parent)
-            payload.parent = MakeReviewElement(*parent, "parent");
+            payload.parent = MakeReviewElement(*parent, "parent", selected_node->parent);
     }
 
     if (selected_node) {

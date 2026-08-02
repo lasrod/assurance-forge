@@ -24,6 +24,12 @@ void AiReviewActions::BeginForSelection(const std::string& review_profile_id) {
         GetLoadedCase(state_), state_.current_tree, ui::GetUiState().selected_element_id, review_profile_id);
 }
 
+void AiReviewActions::RunForSelection() {
+    state_.ai.review_controller->CancelPendingRequest();
+    BeginForSelection();
+    state_.ai.review_controller->StartPendingRequest();
+}
+
 void AiReviewActions::RunForSelection(const std::string& review_profile_id) {
     state_.ai.review_controller->CancelPendingRequest();
     BeginForSelection(review_profile_id);

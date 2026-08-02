@@ -51,6 +51,11 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
                                                       ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
                                                       : nullptr;
     const core::TreeNode* selected_node = core::FindTreeNode(state.current_tree, ui_state.selected_element_id);
+    controllers::AiReviewGuidelineSelection profile_selection;
+    if (state.guideline_catalog.has_value() && selected_element) {
+        profile_selection =
+            controllers::SelectReviewProfileForElement(*state.guideline_catalog, *selected_element, selected_node);
+    }
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -60,45 +65,32 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     const float panel_height = std::max(120.0f, available.y);
 
     ImGui::BeginChild("##ai_debug_actions", ImVec2(left_width, panel_height), true);
+    const bool review_enabled = !review_running && loaded_case && selected_element &&
+                                state.guideline_catalog.has_value() && profile_selection.review_profile != nullptr &&
+                                profile_selection.error_message.empty();
+    std::string review_tooltip;
     if (review_running)
+        review_tooltip = AF_TR("AI review is already running.");
+    else if (!loaded_case)
+        review_tooltip = AF_TR("Open an assurance case before running SCCG profile reviews.");
+    else if (!selected_element)
+        review_tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
+    else if (!state.guideline_catalog.has_value())
+        review_tooltip =
+            state.guideline_catalog_error.empty() ? AF_TR("SCCG profiles unavailable.") : state.guideline_catalog_error;
+    else if (!profile_selection.error_message.empty())
+        review_tooltip = profile_selection.error_message;
+    else if (profile_selection.review_profile)
+        review_tooltip =
+            profile_selection.review_profile->display_name + "\n\n" + profile_selection.review_profile->description;
+
+    if (!review_enabled)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("AI Review").c_str(), ImVec2(-1.0f, 0.0f))) {
+    if (ImGui::Button(AF_TR("AI Review").c_str(), ImVec2(-1.0f, 0.0f)))
         actions::AiReviewActions(state).BeginForSelection();
-    }
-    if (review_running)
+    DrawTooltipIfHovered(review_tooltip);
+    if (!review_enabled)
         ImGui::EndDisabled();
-
-    if (state.guideline_catalog.has_value()) {
-        ImGui::Separator();
-        for (const parser::ReviewProfile& profile : state.guideline_catalog->document.review_profiles) {
-            const bool compatible =
-                selected_element && ai::IsReviewProfileCompatibleWithElement(profile, *selected_element, selected_node);
-            const bool enabled = !review_running && loaded_case && selected_element && compatible;
-            std::string tooltip = profile.description;
-            if (!loaded_case)
-                tooltip = AF_TR("Open an assurance case before running SCCG profile reviews.");
-            else if (!selected_element)
-                tooltip = AF_TR("Select a GSN/SACM element before running SCCG profile reviews.");
-            else if (!compatible)
-                tooltip =
-                    profile.description + "\n\n" + AF_TR("This profile does not apply to the selected element type.");
-
-            ImGui::PushID(profile.id.c_str());
-            if (!enabled)
-                ImGui::BeginDisabled();
-            if (ImGui::Button(profile.display_name.c_str(), ImVec2(-1.0f, 0.0f))) {
-                actions::AiReviewActions(state).BeginForSelection(profile.id);
-            }
-            DrawTooltipIfHovered(tooltip);
-            if (!enabled)
-                ImGui::EndDisabled();
-            ImGui::PopID();
-        }
-    } else if (!state.guideline_catalog_error.empty()) {
-        ImGui::Separator();
-        ImGui::TextWrapped("%s",
-                           ui::i18n::trf("SCCG profiles unavailable: {0}", state.guideline_catalog_error).c_str());
-    }
     ImGui::EndChild();
 
     ImGui::SameLine();

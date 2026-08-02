@@ -99,7 +99,10 @@ public:
     // Render AI review actions inside an element context menu.
     void RenderAiReviewContextMenuForSelected();
 
-    // Build and send an AI review request for the selected element and SCCG profile.
+    // Build and send an AI review request using the selected element's unique SCCG profile.
+    void RunAiReviewForSelection();
+
+    // Explicit-profile entry point retained for internal/debug callers.
     void RunAiReviewForSelection(const std::string& review_profile_id);
 
     // Returns the currently loaded assurance case, or nullptr if none.

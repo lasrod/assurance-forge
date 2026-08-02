@@ -24,9 +24,11 @@ struct AiReviewGuidelineSelection {
     std::string error_message;
 };
 
-AiReviewGuidelineSelection SelectClaimReviewGuidelines(const core::GuidelineCatalog& guideline_catalog);
 AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCatalog& guideline_catalog,
                                                          const std::string& review_profile_id);
+AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCatalog& guideline_catalog,
+                                                         const parser::SacmElement& element,
+                                                         const core::TreeNode* node = nullptr);
 
 class AiReviewController {
 public:

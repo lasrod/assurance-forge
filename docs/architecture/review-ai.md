@@ -90,13 +90,18 @@ stateDiagram-v2
 
 ## AI Review
 
-AI review builds a narrow request from the selected element and nearby tree context.
+AI review builds a request from the selected element and the data packages required
+by its SCCG review profile. The UI exposes one `AI Review` action. The controller
+maps the selected GSN role to exactly one SCCG 0.6 profile and refuses to run if
+the catalog has no match or an ambiguous match.
 
 ```mermaid
 sequenceDiagram
     participant UI as UI action
     participant Controller as AiReviewController
+    participant Catalog as SCCG profile catalog
     participant Payload as BuildAiReviewPayload
+    participant Data as CollectAiReviewDataPackages
     participant Artifacts as BuildAiReviewRequestArtifacts
     participant Runner as AiTaskRunner
     participant Service as AiService
@@ -104,11 +109,15 @@ sequenceDiagram
     participant Problems as ProblemsManager
 
     UI->>Controller: BeginReviewForSelection(case, tree, element_id)
+    Controller->>Catalog: select unique profile for element role
+    Catalog-->>Controller: profile + guidelines
     Controller->>Payload: selected + parent + children
     Payload-->>Controller: AiReviewPayload
-    Controller->>Artifacts: add guidelines and schema
+    Controller->>Data: collect profile-required context
+    Data-->>Controller: available and unavailable packages
+    Controller->>Artifacts: add profile, guidelines, packages and schema
     Artifacts-->>Controller: AiReviewRequestArtifacts
-    Controller-->>UI: debug modal
+    Controller-->>UI: request ready in AI Debug panel
     UI->>Controller: StartPendingRequest()
     Controller->>Runner: RunGenerate
     Runner->>Service: Generate(AiRequest)

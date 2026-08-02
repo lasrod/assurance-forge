@@ -241,7 +241,7 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
 
     ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
     EXPECT_EQ(result.value().schema_version, "1.0.0");
-    EXPECT_EQ(result.value().sccg_version, "0.5.0");
+    EXPECT_EQ(result.value().sccg_version, "0.6.0");
     EXPECT_EQ(result.value().metadata.title, "Safety Case Core Guidelines");
     EXPECT_FALSE(result.value().categories.empty());
     EXPECT_FALSE(result.value().reference_sources.empty());
@@ -259,10 +259,10 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     EXPECT_FALSE(claim_guideline->rationale.empty());
     EXPECT_FALSE(claim_guideline->tool.applicable_elements.empty());
 
-    const parser::ReviewProfile* profile = result.value().FindReviewProfileById("claim_wording_review");
+    const parser::ReviewProfile* profile = result.value().FindReviewProfileById("claim_review");
     ASSERT_NE(profile, nullptr);
     EXPECT_FALSE(profile->guideline_ids.empty());
-    EXPECT_FALSE(result.value().FindGuidelinesByReviewProfile("claim_wording_review").empty());
+    EXPECT_FALSE(result.value().FindGuidelinesByReviewProfile("claim_review").empty());
     EXPECT_FALSE(result.value().data_packages.empty());
     EXPECT_FALSE(result.value().prechecks.empty());
 
@@ -286,7 +286,7 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
 
     ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
     EXPECT_EQ(result.value().schema_version, "1.0.0");
-    EXPECT_EQ(result.value().sccg_version, "0.5.0");
+    EXPECT_EQ(result.value().sccg_version, "0.6.0");
     EXPECT_GT(result.value().guidelines.size(), 30u);
     EXPECT_FALSE(result.value().review_profiles.empty());
     EXPECT_FALSE(result.value().data_packages.empty());
@@ -300,19 +300,20 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
     EXPECT_FALSE(cl1->review_profile_ids.empty());
     EXPECT_FALSE(cl1->data_package_ids.empty());
 
-    const parser::ReviewProfile* profile = result.value().FindReviewProfileById("claim_wording_review");
+    const parser::ReviewProfile* profile = result.value().FindReviewProfileById("claim_review");
     ASSERT_NE(profile, nullptr);
     EXPECT_FALSE(profile->applies_to.empty());
     EXPECT_FALSE(result.value().FindGuidelinesByReviewProfile(profile->id).empty());
 
-    const parser::ReviewProfile* decomposition_profile = result.value().FindReviewProfileById("decomposition_review");
-    ASSERT_NE(decomposition_profile, nullptr);
-    for (const std::string& applicable_element : {"GSN Strategy", "SACM ArgumentReasoning", "CAE Argument"}) {
-        const bool applies = std::find(decomposition_profile->applies_to.begin(),
-                                       decomposition_profile->applies_to.end(),
-                                       applicable_element) != decomposition_profile->applies_to.end();
+    const parser::ReviewProfile* strategy_profile = result.value().FindReviewProfileById("strategy_review");
+    ASSERT_NE(strategy_profile, nullptr);
+    for (const std::string& applicable_element : {"GSN Strategy", "CAE Argument"}) {
+        const bool applies =
+            std::find(strategy_profile->applies_to.begin(), strategy_profile->applies_to.end(), applicable_element) !=
+            strategy_profile->applies_to.end();
         EXPECT_TRUE(applies) << applicable_element;
     }
+    EXPECT_EQ(result.value().review_profiles.size(), 7u);
 }
 
 TEST(GuidelinesParserTest, SccgSchemaContractsArePresentAndReadable) {

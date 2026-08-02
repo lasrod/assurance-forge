@@ -1630,9 +1630,6 @@ msgstr "SCCG ガイドラインは使用できません。"
 msgid "SCCG profiles unavailable."
 msgstr "SCCG プロファイルを使用できません。"
 
-msgid "SCCG profiles unavailable: {0}"
-msgstr "SCCG プロファイルを使用できません: {0}"
-
 msgid "Safety Case Owner"
 msgstr "安全ケース責任者"
 
@@ -1938,9 +1935,6 @@ msgstr "これはプレビューです。プロジェクトモデルは変更さ
 
 msgid "This node only ({0})"
 msgstr "このノードのみ ({0})"
-
-msgid "This profile does not apply to the selected element type."
-msgstr "このプロファイルは選択した要素の種別には適用されません。"
 
 msgid "This project does not have an audit store yet."
 msgstr "このプロジェクトにはまだ監査ストアがありません。"
