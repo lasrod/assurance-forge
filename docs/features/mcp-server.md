@@ -2,7 +2,8 @@
 
 - **Status:** Implemented. Capability matrix rows `AF-AI-007` (read),
   `AF-AI-008` (bridge), `AF-AI-009` (propose changes).
-- **Architecture:** ADR 0008 — one owner for the open project.
+- **Architecture:** ADR 0008 — one owner for the open project; ADR 0009 and
+  ADR 0010 — one persisted integrated draft with human-controlled promotion.
 - **Consent:** ADR 0007 — unchanged.
 
 Expose Assurance Forge over the [Model Context Protocol](https://modelcontextprotocol.io)
@@ -39,11 +40,13 @@ same answers whether or not a window is open.
 | | Connected | Offline |
 |---|---|---|
 | When | Assurance Forge has the project open | No application running |
-| Reads | Answered by the application, from the argument the user is looking at, including unsaved edits | Answered from a copy the adapter loaded |
-| Changes | Change sets, accepted by a person | **Refused** |
+| Reads | The complete integrated working draft the user is looking at, including MCP, SCCG and human draft groups | Accepted SACM from a copy the adapter loaded |
+| Changes | Revision-checked groups in the application's persisted draft workspace | **Refused** |
 
-Offline is read-only because changing a safety case needs a command bus, an
-audit log and a human to accept it. The refusal says so and says what to do.
+Offline is read-only because the running application is the sole owner of the
+workspace, presents every unaccepted change to the user, and serializes edits
+from all contributors through one revision. A headless copy cannot safely do
+that. The refusal says so and says what to do.
 
 The mode is fixed at connection time. A session does not promote itself when the
 application starts later: the client has been told what this connection can do,
@@ -64,75 +67,75 @@ Hard limits on `find_elements` and `get_argument_tree` are a correctness
 requirement, not a nicety — an unbounded call on a real case spends the whole
 conversation.
 
-## Changing: change sets
+Every case-content response identifies what it returned. Connected reads name
+`view: working_draft` or `view: accepted`, plus `argument_file` and the current
+`working_revision`; an active workspace also supplies `workspace_id`. Offline
+reads name `view: accepted`. A client never has to infer whether text has been
+accepted.
 
-An agent builds a **change set** the user watches take shape.
+## Changing: integrated draft groups
 
-1. `begin_change_set` — from here the user sees it in Assurance Forge.
-2. `stage_operations` — checked against the current case and refused as a group
-   if they would not apply, so the canvas can always draw the result. Returns the
-   diff, the ids given to created elements, and SCCG findings.
-3. `unstage_operations` — revise after "not there" without starting over.
-4. `describe_change_set` — the full diff, and whether it still applies.
-5. `submit_change_set` — hand it to the user for a decision.
+An agent contributes one coherent **change group** to the same working draft as
+the user and SCCG review.
 
-**Staging changes nothing.** No SACM write, no command, no audit transaction.
-The model changes exactly once, when a person clicks Accept in the Review panel.
+1. Read the case or call `get_draft_status` and retain `working_revision`.
+2. `begin_change_group` with a title, rationale and that expected revision.
+3. `stage_operations` in small steps. Each call returns stable generated ids,
+   combined findings and the next revision.
+4. Use `replace_change_group` to revise the group wholesale after feedback;
+   `describe_change_group` and `describe_working_draft` inspect the contribution
+   and its effect on the combination.
+5. `get_draft_events(after_revision)` reports what other contributors changed.
+6. `submit_change_group` marks the work ready for the user. `remove_change_group`
+   or `close_change_group` abandons it without deleting its provenance record.
 
-**Acceptance is an ordinary audited edit.** It runs the unchanged
-`ApplyProposalCommand`, so it is undoable, replayable and attributed to the
-connecting client. No agent-specific command type exists — which is what
-guarantees an agent cannot make a change the application could not make itself.
+Every modifying call carries `expected_working_revision`. If a human edit, SCCG
+review or another MCP client changed the shared draft, the call is refused with
+`current_working_revision`; the agent rereads and decides whether its intended
+operation still means the same thing. This is optimistic concurrency over the
+semantic graph rather than silent last-writer-wins.
 
-There is deliberately **no `apply` tool**. Acceptance is a human action.
+An MCP session may inspect the whole working draft but may mutate only groups it
+created. This prevents one client from rewriting human, SCCG, or another
+client's work while still letting all of them reason about the same argument.
 
-### Naming what you have already staged
+**Staging changes no accepted assurance data.** It writes only recovery state
+under `.af/drafts`, with source label, session identity, operations, stable
+generated ids, dependencies and events. It performs no SACM write, no command
+and no audit transaction. Restarting Assurance Forge restores the same graph and
+revision.
 
-`stage_operations` answers with `created_element_ids` -- `"$topGoal" -> "G3"` --
-so a later call can develop what an earlier one made, by id. Acceptance used to
-check every reference against the *committed* model alone, where G3 does not
-exist and was never meant to, so a change set built over more than one call
-staged cleanly, drew on the canvas, counted correctly in the Review panel, and
-then could not be accepted at all. The gate was stricter than the thing it
-guards. It now checks against the model the patch produces, which is what
-applying it does.
+Promotion remains an ordinary audited `ApplyProposalCommand`, undoable and
+replayable, and is exposed only in Assurance Forge. There is deliberately no
+MCP `apply`, `accept` or `promote` tool; a registry-wide test enforces this.
 
-Reading still answers from the committed case: `find_elements` and `get_element`
-do not see staged work. An agent developing its own proposal refers to it by
-`create_ref` or by the id it was given, not by searching for it.
+For one migration release, `begin_change_set`, `describe_change_set` and
+`submit_change_set` are aliases for the group operations and results include
+both `group_id` and `change_set_id`. The older unstage, discard and list names
+also operate on the integrated workspace. They no longer create private
+in-memory change sets.
 
-### One change set, one argument
+### Naming and rereading staged elements
 
-A change set records the argument file it was begun against, and everything
-afterwards is checked against it. Staging, submitting and accepting are refused
-while a different one of the project's arguments is open; `describe_change_set`
-reports the mismatch rather than refusing, because a read is still owed an
-answer. The refusal names the file and says to call `open_case_file`.
+`stage_operations` answers with `created_element_ids`, for example
+`"$topGoal" -> "G3"`. The identity is allocated once, persisted and reused on
+every materialization. Later calls can refer to `G3`, and ordinary read tools
+can search or fetch it because connected reads use the complete working draft.
 
-This is not bookkeeping. Every argument in a project is seeded from the same
-template, so every argument has a `G1`, and an operation naming `G1` resolves
-just as cleanly against the wrong document as the right one. Without the binding
-a change set built against `main2.sacm` decorated `main.sacm`'s `G1` on the
-canvas, and Accept refused it as stale — reporting the wrong cause, because the
-element hashes it compared came from a document nobody had asked about.
+### One workspace per argument
 
-### Watching it happen
+Each argument file has one persisted workspace, keyed by its project-relative
+path. Switching arguments switches both the accepted baseline and its draft;
+ids such as `G1` that legitimately repeat in another argument cannot receive the
+wrong file's operations. Offline mode never reads `.af/drafts`.
 
-While a change set is open the canvas draws the preview — the argument as it
-would be if accepted — with additions marked NEW, edits EDIT and removals
-REMOVE, each by border *and* badge so the cue survives colour-blindness. An
-element the change set removes is put back for display only: a reviewer
-approving a deletion should see what is being deleted rather than infer it from
-a gap.
+### Watching the combination
 
-The per-package canvas projects an argument package through the ids that package
-holds, and a staged element is in no package at all — nothing has been applied.
-So the preview projection takes in an addition when it is connected to the
-package, directly or through other additions; one connected to nothing goes on
-the document's first argument package, which is where applying it would put it.
-Without that, the canvas drew the committed argument while the Argument
-Navigator, which builds from the preview directly, showed all of the staged
-work — the two views of one change set disagreeing.
+The canvas, navigator, inspectors, search, MCP and SCCG review all consume the
+same materialized model. Additions, edits and removals are marked in place, with
+removed elements retained as presentation-only tombstones. When several groups
+touch one element, the inspector shows the ordered contribution history rather
+than choosing one proposal to preview.
 
 ## SCCG
 
@@ -147,7 +150,7 @@ so prompt and guideline cannot drift. This is what makes an agent aware of the
 rules *before* it writes.
 
 **Checks on staged work.** Returned in the result of every staging call so the
-agent self-corrects, and shown on the change set for the reviewer.
+agent self-corrects, and shown on the integrated draft for the reviewer.
 
 !!! warning "What the checks do and do not cover"
     Most of SCCG is prose only a reader can judge — whether a claim is
@@ -169,8 +172,9 @@ alongside a copyable client configuration. It fails closed on every failure path
 on every call, so revoking it takes effect immediately rather than when the
 client happens to restart.
 
-Connected clients are named in the Review panel. Something reading a safety
-argument should never be invisible to the person responsible for it.
+Connected clients are named on their draft groups. Something reading or
+contributing to a safety argument should never be invisible to the person
+responsible for it.
 
 ## Security of the bridge
 
@@ -196,12 +200,11 @@ version control.
 - **No atomic re-parent.** Restructuring is expressed as remove-then-add
   supported-by pairs, which works but loses the intent in the diff. A `MoveUnder`
   operation is designed and not yet built.
-- **One change set is drawn at a time.** Concurrent clients are supported and all
-  their change sets are listed, but the canvas shows the most recent of those
-  written against the argument that is open.
-- **A change set is held in memory.** Restarting Assurance Forge discards an
-  agent's staged work — expected from "not project data", and not obviously what
-  a user wants after a large restructure.
+- **Concurrent clients share one draft.** They see each other's submitted and
+  building groups; optimistic revision checks replace private client sandboxes.
+- **Draft recovery is local to the project checkout.** `.af/.gitignore` keeps it
+  out of version control, so unaccepted work is not shared through tracked
+  project files and requires an explicit future export to move elsewhere.
 - **Applying collapses argument packages.** The preview places each staged
   addition on the package it attaches to; `ApplyProposalCommand` writes every
   element into the document's first argument package. Pre-existing, shared with
@@ -215,12 +218,16 @@ version control.
   including a real loopback round trip and the shutdown path.
 - `tests/test_agent_bridge_controller.cpp` — the online path end to end over a
   real pipe: handshake, token refusal, protocol mismatch, frame-thread execution.
-- `tests/test_change_sets.cpp`, `tests/test_change_set_acceptance.cpp` — staging
-  changes nothing; acceptance produces one audited `ApplyProposal` transaction
-  through a real `CommandBus`.
+- `tests/test_agent_request_handler.cpp` — connected reads use the integrated
+  working model; MCP groups persist, support multi-call editing, and refuse a
+  stale revision after another contributor changes the draft.
+- `tests/test_draft_workspace.cpp` — staging changes no accepted SACM; stable ids,
+  restart recovery, combined materialization and human promotion are verified.
 - `tests/test_sccg_staged_checks.cpp` — one test per mechanical rule.
 - `tests/test_mcp_modes.cpp` — offline is read-only, and every published tool
   leaves the project directory byte-identical.
+- `tests/test_mcp_server.cpp` — every draft tool is consent-gated and the whole
+  registry contains no apply, accept or promote operation.
 - `cmake/run_mcp_smoke_test.cmake` — the consent gate through the real process.
 
 Both platform branches of the transport are compiled: MSVC and MinGW g++ for

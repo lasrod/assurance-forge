@@ -1183,8 +1183,8 @@ void AppRuntime::UpdateAgentBridgeForProject() {
     }
     if (!impl_->app_state.current_project.has_value()) {
         // Includes a bare SACM file opened outside a project: there is no root
-        // to key an endpoint record on, and no proposals directory to work
-        // against, so there is nothing useful to serve.
+        // to key an endpoint record on, and no project-owned draft workspace to
+        // work against, so there is nothing useful to serve.
         impl_->agent_bridge->Stop();
         return;
     }
@@ -1202,19 +1202,6 @@ bool AppRuntime::PollAgentBridge() {
         return false;
     }
 
-    // Anything an agent staged since the last frame has to reach the canvas, and
-    // staging deliberately mutates no model, so nothing else marks the derived
-    // views dirty. Checked before the poll as well as after: a change set left
-    // open when the user switched argument files must be redrawn on the way back.
-    const auto mark_dirty_if_changed = [this]() {
-        const std::uint64_t revision = impl_->agent_change_sets.revision();
-        if (revision != impl_->agent_change_revision_drawn) {
-            impl_->agent_change_revision_drawn = revision;
-            impl_->tree_needs_rebuild = true;
-        }
-    };
-    mark_dirty_if_changed();
-
     const std::string project_path = impl_->app_state.current_project.has_value()
                                          ? impl_->app_state.current_project->rootPath.generic_string()
                                          : std::string();
@@ -1227,12 +1214,30 @@ bool AppRuntime::PollAgentBridge() {
                                               [this](const std::string& relative_path, std::string& error) {
                                                   return OpenAgentRequestedCaseFile(relative_path, error);
                                               },
-                                              &impl_->agent_change_sets,
-                                              connection.id};
+                                              connection.id,
+                                              connection.session_id,
+                                              &impl_->draft_workspace,
+                                              [this] {
+                                                  SyncDraftWorkspace();
+                                                  if (!impl_->app_state.loaded_case.has_value())
+                                                      return AgentArgumentView{};
+                                                  const core::drafts::DraftWorkspace* workspace =
+                                                      impl_->draft_workspace.workspace();
+                                                  const parser::AssuranceCase& view = CurrentArgumentView();
+                                                  // CurrentArgumentView deliberately falls back to accepted
+                                                  // content if a recovered draft cannot materialize. Label
+                                                  // the bytes actually returned, not merely the workspace's
+                                                  // desired state, so an MCP client never mistakes that
+                                                  // fallback for the integrated working model.
+                                                  const bool is_working =
+                                                      workspace != nullptr && workspace->has_active_groups() &&
+                                                      workspace->state == core::drafts::DraftWorkspaceState::Active &&
+                                                      &view != &impl_->app_state.loaded_case.value();
+                                                  return AgentArgumentView{&view, workspace, is_working};
+                                              }};
             return HandleAgentRequest(request, context);
         });
 
-    mark_dirty_if_changed();
     return handled > 0;
 }
 

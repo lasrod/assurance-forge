@@ -141,11 +141,27 @@ nlohmann::json TreeNodeJson(const core::TreeNode& node, int remaining_depth) {
 }
 
 bool HasCase(const ReadContext& context) {
-    return context.state.loaded_case.has_value();
+    return context.argument() != nullptr;
 }
 
 Result NoCase() {
     return Result::Error("No assurance case is loaded for this project.");
+}
+
+std::string ArgumentFile(const ReadContext& context) {
+    std::filesystem::path argument = context.state.loaded_file_path;
+    if (context.draft_workspace != nullptr && !context.draft_workspace->argument_file.empty())
+        argument = context.draft_workspace->argument_file;
+    if (argument.is_relative())
+        return argument.generic_string();
+    if (context.state.current_project.has_value()) {
+        std::error_code error;
+        const std::filesystem::path relative =
+            std::filesystem::relative(argument, context.state.current_project->rootPath, error);
+        if (!error && !relative.empty())
+            return relative.generic_string();
+    }
+    return argument.generic_string();
 }
 
 } // namespace
@@ -158,11 +174,27 @@ Result Result::Error(std::string message) {
     return Result{nlohmann::json{{"error", std::move(message)}}, true};
 }
 
+Result ReadResult(const ReadContext& context, nlohmann::json payload) {
+    const core::drafts::DraftWorkspace* workspace = context.draft_workspace;
+    payload["argument_file"] = ArgumentFile(context);
+    if (workspace != nullptr) {
+        payload["view"] = context.is_working_draft ? "working_draft" : "accepted";
+        payload["workspace_id"] = workspace->id;
+        payload["working_revision"] = workspace->working_revision;
+        payload["workspace_state"] = core::drafts::DraftWorkspaceStateToString(workspace->state);
+    } else {
+        payload["view"] = "accepted";
+        if (context.argument_view != nullptr)
+            payload["working_revision"] = 0;
+    }
+    return Result::Ok(std::move(payload));
+}
+
 Result GetCaseOverview(const ReadContext& context) {
     if (!HasCase(context)) {
         return NoCase();
     }
-    const parser::AssuranceCase& model = context.state.loaded_case.value();
+    const parser::AssuranceCase& model = *context.argument();
 
     std::map<std::string, int> counts_by_type;
     for (const parser::SacmElement& element : model.elements) {
@@ -190,7 +222,7 @@ Result GetCaseOverview(const ReadContext& context) {
         // the argument should know that before it proposes anything.
         overview["load_warnings"] = context.state.load_warnings;
     }
-    return Result::Ok(std::move(overview));
+    return ReadResult(context, std::move(overview));
 }
 
 Result FindElements(const ReadContext& context, const nlohmann::json& arguments) {
@@ -204,7 +236,7 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
 
     nlohmann::json matches = nlohmann::json::array();
     int total = 0;
-    for (const parser::SacmElement& element : context.state.loaded_case->elements) {
+    for (const parser::SacmElement& element : context.argument()->elements) {
         if (!type.empty() && Lowercased(element.type) != type) {
             continue;
         }
@@ -227,13 +259,14 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
     // in the same initializer list reads the moved-from value, and braced-init
     // evaluation is left-to-right, so it would reliably report zero.
     const int returned = static_cast<int>(matches.size());
-    return Result::Ok(nlohmann::json{
-        {"matches", std::move(matches)},
-        {"returned", returned},
-        {"total_matches", total},
-        {"limit", limit},
-        {"truncated", total > returned},
-    });
+    return ReadResult(context,
+                      nlohmann::json{
+                          {"matches", std::move(matches)},
+                          {"returned", returned},
+                          {"total_matches", total},
+                          {"limit", limit},
+                          {"truncated", total > returned},
+                      });
 }
 
 Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
@@ -246,7 +279,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
         return Result::Error("Argument \"id\" is required.");
     }
 
-    const parser::AssuranceCase& model = context.state.loaded_case.value();
+    const parser::AssuranceCase& model = *context.argument();
     const parser::SacmElement* element = parser::FindElementById(model, id);
     if (element == nullptr) {
         return Result::Error("No element with id \"" + id + "\".");
@@ -298,7 +331,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
         result["in_context_of_ids"] = std::move(attachments);
     }
 
-    return Result::Ok(std::move(result));
+    return ReadResult(context, std::move(result));
 }
 
 Result GetArgumentTree(const ReadContext& context, const nlohmann::json& arguments) {
@@ -309,7 +342,7 @@ Result GetArgumentTree(const ReadContext& context, const nlohmann::json& argumen
     const std::string root_id = StringArgument(arguments, "root_id");
     const int depth = ClampedInt(arguments, "depth", kDefaultTreeDepth, kMaxTreeDepth);
 
-    const core::AssuranceTree tree = core::AssuranceTree::Build(context.state.loaded_case.value());
+    const core::AssuranceTree tree = core::AssuranceTree::Build(*context.argument());
 
     const core::TreeNode* root = root_id.empty() ? tree.root : core::FindTreeNode(tree, root_id);
     if (root == nullptr) {
@@ -327,7 +360,7 @@ Result GetArgumentTree(const ReadContext& context, const nlohmann::json& argumen
         }
         result["orphan_ids"] = std::move(orphans);
     }
-    return Result::Ok(std::move(result));
+    return ReadResult(context, std::move(result));
 }
 
 Result ListCaseFiles(const ReadContext& context) {

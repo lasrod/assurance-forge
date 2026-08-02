@@ -196,11 +196,14 @@ bool AgentBridgeController::CheckEnvelope(const bridge::Request& request,
     return true;
 }
 
-void AgentBridgeController::MarkInitialized(std::uint64_t id, const std::string& client_label) {
+void AgentBridgeController::UpdateConnectionIdentity(std::uint64_t id,
+                                                     const std::string& client_label,
+                                                     const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
     for (const std::unique_ptr<ServedConnection>& entry : served_) {
         if (entry->descriptor.id == id) {
             entry->descriptor.client_label = client_label;
+            entry->descriptor.session_id = session_id;
             return;
         }
     }
@@ -245,11 +248,19 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
         }
 
         if (request.op == bridge::kHelloOperation) {
+            const nlohmann::json::const_iterator session = request.args.find("session");
+            if (session == request.args.end() || !session->is_string() || session->get<std::string>().empty()) {
+                connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
+                    request.id, bridge::error_code::kBadRequest, "Hello requires a non-empty session id.")));
+                continue;
+            }
+
             const nlohmann::json::const_iterator client = request.args.find("client");
             if (client != request.args.end() && client->is_string()) {
                 descriptor.client_label = client->get<std::string>();
             }
-            MarkInitialized(descriptor.id, descriptor.client_label);
+            descriptor.session_id = session->get<std::string>();
+            UpdateConnectionIdentity(descriptor.id, descriptor.client_label, descriptor.session_id);
             initialized = true;
             connection->WriteMessage(
                 bridge::EncodeResponse(bridge::MakeResult(request.id,
@@ -259,6 +270,20 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
                                                               {"projectRoot", project_root_.generic_string()},
                                                               {"connectionId", descriptor.id},
                                                           })));
+            continue;
+        }
+
+        if (request.op == bridge::kIdentifyOperation) {
+            const nlohmann::json::const_iterator client = request.args.find("client");
+            if (client == request.args.end() || !client->is_string() || client->get<std::string>().empty()) {
+                connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
+                    request.id, bridge::error_code::kBadRequest, "Identify requires a non-empty client label.")));
+                continue;
+            }
+            descriptor.client_label = client->get<std::string>();
+            UpdateConnectionIdentity(descriptor.id, descriptor.client_label, descriptor.session_id);
+            connection->WriteMessage(bridge::EncodeResponse(
+                bridge::MakeResult(request.id, nlohmann::json{{"client", descriptor.client_label}})));
             continue;
         }
 

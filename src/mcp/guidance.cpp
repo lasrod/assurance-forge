@@ -88,14 +88,19 @@ std::string Argument(const nlohmann::json& arguments, const char* key, const std
 constexpr const char* kWorkflow =
     "How to work here:\n"
     "1. Read before writing. `get_case_overview`, `get_argument_tree` and `find_elements` show "
-    "what already exists; do not duplicate or contradict it.\n"
-    "2. `begin_change_set` with a clear title. From that moment the user watches your work appear "
-    "on their canvas, so build it in an order that reads sensibly.\n"
-    "3. `stage_operations` in small groups. Each call returns what changed and any SCCG findings "
-    "against it -- act on those before continuing.\n"
-    "4. `submit_change_set` when finished, then tell the user it is waiting for them in Assurance "
+    "what already exists in the integrated working draft and report its `working_revision`; do not "
+    "duplicate or contradict it.\n"
+    "2. `begin_change_group` with a clear title, rationale and the revision you read. From that "
+    "moment the user watches your contribution appear on their canvas.\n"
+    "3. `stage_operations` in small steps, always carrying the latest revision. Each call returns "
+    "stable ids, the next revision and findings against the combined draft -- act on those before "
+    "continuing. If a revision is stale, reread because a user, SCCG review or another client changed "
+    "the shared draft.\n"
+    "4. Use `replace_change_group` when feedback changes the proposal, rather than layering a "
+    "contradictory second version over it.\n"
+    "5. `submit_change_group` when finished, then tell the user it is waiting for them in Assurance "
     "Forge.\n\n"
-    "You are not editing the safety case. Nothing you stage takes effect until a person accepts "
+    "You are not editing the accepted safety case. Nothing you stage takes effect until a person promotes "
     "it. Never tell the user you have changed their argument.\n";
 
 } // namespace

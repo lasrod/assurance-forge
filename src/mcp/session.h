@@ -4,16 +4,14 @@
 //
 // **Connected.** Assurance Forge has this project open. The session holds no
 // model of its own; every operation goes over the bridge and is answered by the
-// application from the argument the user is looking at. This is the mode that
-// matters: the agent and the user see one thing, and anything that changes the
-// case goes through the same command, validation, undo and audit path as an
-// edit made with the mouse.
+// application from the integrated working argument the user is looking at. This
+// is the mode that matters: the agent and the user see one thing, and draft
+// changes are serialized through the application's revisioned workspace.
 //
 // **Offline.** No application is running, so the session loads the project
-// itself and answers reads from that copy. It is **read-only**. Proposing a
-// change needs a command bus, an audit log and a human to accept it, none of
-// which exist in a headless process -- and a second writer in the project
-// directory is exactly the fault this design removes.
+// itself and answers reads from accepted SACM. It is **read-only**. A headless
+// process cannot own the user's integrated draft or present unaccepted changes,
+// and a second project writer is exactly the fault this design removes.
 //
 // The mode is decided once, at open. A session does not promote itself when the
 // application starts later: the client has already been told what this
@@ -102,11 +100,12 @@ public:
 
     // Client name and version from the initialize handshake, used to attribute
     // anything this session produces.
-    void set_client_label(std::string label) {
-        client_label_ = std::move(label);
-    }
+    void set_client_label(std::string label);
     const std::string& client_label() const {
         return client_label_;
+    }
+    const std::string& session_id() const {
+        return session_id_;
     }
 
     const std::filesystem::path& project_path() const {
@@ -133,6 +132,7 @@ private:
     std::filesystem::path settings_path_;
     bool initialized_ = false;
     std::string client_label_;
+    std::string session_id_;
 };
 
 // Reads the `mcp.enabled` flag from a settings document. A missing file, a

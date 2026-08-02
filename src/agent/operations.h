@@ -19,6 +19,8 @@
 
 #include "core/app_state.h"
 #include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_workspace.h"
+#include "core/drafts/draft_workspace_store.h"
 
 #include <nlohmann/json.hpp>
 
@@ -46,7 +48,25 @@ struct ReadContext {
     // How this case was addressed: the project directory, or the file itself
     // when a bare SACM document was opened outside a project.
     std::string project_path;
+
+    // Connected mode supplies the immutable integrated working model that the
+    // application is rendering. Offline mode leaves this null and therefore
+    // reads only the accepted model loaded from SACM.
+    const parser::AssuranceCase* argument_view = nullptr;
+    const core::drafts::DraftWorkspace* draft_workspace = nullptr;
+    bool is_working_draft = false;
+
+    const parser::AssuranceCase* argument() const {
+        if (argument_view != nullptr)
+            return argument_view;
+        return state.loaded_case.has_value() ? &state.loaded_case.value() : nullptr;
+    }
 };
+
+// Adds the read-view contract shared by every case-content operation. An MCP
+// client must never have to guess whether returned argument text is accepted or
+// still part of the integrated draft.
+Result ReadResult(const ReadContext& context, nlohmann::json payload);
 
 Result GetCaseOverview(const ReadContext& context);
 Result FindElements(const ReadContext& context, const nlohmann::json& arguments);
@@ -88,6 +108,34 @@ Result DescribeChangeSet(const ChangeContext& context, const nlohmann::json& arg
 Result SubmitChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
 Result DiscardChangeSet(const ChangeContext& context, const nlohmann::json& arguments);
 Result ListChangeSets(const ChangeContext& context);
+
+// ---------------------------------------------------------------------------
+// Integrated draft groups
+//
+// MCP now contributes to the same persisted workspace as human draft editing
+// and SCCG review. The accepted AppState remains the immutable baseline; every
+// mutation is revision checked and touches only DraftWorkspaceStore.
+// ---------------------------------------------------------------------------
+
+struct DraftContext {
+    const core::AppState& state;
+    core::drafts::DraftWorkspaceStore& store;
+    std::uint64_t connection_id = 0;
+    std::string client_label;
+    std::string session_id;
+};
+
+Result GetDraftStatus(const DraftContext& context);
+Result BeginChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
+Result StageDraftOperations(const DraftContext& context, const nlohmann::json& arguments);
+Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
+Result RemoveChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
+Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
+Result SubmitChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
+Result DescribeWorkingDraft(const DraftContext& context);
+Result GetDraftEvents(const DraftContext& context, const nlohmann::json& arguments);
+Result CloseChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
+Result UnstageDraftOperations(const DraftContext& context, const nlohmann::json& arguments);
 
 // Parses the operation vocabulary an agent sends. Exposed so the operation
 // schema published over MCP and the parser that enforces it stay one thing.

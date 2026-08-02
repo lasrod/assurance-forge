@@ -151,6 +151,9 @@ TEST(McpOffline, ReadsTheCaseWithNoApplicationRunning) {
     const ToolCall overview = CallTool(server, "get_case_overview");
     ASSERT_FALSE(overview.is_error) << overview.payload.dump();
     EXPECT_GT(overview.payload["element_count"].get<int>(), 0);
+    EXPECT_EQ(overview.payload["view"], "accepted");
+    EXPECT_FALSE(overview.payload.contains("workspace_id"));
+    EXPECT_FALSE(overview.payload.contains("working_revision"));
 }
 
 TEST(McpOffline, SearchesAndFetchesElements) {

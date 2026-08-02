@@ -1,5 +1,6 @@
 add_library(af_agent OBJECT
     change_operations.cpp
+    draft_operations.cpp
     placement.cpp
     read_operations.cpp
 )

@@ -81,8 +81,10 @@ protected:
         while (!stop.load()) {
             controller.PollPendingRequests(
                 [](const bridge::Request& request, const app::controllers::AgentConnection& connection) {
-                    return bridge::MakeResult(
-                        request.id, nlohmann::json{{"ranOperation", request.op}, {"client", connection.client_label}});
+                    return bridge::MakeResult(request.id,
+                                              nlohmann::json{{"ranOperation", request.op},
+                                                             {"client", connection.client_label},
+                                                             {"session", connection.session_id}});
                 });
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
@@ -188,17 +190,22 @@ TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
     ASSERT_NE(client, nullptr);
 
     bridge::Request hello = Say(bridge::kHelloOperation, token, 1);
-    hello.args = nlohmann::json{{"client", "claude-ai 0.1.0"}};
+    hello.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", "stable-session-1"}};
     const bridge::Response greeting = Exchange(*client, hello);
     ASSERT_TRUE(greeting.ok) << greeting.error_message;
     EXPECT_EQ(greeting.result["appVersion"], "0.1.0");
 
-    const bridge::Response answer = Exchange(*client, Say("get_case_overview", token, 2));
+    bridge::Request identify = Say(bridge::kIdentifyOperation, token, 2);
+    identify.args = nlohmann::json{{"client", "claude-ai 0.1.0"}};
+    ASSERT_TRUE(Exchange(*client, identify).ok);
+
+    const bridge::Response answer = Exchange(*client, Say("get_case_overview", token, 3));
     ASSERT_TRUE(answer.ok) << answer.error_message;
     EXPECT_EQ(answer.result["ranOperation"], "get_case_overview");
     // Attribution survives the hop, so anything a connection produces can be
     // traced to the client that asked for it rather than to "the AI".
     EXPECT_EQ(answer.result["client"], "claude-ai 0.1.0");
+    EXPECT_EQ(answer.result["session"], "stable-session-1");
 
     stop.store(true);
     frames.join();
@@ -215,13 +222,43 @@ TEST_F(AgentBridgeControllerTest, ShowsAConnectedClientToTheApplication) {
     ASSERT_NE(client, nullptr);
 
     bridge::Request hello = Say(bridge::kHelloOperation, token, 1);
-    hello.args = nlohmann::json{{"client", "claude-ai 0.1.0"}};
+    hello.args = nlohmann::json{{"client", "claude-ai 0.1.0"}, {"session", "stable-session-2"}};
     ASSERT_TRUE(Exchange(*client, hello).ok);
 
     const std::vector<app::controllers::AgentConnection> connected = controller.connections();
     ASSERT_EQ(connected.size(), 1u);
     EXPECT_EQ(connected[0].client_label, "claude-ai 0.1.0");
+    EXPECT_EQ(connected[0].session_id, "stable-session-2");
     EXPECT_FALSE(connected[0].connected_utc.empty());
+}
+
+TEST_F(AgentBridgeControllerTest, RefusesHelloUntilAStableSessionIdIsProvided) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+
+    bridge::Request missing = Say(bridge::kHelloOperation, token, 1);
+    missing.args = nlohmann::json{{"client", "assurance-forge-mcp"}};
+    const bridge::Response missing_response = Exchange(*client, missing);
+    EXPECT_FALSE(missing_response.ok);
+    EXPECT_EQ(missing_response.error_code, bridge::error_code::kBadRequest);
+    EXPECT_NE(missing_response.error_message.find("session"), std::string::npos);
+
+    bridge::Request empty = Say(bridge::kHelloOperation, token, 2);
+    empty.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", ""}};
+    const bridge::Response empty_response = Exchange(*client, empty);
+    EXPECT_FALSE(empty_response.ok);
+    EXPECT_EQ(empty_response.error_code, bridge::error_code::kBadRequest);
+
+    bridge::Request valid = Say(bridge::kHelloOperation, token, 3);
+    valid.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", "stable-session-3"}};
+    EXPECT_TRUE(Exchange(*client, valid).ok);
+    ASSERT_EQ(controller.connections().size(), 1u);
+    EXPECT_EQ(controller.connections()[0].session_id, "stable-session-3");
 }
 
 // The token lives in the user's own runtime directory. A local process that did

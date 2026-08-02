@@ -9,4 +9,4 @@ Then Terminology Assist when you need to manage controlled vocabulary, define ac
 - [Capability Matrix](feature-matrix.md) — what is supported, in development, and planned
 - [Terminology Assist](terminology-assist.md)
 - [Confidence Panel Prototype](confidence-panel-prototype.md)
-- [MCP Server](mcp-server.md) — planned; build safety cases by chat from your own AI client
+- [MCP Server](mcp-server.md) — read and build integrated draft groups from your own AI client

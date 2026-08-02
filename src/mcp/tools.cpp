@@ -47,6 +47,42 @@ ToolResult SuggestPlacement(Session& session, const nlohmann::json& arguments) {
     return Run(session, "suggest_placement", arguments);
 }
 
+ToolResult GetDraftStatus(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "get_draft_status", arguments);
+}
+
+ToolResult BeginChangeGroup(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "begin_change_group", arguments);
+}
+
+ToolResult ReplaceChangeGroup(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "replace_change_group", arguments);
+}
+
+ToolResult RemoveChangeGroup(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "remove_change_group", arguments);
+}
+
+ToolResult DescribeChangeGroup(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "describe_change_group", arguments);
+}
+
+ToolResult SubmitChangeGroup(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "submit_change_group", arguments);
+}
+
+ToolResult DescribeWorkingDraft(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "describe_working_draft", arguments);
+}
+
+ToolResult GetDraftEvents(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "get_draft_events", arguments);
+}
+
+ToolResult CloseChangeGroup(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "close_change_group", arguments);
+}
+
 ToolResult BeginChangeSet(Session& session, const nlohmann::json& arguments) {
     return Run(session, "begin_change_set", arguments);
 }
@@ -128,10 +164,20 @@ nlohmann::json OperationsSchema() {
             {"text", {{"type", "string"}, {"description", "Initial text for a Create* operation."}}}}}}}};
 }
 
-nlohmann::json ChangeSetIdSchema() {
+nlohmann::json DraftGroupIdSchema() {
     return nlohmann::json{
+        {"group_id",
+         {{"type", "string"}, {"description", "Defaults to the newest open group created by this MCP session."}}},
         {"change_set_id",
-         {{"type", "string"}, {"description", "Defaults to the change set this connection has open."}}}};
+         {{"type", "string"}, {"description", "Compatibility alias for group_id during the migration release."}}},
+    };
+}
+
+nlohmann::json ExpectedRevisionSchema() {
+    return nlohmann::json{
+        {"type", "integer"},
+        {"minimum", 0},
+        {"description", "The working_revision returned by the draft or case-content read this change is based on."}};
 }
 
 std::vector<ToolDefinition> BuildTools() {
@@ -237,7 +283,133 @@ std::vector<ToolDefinition> BuildTools() {
     });
 
     // ---------------------------------------------------------------------
-    // Change sets
+    // Integrated draft workspace
+    // ---------------------------------------------------------------------
+
+    tools.push_back(ToolDefinition{
+        "get_draft_status",
+        "Report the integrated working draft, its revision, and every active change group. Read this before "
+        "modifying the draft; every modifying call must carry the returned working_revision.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &GetDraftStatus,
+    });
+
+    tools.push_back(ToolDefinition{
+        "begin_change_group",
+        "Start one coherent contribution to the shared working draft. Human edits, SCCG review, and other MCP "
+        "groups may already be present. Nothing is accepted until a human promotes it in Assurance Forge.",
+        nlohmann::json{
+            {"type", "object"},
+            {"properties",
+             {{"title", {{"type", "string"}, {"description", "Short title shown to the reviewer."}}},
+              {"summary", {{"type", "string"}, {"description", "What this group changes."}}},
+              {"rationale", {{"type", "string"}, {"description", "Why this safety-argument change is needed."}}},
+              {"expected_working_revision", ExpectedRevisionSchema()}}},
+            {"required", nlohmann::json::array({"title", "expected_working_revision"})}},
+        true,
+        &BeginChangeGroup,
+    });
+
+    tools.push_back(ToolDefinition{
+        "replace_change_group",
+        "Replace every operation in one of this MCP session's groups. Use this when feedback changes the shape of "
+        "the proposal; the replacement is rehearsed against the complete integrated draft before it is stored.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["operations"] = OperationsSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"operations", "expected_working_revision"})}},
+        true,
+        &ReplaceChangeGroup,
+    });
+
+    tools.push_back(ToolDefinition{
+        "remove_change_group",
+        "Reject one of this MCP session's groups and remove its contribution from the working model. The record is "
+        "retained for provenance; accepted SACM is untouched.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"expected_working_revision"})}},
+        true,
+        &RemoveChangeGroup,
+    });
+
+    tools.push_back(ToolDefinition{
+        "describe_change_group",
+        "Describe one change group's provenance, operations, generated element ids, dependencies, and findings in "
+        "the combined working draft.",
+        nlohmann::json{{"type", "object"}, {"properties", DraftGroupIdSchema()}},
+        true,
+        &DescribeChangeGroup,
+    });
+
+    tools.push_back(ToolDefinition{
+        "submit_change_group",
+        "Mark one of this MCP session's groups ready for human review. This does not accept or apply it; only the "
+        "user can promote draft work in Assurance Forge.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"expected_working_revision"})}},
+        true,
+        &SubmitChangeGroup,
+    });
+
+    tools.push_back(ToolDefinition{
+        "describe_working_draft",
+        "Summarize whether the complete integrated draft materializes and report its combined SCCG and structural "
+        "findings. Use the ordinary read tools to inspect its elements and tree.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &DescribeWorkingDraft,
+    });
+
+    tools.push_back(ToolDefinition{
+        "get_draft_events",
+        "Return draft events after a revision, so a client can learn what humans, SCCG review, or other MCP clients "
+        "changed without guessing from stale local state.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        {{"after_revision",
+                          {{"type", "integer"},
+                           {"minimum", 0},
+                           {"description", "Return events newer than this revision (default 0)."}}}}}},
+        true,
+        &GetDraftEvents,
+    });
+
+    tools.push_back(ToolDefinition{
+        "close_change_group",
+        "Abandon one of this MCP session's groups when the conversation ends without submitting it. This removes "
+        "its contribution from the working model and retains the rejected record.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"expected_working_revision"})}},
+        true,
+        &CloseChangeGroup,
+    });
+
+    // ---------------------------------------------------------------------
+    // Change-set compatibility aliases
     //
     // The descriptions carry one message repeatedly and deliberately: staging
     // does not change the safety case. An agent that believes it has edited the
@@ -246,11 +418,8 @@ std::vector<ToolDefinition> BuildTools() {
 
     tools.push_back(ToolDefinition{
         "begin_change_set",
-        "Start a change the user watches you build. From this call onward, Assurance Forge shows "
-        "your work on the canvas as you stage it: new elements appear in a proposed style, edits "
-        "are marked in place, removals are ghosted. Nothing is applied to the safety case -- the "
-        "user accepts or rejects the finished change set in the application. Requires Assurance "
-        "Forge to be running with the project open.",
+        "Compatibility alias for begin_change_group. Starts a group in the shared integrated draft and returns both "
+        "group_id and change_set_id. Migrate to begin_change_group.",
         nlohmann::json{
             {"type", "object"},
             {"properties",
@@ -260,26 +429,27 @@ std::vector<ToolDefinition> BuildTools() {
                {{"type", "string"},
                 {"description",
                  "Why you are making it. The reviewer is being asked to accept a "
-                 "change to a safety argument and needs the reasoning."}}}}},
-            {"required", nlohmann::json::array({"title"})}},
+                 "change to a safety argument and needs the reasoning."}}},
+              {"expected_working_revision", ExpectedRevisionSchema()}}},
+            {"required", nlohmann::json::array({"title", "expected_working_revision"})}},
         true,
         &BeginChangeSet,
     });
 
     tools.push_back(ToolDefinition{
         "stage_operations",
-        "Add operations to the open change set. They are checked against the current case and "
-        "refused as a group if they would not apply, so a clean result means the user is now "
-        "seeing exactly this on the canvas. Returns what changed and the ids given to elements "
-        "you created. This does NOT change the safety case.",
+        "Append operations to a draft change group. They are checked against the complete integrated working draft "
+        "and refused together if they would not materialize. Returns stable ids for created elements. This does not "
+        "change accepted SACM.",
         nlohmann::json{{"type", "object"},
                        {"properties",
                         [&] {
-                            nlohmann::json properties = ChangeSetIdSchema();
+                            nlohmann::json properties = DraftGroupIdSchema();
                             properties["operations"] = OperationsSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
                             return properties;
                         }()},
-                       {"required", nlohmann::json::array({"operations"})}},
+                       {"required", nlohmann::json::array({"operations", "expected_working_revision"})}},
         true,
         &StageOperations,
     });
@@ -291,11 +461,13 @@ std::vector<ToolDefinition> BuildTools() {
         nlohmann::json{{"type", "object"},
                        {"properties",
                         [&] {
-                            nlohmann::json properties = ChangeSetIdSchema();
+                            nlohmann::json properties = DraftGroupIdSchema();
                             properties["count"] = nlohmann::json{
                                 {"type", "integer"}, {"description", "How many to drop from the end (default 1)."}};
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
                             return properties;
-                        }()}},
+                        }()},
+                       {"required", nlohmann::json::array({"expected_working_revision"})}},
         true,
         &UnstageOperations,
     });
@@ -305,7 +477,7 @@ std::vector<ToolDefinition> BuildTools() {
         "Report what a change set would do to the case: elements added, modified and removed, "
         "with their text. Also reports whether it still applies -- the user may have edited the "
         "argument while you were working.",
-        nlohmann::json{{"type", "object"}, {"properties", ChangeSetIdSchema()}},
+        nlohmann::json{{"type", "object"}, {"properties", DraftGroupIdSchema()}},
         true,
         &DescribeChangeSet,
     });
@@ -315,7 +487,14 @@ std::vector<ToolDefinition> BuildTools() {
         "Hand the change set to the user for a decision. After this, tell them it is waiting for "
         "review in Assurance Forge. Do not tell them the safety case has been changed: it has "
         "not, and only they can change it.",
-        nlohmann::json{{"type", "object"}, {"properties", ChangeSetIdSchema()}},
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"expected_working_revision"})}},
         true,
         &SubmitChangeSet,
     });
@@ -323,7 +502,14 @@ std::vector<ToolDefinition> BuildTools() {
     tools.push_back(ToolDefinition{
         "discard_change_set",
         "Abandon a change set and remove it from the user's canvas.",
-        nlohmann::json{{"type", "object"}, {"properties", ChangeSetIdSchema()}},
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"expected_working_revision"})}},
         true,
         &DiscardChangeSet,
     });
