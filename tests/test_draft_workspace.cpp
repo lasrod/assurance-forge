@@ -241,6 +241,62 @@ TEST(DraftWorkspace, ReopeningTheSameArgumentRestoresTheSameWorkspace) {
     EXPECT_EQ(fixture.store.workspace()->groups.front().id, group);
 }
 
+// The sequence `AppRuntime::SyncDraftWorkspace` drives every frame: the argument
+// changes, the store is repointed, and each argument keeps its own draft.
+//
+// Element ids repeat across a project's arguments -- each is seeded from the same
+// template, so each starts with the same top goal -- so a workspace left pointing
+// at the previous argument would decorate this one's identically-named elements.
+// That defect has been shipped once already, in the change-set overlay.
+TEST(DraftWorkspace, SwitchingArgumentsAndBackKeepsEachDraftWithItsOwnArgument) {
+    Fixture fixture;
+    const std::string first_group = fixture.BeginGroup("Clarify the first argument");
+    fixture.Stage(first_group, {UpdateTextOp("G1", "First argument wording.")});
+
+    const std::filesystem::path second_argument = fixture.dir.path / "arguments" / "secondary.sacm";
+    std::string error;
+    ASSERT_TRUE(fixture.store.Open(second_argument, fixture.accepted, error)) << error;
+    EXPECT_FALSE(fixture.store.has_workspace()) << "the second argument has no draft of its own yet";
+
+    const std::string second_group =
+        fixture.store.BeginGroup(McpRequest("Clarify the second argument"), fixture.accepted, error);
+    ASSERT_FALSE(second_group.empty()) << error;
+    ASSERT_TRUE(fixture.store.StageOperations(
+        second_group, {UpdateTextOp("G1", "Second argument wording.")}, fixture.accepted, error))
+        << error;
+
+    // Back to the first. Its own group is there, and the second argument's is
+    // not.
+    ASSERT_TRUE(fixture.store.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    ASSERT_TRUE(fixture.store.has_workspace());
+    ASSERT_EQ(fixture.store.workspace()->groups.size(), 1u);
+    EXPECT_EQ(fixture.store.workspace()->groups.front().title, "Clarify the first argument");
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(result.success) << result.error;
+    const core::SacmElement* element = FindElement(result.working_model, "G1");
+    ASSERT_NE(element, nullptr);
+    EXPECT_EQ(element->content, "First argument wording.");
+}
+
+TEST(DraftWorkspace, ClosingTheProjectForgetsTheDraftWithoutDeletingIt) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Clarify G1");
+    fixture.Stage(group, {UpdateTextOp("G1", "Clarified.")});
+
+    // What the runtime does when no argument is loaded. Closing the application
+    // is not a decision about unaccepted work: the draft is recovery state and
+    // waits.
+    fixture.store.SetProjectRoot({});
+    EXPECT_FALSE(fixture.store.has_workspace());
+
+    fixture.store.SetProjectRoot(fixture.dir.path);
+    std::string error;
+    ASSERT_TRUE(fixture.store.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    ASSERT_TRUE(fixture.store.has_workspace());
+    EXPECT_EQ(fixture.store.workspace()->groups.size(), 1u);
+}
+
 TEST(DraftWorkspace, ADifferentArgumentGetsItsOwnWorkspace) {
     Fixture fixture;
     fixture.BeginGroup("Clarify G1");

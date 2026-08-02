@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/app_events.h"
+#include "core/drafts/draft_workspace.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_item.h"
 #include "core/project_model.h"
@@ -188,7 +189,23 @@ private:
     // the canvas decorates nodes with.
     const parser::AssuranceCase& RefreshAgentChangePreview(const parser::AssuranceCase& committed);
 
+    // Points the draft workspace store at whatever argument is open, opening its
+    // recovery data when there is any and closing the previous one first.
+    //
+    // A draft belongs to one argument file, and the application has one loaded,
+    // so exactly one workspace is live at a time. Run every frame before the
+    // derived views rebuild: a connected client can switch which argument is
+    // open, and a workspace left pointing at the previous one would decorate
+    // this argument's identically-named elements.
+    void SyncDraftWorkspace();
+
 public:
+    // The draft workspace for the argument that is open, or null when there is
+    // no draft. Read-only: only `AppRuntime` mutates it, which is what keeps
+    // ADR 0008's single-owner rule true of draft state as well as of SACM.
+    const core::drafts::DraftWorkspace* CurrentDraftWorkspace() const;
+
+private:
     // Accepts an agent's change set: the one point where staged work becomes a
     // real edit. Goes through `ApplyProposalCommand`, so it is audited, undoable
     // and attributed like any other change. Only a person reaches this.

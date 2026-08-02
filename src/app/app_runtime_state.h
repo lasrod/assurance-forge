@@ -8,6 +8,7 @@
 #include "app/app_events.h"
 #include "app/controllers/agent_bridge_controller.h"
 #include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_workspace_store.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
 #include "app/controllers/confidence_controller.h"
@@ -206,6 +207,20 @@ struct AppRuntimeState {
     // into the project: a change set is a proposal in progress, not project
     // data, and a second writer in that directory is what this design removed.
     core::changesets::ChangeSetStore agent_change_sets;
+    // The integrated working draft for the argument that is open: ordered change
+    // groups from MCP, SCCG AI review, the user and imported legacy proposals,
+    // materialized into one complete assurance case (ADR 0009, ADR 0010).
+    //
+    // Owned here rather than in `core::AppState` because a draft is workflow
+    // state, not loaded project data. The accepted case in `app_state` stays
+    // exactly what the user accepted; this is what has been proposed against it.
+    core::drafts::DraftWorkspaceStore draft_workspace;
+    // What `draft_workspace` was last opened for. A draft belongs to one
+    // argument file -- element ids repeat across a project's arguments, so a
+    // draft written against one must never decorate another's identically-named
+    // elements -- and this is how the runtime notices the argument changed.
+    std::filesystem::path draft_workspace_argument;
+    std::filesystem::path draft_workspace_root;
     // The store revision the canvas was last built against. Staging is not a
     // model mutation and so marks nothing dirty; comparing this each frame is
     // what turns an agent's staged operation into a repaint.

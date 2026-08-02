@@ -534,6 +534,42 @@ const parser::AssuranceCase& AppRuntime::RefreshAgentChangePreview(const parser:
     return impl_->agent_preview_case.value();
 }
 
+const core::drafts::DraftWorkspace* AppRuntime::CurrentDraftWorkspace() const {
+    return impl_->draft_workspace.workspace();
+}
+
+void AppRuntime::SyncDraftWorkspace() {
+    const std::filesystem::path root = impl_->app_state.current_project.has_value()
+                                           ? impl_->app_state.current_project->rootPath
+                                           : std::filesystem::path{};
+    const std::filesystem::path argument =
+        impl_->app_state.loaded_case.has_value() ? impl_->app_state.loaded_file_path : std::filesystem::path{};
+
+    if (root == impl_->draft_workspace_root && argument == impl_->draft_workspace_argument) {
+        return;
+    }
+
+    impl_->draft_workspace_root = root;
+    impl_->draft_workspace_argument = argument;
+    impl_->draft_workspace.SetProjectRoot(root);
+
+    if (argument.empty() || !impl_->app_state.loaded_case.has_value()) {
+        // Forgets the workspace without touching what is on disk, so the draft
+        // is still there when the argument is opened again. Closing the
+        // application is not a decision about unaccepted work.
+        impl_->draft_workspace.Close();
+        return;
+    }
+
+    std::string error;
+    if (!impl_->draft_workspace.Open(argument, impl_->app_state.loaded_case.value(), error)) {
+        // Recovery data that cannot be read is reported rather than deleted. The
+        // work in it may be hours of an agent's conversation, and the file is the
+        // only copy.
+        impl_->app_state.status_message = "Warning: could not read the draft for this argument: " + error;
+    }
+}
+
 void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // A library-primary (flipped) command committed its edit to the library but
     // deliberately did NOT rebuild the live loaded_case/sacm_package inside the

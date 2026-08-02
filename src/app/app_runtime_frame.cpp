@@ -135,6 +135,15 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     {
+        // After the bridge, for the same reason the bridge runs before the
+        // derived views: a connected client can switch which argument file is
+        // open, and a workspace still pointing at the previous one would
+        // decorate this argument's identically-named elements.
+        core::perf::ScopedTimer s("app.draft_workspace");
+        SyncDraftWorkspace();
+    }
+
+    {
         core::perf::ScopedTimer s("app.derived_views");
         // Building the tree / GSN layout for a very large case can exhaust memory. Catch it here
         // so an allocation failure reports to the user and drops the case instead of escaping the
