@@ -460,12 +460,17 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
     if (model.stale) {
         const std::string warning =
             AF_TR("This confidence assessment may be stale because the element changed after the value was stored.");
-        const float warning_width = std::max(80.0f, ImGui::GetContentRegionAvail().x - 18.0f);
-        const float warning_height = ImGui::CalcTextSize(warning.c_str(), nullptr, false, warning_width).y + 16.0f;
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float warning_child_width = std::max(1.0f, ImGui::GetContentRegionAvail().x);
+        const float warning_wrap_width = std::max(1.0f, warning_child_width - style.WindowPadding.x * 2.0f);
+        const float warning_text_height = ImGui::CalcTextSize(warning.c_str(), nullptr, false, warning_wrap_width).y;
+        const float warning_height = warning_text_height + style.WindowPadding.y * 2.0f;
         ImGui::PushStyleColor(ImGuiCol_ChildBg,
                               ImGui::ColorConvertU32ToFloat4(LerpColor(theme.surface_1, theme.warning, 0.09f)));
-        ImGui::BeginChild(
-            "##stale_confidence_notice", ImVec2(0.0f, warning_height), true, ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild("##stale_confidence_notice",
+                          ImVec2(0.0f, warning_height),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar);
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
         ImGui::TextWrapped("%s", warning.c_str());
         ImGui::PopStyleColor();
