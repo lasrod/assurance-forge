@@ -274,13 +274,11 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
 
     InspectorFieldLabel(AF_TR("Contributions"));
     for (const DraftContributionView& contribution : detail.contributions) {
-        ImGui::Bullet();
-        ImGui::SameLine(0.0f, 4.0f);
-        ImGui::TextWrapped("%s",
-                           ui::i18n::trf("{0} — {1}",
-                                         contribution.source_label,
-                                         contribution.title.empty() ? contribution.group_id : contribution.title)
-                               .c_str());
+        ImGui::BulletText("%s",
+                          ui::i18n::trf("{0} — {1}",
+                                        contribution.source_label,
+                                        contribution.title.empty() ? contribution.group_id : contribution.title)
+                              .c_str());
         if (!contribution.rationale.empty()) {
             ImGui::Indent();
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
