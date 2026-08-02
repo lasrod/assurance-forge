@@ -17,7 +17,7 @@ struct AiReviewInput {
 std::optional<AiReviewInput> BuildAiReviewInput(AppRuntimeState& state) {
     AiReviewInput input;
     if (!state.app_state.loaded_case.has_value())
-        return input;
+        return std::nullopt;
 
     input.model = &state.app_state.loaded_case.value();
     const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();

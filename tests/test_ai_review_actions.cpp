@@ -104,6 +104,17 @@ core::reviews::ReviewItem MakeReviewItem() {
 
 } // namespace
 
+TEST(AiReviewActionsTest, DoesNotBuildReviewInputWithoutALoadedCase) {
+    app::AppRuntimeState state;
+    ui::GetUiState().selected_element_id = "G1";
+
+    app::actions::AiReviewActions(state).BeginForSelection();
+
+    EXPECT_FALSE(state.ai.review_controller->HasPendingRequest());
+    EXPECT_TRUE(state.problems_manager.GetProblems().empty());
+    ui::GetUiState().selected_element_id.clear();
+}
+
 TEST(AiReviewActionsTest, BuildsReviewFromTheMaterializedWorkingDraft) {
     TempDir temp = MakeTempDir("working_view");
     app::AppRuntimeState state;
