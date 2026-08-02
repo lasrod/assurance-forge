@@ -1,14 +1,18 @@
 #include "ui/panels/confidence_panel.h"
 
-#include "imgui.h"
 #include "ui/confidence_model.h"
+#include "ui/fonts.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
+#include "hello_imgui/icons_font_awesome_4.h"
+#include "imgui.h"
+
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <string_view>
 
 namespace ui::panels {
 
@@ -17,6 +21,36 @@ namespace {
 constexpr float kTrianglePadding = 28.0f;
 constexpr float kTriangleMinHeight = 190.0f;
 constexpr float kTriangleMaxHeight = 260.0f;
+
+void ConfidenceFieldLabel(std::string_view label) {
+    const Theme& theme = GetTheme();
+    fonts::Scoped caption(fonts::Role::Caption);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+    ImGui::TextUnformatted(label.data(), label.data() + label.size());
+    ImGui::PopStyleColor();
+}
+
+void ConfidenceMetadataRow(std::string_view label, std::string_view value) {
+    ConfidenceFieldLabel(label);
+    ImGui::SameLine(0.0f, 7.0f);
+    fonts::Scoped strong(fonts::Role::BodyStrong);
+    ImGui::TextUnformatted(value.data(), value.data() + value.size());
+}
+
+void ConfidenceSectionHeader() {
+    const Theme& theme = GetTheme();
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(theme.accent), "%s", ICON_FA_CHECK_CIRCLE);
+    ImGui::SameLine(0.0f, 7.0f);
+    {
+        fonts::Scoped strong(fonts::Role::BodyStrong);
+        ImGui::TextUnformatted(AF_TR("Confidence").c_str());
+    }
+    ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.border, 0.72f)));
+    ImGui::Separator();
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0.0f, 2.0f));
+}
 
 ImVec2 ToImVec2(ConfidencePoint point) {
     return ImVec2(point.x, point.y);
@@ -162,16 +196,14 @@ void DrawProjectedConfidence(float value) {
 void DrawFinalConfidence(float value, bool active) {
     const Theme& theme = GetTheme();
     value = ClampConfidenceValue(value);
-    ImGui::TextUnformatted(AF_TR("Confidence").c_str());
-    if (ui::gsn::g_BoldFont)
-        ImGui::PushFont(ui::gsn::g_BoldFont);
+    ConfidenceFieldLabel(AF_TR("Confidence"));
+    fonts::Push(fonts::Role::BodyStrong);
     ImGui::PushStyleColor(
         ImGuiCol_Text,
         ImGui::ColorConvertU32ToFloat4(active ? theme.accent_hover : WithAlpha(theme.text_secondary, 0.58f)));
     ImGui::Text("%.2f", value);
     ImGui::PopStyleColor();
-    if (ui::gsn::g_BoldFont)
-        ImGui::PopFont();
+    fonts::Pop();
     ImGui::PushStyleColor(ImGuiCol_FrameBg,
                           ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_3, active ? 0.68f : 0.28f)));
     ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
@@ -386,17 +418,7 @@ void DrawOpinionMode(ElementConfidence& confidence) {
 
 bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePanelCallbacks& callbacks) {
     const Theme& theme = GetTheme();
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    if (ui::gsn::g_BoldFont)
-        ImGui::PushFont(ui::gsn::g_BoldFont);
-    ImGui::TextUnformatted(AF_TR("Confidence").c_str());
-    if (ui::gsn::g_BoldFont)
-        ImGui::PopFont();
-
-    ImGui::Spacing();
+    ConfidenceSectionHeader();
     bool changed = false;
 
     if (!model.storage_warning.empty()) {
@@ -431,16 +453,23 @@ bool ShowConfidencePanel(const ConfidencePanelModel& model, const ConfidencePane
     // the caller passed an English msgid or a pre-translated label.
     const std::string method =
         model.method_label.empty() ? AF_TR(MethodLabel(confidence.mode)) : AF_TR(model.method_label);
-    ImGui::TextUnformatted(ui::i18n::trf("Method: {0}", method).c_str());
+    ConfidenceMetadataRow(AF_TR("Method"), method);
     const std::string status = model.status_label.empty() ? AF_TR("Active") : AF_TR(model.status_label);
-    ImGui::TextUnformatted(ui::i18n::trf("Status: {0}", status).c_str());
+    ConfidenceMetadataRow(AF_TR("Status"), status);
 
     if (model.stale) {
+        const std::string warning =
+            AF_TR("This confidence assessment may be stale because the element changed after the value was stored.");
+        const float warning_width = std::max(80.0f, ImGui::GetContentRegionAvail().x - 18.0f);
+        const float warning_height = ImGui::CalcTextSize(warning.c_str(), nullptr, false, warning_width).y + 16.0f;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                              ImGui::ColorConvertU32ToFloat4(LerpColor(theme.surface_1, theme.warning, 0.09f)));
+        ImGui::BeginChild(
+            "##stale_confidence_notice", ImVec2(0.0f, warning_height), true, ImGuiWindowFlags_NoScrollbar);
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.warning));
-        ImGui::TextWrapped(
-            "%s",
-            AF_TR("This confidence assessment may be stale because the element changed after the value was stored.")
-                .c_str());
+        ImGui::TextWrapped("%s", warning.c_str());
+        ImGui::PopStyleColor();
+        ImGui::EndChild();
         ImGui::PopStyleColor();
         if (ImGui::Button(AF_TR("Mark as reviewed").c_str()) && callbacks.mark_reviewed)
             changed = callbacks.mark_reviewed() || changed;

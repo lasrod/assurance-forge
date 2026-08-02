@@ -48,19 +48,43 @@ std::string TranslateTooltip(ToolbarAction action) {
 }
 
 // Draws one icon button. Returns true when clicked and enabled.
-bool DrawButton(const ToolbarButton& button, bool enabled, float height, const char* shortcut) {
+bool DrawButton(const ToolbarButton& button,
+                bool enabled,
+                float height,
+                const char* shortcut,
+                bool show_label,
+                bool needs_attention) {
     ImGui::PushID(static_cast<int>(button.action));
     if (!enabled)
         ImGui::BeginDisabled();
 
-    const float width = ImGui::GetFrameHeight();
-    const bool clicked = ImGui::Button(button.icon, ImVec2(width, height));
+    const std::string label = TranslateTooltip(button.action);
+    const std::string button_text = show_label ? std::string(button.icon) + "  " + label : std::string(button.icon);
+    const float width = show_label
+                            ? ImGui::CalcTextSize(button_text.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f
+                            : ImGui::GetFrameHeight();
+
+    if (enabled && needs_attention) {
+        const Theme& theme = GetTheme();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.accent, 0.18f)));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.accent, 0.28f)));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.accent_hover));
+    }
+
+    const bool clicked = ImGui::Button(button_text.c_str(), ImVec2(width, height));
+    if (enabled && needs_attention) {
+        const ImVec2 item_min = ImGui::GetItemRectMin();
+        const ImVec2 item_max = ImGui::GetItemRectMax();
+        ImGui::GetWindowDrawList()->AddCircleFilled(
+            ImVec2(item_max.x - 5.0f, item_min.y + 5.0f), 2.25f, GetTheme().attention);
+        ImGui::PopStyleColor(3);
+    }
 
     if (!enabled)
         ImGui::EndDisabled();
 
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        std::string tip = TranslateTooltip(button.action);
+        std::string tip = label;
         if (shortcut != nullptr)
             tip += "  (" + std::string(shortcut) + ")";
         if (!enabled)
@@ -131,31 +155,39 @@ void ShowToolbar(const ToolbarModel& model, const ToolbarCallbacks& callbacks, f
 
     const float button_height = ImGui::GetFrameHeight();
     bool first = true;
-    auto run = [&](ToolbarAction action, const char* icon, const char* shortcut, const std::function<void()>& handler) {
+    auto run = [&](ToolbarAction action,
+                   const char* icon,
+                   const char* shortcut,
+                   bool show_label,
+                   bool needs_attention,
+                   const std::function<void()>& handler) {
         // Buttons sit on one row; without this each would start a new line and
         // only the first would be inside the bar's height.
         if (!first)
             ImGui::SameLine(0.0f, 2.0f);
         first = false;
-        if (DrawButton({action, icon}, IsActionEnabled(model, action), button_height, shortcut) && handler)
+        if (DrawButton(
+                {action, icon}, IsActionEnabled(model, action), button_height, shortcut, show_label, needs_attention) &&
+            handler) {
             handler();
+        }
     };
 
-    run(ToolbarAction::OpenProject, ICON_FA_FOLDER_OPEN, nullptr, callbacks.open_project);
-    run(ToolbarAction::SaveProject, ICON_FA_SAVE, nullptr, callbacks.save_project);
-    run(ToolbarAction::Undo, ICON_FA_UNDO, "Ctrl+Z", callbacks.undo);
+    run(ToolbarAction::OpenProject, ICON_FA_FOLDER_OPEN, nullptr, true, false, callbacks.open_project);
+    run(ToolbarAction::SaveProject, ICON_FA_SAVE, nullptr, true, model.has_unsaved_changes, callbacks.save_project);
+    run(ToolbarAction::Undo, ICON_FA_UNDO, "Ctrl+Z", false, false, callbacks.undo);
 
-    DrawSeparator(height);
-    run(ToolbarAction::NewSacmFile, ICON_FA_PLUS, nullptr, callbacks.new_sacm_file);
-    run(ToolbarAction::FitToView, ICON_FA_EXPAND, nullptr, callbacks.fit_to_view);
-    run(ToolbarAction::ExportGsnSvg, ICON_FA_DOWNLOAD, nullptr, callbacks.export_gsn_svg);
+    DrawSeparator(button_height);
+    run(ToolbarAction::NewSacmFile, ICON_FA_PLUS, nullptr, false, false, callbacks.new_sacm_file);
+    run(ToolbarAction::FitToView, ICON_FA_EXPAND, nullptr, false, false, callbacks.fit_to_view);
+    run(ToolbarAction::ExportGsnSvg, ICON_FA_DOWNLOAD, nullptr, false, false, callbacks.export_gsn_svg);
 
     // Preferences sits at the far right, away from the document actions.
     ImGui::SameLine();
     const float right = ImGui::GetWindowContentRegionMax().x - ImGui::GetFrameHeight();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right));
     first = true; // Already positioned; do not let `run` add another SameLine.
-    run(ToolbarAction::Preferences, ICON_FA_COG, nullptr, callbacks.open_preferences);
+    run(ToolbarAction::Preferences, ICON_FA_COG, nullptr, false, false, callbacks.open_preferences);
 
     // Hairline below, matching the status bar's rule above it.
     const ImVec2 origin = ImGui::GetWindowPos();

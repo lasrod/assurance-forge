@@ -2,15 +2,18 @@
 
 #include "core/element_factory.h"
 #include "core/terminology_scope_service.h"
-#include "imgui.h"
-#include "imgui_stdlib.h"
+#include "ui/fonts.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/confidence_panel.h"
 #include "ui/text_edit_session.h"
 #include "ui/theme.h"
-#include "ui/widgets/empty_state.h"
 #include "ui/ui_state.h"
+#include "ui/widgets/empty_state.h"
+
+#include "hello_imgui/icons_font_awesome_4.h"
+#include "imgui.h"
+#include "imgui_stdlib.h"
 
 #include <algorithm>
 #include <array>
@@ -168,29 +171,69 @@ static bool element_has_secondary(const parser::SacmElement& elem, const std::st
     return false;
 }
 
+void InspectorFieldLabel(std::string_view label) {
+    const Theme& theme = GetTheme();
+    fonts::Scoped caption(fonts::Role::Caption);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+    ImGui::TextUnformatted(label.data(), label.data() + label.size());
+    ImGui::PopStyleColor();
+}
+
+void InspectorSection(const char* icon, std::string_view title) {
+    const Theme& theme = GetTheme();
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(theme.accent), "%s", icon);
+    ImGui::SameLine(0.0f, 7.0f);
+    {
+        fonts::Scoped strong(fonts::Role::BodyStrong);
+        ImGui::TextUnformatted(title.data(), title.data() + title.size());
+    }
+    ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.border, 0.72f)));
+    ImGui::Separator();
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0.0f, 2.0f));
+}
+
 static void RenderMetadataRow(const char* label, const std::string& value) {
     const Theme& theme = GetTheme();
     const char* display_value = value.empty() ? "-" : value.c_str();
 
-    ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
-    ImGui::Text("%s:", label);
-    ImGui::PopStyleColor();
-
-    ImGui::SameLine(0.0f, 6.0f);
-
-    if (ui::gsn::g_BoldFont)
-        ImGui::PushFont(ui::gsn::g_BoldFont);
-    ImGui::PushStyleColor(ImGuiCol_Text, theme.text_primary);
-    ImGui::TextWrapped("%s", display_value);
-    ImGui::PopStyleColor();
-    if (ui::gsn::g_BoldFont)
-        ImGui::PopFont();
+    {
+        fonts::Scoped caption(fonts::Role::Caption);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.text_secondary));
+        ImGui::TextUnformatted(label);
+        ImGui::PopStyleColor();
+    }
+    ImGui::SameLine(0.0f, 7.0f);
+    {
+        fonts::Scoped strong(fonts::Role::BodyStrong);
+        ImGui::TextWrapped("%s", display_value);
+    }
 }
 
 static void RenderElementMetadata(const parser::SacmElement& elem) {
-    RenderMetadataRow(AF_TR("ID").c_str(), elem.id);
-    RenderMetadataRow(AF_TR("Type").c_str(), ElementTypeDisplayName(elem.type));
-    ImGui::Spacing();
+    const Theme& theme = GetTheme();
+    const float card_height = fonts::SizeFor(fonts::Role::Caption) + fonts::SizeFor(fonts::Role::BodyStrong) +
+                              ImGui::GetStyle().ItemSpacing.y + ImGui::GetStyle().WindowPadding.y * 2.0f;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_2, 0.76f)));
+    ImGui::BeginChild("##element_metadata", ImVec2(0.0f, card_height), true, ImGuiWindowFlags_NoScrollbar);
+    if (ImGui::BeginTable("##element_metadata_columns", 2, ImGuiTableFlags_SizingStretchSame)) {
+        ImGui::TableNextColumn();
+        InspectorFieldLabel(AF_TR("ID"));
+        {
+            fonts::Scoped strong(fonts::Role::BodyStrong);
+            ImGui::TextUnformatted(elem.id.c_str());
+        }
+        ImGui::TableNextColumn();
+        InspectorFieldLabel(AF_TR("Type"));
+        {
+            fonts::Scoped strong(fonts::Role::BodyStrong);
+            ImGui::TextUnformatted(ElementTypeDisplayName(elem.type).c_str());
+        }
+        ImGui::EndTable();
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 // Supported secondary languages (no special font requirements except ja which uses merged font)
@@ -474,9 +517,10 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
             }
         };
 
+    InspectorSection(ICON_FA_EDIT, AF_TR("Element"));
+
     // GSN notation identifier (editable independently of the read-only SACM id).
-    ImGui::Text("%s", AF_TR("GSN identifier").c_str());
-    ImGui::Separator();
+    InspectorFieldLabel(AF_TR("GSN identifier"));
     {
         std::string displayed_identifier = core::GsnIdentifierFor(*elem);
         ImGuiID widget_id = 0;
@@ -489,8 +533,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     ImGui::Spacing();
 
     // Name (editable)
-    ImGui::Text("%s", AF_TR("Name").c_str());
-    ImGui::Separator();
+    InspectorFieldLabel(AF_TR("Name"));
     {
         ImGuiID widget_id = 0;
         if (EditableSingleLine("name", elem->name, &widget_id)) {
@@ -501,9 +544,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     }
     // Secondary language name (only show if this field has the secondary language)
     if (elem->name_langs.count(sec_lang)) {
-        ImGui::TextUnformatted(ui::i18n::trf("Name ({0})", sec_lang).c_str());
-        if (ui::gsn::g_BoldFont)
-            ImGui::PushFont(ui::gsn::g_BoldFont);
+        InspectorFieldLabel(ui::i18n::trf("Name ({0})", sec_lang));
         std::string sec_name = elem->name_langs.at(sec_lang);
         ImGuiID widget_id = 0;
         if (EditableSingleLine("name_sec", sec_name, &widget_id)) {
@@ -511,8 +552,6 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
             modified = true;
         }
         commit_if_finished(widget_id, sec_name, "name", sec_lang);
-        if (ui::gsn::g_BoldFont)
-            ImGui::PopFont();
     }
     ImGui::Spacing();
 
@@ -520,8 +559,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     bool has_content = (elem->type == "claim" || elem->type == "argumentreasoning");
     bool supports_undeveloped = has_content;
     if (has_content) {
-        ImGui::Text("%s", AF_TR("Content").c_str());
-        ImGui::Separator();
+        InspectorFieldLabel(AF_TR("Content"));
         {
             ImGuiID widget_id = 0;
             if (EditableTextField("content", elem->content, -1.0f, &widget_id)) {
@@ -533,7 +571,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->content, terminology_callbacks);
         // Secondary language content (only show if this field has the secondary language)
         if (elem->content_langs.count(sec_lang)) {
-            ImGui::TextUnformatted(ui::i18n::trf("Content ({0})", sec_lang).c_str());
+            InspectorFieldLabel(ui::i18n::trf("Content ({0})", sec_lang));
             std::string sec_content = elem->content_langs.at(sec_lang);
             ImGuiID widget_id = 0;
             if (EditableTextField("content_sec", sec_content, -1.0f, &widget_id)) {
@@ -555,8 +593,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     }
 
     // Description (editable)
-    ImGui::Text("%s", AF_TR("Description").c_str());
-    ImGui::Separator();
+    InspectorFieldLabel(AF_TR("Description"));
     {
         ImGuiID widget_id = 0;
         if (EditableTextField("description", elem->description, -1.0f, &widget_id)) {
@@ -569,7 +606,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->description, terminology_callbacks);
     // Secondary language description (only show if this field has the secondary language)
     if (elem->description_langs.count(sec_lang)) {
-        ImGui::TextUnformatted(ui::i18n::trf("Description ({0})", sec_lang).c_str());
+        InspectorFieldLabel(ui::i18n::trf("Description ({0})", sec_lang));
         std::string sec_desc = elem->description_langs.at(sec_lang);
         ImGuiID widget_id = 0;
         if (EditableTextField("description_sec", sec_desc, -1.0f, &widget_id)) {
@@ -579,15 +616,12 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         commit_if_finished(widget_id, sec_desc, "description", sec_lang);
     }
 
-    ImGui::Spacing();
-    ImGui::Separator();
-
     // Translation controls: checkbox + language dropdown
     {
         UiState& mut_state = GetUiState();
 
         // Language selector dropdown
-        ImGui::Text("%s", AF_TR("Translation Language").c_str());
+        InspectorSection(ICON_FA_LANGUAGE, AF_TR("Translation Language"));
         int current_lang_idx = 0;
         for (int i = 0; i < kLangCount; ++i) {
             if (mut_state.active_secondary_lang == kLangCodes[i]) {
@@ -673,9 +707,7 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     if (history_callbacks && history_callbacks->model_for_element) {
         ElementHistoryModel hm = history_callbacks->model_for_element(elem->id);
         if (hm.available) {
-            ImGui::Spacing();
-            ImGui::Text("%s", AF_TR("History").c_str());
-            ImGui::Separator();
+            InspectorSection(ICON_FA_HISTORY, AF_TR("History"));
             if (!hm.ever_seen) {
                 ImGui::TextDisabled("%s", AF_TR("No recorded changes for this element.").c_str());
             } else {

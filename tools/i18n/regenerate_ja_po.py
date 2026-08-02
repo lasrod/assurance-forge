@@ -425,6 +425,7 @@ TRANSLATIONS = {
     "Add fixed confidence": "固定信頼度を追加",
     "Add Jøsang confidence": "Jøsang 信頼度を追加",
     "Back up and start new confidence file": "バックアップして新しい信頼度ファイルを開始",
+    "Method": "方式",
     "Method: {0}": "方式: {0}",
     "Status: {0}": "ステータス: {0}",
     "Status": "ステータス",

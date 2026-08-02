@@ -1,11 +1,13 @@
 #include "ui/panels/welcome_modal.h"
 
-#include "hello_imgui/hello_imgui.h"
-#include "imgui.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
+
+#include "hello_imgui/hello_imgui.h"
+#include "hello_imgui/icons_font_awesome_4.h"
+#include "imgui.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -17,31 +19,28 @@ namespace {
 
 constexpr float kWelcomeBodyFontScale = 1.04f;
 constexpr float kWelcomeSectionTitleFontScale = kWelcomeBodyFontScale * 1.15f;
-constexpr float kWelcomeTitleFontScale = 2.30f;
+constexpr float kWelcomeTitleFontScale = 2.15f;
 constexpr float kWelcomeWindowAnchor = 0.0f;
-constexpr float kWelcomeHoverSurfaceAlpha = 0.72f;
+constexpr float kWelcomeHoverSurfaceAlpha = 0.82f;
 
-constexpr float kWelcomeWindowPaddingX = 28.0f;
-constexpr float kWelcomeWindowPaddingY = 18.0f;
+constexpr float kWelcomeWindowPaddingX = 32.0f;
+constexpr float kWelcomeWindowPaddingY = 28.0f;
 constexpr float kWelcomeItemSpacingX = 10.0f;
-constexpr float kWelcomeItemSpacingY = 6.0f;
+constexpr float kWelcomeItemSpacingY = 8.0f;
 
-constexpr float kWelcomeTaglineTopSpacing = 14.0f;
-constexpr float kWelcomeTableHeight = 460.0f;
-constexpr float kWelcomeTableMaxWidth = 1320.0f;
-constexpr float kWelcomeStartColumnRatio = 0.48f;
-constexpr float kWelcomeWalkthroughColumnRatio = 0.52f;
-constexpr float kWelcomeSectionTopSpacing = 6.0f;
-constexpr float kWelcomeRecentSectionSpacing = 18.0f;
-constexpr float kWelcomeWalkthroughCardSpacing = 8.0f;
-constexpr float kWelcomeTitleIconSize = 52.0f;
-constexpr float kWelcomeTitleIconSpacing = 12.0f;
+constexpr float kWelcomeTaglineTopSpacing = 22.0f;
+constexpr float kWelcomeSurfaceHeight = 720.0f;
+constexpr float kWelcomeSurfaceMaxWidth = 1360.0f;
+constexpr float kWelcomeStartColumnRatio = 0.52f;
+constexpr float kWelcomeWalkthroughColumnRatio = 0.48f;
+constexpr float kWelcomeSectionTopSpacing = 10.0f;
+constexpr float kWelcomeRecentSectionSpacing = 24.0f;
+constexpr float kWelcomeWalkthroughCardSpacing = 10.0f;
+constexpr float kWelcomeTitleIconSize = 48.0f;
+constexpr float kWelcomeTitleIconSpacing = 14.0f;
 constexpr float kWelcomeTitleIconTopOffset = 2.0f;
 constexpr float kWelcomeTitleToTaglineSpacing = 2.0f;
-
-constexpr float kGetStartedProgress = 0.34f;
-constexpr float kFundamentalsProgress = 0.18f;
-constexpr float kConformanceProgress = 0.12f;
+constexpr float kWelcomeColumnGap = 34.0f;
 
 constexpr const char* kWelcomePopupId = "Welcome!";
 constexpr const char* kWelcomeLayoutTableId = "WelcomeLayout";
@@ -108,46 +107,63 @@ void SectionTitle(std::string_view label) {
     ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
 }
 
-bool ActionLink(std::string_view id, std::string_view title, std::string_view subtitle) {
-    constexpr float kLinkHeightWithSubtitle = 50.0f;
-    constexpr float kLinkHeightWithoutSubtitle = 34.0f;
-    constexpr float kLinkTextOffsetX = 10.0f;
-    constexpr float kLinkTitleOffsetY = 6.0f;
-    constexpr float kLinkSubtitleOffsetY = 24.0f;
+bool ActionLink(const char* icon, std::string_view id, std::string_view title, std::string_view subtitle) {
+    constexpr float kLinkHeight = 62.0f;
+    constexpr float kIconBoxSize = 34.0f;
+    constexpr float kLinkTextOffsetX = 58.0f;
+    constexpr float kLinkTitleOffsetY = 12.0f;
+    constexpr float kLinkSubtitleOffsetY = 34.0f;
 
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* const draw_list = ImGui::GetWindowDrawList();
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
-    const bool has_subtitle = !subtitle.empty();
-    const float height = has_subtitle ? Px(kLinkHeightWithSubtitle) : Px(kLinkHeightWithoutSubtitle);
+    const float height = Px(kLinkHeight);
     const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
-    if (interaction.hovered) {
-        draw_list->AddRectFilled(pos,
-                                 ImVec2(pos.x + width, pos.y + height),
-                                 ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha),
-                                 theme.rounding_ui);
-    }
+    const ImU32 fill = interaction.hovered ? ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha)
+                                           : ui::WithAlpha(theme.surface_2, 0.72f);
+    draw_list->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), fill, theme.rounding_ui);
+    draw_list->AddRect(pos,
+                       ImVec2(pos.x + width, pos.y + height),
+                       interaction.hovered ? ui::WithAlpha(theme.accent, 0.70f) : theme.border,
+                       theme.rounding_ui);
 
-    const ImU32 title_color = interaction.hovered ? theme.accent_hover : theme.accent;
+    const float icon_size = Px(kIconBoxSize);
+    const ImVec2 icon_min(pos.x + Px(12.0f), pos.y + (height - icon_size) * 0.5f);
+    draw_list->AddRectFilled(icon_min,
+                             ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                             ui::WithAlpha(theme.accent, interaction.hovered ? 0.20f : 0.12f),
+                             theme.rounding_ui);
+    const ImVec2 icon_text_size = ImGui::CalcTextSize(icon);
+    DrawText(
+        draw_list,
+        ImVec2(icon_min.x + (icon_size - icon_text_size.x) * 0.5f, icon_min.y + (icon_size - icon_text_size.y) * 0.5f),
+        interaction.hovered ? theme.accent_hover : theme.accent,
+        icon);
+
+    const ImU32 title_color = theme.text_primary;
     DrawText(draw_list, ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkTitleOffsetY)), title_color, title);
-    if (has_subtitle) {
+    if (!subtitle.empty()) {
         DrawText(draw_list,
                  ImVec2(pos.x + Px(kLinkTextOffsetX), pos.y + Px(kLinkSubtitleOffsetY)),
                  theme.text_secondary,
                  subtitle);
     }
+    DrawText(draw_list,
+             ImVec2(pos.x + width - Px(25.0f), pos.y + (height - ImGui::GetTextLineHeight()) * 0.5f),
+             interaction.hovered ? theme.accent_hover : theme.text_muted,
+             ICON_FA_ARROW_RIGHT);
 
     return interaction.clicked;
 }
 
 bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
-    constexpr float kRecentItemHeight = 72.0f;
-    constexpr float kRecentTextOffsetX = 10.0f;
-    constexpr float kRecentNameOffsetY = 6.0f;
-    constexpr float kRecentStatsOffsetY = 24.0f;
-    constexpr float kRecentPathOffsetY = 40.0f;
+    constexpr float kRecentItemHeight = 76.0f;
+    constexpr float kRecentTextOffsetX = 14.0f;
+    constexpr float kRecentNameOffsetY = 9.0f;
+    constexpr float kRecentStatsOffsetY = 31.0f;
+    constexpr float kRecentPathOffsetY = 49.0f;
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* const draw_list = ImGui::GetWindowDrawList();
     const ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -155,12 +171,15 @@ bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
     const float height = Px(kRecentItemHeight);
     const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
-    if (interaction.hovered) {
-        draw_list->AddRectFilled(pos,
-                                 ImVec2(pos.x + width, pos.y + height),
-                                 ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha),
-                                 theme.rounding_ui);
-    }
+    draw_list->AddRectFilled(pos,
+                             ImVec2(pos.x + width, pos.y + height),
+                             interaction.hovered ? ui::WithAlpha(theme.surface_3, kWelcomeHoverSurfaceAlpha)
+                                                 : ui::WithAlpha(theme.surface_2, 0.52f),
+                             theme.rounding_ui);
+    draw_list->AddRect(pos,
+                       ImVec2(pos.x + width, pos.y + height),
+                       interaction.hovered ? theme.border_strong : theme.border,
+                       theme.rounding_ui);
 
     const ImU32 name_color = interaction.hovered ? theme.accent_hover : theme.accent;
     DrawText(draw_list, ImVec2(pos.x + Px(kRecentTextOffsetX), pos.y + Px(kRecentNameOffsetY)), name_color, entry.name);
@@ -178,13 +197,12 @@ bool RecentLink(std::string_view id, const RecentProjectEntry& entry) {
     return interaction.clicked;
 }
 
-bool WalkthroughCard(std::string_view id, std::string_view title, std::string_view subtitle, float progress) {
-    constexpr float kCardHeight = 84.0f;
+bool WalkthroughCard(const char* icon, std::string_view id, std::string_view title, std::string_view subtitle) {
+    constexpr float kCardHeight = 104.0f;
     constexpr float kCardBorderThickness = 1.0f;
-    constexpr float kCardStripeHeight = 4.0f;
-    constexpr float kCardTextOffsetX = 16.0f;
-    constexpr float kCardTitleOffsetY = 13.0f;
-    constexpr float kCardSubtitleOffsetY = 43.0f;
+    constexpr float kCardTextOffsetX = 64.0f;
+    constexpr float kCardTitleOffsetY = 24.0f;
+    constexpr float kCardSubtitleOffsetY = 54.0f;
 
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* const draw_list = ImGui::GetWindowDrawList();
@@ -193,23 +211,39 @@ bool WalkthroughCard(std::string_view id, std::string_view title, std::string_vi
     const float height = Px(kCardHeight);
     const ItemInteraction interaction = InvisibleButtonInteraction(id, ImVec2(width, height));
 
-    const ImU32 fill = interaction.hovered ? theme.surface_3 : theme.surface_2;
+    const ImU32 fill = interaction.hovered ? theme.surface_3 : ui::WithAlpha(theme.surface_2, 0.72f);
     draw_list->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), fill, theme.rounding_ui);
     draw_list->AddRect(
         pos, ImVec2(pos.x + width, pos.y + height), theme.border, theme.rounding_ui, 0, Px(kCardBorderThickness));
 
-    const float stripe_width = width * progress;
-    draw_list->AddRectFilled(ImVec2(pos.x, pos.y + height - Px(kCardStripeHeight)),
-                             ImVec2(pos.x + stripe_width, pos.y + height),
-                             theme.accent,
+    draw_list->AddRectFilled(ImVec2(pos.x, pos.y),
+                             ImVec2(pos.x + Px(4.0f), pos.y + height),
+                             interaction.hovered ? theme.accent_hover : theme.accent,
                              theme.rounding_ui,
-                             ImDrawFlags_RoundCornersBottomLeft);
+                             ImDrawFlags_RoundCornersLeft);
+
+    const float icon_size = Px(34.0f);
+    const ImVec2 icon_min(pos.x + Px(16.0f), pos.y + (height - icon_size) * 0.5f);
+    draw_list->AddRectFilled(icon_min,
+                             ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                             ui::WithAlpha(theme.accent, 0.14f),
+                             theme.rounding_ui);
+    const ImVec2 icon_text_size = ImGui::CalcTextSize(icon);
+    DrawText(
+        draw_list,
+        ImVec2(icon_min.x + (icon_size - icon_text_size.x) * 0.5f, icon_min.y + (icon_size - icon_text_size.y) * 0.5f),
+        theme.accent,
+        icon);
 
     DrawText(draw_list, ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardTitleOffsetY)), theme.text_primary, title);
     DrawText(draw_list,
              ImVec2(pos.x + Px(kCardTextOffsetX), pos.y + Px(kCardSubtitleOffsetY)),
              theme.text_secondary,
              subtitle);
+    DrawText(draw_list,
+             ImVec2(pos.x + width - Px(28.0f), pos.y + (height - ImGui::GetTextLineHeight()) * 0.5f),
+             interaction.hovered ? theme.accent_hover : theme.text_muted,
+             ICON_FA_ARROW_RIGHT);
 
     return interaction.clicked;
 }
@@ -244,26 +278,67 @@ void ShowWelcomeModal(bool& is_open,
     ImGui::SetNextWindowPos(viewport_pos, ImGuiCond_Always, ImVec2(kWelcomeWindowAnchor, kWelcomeWindowAnchor));
     ImGui::SetNextWindowSize(viewport_size, ImGuiCond_Always);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
-                        ImVec2(PxAtScale(kWelcomeWindowPaddingX, welcome_layout_scale),
-                               PxAtScale(kWelcomeWindowPaddingY, welcome_layout_scale)));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
                         ImVec2(PxAtScale(kWelcomeItemSpacingX, welcome_layout_scale),
                                PxAtScale(kWelcomeItemSpacingY, welcome_layout_scale)));
 
     if (ImGui::BeginPopupModal(welcome_popup_id.c_str(),
                                &is_open,
-                               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                                   ImGuiWindowFlags_NoSavedSettings)) {
+                               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoTitleBar)) {
         const ui::Theme& theme = ui::GetTheme();
         bool show_template_not_implemented = false;
         bool show_import_sacm_not_implemented = false;
         bool show_walkthrough_not_implemented = false;
 
+        ImDrawList* background = ImGui::GetWindowDrawList();
+        background->AddRectFilled(
+            viewport_pos, ImVec2(viewport_pos.x + viewport_size.x, viewport_pos.y + viewport_size.y), theme.bg_app);
+        background->AddRectFilledMultiColor(
+            viewport_pos,
+            ImVec2(viewport_pos.x + viewport_size.x, viewport_pos.y + viewport_size.y * 0.62f),
+            ui::WithAlpha(theme.accent, 0.10f),
+            ui::WithAlpha(theme.accent, 0.02f),
+            ui::WithAlpha(theme.accent, 0.00f),
+            ui::WithAlpha(theme.accent, 0.00f));
+
+        const float surface_width = std::min(viewport_size.x - Px(72.0f), Px(kWelcomeSurfaceMaxWidth));
+        const float surface_height = std::min(viewport_size.y - Px(64.0f), Px(kWelcomeSurfaceHeight));
+        const ImVec2 surface_position(viewport_pos.x + (viewport_size.x - surface_width) * 0.5f,
+                                      viewport_pos.y + (viewport_size.y - surface_height) * 0.46f);
+        background->AddRectFilled(
+            ImVec2(surface_position.x - Px(10.0f), surface_position.y + Px(8.0f)),
+            ImVec2(surface_position.x + surface_width + Px(10.0f), surface_position.y + surface_height + Px(18.0f)),
+            IM_COL32(0, 0, 0, ui::GetCurrentAppTheme() == ui::AppTheme::Light ? 24 : 72),
+            Px(14.0f));
+
+        ImGui::SetCursorScreenPos(surface_position);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, Px(12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                            ImVec2(PxAtScale(kWelcomeWindowPaddingX, welcome_layout_scale),
+                                   PxAtScale(kWelcomeWindowPaddingY, welcome_layout_scale)));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ToVec4(theme.surface_1));
+        ImGui::PushStyleColor(ImGuiCol_Border, ToVec4(theme.border));
+        ImGui::BeginChild("##welcome_surface",
+                          ImVec2(surface_width, surface_height),
+                          ImGuiChildFlags_Borders,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
 
-        const bool has_welcome_title_icon = HelloImGui::AssetExists(kWelcomeTitleIconAsset);
+        const ImVec2 header_cursor = ImGui::GetCursorPos();
+        const float close_size = ImGui::GetFrameHeight();
+        ImGui::SetCursorPos(ImVec2(ImGui::GetWindowContentRegionMax().x - close_size, header_cursor.y));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        if (ImGui::Button(ICON_FA_TIMES, ImVec2(close_size, close_size)))
+            dismiss();
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", AF_TR("Close").c_str());
+        ImGui::SetCursorPos(header_cursor);
 
+        const bool has_welcome_title_icon = HelloImGui::AssetExists(kWelcomeTitleIconAsset);
         ImGui::BeginGroup();
         if (has_welcome_title_icon) {
             const float start_y = ImGui::GetCursorPosY();
@@ -284,7 +359,6 @@ void ShowWelcomeModal(bool& is_open,
 
         ImGui::SetWindowFontScale(kWelcomeBodyFontScale);
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTitleToTaglineSpacing)));
-
         ImGui::PushStyleColor(ImGuiCol_Text, ToVec4(theme.text_secondary));
         ImGui::TextUnformatted(AF_TR("Forge Confidence in Safety").c_str());
         ImGui::PopStyleColor();
@@ -292,12 +366,11 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::EndGroup();
 
         ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeTaglineTopSpacing)));
-
-        const float layout_width = std::min(ImGui::GetContentRegionAvail().x, Px(kWelcomeTableMaxWidth));
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(Px(kWelcomeColumnGap) * 0.5f, 0.0f));
         if (ImGui::BeginTable(kWelcomeLayoutTableId,
                               2,
-                              ImGuiTableFlags_SizingStretchProp,
-                              ImVec2(layout_width, Px(kWelcomeTableHeight)))) {
+                              ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV,
+                              ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y))) {
             ImGui::TableSetupColumn(
                 kWelcomeStartColumnId, ImGuiTableColumnFlags_WidthStretch, kWelcomeStartColumnRatio);
             ImGui::TableSetupColumn(
@@ -307,25 +380,30 @@ void ShowWelcomeModal(bool& is_open,
             ImGui::TableNextColumn();
             SectionTitle(AF_TR("Start"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
-            if (ActionLink("##create_empty",
+            if (ActionLink(ICON_FA_PLUS,
+                           "##create_empty",
                            AF_TR("Create Empty Assurance Project"),
                            AF_TR("Start with a blank assurance project workspace"))) {
                 if (callbacks.create_empty_project)
                     callbacks.create_empty_project();
             }
-            if (ActionLink("##create_template",
+            if (ActionLink(ICON_FA_FILE_ALT,
+                           "##create_template",
                            AF_TR("Create Assurance Project from Template"),
                            AF_TR("Create a project from a predefined assurance case template"))) {
                 if (callbacks.create_project_from_template)
                     callbacks.create_project_from_template();
                 show_template_not_implemented = true;
             }
-            if (ActionLink(
-                    "##open_project", AF_TR("Open Project"), AF_TR("Open an existing Assurance Forge project"))) {
+            if (ActionLink(ICON_FA_FOLDER_OPEN,
+                           "##open_project",
+                           AF_TR("Open Project"),
+                           AF_TR("Open an existing Assurance Forge project"))) {
                 if (callbacks.open_project)
                     callbacks.open_project();
             }
-            if (ActionLink("##import_sacm", AF_TR("Import SACM"), AF_TR("Import a SACM XML assurance case"))) {
+            if (ActionLink(
+                    ICON_FA_UPLOAD, "##import_sacm", AF_TR("Import SACM"), AF_TR("Import a SACM XML assurance case"))) {
                 if (callbacks.import_sacm)
                     callbacks.import_sacm();
                 show_import_sacm_not_implemented = true;
@@ -339,6 +417,8 @@ void ShowWelcomeModal(bool& is_open,
                 ImGui::TextUnformatted(AF_TR("No recent projects.").c_str());
                 ImGui::PopStyleColor();
             } else {
+                const float recent_height = std::max(Px(92.0f), ImGui::GetContentRegionAvail().y);
+                ImGui::BeginChild("##recent_projects", ImVec2(0.0f, recent_height), false);
                 for (int i = 0; i < static_cast<int>(recent.size()); ++i) {
                     char row_id[32];
                     std::snprintf(row_id, sizeof(row_id), "##recent_%d", i);
@@ -348,33 +428,34 @@ void ShowWelcomeModal(bool& is_open,
                         dismiss();
                     }
                 }
+                ImGui::EndChild();
             }
 
             ImGui::TableNextColumn();
             SectionTitle(AF_TR("Walkthroughs"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
-            if (WalkthroughCard("##walkthrough_get_started",
+            if (WalkthroughCard(ICON_FA_ROCKET,
+                                "##walkthrough_get_started",
                                 AF_TR("Get started with Assurance Forge"),
-                                AF_TR("Create, inspect, and navigate a safety case"),
-                                kGetStartedProgress)) {
+                                AF_TR("Create, inspect, and navigate a safety case"))) {
                 if (callbacks.walkthrough_get_started)
                     callbacks.walkthrough_get_started();
                 show_walkthrough_not_implemented = true;
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
-            if (WalkthroughCard("##walkthrough_fundamentals",
+            if (WalkthroughCard(ICON_FA_GRADUATION_CAP,
+                                "##walkthrough_fundamentals",
                                 AF_TR("Learn the Fundamentals"),
-                                AF_TR("GSN structure, SACM imports, evidence, and registers"),
-                                kFundamentalsProgress)) {
+                                AF_TR("GSN structure, SACM imports, evidence, and registers"))) {
                 if (callbacks.walkthrough_fundamentals)
                     callbacks.walkthrough_fundamentals();
                 show_walkthrough_not_implemented = true;
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
-            if (WalkthroughCard("##walkthrough_conformance",
+            if (WalkthroughCard(ICON_FA_CHECK_CIRCLE,
+                                "##walkthrough_conformance",
                                 AF_TR("Prepare a Conformance Review"),
-                                AF_TR("Trace claims, evidence, and review outputs"),
-                                kConformanceProgress)) {
+                                AF_TR("Trace claims, evidence, and review outputs"))) {
                 if (callbacks.walkthrough_conformance)
                     callbacks.walkthrough_conformance();
                 show_walkthrough_not_implemented = true;
@@ -382,6 +463,10 @@ void ShowWelcomeModal(bool& is_open,
 
             ImGui::EndTable();
         }
+        ImGui::PopStyleVar();
+        ImGui::EndChild();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
 
         if (show_template_not_implemented) {
             ImGui::OpenPopup(kTemplatePopupId);
