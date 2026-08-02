@@ -26,7 +26,7 @@ public:
     bool PreviewById(const std::string& proposal_id);
     bool SaveActive(const core::reviews::ReviewItem& item);
     bool ApplyReviewProposal(const core::reviews::ReviewItem& item);
-    void CreateAiGenerated(const std::vector<AiReviewProposalSuggestion>& suggestions);
+    void CreateAiGenerated(const AiReviewProposalSuggestionsEvent& event);
     void CancelActive();
     bool AddChildToSelected(core::NewElementKind kind);
     bool AddTopGoal();

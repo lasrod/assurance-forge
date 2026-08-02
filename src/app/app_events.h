@@ -82,6 +82,12 @@ struct AiReviewProposalSuggestion {
 
 struct AiReviewProposalSuggestionsEvent {
     std::vector<AiReviewProposalSuggestion> suggestions;
+    std::string review_profile_id;
+    std::string review_profile_name;
+    std::string review_run_id;
+    // Semantic hash of the complete working model sent for review. Suggested
+    // edits must not be staged if that model changed while the request ran.
+    std::string reviewed_model_hash;
 };
 
 enum class CenterViewRequest {

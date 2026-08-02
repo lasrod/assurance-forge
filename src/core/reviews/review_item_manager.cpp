@@ -163,6 +163,21 @@ bool ReviewItemManager::ClearProposal(const std::string& review_item_id) {
     return false;
 }
 
+bool ReviewItemManager::AddDraftGroup(const std::string& review_item_id, const std::string& group_id) {
+    if (group_id.empty())
+        return false;
+    for (ReviewItem& item : items_) {
+        if (item.id != review_item_id)
+            continue;
+        if (std::find(item.draft_group_ids.begin(), item.draft_group_ids.end(), group_id) ==
+            item.draft_group_ids.end()) {
+            item.draft_group_ids.push_back(group_id);
+        }
+        return true;
+    }
+    return false;
+}
+
 bool ReviewItemManager::SetElementReviewState(const std::string& element_id, ElementReviewState state) {
     if (element_id.empty())
         return false;

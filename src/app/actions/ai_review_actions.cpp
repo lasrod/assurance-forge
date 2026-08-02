@@ -3,11 +3,37 @@
 #include "app/app_runtime_state.h"
 #include "ui/ui_state.h"
 
+#include <optional>
+
 namespace app::actions {
 namespace {
 
-const parser::AssuranceCase* GetLoadedCase(const AppRuntimeState& state) {
-    return state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
+struct AiReviewInput {
+    const parser::AssuranceCase* model = nullptr;
+    core::AssuranceTree tree;
+    bool includes_working_draft = false;
+};
+
+std::optional<AiReviewInput> BuildAiReviewInput(AppRuntimeState& state) {
+    AiReviewInput input;
+    if (!state.app_state.loaded_case.has_value())
+        return std::nullopt;
+
+    input.model = &state.app_state.loaded_case.value();
+    const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
+    if (workspace != nullptr && workspace->has_active_groups()) {
+        const core::drafts::DraftMaterializationResult& result =
+            state.draft_workspace.Materialize(state.app_state.loaded_case.value(), state.app_state.case_revision);
+        if (!result.success) {
+            state.events.Emit(StatusMessageEvent{
+                "AI review cannot run because the working draft could not be materialized: " + result.error});
+            return std::nullopt;
+        }
+        input.model = &result.working_model;
+        input.includes_working_draft = true;
+    }
+    input.tree = core::AssuranceTree::Build(*input.model, ui::GetUiState().active_secondary_lang);
+    return input;
 }
 
 } // namespace
@@ -15,13 +41,29 @@ const parser::AssuranceCase* GetLoadedCase(const AppRuntimeState& state) {
 AiReviewActions::AiReviewActions(AppRuntimeState& state) : state_(state) {}
 
 void AiReviewActions::BeginForSelection() {
+    const std::optional<AiReviewInput> input = BuildAiReviewInput(state_);
+    if (!input.has_value())
+        return;
     state_.ai.review_controller->BeginReviewForSelection(
-        GetLoadedCase(state_), state_.current_tree, ui::GetUiState().selected_element_id);
+        input->model, input->tree, ui::GetUiState().selected_element_id);
+    if (input->includes_working_draft)
+        state_.ai.review_controller->MarkPendingRequestIncludesWorkingDraft();
 }
 
 void AiReviewActions::BeginForSelection(const std::string& review_profile_id) {
+    const std::optional<AiReviewInput> input = BuildAiReviewInput(state_);
+    if (!input.has_value())
+        return;
     state_.ai.review_controller->BeginReviewForSelection(
-        GetLoadedCase(state_), state_.current_tree, ui::GetUiState().selected_element_id, review_profile_id);
+        input->model, input->tree, ui::GetUiState().selected_element_id, review_profile_id);
+    if (input->includes_working_draft)
+        state_.ai.review_controller->MarkPendingRequestIncludesWorkingDraft();
+}
+
+void AiReviewActions::RunForSelection() {
+    state_.ai.review_controller->CancelPendingRequest();
+    BeginForSelection();
+    state_.ai.review_controller->StartPendingRequest();
 }
 
 void AiReviewActions::RunForSelection(const std::string& review_profile_id) {

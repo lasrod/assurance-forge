@@ -90,33 +90,58 @@ stateDiagram-v2
 
 ## AI Review
 
-AI review builds a narrow request from the selected element and nearby tree context.
+AI review builds a request from the selected element and the data packages required
+by its SCCG review profile. When an integrated draft is active, the request uses
+the complete materialized working model, including changes contributed by MCP,
+the user, and earlier SCCG review groups. The request preview explicitly says
+that it includes unaccepted draft content.
+
+The UI exposes one `AI Review` action. The controller maps the selected GSN role
+to exactly one SCCG 0.6 profile and refuses to run if the catalog has no match or
+an ambiguous match. A no-findings result is persisted in the element review state
+and rendered as a green check badge on the GSN node, so completion remains visible
+after the spinner stops and after the project is reopened.
 
 ```mermaid
 sequenceDiagram
     participant UI as UI action
     participant Controller as AiReviewController
+    participant Catalog as SCCG profile catalog
     participant Payload as BuildAiReviewPayload
+    participant Data as CollectAiReviewDataPackages
     participant Artifacts as BuildAiReviewRequestArtifacts
     participant Runner as AiTaskRunner
     participant Service as AiService
     participant Parser as ParseAiReviewResponse
     participant Problems as ProblemsManager
+    participant Draft as Integrated draft workspace
 
-    UI->>Controller: BeginReviewForSelection(case, tree, element_id)
+    UI->>Draft: materialize current working model
+    Draft-->>UI: model + tree
+    UI->>Controller: BeginReviewForSelection(working model, tree, element_id)
+    Controller->>Catalog: select unique profile for element role
+    Catalog-->>Controller: profile + guidelines
     Controller->>Payload: selected + parent + children
     Payload-->>Controller: AiReviewPayload
-    Controller->>Artifacts: add guidelines and schema
+    Controller->>Data: collect profile-required context
+    Data-->>Controller: available and unavailable packages
+    Controller->>Artifacts: add profile, guidelines, packages and schema
     Artifacts-->>Controller: AiReviewRequestArtifacts
-    Controller-->>UI: debug modal
+    Controller-->>UI: request ready in AI Debug panel
     UI->>Controller: StartPendingRequest()
     Controller->>Runner: RunGenerate
     Runner->>Service: Generate(AiRequest)
     Service-->>Runner: AiResponse
     Runner-->>Controller: snapshot success/error
     Controller->>Parser: ParseAiReviewResponse
-    Parser-->>Controller: ProblemItem[]
+    Parser-->>Controller: findings + suggested text
     Controller->>Problems: AddOrUpdateProblem
+    alt suggested model correction
+        Controller-->>Draft: one ready SCCG group per correction
+        Note over Controller,Draft: Refused if the working model changed while the review ran
+    else no findings
+        Controller-->>UI: persist success and show check badge
+    end
 ```
 
 ## AI Service Stack

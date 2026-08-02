@@ -56,6 +56,16 @@ void DrawSpinnerGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color
     draw_list->PathStroke(color, false, stroke);
 }
 
+void DrawCheckGlyph(ImDrawList* draw_list, const BadgeRect& badge, ImU32 color, float zoom) {
+    const float size = badge.max.x - badge.min.x;
+    const float stroke = std::max(DpiSize(1.8f) * zoom, 1.0f);
+    const ImVec2 start(badge.min.x + size * 0.25f, badge.min.y + size * 0.53f);
+    const ImVec2 middle(badge.min.x + size * 0.43f, badge.min.y + size * 0.70f);
+    const ImVec2 end(badge.min.x + size * 0.76f, badge.min.y + size * 0.31f);
+    draw_list->AddLine(start, middle, color, stroke);
+    draw_list->AddLine(middle, end, color, stroke);
+}
+
 // Draw a single character glyph (e.g. "!" / "i") centered inside the badge.
 void DrawCenteredGlyph(ImDrawList* draw_list, const BadgeRect& badge, const char* glyph, ImU32 color, float zoom) {
     ImFont* font = g_BoldFont ? g_BoldFont : ImGui::GetFont();
@@ -149,6 +159,21 @@ void DrawAiSpinnerBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoo
     DrawSpinnerGlyph(draw_list, badge, InkOn(theme.accent), zoom);
     if (IsMouseHoveringBadge(badge)) {
         ImGui::SetTooltip("%s", AF_TR("AI review in progress.").c_str());
+    }
+}
+
+void DrawAiSuccessBadge(ImDrawList* draw_list,
+                        const BadgeRect& badge,
+                        float zoom,
+                        const AiReviewSuccessMarker& marker) {
+    const Theme& theme = GetTheme();
+    DrawBadgeShell(draw_list, badge, theme.success, zoom);
+    DrawCheckGlyph(draw_list, badge, InkOn(theme.success), zoom);
+    if (IsMouseHoveringBadge(badge)) {
+        std::string tooltip = AF_TR("AI review completed with no findings.");
+        if (!marker.review_profile_name.empty())
+            tooltip += "\n" + ui::i18n::trf("Profile: {0}", marker.review_profile_name);
+        ImGui::SetTooltip("%s", tooltip.c_str());
     }
 }
 

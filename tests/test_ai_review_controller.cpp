@@ -3,6 +3,7 @@
 #include "ai/ai_provider.h"
 #include "ai/secret_store.h"
 #include "app/review_problem_sync.h"
+#include "core/reviews/review_proposal.h"
 
 #include <chrono>
 #include <gtest/gtest.h>
@@ -137,6 +138,61 @@ parser::Guideline MakeGuideline(std::string id, std::string category) {
     return guideline;
 }
 
+parser::ReviewProfile
+MakeReviewProfile(std::string id, std::string display_name, std::string applies_to, std::string guideline_id) {
+    parser::ReviewProfile profile;
+    profile.id = std::move(id);
+    profile.display_name = std::move(display_name);
+    profile.applies_to = {std::move(applies_to)};
+    profile.guideline_ids = {std::move(guideline_id)};
+    return profile;
+}
+
+parser::GuidelinesDocument MakeElementReviewProfiles() {
+    parser::GuidelinesDocument document;
+    document.guidelines = {
+        MakeGuideline("CL.1", "CL"),
+        MakeGuideline("AR.1", "AR"),
+        MakeGuideline("EV.1", "EV"),
+        MakeGuideline("SU.1", "SU"),
+        MakeGuideline("SU.2", "SU"),
+        MakeGuideline("CL.3", "CL"),
+        MakeGuideline("SU.11", "SU"),
+    };
+    document.review_profiles = {
+        MakeReviewProfile("claim_review", "Claim review", "GSN Goal", "CL.1"),
+        MakeReviewProfile("strategy_review", "Strategy review", "GSN Strategy", "AR.1"),
+        MakeReviewProfile("evidence_review", "Evidence review", "GSN Solution", "EV.1"),
+        MakeReviewProfile("assumption_review", "Assumption review", "GSN Assumption", "SU.1"),
+        MakeReviewProfile("justification_review", "Justification review", "GSN Justification", "SU.2"),
+        MakeReviewProfile("context_review", "Context review", "GSN Context", "CL.3"),
+        MakeReviewProfile("challenge_review", "Challenge review", "GSN Counter Claim", "SU.11"),
+    };
+    return document;
+}
+
+struct ReviewProfileSelectionCase {
+    const char* raw_type;
+    const char* assertion_declaration;
+    core::NodeRole role;
+    bool counter;
+    const char* expected_profile_id;
+};
+
+const std::vector<ReviewProfileSelectionCase>& ReviewProfileSelectionCases() {
+    static const std::vector<ReviewProfileSelectionCase> cases = {
+        {"claim", "asserted", core::NodeRole::Claim, false, "claim_review"},
+        {"argumentreasoning", "", core::NodeRole::Strategy, false, "strategy_review"},
+        {"artifactreference", "", core::NodeRole::Solution, false, "evidence_review"},
+        {"claim", "assumed", core::NodeRole::Assumption, false, "assumption_review"},
+        {"claim", "justification", core::NodeRole::Justification, false, "justification_review"},
+        {"artifactreference", "", core::NodeRole::Context, false, "context_review"},
+        {"claim", "asserted", core::NodeRole::Claim, true, "challenge_review"},
+        {"artifactreference", "", core::NodeRole::Solution, true, "challenge_review"},
+    };
+    return cases;
+}
+
 core::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
     return core::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
 }
@@ -220,52 +276,87 @@ TEST(AiReviewControllerTest, CancelPendingRequestClearsPendingDebugState) {
     EXPECT_TRUE(harness.controller.PendingDebugText().empty());
 }
 
-TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesUsesProfileWhenAvailable) {
-    parser::GuidelinesDocument document;
-    document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
-    document.guidelines.push_back(MakeGuideline("RD.4", "RD"));
-    parser::ReviewProfile profile;
-    profile.id = "claim_wording_review";
-    profile.guideline_ids = {"RD.4"};
-    document.review_profiles.push_back(profile);
+TEST(AiReviewControllerTest, SelectsExactlyOneReviewProfileForEverySupportedGsnElementRole) {
+    core::GuidelineCatalog catalog = MakeCatalog(MakeElementReviewProfiles());
+    for (const ReviewProfileSelectionCase& selection_case : ReviewProfileSelectionCases()) {
+        SCOPED_TRACE(selection_case.expected_profile_id);
+        parser::SacmElement element;
+        element.id = "selected";
+        element.type = selection_case.raw_type;
+        element.assertion_declaration = selection_case.assertion_declaration;
+        core::TreeNode node;
+        node.id = element.id;
+        node.role = selection_case.role;
+        node.is_counter_source = selection_case.counter;
 
-    core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
-    app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
+        app::controllers::AiReviewGuidelineSelection selection =
+            app::controllers::SelectReviewProfileForElement(catalog, element, &node);
 
-    ASSERT_NE(selection.review_profile, nullptr);
-    ASSERT_EQ(selection.guidelines.size(), 1u);
-    EXPECT_EQ(selection.guidelines[0]->id, "RD.4");
-    EXPECT_TRUE(selection.error_message.empty());
+        ASSERT_NE(selection.review_profile, nullptr) << selection.error_message;
+        EXPECT_EQ(selection.review_profile->id, selection_case.expected_profile_id);
+        EXPECT_EQ(selection.guidelines.size(), 1u);
+        EXPECT_TRUE(selection.error_message.empty());
+    }
 }
 
-TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesFallsBackToClWhenProfileMissing) {
-    parser::GuidelinesDocument document;
-    document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
-    document.guidelines.push_back(MakeGuideline("RD.4", "RD"));
+TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnElementRole) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+    ASSERT_EQ(catalog.document.sccg_version, "0.6.0");
 
+    for (const ReviewProfileSelectionCase& selection_case : ReviewProfileSelectionCases()) {
+        SCOPED_TRACE(selection_case.expected_profile_id);
+        parser::SacmElement element;
+        element.id = "selected";
+        element.type = selection_case.raw_type;
+        element.assertion_declaration = selection_case.assertion_declaration;
+        core::TreeNode node;
+        node.id = element.id;
+        node.role = selection_case.role;
+        node.is_counter_source = selection_case.counter;
+
+        app::controllers::AiReviewGuidelineSelection selection =
+            app::controllers::SelectReviewProfileForElement(catalog, element, &node);
+
+        ASSERT_NE(selection.review_profile, nullptr) << selection.error_message;
+        EXPECT_EQ(selection.review_profile->id, selection_case.expected_profile_id);
+        EXPECT_FALSE(selection.guidelines.empty());
+        EXPECT_TRUE(selection.error_message.empty());
+    }
+}
+
+TEST(AiReviewControllerTest, RefusesAmbiguousElementReviewProfiles) {
+    parser::GuidelinesDocument document = MakeElementReviewProfiles();
+    document.review_profiles.push_back(MakeReviewProfile("second_claim_review", "Other", "GSN Goal", "CL.1"));
     core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
-    app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
+    parser::SacmElement element = MakeCaseWithElement("G1", "claim").elements.front();
+    core::TreeNode node;
+    node.id = element.id;
+    node.role = core::NodeRole::Claim;
+
+    app::controllers::AiReviewGuidelineSelection selection =
+        app::controllers::SelectReviewProfileForElement(catalog, element, &node);
 
     EXPECT_EQ(selection.review_profile, nullptr);
-    ASSERT_EQ(selection.guidelines.size(), 1u);
-    EXPECT_EQ(selection.guidelines[0]->id, "CL.1");
-    EXPECT_TRUE(selection.error_message.empty());
+    EXPECT_NE(selection.error_message.find("More than one SCCG review profile"), std::string::npos);
 }
 
-TEST(AiReviewControllerTest, SelectClaimReviewGuidelinesReportsProfileWithNoValidGuidelines) {
-    parser::GuidelinesDocument document;
-    document.guidelines.push_back(MakeGuideline("CL.1", "CL"));
-    parser::ReviewProfile profile;
-    profile.id = "claim_wording_review";
-    profile.guideline_ids = {"missing-guideline"};
-    document.review_profiles.push_back(profile);
-
+TEST(AiReviewControllerTest, ReportsWhenElementHasNoReviewProfile) {
+    parser::GuidelinesDocument document = MakeElementReviewProfiles();
+    std::erase_if(document.review_profiles,
+                  [](const parser::ReviewProfile& profile) { return profile.id == "context_review"; });
     core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
-    app::controllers::AiReviewGuidelineSelection selection = app::controllers::SelectClaimReviewGuidelines(catalog);
+    parser::SacmElement element = MakeCaseWithElement("C1", "artifactreference").elements.front();
+    core::TreeNode node;
+    node.id = element.id;
+    node.role = core::NodeRole::Context;
 
-    ASSERT_NE(selection.review_profile, nullptr);
-    EXPECT_TRUE(selection.guidelines.empty());
-    EXPECT_NE(selection.error_message.find("no valid guidelines"), std::string::npos);
+    app::controllers::AiReviewGuidelineSelection selection =
+        app::controllers::SelectReviewProfileForElement(catalog, element, &node);
+
+    EXPECT_EQ(selection.review_profile, nullptr);
+    EXPECT_NE(selection.error_message.find("No SCCG review profile"), std::string::npos);
 }
 
 TEST(AiReviewControllerTest, BeginReviewForSelectionBuildsProfilePrompt) {
@@ -278,7 +369,7 @@ TEST(AiReviewControllerTest, BeginReviewForSelectionBuildsProfilePrompt) {
     ASSERT_TRUE(harness.controller.HasPendingRequest());
     ASSERT_FALSE(harness.controller.PendingPrompt().empty());
     ASSERT_FALSE(harness.controller.PendingDebugText().empty());
-    EXPECT_NE(harness.controller.PendingDebugText().find("claim_wording_review"), std::string::npos);
+    EXPECT_NE(harness.controller.PendingDebugText().find("claim_review"), std::string::npos);
     EXPECT_EQ(harness.controller.PendingDebugText().find("SCCG CL rules"), std::string::npos);
     EXPECT_NE(harness.controller.PendingDebugText().find("Available data packages"), std::string::npos);
     EXPECT_FALSE(harness.controller.ShouldShowDebugModal());
@@ -328,6 +419,11 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFindings);
     EXPECT_EQ(harness.review_visual_events.back().element_id, "claim-1");
     ASSERT_EQ(harness.proposal_suggestion_events.size(), 1u);
+    EXPECT_EQ(harness.proposal_suggestion_events[0].review_profile_id, "claim_review");
+    EXPECT_EQ(harness.proposal_suggestion_events[0].review_profile_name, "Claim review");
+    EXPECT_FALSE(harness.proposal_suggestion_events[0].review_run_id.empty());
+    EXPECT_EQ(harness.proposal_suggestion_events[0].reviewed_model_hash,
+              core::reviews::ComputeModelSemanticHash(assurance_case));
     ASSERT_EQ(harness.proposal_suggestion_events[0].suggestions.size(), 1u);
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].review_item_id, comments[0].id);
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "claim-1");
@@ -367,7 +463,7 @@ TEST(AiReviewControllerTest, StrategyReviewEmitsProposalSuggestionFromSuggestedE
     assurance_case.elements.back().content = "Argument by credible hazard control.";
     core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
 
-    harness.controller.BeginReviewForSelection(&assurance_case, tree, "strategy-1", "decomposition_review");
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "strategy-1");
     ASSERT_TRUE(harness.controller.HasPendingRequest());
     harness.controller.StartPendingRequest();
     ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
@@ -410,7 +506,7 @@ TEST(AiReviewControllerTest, EvidenceReviewEmitsProposalSuggestionFromSuggestedE
     assurance_case.elements.front().name = "Evidence";
     core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
 
-    harness.controller.BeginReviewForSelection(&assurance_case, tree, "evidence-1", "evidence_item_review");
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "evidence-1");
     ASSERT_TRUE(harness.controller.HasPendingRequest());
     harness.controller.StartPendingRequest();
     ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));

@@ -266,7 +266,7 @@ void AppRuntime::RegisterAppEventListeners() {
         }
     });
     impl_->events.Subscribe<AiReviewProposalSuggestionsEvent>([this](const AiReviewProposalSuggestionsEvent& event) {
-        actions::ProposalActions(*impl_).CreateAiGenerated(event.suggestions);
+        actions::ProposalActions(*impl_).CreateAiGenerated(event);
     });
     impl_->events.Subscribe<ArgumentPackageCanvasRequestEvent>([this](const ArgumentPackageCanvasRequestEvent& event) {
         OpenArgumentPackageCanvas(event.package_id, event.package_gid, event.display_name, event.focus_element_id);

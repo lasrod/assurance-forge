@@ -1,12 +1,14 @@
 #include "app/controllers/ai_review_controller.h"
 
 #include "core/guideline_catalog.h"
+#include "core/reviews/review_proposal.h"
 #include "core/reviews/review_text_utils.h"
 #include "core/time_utils.h"
 #include "parser/guidelines_parser.h"
 
 #include <nlohmann/json.hpp>
 
+#include <atomic>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -14,10 +16,13 @@
 namespace app::controllers {
 namespace {
 
-constexpr const char* kDefaultClaimReviewProfileId = "claim_wording_review";
-
 using core::NowUtcString;
 using core::reviews::TruncateForProblemMessage;
+
+std::string GenerateAiReviewRunId() {
+    static std::atomic_uint64_t counter = 0;
+    return "ai-review-run-" + NowUtcString() + "-" + std::to_string(++counter);
+}
 
 core::ProblemItem MakeAiReviewProblem(const std::string& id,
                                       core::ProblemSeverity severity,
@@ -167,20 +172,27 @@ AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCa
     return selection;
 }
 
-AiReviewGuidelineSelection SelectClaimReviewGuidelines(const core::GuidelineCatalog& guideline_catalog) {
-    AiReviewGuidelineSelection selection;
-    selection.review_profile = guideline_catalog.document.FindReviewProfileById(kDefaultClaimReviewProfileId);
-    selection.guidelines = selection.review_profile
-                               ? guideline_catalog.document.FindGuidelinesByReviewProfile(kDefaultClaimReviewProfileId)
-                               : guideline_catalog.document.FindGuidelinesByCategory("CL");
-
-    if (selection.review_profile && selection.guidelines.empty()) {
-        selection.error_message = std::string("SCCG catalog contains review profile '") + kDefaultClaimReviewProfileId +
-                                  "' but it references no valid guidelines.";
-    } else if (selection.guidelines.empty()) {
-        selection.error_message = "No SCCG guidelines were found for AI review.";
+AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCatalog& guideline_catalog,
+                                                         const parser::SacmElement& element,
+                                                         const core::TreeNode* node) {
+    const parser::ReviewProfile* match = nullptr;
+    for (const parser::ReviewProfile& profile : guideline_catalog.document.review_profiles) {
+        if (!ai::IsReviewProfileCompatibleWithElement(profile, element, node))
+            continue;
+        if (match != nullptr) {
+            AiReviewGuidelineSelection selection;
+            selection.error_message = "More than one SCCG review profile applies to the selected element type: '" +
+                                      match->display_name + "' and '" + profile.display_name + "'.";
+            return selection;
+        }
+        match = &profile;
     }
-    return selection;
+    if (match == nullptr) {
+        AiReviewGuidelineSelection selection;
+        selection.error_message = "No SCCG review profile applies to the selected element type.";
+        return selection;
+    }
+    return SelectReviewProfileGuidelines(guideline_catalog, match->id);
 }
 
 AiReviewController::AiReviewController(AppEvents& events,
@@ -197,7 +209,7 @@ AiReviewController::AiReviewController(AppEvents& events,
 void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* assurance_case,
                                                  const core::AssuranceTree& current_tree,
                                                  const std::string& selected_element_id) {
-    BeginReviewForSelection(assurance_case, current_tree, selected_element_id, kDefaultClaimReviewProfileId);
+    BeginReviewForSelection(assurance_case, current_tree, selected_element_id, {});
 }
 
 void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* assurance_case,
@@ -306,10 +318,10 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
+    const core::TreeNode* selected_node = core::FindTreeNode(current_tree, selected_element_id);
     AiReviewGuidelineSelection guideline_selection =
-        review_profile_id == kDefaultClaimReviewProfileId
-            ? SelectClaimReviewGuidelines(guideline_catalog)
-            : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
+        review_profile_id.empty() ? SelectReviewProfileForElement(guideline_catalog, *selected_element, selected_node)
+                                  : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
 
     if (!guideline_selection.error_message.empty()) {
         ReplaceAiReviewWithSingleItem(review_controller_,
@@ -339,9 +351,8 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     if (guideline_selection.review_profile &&
-        !ai::IsReviewProfileCompatibleWithElement(*guideline_selection.review_profile,
-                                                  *selected_element,
-                                                  core::FindTreeNode(current_tree, selected_element_id))) {
+        !ai::IsReviewProfileCompatibleWithElement(
+            *guideline_selection.review_profile, *selected_element, selected_node)) {
         const std::string message = "SCCG review profile '" + guideline_selection.review_profile->display_name +
                                     "' does not apply to the selected element type.";
         problems_manager_.AddOrUpdateProblem(
@@ -401,10 +412,19 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "";
     pending_review_scope_element_ids_ = BuildReviewScopeElementIds(payload, data_packages);
     pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
+    pending_review_model_hash_ = core::reviews::ComputeModelSemanticHash(*assurance_case);
+    pending_review_run_id_.clear();
     last_raw_response_.clear();
     last_parse_error_.clear();
     show_debug_modal_ = false;
     events_.Emit(StatusMessageEvent{"AI review request is ready in the AI Debug panel."});
+}
+
+void AiReviewController::MarkPendingRequestIncludesWorkingDraft() {
+    if (pending_review_.prompt.empty())
+        return;
+    pending_review_.debugText =
+        "NOTICE: This AI review includes unaccepted working-draft content.\n\n" + pending_review_.debugText;
 }
 
 void AiReviewController::StartPendingRequest() {
@@ -416,6 +436,7 @@ void AiReviewController::StartPendingRequest() {
     ai::AiRequest request;
     request.systemInstruction = pending_review_.systemInstruction;
     request.userPrompt = pending_review_.prompt;
+    pending_review_run_id_ = GenerateAiReviewRunId();
 
     std::shared_ptr<ai::AiService> service = ai_service_;
     review_task_ = task_runner_.RunGenerate([service, request]() {
@@ -599,7 +620,13 @@ void AiReviewController::PollTask() {
                                         : "AI review completed with " + std::to_string(parse_result.problems.size()) +
                                               " finding(s) added as review comment(s)."});
     if (!proposal_suggestions.empty()) {
-        events_.Emit(AiReviewProposalSuggestionsEvent{std::move(proposal_suggestions)});
+        AiReviewProposalSuggestionsEvent event;
+        event.suggestions = std::move(proposal_suggestions);
+        event.review_profile_id = pending_review_profile_id_;
+        event.review_profile_name = pending_review_profile_name_;
+        event.review_run_id = pending_review_run_id_;
+        event.reviewed_model_hash = pending_review_model_hash_;
+        events_.Emit(std::move(event));
     }
 }
 
@@ -612,6 +639,8 @@ void AiReviewController::CancelPendingRequest() {
     pending_review_profile_name_.clear();
     pending_review_scope_element_ids_.clear();
     pending_guideline_ids_.clear();
+    pending_review_run_id_.clear();
+    pending_review_model_hash_.clear();
 }
 
 bool AiReviewController::IsReviewRunning() const {
