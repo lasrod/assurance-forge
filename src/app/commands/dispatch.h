@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "core/commands/command_bus.h"
 
+#include <cstdint>
 #include <string>
 
 // Bridges the app-actions layer to `core::commands::CommandBus`. Every
@@ -19,6 +20,11 @@ struct DispatchOutcome {
     // intent may already be committed while autosave failed, so promotion must
     // not delete its recovery workspace based on `success` alone.
     bool sacm_written = false;
+    // The audit transaction this command recorded, and the sequence a later undo
+    // targets. Zero when there was no bus to record one. Draft promotion keys its
+    // pre-promotion snapshot on this, which is what lets undo tell a promotion
+    // apart from an ordinary proposal application.
+    std::uint64_t transaction_sequence = 0;
 };
 
 // Run `command` through the project's audit bus. Returns failure if no

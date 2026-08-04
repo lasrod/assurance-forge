@@ -114,7 +114,7 @@ DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command
         state.app_state.has_unsaved_changes = false;
         state.autosave_persisted_pending_edit = true;
     }
-    return {true, {}, result.sacm_written};
+    return {true, {}, result.sacm_written, result.transaction_sequence};
 }
 
 } // namespace app::commands

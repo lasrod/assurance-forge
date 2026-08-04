@@ -339,4 +339,78 @@ bool DeleteDraftWorkspace(const std::filesystem::path& project_root,
     return true;
 }
 
+std::filesystem::path DraftPromotionSnapshotsDirectory(const std::filesystem::path& project_root) {
+    return project_root / ".af" / "draft-promotions";
+}
+
+std::filesystem::path DraftPromotionSnapshotPath(const std::filesystem::path& project_root,
+                                                 std::uint64_t transaction_sequence) {
+    return DraftPromotionSnapshotsDirectory(project_root) / (std::to_string(transaction_sequence) + ".json");
+}
+
+bool SaveDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                std::uint64_t transaction_sequence,
+                                const DraftWorkspace& workspace,
+                                std::string& error) {
+    error.clear();
+    if (project_root.empty()) {
+        error = "Cannot save a draft promotion snapshot without a project root.";
+        return false;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(DraftPromotionSnapshotsDirectory(project_root), ec);
+    if (ec) {
+        error = "Could not create the draft promotion directory: " + ec.message();
+        return false;
+    }
+
+    // Events are not written beside it. A snapshot is not a second workspace a
+    // user can open; it is the material one undo needs, and the live event log
+    // keeps the history of what happened either way.
+    const std::expected<void, std::string> written = WriteTextFileAtomic(
+        DraftPromotionSnapshotPath(project_root, transaction_sequence), SerializeDraftWorkspace(workspace));
+    if (!written.has_value()) {
+        error = written.error();
+        return false;
+    }
+    return true;
+}
+
+bool LoadDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                std::uint64_t transaction_sequence,
+                                DraftWorkspace& workspace,
+                                std::string& error) {
+    error.clear();
+    const std::filesystem::path path = DraftPromotionSnapshotPath(project_root, transaction_sequence);
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec))
+        return false;
+
+    const std::expected<std::string, std::string> content = ReadTextFile(path);
+    if (!content.has_value()) {
+        error = content.error();
+        return false;
+    }
+    return DeserializeDraftWorkspace(content.value(), workspace, error);
+}
+
+bool DraftPromotionSnapshotExists(const std::filesystem::path& project_root, std::uint64_t transaction_sequence) {
+    std::error_code ec;
+    return std::filesystem::exists(DraftPromotionSnapshotPath(project_root, transaction_sequence), ec);
+}
+
+bool DeleteDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                  std::uint64_t transaction_sequence,
+                                  std::string& error) {
+    error.clear();
+    std::error_code ec;
+    std::filesystem::remove(DraftPromotionSnapshotPath(project_root, transaction_sequence), ec);
+    if (ec) {
+        error = "Could not remove the draft promotion snapshot: " + ec.message();
+        return false;
+    }
+    return true;
+}
+
 } // namespace core::drafts

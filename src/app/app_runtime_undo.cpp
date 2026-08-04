@@ -9,6 +9,9 @@
 #include "core/audit/undo_boundary.h"
 #include "core/audit/undo_resolver.h"
 #include "core/commands/undo_command.h"
+#include "core/drafts/draft_persistence.h"
+#include "core/drafts/draft_workspace.h"
+#include "sacm_adapter/case_projection.h"
 
 #include <string>
 
@@ -92,6 +95,37 @@ bool AppRuntime::Undo() {
         return false;
     }
 
+    // A draft promotion is one transaction on this stack, but the draft it
+    // consumed lives nowhere in the audit log. Undoing it therefore has to put
+    // the groups back as well, or the change leaves the accepted argument while
+    // already having left the draft -- and when the promotion took the last
+    // group, the workspace was deleted with it.
+    //
+    // Loaded before anything is mutated, so a snapshot that cannot be read
+    // refuses the undo instead of discovering the problem once the accepted model
+    // has already moved. Fail-closed is the right default here: the alternative
+    // silently destroys unaccepted work whose only copy this is.
+    core::drafts::DraftWorkspace promotion_snapshot;
+    bool undo_restores_draft = false;
+    if (state.draft_workspace.HasPromotionSnapshot(target.target_sequence)) {
+        std::string snapshot_error;
+        if (!state.draft_workspace.LoadPromotionSnapshot(target.target_sequence, promotion_snapshot, snapshot_error)) {
+            state.app_state.status_message =
+                "Cannot undo this acceptance: the draft it came from could not be read (" + snapshot_error +
+                "). Remove " +
+                core::drafts::DraftPromotionSnapshotPath(project.rootPath, target.target_sequence).generic_string() +
+                " to undo without restoring it.";
+            return false;
+        }
+        if (!core::drafts::WorkspaceTargetsArgumentFile(promotion_snapshot, state.draft_workspace.argument_file())) {
+            state.app_state.status_message = "Cannot undo this acceptance here: it belongs to " +
+                                             promotion_snapshot.argument_file.filename().generic_string() +
+                                             ". Open that argument and undo there, so its draft is restored with it.";
+            return false;
+        }
+        undo_restores_draft = true;
+    }
+
     // Reconstruct the prior state (transaction immediately before the target).
     // ReconstructAtSequence honors existing Undo markers, so chained undos
     // and redos compose correctly without special-casing here.
@@ -106,6 +140,13 @@ bool AppRuntime::Undo() {
     // serializes it, preserving the unknown/foreign content no projection can
     // carry. The views come along for the legacy path (a context with no
     // library document).
+    //
+    // Which of the two paths runs decides where the restored accepted model can
+    // be read from afterwards, so it is settled here while both parts are still
+    // in hand. Library-primary deliberately leaves `loaded_case` stale until the
+    // next frame boundary; hashing that stale view would rebase the draft onto a
+    // model the argument no longer has.
+    const bool library_primary_undo = state.app_state.library_document != nullptr && prior.value().document != nullptr;
     core::commands::UndoLastTransactionCommand cmd(target.target_sequence,
                                                    target.target_command_name,
                                                    std::move(prior.value().views.model),
@@ -118,6 +159,25 @@ bool AppRuntime::Undo() {
         return false;
     }
 
+    std::string draft_note;
+    if (undo_restores_draft) {
+        const parser::AssuranceCase restored_accepted =
+            library_primary_undo ? sacm_adapter::project_case(*state.app_state.library_document)
+                                 : state.app_state.loaded_case.value();
+        std::string restore_error;
+        if (state.draft_workspace.RestorePromotionSnapshot(promotion_snapshot, restored_accepted, restore_error)) {
+            // Consumed. Keeping it would offer to restore the same groups a second
+            // time if this transaction were ever undone again.
+            std::string discard_error;
+            state.draft_workspace.DeletePromotionSnapshot(target.target_sequence, discard_error);
+        } else {
+            // The accepted model has already moved, so this is not a failed undo.
+            // Say what was and was not done rather than reporting a clean one: the
+            // snapshot file is still there and is still the only copy of that work.
+            draft_note = " — but the draft it came from was not restored: " + restore_error;
+        }
+    }
+
     // The model has been wholesale-replaced. Rebuild derived views (tree,
     // canvas, registers) on the next frame and drop any selection that may
     // now reference a removed element. Mirrors the post-dispatch fan-out
@@ -126,7 +186,7 @@ bool AppRuntime::Undo() {
     state.events.Emit(SelectionChangedEvent{});
     state.events.Emit(DocumentDirtyEvent{});
 
-    state.app_state.status_message = "Undid: " + target.target_command_name;
+    state.app_state.status_message = "Undid: " + target.target_command_name + draft_note;
     return true;
 }
 

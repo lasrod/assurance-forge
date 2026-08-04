@@ -469,6 +469,101 @@ bool DraftWorkspaceStore::DiscardWorkspace(std::string& error) {
     return DeleteDraftWorkspace(project_root_, key, error);
 }
 
+bool DraftWorkspaceStore::SavePromotionSnapshot(std::uint64_t transaction_sequence,
+                                                const DraftWorkspace& pre_promotion,
+                                                std::string& error) const {
+    error.clear();
+    if (project_root_.empty()) {
+        error = "Cannot record a draft promotion snapshot without a project root.";
+        return false;
+    }
+    return SaveDraftPromotionSnapshot(project_root_, transaction_sequence, pre_promotion, error);
+}
+
+bool DraftWorkspaceStore::HasPromotionSnapshot(std::uint64_t transaction_sequence) const {
+    if (project_root_.empty())
+        return false;
+    return DraftPromotionSnapshotExists(project_root_, transaction_sequence);
+}
+
+bool DraftWorkspaceStore::LoadPromotionSnapshot(std::uint64_t transaction_sequence,
+                                                DraftWorkspace& snapshot,
+                                                std::string& error) const {
+    error.clear();
+    if (project_root_.empty())
+        return false;
+    return LoadDraftPromotionSnapshot(project_root_, transaction_sequence, snapshot, error);
+}
+
+bool DraftWorkspaceStore::DeletePromotionSnapshot(std::uint64_t transaction_sequence, std::string& error) const {
+    error.clear();
+    if (project_root_.empty())
+        return true;
+    return DeleteDraftPromotionSnapshot(project_root_, transaction_sequence, error);
+}
+
+bool DraftWorkspaceStore::RestorePromotionSnapshot(const DraftWorkspace& snapshot,
+                                                   const core::AssuranceCase& restored_accepted,
+                                                   std::string& error) {
+    error.clear();
+    if (!WorkspaceTargetsArgumentFile(snapshot, argument_file_)) {
+        error = "That promotion belongs to a different argument file.";
+        return false;
+    }
+
+    const bool had_workspace = workspace_.has_value();
+    const DraftWorkspace previous = had_workspace ? workspace_.value() : DraftWorkspace{};
+    if (!had_workspace) {
+        // The promotion consumed the last group, so `RemovePromotedGroups`
+        // deleted the workspace. The snapshot is the whole of it.
+        DraftWorkspace restored = snapshot;
+        restored.argument_file = argument_file_;
+        restored.pending_promotion.reset();
+        restored.state = DraftWorkspaceState::Active;
+        workspace_ = std::move(restored);
+    } else {
+        DraftWorkspace& workspace = workspace_.value();
+        std::size_t reinstated = 0;
+        for (const DraftChangeGroup& group : snapshot.groups) {
+            if (workspace.FindGroup(group.id) != nullptr)
+                continue;
+            workspace.groups.push_back(group);
+            ++reinstated;
+        }
+        if (reinstated == 0) {
+            error = "That promotion's draft changes are already present.";
+            return false;
+        }
+        std::sort(
+            workspace.groups.begin(),
+            workspace.groups.end(),
+            [](const DraftChangeGroup& left, const DraftChangeGroup& right) { return left.sequence < right.sequence; });
+        workspace.next_sequence = std::max(workspace.next_sequence, snapshot.next_sequence);
+        workspace.pending_promotion.reset();
+        workspace.state = DraftWorkspaceState::Active;
+    }
+
+    DraftWorkspace& workspace = workspace_.value();
+    // The baseline moves back with the groups. Undo restored the argument these
+    // groups were authored against, so leaving the post-promotion hash here would
+    // call the draft stale against the very model it was written for.
+    workspace.base_model_hash = reviews::ComputeModelSemanticHash(restored_accepted);
+    workspace.working_revision = std::max(workspace.working_revision, snapshot.working_revision) + 1;
+    RecordEvent("promotion_undone", {}, std::to_string(snapshot.groups.size()) + " groups restored");
+    InvalidateMaterialization();
+
+    if (!Save(error)) {
+        if (had_workspace) {
+            workspace_ = previous;
+        } else {
+            workspace_.reset();
+        }
+        InvalidateMaterialization();
+        return false;
+    }
+    return true;
+}
+
 std::shared_ptr<const DraftMaterializationResult>
 DraftWorkspaceStore::MaterializeSnapshot(const core::AssuranceCase& accepted, std::uint64_t accepted_revision) {
     if (materialization_valid_ && materialized_accepted_revision_ == accepted_revision &&
