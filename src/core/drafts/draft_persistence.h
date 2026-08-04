@@ -111,14 +111,28 @@ bool SaveDraftPromotionSnapshot(const std::filesystem::path& project_root,
                                 const DraftWorkspace& workspace,
                                 std::string& error);
 
-// Reads a snapshot back. Returns false with an empty `error` when there is none
-// for that sequence, which is the ordinary case: most transactions are not
-// promotions.
+// Reads a snapshot back.
+//
+//   false + empty `error`     -- there is none, so that transaction was not a
+//                                promotion. The ordinary case.
+//   false + non-empty `error` -- there may be one and it could not be read.
+//                                **Not the same answer.** A caller deciding
+//                                whether to destroy unaccepted work must refuse
+//                                here, not treat it as "not a promotion".
+//
+// This is the only function that can tell those apart, which is why the undo
+// path calls it unconditionally rather than gating on an existence check.
 bool LoadDraftPromotionSnapshot(const std::filesystem::path& project_root,
                                 std::uint64_t transaction_sequence,
                                 DraftWorkspace& workspace,
                                 std::string& error);
 
+// Convenience for tests and diagnostics.
+//
+// **Not for a fail-closed decision.** It returns false both for "no snapshot"
+// and for "the path could not be interrogated", and nothing about a bool can
+// distinguish them. Use `LoadDraftPromotionSnapshot` where the difference
+// decides whether unaccepted work survives.
 bool DraftPromotionSnapshotExists(const std::filesystem::path& project_root, std::uint64_t transaction_sequence);
 
 bool DeleteDraftPromotionSnapshot(const std::filesystem::path& project_root,

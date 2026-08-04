@@ -282,8 +282,18 @@ bool LoadDraftWorkspace(const std::filesystem::path& project_root,
     error.clear();
     const std::filesystem::path path = DraftWorkspacePath(project_root, argument_key);
     std::error_code ec;
-    if (!std::filesystem::exists(path, ec))
+    if (!std::filesystem::exists(path, ec)) {
+        // Same distinction the promotion snapshot makes below: a project with no
+        // draft is the ordinary case, but a draft directory that cannot be
+        // interrogated is reported rather than read as "there is no draft". The
+        // work may be hours of an agent's conversation and this file is the only
+        // copy of it.
+        if (ec) {
+            error = "Could not determine whether this argument has a draft: " + ec.message();
+            return false;
+        }
         return false;
+    }
 
     const std::expected<std::string, std::string> content = ReadTextFile(path);
     if (!content.has_value()) {
@@ -384,8 +394,19 @@ bool LoadDraftPromotionSnapshot(const std::filesystem::path& project_root,
     error.clear();
     const std::filesystem::path path = DraftPromotionSnapshotPath(project_root, transaction_sequence);
     std::error_code ec;
-    if (!std::filesystem::exists(path, ec))
+    if (!std::filesystem::exists(path, ec)) {
+        // `exists` reports "no" for both a genuinely absent file and a path it
+        // could not interrogate, and those must not mean the same thing here.
+        // Absent is "this transaction was not a promotion"; unreadable is "there
+        // may be unaccepted work behind this and it cannot be seen". Collapsing
+        // the second into the first lets an undo proceed as an ordinary one and
+        // destroy the only copy of that work.
+        if (ec) {
+            error = "Could not determine whether this acceptance has a draft snapshot: " + ec.message();
+            return false;
+        }
         return false;
+    }
 
     const std::expected<std::string, std::string> content = ReadTextFile(path);
     if (!content.has_value()) {

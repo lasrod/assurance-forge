@@ -1463,6 +1463,30 @@ TEST(DraftWorkspace, AnOrdinaryTransactionHasNoPromotionSnapshot) {
     EXPECT_TRUE(error.empty()) << "not a promotion is not a failure";
 }
 
+TEST(DraftWorkspace, AnUnreadableSnapshotIsNotReportedAsAbsent) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    PromoteThroughStore(fixture, {branch}, 7);
+
+    // A directory where the snapshot file should be: the sort of thing a botched
+    // sync or a half-restored backup leaves behind. It exists, so this is not
+    // "that transaction was not a promotion" -- but it cannot be read.
+    const std::filesystem::path path = core::drafts::DraftPromotionSnapshotPath(fixture.dir.path, 7);
+    std::filesystem::remove(path);
+    std::filesystem::create_directories(path);
+
+    // The two answers must stay distinguishable. Undo discards unaccepted work on
+    // this distinction, and reading "cannot be read" as "not a promotion" sends a
+    // transaction that *is* one down the ordinary path -- destroying the draft in
+    // precisely the case the check exists to protect.
+    core::drafts::DraftWorkspace snapshot;
+    std::string error;
+    EXPECT_FALSE(fixture.store.LoadPromotionSnapshot(7, snapshot, error));
+    EXPECT_FALSE(error.empty()) << "an unreadable snapshot must not read as 'this was not a promotion'";
+}
+
 TEST(DraftWorkspace, APromotionSnapshotIsRefusedRatherThanGuessedAt) {
     Fixture fixture;
     const std::string branch = fixture.BeginGroup("Add a sub-claim");

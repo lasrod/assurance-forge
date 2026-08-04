@@ -161,10 +161,16 @@ public:
                                const DraftWorkspace& pre_promotion,
                                std::string& error) const;
 
+    // Convenience for tests and diagnostics. **Not for a fail-closed decision**
+    // -- it answers false both for "no snapshot" and for "the path could not be
+    // interrogated". Undo must tell those apart, so it uses the loader below.
     bool HasPromotionSnapshot(std::uint64_t transaction_sequence) const;
 
     // Returns false with an empty `error` when `transaction_sequence` is not a
-    // promotion, which is the ordinary case.
+    // promotion, which is the ordinary case, and false with a non-empty `error`
+    // when there may be a snapshot that could not be read. A caller about to
+    // discard unaccepted work has to refuse on the second and continue on the
+    // first, so it must call this rather than test existence first.
     bool LoadPromotionSnapshot(std::uint64_t transaction_sequence, DraftWorkspace& snapshot, std::string& error) const;
 
     bool DeletePromotionSnapshot(std::uint64_t transaction_sequence, std::string& error) const;

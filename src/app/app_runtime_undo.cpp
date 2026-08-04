@@ -105,25 +105,30 @@ bool AppRuntime::Undo() {
     // refuses the undo instead of discovering the problem once the accepted model
     // has already moved. Fail-closed is the right default here: the alternative
     // silently destroys unaccepted work whose only copy this is.
+    //
+    // Deliberately not gated on an existence check first. `std::filesystem::exists`
+    // answers false both for "no snapshot" and for a path it could not
+    // interrogate, so gating on it would send a transaction that *is* a promotion
+    // down the ordinary path on any IO error -- losing the draft in exactly the
+    // case the check was added to protect. Only the loader distinguishes "not a
+    // promotion" (false, no error) from "cannot tell" (false, error).
     core::drafts::DraftWorkspace promotion_snapshot;
-    bool undo_restores_draft = false;
-    if (state.draft_workspace.HasPromotionSnapshot(target.target_sequence)) {
-        std::string snapshot_error;
-        if (!state.draft_workspace.LoadPromotionSnapshot(target.target_sequence, promotion_snapshot, snapshot_error)) {
-            state.app_state.status_message =
-                "Cannot undo this acceptance: the draft it came from could not be read (" + snapshot_error +
-                "). Remove " +
-                core::drafts::DraftPromotionSnapshotPath(project.rootPath, target.target_sequence).generic_string() +
-                " to undo without restoring it.";
-            return false;
-        }
-        if (!core::drafts::WorkspaceTargetsArgumentFile(promotion_snapshot, state.draft_workspace.argument_file())) {
-            state.app_state.status_message = "Cannot undo this acceptance here: it belongs to " +
-                                             promotion_snapshot.argument_file.filename().generic_string() +
-                                             ". Open that argument and undo there, so its draft is restored with it.";
-            return false;
-        }
-        undo_restores_draft = true;
+    std::string snapshot_error;
+    const bool undo_restores_draft =
+        state.draft_workspace.LoadPromotionSnapshot(target.target_sequence, promotion_snapshot, snapshot_error);
+    if (!undo_restores_draft && !snapshot_error.empty()) {
+        state.app_state.status_message =
+            "Cannot undo this acceptance: the draft it came from could not be read (" + snapshot_error + "). Remove " +
+            core::drafts::DraftPromotionSnapshotPath(project.rootPath, target.target_sequence).generic_string() +
+            " to undo without restoring it.";
+        return false;
+    }
+    if (undo_restores_draft &&
+        !core::drafts::WorkspaceTargetsArgumentFile(promotion_snapshot, state.draft_workspace.argument_file())) {
+        state.app_state.status_message = "Cannot undo this acceptance here: it belongs to " +
+                                         promotion_snapshot.argument_file.filename().generic_string() +
+                                         ". Open that argument and undo there, so its draft is restored with it.";
+        return false;
     }
 
     // Reconstruct the prior state (transaction immediately before the target).
