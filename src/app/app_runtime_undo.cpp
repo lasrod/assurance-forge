@@ -39,6 +39,12 @@ bool ActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
 
 bool AppRuntime::CanUndo() const {
     const AppRuntimeState& state = *impl_;
+    // Draft edits are not commands and are not in the audit log, so they need
+    // their own stack -- and while a draft holds unaccepted edits, that is the
+    // stack the user means. Checked before the audit preconditions, because a
+    // draft edit is undoable in situations an audited command is not.
+    if (state.draft_workspace.CanUndoDraftEdit())
+        return true;
     if (!state.command_bus)
         return false;
     if (!state.app_state.current_project.has_value())
@@ -64,6 +70,35 @@ bool AppRuntime::CanUndo() const {
 
 bool AppRuntime::Undo() {
     AppRuntimeState& state = *impl_;
+
+    // The workspace first, and only then the accepted history.
+    //
+    // A draft edit writes no SACM and records no audit transaction -- that is
+    // what keeps the accepted file byte-stable while a draft is built -- so
+    // undoing one cannot go through the audit stack. Taking the draft stack
+    // first is also what a user means by Ctrl+Z here: the last thing they did
+    // was to the draft.
+    //
+    // It falls through once the draft has nothing left to undo, rather than
+    // stopping. That is what keeps a promotion undoable while later groups are
+    // still staged: the promotion is a boundary on the accepted stack, and
+    // refusing to reach it would strand the acceptance the user wants to
+    // reverse.
+    if (state.draft_workspace.CanUndoDraftEdit()) {
+        const std::string label = state.draft_workspace.NextDraftUndoLabel();
+        std::string draft_error;
+        if (!state.draft_workspace.UndoDraftEdit(draft_error)) {
+            state.app_state.status_message = "Undo failed: " + draft_error;
+            return false;
+        }
+        // No `DocumentDirtyEvent`: the accepted `.sacm` did not change and must
+        // not be autosaved by an edit to unaccepted work.
+        state.events.Emit(TreeDirtyEvent{});
+        state.events.Emit(SelectionChangedEvent{});
+        state.app_state.status_message =
+            label.empty() ? "Undid the last draft change." : ("Undid draft change: " + label);
+        return true;
+    }
 
     if (!state.command_bus) {
         state.app_state.status_message = "Undo unavailable: no project audit bus.";

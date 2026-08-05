@@ -1718,7 +1718,9 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     return true;
 }
 
-bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids,
+                                   DraftRejectionScope scope,
+                                   std::string& error) {
     error.clear();
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || group_ids.empty()) {
@@ -1726,18 +1728,90 @@ bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids, st
         return false;
     }
 
-    // A group whose creations another group edits cannot be rejected alone: the
-    // second would refer to an element that will never exist. Both go.
-    std::vector<std::string> rejecting = group_ids;
-    for (const std::string& dependent : core::drafts::DependentsOf(*workspace, group_ids))
-        rejecting.push_back(dependent);
+    // A group whose creations another group edits cannot survive alone once the
+    // creation is rejected: it would refer to an element that will never exist.
+    // What happens to it is the user's decision, taken before this is called.
+    const std::vector<std::string> dependents = core::drafts::DependentsOf(*workspace, group_ids);
 
-    for (const std::string& group_id : rejecting) {
+    for (const std::string& group_id : group_ids) {
         if (!impl_->draft_workspace.RejectGroup(group_id, error))
+            return false;
+    }
+    for (const std::string& dependent : dependents) {
+        const bool applied = scope == DraftRejectionScope::Cascade
+                                 ? impl_->draft_workspace.RejectGroup(dependent, error)
+                                 : impl_->draft_workspace.MarkGroupNeedsAttention(dependent, error);
+        if (!applied)
             return false;
     }
     impl_->tree_needs_rebuild = true;
     return true;
+}
+
+void AppRuntime::BeginRejectDraftGroups(const std::vector<std::string>& group_ids) {
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || group_ids.empty()) {
+        SetStatus(AF_TR("There is nothing to reject."));
+        return;
+    }
+
+    const std::vector<std::string> dependents = core::drafts::DependentsOf(*workspace, group_ids);
+    if (dependents.empty()) {
+        // Nothing else is affected, so there is no decision to put to the user.
+        std::string error;
+        if (RejectDraftGroups(group_ids, DraftRejectionScope::Cascade, error)) {
+            SetStatus(AF_TR("Rejected the change. The accepted argument is unchanged."));
+        } else {
+            SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
+        }
+        return;
+    }
+
+    const auto title_of = [workspace](const std::string& group_id) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group == nullptr || group->title.empty())
+            return group_id;
+        return group->title;
+    };
+
+    AppRuntimeState::PendingDraftRejection pending;
+    pending.active = true;
+    pending.selection = group_ids;
+    pending.dependents = dependents;
+    for (const std::string& group_id : group_ids)
+        pending.selection_titles.push_back(title_of(group_id));
+    for (const std::string& group_id : dependents)
+        pending.dependent_titles.push_back(title_of(group_id));
+    impl_->pending_draft_rejection = std::move(pending);
+}
+
+void AppRuntime::ResolvePendingDraftRejection(DraftRejectionScope scope) {
+    if (!impl_->pending_draft_rejection.active)
+        return;
+    const std::vector<std::string> selection = impl_->pending_draft_rejection.selection;
+    const std::size_t stranded = impl_->pending_draft_rejection.dependents.size();
+    impl_->pending_draft_rejection = {};
+
+    std::string error;
+    if (!RejectDraftGroups(selection, scope, error)) {
+        SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
+        return;
+    }
+    if (scope == DraftRejectionScope::Cascade) {
+        SetStatus(ui::i18n::trnf("Rejected the change and {0} that depended on it.",
+                                 "Rejected the change and {0} that depended on it.",
+                                 static_cast<int>(stranded),
+                                 stranded));
+    } else {
+        SetStatus(ui::i18n::trnf("Rejected the change. {0} change now needs attention before it can be accepted.",
+                                 "Rejected the change. {0} changes now need attention before they can be accepted.",
+                                 static_cast<int>(stranded),
+                                 stranded));
+    }
+}
+
+void AppRuntime::CancelPendingDraftRejection() {
+    impl_->pending_draft_rejection = {};
 }
 
 bool AppRuntime::DiscardWorkingDraft(std::string& error) {

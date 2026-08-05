@@ -311,8 +311,27 @@ private:
     // anything is written. If either fails, nothing is.
     bool PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
 
-    // Rejects a selection and everything left dangling by it.
-    bool RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
+    // How far a rejection reaches past what the user picked.
+    enum class DraftRejectionScope {
+        // Reject the dependents too. The work goes, and goes visibly.
+        Cascade,
+        // Keep them, marked `NeedsAttention`. They leave materialization -- they
+        // could not apply -- but stay in the workspace for their author to
+        // retarget.
+        StrandDependents,
+    };
+
+    // Rejects a selection, applying `scope` to whatever it would strand.
+    bool RejectDraftGroups(const std::vector<std::string>& group_ids, DraftRejectionScope scope, std::string& error);
+
+    // Starts a rejection, raising the choice above only when there is one to make.
+    //
+    // A rejection that strands nothing is applied immediately: a modal on every
+    // rejection is a modal the user stops reading, and then the one that matters
+    // is dismissed with the rest.
+    void BeginRejectDraftGroups(const std::vector<std::string>& group_ids);
+    void ResolvePendingDraftRejection(DraftRejectionScope scope);
+    void CancelPendingDraftRejection();
 
     // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
     // because nothing in the draft was ever applied to it.

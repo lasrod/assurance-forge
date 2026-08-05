@@ -42,6 +42,9 @@ private:
     void RenderTerminologyCategoryEditorModal();
     void RenderDeleteTerminologyCategoryModal();
     void RenderReviewerNamePromptModal();
+    // How far a draft rejection reaches: the changes built on top of the
+    // rejected one go with it, or stay and wait for their author.
+    void RenderDraftRejectionScopeModal();
 
     AppRuntimeState& state_;
     bool& done_;

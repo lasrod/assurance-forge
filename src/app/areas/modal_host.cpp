@@ -44,6 +44,7 @@ void ModalHost::Render() {
     RenderStartupProjectWindow();
     RenderNotImplementedModal();
     RenderReviewerNamePromptModal();
+    RenderDraftRejectionScopeModal();
 }
 
 void ModalHost::RenderPreferencesWindow() {
@@ -620,6 +621,78 @@ void ModalHost::RenderReviewerNamePromptModal() {
         ImGui::EndPopup();
     } else if (state_.modal_coordinator->show_reviewer_name_prompt) {
         ImGui::OpenPopup((AF_TR("Reviewer Name") + "###Reviewer Name").c_str());
+    }
+}
+
+// Rejecting one change can strand others. Which of the two things that means is
+// the user's decision, and this is where it is put to them.
+//
+// The alternative -- cascading silently, which is what this replaces -- discards
+// work the user never chose to discard, in a tool where the work is a safety
+// argument. Applying only the selection is not an option: the stranded groups
+// would fail to materialize and take the whole draft down with them.
+void ModalHost::RenderDraftRejectionScopeModal() {
+    const AppRuntimeState::PendingDraftRejection& pending = state_.pending_draft_rejection;
+    const std::string title = AF_TR("Reject dependent changes?") + "###draft_rejection_scope";
+    if (!pending.active) {
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const std::size_t dependents = pending.dependent_titles.size();
+        ImGui::TextWrapped("%s",
+                           ui::i18n::trnf("{0} other change is built on the one you are rejecting, so it can no "
+                                          "longer be applied on its own.",
+                                          "{0} other changes are built on the one you are rejecting, so they can no "
+                                          "longer be applied on their own.",
+                                          static_cast<int>(dependents),
+                                          dependents)
+                               .c_str());
+        ImGui::Spacing();
+
+        // Both lists are named. A user deciding what to throw away needs to see
+        // what is on each side of the decision, not a count.
+        ImGui::TextUnformatted(AF_TR("Rejecting:").c_str());
+        for (const std::string& title_text : pending.selection_titles) {
+            ImGui::Bullet();
+            ImGui::TextUnformatted(title_text.c_str());
+        }
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Built on it:").c_str());
+        for (const std::string& title_text : pending.dependent_titles) {
+            ImGui::Bullet();
+            ImGui::TextUnformatted(title_text.c_str());
+        }
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        if (ImGui::Button(AF_TR("Keep them for review").c_str(), ImVec2(200.0f, 0.0f))) {
+            if (callbacks_.resolve_draft_rejection)
+                callbacks_.resolve_draft_rejection(false);
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s",
+                              AF_TR("They stop being applied to the working draft and are marked as needing "
+                                    "attention, so their author can retarget them.")
+                                  .c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(AF_TR("Reject them too").c_str(), ImVec2(160.0f, 0.0f))) {
+            if (callbacks_.resolve_draft_rejection)
+                callbacks_.resolve_draft_rejection(true);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+            if (callbacks_.cancel_draft_rejection)
+                callbacks_.cancel_draft_rejection();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else {
+        ImGui::OpenPopup(title.c_str());
     }
 }
 

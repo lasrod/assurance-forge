@@ -134,7 +134,22 @@ struct DraftChangeGroup {
     std::vector<std::string> depends_on_group_ids;
 
     // Whether this group takes part in materialization.
+    //
+    // `NeedsAttention` is excluded deliberately. Such a group cannot apply -- the
+    // group that created what it edits is gone -- so materializing it would fail
+    // and take the whole working model down with it, leaving the user's draft
+    // `Blocked` because they declined a cascade. Excluding it keeps the rest of
+    // the draft drawable while the stranded group waits for its author.
     bool active() const {
+        return state == DraftGroupState::Building || state == DraftGroupState::Ready;
+    }
+
+    // Whether the workspace is worth keeping for this group's sake.
+    //
+    // Wider than `active()`: a stranded group is real work whose only copy this
+    // is, and a workspace holding nothing else must not be cleaned up as though
+    // it were empty.
+    bool recoverable() const {
         return state != DraftGroupState::Rejected;
     }
 
