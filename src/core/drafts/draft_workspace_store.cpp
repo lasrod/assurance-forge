@@ -156,9 +156,37 @@ constexpr std::size_t kMaxDraftEditUndoDepth = 64;
 void DraftWorkspaceStore::PushEditUndo(std::string label) {
     if (!workspace_.has_value())
         return;
+    // A scope is open, so the gesture as a whole owns the entry. Pushing here as
+    // well would let one Ctrl+Z reverse part of it.
+    if (edit_undo_scope_depth_ > 0)
+        return;
     edit_undo_stack_.push_back(DraftEditUndoEntry{workspace_.value(), std::move(label)});
     if (edit_undo_stack_.size() > kMaxDraftEditUndoDepth)
         edit_undo_stack_.erase(edit_undo_stack_.begin());
+}
+
+DraftWorkspaceStore::EditUndoScope::EditUndoScope(DraftWorkspaceStore& store, std::string label)
+    : store_(store), label_(std::move(label)) {
+    outermost_ = store_.edit_undo_scope_depth_ == 0;
+    if (outermost_ && store_.workspace_.has_value()) {
+        before_ = store_.workspace_.value();
+        revision_on_entry_ = store_.workspace_->working_revision;
+    }
+    ++store_.edit_undo_scope_depth_;
+}
+
+DraftWorkspaceStore::EditUndoScope::~EditUndoScope() {
+    --store_.edit_undo_scope_depth_;
+    if (!outermost_ || !before_.has_value() || !store_.workspace_.has_value())
+        return;
+    // Nothing moved, so the gesture was refused and there is nothing to undo.
+    // An entry here would silently reverse the edit before it.
+    if (store_.workspace_->working_revision == revision_on_entry_)
+        return;
+
+    store_.edit_undo_stack_.push_back(DraftEditUndoEntry{std::move(before_.value()), std::move(label_)});
+    if (store_.edit_undo_stack_.size() > kMaxDraftEditUndoDepth)
+        store_.edit_undo_stack_.erase(store_.edit_undo_stack_.begin());
 }
 
 void DraftWorkspaceStore::ClearEditUndoHistory() {

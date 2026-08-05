@@ -1762,6 +1762,18 @@ bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids,
     // What happens to it is the user's decision, taken before this is called.
     const std::vector<std::string> dependents = core::drafts::DependentsOf(*workspace, group_ids);
 
+    // One gesture, one undo entry. Rejecting a change and deciding what happens
+    // to the changes built on it is a single decision the user took, and undoing
+    // half of it would leave the draft in the incoherent state the decision
+    // existed to prevent.
+    const std::string label = [&]() {
+        const core::drafts::DraftChangeGroup* first = workspace->FindGroup(group_ids.front());
+        if (first == nullptr || first->title.empty())
+            return std::string("Rejected a change");
+        return "Rejected " + first->title;
+    }();
+    const core::drafts::DraftWorkspaceStore::EditUndoScope undo_scope(impl_->draft_workspace, label);
+
     for (const std::string& group_id : group_ids) {
         if (!impl_->draft_workspace.RejectGroup(group_id, error))
             return false;

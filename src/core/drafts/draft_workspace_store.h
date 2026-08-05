@@ -220,6 +220,32 @@ public:
 
     bool CanUndoDraftEdit() const;
 
+    // Collapses every mutation made during its lifetime into one undo entry.
+    //
+    // One user gesture can be several store mutations: rejecting a change and
+    // stranding what depended on it is two, and the whole point of putting that
+    // choice to the user is that the two go together. Without this, one Ctrl+Z
+    // reverses half of it and leaves the draft in exactly the incoherent state
+    // the choice existed to prevent.
+    //
+    // An entry is pushed only if the revision actually moved, so a gesture that
+    // was refused leaves nothing to undo.
+    class [[nodiscard]] EditUndoScope {
+    public:
+        EditUndoScope(DraftWorkspaceStore& store, std::string label);
+        ~EditUndoScope();
+
+        EditUndoScope(const EditUndoScope&) = delete;
+        EditUndoScope& operator=(const EditUndoScope&) = delete;
+
+    private:
+        DraftWorkspaceStore& store_;
+        std::string label_;
+        std::optional<DraftWorkspace> before_;
+        std::uint64_t revision_on_entry_ = 0;
+        bool outermost_ = false;
+    };
+
     // What the next undo would reverse, for the status line. Empty when there is
     // nothing to undo.
     std::string NextDraftUndoLabel() const;
@@ -277,6 +303,9 @@ private:
     std::optional<DraftWorkspace> workspace_;
     std::unordered_set<std::string> authoritative_identities_;
     std::vector<DraftEditUndoEntry> edit_undo_stack_;
+    // Non-zero while an `EditUndoScope` is open, which suppresses the per-mutation
+    // entries in favour of the one the scope pushes.
+    int edit_undo_scope_depth_ = 0;
 
     std::shared_ptr<DraftMaterializationResult> materialization_ = std::make_shared<DraftMaterializationResult>();
     bool materialization_valid_ = false;

@@ -667,7 +667,11 @@ void ModalHost::RenderDraftRejectionScopeModal() {
         ImGui::Spacing();
         ImGui::Spacing();
 
-        if (ImGui::Button(AF_TR("Keep them for review").c_str(), ImVec2(200.0f, 0.0f))) {
+        // Sized to their labels rather than pinned. These read as sentences, not
+        // as "OK"/"Cancel", and at a scaled DPI a fixed width truncated them to
+        // "Keep them for rev" and "Reject them to" -- which is the one thing a
+        // dialog asking what to destroy must not do.
+        if (ImGui::Button(AF_TR("Keep them for review").c_str())) {
             if (callbacks_.resolve_draft_rejection)
                 callbacks_.resolve_draft_rejection(false);
             ImGui::CloseCurrentPopup();
@@ -679,13 +683,13 @@ void ModalHost::RenderDraftRejectionScopeModal() {
                                   .c_str());
         }
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Reject them too").c_str(), ImVec2(160.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Reject them too").c_str())) {
             if (callbacks_.resolve_draft_rejection)
                 callbacks_.resolve_draft_rejection(true);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             if (callbacks_.cancel_draft_rejection)
                 callbacks_.cancel_draft_rejection();
             ImGui::CloseCurrentPopup();

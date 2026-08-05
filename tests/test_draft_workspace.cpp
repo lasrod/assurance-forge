@@ -1922,3 +1922,61 @@ TEST(DraftWorkspace, AnOrdinaryTransactionSerializesExactlyAsItDidBefore) {
     ASSERT_TRUE(core::audit::ParseAuditTransactionLine(line, parsed, error)) << error;
     EXPECT_TRUE(parsed.draft_promotion.empty());
 }
+
+TEST(DraftWorkspace, OneGestureIsOneUndoEvenWhenItTouchesSeveralGroups) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    std::string error;
+    {
+        // What "reject this, keep what depended on it" does: two store mutations
+        // from one click.
+        const core::drafts::DraftWorkspaceStore::EditUndoScope scope(fixture.store, "Rejected Add a sub-claim");
+        ASSERT_TRUE(fixture.store.RejectGroup(creator, error)) << error;
+        ASSERT_TRUE(fixture.store.MarkGroupNeedsAttention(editor, error)) << error;
+    }
+
+    ASSERT_TRUE(fixture.store.CanUndoDraftEdit());
+    EXPECT_EQ(fixture.store.NextDraftUndoLabel(), "Rejected Add a sub-claim");
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    // Both halves come back together. Undoing only the stranding would leave the
+    // creation rejected and its dependent healthy -- an argument state the user
+    // never chose, produced by the very control that exists to stop them
+    // choosing one by accident.
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(creator)->state, core::drafts::DraftGroupState::Building);
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(editor)->state, core::drafts::DraftGroupState::Building);
+
+    // Exactly one entry, so the *next* undo reaches the edit before the gesture
+    // rather than a half-applied state inside it. Asserted by taking it: with
+    // per-mutation entries left behind, this second undo lands on
+    // "creation rejected, dependent healthy" -- which is the state the whole
+    // mechanism exists to make unreachable.
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(creator)->state, core::drafts::DraftGroupState::Building)
+        << "the second undo went past the gesture, not into the middle of it";
+    EXPECT_TRUE(fixture.store.workspace()->FindGroup(editor)->operations.empty())
+        << "and reached the staging that preceded it";
+}
+
+TEST(DraftWorkspace, AGestureThatChangesNothingLeavesNoUndoEntry) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+
+    std::string error;
+    {
+        const core::drafts::DraftWorkspaceStore::EditUndoScope scope(fixture.store, "Rejected nothing at all");
+        EXPECT_FALSE(fixture.store.RejectGroup("group-does-not-exist", error));
+    }
+
+    // An entry for a gesture that did nothing would make the next Ctrl+Z reverse
+    // the user's last real change while appearing to reverse the refused one.
+    EXPECT_EQ(fixture.store.NextDraftUndoLabel(), "Reword the top goal");
+}
