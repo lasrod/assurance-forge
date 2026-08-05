@@ -89,6 +89,10 @@ struct WorkbenchState {
     bool focus_review_tab = false;
     std::string focus_review_item_id;
     bool focus_history_tab = false;
+    // Raised when the user asks to see the draft from somewhere else -- the
+    // banner, or an element's contribution list in the inspector -- so the list
+    // of changes is one click from what they were looking at.
+    bool focus_draft_changes_tab = false;
     // When non-empty, the History panel scopes its transaction list to changes
     // touching this element id. Cleared by the History panel's "Clear filter"
     // control or when the user opens a different element history.

@@ -333,6 +333,11 @@ private:
     void ResolvePendingDraftRejection(DraftRejectionScope scope);
     void CancelPendingDraftRejection();
 
+    // Selects the first element a draft group changes and centres the canvas on
+    // it. Does nothing when the group's changes are not on screen -- a stranded
+    // group is not applied to the working model, so there is nothing to focus.
+    void FocusDraftGroupOnCanvas(const std::string& group_id);
+
     // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
     // because nothing in the draft was ever applied to it.
     bool DiscardWorkingDraft(std::string& error);

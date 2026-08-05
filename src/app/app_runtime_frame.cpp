@@ -410,6 +410,25 @@ void AppRuntime::RenderFrame(bool& done) {
         areas::RenderReviewPanelContent(*impl_, review_panel_callbacks);
     };
     feedback_dock_callbacks.render_ai_debug_content = [this]() { areas::RenderAiDebugPanelContent(*impl_); };
+    feedback_dock_callbacks.draft_changes.accept_group = [this](const std::string& group_id) {
+        std::string error;
+        if (PromoteDraftGroups({group_id}, error)) {
+            SetStatus(AF_TR("Accepted the change. The rest of the draft is still unaccepted."));
+        } else {
+            SetStatus(ui::i18n::trf("Could not accept this change: {0}", error));
+        }
+    };
+    feedback_dock_callbacks.draft_changes.reject_group = [this](const std::string& group_id) {
+        BeginRejectDraftGroups({group_id});
+    };
+    feedback_dock_callbacks.draft_changes.accept_all = [this]() {
+        std::string error;
+        if (!PromoteWorkingDraft(error))
+            SetStatus(ui::i18n::trf("Could not accept the draft: {0}", error));
+    };
+    feedback_dock_callbacks.draft_changes.focus_group = [this](const std::string& group_id) {
+        FocusDraftGroupOnCanvas(group_id);
+    };
     {
         core::perf::ScopedTimer s("app.area.feedback_dock");
         areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);

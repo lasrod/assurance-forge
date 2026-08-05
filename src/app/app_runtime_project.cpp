@@ -1798,8 +1798,8 @@ void AppRuntime::ResolvePendingDraftRejection(DraftRejectionScope scope) {
         return;
     }
     if (scope == DraftRejectionScope::Cascade) {
-        SetStatus(ui::i18n::trnf("Rejected the change and {0} that depended on it.",
-                                 "Rejected the change and {0} that depended on it.",
+        SetStatus(ui::i18n::trnf("Rejected the change, and {0} change that depended on it.",
+                                 "Rejected the change, and {0} changes that depended on it.",
                                  static_cast<int>(stranded),
                                  stranded));
     } else {
@@ -1812,6 +1812,29 @@ void AppRuntime::ResolvePendingDraftRejection(DraftRejectionScope scope) {
 
 void AppRuntime::CancelPendingDraftRejection() {
     impl_->pending_draft_rejection = {};
+}
+
+void AppRuntime::FocusDraftGroupOnCanvas(const std::string& group_id) {
+    const std::shared_ptr<const core::drafts::DraftMaterializationResult> materialization =
+        impl_->draft_frame_materialization;
+    if (materialization == nullptr)
+        return;
+
+    // The index is keyed by element, so the group's elements are found by asking
+    // each changed element who contributed to it. In materialization order, so
+    // "the first element this group changed" is stable between frames rather
+    // than whichever the map happened to yield first.
+    for (const std::string& element_id : materialization->change_index.ChangedElementIds()) {
+        const std::vector<std::string> contributors = materialization->change_index.ContributingGroupIds(element_id);
+        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
+            continue;
+        // A removed element is not on the canvas to be centred on, but the
+        // presentation view keeps it as a tombstone, so selecting it still lands
+        // somewhere the user can see.
+        impl_->events.Emit(SelectionChangedEvent{element_id, true});
+        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+        return;
+    }
 }
 
 bool AppRuntime::DiscardWorkingDraft(std::string& error) {

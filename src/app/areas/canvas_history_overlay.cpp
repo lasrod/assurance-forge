@@ -513,6 +513,12 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     }
 
     ImGui::SameLine();
+    // The banner says how many changes there are; this is where the user finds
+    // out what they are, who wrote each one, and which can be accepted alone.
+    if (ImGui::Button((AF_TR("Review changes") + "##draft_review_changes").c_str()))
+        state.workbench.focus_draft_changes_tab = true;
+
+    ImGui::SameLine();
     ImGui::BeginDisabled(promoting);
     if (ImGui::Button((AF_TR("Discard draft") + "##draft_discard").c_str())) {
         if (callbacks.discard_working_draft)

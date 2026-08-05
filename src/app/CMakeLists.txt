@@ -25,6 +25,7 @@ add_library(af_app OBJECT
     areas/audit_data_cache.cpp
     areas/baseline_modal.cpp
     areas/canvas_history_overlay.cpp
+    areas/draft_changes_area.cpp
     areas/feedback_dock_area.cpp
     areas/history_panel_area.cpp
     areas/inspector_area.cpp
