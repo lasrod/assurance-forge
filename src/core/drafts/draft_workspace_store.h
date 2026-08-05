@@ -49,6 +49,11 @@ public:
         return project_root_;
     }
 
+    // The argument this store has open, whether or not a workspace exists for it.
+    const std::filesystem::path& argument_file() const {
+        return argument_file_;
+    }
+
     // Opens the workspace for `argument_file`, restoring stored recovery data
     // when there is any.
     //
@@ -137,6 +142,52 @@ public:
     // Discards the whole workspace, in memory and on disk. The accepted `.sacm`
     // is left byte-identical.
     bool DiscardWorkspace(std::string& error);
+
+    // --- Undoing a promotion ---------------------------------------------
+    //
+    // `RemovePromotedGroups` is not reversible on its own: it erases the groups,
+    // and when none are left it deletes the workspace outright. Undo restores the
+    // accepted model from the audit log, which would otherwise leave the promoted
+    // work in neither place.
+    //
+    // So promotion records the workspace as it stood before it, keyed by the
+    // audit transaction sequence it produced, and undo puts it back.
+
+    // Writes the pre-promotion workspace for `transaction_sequence`. Called after
+    // the promotion's audited command has committed, because that is when the
+    // sequence exists -- but before the groups are removed, so the snapshot is
+    // durable before the thing it recovers is gone.
+    bool SavePromotionSnapshot(std::uint64_t transaction_sequence,
+                               const DraftWorkspace& pre_promotion,
+                               std::string& error) const;
+
+    // Convenience for tests and diagnostics. **Not for a fail-closed decision**
+    // -- it answers false both for "no snapshot" and for "the path could not be
+    // interrogated". Undo must tell those apart, so it uses the loader below.
+    bool HasPromotionSnapshot(std::uint64_t transaction_sequence) const;
+
+    // Returns false with an empty `error` when `transaction_sequence` is not a
+    // promotion, which is the ordinary case, and false with a non-empty `error`
+    // when there may be a snapshot that could not be read. A caller about to
+    // discard unaccepted work has to refuse on the second and continue on the
+    // first, so it must call this rather than test existence first.
+    bool LoadPromotionSnapshot(std::uint64_t transaction_sequence, DraftWorkspace& snapshot, std::string& error) const;
+
+    bool DeletePromotionSnapshot(std::uint64_t transaction_sequence, std::string& error) const;
+
+    // Puts the groups a promotion consumed back into the live workspace, once
+    // that promotion has been undone and `restored_accepted` is the model the
+    // undo produced.
+    //
+    // Groups the workspace already holds are kept as they are, and only those
+    // missing from it are reinstated. Work staged *after* the promotion is
+    // therefore not lost -- which wholesale replacement with the snapshot would
+    // do, trading one silent loss for another. Reinstated groups keep their
+    // original sequence and their `generated_ids`, so a later group that
+    // developed a promoted element still resolves against it.
+    bool RestorePromotionSnapshot(const DraftWorkspace& snapshot,
+                                  const core::AssuranceCase& restored_accepted,
+                                  std::string& error);
 
     // The working model, and everything derived from it.
     //

@@ -1282,6 +1282,254 @@ TEST(DraftWorkspace, RejectingACreationIdentifiesWhatDependsOnIt) {
 }
 
 // --------------------------------------------------------------------------
+// Undoing a promotion.
+//
+// Promotion is one boundary on the accepted undo stack, but a draft is not a
+// command and has no entry on that stack. Undo therefore restores an accepted
+// model the remaining groups were never rebased onto -- and, when the promotion
+// consumed the last group, one whose work has already been deleted from the
+// draft. The draft was the only copy.
+// --------------------------------------------------------------------------
+
+namespace {
+
+// The store-side half of `AppRuntime::PromoteDraftGroups`: everything it does
+// around the audited command, in the order it does it. `sequence` stands in for
+// the audit transaction the real promotion records.
+core::drafts::DraftPromotionPlan
+PromoteThroughStore(Fixture& fixture, const std::vector<std::string>& group_ids, std::uint64_t sequence) {
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, group_ids, "Jesper");
+    EXPECT_TRUE(plan.ok) << plan.error;
+    if (!plan.ok)
+        return plan;
+
+    const core::drafts::DraftWorkspace pre_promotion = *fixture.store.workspace();
+    std::string error;
+    EXPECT_TRUE(fixture.store.BeginPromotion(plan.closure, plan.promoted_model, error)) << error;
+    EXPECT_TRUE(fixture.store.SavePromotionSnapshot(sequence, pre_promotion, error)) << error;
+    EXPECT_TRUE(fixture.store.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) << error;
+    return plan;
+}
+
+} // namespace
+
+TEST(DraftWorkspace, PromotingTheLastGroupStillLeavesSomethingToUndoInto) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    PromoteThroughStore(fixture, {branch}, 7);
+
+    // Accepting the last group deletes the workspace directory outright, which is
+    // exactly why the snapshot is not kept inside it.
+    EXPECT_EQ(fixture.store.workspace(), nullptr);
+    EXPECT_FALSE(std::filesystem::exists(core::drafts::DraftWorkspaceDirectory(
+        fixture.dir.path, core::drafts::ArgumentStableKey(std::filesystem::path("arguments") / "main.sacm"))));
+    EXPECT_TRUE(fixture.store.HasPromotionSnapshot(7));
+}
+
+TEST(DraftWorkspace, UndoingAPromotionPutsBackTheDraftItConsumed) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, branch, "$sub");
+    ASSERT_FALSE(sub_id.empty());
+
+    PromoteThroughStore(fixture, {branch}, 7);
+    ASSERT_EQ(fixture.store.workspace(), nullptr);
+
+    // The undo restored the accepted model to the baseline. Without the restore
+    // below, the created claim is now in neither the argument nor the draft.
+    core::drafts::DraftWorkspace snapshot;
+    std::string error;
+    ASSERT_TRUE(fixture.store.LoadPromotionSnapshot(7, snapshot, error)) << error;
+    ASSERT_TRUE(fixture.store.RestorePromotionSnapshot(snapshot, fixture.accepted, error)) << error;
+
+    const core::drafts::DraftWorkspace* restored = fixture.store.workspace();
+    ASSERT_NE(restored, nullptr);
+    ASSERT_EQ(restored->groups.size(), 1u);
+    EXPECT_EQ(restored->groups.front().id, branch);
+    EXPECT_EQ(restored->groups.front().title, "Add a sub-claim");
+    EXPECT_EQ(restored->groups.front().source_label, "Claude Code")
+        << "provenance comes back with the work, or the audit record of a re-acceptance is wrong";
+
+    // And it comes back at the identity it was shown under, so a selection or an
+    // agent's reference to it still resolves.
+    EXPECT_EQ(IdentityFor(fixture.store, branch, "$sub"), sub_id);
+    const core::drafts::DraftMaterializationResult& materialized = fixture.store.Materialize(fixture.accepted, 2);
+    ASSERT_TRUE(materialized.success) << materialized.error;
+    EXPECT_NE(FindElement(materialized.working_model, sub_id), nullptr);
+}
+
+TEST(DraftWorkspace, ARestoredDraftIsNotStaleAgainstTheArgumentTheUndoRestored) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    // A second group, so the promotion is partial and the workspace survives it
+    // carrying the post-promotion base hash. Promoting the last group instead
+    // would delete the workspace and restore the snapshot's own hash, which is
+    // already the right one -- and would assert nothing about the restore.
+    const std::string unrelated = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(unrelated, {UpdateTextOp("G1", "Clarified.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    PromoteThroughStore(fixture, {branch}, 7);
+    ASSERT_NE(fixture.store.workspace(), nullptr);
+
+    core::drafts::DraftWorkspace snapshot;
+    std::string error;
+    ASSERT_TRUE(fixture.store.LoadPromotionSnapshot(7, snapshot, error)) << error;
+    ASSERT_TRUE(fixture.store.RestorePromotionSnapshot(snapshot, fixture.accepted, error)) << error;
+
+    // `RemovePromotedGroups` moved the base hash forward to the promoted model.
+    // If the restore leaves it there, the very next open compares the draft
+    // against an argument the undo has already taken away and declares it stale
+    // -- inert work, restored into a state it can never leave.
+    core::drafts::DraftWorkspaceStore reopened;
+    reopened.SetProjectRoot(fixture.dir.path);
+    ASSERT_TRUE(reopened.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    ASSERT_NE(reopened.workspace(), nullptr);
+    EXPECT_EQ(reopened.workspace()->state, core::drafts::DraftWorkspaceState::Active);
+    ASSERT_EQ(reopened.workspace()->groups.size(), 2u);
+    EXPECT_EQ(reopened.workspace()->groups.front().id, branch);
+}
+
+TEST(DraftWorkspace, UndoingAPromotionKeepsWorkStagedAfterIt) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    const std::string unrelated = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(unrelated, {UpdateTextOp("G1", "Clarified.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, branch, "$sub");
+
+    const core::drafts::DraftPromotionPlan plan = PromoteThroughStore(fixture, {branch}, 11);
+    ASSERT_NE(fixture.store.workspace(), nullptr);
+    ASSERT_EQ(fixture.store.workspace()->groups.size(), 1u) << "the unrelated group stays behind";
+
+    // A third group arrives after the promotion, against the promoted baseline,
+    // and develops the element the promotion accepted.
+    std::string error;
+    const std::string later = fixture.store.BeginGroup(McpRequest("Qualify the sub-claim"), plan.promoted_model, error);
+    ASSERT_FALSE(later.empty()) << error;
+    ASSERT_TRUE(fixture.store.StageOperations(
+        later, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")}, plan.promoted_model, error))
+        << error;
+
+    core::drafts::DraftWorkspace snapshot;
+    ASSERT_TRUE(fixture.store.LoadPromotionSnapshot(11, snapshot, error)) << error;
+    ASSERT_TRUE(fixture.store.RestorePromotionSnapshot(snapshot, fixture.accepted, error)) << error;
+
+    // Restoring the snapshot wholesale would take the workspace back to two
+    // groups and drop the third, trading one silent loss of unaccepted work for
+    // another.
+    const core::drafts::DraftWorkspace* restored = fixture.store.workspace();
+    ASSERT_NE(restored, nullptr);
+    ASSERT_EQ(restored->groups.size(), 3u);
+    EXPECT_EQ(restored->groups[0].id, branch) << "reinstated at its original sequence, ahead of what followed it";
+    EXPECT_EQ(restored->groups[1].id, unrelated);
+    EXPECT_EQ(restored->groups[2].id, later);
+
+    // The group staged after the promotion referred to an element only the
+    // promoted group creates. Reinstating that group with its generated ids is
+    // what keeps the reference resolvable.
+    const core::drafts::DraftMaterializationResult& materialized = fixture.store.Materialize(fixture.accepted, 2);
+    ASSERT_TRUE(materialized.success) << materialized.error;
+    const core::SacmElement* developed = FindElement(materialized.working_model, sub_id);
+    ASSERT_NE(developed, nullptr);
+    EXPECT_EQ(developed->content, "Identified hazards are mitigated to ALARP.");
+}
+
+TEST(DraftWorkspace, AnOrdinaryTransactionHasNoPromotionSnapshot) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    PromoteThroughStore(fixture, {branch}, 7);
+
+    // The file existing is what marks a transaction as a promotion, so undo never
+    // has to infer it from a command name that ordinary proposal application
+    // shares.
+    EXPECT_TRUE(fixture.store.HasPromotionSnapshot(7));
+    EXPECT_FALSE(fixture.store.HasPromotionSnapshot(6));
+    EXPECT_FALSE(fixture.store.HasPromotionSnapshot(8));
+
+    core::drafts::DraftWorkspace ignored;
+    std::string error;
+    EXPECT_FALSE(fixture.store.LoadPromotionSnapshot(6, ignored, error));
+    EXPECT_TRUE(error.empty()) << "not a promotion is not a failure";
+}
+
+TEST(DraftWorkspace, AnUnreadableSnapshotIsNotReportedAsAbsent) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    PromoteThroughStore(fixture, {branch}, 7);
+
+    // A directory where the snapshot file should be: the sort of thing a botched
+    // sync or a half-restored backup leaves behind. It exists, so this is not
+    // "that transaction was not a promotion" -- but it cannot be read.
+    const std::filesystem::path path = core::drafts::DraftPromotionSnapshotPath(fixture.dir.path, 7);
+    std::filesystem::remove(path);
+    std::filesystem::create_directories(path);
+
+    // The two answers must stay distinguishable. Undo discards unaccepted work on
+    // this distinction, and reading "cannot be read" as "not a promotion" sends a
+    // transaction that *is* one down the ordinary path -- destroying the draft in
+    // precisely the case the check exists to protect.
+    core::drafts::DraftWorkspace snapshot;
+    std::string error;
+    EXPECT_FALSE(fixture.store.LoadPromotionSnapshot(7, snapshot, error));
+    EXPECT_FALSE(error.empty()) << "an unreadable snapshot must not read as 'this was not a promotion'";
+}
+
+TEST(DraftWorkspace, APromotionSnapshotIsRefusedRatherThanGuessedAt) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    PromoteThroughStore(fixture, {branch}, 7);
+
+    {
+        std::ofstream damaged(core::drafts::DraftPromotionSnapshotPath(fixture.dir.path, 7),
+                              std::ios::binary | std::ios::trunc);
+        damaged << R"({"schema":"assurance-forge.draft-workspace.v99"})";
+    }
+
+    // Read through the wrong schema, a draft is a draft quietly altered. The
+    // caller is told, and `AppRuntime::Undo` refuses the undo rather than
+    // destroying the accepted copy of work it cannot put back.
+    core::drafts::DraftWorkspace snapshot;
+    std::string error;
+    EXPECT_FALSE(fixture.store.LoadPromotionSnapshot(7, snapshot, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(DraftWorkspace, APromotionFromAnotherArgumentIsNotRestoredHere) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    PromoteThroughStore(fixture, {branch}, 7);
+
+    core::drafts::DraftWorkspace snapshot;
+    std::string error;
+    ASSERT_TRUE(fixture.store.LoadPromotionSnapshot(7, snapshot, error)) << error;
+    snapshot.argument_file = fixture.dir.path / "arguments" / "main2.sacm";
+
+    // Element ids repeat across a project's arguments -- every argument seeded
+    // from the template starts with the same top goal -- so a draft restored into
+    // the wrong one lands on ids that happen to match.
+    EXPECT_FALSE(fixture.store.RestorePromotionSnapshot(snapshot, fixture.accepted, error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_EQ(fixture.store.workspace(), nullptr) << "and nothing is left half-restored";
+}
+
+// --------------------------------------------------------------------------
 // `.af/` must not reach a colleague through version control.
 // --------------------------------------------------------------------------
 

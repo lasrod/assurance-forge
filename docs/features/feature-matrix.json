@@ -1545,19 +1545,48 @@
       "id": "AF-AI-015",
       "area": "AI",
       "name": "Dependency-aware selective promotion of draft changes",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`."
+      "status": "prototype",
+      "evidence": [
+        "src/core/drafts/draft_dependency_graph.cpp",
+        "src/core/drafts/draft_promotion_service.cpp",
+        "src/app/app_runtime_project.cpp",
+        "src/ui/panels/element_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_draft_workspace.cpp"
+      ],
+      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`, and undoing one restores the accepted baseline and the pre-promotion draft together (AF-AI-017). **Selection is per element, from the Inspector's contribution list, plus accept-all from the banner.** There is no Draft Changes panel yet, so a draft is reviewed one element at a time rather than as a list of groups with their sources, rationale, dependencies and findings — which is what a reviewer approving several agents' work at once actually needs. Rejecting a group does not yet offer a dependent cascade. Kept at prototype until both land and the release-gate scenario in #273 passes in the running application."
     },
     {
       "id": "AF-AI-016",
       "area": "AI",
       "name": "Draft recovery across restart",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": "Unaccepted work survives closing the application, stored under `.af/drafts/` and reconstructed from the accepted baseline plus its change groups — never as SACM, which has no assertion state meaning \"AI-proposed and not accepted\". A stored draft whose base hash no longer matches the argument enters `NeedsRebase` and replays nothing. `.af/` is generated with a `.gitignore` so unaccepted AI-authored argument text does not reach a colleague through version control."
+      "status": "prototype",
+      "evidence": [
+        "src/core/drafts/draft_persistence.cpp",
+        "src/core/drafts/draft_workspace_store.cpp",
+        "src/core/project_service.cpp"
+      ],
+      "tests": [
+        "tests/test_draft_workspace.cpp"
+      ],
+      "notes": "Unaccepted work survives closing the application, stored under `.af/drafts/` and reconstructed from the accepted baseline plus its change groups — never as SACM, which has no assertion state meaning \"AI-proposed and not accepted\". A stored draft whose base hash no longer matches the argument enters `NeedsRebase` and replays nothing. Promotion writes a pending marker before it touches accepted SACM, so a crash mid-promotion finalizes or cancels from the accepted-model hash rather than applying twice. `.af/` is generated with a `.gitignore` so unaccepted AI-authored argument text does not reach a colleague through version control. Kept at prototype with AF-AI-014: recovery is only as trustworthy as the workspace lifecycle around it, which is still under stability testing."
+    },
+    {
+      "id": "AF-AI-017",
+      "area": "AI",
+      "name": "Undoing an acceptance restores the draft it consumed",
+      "status": "prototype",
+      "evidence": [
+        "src/core/drafts/draft_persistence.cpp",
+        "src/core/drafts/draft_workspace_store.cpp",
+        "src/app/app_runtime_project.cpp",
+        "src/app/app_runtime_undo.cpp"
+      ],
+      "tests": [
+        "tests/test_draft_workspace.cpp"
+      ],
+      "notes": "Promotion is one boundary on the accepted undo stack, but a draft is deliberately not a command and has no entry on that stack. Undoing a promotion therefore took the change out of the accepted argument while the draft had already given it up — and where the promotion consumed the last group, the workspace was deleted with it, so the work was in neither place. Promotion now records the pre-promotion workspace under `.af/draft-promotions/<transaction>.json`, outside the per-argument draft directory the acceptance deletes, and undo puts the groups back with their provenance and generated identities, rebased onto the model the undo restored. Groups staged after the promotion are kept rather than replaced. A snapshot that cannot be read, or that belongs to another argument, refuses the undo instead of destroying the only copy of the work. **Not yet a two-stack undo**: while a draft is active, Ctrl+Z still targets the accepted model, so an individual draft edit cannot be undone on its own."
     },
     {
       "id": "AF-PLAT-001",

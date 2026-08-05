@@ -282,8 +282,18 @@ bool LoadDraftWorkspace(const std::filesystem::path& project_root,
     error.clear();
     const std::filesystem::path path = DraftWorkspacePath(project_root, argument_key);
     std::error_code ec;
-    if (!std::filesystem::exists(path, ec))
+    if (!std::filesystem::exists(path, ec)) {
+        // Same distinction the promotion snapshot makes below: a project with no
+        // draft is the ordinary case, but a draft directory that cannot be
+        // interrogated is reported rather than read as "there is no draft". The
+        // work may be hours of an agent's conversation and this file is the only
+        // copy of it.
+        if (ec) {
+            error = "Could not determine whether this argument has a draft: " + ec.message();
+            return false;
+        }
         return false;
+    }
 
     const std::expected<std::string, std::string> content = ReadTextFile(path);
     if (!content.has_value()) {
@@ -334,6 +344,91 @@ bool DeleteDraftWorkspace(const std::filesystem::path& project_root,
     std::filesystem::remove_all(DraftWorkspaceDirectory(project_root, argument_key), ec);
     if (ec) {
         error = "Could not remove the draft directory: " + ec.message();
+        return false;
+    }
+    return true;
+}
+
+std::filesystem::path DraftPromotionSnapshotsDirectory(const std::filesystem::path& project_root) {
+    return project_root / ".af" / "draft-promotions";
+}
+
+std::filesystem::path DraftPromotionSnapshotPath(const std::filesystem::path& project_root,
+                                                 std::uint64_t transaction_sequence) {
+    return DraftPromotionSnapshotsDirectory(project_root) / (std::to_string(transaction_sequence) + ".json");
+}
+
+bool SaveDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                std::uint64_t transaction_sequence,
+                                const DraftWorkspace& workspace,
+                                std::string& error) {
+    error.clear();
+    if (project_root.empty()) {
+        error = "Cannot save a draft promotion snapshot without a project root.";
+        return false;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(DraftPromotionSnapshotsDirectory(project_root), ec);
+    if (ec) {
+        error = "Could not create the draft promotion directory: " + ec.message();
+        return false;
+    }
+
+    // Events are not written beside it. A snapshot is not a second workspace a
+    // user can open; it is the material one undo needs, and the live event log
+    // keeps the history of what happened either way.
+    const std::expected<void, std::string> written = WriteTextFileAtomic(
+        DraftPromotionSnapshotPath(project_root, transaction_sequence), SerializeDraftWorkspace(workspace));
+    if (!written.has_value()) {
+        error = written.error();
+        return false;
+    }
+    return true;
+}
+
+bool LoadDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                std::uint64_t transaction_sequence,
+                                DraftWorkspace& workspace,
+                                std::string& error) {
+    error.clear();
+    const std::filesystem::path path = DraftPromotionSnapshotPath(project_root, transaction_sequence);
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec)) {
+        // `exists` reports "no" for both a genuinely absent file and a path it
+        // could not interrogate, and those must not mean the same thing here.
+        // Absent is "this transaction was not a promotion"; unreadable is "there
+        // may be unaccepted work behind this and it cannot be seen". Collapsing
+        // the second into the first lets an undo proceed as an ordinary one and
+        // destroy the only copy of that work.
+        if (ec) {
+            error = "Could not determine whether this acceptance has a draft snapshot: " + ec.message();
+            return false;
+        }
+        return false;
+    }
+
+    const std::expected<std::string, std::string> content = ReadTextFile(path);
+    if (!content.has_value()) {
+        error = content.error();
+        return false;
+    }
+    return DeserializeDraftWorkspace(content.value(), workspace, error);
+}
+
+bool DraftPromotionSnapshotExists(const std::filesystem::path& project_root, std::uint64_t transaction_sequence) {
+    std::error_code ec;
+    return std::filesystem::exists(DraftPromotionSnapshotPath(project_root, transaction_sequence), ec);
+}
+
+bool DeleteDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                  std::uint64_t transaction_sequence,
+                                  std::string& error) {
+    error.clear();
+    std::error_code ec;
+    std::filesystem::remove(DraftPromotionSnapshotPath(project_root, transaction_sequence), ec);
+    if (ec) {
+        error = "Could not remove the draft promotion snapshot: " + ec.message();
         return false;
     }
     return true;

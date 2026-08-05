@@ -1591,6 +1591,12 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
 
     const std::string author = core::drafts::DraftPromotionAuthor(*workspace, group_ids);
 
+    // Taken before `BeginPromotion` marks the workspace `Promoting`, so what undo
+    // restores is the workspace a user would recognize rather than one frozen
+    // mid-commit. It is written out only once the audit sequence to key it on
+    // exists, which is after dispatch.
+    const core::drafts::DraftWorkspace pre_promotion = *workspace;
+
     // Everything that can refuse, refuses here -- before the accepted model is
     // touched at all.
     const core::drafts::DraftPromotionPlan plan =
@@ -1683,6 +1689,22 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         impl_->app_state.mark_dirty();
         impl_->tree_needs_rebuild = true;
         return false;
+    }
+
+    // Undo restores the accepted model from the audit log, and nothing in that
+    // log describes a draft. Without this snapshot, undoing the promotion takes
+    // the change out of the accepted argument while `RemovePromotedGroups` has
+    // already taken it out of the draft -- and when the promotion consumed the
+    // last group, the workspace was deleted with it. Recorded before the removal
+    // so it is durable before the work it recovers is gone.
+    //
+    // A failure here does not fail the promotion: the accepted file is already
+    // written and correct. It costs the ability to undo *into* the draft, and the
+    // user is told that rather than left to discover it.
+    std::string snapshot_error;
+    if (outcome.transaction_sequence != 0 &&
+        !impl_->draft_workspace.SavePromotionSnapshot(outcome.transaction_sequence, pre_promotion, snapshot_error)) {
+        impl_->app_state.status_message = "Accepted, but undoing this will not bring the draft back: " + snapshot_error;
     }
 
     // Promoted groups leave the active workspace; the rest stay visible against

@@ -15,6 +15,13 @@
 //
 //     .af/drafts/<argument-stable-key>/workspace.json
 //     .af/drafts/<argument-stable-key>/events.jsonl
+//     .af/draft-promotions/<audit-transaction-sequence>.json
+//
+// The third is the pre-promotion workspace kept so that undoing a promotion can
+// put back the groups it consumed. It is deliberately **not** under
+// `.af/drafts/<key>/`: promoting the last group deletes that whole directory, so
+// a snapshot stored inside it would be destroyed by the very operation it exists
+// to reverse.
 //
 // **`.af/` is generated with a `.gitignore`.** ADR 0008 kept transient AI state
 // out of the project directory because the project directory reaches a colleague
@@ -29,6 +36,7 @@
 
 #include "core/drafts/draft_workspace.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -70,5 +78,65 @@ bool DraftWorkspaceExists(const std::filesystem::path& project_root, const std::
 bool DeleteDraftWorkspace(const std::filesystem::path& project_root,
                           const std::string& argument_key,
                           std::string& error);
+
+// --- Promotion snapshots -------------------------------------------------
+//
+// Promotion is one boundary on the accepted undo stack, but draft mutation is
+// deliberately not a command, so the workspace has no entry on that stack of its
+// own. Undoing a promotion therefore restores an accepted model the remaining
+// groups were never rebased onto -- and, when the promotion consumed the last
+// group, restores it with the promoted work gone from the draft as well. The
+// draft was the only copy of that work.
+//
+// A snapshot of the workspace as it stood *before* the promotion closes that
+// hole. It is keyed by the audit transaction sequence the promotion recorded,
+// which is also what identifies the promotion to undo: the file existing is what
+// marks transaction N as a promotion, so nothing has to infer it from a command
+// name that ordinary proposal application shares.
+//
+// **These are not pruned.** A snapshot is deleted when an undo consumes it and
+// otherwise accumulates, so a long-lived project keeps one small JSON file per
+// promotion it has ever made. Deliberate: the obvious cheap rules -- keep the
+// last N, drop anything older than a date -- can each delete a snapshot that is
+// still reachable from the undo stack, which is the precise failure this file
+// exists to prevent. Pruning against the audit undo boundary is correct and
+// needs audit knowledge `core` does not have. Left for the app layer.
+
+std::filesystem::path DraftPromotionSnapshotsDirectory(const std::filesystem::path& project_root);
+std::filesystem::path DraftPromotionSnapshotPath(const std::filesystem::path& project_root,
+                                                 std::uint64_t transaction_sequence);
+
+bool SaveDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                std::uint64_t transaction_sequence,
+                                const DraftWorkspace& workspace,
+                                std::string& error);
+
+// Reads a snapshot back.
+//
+//   false + empty `error`     -- there is none, so that transaction was not a
+//                                promotion. The ordinary case.
+//   false + non-empty `error` -- there may be one and it could not be read.
+//                                **Not the same answer.** A caller deciding
+//                                whether to destroy unaccepted work must refuse
+//                                here, not treat it as "not a promotion".
+//
+// This is the only function that can tell those apart, which is why the undo
+// path calls it unconditionally rather than gating on an existence check.
+bool LoadDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                std::uint64_t transaction_sequence,
+                                DraftWorkspace& workspace,
+                                std::string& error);
+
+// Convenience for tests and diagnostics.
+//
+// **Not for a fail-closed decision.** It returns false both for "no snapshot"
+// and for "the path could not be interrogated", and nothing about a bool can
+// distinguish them. Use `LoadDraftPromotionSnapshot` where the difference
+// decides whether unaccepted work survives.
+bool DraftPromotionSnapshotExists(const std::filesystem::path& project_root, std::uint64_t transaction_sequence);
+
+bool DeleteDraftPromotionSnapshot(const std::filesystem::path& project_root,
+                                  std::uint64_t transaction_sequence,
+                                  std::string& error);
 
 } // namespace core::drafts
