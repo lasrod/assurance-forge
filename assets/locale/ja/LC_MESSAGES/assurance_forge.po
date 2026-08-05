@@ -1555,9 +1555,6 @@ msgstr "まとめて却下"
 msgid "Reject this change"
 msgstr "この変更を却下"
 
-msgid "Rejected the change. The accepted argument is unchanged."
-msgstr "変更を却下しました。受理済みの議論は変更されていません。"
-
 msgid "Rejecting:"
 msgstr "却下する変更:"
 
@@ -2380,13 +2377,13 @@ msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
 msgstr[0] "提案ドラフト: {0} 件の操作"
 
-msgid "Rejected the change, and {0} change that depended on it."
-msgid_plural "Rejected the change, and {0} changes that depended on it."
-msgstr[0] "変更と、それを前提とする変更 {0} 件を却下しました。"
+msgid "Rejected {0} change."
+msgid_plural "Rejected {0} changes."
+msgstr[0] "変更 {0} 件を却下しました。"
 
-msgid "Rejected the change. {0} change now needs attention before it can be accepted."
-msgid_plural "Rejected the change. {0} changes now need attention before they can be accepted."
-msgstr[0] "変更を却下しました。受理するには {0} 件の変更に対応が必要です。"
+msgid "Rejected {0} change. The accepted argument is unchanged."
+msgid_plural "Rejected {0} changes. The accepted argument is unchanged."
+msgstr[0] "変更 {0} 件を却下しました。受理済みの議論は変更されていません。"
 
 msgid "This category is assigned to {0} term. Remove those assignments before deleting it."
 msgid_plural "This category is assigned to {0} terms. Remove those assignments before deleting it."
@@ -2404,9 +2401,17 @@ msgid "{0} SCCG finding"
 msgid_plural "{0} SCCG findings"
 msgstr[0] "SCCG 指摘 {0} 件"
 
+msgid "{0} change now needs attention before it can be accepted."
+msgid_plural "{0} changes now need attention before they can be accepted."
+msgstr[0] "受理するには {0} 件の変更に対応が必要です。"
+
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."
 msgstr[0] "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
+
+msgid "{0} dependent change was rejected too."
+msgid_plural "{0} dependent changes were rejected too."
+msgstr[0] "前提とする変更 {0} 件もあわせて却下しました。"
 
 msgid "{0} element"
 msgid_plural "{0} elements"

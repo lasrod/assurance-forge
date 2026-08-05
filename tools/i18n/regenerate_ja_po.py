@@ -280,7 +280,6 @@ TRANSLATIONS = {
     "Accepting this also accepts: {0}": "これを受理すると次も受理されます: {0}",
     "Accept this change": "この変更を受理",
     "Reject this change": "この変更を却下",
-    "Rejected the change. The accepted argument is unchanged.": "変更を却下しました。受理済みの議論は変更されていません。",
     "Could not accept this change: {0}": "この変更を受理できませんでした: {0}",
     "Could not reject this change: {0}": "この変更を却下できませんでした: {0}",
     "My edits": "自分の編集",
@@ -951,12 +950,18 @@ TRANSLATIONS = {
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
-    ('Rejected the change, and {0} change that depended on it.',
-     'Rejected the change, and {0} changes that depended on it.'):
-        ['変更と、それを前提とする変更 {0} 件を却下しました。'],
-    ('Rejected the change. {0} change now needs attention before it can be accepted.',
-     'Rejected the change. {0} changes now need attention before they can be accepted.'):
-        ['変更を却下しました。受理するには {0} 件の変更に対応が必要です。'],
+    ('Rejected {0} change.',
+     'Rejected {0} changes.'):
+        ['変更 {0} 件を却下しました。'],
+    ('Rejected {0} change. The accepted argument is unchanged.',
+     'Rejected {0} changes. The accepted argument is unchanged.'):
+        ['変更 {0} 件を却下しました。受理済みの議論は変更されていません。'],
+    ('{0} dependent change was rejected too.',
+     '{0} dependent changes were rejected too.'):
+        ['前提とする変更 {0} 件もあわせて却下しました。'],
+    ('{0} change now needs attention before it can be accepted.',
+     '{0} changes now need attention before they can be accepted.'):
+        ['受理するには {0} 件の変更に対応が必要です。'],
     ('{0} element added',
      '{0} elements added'):
         ['要素 {0} 件を追加'],

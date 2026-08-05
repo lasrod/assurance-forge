@@ -1980,3 +1980,34 @@ TEST(DraftWorkspace, AGestureThatChangesNothingLeavesNoUndoEntry) {
     // the user's last real change while appearing to reverse the refused one.
     EXPECT_EQ(fixture.store.NextDraftUndoLabel(), "Reword the top goal");
 }
+
+TEST(DraftWorkspace, UndoingADraftEditDoesNotRevivateAStaleDraft) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    fixture.Stage(group, {ClearUndevelopedOp("G1")});
+
+    // The accepted argument changes while the draft is open. This is the path
+    // `Open()` does not cover and that does not clear the undo stack, so the
+    // entries above still describe an `Active` workspace.
+    core::AssuranceCase moved = fixture.accepted;
+    moved.elements.push_back(Claim("G2", "Something else was accepted in the meantime."));
+    fixture.store.Materialize(moved, 2);
+    ASSERT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::NeedsRebase);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    // Restoring the state from the entry would put this back to `Active`.
+    // `AppRuntime::PromoteDraftGroups` checks this flag before it checks
+    // anything else, so that would reopen the path to promoting a draft against
+    // a baseline it was never written for -- until the next materialization
+    // happened to re-detect the drift.
+    EXPECT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::NeedsRebase)
+        << "reversing a draft edit does not change the draft's relationship to the accepted argument";
+
+    // And the edit itself really was reversed, so this is not passing by doing
+    // nothing at all.
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(group)->operations.size(), 1u);
+}

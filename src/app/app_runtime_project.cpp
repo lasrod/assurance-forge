@@ -1800,8 +1800,15 @@ void AppRuntime::BeginRejectDraftGroups(const std::vector<std::string>& group_id
     if (dependents.empty()) {
         // Nothing else is affected, so there is no decision to put to the user.
         std::string error;
+        const std::size_t rejected = group_ids.size();
         if (RejectDraftGroups(group_ids, DraftRejectionScope::Cascade, error)) {
-            SetStatus(AF_TR("Rejected the change. The accepted argument is unchanged."));
+            // Counted, because this takes a selection: the panel rejects one row
+            // at a time today, but a message that says "the change" after
+            // rejecting three is the kind of report a reviewer acts on.
+            SetStatus(ui::i18n::trnf("Rejected {0} change. The accepted argument is unchanged.",
+                                     "Rejected {0} changes. The accepted argument is unchanged.",
+                                     static_cast<int>(rejected),
+                                     rejected));
         } else {
             SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
         }
@@ -1838,17 +1845,24 @@ void AppRuntime::ResolvePendingDraftRejection(DraftRejectionScope scope) {
         SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
         return;
     }
-    if (scope == DraftRejectionScope::Cascade) {
-        SetStatus(ui::i18n::trnf("Rejected the change, and {0} change that depended on it.",
-                                 "Rejected the change, and {0} changes that depended on it.",
-                                 static_cast<int>(stranded),
-                                 stranded));
-    } else {
-        SetStatus(ui::i18n::trnf("Rejected the change. {0} change now needs attention before it can be accepted.",
-                                 "Rejected the change. {0} changes now need attention before they can be accepted.",
-                                 static_cast<int>(stranded),
-                                 stranded));
-    }
+    // Two sentences, each pluralized on its own count. One sentence cannot be:
+    // gettext pluralizes on a single number, and this message has two -- how many
+    // changes the user rejected and how many were affected by it. Phrased without
+    // a pronoun referring back to the selection, so neither half has to agree in
+    // number with the other.
+    const std::size_t rejected = selection.size();
+    const std::string rejected_sentence =
+        ui::i18n::trnf("Rejected {0} change.", "Rejected {0} changes.", static_cast<int>(rejected), rejected);
+    const std::string consequence = scope == DraftRejectionScope::Cascade
+                                        ? ui::i18n::trnf("{0} dependent change was rejected too.",
+                                                         "{0} dependent changes were rejected too.",
+                                                         static_cast<int>(stranded),
+                                                         stranded)
+                                        : ui::i18n::trnf("{0} change now needs attention before it can be accepted.",
+                                                         "{0} changes now need attention before they can be accepted.",
+                                                         static_cast<int>(stranded),
+                                                         stranded);
+    SetStatus(rejected_sentence + " " + consequence);
 }
 
 void AppRuntime::CancelPendingDraftRejection() {

@@ -230,8 +230,24 @@ bool DraftWorkspaceStore::UndoDraftEdit(std::string& error) {
     // rather than rewound -- an MCP client polling by revision must not see
     // history it has already read disappear.
     workspace_->groups = std::move(entry.workspace.groups);
-    workspace_->state = entry.workspace.state;
     workspace_->next_sequence = std::max(workspace_->next_sequence, entry.workspace.next_sequence);
+
+    // **The workspace state is deliberately not restored.**
+    //
+    // It describes the draft's relationship to the accepted argument, which
+    // reversing a draft edit does not change. `Active`/`Blocked` are recomputed
+    // by the next materialization -- invalidated below -- and `NeedsRebase` is
+    // sticky by design.
+    //
+    // Restoring it would put a stale draft back to `Active`: the accepted
+    // argument can change while a draft is open, and materialization sets
+    // `NeedsRebase` there without clearing this stack. Promotion checks that
+    // flag before it checks anything else, so an undo that cleared it would
+    // reopen the path to promoting a draft against a baseline it was never
+    // written for -- until the next materialization happened to re-detect the
+    // drift.
+
+    ++workspace_->working_revision;
     ++workspace_->working_revision;
     RecordEvent("edit_undone", {}, entry.label);
     InvalidateMaterialization();
