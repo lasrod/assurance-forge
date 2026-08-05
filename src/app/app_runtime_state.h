@@ -89,6 +89,10 @@ struct WorkbenchState {
     bool focus_review_tab = false;
     std::string focus_review_item_id;
     bool focus_history_tab = false;
+    // Raised when the user asks to see the draft from somewhere else -- the
+    // banner, or an element's contribution list in the inspector -- so the list
+    // of changes is one click from what they were looking at.
+    bool focus_draft_changes_tab = false;
     // When non-empty, the History panel scopes its transaction list to changes
     // touching this element id. Cleared by the History panel's "Clear filter"
     // control or when the user opens a different element history.
@@ -244,6 +248,27 @@ struct AppRuntimeState {
     // rendering; retaining this immutable snapshot prevents the canvas and
     // inspector from dereferencing freed materialization storage.
     std::shared_ptr<const core::drafts::DraftMaterializationResult> draft_frame_materialization;
+    // A rejection the user has asked for that reaches further than what they
+    // picked, held while they decide how far it should go.
+    //
+    // Rejecting a group whose creations another group edits leaves that second
+    // group referring to an element that will never exist. Cascading silently is
+    // how a user loses work they never chose to discard, and applying only the
+    // selection would block the whole draft -- so the choice is theirs, and this
+    // is where it waits.
+    struct PendingDraftRejection {
+        bool active = false;
+        // What the user actually picked.
+        std::vector<std::string> selection;
+        // What would be stranded by it, transitively.
+        std::vector<std::string> dependents;
+        // Titles for the two lists above, so the modal names changes rather than
+        // group ids.
+        std::vector<std::string> selection_titles;
+        std::vector<std::string> dependent_titles;
+    };
+    PendingDraftRejection pending_draft_rejection;
+
     // Element ids the draft adds. The argument-package canvas filters by SACM
     // package ownership, and a proposed element belongs to no package at all --
     // so without this list the ownership filter drops every one of them and

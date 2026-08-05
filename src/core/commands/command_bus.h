@@ -118,7 +118,14 @@ public:
     // `transaction_id`, `transaction_sequence`, and post-state hashes are
     // populated whenever `success` is true, including the partial-failure
     // cases.
-    CommandResult Execute(ICommand& command, CommandContext& ctx, const std::string& author);
+    // `draft_promotion` is recorded verbatim on the transaction and is empty for
+    // every command except a draft promotion. It is the machine-readable half of
+    // attribution: `author` says who approved and which sources contributed,
+    // this says which groups, against which guidelines, and why.
+    CommandResult Execute(ICommand& command,
+                          CommandContext& ctx,
+                          const std::string& author,
+                          const audit::DraftPromotionRecord& draft_promotion = {});
 
     const audit::AuditManifest& Manifest() const {
         return manifest_;

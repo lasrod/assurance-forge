@@ -19,8 +19,34 @@ ordered_json SerializeAuditTransaction(const AuditTransaction& tx) {
     for (const AuditEvent& e : tx.events)
         events.push_back(SerializeAuditEvent(e));
     j["events"] = std::move(events);
+    // Emitted only when there is one. Every non-promotion transaction therefore
+    // serializes to exactly the bytes it did before this field existed, which is
+    // what keeps replay and the hash chain unaffected for existing logs.
+    if (!tx.draft_promotion.empty()) {
+        ordered_json promotion;
+        promotion["group_ids"] = tx.draft_promotion.group_ids;
+        promotion["source_labels"] = tx.draft_promotion.source_labels;
+        promotion["guideline_ids"] = tx.draft_promotion.guideline_ids;
+        promotion["review_item_ids"] = tx.draft_promotion.review_item_ids;
+        promotion["rationales"] = tx.draft_promotion.rationales;
+        j["draft_promotion"] = std::move(promotion);
+    }
     return j;
 }
+
+namespace {
+
+void ReadStringArray(const ordered_json& parent, const char* key, std::vector<std::string>& out) {
+    const auto it = parent.find(key);
+    if (it == parent.end() || !it->is_array())
+        return;
+    for (const auto& value : *it) {
+        if (value.is_string())
+            out.push_back(value.get<std::string>());
+    }
+}
+
+} // namespace
 
 std::string SerializeAuditTransactionLine(const AuditTransaction& tx) {
     // Compact single-line form for JSONL. No trailing newline — callers add
@@ -49,6 +75,13 @@ bool ParseAuditTransaction(const ordered_json& j, AuditTransaction& out, std::st
             out.command_name = it->get<std::string>();
         if (auto it = j.find("previous_transaction_hash"); it != j.end() && it->is_string())
             out.previous_transaction_hash = it->get<std::string>();
+        if (auto it = j.find("draft_promotion"); it != j.end() && it->is_object()) {
+            ReadStringArray(*it, "group_ids", out.draft_promotion.group_ids);
+            ReadStringArray(*it, "source_labels", out.draft_promotion.source_labels);
+            ReadStringArray(*it, "guideline_ids", out.draft_promotion.guideline_ids);
+            ReadStringArray(*it, "review_item_ids", out.draft_promotion.review_item_ids);
+            ReadStringArray(*it, "rationales", out.draft_promotion.rationales);
+        }
         if (auto it = j.find("events"); it != j.end() && it->is_array()) {
             for (const auto& e : *it) {
                 AuditEvent ev;

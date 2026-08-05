@@ -61,6 +61,12 @@ msgstr "1 件の{0}: {1}"
 msgid "<empty>"
 msgstr "<空>"
 
+msgid "A change this one was built on was rejected, so it is no longer applied. Its author can retarget it at what remains."
+msgstr "この変更が前提としていた変更が却下されたため、現在は適用されていません。作成者が残っている内容に向けて修正できます。"
+
+msgid "A change this one was built on was rejected, so it no longer applies."
+msgstr "この変更が前提としていた変更が却下されたため、適用できません。"
+
 msgid "A full editor for this SACM package type will be added in a later workflow."
 msgstr "この SACM パッケージ種別の完全なエディターは後のワークフローで追加されます。"
 
@@ -90,6 +96,9 @@ msgstr "AI デバッグ"
 
 msgid "AI Review"
 msgstr "AI レビュー"
+
+msgid "AI client"
+msgstr "AI クライアント"
 
 msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
 msgstr "AI 機能は、選択した安全ケースの内容とプロンプトを構成された AI プロバイダーに送信することがあります。Assurance Forge はプロジェクトデータを自動的には送信しません。データは明示的に AI アクションを使用した場合のみ送信されます。"
@@ -124,6 +133,9 @@ msgstr "API キーを削除しました。"
 msgid "API key saved securely."
 msgstr "API キーを安全に保存しました。"
 
+msgid "Accept"
+msgstr "受理"
+
 msgid "Accept all"
 msgstr "すべて受理"
 
@@ -139,8 +151,14 @@ msgstr "受理済み"
 msgid "Accepted baseline"
 msgstr "受理済みベースライン"
 
+msgid "Accepted the change. The rest of the draft is still unaccepted."
+msgstr "変更を受理しました。ドラフトの残りは未受理のままです。"
+
 msgid "Accepted the working draft."
 msgstr "作業ドラフトを受理しました。"
+
+msgid "Accepting this also accepts:"
+msgstr "これを受理すると次も受理されます:"
 
 msgid "Accepting this also accepts: {0}"
 msgstr "これを受理すると次も受理されます: {0}"
@@ -340,6 +358,9 @@ msgstr "バケット"
 msgid "Buckets (sorted by cost)"
 msgstr "バケット (コスト順)"
 
+msgid "Built on it:"
+msgstr "これを前提とする変更:"
+
 msgid "CSE ID"
 msgstr "CSE ID"
 
@@ -493,6 +514,9 @@ msgstr "設定をコピー"
 msgid "Copy report to clipboard"
 msgstr "レポートをクリップボードにコピー"
 
+msgid "Could not accept the draft: {0}"
+msgstr "ドラフトを受理できませんでした: {0}"
+
 msgid "Could not accept the working draft: {0}"
 msgstr "作業ドラフトを受理できませんでした: {0}"
 
@@ -628,6 +652,9 @@ msgstr "この用語を削除しますか?"
 msgid "Delete this terminology package?"
 msgstr "この用語パッケージを削除しますか?"
 
+msgid "Depends on:"
+msgstr "前提とする変更:"
+
 msgid "Description"
 msgstr "説明"
 
@@ -678,6 +705,9 @@ msgstr "閉じる"
 
 msgid "Don't Save"
 msgstr "保存しない"
+
+msgid "Draft Changes"
+msgstr "ドラフトの変更"
 
 msgid "Drag to adjust {0}"
 msgstr "{0} を調整するにはドラッグしてください"
@@ -832,6 +862,9 @@ msgstr "使用箇所検索: {0}"
 msgid "Find usages: {0}  {1}"
 msgstr "使用箇所検索: {0}  {1}"
 
+msgid "Findings (advisory):"
+msgstr "指摘 (参考):"
+
 msgid "Fit to view"
 msgstr "全体を表示"
 
@@ -882,6 +915,9 @@ msgstr "ゴール"
 
 msgid "Guideline"
 msgstr "ガイドライン"
+
+msgid "Guidelines: {0}"
+msgstr "ガイドライン: {0}"
 
 msgid "High culling"
 msgstr "高カリング"
@@ -960,6 +996,9 @@ msgstr "Jøsang の意見三角形"
 
 msgid "Keep filtering to narrow the remaining guidelines."
 msgstr "残りのガイドラインを絞り込むには、さらにフィルターを続けてください。"
+
+msgid "Keep them for review"
+msgstr "確認のために残す"
 
 msgid "Key stored: ********"
 msgstr "キー保存済み: ********"
@@ -1207,6 +1246,9 @@ msgstr "用語なし"
 msgid "No transactions have been recorded yet."
 msgstr "トランザクションはまだ記録されていません。"
 
+msgid "No unaccepted changes. The argument on screen is the accepted one."
+msgstr "未受理の変更はありません。画面上の議論は受理済みのものです。"
+
 msgid "No undeveloped elements"
 msgstr "未展開の要素はありません"
 
@@ -1429,6 +1471,9 @@ msgstr "投影信頼度"
 msgid "Promotion is awaiting durable SACM completion."
 msgstr "プロモーションは SACM への確実な保存完了を待っています。"
 
+msgid "Promotion is recorded, but the accepted SACM file is not yet confirmed. The draft is retained and cannot be edited or accepted."
+msgstr "受理は記録されましたが、受理済み SACM ファイルはまだ確認されていません。ドラフトは保持され、編集も受理もできません。"
+
 msgid "Promotion is recorded, but the accepted SACM file is not yet confirmed. The draft is retained and cannot be edited or discarded."
 msgstr "プロモーションは記録されましたが、承認済み SACM ファイルへの保存はまだ確認されていません。ドラフトは保持され、編集または破棄できません。"
 
@@ -1455,6 +1500,9 @@ msgstr "提案変更: 有効"
 
 msgid "Provider"
 msgstr "プロバイダー"
+
+msgid "Rationale:"
+msgstr "根拠:"
 
 msgid "Raw bucket table"
 msgstr "生バケットテーブル"
@@ -1492,14 +1540,23 @@ msgstr "参照: {0}"
 msgid "Register assessments could not be loaded, so edits cannot be saved: {0}"
 msgstr "登録簿の評価を読み込めなかったため、編集を保存できません: {0}"
 
+msgid "Reject"
+msgstr "却下"
+
 msgid "Reject change"
 msgstr "変更を却下する"
+
+msgid "Reject dependent changes?"
+msgstr "前提とする変更も却下しますか?"
+
+msgid "Reject them too"
+msgstr "まとめて却下"
 
 msgid "Reject this change"
 msgstr "この変更を却下"
 
-msgid "Rejected the change. The accepted argument is unchanged."
-msgstr "変更を却下しました。受理済みの議論は変更されていません。"
+msgid "Rejecting:"
+msgstr "却下する変更:"
 
 msgid "Relationship not found: {0}"
 msgstr "関係が見つかりません: {0}"
@@ -1585,11 +1642,17 @@ msgstr "ライブ表示に戻る"
 msgid "Review"
 msgstr "レビュー"
 
+msgid "Review changes"
+msgstr "変更を確認"
+
 msgid "Review comment"
 msgstr "レビューコメント"
 
 msgid "Review element"
 msgstr "要素を確認"
+
+msgid "Review items: {0}"
+msgstr "レビュー項目: {0}"
 
 msgid "Review status: {0}"
 msgstr "レビュー状態: {0}"
@@ -1623,6 +1686,9 @@ msgstr "SACM 関係: {0}"
 
 msgid "SCCG"
 msgstr "SCCG"
+
+msgid "SCCG AI review"
+msgstr "SCCG AI レビュー"
 
 msgid "SCCG Guideline"
 msgstr "SCCG ガイドライン"
@@ -1761,6 +1827,9 @@ msgstr "適合性評価を開始"
 
 msgid "Start with a blank assurance project workspace"
 msgstr "空の保証プロジェクトワークスペースから開始します"
+
+msgid "State: {0}"
+msgstr "状態: {0}"
 
 msgid "Status"
 msgstr "ステータス"
@@ -1915,14 +1984,29 @@ msgstr "作業ドラフトはこの要素を変更しません。NEW、EDIT、MU
 msgid "Theme"
 msgstr "テーマ"
 
+msgid "There is nothing to reject."
+msgstr "却下できるものがありません。"
+
+msgid "They stop being applied to the working draft and are marked as needing attention, so their author can retarget them."
+msgstr "作業ドラフトへの適用が停止され、要対応として表示されます。作成者が対象を修正できます。"
+
 msgid "This change was written against {0}. Open that argument to review it."
 msgstr "この変更は {0} に対して作成されました。レビューするにはその論証を開いてください。"
 
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
 
+msgid "This draft cannot be shown because one of its changes no longer applies."
+msgstr "このドラフトは、含まれる変更のひとつが適用できなくなったため表示できません。"
+
 msgid "This draft cannot be shown because one of its changes no longer applies. The accepted argument is displayed instead."
 msgstr "このドラフトの変更のいずれかが適用できないため表示できません。代わりに受理済みの議論を表示しています。"
+
+msgid "This draft could not be applied to the accepted argument."
+msgstr "このドラフトを受理済みの議論に適用できませんでした。"
+
+msgid "This draft could not be applied: {0}"
+msgstr "このドラフトを適用できませんでした: {0}"
 
 msgid "This element is proposed and is not in the accepted argument."
 msgstr "この要素は提案されたもので、受理済みの議論には含まれていません。"
@@ -2010,6 +2094,9 @@ msgstr "未保存の変更"
 
 msgid "Unsaved changes"
 msgstr "未保存の変更"
+
+msgid "Untitled change ({0})"
+msgstr "無題の変更 ({0})"
 
 msgid "Update Key"
 msgstr "キーを更新"
@@ -2107,6 +2194,9 @@ msgstr "直近の変更は監査ログに記録されていますが、ディス
 msgid "author"
 msgstr "作成者"
 
+msgid "being written"
+msgstr "作成中"
+
 msgid "disabled"
 msgstr "無効"
 
@@ -2122,11 +2212,17 @@ msgstr "フレーム間隔 (FPS で色分け)"
 msgid "hello_imgui FpsIdling: when the UI is quiet, throttle to {0:.0f} FPS to save power.\nUncheck to keep the app running at full speed even when idle."
 msgstr "hello_imgui FpsIdling: UI が静かなときに {0:.0f} FPS にスロットルして電力を節約します。\nアイドル時もフルスピードで動作させるにはオフにしてください。"
 
+msgid "imported proposal"
+msgstr "取り込んだ提案"
+
 msgid "info"
 msgstr "情報"
 
 msgid "items"
 msgstr "項目"
+
+msgid "needs attention"
+msgstr "要対応"
 
 msgid "not recorded"
 msgstr "未記録"
@@ -2134,14 +2230,26 @@ msgstr "未記録"
 msgid "open"
 msgstr "未解決"
 
+msgid "person"
+msgstr "人"
+
 msgid "problem"
 msgstr "問題"
+
+msgid "ready for a decision"
+msgstr "判断待ち"
+
+msgid "rejected"
+msgstr "却下済み"
 
 msgid "render cost only"
 msgstr "描画コストのみ"
 
 msgid "replay={0}  on_disk={1}"
 msgstr "再生={0}  ディスク={1}"
+
+msgid "session {0}"
+msgstr "セッション {0}"
 
 msgid "the selected project file"
 msgstr "選択したプロジェクトファイル"
@@ -2154,6 +2262,9 @@ msgstr "このノードとその子孫"
 
 msgid "throttled"
 msgstr "スロットル中"
+
+msgid "unknown"
+msgstr "不明"
 
 msgid "unthrottled"
 msgstr "非スロットル"
@@ -2266,6 +2377,14 @@ msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
 msgstr[0] "提案ドラフト: {0} 件の操作"
 
+msgid "Rejected {0} change."
+msgid_plural "Rejected {0} changes."
+msgstr[0] "変更 {0} 件を却下しました。"
+
+msgid "Rejected {0} change. The accepted argument is unchanged."
+msgid_plural "Rejected {0} changes. The accepted argument is unchanged."
+msgstr[0] "変更 {0} 件を却下しました。受理済みの議論は変更されていません。"
+
 msgid "This category is assigned to {0} term. Remove those assignments before deleting it."
 msgid_plural "This category is assigned to {0} terms. Remove those assignments before deleting it."
 msgstr[0] "この分類は {0} 件の用語に割り当てられています。削除前にそれらの割り当てを除去してください。"
@@ -2282,13 +2401,33 @@ msgid "{0} SCCG finding"
 msgid_plural "{0} SCCG findings"
 msgstr[0] "SCCG 指摘 {0} 件"
 
+msgid "{0} change now needs attention before it can be accepted."
+msgid_plural "{0} changes now need attention before they can be accepted."
+msgstr[0] "受理するには {0} 件の変更に対応が必要です。"
+
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."
 msgstr[0] "対象要素が変更されたため、{0} 件の信頼度評価が非アクティブとしてマークされました。"
 
+msgid "{0} dependent change was rejected too."
+msgid_plural "{0} dependent changes were rejected too."
+msgstr[0] "前提とする変更 {0} 件もあわせて却下しました。"
+
 msgid "{0} element"
 msgid_plural "{0} elements"
 msgstr[0] "{0} 要素"
+
+msgid "{0} element added"
+msgid_plural "{0} elements added"
+msgstr[0] "要素 {0} 件を追加"
+
+msgid "{0} element changed"
+msgid_plural "{0} elements changed"
+msgstr[0] "要素 {0} 件を変更"
+
+msgid "{0} element removed"
+msgid_plural "{0} elements removed"
+msgstr[0] "要素 {0} 件を削除"
 
 msgid "{0} element will be deleted (highlighted in red)."
 msgid_plural "{0} elements will be deleted (highlighted in red)."
@@ -2318,9 +2457,29 @@ msgid "{0} operation"
 msgid_plural "{0} operations"
 msgstr[0] "{0} 件の操作"
 
+msgid "{0} operation, nothing applied yet"
+msgid_plural "{0} operations, nothing applied yet"
+msgstr[0] "操作 {0} 件、まだ何も適用されていません"
+
+msgid "{0} other change is built on the one you are rejecting, so it can no longer be applied on its own."
+msgid_plural "{0} other changes are built on the one you are rejecting, so they can no longer be applied on their own."
+msgstr[0] "却下しようとしている変更を前提とする変更が {0} 件あり、単独では適用できなくなります。"
+
 msgid "{0} problem · top: {1}\nClick to open the Problems panel."
 msgid_plural "{0} problems · top: {1}\nClick to open the Problems panel."
 msgstr[0] "{0} 件の問題 · トップ: {1}\nクリックして問題パネルを開きます。"
+
+msgid "{0} relationship added"
+msgid_plural "{0} relationships added"
+msgstr[0] "関係 {0} 件を追加"
+
+msgid "{0} relationship removed"
+msgid_plural "{0} relationships removed"
+msgstr[0] "関係 {0} 件を削除"
+
+msgid "{0} unaccepted change"
+msgid_plural "{0} unaccepted changes"
+msgstr[0] "未受理の変更 {0} 件"
 
 msgid "{0} usage found"
 msgid_plural "{0} usages found"

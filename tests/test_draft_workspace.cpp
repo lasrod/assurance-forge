@@ -2,6 +2,8 @@
 
 #include "core/drafts/draft_materializer.h"
 #include "core/drafts/draft_dependency_graph.h"
+#include "core/audit/audit_transaction.h"
+#include "core/audit/undo_boundary.h"
 #include "core/drafts/draft_persistence.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/reviews/review_proposal_patch_service.h"
@@ -1549,4 +1551,463 @@ TEST(DraftWorkspace, ANewProjectIgnoresItsInternalDirectory) {
     // no human has accepted, which is a different order of problem.
     EXPECT_NE(content.value().find('*'), std::string::npos);
     EXPECT_TRUE(std::filesystem::exists(project.rootPath / ".af" / "drafts"));
+}
+
+// --------------------------------------------------------------------------
+// Undo needs two stacks.
+//
+// A draft edit records no audit transaction and triggers no `.sacm` autosave --
+// that is what keeps the accepted file byte-stable while a draft is built -- so
+// it cannot use the accepted model's undo stack. These cover the stack it uses
+// instead, and the places where the two must not be confused for each other.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, UndoingADraftEditRestoresThePreviousWorkingModel) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    fixture.Stage(group, {UpdateTextOp("G1", "Second wording.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    ASSERT_EQ(FindElement(fixture.store.Materialize(fixture.accepted, 1).working_model, "G1")->content,
+              "Second wording.");
+
+    ASSERT_TRUE(fixture.store.CanUndoDraftEdit());
+    std::string error;
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    const core::drafts::DraftMaterializationResult& after = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(after.success);
+    EXPECT_EQ(FindElement(after.working_model, "G1")->content, "First wording.")
+        << "the working model is back to what it was before the last edit";
+}
+
+TEST(DraftWorkspace, UndoingADraftEditWritesNoByteOfTheAcceptedArgument) {
+    Fixture fixture;
+    // Pinned on the bytes on disk, not on a hash of the in-memory baseline. The
+    // store is never handed the accepted model to write, so a hash comparison
+    // here would pass however the code behaved -- it would be asserting that a
+    // local test object the code cannot reach did not change itself.
+    {
+        std::ofstream accepted(fixture.argument_file, std::ios::binary | std::ios::trunc);
+        accepted << "<sacm:AssuranceCasePackage id=\"case-1\"/>";
+    }
+    const std::expected<std::string, std::string> before = core::ReadTextFile(fixture.argument_file);
+    ASSERT_TRUE(before.has_value()) << before.error();
+
+    const std::string group = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    // Invariant 1, on the undo path. Reversing unaccepted work is not an edit to
+    // the safety argument and must not read as one.
+    const std::expected<std::string, std::string> after = core::ReadTextFile(fixture.argument_file);
+    ASSERT_TRUE(after.has_value()) << after.error();
+    EXPECT_EQ(after.value(), before.value());
+}
+
+TEST(DraftWorkspace, UndoingADraftEditMovesTheRevisionForwardNotBack) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+    const std::uint64_t before_second_edit = fixture.store.revision();
+    fixture.Stage(group, {UpdateTextOp("G1", "Second wording.")});
+    const std::uint64_t after_second_edit = fixture.store.revision();
+    ASSERT_GT(after_second_edit, before_second_edit);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    // Invariant 6. The content is back to what revision `before_second_edit`
+    // described, but a client holding that token must still be refused: it has
+    // not seen the undo, and letting a stale token become valid again because the
+    // content happens to match is exactly the race the token exists to stop.
+    EXPECT_GT(fixture.store.revision(), after_second_edit);
+}
+
+TEST(DraftWorkspace, ARefusedDraftEditLeavesNothingToUndo) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+    const std::uint64_t settled = fixture.store.revision();
+
+    // Refused: nothing in the accepted argument or the draft has this id.
+    std::string error;
+    EXPECT_FALSE(fixture.store.StageOperations(group, {UpdateTextOp("NOPE", "x")}, fixture.accepted, error));
+    EXPECT_EQ(fixture.store.revision(), settled);
+
+    // An undo entry for an edit that never happened would silently reverse the
+    // edit *before* it -- the user's last real change -- while appearing to
+    // reverse the one they just saw refused.
+    ASSERT_TRUE(fixture.store.CanUndoDraftEdit());
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+    const core::drafts::DraftMaterializationResult& after = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(after.success);
+    EXPECT_EQ(FindElement(after.working_model, "G1")->content, BaselineCase().elements.front().content)
+        << "one undo reached the staging, not something before it";
+
+    // Two real edits happened -- opening the group and staging into it -- so the
+    // stack holds two entries and no more. Counted by draining it, because the
+    // depth is what a refused edit would have inflated.
+    ASSERT_TRUE(fixture.store.CanUndoDraftEdit());
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+    EXPECT_TRUE(fixture.store.workspace()->groups.empty());
+    EXPECT_FALSE(fixture.store.CanUndoDraftEdit());
+}
+
+TEST(DraftWorkspace, AcceptingClearsTheDraftUndoHistory) {
+    Fixture fixture;
+    const std::string branch = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(branch, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    const std::string wording = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(wording, {UpdateTextOp("G1", "Clarified.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {wording}, "Jesper");
+    ASSERT_TRUE(plan.ok) << plan.error;
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.BeginPromotion(plan.closure, plan.promoted_model, error)) << error;
+    ASSERT_TRUE(fixture.store.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) << error;
+
+    // The states below the promotion describe a workspace that still held the
+    // wording group. Undoing into one would re-stage a change the user has just
+    // accepted, so it would appear twice: once in the accepted argument and once
+    // as an unaccepted draft change proposing what is already there.
+    EXPECT_FALSE(fixture.store.CanUndoDraftEdit());
+    EXPECT_FALSE(fixture.store.UndoDraftEdit(error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(DraftWorkspace, AnUndoneGroupIdIsNeverReusedForADifferentGroup) {
+    Fixture fixture;
+    const std::string first = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(first, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error; // the staging
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error; // the group itself
+    ASSERT_EQ(fixture.store.workspace()->groups.size(), 0u);
+
+    const std::string second = fixture.BeginGroup("A different change");
+    // The event log still carries `group_created` for the first group. Handing
+    // its id to a second, unrelated group would make an MCP client polling
+    // `get_draft_events` read one history as though it described the other.
+    EXPECT_NE(second, first);
+}
+
+// --------------------------------------------------------------------------
+// Rejecting one change, and what becomes of the changes built on top of it.
+//
+// Cascading silently discards work the user never chose to discard. Applying
+// only the selection is not an alternative: the stranded groups cannot apply,
+// and leaving them in materialization takes the whole draft down. So there is a
+// third state, and these cover what it has to mean.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, AStrandedGroupLeavesMaterializationRatherThanBlockingIt) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    const std::string unrelated = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(unrelated, {UpdateTextOp("G1", "Clarified.")});
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.RejectGroup(creator, error)) << error;
+    ASSERT_TRUE(fixture.store.MarkGroupNeedsAttention(editor, error)) << error;
+
+    // This is the whole reason the stranded group leaves materialization. Left
+    // in, its update targets an element the rejection removed, materialization
+    // fails, and the working model collapses to the accepted baseline -- so
+    // declining a cascade would have blocked the entire draft, including the
+    // unrelated change that has nothing to do with either group.
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 2);
+    ASSERT_TRUE(result.success) << result.error << " (group " << result.failing_group_id << ")";
+    EXPECT_EQ(FindElement(result.working_model, "G1")->content, "Clarified.")
+        << "the unrelated change is still applied";
+    EXPECT_EQ(FindElement(result.working_model, sub_id), nullptr) << "and the rejected creation is gone";
+}
+
+TEST(DraftWorkspace, AStrandedGroupIsKeptRatherThanCleanedUpAsEmpty) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.RejectGroup(creator, error)) << error;
+    ASSERT_TRUE(fixture.store.MarkGroupNeedsAttention(editor, error)) << error;
+
+    // Nothing materializes now, so a workspace that decided emptiness by what
+    // draws would delete itself here -- taking with it the one group the user
+    // deliberately chose to keep. Reopening is where that would surface.
+    ASSERT_TRUE(fixture.store.workspace()->has_active_groups());
+    ASSERT_TRUE(fixture.store.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    ASSERT_NE(fixture.store.workspace(), nullptr) << "the stranded work survived a reopen";
+    const core::drafts::DraftChangeGroup* restored = fixture.store.workspace()->FindGroup(editor);
+    ASSERT_NE(restored, nullptr);
+    EXPECT_EQ(restored->state, core::drafts::DraftGroupState::NeedsAttention);
+    EXPECT_EQ(restored->operations.size(), 1u) << "with its operations intact, to be retargeted";
+}
+
+TEST(DraftWorkspace, RetargetingAStrandedGroupPutsItBackIntoTheDraft) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.RejectGroup(creator, error)) << error;
+    ASSERT_TRUE(fixture.store.MarkGroupNeedsAttention(editor, error)) << error;
+
+    // Without a way out, "keep it for review" is a slower way of losing the work
+    // than rejecting it, because nothing can ever be done with the result.
+    ASSERT_TRUE(fixture.store.ReplaceOperations(
+        editor, {UpdateTextOp("G1", "Reworded against the top goal.")}, fixture.accepted, error))
+        << error;
+
+    const core::drafts::DraftChangeGroup* recovered = fixture.store.workspace()->FindGroup(editor);
+    ASSERT_NE(recovered, nullptr);
+    EXPECT_EQ(recovered->state, core::drafts::DraftGroupState::Building)
+        << "it applies again, so it is no longer stranded";
+
+    const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 3);
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(FindElement(result.working_model, "G1")->content, "Reworded against the top goal.");
+}
+
+// --------------------------------------------------------------------------
+// Pruning promotion snapshots.
+//
+// They accumulate one per promotion and are consumed only by an undo. The rule
+// for deleting one is the audit undo boundary and nothing cheaper: every
+// approximation (keep the last N, drop by age) can delete a snapshot that is
+// still reachable, which destroys the only copy of unaccepted work at exactly
+// the moment the user asked for it back.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, SnapshotEnumerationIgnoresFilesItDidNotWrite) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.SavePromotionSnapshot(7, *fixture.store.workspace(), error)) << error;
+    ASSERT_TRUE(fixture.store.SavePromotionSnapshot(12, *fixture.store.workspace(), error)) << error;
+
+    // Something this code did not write. The one safe thing to do with a file
+    // that may hold unaccepted work and whose name is not understood is to leave
+    // it alone -- so it must not appear in the list a pruner deletes from.
+    const std::filesystem::path directory = core::drafts::DraftPromotionSnapshotsDirectory(fixture.dir.path);
+    {
+        std::ofstream stray(directory / "notes.json", std::ios::binary | std::ios::trunc);
+        stray << "{}";
+    }
+    {
+        std::ofstream stray(directory / "17-backup.json", std::ios::binary | std::ios::trunc);
+        stray << "{}";
+    }
+
+    const std::vector<std::uint64_t> listed = core::drafts::ListDraftPromotionSnapshots(fixture.dir.path);
+    ASSERT_EQ(listed.size(), 2u);
+    EXPECT_EQ(listed[0], 7u) << "ascending, so a caller comparing against a boundary can stop early";
+    EXPECT_EQ(listed[1], 12u);
+}
+
+TEST(DraftWorkspace, PruningKeepsEverySnapshotAnUndoCouldStillReach) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    std::string error;
+    for (const std::uint64_t sequence : {3u, 5u, 9u, 14u})
+        ASSERT_TRUE(fixture.store.SavePromotionSnapshot(sequence, *fixture.store.workspace(), error)) << error;
+
+    // A baseline at 9 is the undo boundary: `CanUndo` is a strict comparison, so
+    // 9 itself and everything below it is unreachable permanently, and 14 is not.
+    const std::uint64_t boundary = 9;
+    std::vector<std::uint64_t> kept;
+    for (const std::uint64_t sequence : core::drafts::ListDraftPromotionSnapshots(fixture.dir.path)) {
+        if (core::audit::CanUndo(sequence, boundary)) {
+            kept.push_back(sequence);
+            continue;
+        }
+        ASSERT_TRUE(fixture.store.DeletePromotionSnapshot(sequence, error)) << error;
+    }
+
+    ASSERT_EQ(kept.size(), 1u);
+    EXPECT_EQ(kept.front(), 14u);
+    // The one that survives is the one the undo stack can still reach, and it is
+    // still readable -- deleting it would be the failure this whole mechanism
+    // exists to prevent.
+    core::drafts::DraftWorkspace restored;
+    EXPECT_TRUE(fixture.store.LoadPromotionSnapshot(14, restored, error)) << error;
+    EXPECT_EQ(restored.groups.size(), 1u);
+    EXPECT_FALSE(fixture.store.HasPromotionSnapshot(3));
+    EXPECT_FALSE(fixture.store.HasPromotionSnapshot(9)) << "at the boundary is already past reach";
+}
+
+// --------------------------------------------------------------------------
+// Attribution in the audit log.
+//
+// Accepting a draft consumes it, so whatever the log does not record about
+// where the change came from is not recoverable from anywhere else. `author`
+// names the approver and the contributing sources; the rest is the trace a
+// person auditing the argument a year later needs.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, APromotionTransactionCarriesItsProvenance) {
+    core::audit::AuditTransaction tx;
+    tx.transaction_sequence = 4;
+    tx.transaction_id = "tx-4";
+    tx.timestamp = "2026-08-05T10:00:00Z";
+    tx.author = "Jesper (accepting work by Claude Code, SCCG AI Review)";
+    tx.command_name = "ApplyProposal";
+    tx.draft_promotion.group_ids = {"group-1", "group-2"};
+    tx.draft_promotion.source_labels = {"Claude Code", "SCCG AI Review"};
+    tx.draft_promotion.guideline_ids = {"AR-02"};
+    tx.draft_promotion.review_item_ids = {"RI-11"};
+    tx.draft_promotion.rationales = {"Add a misuse-hazard branch: the hazard analysis identifies foreseeable misuse."};
+
+    const std::string line = core::audit::SerializeAuditTransactionLine(tx);
+    core::audit::AuditTransaction parsed;
+    std::string error;
+    ASSERT_TRUE(core::audit::ParseAuditTransactionLine(line, parsed, error)) << error;
+
+    EXPECT_EQ(parsed.draft_promotion.group_ids, tx.draft_promotion.group_ids);
+    EXPECT_EQ(parsed.draft_promotion.source_labels, tx.draft_promotion.source_labels);
+    EXPECT_EQ(parsed.draft_promotion.guideline_ids, tx.draft_promotion.guideline_ids);
+    EXPECT_EQ(parsed.draft_promotion.review_item_ids, tx.draft_promotion.review_item_ids);
+    EXPECT_EQ(parsed.draft_promotion.rationales, tx.draft_promotion.rationales);
+}
+
+TEST(DraftWorkspace, AnOrdinaryTransactionSerializesExactlyAsItDidBefore) {
+    core::audit::AuditTransaction tx;
+    tx.transaction_sequence = 1;
+    tx.transaction_id = "tx-1";
+    tx.timestamp = "2026-08-05T10:00:00Z";
+    tx.author = "Jesper";
+    tx.command_name = "CreateClaim";
+
+    // The hash chain is over the bytes of each line. A field emitted
+    // unconditionally -- even as an empty object -- would change the bytes of
+    // every ordinary transaction, and a log written by this version would then
+    // not verify against one written by the last.
+    const std::string line = core::audit::SerializeAuditTransactionLine(tx);
+    EXPECT_EQ(line.find("draft_promotion"), std::string::npos) << line;
+
+    core::audit::AuditTransaction parsed;
+    std::string error;
+    ASSERT_TRUE(core::audit::ParseAuditTransactionLine(line, parsed, error)) << error;
+    EXPECT_TRUE(parsed.draft_promotion.empty());
+}
+
+TEST(DraftWorkspace, OneGestureIsOneUndoEvenWhenItTouchesSeveralGroups) {
+    Fixture fixture;
+    const std::string creator = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(creator, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    const std::string sub_id = IdentityFor(fixture.store, creator, "$sub");
+
+    const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
+    fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
+
+    std::string error;
+    {
+        // What "reject this, keep what depended on it" does: two store mutations
+        // from one click.
+        const core::drafts::DraftWorkspaceStore::EditUndoScope scope(fixture.store, "Rejected Add a sub-claim");
+        ASSERT_TRUE(fixture.store.RejectGroup(creator, error)) << error;
+        ASSERT_TRUE(fixture.store.MarkGroupNeedsAttention(editor, error)) << error;
+    }
+
+    ASSERT_TRUE(fixture.store.CanUndoDraftEdit());
+    EXPECT_EQ(fixture.store.NextDraftUndoLabel(), "Rejected Add a sub-claim");
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    // Both halves come back together. Undoing only the stranding would leave the
+    // creation rejected and its dependent healthy -- an argument state the user
+    // never chose, produced by the very control that exists to stop them
+    // choosing one by accident.
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(creator)->state, core::drafts::DraftGroupState::Building);
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(editor)->state, core::drafts::DraftGroupState::Building);
+
+    // Exactly one entry, so the *next* undo reaches the edit before the gesture
+    // rather than a half-applied state inside it. Asserted by taking it: with
+    // per-mutation entries left behind, this second undo lands on
+    // "creation rejected, dependent healthy" -- which is the state the whole
+    // mechanism exists to make unreachable.
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(creator)->state, core::drafts::DraftGroupState::Building)
+        << "the second undo went past the gesture, not into the middle of it";
+    EXPECT_TRUE(fixture.store.workspace()->FindGroup(editor)->operations.empty())
+        << "and reached the staging that preceded it";
+}
+
+TEST(DraftWorkspace, AGestureThatChangesNothingLeavesNoUndoEntry) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+
+    std::string error;
+    {
+        const core::drafts::DraftWorkspaceStore::EditUndoScope scope(fixture.store, "Rejected nothing at all");
+        EXPECT_FALSE(fixture.store.RejectGroup("group-does-not-exist", error));
+    }
+
+    // An entry for a gesture that did nothing would make the next Ctrl+Z reverse
+    // the user's last real change while appearing to reverse the refused one.
+    EXPECT_EQ(fixture.store.NextDraftUndoLabel(), "Reword the top goal");
+}
+
+TEST(DraftWorkspace, UndoingADraftEditDoesNotRevivateAStaleDraft) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Reword the top goal");
+    fixture.Stage(group, {UpdateTextOp("G1", "First wording.")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+    fixture.Stage(group, {ClearUndevelopedOp("G1")});
+
+    // The accepted argument changes while the draft is open. This is the path
+    // `Open()` does not cover and that does not clear the undo stack, so the
+    // entries above still describe an `Active` workspace.
+    core::AssuranceCase moved = fixture.accepted;
+    moved.elements.push_back(Claim("G2", "Something else was accepted in the meantime."));
+    fixture.store.Materialize(moved, 2);
+    ASSERT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::NeedsRebase);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.UndoDraftEdit(error)) << error;
+
+    // Restoring the state from the entry would put this back to `Active`.
+    // `AppRuntime::PromoteDraftGroups` checks this flag before it checks
+    // anything else, so that would reopen the path to promoting a draft against
+    // a baseline it was never written for -- until the next materialization
+    // happened to re-detect the drift.
+    EXPECT_EQ(fixture.store.workspace()->state, core::drafts::DraftWorkspaceState::NeedsRebase)
+        << "reversing a draft edit does not change the draft's relationship to the accepted argument";
+
+    // And the edit itself really was reversed, so this is not passing by doing
+    // nothing at all.
+    EXPECT_EQ(fixture.store.workspace()->FindGroup(group)->operations.size(), 1u);
 }

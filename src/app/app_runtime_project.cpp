@@ -1635,8 +1635,37 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     if (!impl_->draft_workspace.BeginPromotion(plan.closure, plan.promoted_model, error))
         return false;
 
+    // The draft is consumed by the act of accepting it, so whatever the log does
+    // not record here is not recoverable from anywhere else. `author` names the
+    // approver and the contributing sources; this is the rest of the trace.
+    core::audit::DraftPromotionRecord attribution;
+    attribution.group_ids = plan.closure;
+    attribution.source_labels = plan.compiled.source_labels;
+    for (const std::string& group_id : plan.closure) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group == nullptr)
+            continue;
+        for (const std::string& guideline_id : group->guideline_ids) {
+            if (std::find(attribution.guideline_ids.begin(), attribution.guideline_ids.end(), guideline_id) ==
+                attribution.guideline_ids.end()) {
+                attribution.guideline_ids.push_back(guideline_id);
+            }
+        }
+        for (const std::string& review_item_id : group->review_item_ids) {
+            if (std::find(attribution.review_item_ids.begin(), attribution.review_item_ids.end(), review_item_id) ==
+                attribution.review_item_ids.end()) {
+                attribution.review_item_ids.push_back(review_item_id);
+            }
+        }
+        if (!group->rationale.empty()) {
+            const std::string title = group->title.empty() ? group->id : group->title;
+            attribution.rationales.push_back(title + ": " + group->rationale);
+        }
+    }
+
     core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
-    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(*impl_, command, author);
+    const app::commands::DispatchOutcome outcome =
+        app::commands::DispatchAuditedCommand(*impl_, command, author, attribution);
     if (!outcome.success) {
         const std::string dispatch_error = outcome.error;
         std::string rollback_error;
@@ -1718,7 +1747,9 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     return true;
 }
 
-bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids,
+                                   DraftRejectionScope scope,
+                                   std::string& error) {
     error.clear();
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || group_ids.empty()) {
@@ -1726,18 +1757,139 @@ bool AppRuntime::RejectDraftGroups(const std::vector<std::string>& group_ids, st
         return false;
     }
 
-    // A group whose creations another group edits cannot be rejected alone: the
-    // second would refer to an element that will never exist. Both go.
-    std::vector<std::string> rejecting = group_ids;
-    for (const std::string& dependent : core::drafts::DependentsOf(*workspace, group_ids))
-        rejecting.push_back(dependent);
+    // A group whose creations another group edits cannot survive alone once the
+    // creation is rejected: it would refer to an element that will never exist.
+    // What happens to it is the user's decision, taken before this is called.
+    const std::vector<std::string> dependents = core::drafts::DependentsOf(*workspace, group_ids);
 
-    for (const std::string& group_id : rejecting) {
+    // One gesture, one undo entry. Rejecting a change and deciding what happens
+    // to the changes built on it is a single decision the user took, and undoing
+    // half of it would leave the draft in the incoherent state the decision
+    // existed to prevent.
+    const std::string label = [&]() {
+        const core::drafts::DraftChangeGroup* first = workspace->FindGroup(group_ids.front());
+        if (first == nullptr || first->title.empty())
+            return std::string("Rejected a change");
+        return "Rejected " + first->title;
+    }();
+    const core::drafts::DraftWorkspaceStore::EditUndoScope undo_scope(impl_->draft_workspace, label);
+
+    for (const std::string& group_id : group_ids) {
         if (!impl_->draft_workspace.RejectGroup(group_id, error))
+            return false;
+    }
+    for (const std::string& dependent : dependents) {
+        const bool applied = scope == DraftRejectionScope::Cascade
+                                 ? impl_->draft_workspace.RejectGroup(dependent, error)
+                                 : impl_->draft_workspace.MarkGroupNeedsAttention(dependent, error);
+        if (!applied)
             return false;
     }
     impl_->tree_needs_rebuild = true;
     return true;
+}
+
+void AppRuntime::BeginRejectDraftGroups(const std::vector<std::string>& group_ids) {
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (workspace == nullptr || group_ids.empty()) {
+        SetStatus(AF_TR("There is nothing to reject."));
+        return;
+    }
+
+    const std::vector<std::string> dependents = core::drafts::DependentsOf(*workspace, group_ids);
+    if (dependents.empty()) {
+        // Nothing else is affected, so there is no decision to put to the user.
+        std::string error;
+        const std::size_t rejected = group_ids.size();
+        if (RejectDraftGroups(group_ids, DraftRejectionScope::Cascade, error)) {
+            // Counted, because this takes a selection: the panel rejects one row
+            // at a time today, but a message that says "the change" after
+            // rejecting three is the kind of report a reviewer acts on.
+            SetStatus(ui::i18n::trnf("Rejected {0} change. The accepted argument is unchanged.",
+                                     "Rejected {0} changes. The accepted argument is unchanged.",
+                                     static_cast<int>(rejected),
+                                     rejected));
+        } else {
+            SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
+        }
+        return;
+    }
+
+    const auto title_of = [workspace](const std::string& group_id) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group == nullptr || group->title.empty())
+            return group_id;
+        return group->title;
+    };
+
+    AppRuntimeState::PendingDraftRejection pending;
+    pending.active = true;
+    pending.selection = group_ids;
+    pending.dependents = dependents;
+    for (const std::string& group_id : group_ids)
+        pending.selection_titles.push_back(title_of(group_id));
+    for (const std::string& group_id : dependents)
+        pending.dependent_titles.push_back(title_of(group_id));
+    impl_->pending_draft_rejection = std::move(pending);
+}
+
+void AppRuntime::ResolvePendingDraftRejection(DraftRejectionScope scope) {
+    if (!impl_->pending_draft_rejection.active)
+        return;
+    const std::vector<std::string> selection = impl_->pending_draft_rejection.selection;
+    const std::size_t stranded = impl_->pending_draft_rejection.dependents.size();
+    impl_->pending_draft_rejection = {};
+
+    std::string error;
+    if (!RejectDraftGroups(selection, scope, error)) {
+        SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
+        return;
+    }
+    // Two sentences, each pluralized on its own count. One sentence cannot be:
+    // gettext pluralizes on a single number, and this message has two -- how many
+    // changes the user rejected and how many were affected by it. Phrased without
+    // a pronoun referring back to the selection, so neither half has to agree in
+    // number with the other.
+    const std::size_t rejected = selection.size();
+    const std::string rejected_sentence =
+        ui::i18n::trnf("Rejected {0} change.", "Rejected {0} changes.", static_cast<int>(rejected), rejected);
+    const std::string consequence = scope == DraftRejectionScope::Cascade
+                                        ? ui::i18n::trnf("{0} dependent change was rejected too.",
+                                                         "{0} dependent changes were rejected too.",
+                                                         static_cast<int>(stranded),
+                                                         stranded)
+                                        : ui::i18n::trnf("{0} change now needs attention before it can be accepted.",
+                                                         "{0} changes now need attention before they can be accepted.",
+                                                         static_cast<int>(stranded),
+                                                         stranded);
+    SetStatus(rejected_sentence + " " + consequence);
+}
+
+void AppRuntime::CancelPendingDraftRejection() {
+    impl_->pending_draft_rejection = {};
+}
+
+void AppRuntime::FocusDraftGroupOnCanvas(const std::string& group_id) {
+    const std::shared_ptr<const core::drafts::DraftMaterializationResult> materialization =
+        impl_->draft_frame_materialization;
+    if (materialization == nullptr)
+        return;
+
+    // The index is keyed by element, so the group's elements are found by asking
+    // each changed element who contributed to it. In materialization order, so
+    // "the first element this group changed" is stable between frames rather
+    // than whichever the map happened to yield first.
+    for (const std::string& element_id : materialization->change_index.ChangedElementIds()) {
+        const std::vector<std::string> contributors = materialization->change_index.ContributingGroupIds(element_id);
+        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
+            continue;
+        // A removed element is not on the canvas to be centred on, but the
+        // presentation view keeps it as a tombstone, so selecting it still lands
+        // somewhere the user can see.
+        impl_->events.Emit(SelectionChangedEvent{element_id, true});
+        impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+        return;
+    }
 }
 
 bool AppRuntime::DiscardWorkingDraft(std::string& error) {

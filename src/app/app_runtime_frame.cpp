@@ -410,6 +410,25 @@ void AppRuntime::RenderFrame(bool& done) {
         areas::RenderReviewPanelContent(*impl_, review_panel_callbacks);
     };
     feedback_dock_callbacks.render_ai_debug_content = [this]() { areas::RenderAiDebugPanelContent(*impl_); };
+    feedback_dock_callbacks.draft_changes.accept_group = [this](const std::string& group_id) {
+        std::string error;
+        if (PromoteDraftGroups({group_id}, error)) {
+            SetStatus(AF_TR("Accepted the change. The rest of the draft is still unaccepted."));
+        } else {
+            SetStatus(ui::i18n::trf("Could not accept this change: {0}", error));
+        }
+    };
+    feedback_dock_callbacks.draft_changes.reject_group = [this](const std::string& group_id) {
+        BeginRejectDraftGroups({group_id});
+    };
+    feedback_dock_callbacks.draft_changes.accept_all = [this]() {
+        std::string error;
+        if (!PromoteWorkingDraft(error))
+            SetStatus(ui::i18n::trf("Could not accept the draft: {0}", error));
+    };
+    feedback_dock_callbacks.draft_changes.focus_group = [this](const std::string& group_id) {
+        FocusDraftGroupOnCanvas(group_id);
+    };
     {
         core::perf::ScopedTimer s("app.area.feedback_dock");
         areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
@@ -435,14 +454,7 @@ void AppRuntime::RenderFrame(bool& done) {
                 SetStatus(ui::i18n::trf("Could not accept this change: {0}", error));
             }
         },
-        [this](const std::vector<std::string>& group_ids) {
-            std::string error;
-            if (RejectDraftGroups(group_ids, error)) {
-                SetStatus(AF_TR("Rejected the change. The accepted argument is unchanged."));
-            } else {
-                SetStatus(ui::i18n::trf("Could not reject this change: {0}", error));
-            }
-        },
+        [this](const std::vector<std::string>& group_ids) { BeginRejectDraftGroups(group_ids); },
         [this](const std::string& element_id, const std::string& term_value) {
             BeginQuickDefineTerminologyTerm(element_id, term_value);
         },
@@ -535,6 +547,10 @@ void AppRuntime::RenderFrame(bool& done) {
     modal_callbacks.confirm_delete_terminology_term = [this]() { ConfirmDeleteTerminologyTerm(); };
     modal_callbacks.confirm_terminology_category_edit = [this]() { ConfirmTerminologyCategoryEdit(); };
     modal_callbacks.confirm_delete_terminology_category = [this]() { ConfirmDeleteTerminologyCategory(); };
+    modal_callbacks.resolve_draft_rejection = [this](bool cascade) {
+        ResolvePendingDraftRejection(cascade ? DraftRejectionScope::Cascade : DraftRejectionScope::StrandDependents);
+    };
+    modal_callbacks.cancel_draft_rejection = [this]() { CancelPendingDraftRejection(); };
     {
         core::perf::ScopedTimer s("app.modal_host");
         areas::RenderModalHost(*impl_, done, modal_callbacks);

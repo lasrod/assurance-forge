@@ -131,13 +131,19 @@ std::vector<const DraftChangeGroup*> DraftWorkspace::ActiveGroups() const {
 }
 
 bool DraftWorkspace::has_active_groups() const {
-    return std::any_of(groups.begin(), groups.end(), [](const DraftChangeGroup& group) { return group.active(); });
+    // `recoverable()`, not `active()`. This decides whether the workspace is
+    // deleted, and a draft left holding only stranded groups still holds work
+    // nobody has accepted or rejected.
+    return std::any_of(groups.begin(), groups.end(), [](const DraftChangeGroup& group) { return group.recoverable(); });
 }
 
 std::size_t DraftWorkspace::staged_group_count() const {
     std::size_t count = 0;
     for (const DraftChangeGroup& group : groups) {
-        if (group.active() && !group.operations.empty())
+        // A stranded group is counted although it does not draw. It is still an
+        // unaccepted change and still needs a decision; leaving it out of the
+        // banner is how work goes quiet and then goes missing.
+        if (group.recoverable() && !group.operations.empty())
             ++count;
     }
     return count;

@@ -223,6 +223,16 @@ struct UiState {
     // banner the only evidence anything is pending.
     DraftViewMode draft_view_mode = DraftViewMode::WorkingDraft;
 
+    // The draft change group the user has selected in the Draft Changes panel.
+    // Empty when none is. Selecting one is what focuses its changes on the
+    // canvas, so a row is a way into the argument rather than only a description
+    // of it.
+    std::string selected_draft_group_id;
+    // One-shot request to centre the canvas on the selected group's first
+    // changed element. Cleared by whoever honours it, like
+    // `center_on_selection`.
+    bool center_on_draft_group_pending = false;
+
     // Set to true when the canvas should fit-to-view the marked_for_removal set.
     bool center_on_marked = false;
 

@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <sstream>
 
 namespace core::drafts {
@@ -432,6 +433,36 @@ bool DeleteDraftPromotionSnapshot(const std::filesystem::path& project_root,
         return false;
     }
     return true;
+}
+
+std::vector<std::uint64_t> ListDraftPromotionSnapshots(const std::filesystem::path& project_root) {
+    std::vector<std::uint64_t> sequences;
+    if (project_root.empty())
+        return sequences;
+
+    std::error_code ec;
+    const std::filesystem::path directory = DraftPromotionSnapshotsDirectory(project_root);
+    std::filesystem::directory_iterator entries(directory, ec);
+    if (ec)
+        return sequences;
+
+    for (const std::filesystem::directory_entry& entry : entries) {
+        if (!entry.is_regular_file(ec) || entry.path().extension() != ".json")
+            continue;
+        const std::string stem = entry.path().stem().generic_string();
+        // Parsed strictly. A file whose name is not purely a sequence number is
+        // something this code did not write, and the one safe thing to do with a
+        // file that may hold unaccepted work is to leave it alone.
+        if (stem.empty() || stem.find_first_not_of("0123456789") != std::string::npos)
+            continue;
+        try {
+            sequences.push_back(std::stoull(stem));
+        } catch (const std::exception&) {
+            continue;
+        }
+    }
+    std::sort(sequences.begin(), sequences.end());
+    return sequences;
 }
 
 } // namespace core::drafts

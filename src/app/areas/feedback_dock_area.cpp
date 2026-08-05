@@ -33,6 +33,18 @@ void RenderFeedbackDockArea(AppRuntimeState& state,
         }
         state.terminology.focus_usages_tab = false;
 
+        // Only while there is a draft. A tab that says "nothing here" on every
+        // project that has never used an AI client is noise in a panel the user
+        // reads for problems.
+        if (state.draft_workspace.has_workspace()) {
+            ImGuiTabItemFlags draft_flags = state.workbench.focus_draft_changes_tab ? ImGuiTabItemFlags_SetSelected : 0;
+            if (ImGui::BeginTabItem((AF_TR("Draft Changes") + "###draft_changes_tab").c_str(), nullptr, draft_flags)) {
+                RenderDraftChangesAreaContent(state, callbacks.draft_changes);
+                ImGui::EndTabItem();
+            }
+            state.workbench.focus_draft_changes_tab = false;
+        }
+
         ImGuiTabItemFlags review_flags = state.workbench.focus_review_tab ? ImGuiTabItemFlags_SetSelected : 0;
         if (ImGui::BeginTabItem((AF_TR("Review") + "###review_tab").c_str(), nullptr, review_flags)) {
             if (callbacks.render_review_content)

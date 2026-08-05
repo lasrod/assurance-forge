@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/areas/draft_changes_area.h"
 #include "app/areas/history_panel_area.h"
 #include "app/areas/problems_area.h"
 #include "app/areas/term_usages_area.h"
@@ -20,6 +21,7 @@ struct FeedbackDockAreaCallbacks {
     ProblemsAreaCallbacks problems;
     TermUsagesAreaCallbacks term_usages;
     HistoryPanelAreaCallbacks history;
+    DraftChangesAreaCallbacks draft_changes;
     std::function<void()> render_review_content;
     std::function<void()> render_ai_debug_content;
 };

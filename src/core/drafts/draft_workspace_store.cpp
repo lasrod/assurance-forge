@@ -33,6 +33,9 @@ void DraftWorkspaceStore::Close() {
     workspace_.reset();
     argument_file_.clear();
     project_relative_argument_file_.clear();
+    // The stack holds workspaces for the argument being closed. Carrying it into
+    // the next argument would offer to undo one draft into another.
+    ClearEditUndoHistory();
     InvalidateMaterialization();
 }
 
@@ -139,6 +142,118 @@ bool DraftWorkspaceStore::Save(std::string& error) {
     return SaveDraftWorkspace(project_root_, ArgumentKey(), workspace_.value(), error);
 }
 
+namespace {
+
+// Deep enough that an editing session does not run out of undo in practice,
+// bounded because each entry is a whole workspace copy and a draft built over a
+// long MCP conversation would otherwise grow without limit. Dropping the oldest
+// entry costs an editing convenience; the draft content itself is persisted
+// separately and is never what is discarded here.
+constexpr std::size_t kMaxDraftEditUndoDepth = 64;
+
+} // namespace
+
+void DraftWorkspaceStore::PushEditUndo(std::string label) {
+    if (!workspace_.has_value())
+        return;
+    // A scope is open, so the gesture as a whole owns the entry. Pushing here as
+    // well would let one Ctrl+Z reverse part of it.
+    if (edit_undo_scope_depth_ > 0)
+        return;
+    edit_undo_stack_.push_back(DraftEditUndoEntry{workspace_.value(), std::move(label)});
+    if (edit_undo_stack_.size() > kMaxDraftEditUndoDepth)
+        edit_undo_stack_.erase(edit_undo_stack_.begin());
+}
+
+DraftWorkspaceStore::EditUndoScope::EditUndoScope(DraftWorkspaceStore& store, std::string label)
+    : store_(store), label_(std::move(label)) {
+    outermost_ = store_.edit_undo_scope_depth_ == 0;
+    if (outermost_ && store_.workspace_.has_value()) {
+        before_ = store_.workspace_.value();
+        revision_on_entry_ = store_.workspace_->working_revision;
+    }
+    ++store_.edit_undo_scope_depth_;
+}
+
+DraftWorkspaceStore::EditUndoScope::~EditUndoScope() {
+    --store_.edit_undo_scope_depth_;
+    if (!outermost_ || !before_.has_value() || !store_.workspace_.has_value())
+        return;
+    // Nothing moved, so the gesture was refused and there is nothing to undo.
+    // An entry here would silently reverse the edit before it.
+    if (store_.workspace_->working_revision == revision_on_entry_)
+        return;
+
+    store_.edit_undo_stack_.push_back(DraftEditUndoEntry{std::move(before_.value()), std::move(label_)});
+    if (store_.edit_undo_stack_.size() > kMaxDraftEditUndoDepth)
+        store_.edit_undo_stack_.erase(store_.edit_undo_stack_.begin());
+}
+
+void DraftWorkspaceStore::ClearEditUndoHistory() {
+    edit_undo_stack_.clear();
+}
+
+bool DraftWorkspaceStore::CanUndoDraftEdit() const {
+    if (!workspace_.has_value() || edit_undo_stack_.empty())
+        return false;
+    // While a promotion is pending the draft is inert by design, and reversing an
+    // edit under it would change what the recorded promotion intent refers to.
+    return !workspace_->pending_promotion.has_value();
+}
+
+std::string DraftWorkspaceStore::NextDraftUndoLabel() const {
+    if (!CanUndoDraftEdit())
+        return {};
+    return edit_undo_stack_.back().label;
+}
+
+bool DraftWorkspaceStore::UndoDraftEdit(std::string& error) {
+    error.clear();
+    if (!workspace_.has_value()) {
+        error = "There is no draft workspace for this argument.";
+        return false;
+    }
+    if (workspace_->pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion, so its edits cannot be undone.";
+        return false;
+    }
+    if (edit_undo_stack_.empty()) {
+        error = "There is no draft change left to undo.";
+        return false;
+    }
+
+    DraftEditUndoEntry entry = std::move(edit_undo_stack_.back());
+    edit_undo_stack_.pop_back();
+
+    // Only what the edit changed is restored. The event log is a record of what
+    // happened and an undo is one more thing that happened, so it is appended to
+    // rather than rewound -- an MCP client polling by revision must not see
+    // history it has already read disappear.
+    workspace_->groups = std::move(entry.workspace.groups);
+    workspace_->next_sequence = std::max(workspace_->next_sequence, entry.workspace.next_sequence);
+
+    // **The workspace state is deliberately not restored.**
+    //
+    // It describes the draft's relationship to the accepted argument, which
+    // reversing a draft edit does not change. `Active`/`Blocked` are recomputed
+    // by the next materialization -- invalidated below -- and `NeedsRebase` is
+    // sticky by design.
+    //
+    // Restoring it would put a stale draft back to `Active`: the accepted
+    // argument can change while a draft is open, and materialization sets
+    // `NeedsRebase` there without clearing this stack. Promotion checks that
+    // flag before it checks anything else, so an undo that cleared it would
+    // reopen the path to promoting a draft against a baseline it was never
+    // written for -- until the next materialization happened to re-detect the
+    // drift.
+
+    ++workspace_->working_revision;
+    ++workspace_->working_revision;
+    RecordEvent("edit_undone", {}, entry.label);
+    InvalidateMaterialization();
+    return Save(error);
+}
+
 std::string DraftWorkspaceStore::BeginGroup(const DraftGroupRequest& request,
                                             const core::AssuranceCase& accepted,
                                             std::string& error) {
@@ -164,6 +279,8 @@ std::string DraftWorkspaceStore::BeginGroup(const DraftGroupRequest& request,
         error = "The argument changed since this draft was written. Rebase or discard it before adding to it.";
         return {};
     }
+
+    PushEditUndo(request.title.empty() ? std::string("New change group") : request.title);
 
     DraftChangeGroup group;
     group.sequence = workspace.next_sequence++;
@@ -229,6 +346,8 @@ bool DraftWorkspaceStore::StageOperations(const std::string& group_id,
     if (!CanStageOperations(workspace, accepted, group_id, operations, error, authoritative_identities_))
         return false;
 
+    PushEditUndo(group->title.empty() ? std::string("Staged operations") : group->title);
+
     group->operations.insert(group->operations.end(), operations.begin(), operations.end());
     group->updated_utc = NowUtcString();
     ++workspace.working_revision;
@@ -260,7 +379,11 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
         error = "No draft change group with id " + group_id + ".";
         return false;
     }
-    if (!group->open()) {
+    // A stranded group is the one closed state that can still be written to.
+    // Retargeting its operations at something that exists is the only way out of
+    // `NeedsAttention`, and without it that state is a place work goes to die
+    // rather than an alternative to the cascade.
+    if (!group->open() && group->state != DraftGroupState::NeedsAttention) {
         error = "Draft change group " + group_id + " is no longer open.";
         return false;
     }
@@ -291,9 +414,21 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
         return false;
     }
 
+    // Taken after the rehearsal has restored the group, so the entry holds the
+    // workspace the user last saw rather than the cleared intermediate state the
+    // rehearsal needed.
+    group->operations = previous_operations;
+    group->generated_ids = previous_identities;
+    PushEditUndo(group->title.empty() ? std::string("Replaced operations") : group->title);
+
     group->operations = operations;
     group->generated_ids = std::move(retained_identities);
     group->updated_utc = NowUtcString();
+    // The rehearsal above proved these operations apply on top of everything
+    // active, which is exactly the condition that stranded it. So it is no longer
+    // stranded, and rejoins materialization.
+    if (group->state == DraftGroupState::NeedsAttention)
+        group->state = DraftGroupState::Building;
     ++workspace.working_revision;
     RecordEvent("operations_replaced", group_id, std::to_string(operations.size()) + " operations");
     InvalidateMaterialization();
@@ -319,6 +454,8 @@ bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id, std::strin
         error = "Draft change group " + group_id + " has no operations to review.";
         return false;
     }
+    PushEditUndo(group->title.empty() ? std::string("Marked ready") : group->title);
+
     group->state = DraftGroupState::Ready;
     group->updated_utc = NowUtcString();
     ++workspace_->working_revision;
@@ -345,10 +482,42 @@ bool DraftWorkspaceStore::RejectGroup(const std::string& group_id, std::string& 
     if (group->state == DraftGroupState::Rejected)
         return true;
 
+    PushEditUndo(group->title.empty() ? std::string("Rejected a change") : group->title);
+
     group->state = DraftGroupState::Rejected;
     group->updated_utc = NowUtcString();
     ++workspace_->working_revision;
     RecordEvent("group_rejected", group_id, group->title);
+    InvalidateMaterialization();
+    return Save(error);
+}
+
+bool DraftWorkspaceStore::MarkGroupNeedsAttention(const std::string& group_id, std::string& error) {
+    error.clear();
+    if (!workspace_.has_value()) {
+        error = "There is no draft workspace for this argument.";
+        return false;
+    }
+    if (workspace_->pending_promotion.has_value()) {
+        error = "A draft promotion is awaiting durable completion.";
+        return false;
+    }
+    DraftChangeGroup* group = workspace_->FindGroup(group_id);
+    if (group == nullptr) {
+        error = "No draft change group with id " + group_id + ".";
+        return false;
+    }
+    // A group the user rejected outright is not quietly revived into a state that
+    // still asks them for a decision.
+    if (group->state == DraftGroupState::Rejected || group->state == DraftGroupState::NeedsAttention)
+        return true;
+
+    PushEditUndo(group->title.empty() ? std::string("Stranded a change") : group->title);
+
+    group->state = DraftGroupState::NeedsAttention;
+    group->updated_utc = NowUtcString();
+    ++workspace_->working_revision;
+    RecordEvent("group_needs_attention", group_id, group->title);
     InvalidateMaterialization();
     return Save(error);
 }
@@ -431,6 +600,10 @@ bool DraftWorkspaceStore::RemovePromotedGroups(const std::vector<std::string>& g
     workspace.state = DraftWorkspaceState::Active;
     ++workspace.working_revision;
     RecordEvent("groups_promoted", {}, std::to_string(group_ids.size()) + " groups");
+    // Every entry below this point describes groups the accepted argument now
+    // contains, so undoing into one would re-stage work the user has accepted.
+    // Reversing the promotion is the audit stack's job, not this one's.
+    ClearEditUndoHistory();
     InvalidateMaterialization();
 
     // Persist the finalized state before deleting recovery files. If directory
@@ -463,6 +636,7 @@ bool DraftWorkspaceStore::DiscardWorkspace(std::string& error) {
     }
     const std::string key = ArgumentKey();
     workspace_.reset();
+    ClearEditUndoHistory();
     InvalidateMaterialization();
     if (project_root_.empty())
         return true;
@@ -550,6 +724,10 @@ bool DraftWorkspaceStore::RestorePromotionSnapshot(const DraftWorkspace& snapsho
     workspace.base_model_hash = reviews::ComputeModelSemanticHash(restored_accepted);
     workspace.working_revision = std::max(workspace.working_revision, snapshot.working_revision) + 1;
     RecordEvent("promotion_undone", {}, std::to_string(snapshot.groups.size()) + " groups restored");
+    // The groups came back from a snapshot, not from an edit. Any entry still
+    // here predates the promotion and describes a workspace built on a baseline
+    // two accepted-model changes ago.
+    ClearEditUndoHistory();
     InvalidateMaterialization();
 
     if (!Save(error)) {

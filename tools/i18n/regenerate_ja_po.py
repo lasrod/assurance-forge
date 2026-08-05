@@ -280,7 +280,6 @@ TRANSLATIONS = {
     "Accepting this also accepts: {0}": "これを受理すると次も受理されます: {0}",
     "Accept this change": "この変更を受理",
     "Reject this change": "この変更を却下",
-    "Rejected the change. The accepted argument is unchanged.": "変更を却下しました。受理済みの議論は変更されていません。",
     "Could not accept this change: {0}": "この変更を受理できませんでした: {0}",
     "Could not reject this change: {0}": "この変更を却下できませんでした: {0}",
     "My edits": "自分の編集",
@@ -905,12 +904,88 @@ TRANSLATIONS = {
     "and reactivate confidence if it is still valid.":
         "この要素が変更されたため、保存された信頼度評価の確認が必要です。値を確認し、まだ有効であれば "
         "信頼度を再アクティブ化してください。",
+
+    # ===== Integrated draft workspace: Draft Changes panel and rejection scope =====
+    'A change this one was built on was rejected, so it is no longer applied. Its author can retarget it at what remains.': 'この変更が前提としていた変更が却下されたため、現在は適用されていません。作成者が残っている内容に向けて修正できます。',
+    'A change this one was built on was rejected, so it no longer applies.': 'この変更が前提としていた変更が却下されたため、適用できません。',
+    'AI client': 'AI クライアント',
+    'Accept': '受理',
+    'Accepted the change. The rest of the draft is still unaccepted.': '変更を受理しました。ドラフトの残りは未受理のままです。',
+    'Accepting this also accepts:': 'これを受理すると次も受理されます:',
+    'Built on it:': 'これを前提とする変更:',
+    'Could not accept the draft: {0}': 'ドラフトを受理できませんでした: {0}',
+    'Depends on:': '前提とする変更:',
+    'Draft Changes': 'ドラフトの変更',
+    'Findings (advisory):': '指摘 (参考):',
+    'Guidelines: {0}': 'ガイドライン: {0}',
+    'Keep them for review': '確認のために残す',
+    'No unaccepted changes. The argument on screen is the accepted one.': '未受理の変更はありません。画面上の議論は受理済みのものです。',
+    'Promotion is recorded, but the accepted SACM file is not yet confirmed. The draft is retained and cannot be edited or accepted.': '受理は記録されましたが、受理済み SACM ファイルはまだ確認されていません。ドラフトは保持され、編集も受理もできません。',
+    'Rationale:': '根拠:',
+    'Reject': '却下',
+    'Reject dependent changes?': '前提とする変更も却下しますか?',
+    'Reject them too': 'まとめて却下',
+    'Rejecting:': '却下する変更:',
+    'Review changes': '変更を確認',
+    'Review items: {0}': 'レビュー項目: {0}',
+    'SCCG AI review': 'SCCG AI レビュー',
+    'State: {0}': '状態: {0}',
+    'There is nothing to reject.': '却下できるものがありません。',
+    'They stop being applied to the working draft and are marked as needing attention, so their author can retarget them.': '作業ドラフトへの適用が停止され、要対応として表示されます。作成者が対象を修正できます。',
+    'This draft cannot be shown because one of its changes no longer applies.': 'このドラフトは、含まれる変更のひとつが適用できなくなったため表示できません。',
+    'This draft could not be applied to the accepted argument.': 'このドラフトを受理済みの議論に適用できませんでした。',
+    'This draft could not be applied: {0}': 'このドラフトを適用できませんでした: {0}',
+    'Untitled change ({0})': '無題の変更 ({0})',
+    'being written': '作成中',
+    'imported proposal': '取り込んだ提案',
+    'needs attention': '要対応',
+    'person': '人',
+    'ready for a decision': '判断待ち',
+    'rejected': '却下済み',
+    'session {0}': 'セッション {0}',
+    'unknown': '不明',
 }
 
 
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
+    ('Rejected {0} change.',
+     'Rejected {0} changes.'):
+        ['変更 {0} 件を却下しました。'],
+    ('Rejected {0} change. The accepted argument is unchanged.',
+     'Rejected {0} changes. The accepted argument is unchanged.'):
+        ['変更 {0} 件を却下しました。受理済みの議論は変更されていません。'],
+    ('{0} dependent change was rejected too.',
+     '{0} dependent changes were rejected too.'):
+        ['前提とする変更 {0} 件もあわせて却下しました。'],
+    ('{0} change now needs attention before it can be accepted.',
+     '{0} changes now need attention before they can be accepted.'):
+        ['受理するには {0} 件の変更に対応が必要です。'],
+    ('{0} element added',
+     '{0} elements added'):
+        ['要素 {0} 件を追加'],
+    ('{0} element changed',
+     '{0} elements changed'):
+        ['要素 {0} 件を変更'],
+    ('{0} element removed',
+     '{0} elements removed'):
+        ['要素 {0} 件を削除'],
+    ('{0} operation, nothing applied yet',
+     '{0} operations, nothing applied yet'):
+        ['操作 {0} 件、まだ何も適用されていません'],
+    ('{0} other change is built on the one you are rejecting, so it can no longer be applied on its own.',
+     '{0} other changes are built on the one you are rejecting, so they can no longer be applied on their own.'):
+        ['却下しようとしている変更を前提とする変更が {0} 件あり、単独では適用できなくなります。'],
+    ('{0} relationship added',
+     '{0} relationships added'):
+        ['関係 {0} 件を追加'],
+    ('{0} relationship removed',
+     '{0} relationships removed'):
+        ['関係 {0} 件を削除'],
+    ('{0} unaccepted change',
+     '{0} unaccepted changes'):
+        ['未受理の変更 {0} 件'],
     ("WORKING DRAFT — {0} unaccepted change", "WORKING DRAFT — {0} unaccepted changes"): ["作業ドラフト — 未受理の変更 {0} 件"],
     ("Accepted {0} draft change.", "Accepted {0} draft changes."): ["ドラフトの変更 {0} 件を受理しました。"],
     ("{0} element", "{0} elements"): ["{0} 要素"],

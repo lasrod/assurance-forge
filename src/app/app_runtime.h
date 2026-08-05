@@ -311,8 +311,43 @@ private:
     // anything is written. If either fails, nothing is.
     bool PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
 
-    // Rejects a selection and everything left dangling by it.
-    bool RejectDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
+    // How far a rejection reaches past what the user picked.
+    enum class DraftRejectionScope {
+        // Reject the dependents too. The work goes, and goes visibly.
+        Cascade,
+        // Keep them, marked `NeedsAttention`. They leave materialization -- they
+        // could not apply -- but stay in the workspace for their author to
+        // retarget.
+        StrandDependents,
+    };
+
+    // Rejects a selection, applying `scope` to whatever it would strand.
+    bool RejectDraftGroups(const std::vector<std::string>& group_ids, DraftRejectionScope scope, std::string& error);
+
+    // Starts a rejection, raising the choice above only when there is one to make.
+    //
+    // A rejection that strands nothing is applied immediately: a modal on every
+    // rejection is a modal the user stops reading, and then the one that matters
+    // is dismissed with the rest.
+    void BeginRejectDraftGroups(const std::vector<std::string>& group_ids);
+    void ResolvePendingDraftRejection(DraftRejectionScope scope);
+    void CancelPendingDraftRejection();
+
+    // Selects the first element a draft group changes and centres the canvas on
+    // it. Does nothing when the group's changes are not on screen -- a stranded
+    // group is not applied to the working model, so there is nothing to focus.
+    void FocusDraftGroupOnCanvas(const std::string& group_id);
+
+    // Deletes promotion snapshots the undo stack can no longer reach.
+    //
+    // The rule is the audit undo boundary and nothing else. `CanUndo` requires a
+    // sequence strictly past the boundary, and a boundary only ever moves
+    // forward as snapshots and baselines are taken -- so a promotion at or below
+    // it is unreachable permanently, and its snapshot can never be consulted
+    // again. Every cheaper rule (keep the last N, drop by age) can delete a
+    // snapshot that is still reachable, which would destroy the only copy of
+    // unaccepted work at the exact moment the user asked for it back.
+    void PrunePromotionSnapshots();
 
     // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
     // because nothing in the draft was ever applied to it.

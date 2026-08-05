@@ -120,6 +120,16 @@ public:
     // the record of what was proposed and declined survives.
     bool RejectGroup(const std::string& group_id, std::string& error);
 
+    // Marks a group stranded: something it depended on was rejected, so it can no
+    // longer apply.
+    //
+    // Offered instead of a cascade, for a user who rejects one change but does
+    // not want the changes built on top of it thrown away with it. The group
+    // leaves materialization -- it would fail and block the whole draft -- but
+    // stays in the workspace, and its author can `ReplaceOperations` to retarget
+    // it at something that exists.
+    bool MarkGroupNeedsAttention(const std::string& group_id, std::string& error);
+
     // Durably records promotion intent before the accepted SACM/audit command
     // runs. While pending, draft operations are inert. Recovery can then decide
     // from the accepted-model hash whether to finalize or cancel after a crash.
@@ -189,6 +199,66 @@ public:
                                   const core::AssuranceCase& restored_accepted,
                                   std::string& error);
 
+    // --- Undoing one draft edit ------------------------------------------
+    //
+    // Draft mutation is deliberately not a command: it records no audit
+    // transaction and triggers no `.sacm` autosave, which is what keeps the
+    // accepted file byte-stable while a draft is built. So it cannot use the
+    // accepted model's undo stack, and needs one of its own.
+    //
+    // This stack holds the workspace as it stood before each edit. It is
+    // **session state, not recovery state**: the draft's content is persisted so
+    // a restart recovers the work, but the edit history is not, so a restart
+    // recovers the work with nothing left to undo. Persisting it would grow the
+    // stored draft by a whole workspace copy per keystroke to buy back a
+    // convenience, and the thing that must survive a crash is the work itself.
+    //
+    // A promotion clears it. The states below it describe groups the accepted
+    // argument now contains, and undoing into one would re-stage work the user
+    // has already accepted. Undoing the promotion itself is a different
+    // mechanism -- an audit boundary plus `RestorePromotionSnapshot`.
+
+    bool CanUndoDraftEdit() const;
+
+    // Collapses every mutation made during its lifetime into one undo entry.
+    //
+    // One user gesture can be several store mutations: rejecting a change and
+    // stranding what depended on it is two, and the whole point of putting that
+    // choice to the user is that the two go together. Without this, one Ctrl+Z
+    // reverses half of it and leaves the draft in exactly the incoherent state
+    // the choice existed to prevent.
+    //
+    // An entry is pushed only if the revision actually moved, so a gesture that
+    // was refused leaves nothing to undo.
+    class [[nodiscard]] EditUndoScope {
+    public:
+        EditUndoScope(DraftWorkspaceStore& store, std::string label);
+        ~EditUndoScope();
+
+        EditUndoScope(const EditUndoScope&) = delete;
+        EditUndoScope& operator=(const EditUndoScope&) = delete;
+
+    private:
+        DraftWorkspaceStore& store_;
+        std::string label_;
+        std::optional<DraftWorkspace> before_;
+        std::uint64_t revision_on_entry_ = 0;
+        bool outermost_ = false;
+    };
+
+    // What the next undo would reverse, for the status line. Empty when there is
+    // nothing to undo.
+    std::string NextDraftUndoLabel() const;
+
+    // Restores the workspace to its state before the most recent edit.
+    //
+    // The revision still moves **forward**: an undo changes what a reader would
+    // see, and a token minted before it must not silently become valid again
+    // because the content happens to match. `next_sequence` likewise never goes
+    // backwards, so a reinstated group id can never name two different groups in
+    // one event log.
+    bool UndoDraftEdit(std::string& error);
+
     // The working model, and everything derived from it.
     //
     // `accepted_revision` is the caller's own token for "the accepted model has
@@ -210,8 +280,20 @@ public:
     void InvalidateMaterialization();
 
 private:
+    // The workspace as it stood before one edit, and what that edit was.
+    struct DraftEditUndoEntry {
+        DraftWorkspace workspace;
+        // Shown in the status line when this entry is undone, so the user is told
+        // what came back rather than only that something did.
+        std::string label;
+    };
+
     DraftWorkspace& EnsureWorkspace(const core::AssuranceCase& accepted);
     void RecordEvent(std::string type, std::string group_id, std::string detail);
+    // Records the pre-edit workspace. Called by a mutation once it is certain to
+    // succeed, so a refused edit leaves no undo entry that would reverse nothing.
+    void PushEditUndo(std::string label);
+    void ClearEditUndoHistory();
     bool Save(std::string& error);
     std::string ArgumentKey() const;
 
@@ -220,6 +302,10 @@ private:
     std::filesystem::path project_relative_argument_file_;
     std::optional<DraftWorkspace> workspace_;
     std::unordered_set<std::string> authoritative_identities_;
+    std::vector<DraftEditUndoEntry> edit_undo_stack_;
+    // Non-zero while an `EditUndoScope` is open, which suppresses the per-mutation
+    // entries in favour of the one the scope pushes.
+    int edit_undo_scope_depth_ = 0;
 
     std::shared_ptr<DraftMaterializationResult> materialization_ = std::make_shared<DraftMaterializationResult>();
     bool materialization_valid_ = false;

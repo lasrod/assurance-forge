@@ -32,6 +32,10 @@ struct ModalHostCallbacks {
     std::function<void()> confirm_delete_terminology_term;
     std::function<void()> confirm_terminology_category_edit;
     std::function<void()> confirm_delete_terminology_category;
+    // How far a draft rejection should reach. `true` rejects the dependent
+    // changes too; `false` keeps them, marked as needing attention.
+    std::function<void(bool cascade)> resolve_draft_rejection;
+    std::function<void()> cancel_draft_rejection;
 };
 
 void RenderModalHost(AppRuntimeState& state, bool& done, const ModalHostCallbacks& callbacks);

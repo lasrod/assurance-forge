@@ -39,6 +39,12 @@ bool ActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
 
 bool AppRuntime::CanUndo() const {
     const AppRuntimeState& state = *impl_;
+    // Draft edits are not commands and are not in the audit log, so they need
+    // their own stack -- and while a draft holds unaccepted edits, that is the
+    // stack the user means. Checked before the audit preconditions, because a
+    // draft edit is undoable in situations an audited command is not.
+    if (state.draft_workspace.CanUndoDraftEdit())
+        return true;
     if (!state.command_bus)
         return false;
     if (!state.app_state.current_project.has_value())
@@ -64,6 +70,35 @@ bool AppRuntime::CanUndo() const {
 
 bool AppRuntime::Undo() {
     AppRuntimeState& state = *impl_;
+
+    // The workspace first, and only then the accepted history.
+    //
+    // A draft edit writes no SACM and records no audit transaction -- that is
+    // what keeps the accepted file byte-stable while a draft is built -- so
+    // undoing one cannot go through the audit stack. Taking the draft stack
+    // first is also what a user means by Ctrl+Z here: the last thing they did
+    // was to the draft.
+    //
+    // It falls through once the draft has nothing left to undo, rather than
+    // stopping. That is what keeps a promotion undoable while later groups are
+    // still staged: the promotion is a boundary on the accepted stack, and
+    // refusing to reach it would strand the acceptance the user wants to
+    // reverse.
+    if (state.draft_workspace.CanUndoDraftEdit()) {
+        const std::string label = state.draft_workspace.NextDraftUndoLabel();
+        std::string draft_error;
+        if (!state.draft_workspace.UndoDraftEdit(draft_error)) {
+            state.app_state.status_message = "Undo failed: " + draft_error;
+            return false;
+        }
+        // No `DocumentDirtyEvent`: the accepted `.sacm` did not change and must
+        // not be autosaved by an edit to unaccepted work.
+        state.events.Emit(TreeDirtyEvent{});
+        state.events.Emit(SelectionChangedEvent{});
+        state.app_state.status_message =
+            label.empty() ? "Undid the last draft change." : ("Undid draft change: " + label);
+        return true;
+    }
 
     if (!state.command_bus) {
         state.app_state.status_message = "Undo unavailable: no project audit bus.";
@@ -192,7 +227,44 @@ bool AppRuntime::Undo() {
     state.events.Emit(DocumentDirtyEvent{});
 
     state.app_state.status_message = "Undid: " + target.target_command_name + draft_note;
+    PrunePromotionSnapshots();
     return true;
+}
+
+void AppRuntime::PrunePromotionSnapshots() {
+    AppRuntimeState& state = *impl_;
+    if (!state.app_state.current_project.has_value())
+        return;
+
+    const core::AssuranceProject& project = state.app_state.current_project.value();
+    const std::vector<std::uint64_t> stored = core::drafts::ListDraftPromotionSnapshots(project.rootPath);
+    if (stored.empty())
+        return;
+
+    // The boundary is computed for the *latest* sequence, which is the furthest
+    // back any future undo could reach. Computing it per snapshot would be the
+    // same answer at more cost: `FindUndoBoundary` is monotonic in its sequence
+    // argument, so the boundary for the newest transaction bounds them all.
+    const auto& transactions = state.command_bus != nullptr ? state.command_bus->Store().Transactions()
+                                                            : std::vector<core::audit::AuditTransaction>{};
+    if (transactions.empty())
+        return;
+    const std::uint64_t latest = transactions.back().transaction_sequence;
+    const auto& snapshots = areas::GetCachedSnapshots(project.rootPath);
+    const auto& baselines = areas::GetCachedBaselines(project.rootPath);
+    const std::uint64_t boundary = core::audit::FindUndoBoundary(snapshots, baselines, latest);
+
+    for (const std::uint64_t sequence : stored) {
+        // Strictly at or below. A snapshot exactly *at* the boundary is already
+        // unreachable -- `CanUndo` is a strict comparison -- and keeping it would
+        // leave one file behind forever for every baseline the project takes.
+        if (core::audit::CanUndo(sequence, boundary))
+            continue;
+        std::string error;
+        // Best effort. Failing to delete a file that will never be read again is
+        // not worth interrupting the user for, and the next prune retries it.
+        state.draft_workspace.DeletePromotionSnapshot(sequence, error);
+    }
 }
 
 } // namespace app
