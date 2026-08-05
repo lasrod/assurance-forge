@@ -338,6 +338,17 @@ private:
     // group is not applied to the working model, so there is nothing to focus.
     void FocusDraftGroupOnCanvas(const std::string& group_id);
 
+    // Deletes promotion snapshots the undo stack can no longer reach.
+    //
+    // The rule is the audit undo boundary and nothing else. `CanUndo` requires a
+    // sequence strictly past the boundary, and a boundary only ever moves
+    // forward as snapshots and baselines are taken -- so a promotion at or below
+    // it is unreachable permanently, and its snapshot can never be consulted
+    // again. Every cheaper rule (keep the last N, drop by age) can delete a
+    // snapshot that is still reachable, which would destroy the only copy of
+    // unaccepted work at the exact moment the user asked for it back.
+    void PrunePromotionSnapshots();
+
     // Throws the whole draft away. The accepted `.sacm` is left byte-identical,
     // because nothing in the draft was ever applied to it.
     bool DiscardWorkingDraft(std::string& error);

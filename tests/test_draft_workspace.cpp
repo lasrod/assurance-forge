@@ -2,6 +2,8 @@
 
 #include "core/drafts/draft_materializer.h"
 #include "core/drafts/draft_dependency_graph.h"
+#include "core/audit/audit_transaction.h"
+#include "core/audit/undo_boundary.h"
 #include "core/drafts/draft_persistence.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/reviews/review_proposal_patch_service.h"
@@ -1791,4 +1793,132 @@ TEST(DraftWorkspace, RetargetingAStrandedGroupPutsItBackIntoTheDraft) {
     const core::drafts::DraftMaterializationResult& result = fixture.store.Materialize(fixture.accepted, 3);
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_EQ(FindElement(result.working_model, "G1")->content, "Reworded against the top goal.");
+}
+
+// --------------------------------------------------------------------------
+// Pruning promotion snapshots.
+//
+// They accumulate one per promotion and are consumed only by an undo. The rule
+// for deleting one is the audit undo boundary and nothing cheaper: every
+// approximation (keep the last N, drop by age) can delete a snapshot that is
+// still reachable, which destroys the only copy of unaccepted work at exactly
+// the moment the user asked for it back.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, SnapshotEnumerationIgnoresFilesItDidNotWrite) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.SavePromotionSnapshot(7, *fixture.store.workspace(), error)) << error;
+    ASSERT_TRUE(fixture.store.SavePromotionSnapshot(12, *fixture.store.workspace(), error)) << error;
+
+    // Something this code did not write. The one safe thing to do with a file
+    // that may hold unaccepted work and whose name is not understood is to leave
+    // it alone -- so it must not appear in the list a pruner deletes from.
+    const std::filesystem::path directory = core::drafts::DraftPromotionSnapshotsDirectory(fixture.dir.path);
+    {
+        std::ofstream stray(directory / "notes.json", std::ios::binary | std::ios::trunc);
+        stray << "{}";
+    }
+    {
+        std::ofstream stray(directory / "17-backup.json", std::ios::binary | std::ios::trunc);
+        stray << "{}";
+    }
+
+    const std::vector<std::uint64_t> listed = core::drafts::ListDraftPromotionSnapshots(fixture.dir.path);
+    ASSERT_EQ(listed.size(), 2u);
+    EXPECT_EQ(listed[0], 7u) << "ascending, so a caller comparing against a boundary can stop early";
+    EXPECT_EQ(listed[1], 12u);
+}
+
+TEST(DraftWorkspace, PruningKeepsEverySnapshotAnUndoCouldStillReach) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a sub-claim");
+    fixture.Stage(group, {CreateClaimOp("$sub", "Hazards are mitigated."), SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    std::string error;
+    for (const std::uint64_t sequence : {3u, 5u, 9u, 14u})
+        ASSERT_TRUE(fixture.store.SavePromotionSnapshot(sequence, *fixture.store.workspace(), error)) << error;
+
+    // A baseline at 9 is the undo boundary: `CanUndo` is a strict comparison, so
+    // 9 itself and everything below it is unreachable permanently, and 14 is not.
+    const std::uint64_t boundary = 9;
+    std::vector<std::uint64_t> kept;
+    for (const std::uint64_t sequence : core::drafts::ListDraftPromotionSnapshots(fixture.dir.path)) {
+        if (core::audit::CanUndo(sequence, boundary)) {
+            kept.push_back(sequence);
+            continue;
+        }
+        ASSERT_TRUE(fixture.store.DeletePromotionSnapshot(sequence, error)) << error;
+    }
+
+    ASSERT_EQ(kept.size(), 1u);
+    EXPECT_EQ(kept.front(), 14u);
+    // The one that survives is the one the undo stack can still reach, and it is
+    // still readable -- deleting it would be the failure this whole mechanism
+    // exists to prevent.
+    core::drafts::DraftWorkspace restored;
+    EXPECT_TRUE(fixture.store.LoadPromotionSnapshot(14, restored, error)) << error;
+    EXPECT_EQ(restored.groups.size(), 1u);
+    EXPECT_FALSE(fixture.store.HasPromotionSnapshot(3));
+    EXPECT_FALSE(fixture.store.HasPromotionSnapshot(9)) << "at the boundary is already past reach";
+}
+
+// --------------------------------------------------------------------------
+// Attribution in the audit log.
+//
+// Accepting a draft consumes it, so whatever the log does not record about
+// where the change came from is not recoverable from anywhere else. `author`
+// names the approver and the contributing sources; the rest is the trace a
+// person auditing the argument a year later needs.
+// --------------------------------------------------------------------------
+
+TEST(DraftWorkspace, APromotionTransactionCarriesItsProvenance) {
+    core::audit::AuditTransaction tx;
+    tx.transaction_sequence = 4;
+    tx.transaction_id = "tx-4";
+    tx.timestamp = "2026-08-05T10:00:00Z";
+    tx.author = "Jesper (accepting work by Claude Code, SCCG AI Review)";
+    tx.command_name = "ApplyProposal";
+    tx.draft_promotion.group_ids = {"group-1", "group-2"};
+    tx.draft_promotion.source_labels = {"Claude Code", "SCCG AI Review"};
+    tx.draft_promotion.guideline_ids = {"AR-02"};
+    tx.draft_promotion.review_item_ids = {"RI-11"};
+    tx.draft_promotion.rationales = {"Add a misuse-hazard branch: the hazard analysis identifies foreseeable misuse."};
+
+    const std::string line = core::audit::SerializeAuditTransactionLine(tx);
+    core::audit::AuditTransaction parsed;
+    std::string error;
+    ASSERT_TRUE(core::audit::ParseAuditTransactionLine(line, parsed, error)) << error;
+
+    EXPECT_EQ(parsed.draft_promotion.group_ids, tx.draft_promotion.group_ids);
+    EXPECT_EQ(parsed.draft_promotion.source_labels, tx.draft_promotion.source_labels);
+    EXPECT_EQ(parsed.draft_promotion.guideline_ids, tx.draft_promotion.guideline_ids);
+    EXPECT_EQ(parsed.draft_promotion.review_item_ids, tx.draft_promotion.review_item_ids);
+    EXPECT_EQ(parsed.draft_promotion.rationales, tx.draft_promotion.rationales);
+}
+
+TEST(DraftWorkspace, AnOrdinaryTransactionSerializesExactlyAsItDidBefore) {
+    core::audit::AuditTransaction tx;
+    tx.transaction_sequence = 1;
+    tx.transaction_id = "tx-1";
+    tx.timestamp = "2026-08-05T10:00:00Z";
+    tx.author = "Jesper";
+    tx.command_name = "CreateClaim";
+
+    // The hash chain is over the bytes of each line. A field emitted
+    // unconditionally -- even as an empty object -- would change the bytes of
+    // every ordinary transaction, and a log written by this version would then
+    // not verify against one written by the last.
+    const std::string line = core::audit::SerializeAuditTransactionLine(tx);
+    EXPECT_EQ(line.find("draft_promotion"), std::string::npos) << line;
+
+    core::audit::AuditTransaction parsed;
+    std::string error;
+    ASSERT_TRUE(core::audit::ParseAuditTransactionLine(line, parsed, error)) << error;
+    EXPECT_TRUE(parsed.draft_promotion.empty());
 }

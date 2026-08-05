@@ -38,7 +38,12 @@ struct DispatchOutcome {
 // question the audit log of a safety argument exists to answer, and an edge
 // case where the answer is "an agent proposed it and a person approved it" is
 // the one it must not silently record as `system`.
-DispatchOutcome
-DispatchAuditedCommand(AppRuntimeState& state, core::commands::ICommand& command, const std::string& author = {});
+// `draft_promotion` is recorded on the audit transaction and is empty for every
+// command except a draft promotion, whose provenance the log has to carry
+// because the draft it came from is consumed by the act of accepting it.
+DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
+                                       core::commands::ICommand& command,
+                                       const std::string& author = {},
+                                       const core::audit::DraftPromotionRecord& draft_promotion = {});
 
 } // namespace app::commands

@@ -227,7 +227,44 @@ bool AppRuntime::Undo() {
     state.events.Emit(DocumentDirtyEvent{});
 
     state.app_state.status_message = "Undid: " + target.target_command_name + draft_note;
+    PrunePromotionSnapshots();
     return true;
+}
+
+void AppRuntime::PrunePromotionSnapshots() {
+    AppRuntimeState& state = *impl_;
+    if (!state.app_state.current_project.has_value())
+        return;
+
+    const core::AssuranceProject& project = state.app_state.current_project.value();
+    const std::vector<std::uint64_t> stored = core::drafts::ListDraftPromotionSnapshots(project.rootPath);
+    if (stored.empty())
+        return;
+
+    // The boundary is computed for the *latest* sequence, which is the furthest
+    // back any future undo could reach. Computing it per snapshot would be the
+    // same answer at more cost: `FindUndoBoundary` is monotonic in its sequence
+    // argument, so the boundary for the newest transaction bounds them all.
+    const auto& transactions = state.command_bus != nullptr ? state.command_bus->Store().Transactions()
+                                                            : std::vector<core::audit::AuditTransaction>{};
+    if (transactions.empty())
+        return;
+    const std::uint64_t latest = transactions.back().transaction_sequence;
+    const auto& snapshots = areas::GetCachedSnapshots(project.rootPath);
+    const auto& baselines = areas::GetCachedBaselines(project.rootPath);
+    const std::uint64_t boundary = core::audit::FindUndoBoundary(snapshots, baselines, latest);
+
+    for (const std::uint64_t sequence : stored) {
+        // Strictly at or below. A snapshot exactly *at* the boundary is already
+        // unreachable -- `CanUndo` is a strict comparison -- and keeping it would
+        // leave one file behind forever for every baseline the project takes.
+        if (core::audit::CanUndo(sequence, boundary))
+            continue;
+        std::string error;
+        // Best effort. Failing to delete a file that will never be read again is
+        // not worth interrupting the user for, and the next prune retries it.
+        state.draft_workspace.DeletePromotionSnapshot(sequence, error);
+    }
 }
 
 } // namespace app

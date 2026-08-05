@@ -1635,8 +1635,37 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     if (!impl_->draft_workspace.BeginPromotion(plan.closure, plan.promoted_model, error))
         return false;
 
+    // The draft is consumed by the act of accepting it, so whatever the log does
+    // not record here is not recoverable from anywhere else. `author` names the
+    // approver and the contributing sources; this is the rest of the trace.
+    core::audit::DraftPromotionRecord attribution;
+    attribution.group_ids = plan.closure;
+    attribution.source_labels = plan.compiled.source_labels;
+    for (const std::string& group_id : plan.closure) {
+        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
+        if (group == nullptr)
+            continue;
+        for (const std::string& guideline_id : group->guideline_ids) {
+            if (std::find(attribution.guideline_ids.begin(), attribution.guideline_ids.end(), guideline_id) ==
+                attribution.guideline_ids.end()) {
+                attribution.guideline_ids.push_back(guideline_id);
+            }
+        }
+        for (const std::string& review_item_id : group->review_item_ids) {
+            if (std::find(attribution.review_item_ids.begin(), attribution.review_item_ids.end(), review_item_id) ==
+                attribution.review_item_ids.end()) {
+                attribution.review_item_ids.push_back(review_item_id);
+            }
+        }
+        if (!group->rationale.empty()) {
+            const std::string title = group->title.empty() ? group->id : group->title;
+            attribution.rationales.push_back(title + ": " + group->rationale);
+        }
+    }
+
     core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
-    const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(*impl_, command, author);
+    const app::commands::DispatchOutcome outcome =
+        app::commands::DispatchAuditedCommand(*impl_, command, author, attribution);
     if (!outcome.success) {
         const std::string dispatch_error = outcome.error;
         std::string rollback_error;

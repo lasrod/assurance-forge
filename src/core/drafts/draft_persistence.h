@@ -39,6 +39,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace core::drafts {
 
@@ -94,13 +95,16 @@ bool DeleteDraftWorkspace(const std::filesystem::path& project_root,
 // marks transaction N as a promotion, so nothing has to infer it from a command
 // name that ordinary proposal application shares.
 //
-// **These are not pruned.** A snapshot is deleted when an undo consumes it and
-// otherwise accumulates, so a long-lived project keeps one small JSON file per
-// promotion it has ever made. Deliberate: the obvious cheap rules -- keep the
-// last N, drop anything older than a date -- can each delete a snapshot that is
-// still reachable from the undo stack, which is the precise failure this file
-// exists to prevent. Pruning against the audit undo boundary is correct and
-// needs audit knowledge `core` does not have. Left for the app layer.
+// **Pruning is the app layer's decision, not this one's.** A snapshot is deleted
+// when an undo consumes it; the rest would otherwise accumulate, one small JSON
+// file per promotion the project has ever made. The obvious cheap rules -- keep
+// the last N, drop anything older than a date -- can each delete a snapshot that
+// is still reachable from the undo stack, which is the precise failure this file
+// exists to prevent. The correct rule is the audit undo boundary: a snapshot at
+// or below it can never be reached, because `CanUndo` requires the sequence to
+// be strictly past the boundary and boundaries only move forward. That needs
+// audit knowledge `core` does not have, so this offers enumeration only and
+// `AppRuntime::PrunePromotionSnapshots` owns the decision.
 
 std::filesystem::path DraftPromotionSnapshotsDirectory(const std::filesystem::path& project_root);
 std::filesystem::path DraftPromotionSnapshotPath(const std::filesystem::path& project_root,
@@ -138,5 +142,13 @@ bool DraftPromotionSnapshotExists(const std::filesystem::path& project_root, std
 bool DeleteDraftPromotionSnapshot(const std::filesystem::path& project_root,
                                   std::uint64_t transaction_sequence,
                                   std::string& error);
+
+// The transaction sequences that have a stored snapshot, ascending.
+//
+// Enumeration only -- deciding which of these is still reachable needs the audit
+// undo boundary, which `core` has no knowledge of. A file whose name is not a
+// sequence number is skipped rather than reported: this answers "what can be
+// pruned", and something unrecognized is exactly what must not be.
+std::vector<std::uint64_t> ListDraftPromotionSnapshots(const std::filesystem::path& project_root);
 
 } // namespace core::drafts

@@ -856,6 +856,13 @@ void AppRuntime::SyncDraftWorkspace() {
         // only copy.
         impl_->app_state.status_message = "Warning: could not read the draft for this argument: " + error;
     }
+
+    // Snapshots accumulate one per promotion and are only consumed by an undo,
+    // so a project that has accepted many drafts and undone none carries them
+    // all. Opening is the natural moment to clear what the undo stack can no
+    // longer reach -- the audit store and its baselines are loaded by then, and
+    // the boundary is what decides.
+    PrunePromotionSnapshots();
 }
 
 void AppRuntime::RebuildDerivedViewsIfNeeded() {

@@ -30,7 +30,10 @@ CommandBus::Open(AssuranceProject project, std::filesystem::path sacm_absolute_p
     return bus;
 }
 
-CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const std::string& author) {
+CommandResult CommandBus::Execute(ICommand& command,
+                                  CommandContext& ctx,
+                                  const std::string& author,
+                                  const audit::DraftPromotionRecord& draft_promotion) {
     CommandResult result;
 
     // Each command must opt into its edit-routing explicitly. The context is
@@ -140,6 +143,7 @@ CommandResult CommandBus::Execute(ICommand& command, CommandContext& ctx, const 
     audit::AuditTransaction tx;
     tx.command_name = command.Name();
     tx.author = author.empty() ? std::string("system") : author;
+    tx.draft_promotion = draft_promotion;
     tx.events.push_back(std::move(event));
 
     std::string append_error;
