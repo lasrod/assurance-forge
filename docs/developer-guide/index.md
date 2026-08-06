@@ -2,12 +2,15 @@
 
 This section contains development guidance for Assurance Forge contributors.
 
-Initial topics:
+Start here:
 
-- Building the project
-- Generating documentation
+- [Documentation map](../documentation-map.md) — which page is canonical for
+  which policy, what each authority level means, and what the CI documentation
+  gate enforces. Read this before adding a page.
+- [Layers and ownership](../architecture/layers-and-ownership.md) — what each
+  subsystem owns and which direction dependencies may run.
 - [Generating class diagrams](generating-class-diagrams.md)
-- Understanding the project architecture
+- [Releasing](../RELEASING.md) — how a release is cut, and what its notes must say.
 
 ## Repository quality
 

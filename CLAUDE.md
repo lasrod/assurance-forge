@@ -21,16 +21,27 @@ Assurance Forge is a C++23 ImGui desktop application for safety case engineering
 
 ### Layers (low → high, no upward dependencies)
 
+> **Canonical source:** `docs/architecture/layers-and-ownership.md`. The table
+> below is a convenience copy; where they disagree, that page wins.
+
 | Layer | Owns |
 |-------|------|
-| `sacm` | SACM model types, XML parsing, serialization |
+| `libs/sacm` | The reusable SACM 2.3 library: model, XMI I/O, validation, commands. Independent of Assurance Forge |
+| `sacm` | Legacy SACM model types, parsing, serialization, predating `libs/sacm` |
 | `parser` | XML parsing, SACM model building, SCCG guideline catalog loading |
-| `core` | UI-independent domain behavior (tree building, add/remove logic, project model) |
+| `sacm_adapter` | The seam between `libs/sacm` and the app: projection, library-backed edits, library load |
+| `core` | UI-independent domain behavior (tree building, add/remove logic, project model, drafts, audit) |
 | `ai` | AI settings, prompt construction, provider calls, response parsing, background task execution |
+| `export` | SVG export of GSN diagrams — its own projection and renderer, separate from the canvas |
 | `ui` | ImGui rendering, transient UI state, GSN canvas, panels, widgets |
+| `bridge` | Local transport between the MCP adapter and the running application |
+| `agent` | Operations an external agent can request, independent of transport |
+| `mcp` | The MCP server: JSON-RPC, session, tools. Its own executable |
 | `app` | Runtime orchestration, controllers, project workflow, modal state, command handling |
 
-**The dependency rule is enforced at build time** by `cmake/check_layer_gates.cmake`. `core`, `parser`, and `sacm` must never include ImGui or `app` headers. `ui` must not depend on `app` directly — panels receive action objects passed in from `AppRuntime`.
+**The dependency rule is enforced at build time** by `cmake/check_layer_gates.cmake`. `core`, `parser`, and `sacm` must never include ImGui or `app` headers. `ui` must not depend on `app` directly — panels receive action objects passed in from `AppRuntime`. `bridge` and `agent` must not include each other's transport or `mcp`.
+
+Note that `src/sacm` and `libs/sacm/include/sacm` share the `sacm/` include prefix: `sacm/model/document.h` is the library, `sacm/sacm_parser.h` is not.
 
 ### Frame & Interaction Flow
 
@@ -138,6 +149,25 @@ any GSN feature. GSN→SACM mappings are evidence-backed and recorded in
 `docs/sacm/sacm-gsn-mapping.md`; never invent one in code. Note that the canvas
 (`src/ui/gsn/`) and the SVG export (`src/export/`) are separate renderers with
 separate models — a decorator added to one is absent from the other.
+
+## Repository gates
+
+All run under `ctest`. A change that trips one is not ready:
+
+| Gate | Fails when |
+|---|---|
+| `i18n_catalog_check` | A source msgid is missing from the `.po`, or the committed `.mo` is stale |
+| `sacm_matrix_check` | A `verified` row has no ID-bearing test, or a cited path moved |
+| `gsn_matrix_check` | GSN taxonomy, statuses, or cited evidence drift |
+| `feature_matrix_check` | A `supported` row cites no existing test, or the exported JSON is stale |
+| `no_committed_artifacts_check` | A build log, test output or scratch file is tracked by git |
+| `documentation_check` | A broken internal link, an unreachable page, an unmarked generated doc, or an architecture page missing a subsystem |
+| `verification_index_check` | The verification index no longer matches the records' front matter |
+
+Documentation authority — which page is canonical for which policy — is
+`docs/documentation-map.md`. Neither this file nor `AGENTS.md` is canonical for
+anything listed there; on conflict, the canonical page wins. A change to a policy
+agents must follow goes into **both** files, or into neither.
 
 ## Key Constraints
 
