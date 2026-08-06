@@ -16,15 +16,19 @@ trusting it.
 | Base commit date | 2026-08-05 |
 | Collected | 2026-08-06 |
 | First commit | 2026-04-17 |
-| Commits in history | 274 |
 | Collector | `tools/quality/collect_baseline.py` |
 | Machine-readable | [repository-baseline.json](repository-baseline.json) |
 
-A baseline cannot name its own commit — recording the SHA changes it. The figures
-below therefore describe `main` at the base commit **plus the files this baseline
-itself adds** (the collector, this report, and the JSON snapshot), which is the
-tree as it exists once this change lands. Only the documentation and tooling
-counts are affected; no production, test, or coverage figure moves.
+A baseline cannot name its own commit — recording the SHA changes it, and
+amending to correct that changes it again. It therefore cites the **base
+commit**: the point this work branched from, which is stable however many
+commits the baseline itself adds. The JSON additionally records the HEAD it was
+generated at, for anyone who needs the exact provenance.
+
+The figures below describe `main` at the base commit **plus the files this
+baseline adds** (the collector, this report, and the JSON snapshot) — the tree as
+it exists once this change lands. Only the documentation and tooling counts are
+affected; no production, test, or coverage figure moves.
 
 ## How to read this
 
@@ -58,7 +62,7 @@ not to line counts, which is why those rows show `—`.
 |---|---|---|---|
 | First-party production | 527 | 92,198 | 71,524 |
 | First-party tests | 170 | 37,222 | 27,441 |
-| First-party tooling | 19 | 4,830 | 4,095 |
+| First-party tooling | 19 | 4,855 | 4,120 |
 | CI and repository config | 14 | 1,581 | 1,319 |
 | Documentation | 86 | — | — |
 | Assets and data | 13 | — | — |
@@ -164,9 +168,16 @@ form of the `src/sacm` versus `libs/sacm` confusion described in
 ## Coverage
 
 Measured, and read back from Coverage workflow run
-[31007382290](https://github.com/lasrod/assurance-forge/actions/runs/31007382290).
-**That run built commit `84cd98c`, the same commit as this baseline**, so these
-figures describe exactly the tree measured above.
+[31007382290](https://github.com/lasrod/assurance-forge/actions/runs/31007382290),
+which built the base commit `84cd98c`.
+
+**No compiled file differs between that commit and the tree measured here**, so
+these figures describe exactly the code counted above. The collector checks this
+rather than comparing SHAs: a commit touching only documentation cannot
+invalidate a coverage number, but a SHA comparison would claim otherwise. The
+list of differing compiled files is recorded in the JSON as
+`compiled_files_changed_since_run`, and it is empty. Were it not, these
+percentages would need re-measuring before being cited.
 
 | Scope | Lines | Functions | Branches | Conditions (MC/DC) |
 |---|---|---|---|---|

@@ -42,14 +42,12 @@ sys.path.insert(0, str(REPO / "tools"))
 # Classification. Order matters: the first matching rule wins.
 # --------------------------------------------------------------------------
 
-# Directories never walked. Build trees, virtualenvs, caches, and submodule
-# working copies. Submodules are inventoried separately from their gitlink.
-SKIP_DIRS = {
-    ".git", ".venv", "__pycache__", "node_modules",
-    "build", "build-docs", "build-coverage", "build-sacm-standalone",
-    "site", "CMakeFiles", "Testing", "tmp", "shots",
-    "external", "examples",
-}
+# There is no directory skip list because nothing here walks the filesystem for
+# content: every measurement enumerates `git ls-files`. Build trees, virtualenvs,
+# caches, and submodule working copies are therefore excluded by construction
+# rather than by a list that could drift out of step with .gitignore. The one
+# exception is collect_root_surface(), which lists the repository root
+# deliberately, untracked residue included, because that residue is a finding.
 
 CODE_SUFFIXES = {".cpp", ".cc", ".h", ".hpp", ".inl"}
 SCRIPT_SUFFIXES = {".py", ".sh", ".ps1"}
@@ -155,15 +153,27 @@ def collect_identity():
     sha = (run("git", "rev-parse", "HEAD") or "").strip()
     date = (run("git", "log", "-1", "--format=%cI") or "").strip()
     branch = (run("git", "rev-parse", "--abbrev-ref", "HEAD") or "").strip()
-    first = (run("git", "log", "--reverse", "--format=%cI") or "").splitlines()
+    # A baseline cannot cite its own commit -- recording the SHA changes it, and
+    # amending to fix that changes it again. Cite the point it branched from
+    # instead, which is stable no matter how many commits the baseline itself
+    # adds. Falls back to HEAD when origin/main is not fetched.
+    base = (run("git", "merge-base", "HEAD", "origin/main") or "").strip() or sha
+    # Ask for the root commit directly. `git log --reverse` would walk the whole
+    # history to yield a first line, which gets slower every year for one date.
+    roots = sorted(
+        line.strip()
+        for line in (run("git", "log", "--format=%cI", "--max-parents=0", "HEAD") or "").splitlines()
+        if line.strip()
+    )
     commits = (run("git", "rev-list", "--count", "HEAD") or "").strip()
     status = run("git", "status", "--porcelain") or ""
     dirty = [line for line in status.splitlines() if line.strip()]
     return {
         "commit": sha,
         "commit_date": date,
+        "base_commit": base,
         "branch": branch,
-        "first_commit_date": first[0].strip() if first else None,
+        "first_commit_date": roots[0] if roots else None,
         "total_commits": int(commits) if commits.isdigit() else None,
         "working_tree_dirty_entries": len(dirty),
     }
@@ -669,7 +679,7 @@ def collect_coverage():
         "run_id": entry["databaseId"],
         "run_commit": entry["headSha"],
         "run_date": entry["createdAt"],
-        "matches_baseline_commit": None,  # filled in by collect(), which knows HEAD
+        "compiled_files_changed_since_run": None,  # filled in by collect()
         "by_scope": {scope: measure for scope, measure in zip(scopes, measures)},
         "note": "Linux / GCC 14 only. No threshold gates on these numbers.",
     }
@@ -768,8 +778,9 @@ def render_markdown(data):
     parts.append(table(
         ["Field", "Value"],
         [
-            ["Commit", f"`{identity['commit']}`"],
-            ["Commit date", identity["commit_date"]],
+            ["Base commit", f"`{identity['base_commit']}`"],
+            ["HEAD at collection", f"`{identity['commit']}`"],
+            ["HEAD date", identity["commit_date"]],
             ["First commit", identity["first_commit_date"]],
             ["Commits in history", identity["total_commits"]],
         ],
@@ -951,26 +962,40 @@ def collect():
         "submodules": collect_submodules(),
     }
 
-    # Coverage is only trustworthy as a description of *this* tree if the run that
-    # produced it built this commit. Record the comparison rather than leaving the
-    # reader to check two SHAs by eye.
+    # Coverage describes this tree only if nothing compiled has moved since the run
+    # that produced it. Comparing SHAs would answer a narrower and less useful
+    # question -- a commit touching only documentation cannot invalidate a coverage
+    # figure, but it would make an equality check say otherwise. Diff the working
+    # tree against the run's commit and report which compiled files actually differ.
     coverage = data["build_and_analysis"].get("coverage", {})
-    if coverage.get("available"):
-        coverage["matches_baseline_commit"] = coverage.get("run_commit") == data["identity"]["commit"]
+    if coverage.get("available") and coverage.get("run_commit"):
+        diff = run("git", "diff", "--name-only", coverage["run_commit"])
+        changed = []
+        if diff is not None:
+            changed = sorted(
+                path.strip()
+                for path in diff.splitlines()
+                if path.strip() and Path(path.strip()).suffix in CODE_SUFFIXES
+            )
+        coverage["compiled_files_changed_since_run"] = changed
+        coverage["describes_current_tree"] = not changed
 
     return data
 
 
 def volatile_free(data):
-    """Strip fields that change without the repository changing.
+    """Strip fields that change without the repository content changing.
 
-    CI durations come from the GitHub API and the working-tree dirty count comes
-    from uncommitted edits; neither is a property of the committed tree, so
-    `--check` must not fail on them.
+    CI durations and coverage come from the GitHub API, the CTest count needs a
+    build tree, the dirty count reflects uncommitted edits, and the branch name is
+    a property of the checkout rather than the tree — the same commit examined
+    from two branches must not read as stale. None of these describes committed
+    content, so `--check` must not fail on them.
     """
     copy = json.loads(json.dumps(data))
     copy.get("ci", {}).pop("observed_durations", None)
     copy.get("identity", {}).pop("working_tree_dirty_entries", None)
+    copy.get("identity", {}).pop("branch", None)
     copy.get("tests", {}).pop("ctest_registered", None)
     copy.get("build_and_analysis", {}).pop("coverage", None)
     return copy

@@ -2,12 +2,13 @@
   "schema": 1,
   "generator": "tools/quality/collect_baseline.py",
   "identity": {
-    "commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
-    "commit_date": "2026-08-05T21:50:03+09:00",
+    "commit": "7da226f59f309ac06535c3ba619a5ebfa0672585",
+    "commit_date": "2026-08-06T20:22:45+09:00",
+    "base_commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
     "branch": "chore/288-repository-quality-baseline",
     "first_commit_date": "2026-04-17T00:13:04+09:00",
-    "total_commits": 274,
-    "working_tree_dirty_entries": 7
+    "total_commits": 275,
+    "working_tree_dirty_entries": 5
   },
   "code_size": {
     "by_category": {
@@ -38,8 +39,8 @@
       },
       "first_party_tooling": {
         "files": 19,
-        "physical_lines": 4830,
-        "code_lines": 4095
+        "physical_lines": 4855,
+        "code_lines": 4120
       },
       "other": {
         "files": 48,
@@ -1084,7 +1085,7 @@
       "run_id": 31007382290,
       "run_commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
       "run_date": "2026-08-05T12:50:07Z",
-      "matches_baseline_commit": true,
+      "compiled_files_changed_since_run": [],
       "by_scope": {
         "logic scope, headline": {
           "lines": {
@@ -1175,7 +1176,8 @@
           }
         }
       },
-      "note": "Linux / GCC 14 only. No threshold gates on these numbers."
+      "note": "Linux / GCC 14 only. No threshold gates on these numbers.",
+      "describes_current_tree": true
     }
   },
   "ci": {
