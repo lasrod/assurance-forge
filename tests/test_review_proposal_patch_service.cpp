@@ -324,3 +324,143 @@ TEST(ReviewProposalPatchServiceTest, FailedApplyLeavesModelUnchanged) {
     EXPECT_EQ(core::reviews::ComputeModelSemanticHash(model), before_hash);
     EXPECT_EQ(FindElement(model, "G1")->content, "Original content");
 }
+
+// ---------------------------------------------------------------------------
+// Bilingual argument
+//
+// A case reviewed in two languages is only reviewable in both if the argument
+// exists in both. These pin the rules that make that safe: a translation never
+// displaces the primary language, translating existing argument does not
+// disturb the English, and no element arrives in a translation alone.
+// ---------------------------------------------------------------------------
+
+TEST(ReviewProposalPatchServiceTest, CreatesClaimInBothLanguages) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation create =
+        Create(core::reviews::PatchOperationType::CreateClaim, "$sub", "The interlock prevents operation when open.");
+    create.translations["ja"] = "インターロックにより開状態での動作を防止する。";
+    proposal.operations.push_back(create);
+    proposal.operations.push_back(
+        AddSupportedBy(core::reviews::ElementRef{std::nullopt, "$sub"}, core::reviews::ElementRef{"G1", std::nullopt}));
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    const parser::SacmElement* claim = FindElement(model, result.generated_ids.at("$sub"));
+    ASSERT_NE(claim, nullptr);
+    // The scalar and the "en" entry carry the English; the translation lives
+    // beside it and never in it.
+    EXPECT_EQ(claim->content, "The interlock prevents operation when open.");
+    EXPECT_EQ(claim->content_langs.at("en"), "The interlock prevents operation when open.");
+    EXPECT_EQ(claim->content_langs.at("ja"), "インターロックにより開状態での動作を防止する。");
+}
+
+TEST(ReviewProposalPatchServiceTest, TranslationOnlyUpdateLeavesPrimaryTextUnchanged) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
+    update.field = "content";
+    update.translations["ja"] = "トップゴール。";
+    proposal.operations.push_back(update);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    const parser::SacmElement* goal = FindElement(model, "G1");
+    ASSERT_NE(goal, nullptr);
+    // Translating an argument must not blank the argument.
+    EXPECT_EQ(goal->content, "Original content");
+    EXPECT_EQ(goal->content_langs.at("ja"), "トップゴール。");
+}
+
+TEST(ReviewProposalPatchServiceTest, EmptyNewValueStillClearsWhenNoTranslationIsCarried) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
+    update.field = "content";
+    update.new_value = "";
+    proposal.operations.push_back(update);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(FindElement(model, "G1")->content, "");
+}
+
+TEST(ReviewProposalPatchServiceTest, EmptyTranslationRemovesTheTranslation) {
+    parser::AssuranceCase model = MakeModel();
+    for (parser::SacmElement& element : model.elements) {
+        if (element.id == "G1")
+            element.content_langs["ja"] = "古い翻訳。";
+    }
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
+    update.field = "content";
+    update.translations["ja"] = "";
+    proposal.operations.push_back(update);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    const parser::SacmElement* goal = FindElement(model, "G1");
+    ASSERT_NE(goal, nullptr);
+    // A stale translation the author removed must not survive the merge.
+    EXPECT_EQ(goal->content_langs.count("ja"), 0u);
+    EXPECT_EQ(goal->content, "Original content");
+}
+
+TEST(ReviewProposalPatchServiceTest, RefusesToCreateAnElementThatExistsOnlyInTranslation) {
+    parser::AssuranceCase model = MakeModel();
+    const std::string before_hash = core::reviews::ComputeModelSemanticHash(model);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation create = Create(core::reviews::PatchOperationType::CreateClaim, "$sub", "");
+    create.translations["ja"] = "英語のない主張。";
+    proposal.operations.push_back(create);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    // Such a claim renders as an empty node for every reader who has not
+    // switched languages: an invisible claim in a safety argument.
+    EXPECT_FALSE(result.success);
+    EXPECT_NE(result.error.find("translations"), std::string::npos);
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(model), before_hash);
+}
+
+TEST(ReviewProposalPatchServiceTest, TranslatingAnElementChangesItsSemanticHash) {
+    parser::AssuranceCase model = MakeModel();
+    const parser::SacmElement* before = FindElement(model, "G1");
+    ASSERT_NE(before, nullptr);
+    const std::string untranslated = core::reviews::ComputeElementSemanticHash(*before);
+
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
+    update.field = "content";
+    update.translations["ja"] = "トップゴール。";
+    proposal.operations.push_back(update);
+
+    core::reviews::ReviewProposalPatchService service;
+    ASSERT_TRUE(service.ApplyProposal(proposal, model).success);
+
+    // Otherwise a proposal written against the untranslated element still looks
+    // current, and staged work would overwrite a translation it never saw.
+    EXPECT_NE(core::reviews::ComputeElementSemanticHash(*FindElement(model, "G1")), untranslated);
+}

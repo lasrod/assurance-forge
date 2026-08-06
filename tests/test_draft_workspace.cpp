@@ -2011,3 +2011,123 @@ TEST(DraftWorkspace, UndoingADraftEditDoesNotRevivateAStaleDraft) {
     // nothing at all.
     EXPECT_EQ(fixture.store.workspace()->FindGroup(group)->operations.size(), 1u);
 }
+
+// --------------------------------------------------------------------------
+// Bilingual contributions.
+//
+// A case maintained in English and Japanese is reviewed by people reading one
+// or the other. A contribution that reaches the draft in one language only is
+// invisible to half of them, so the language has to survive staging, the
+// restart-recovery round trip, and materialization onto the canvas.
+// --------------------------------------------------------------------------
+
+namespace {
+
+core::reviews::PatchOperation
+CreateBilingualClaimOp(const std::string& create_ref, const std::string& english, const std::string& japanese) {
+    core::reviews::PatchOperation operation = CreateClaimOp(create_ref, english);
+    operation.translations["ja"] = japanese;
+    return operation;
+}
+
+// An update that revises only the Japanese: no `new_value`, so the English the
+// element already carries is left where it is.
+core::reviews::PatchOperation TranslateTextOp(const std::string& element_id, const std::string& japanese) {
+    core::reviews::PatchOperation operation = UpdateTextOp(element_id, "");
+    operation.new_value.clear();
+    operation.translations["ja"] = japanese;
+    return operation;
+}
+
+} // namespace
+
+TEST(DraftWorkspace, ABilingualClaimMaterializesInBothLanguages) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a bilingual sub-claim");
+    fixture.Stage(group,
+                  {CreateBilingualClaimOp(
+                       "$sub", "Brake wear is monitored continuously.", "ブレーキの摩耗は継続的に監視される。"),
+                   SupportOp("$sub", "G1")});
+
+    const core::drafts::DraftMaterializationResult& materialized = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(materialized.success) << materialized.error;
+
+    const core::SacmElement* claim = FindElement(materialized.working_model, IdentityFor(fixture.store, group, "$sub"));
+    ASSERT_NE(claim, nullptr);
+    EXPECT_EQ(claim->content, "Brake wear is monitored continuously.");
+    // The canvas language toggle reads this map; without the entry it falls
+    // back to English and the toggle silently shows the wrong language.
+    EXPECT_EQ(claim->content_langs.at("ja"), "ブレーキの摩耗は継続的に監視される。");
+}
+
+TEST(DraftWorkspace, SerializationRoundTripsTranslations) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Add a bilingual sub-claim");
+    fixture.Stage(group,
+                  {CreateBilingualClaimOp(
+                       "$sub", "Brake wear is monitored continuously.", "ブレーキの摩耗は継続的に監視される。"),
+                   SupportOp("$sub", "G1")});
+
+    core::drafts::DraftWorkspace restored;
+    std::string error;
+    ASSERT_TRUE(core::drafts::DeserializeDraftWorkspace(
+        core::drafts::SerializeDraftWorkspace(*fixture.store.workspace()), restored, error))
+        << error;
+
+    // Recovery state is the only copy of unaccepted work. A translation dropped
+    // here is lost at the next restart, with the English left behind to suggest
+    // nothing went missing.
+    ASSERT_EQ(restored.groups.size(), 1u);
+    ASSERT_FALSE(restored.groups.front().operations.empty());
+    EXPECT_EQ(restored.groups.front().operations.front().translations.at("ja"), "ブレーキの摩耗は継続的に監視される。");
+}
+
+TEST(DraftWorkspace, PromotionReportsMachineWrittenTranslationsForReview) {
+    Fixture fixture;
+    const std::string mcp_group = fixture.BeginGroup("Add a bilingual sub-claim");
+    fixture.Stage(mcp_group,
+                  {CreateBilingualClaimOp(
+                       "$sub", "Brake wear is monitored continuously.", "ブレーキの摩耗は継続的に監視される。"),
+                   SupportOp("$sub", "G1")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    const std::vector<std::string> flagged =
+        core::drafts::MachineTranslatedElementIds(*fixture.store.workspace(), {mcp_group});
+
+    // Promotion accepts the argument. It does not establish that the Japanese
+    // says what the English says, and nobody has read it in Japanese yet.
+    ASSERT_EQ(flagged.size(), 1u);
+    EXPECT_EQ(flagged.front(), IdentityFor(fixture.store, mcp_group, "$sub"));
+}
+
+TEST(DraftWorkspace, AHumanTypedTranslationIsNotFlaggedForReview) {
+    Fixture fixture;
+    core::drafts::DraftGroupRequest request;
+    request.title = "My edits";
+    request.source = core::drafts::DraftSource::Human;
+    request.source_label = "Jesper";
+    std::string error;
+    const std::string human_group = fixture.store.BeginGroup(request, fixture.accepted, error);
+    ASSERT_FALSE(human_group.empty()) << error;
+
+    fixture.Stage(human_group, {TranslateTextOp("G1", "制動サブシステムは所定の性能目標を満たす。")});
+
+    // A person who typed the translation has already reviewed it; telling them
+    // to review their own sentence is noise that devalues the warning.
+    EXPECT_TRUE(core::drafts::MachineTranslatedElementIds(*fixture.store.workspace(), {human_group}).empty());
+}
+
+TEST(DraftWorkspace, TranslatingAnExistingClaimLeavesItsEnglishAlone) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Translate the top goal");
+    fixture.Stage(group, {TranslateTextOp("G1", "制動サブシステムは所定の性能目標を満たす。")});
+
+    const core::drafts::DraftMaterializationResult& materialized = fixture.store.Materialize(fixture.accepted, 1);
+    ASSERT_TRUE(materialized.success) << materialized.error;
+
+    const core::SacmElement* goal = FindElement(materialized.working_model, "G1");
+    ASSERT_NE(goal, nullptr);
+    // Translating a safety case must not edit the safety case.
+    EXPECT_EQ(goal->content, "The braking subsystem meets its stated performance targets.");
+    EXPECT_EQ(goal->content_langs.at("ja"), "制動サブシステムは所定の性能目標を満たす。");
+}

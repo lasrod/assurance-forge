@@ -383,3 +383,110 @@ TEST(AgentRequestHandler, RequiresAPathToSwitchFiles) {
     EXPECT_FALSE(called);
     EXPECT_TRUE(response.result.value("isError", false));
 }
+
+// A client asked for a safety case in English and Japanese has to be able to
+// state both over the wire, read both back, and find an element by either. The
+// path here is the whole one: JSON arguments to a persisted draft group to a
+// materialized working model to the JSON the next read returns.
+TEST(AgentRequestHandler, StagesAndReadsBackAClaimInTwoLanguages) {
+    TempDir workspace{UniqueTempPath("bilingual")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 42;
+    context.source_session_id = "stable-mcp-session-42";
+    context.current_argument_view = [&] {
+        const core::drafts::DraftWorkspace* draft = drafts.workspace();
+        if (draft == nullptr || !draft->has_active_groups())
+            return app::AgentArgumentView{&state.loaded_case.value(), nullptr};
+        const core::drafts::DraftMaterializationResult& materialized =
+            drafts.Materialize(state.loaded_case.value(), state.case_revision);
+        return app::AgentArgumentView{&materialized.working_model, draft, true};
+    };
+
+    const bridge::Response begun =
+        app::HandleAgentRequest(MakeRequest("begin_change_group",
+                                            {{"title", "Add a bilingual sub-claim"},
+                                             {"rationale", "The case is reviewed in both languages."},
+                                             {"expected_working_revision", 0}}),
+                                context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest(
+            "stage_operations",
+            {{"group_id", group_id},
+             {"expected_working_revision", begun.result["working_revision"].get<std::uint64_t>()},
+             {"operations",
+              nlohmann::json::array({{{"type", "CreateClaim"},
+                                      {"create_ref", "$monitoring"},
+                                      {"text", "Monitoring detects unsafe blender operation"},
+                                      {"translations", {{"ja", "監視により危険なブレンダー動作を検出する。"}}}}})}}),
+        context);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    const std::string created_id = staged.result["created_element_ids"]["$monitoring"].get<std::string>();
+
+    // Echoed back, so a client can see what it staged rather than assume it.
+    ASSERT_TRUE(staged.result.contains("operations"));
+    EXPECT_EQ(staged.result["operations"][0]["translations"]["ja"], "監視により危険なブレンダー動作を検出する。");
+
+    const bridge::Response read = app::HandleAgentRequest(MakeRequest("get_element", {{"id", created_id}}), context);
+    ASSERT_FALSE(read.result.value("isError", true)) << read.result.dump();
+    EXPECT_EQ(read.result["element"]["content"], "Monitoring detects unsafe blender operation");
+    EXPECT_EQ(read.result["element"]["translations"]["content"]["ja"], "監視により危険なブレンダー動作を検出する。");
+    ASSERT_TRUE(read.result["element"].contains("translated_languages"));
+    EXPECT_EQ(read.result["element"]["translated_languages"], nlohmann::json::array({"ja"}));
+
+    // Searchable in the language it was written in. Searching only the primary
+    // would report that a claim does not exist because the user asked for it in
+    // the language the claim is not indexed in.
+    const bridge::Response found =
+        app::HandleAgentRequest(MakeRequest("find_elements", {{"query", "ブレンダー動作"}}), context);
+    ASSERT_FALSE(found.result.value("isError", true)) << found.result.dump();
+    ASSERT_EQ(found.result["matches"].size(), 1u) << found.result.dump();
+    EXPECT_EQ(found.result["matches"][0]["id"], created_id);
+    EXPECT_EQ(found.result["matches"][0]["translated_languages"], nlohmann::json::array({"ja"}));
+}
+
+TEST(AgentRequestHandler, RefusesAnOperationWhoseTranslationsAreNotAMapOfText) {
+    TempDir workspace{UniqueTempPath("bad-translations")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 43;
+    context.source_session_id = "stable-mcp-session-43";
+
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_group", {{"title", "Malformed"}, {"expected_working_revision", 0}}), context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest("stage_operations",
+                    {{"group_id", begun.result["group_id"].get<std::string>()},
+                     {"expected_working_revision", begun.result["working_revision"].get<std::uint64_t>()},
+                     {"operations",
+                      nlohmann::json::array({{{"type", "CreateClaim"},
+                                              {"create_ref", "$x"},
+                                              {"text", "An English claim"},
+                                              {"translations", "ja"}}})}}),
+        context);
+
+    // Dropping the malformed field instead would tell the client its bilingual
+    // claim was staged, and the Japanese would simply not be there.
+    EXPECT_TRUE(staged.result.value("isError", false)) << staged.result.dump();
+}

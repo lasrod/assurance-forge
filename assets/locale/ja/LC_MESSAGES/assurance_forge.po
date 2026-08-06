@@ -2053,9 +2053,6 @@ msgstr "トランザクション: {0}   |   現在: Tx {1} / {2}"
 msgid "Translation Language"
 msgstr "翻訳言語"
 
-msgid "Translations cannot be edited while a working draft is active. Accept or discard the draft first."
-msgstr "作業ドラフトが有効な間は翻訳を編集できません。先にドラフトを受理または破棄してください。"
-
 msgid "Type"
 msgstr "種別"
 

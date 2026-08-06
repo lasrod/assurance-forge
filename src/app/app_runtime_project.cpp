@@ -1519,18 +1519,6 @@ bool AppRuntime::CommitTextEditAsDraft(const std::string& element_id,
     if (element_id.empty())
         return false;
 
-    // The operation vocabulary writes the primary language only:
-    // `UpdateElementText` sets the field and its `en` entry, and carries no
-    // language of its own. A secondary-language edit therefore cannot be
-    // expressed as a draft change, and silently writing it into the accepted
-    // argument underneath the draft is the defect this whole routing exists to
-    // stop. Refused, with the reason -- extending the vocabulary is its own
-    // decision, like the missing move operation.
-    if (!language.empty() && language != "en") {
-        SetStatus(AF_TR("Translations cannot be edited while a working draft is active. "
-                        "Accept or discard the draft first."));
-        return true;
-    }
     if (field_token != "name" && field_token != "content" && field_token != "description") {
         SetStatus(ui::i18n::trf("\"{0}\" cannot be edited while a working draft is active.", field_token));
         return true;
@@ -1542,7 +1530,14 @@ bool AppRuntime::CommitTextEditAsDraft(const std::string& element_id,
     element.existing_id = element_id;
     update.element = element;
     update.field = field_token;
-    update.new_value = new_value;
+    // A secondary-language edit revises that language and says nothing about the
+    // primary, so it carries no `new_value`: writing one would blank the English
+    // of a claim the user was translating.
+    if (!language.empty() && language != core::reviews::kPatchPrimaryLanguage) {
+        update.translations[language] = new_value;
+    } else {
+        update.new_value = new_value;
+    }
 
     std::string error;
     if (!StageHumanDraftOperations(AF_TR("My edits"), {update}, error))
@@ -1596,6 +1591,12 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     // mid-commit. It is written out only once the audit sequence to key it on
     // exists, which is after dispatch.
     const core::drafts::DraftWorkspace pre_promotion = *workspace;
+
+    // Read while the groups are still here: promotion consumes them, and by the
+    // time the accepted model is current enough to flag against, there is
+    // nothing left to ask who wrote the Japanese.
+    const std::vector<std::string> machine_translated =
+        core::drafts::MachineTranslatedElementIds(*workspace, group_ids);
 
     // Everything that can refuse, refuses here -- before the accepted model is
     // touched at all.
@@ -1742,6 +1743,11 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) {
         impl_->app_state.status_message = "Accepted, but the draft could not be updated: " + error;
     }
+    // Accepting the argument is not the same as accepting a translation of it.
+    // Applied at the next rebuild, when the accepted model contains what was
+    // just promoted.
+    impl_->translation_review_marks_pending_rebuild.insert(
+        impl_->translation_review_marks_pending_rebuild.end(), machine_translated.begin(), machine_translated.end());
     impl_->app_state.mark_dirty();
     impl_->tree_needs_rebuild = true;
     return true;

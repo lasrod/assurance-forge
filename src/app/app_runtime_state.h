@@ -373,6 +373,14 @@ struct AppRuntimeState {
     // project sidecar so the warning survives reload.
     std::unordered_set<std::string> translation_review_pending_ids;
 
+    // Elements a just-promoted draft gave machine-written translations to,
+    // waiting to be flagged. Deferred rather than flagged at promotion because
+    // flagging reads the accepted model, and on the library-primary path that
+    // projection is deliberately rederived at the next frame boundary -- reading
+    // it during promotion finds the pre-promotion argument, where a newly
+    // created claim does not exist yet and the flag would be dropped as stale.
+    std::vector<std::string> translation_review_marks_pending_rebuild;
+
     bool IsProposalCanvasActive() const;
 
     void LoadAiSettingsState();

@@ -127,7 +127,9 @@ nlohmann::json OperationsSchema() {
         {"description",
          "Patch operations, applied in order. Support runs upwards: "
          "{\"type\":\"AddSupportedBy\",\"source\":{\"ref\":\"$sub\"},"
-         "\"target\":{\"id\":\"G1\"}} puts the new element UNDER G1."},
+         "\"target\":{\"id\":\"G1\"}} puts the new element UNDER G1. When the case is maintained in "
+         "more than one language, state each new element in all of them in the one operation that "
+         "creates it -- see \"translations\"."},
         {"items",
          {{"type", "object"},
           {"properties",
@@ -161,7 +163,21 @@ nlohmann::json OperationsSchema() {
             {"field", {{"type", "string"}, {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},
             {"old_value", {{"type", "string"}}},
             {"new_value", {{"type", "string"}}},
-            {"text", {{"type", "string"}, {"description", "Initial text for a Create* operation."}}}}}}}};
+            {"text", {{"type", "string"}, {"description", "Initial text for a Create* operation."}}},
+            // A safety case read by reviewers in two languages has to be
+            // written in both, and one operation carrying both is what makes
+            // that atomic: the reviewer accepts a bilingual claim or none of
+            // it, and no group can be promoted half-translated.
+            {"translations",
+             {{"type", "object"},
+              {"additionalProperties", {{"type", "string"}}},
+              {"description",
+               "Secondary-language text for this operation's \"text\" or \"new_value\", keyed by "
+               "language code, e.g. {\"ja\": \"...\"}. The English goes in \"text\"/\"new_value\" and "
+               "must not be repeated here. On a Create* operation \"text\" is required alongside it. "
+               "An UpdateElementText carrying only \"translations\" revises just those languages and "
+               "leaves the English untouched -- use that to translate argument that already exists. "
+               "Translations you author arrive flagged for human translation review."}}}}}}}};
 }
 
 nlohmann::json DraftGroupIdSchema() {

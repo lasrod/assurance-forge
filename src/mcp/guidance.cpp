@@ -103,6 +103,19 @@ constexpr const char* kWorkflow =
     "You are not editing the accepted safety case. Nothing you stage takes effect until a person promotes "
     "it. Never tell the user you have changed their argument.\n";
 
+// A case maintained in two languages is read by two sets of reviewers, and an
+// element added in only one of them is invisible to one of those sets. Which
+// languages a case actually uses is a property of the case, so this says how to
+// find out rather than naming any.
+constexpr const char* kLanguages =
+    "\nLanguages: reads report `translated_languages` on each element and the text itself under "
+    "`translations`. If the case is maintained in more than one language, write every new element in "
+    "all of them -- put the English in `text`/`new_value` and the rest in the same operation's "
+    "`translations` map, so a reviewer never sees a claim that exists in only one language. Do not "
+    "translate by transliterating terms: reuse the wording the existing translated claims already "
+    "use for the same concept. Say plainly which languages you wrote, and that a human still has to "
+    "check the translation.\n";
+
 } // namespace
 
 const std::vector<ResourceDefinition>& BuiltinResources() {
@@ -130,6 +143,10 @@ const std::vector<PromptDefinition>& BuiltinPrompts() {
         PromptDefinition{"restructure_case",
                          "Reorganize the argument so named categories become its main branches.",
                          {PromptArgument{"categories", "The top-level branches to organize under.", true}}},
+        PromptDefinition{"translate_case",
+                         "Add a second language to the existing argument, leaving what it asserts unchanged.",
+                         {PromptArgument{"language", "The language code to translate into, e.g. \"ja\".", true},
+                          PromptArgument{"scope", "Which branch to translate. Defaults to the whole case.", false}}},
     };
     return prompts;
 }
@@ -191,7 +208,7 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
             << "Record which clause of " << standard
             << " each claim answers, in the claim's description. Assurance Forge has no dedicated "
                "citation field yet, so that text is the trace.\n\n"
-            << kWorkflow << "\n"
+            << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines, which are what this project's reviews apply:\n\n"
             << GuidelinesFor({"CL.1", "CL.2", "CL.5", "CL.6", "AR.1", "AR.2", "AR.4", "EV.1"});
         return out.str();
@@ -206,7 +223,7 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "so if that is your conclusion. Keep the vocabulary of the branch you join; a "
                "sub-claim that redefines its parent's terms is a break in the argument, not an "
                "addition to it.\n\n"
-            << kWorkflow << "\n"
+            << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
             << GuidelinesFor({"CL.1", "CL.5", "AR.2", "AR.5", "AR.6", "EV.1"});
         return out.str();
@@ -226,9 +243,34 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
             << "Stage this in small groups and check the canvas preview as you go. A restructure "
                "touches many elements at once, and one that goes wrong is hard to read as a single "
                "diff.\n\n"
-            << kWorkflow << "\n"
+            << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
             << GuidelinesFor({"AR.1", "AR.2", "AR.4", "AR.5", "CL.2"});
+        return out.str();
+    }
+
+    if (name == "translate_case") {
+        const std::string language = Argument(arguments, "language", "the language the user named");
+        const std::string scope = Argument(arguments, "scope", "the whole case");
+        out << "Translate " << scope << " into " << language << ".\n\n"
+            << "Translating a safety case is not translating prose. A claim states something that "
+               "can be judged true or false, and the translation has to be judged the same way: "
+               "keep its scope, its qualifiers and its hedging exactly. If the English says "
+               "\"under normal operating conditions\", the translation says so too -- dropping a "
+               "qualifier makes the claim broader than the one the evidence supports.\n\n"
+            << "Do not change the English. Stage `UpdateElementText` operations carrying only a "
+               "`translations` entry for "
+            << language
+            << ", which revises that language and leaves the primary text alone. Reuse the "
+               "terminology already established in the case rather than inventing a second rendering "
+               "of a term that has one.\n\n"
+            << "Read each element before translating it. `translated_languages` tells you which "
+               "already have this language, and `translations` gives you the wording a human "
+               "translator chose -- do not replace it unless the English it renders has changed, "
+               "and say which ones you replaced.\n\n"
+            << "Leave anything you are unsure of untranslated and list it. An untranslated claim is "
+               "a visible gap; a confidently wrong translation of a safety claim is not.\n\n"
+            << kWorkflow << kLanguages;
         return out.str();
     }
 
