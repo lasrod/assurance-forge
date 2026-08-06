@@ -37,6 +37,13 @@ struct ElementRef {
     std::optional<std::string> create_ref;
 };
 
+// The language of `text` and `new_value`. SACM stores a primary LangString plus
+// translations, and the model's scalar `name`/`content`/`description` mirror the
+// primary; keeping the primary in its own field rather than inside
+// `translations` is what stops a proposal from creating an element that has a
+// Japanese statement and no English one.
+constexpr const char* kPatchPrimaryLanguage = "en";
+
 struct PatchOperation {
     PatchOperationType type = PatchOperationType::UpdateElementText;
     std::optional<ElementRef> element;
@@ -47,6 +54,13 @@ struct PatchOperation {
     std::string old_value;
     std::string new_value;
     std::string text;
+    // Secondary-language text for whichever of `text` or `new_value` this
+    // operation carries, keyed by language code ("ja"). One operation therefore
+    // states a claim in every language at once: a reviewer accepts a bilingual
+    // claim or none of it, and no group can be promoted half-translated.
+    //
+    // A "en" entry here is ignored -- the primary language has a field.
+    std::map<std::string, std::string> translations;
 };
 
 struct ReviewProposal {

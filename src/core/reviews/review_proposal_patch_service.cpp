@@ -200,13 +200,49 @@ bool ResolveOptionalElementRef(const std::optional<ElementRef>& ref,
     return ResolveRef(ref.value(), model, generated_ids, resolved_id, error);
 }
 
-void SetElementText(parser::SacmElement& element, const std::string& value) {
-    if (element.type == "claim" || element.type == "argumentreasoning") {
-        element.content = value;
-        element.content_langs["en"] = value;
+// Writes one language of one field. The scalar mirrors the primary language
+// only: it is what the rest of the model treats as "what this element says", and
+// letting a translation land there would change the argument's meaning for every
+// reader who has not switched languages.
+void WriteLanguage(std::string& scalar,
+                   std::map<std::string, std::string>& texts,
+                   const std::string& language,
+                   const std::string& value) {
+    if (value.empty() && language != kPatchPrimaryLanguage) {
+        // Clearing a translation is a real edit -- an author who removes a stale
+        // Japanese sentence must not have it left behind by the merge.
+        texts.erase(language);
+        return;
+    }
+    texts[language] = value;
+    if (language == kPatchPrimaryLanguage)
+        scalar = value;
+}
+
+// Applies the primary text, when the operation states one, plus every
+// translation it carries. `primary` is absent for an update that only revises a
+// translation -- the common case of translating argument that already exists,
+// where touching the English would be a change nobody asked for.
+void WriteField(std::string& scalar,
+                std::map<std::string, std::string>& texts,
+                const std::optional<std::string>& primary,
+                const std::map<std::string, std::string>& translations) {
+    if (primary.has_value())
+        WriteLanguage(scalar, texts, kPatchPrimaryLanguage, primary.value());
+    for (const std::pair<const std::string, std::string>& entry : translations) {
+        if (entry.first != kPatchPrimaryLanguage)
+            WriteLanguage(scalar, texts, entry.first, entry.second);
+    }
+}
+
+void SetElementText(parser::SacmElement& element,
+                    const std::optional<std::string>& primary,
+                    const std::map<std::string, std::string>& translations) {
+    const bool uses_content = element.type == "claim" || element.type == "argumentreasoning";
+    if (uses_content) {
+        WriteField(element.content, element.content_langs, primary, translations);
     } else {
-        element.description = value;
-        element.description_langs["en"] = value;
+        WriteField(element.description, element.description_langs, primary, translations);
     }
 }
 
@@ -228,14 +264,23 @@ bool ApplyCreateOperation(const PatchOperation& operation,
         return false;
     }
 
+    // A new element has no primary text to fall back on, so translations
+    // without it would create a node that renders empty for every reader who
+    // has not switched languages -- an invisible claim in a safety argument.
+    if (operation.text.empty() && !operation.translations.empty()) {
+        error = "Create operation for " + operation.create_ref.value() + " supplies translations but no \"text\"; " +
+                "give the " + std::string(kPatchPrimaryLanguage) + " statement in \"text\".";
+        return false;
+    }
+
     parser::SacmElement element;
     element.id = id_it->second;
     element.type = ElementTypeFor(operation.type);
     element.name = DefaultNameFor(operation.type);
-    element.name_langs["en"] = element.name;
+    element.name_langs[kPatchPrimaryLanguage] = element.name;
     element.assertion_declaration = AssertionDeclarationFor(operation.type);
     if (!operation.text.empty()) {
-        SetElementText(element, operation.text);
+        SetElementText(element, operation.text, operation.translations);
     }
     model.elements.push_back(std::move(element));
     return true;
@@ -282,21 +327,25 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
         return false;
     }
 
+    // An update that carries only translations revises just those languages.
+    // Translating an argument that already exists is the ordinary case, and it
+    // must not blank the English on the way through. With no translations the
+    // primary is always written, so clearing a field keeps working.
+    const std::optional<std::string> primary = (!operation.new_value.empty() || operation.translations.empty())
+                                                   ? std::optional<std::string>(operation.new_value)
+                                                   : std::nullopt;
+
     switch (operation.type) {
     case PatchOperationType::UpdateElementName:
-        element->name = operation.new_value;
-        element->name_langs["en"] = operation.new_value;
+        WriteField(element->name, element->name_langs, primary, operation.translations);
         return true;
     case PatchOperationType::UpdateElementText:
         if (operation.field == "name") {
-            element->name = operation.new_value;
-            element->name_langs["en"] = operation.new_value;
+            WriteField(element->name, element->name_langs, primary, operation.translations);
         } else if (operation.field == "content" || operation.field.empty()) {
-            element->content = operation.new_value;
-            element->content_langs["en"] = operation.new_value;
+            WriteField(element->content, element->content_langs, primary, operation.translations);
         } else if (operation.field == "description") {
-            element->description = operation.new_value;
-            element->description_langs["en"] = operation.new_value;
+            WriteField(element->description, element->description_langs, primary, operation.translations);
         } else {
             error = "Unsupported UpdateElementText field: " + operation.field;
             return false;

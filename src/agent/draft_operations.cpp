@@ -136,6 +136,8 @@ nlohmann::json OperationsJson(const core::drafts::DraftChangeGroup& group) {
             object["new_value"] = operation.new_value;
         if (!operation.text.empty())
             object["text"] = operation.text;
+        if (!operation.translations.empty())
+            object["translations"] = operation.translations;
         operations.push_back(std::move(object));
     }
     return operations;

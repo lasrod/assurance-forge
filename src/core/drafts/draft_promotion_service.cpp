@@ -28,6 +28,22 @@ void NamespaceElementRef(const std::string& group_id, std::optional<reviews::Ele
     ref->create_ref = NamespaceRef(group_id, ref->create_ref.value());
 }
 
+// Whether an operation actually gives an element secondary-language text.
+//
+// A non-empty `translations` map is not the same question. An empty value is a
+// removal -- `WriteLanguage` erases that language -- so an agent tidying away a
+// stale Japanese sentence carries a populated map while adding nothing to read.
+// Flagging that for translation review asks a human to re-read text that is no
+// longer there, and every warning that turns out to be nothing makes the next
+// real one easier to wave through.
+bool AddsSecondaryLanguageText(const reviews::PatchOperation& operation) {
+    for (const std::pair<const std::string, std::string>& entry : operation.translations) {
+        if (entry.first != reviews::kPatchPrimaryLanguage && !entry.second.empty())
+            return true;
+    }
+    return false;
+}
+
 } // namespace
 
 std::string DraftPromotionAuthor(const DraftWorkspace& workspace,
@@ -114,6 +130,48 @@ CompiledDraftPromotion CompileSelectedPromotion(const DraftWorkspace& workspace,
 
     result.success = true;
     return result;
+}
+
+std::vector<std::string> MachineTranslatedElementIds(const DraftWorkspace& workspace,
+                                                     const std::vector<std::string>& group_ids) {
+    const std::unordered_set<std::string> selected(group_ids.begin(), group_ids.end());
+    std::vector<std::string> element_ids;
+    std::unordered_set<std::string> seen;
+
+    for (const DraftChangeGroup* group : workspace.ActiveGroups()) {
+        if (selected.count(group->id) == 0 || group->source == DraftSource::Human)
+            continue;
+
+        for (const reviews::PatchOperation& operation : group->operations) {
+            if (!AddsSecondaryLanguageText(operation))
+                continue;
+
+            // A create names its element by the ref it was staged under; an
+            // update names an existing element, or one an earlier operation in
+            // the same group created.
+            std::string element_id;
+            if (operation.create_ref.has_value()) {
+                const std::map<std::string, std::string>::const_iterator found =
+                    group->generated_ids.find(operation.create_ref.value());
+                if (found != group->generated_ids.end())
+                    element_id = found->second;
+            } else if (operation.element.has_value()) {
+                if (operation.element->existing_id.has_value()) {
+                    element_id = operation.element->existing_id.value();
+                } else if (operation.element->create_ref.has_value()) {
+                    const std::map<std::string, std::string>::const_iterator found =
+                        group->generated_ids.find(operation.element->create_ref.value());
+                    if (found != group->generated_ids.end())
+                        element_id = found->second;
+                }
+            }
+
+            if (!element_id.empty() && seen.insert(element_id).second)
+                element_ids.push_back(element_id);
+        }
+    }
+
+    return element_ids;
 }
 
 DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,

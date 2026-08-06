@@ -4,6 +4,7 @@
 #include "core/sccg/staged_checks.h"
 #include "parser/model_utils.h"
 
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -52,6 +53,37 @@ bool ParseElementRef(const nlohmann::json& source,
     return true;
 }
 
+// Reads the optional lang -> text map. Rejecting a bad shape rather than
+// dropping it matters: an agent told to write a bilingual claim would otherwise
+// be told the claim was staged, and the Japanese would simply be missing.
+bool ParseTranslations(const nlohmann::json& source, std::map<std::string, std::string>& out, std::string& error) {
+    const nlohmann::json::const_iterator found = source.find("translations");
+    if (found == source.end() || found->is_null()) {
+        return true;
+    }
+    if (!found->is_object()) {
+        error = "translations must be an object of language code to text, like {\"ja\": \"...\"}.";
+        return false;
+    }
+    for (nlohmann::json::const_iterator it = found->begin(); it != found->end(); ++it) {
+        if (!it.value().is_string()) {
+            error = "translations[\"" + it.key() + "\"] must be a string.";
+            return false;
+        }
+        if (it.key().empty()) {
+            error = "translations has an empty language code; use a code like \"ja\".";
+            return false;
+        }
+        if (it.key() == core::reviews::kPatchPrimaryLanguage) {
+            error = std::string("translations must not carry \"") + core::reviews::kPatchPrimaryLanguage +
+                    "\"; the primary language goes in \"text\" or \"new_value\".";
+            return false;
+        }
+        out[it.key()] = it.value().get<std::string>();
+    }
+    return true;
+}
+
 bool ParseOne(const nlohmann::json& source, core::reviews::PatchOperation& out, std::string& error) {
     if (!source.is_object()) {
         error = "Each operation must be an object.";
@@ -81,6 +113,9 @@ bool ParseOne(const nlohmann::json& source, core::reviews::PatchOperation& out, 
     out.old_value = StringArgument(source, "old_value");
     out.new_value = StringArgument(source, "new_value");
     out.text = StringArgument(source, "text");
+    if (!ParseTranslations(source, out.translations, error)) {
+        return false;
+    }
     return true;
 }
 

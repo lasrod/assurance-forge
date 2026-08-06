@@ -218,6 +218,8 @@ std::string SerializeReviewProposal(const ReviewProposal& proposal) {
             object["new_value"] = operation.new_value;
         if (!operation.text.empty())
             object["text"] = operation.text;
+        if (!operation.translations.empty())
+            object["translations"] = operation.translations;
         root["operations"].push_back(std::move(object));
     }
 
@@ -279,6 +281,16 @@ bool DeserializeReviewProposal(const std::string& content, ReviewProposal& propo
             operation.old_value = operation_json.value("old_value", "");
             operation.new_value = operation_json.value("new_value", "");
             operation.text = operation_json.value("text", "");
+            if (operation_json.contains("translations") && operation_json["translations"].is_object()) {
+                for (auto it = operation_json["translations"].begin(); it != operation_json["translations"].end();
+                     ++it) {
+                    // A blank entry is a deletion request, not a translation, and
+                    // is preserved as such so replaying a group cannot resurrect
+                    // text the author removed.
+                    if (it.value().is_string() && it.key() != kPatchPrimaryLanguage)
+                        operation.translations[it.key()] = it.value().get<std::string>();
+                }
+            }
             proposal.operations.push_back(std::move(operation));
         }
     } catch (const nlohmann::json::exception& e) {
@@ -302,6 +314,22 @@ std::string ComputeElementSemanticHash(const parser::SacmElement& element) {
         normalized << "source:" << source << '\n';
     for (const std::string& target : element.target_refs)
         normalized << "target:" << target << '\n';
+    // Secondary-language text is part of what the element says, so a proposal
+    // that was written against an untranslated element must not still look
+    // current after someone translated it -- an agent may now overwrite that
+    // translation. Only non-primary, non-empty entries are hashed, and only
+    // when present, so an element with no translations hashes exactly as it did
+    // before this field was covered and proposals saved against it stay valid.
+    auto hash_translations = [&normalized](const char* field, const std::map<std::string, std::string>& texts) {
+        for (const std::pair<const std::string, std::string>& entry : texts) {
+            if (entry.first == kPatchPrimaryLanguage || entry.second.empty())
+                continue;
+            normalized << field << ':' << entry.first << ':' << entry.second << '\n';
+        }
+    };
+    hash_translations("name_lang", element.name_langs);
+    hash_translations("content_lang", element.content_langs);
+    hash_translations("description_lang", element.description_langs);
     return WithHashPrefix(Sha256::HexDigest(normalized.str()));
 }
 

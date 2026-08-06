@@ -285,7 +285,6 @@ TRANSLATIONS = {
     "My edits": "自分の編集",
     "{0} — accepted": "{0} — 受理済み",
     "{0} — working draft": "{0} — 作業ドラフト",
-    "Translations cannot be edited while a working draft is active. Accept or discard the draft first.": "作業ドラフトが有効な間は翻訳を編集できません。先にドラフトを受理または破棄してください。",
     "\"{0}\" cannot be edited while a working draft is active.": "作業ドラフトが有効な間は「{0}」を編集できません。",
     "Could not record the edit in the draft: {0}": "ドラフトに編集を記録できませんでした: {0}",
     "The working draft does not change this element. Select an element marked NEW, EDIT or MULTIPLE CHANGES to review and accept it.": "作業ドラフトはこの要素を変更しません。NEW、EDIT、MULTIPLE CHANGES と表示された要素を選択すると内容を確認して受理できます。",

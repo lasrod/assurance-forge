@@ -1,13 +1,16 @@
 #include "agent/operations.h"
 
 #include "core/assurance_tree.h"
+#include "core/reviews/review_proposal.h"
 #include "parser/model_utils.h"
 
 #include <algorithm>
 #include <cctype>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace agent {
 namespace {
@@ -63,6 +66,39 @@ bool IsRelationship(const parser::SacmElement& element) {
     return element.type.rfind("asserted", 0) == 0;
 }
 
+// The non-primary languages this element actually carries text in. Returned so
+// an agent asked to translate a case can tell which elements still need it
+// instead of re-translating what a human already wrote. Absent when the element
+// is monolingual, so a case with no translations costs nothing to read.
+std::vector<std::string> TranslatedLanguages(const parser::SacmElement& element) {
+    std::set<std::string> languages;
+    auto collect = [&languages](const std::map<std::string, std::string>& texts) {
+        for (const std::pair<const std::string, std::string>& entry : texts) {
+            if (entry.first != core::reviews::kPatchPrimaryLanguage && !entry.second.empty())
+                languages.insert(entry.first);
+        }
+    };
+    collect(element.name_langs);
+    collect(element.content_langs);
+    collect(element.description_langs);
+    return std::vector<std::string>(languages.begin(), languages.end());
+}
+
+// `query` is already lowercased by the caller. Lowercasing is ASCII-only and
+// leaves Japanese untouched, which is harmless: Japanese has no case.
+bool MatchesTranslation(const parser::SacmElement& element, const std::string& query) {
+    auto contains = [&query](const std::map<std::string, std::string>& texts) {
+        for (const std::pair<const std::string, std::string>& entry : texts) {
+            if (entry.first == core::reviews::kPatchPrimaryLanguage)
+                continue;
+            if (Lowercased(entry.second).find(query) != std::string::npos)
+                return true;
+        }
+        return false;
+    };
+    return contains(element.name_langs) || contains(element.content_langs) || contains(element.description_langs);
+}
+
 nlohmann::json ElementSummary(const parser::SacmElement& element) {
     nlohmann::json summary{{"id", element.id}, {"type", element.type}};
     if (!element.name.empty()) {
@@ -73,6 +109,10 @@ nlohmann::json ElementSummary(const parser::SacmElement& element) {
     }
     if (element.undeveloped) {
         summary["undeveloped"] = true;
+    }
+    const std::vector<std::string> languages = TranslatedLanguages(element);
+    if (!languages.empty()) {
+        summary["translated_languages"] = languages;
     }
     return summary;
 }
@@ -99,6 +139,25 @@ nlohmann::json ElementDetail(const parser::SacmElement& element) {
     }
     if (!element.reasoning_ref.empty()) {
         detail["reasoning_ref"] = element.reasoning_ref;
+    }
+    // The secondary-language text itself, per field, so an agent revising a
+    // translated claim can see what the other language currently says rather
+    // than overwriting a human translator's wording sight unseen.
+    nlohmann::json translations = nlohmann::json::object();
+    auto add_field = [&translations](const char* field, const std::map<std::string, std::string>& texts) {
+        nlohmann::json by_language = nlohmann::json::object();
+        for (const std::pair<const std::string, std::string>& entry : texts) {
+            if (entry.first != core::reviews::kPatchPrimaryLanguage && !entry.second.empty())
+                by_language[entry.first] = entry.second;
+        }
+        if (!by_language.empty())
+            translations[field] = std::move(by_language);
+    };
+    add_field("name", element.name_langs);
+    add_field("content", element.content_langs);
+    add_field("description", element.description_langs);
+    if (!translations.empty()) {
+        detail["translations"] = std::move(translations);
     }
     return detail;
 }
@@ -244,7 +303,12 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
             const bool hit = Lowercased(element.id).find(query) != std::string::npos ||
                              Lowercased(element.name).find(query) != std::string::npos ||
                              Lowercased(element.content).find(query) != std::string::npos ||
-                             Lowercased(element.description).find(query) != std::string::npos;
+                             Lowercased(element.description).find(query) != std::string::npos ||
+                             // A bilingual case is searchable in either language.
+                             // Searching only the primary would report that a
+                             // claim does not exist because the user asked for it
+                             // in the language the claim is not indexed in.
+                             MatchesTranslation(element, query);
             if (!hit) {
                 continue;
             }

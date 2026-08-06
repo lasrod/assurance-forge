@@ -64,6 +64,21 @@ CompiledDraftPromotion CompileSelectedPromotion(const DraftWorkspace& workspace,
                                                 const std::vector<std::string>& group_ids,
                                                 const std::string& author_name);
 
+// Element ids in `group_ids` that a non-human contributor gives
+// secondary-language text to.
+//
+// A machine translation of a safety claim is a claim nobody has read in the
+// language it will be read in. Promotion accepts the argument; it does not
+// establish that the Japanese says what the English says, so these come out of
+// promotion flagged for translation review rather than silently equal to text a
+// human wrote. Groups whose source is `Human` are not included -- a person who
+// typed the translation has already reviewed it.
+//
+// Ids only: what to do with them belongs to the application, which owns the
+// pending set and its sidecar.
+std::vector<std::string> MachineTranslatedElementIds(const DraftWorkspace& workspace,
+                                                     const std::vector<std::string>& group_ids);
+
 // Whether promoting `group_ids` would leave a coherent argument, checked before
 // anything is written.
 struct DraftPromotionPlan {

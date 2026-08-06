@@ -943,6 +943,15 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     impl_->problems_dirty.terminology = true;
     impl_->problems_dirty.acp = true;
     impl_->problems_dirty.translation = true;
+
+    // The accepted model is current again, so a promotion's machine-written
+    // translations can now be found and flagged.
+    if (!impl_->translation_review_marks_pending_rebuild.empty()) {
+        const std::vector<std::string> marks = std::move(impl_->translation_review_marks_pending_rebuild);
+        impl_->translation_review_marks_pending_rebuild.clear();
+        for (const std::string& element_id : marks)
+            MarkTranslationReviewPending(element_id);
+    }
     // Any edit to the support structure can create or break a cycle, and this
     // rebuild runs on exactly those edits.
     impl_->problems_dirty.structure = true;

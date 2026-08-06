@@ -420,7 +420,7 @@ TEST(McpServer, CarriesSccgGuidanceInsideEachPrompt) {
     const std::optional<nlohmann::json> listed = server.HandleMessage(Request("prompts/list", nullptr, 2));
     ASSERT_TRUE(listed.has_value());
     ASSERT_TRUE(listed->contains("result")) << listed->dump();
-    EXPECT_EQ((*listed)["result"]["prompts"].size(), 3u);
+    EXPECT_EQ((*listed)["result"]["prompts"].size(), 4u);
 
     const std::optional<nlohmann::json> got = server.HandleMessage(
         Request("prompts/get",
@@ -435,6 +435,29 @@ TEST(McpServer, CarriesSccgGuidanceInsideEachPrompt) {
     EXPECT_NE(text.find("CL.1"), std::string::npos);
     // And the standing reminder that staging is not editing.
     EXPECT_NE(text.find("not editing the accepted safety case"), std::string::npos) << text;
+    // Every prompt carries the language discipline, because an element written
+    // in one language of a two-language case is invisible to half its reviewers.
+    EXPECT_NE(text.find("translations"), std::string::npos) << text;
+}
+
+TEST(McpServer, TheTranslatePromptSaysWhatTranslatingAClaimMustPreserve) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const std::optional<nlohmann::json> got = server.HandleMessage(
+        Request("prompts/get", {{"name", "translate_case"}, {"arguments", {{"language", "ja"}}}}, 3));
+    ASSERT_TRUE(got.has_value());
+    ASSERT_TRUE(got->contains("result")) << got->dump();
+
+    const std::string text = (*got)["result"]["messages"][0]["content"]["text"].get<std::string>();
+    EXPECT_NE(text.find("ja"), std::string::npos);
+    // Translating a claim is not translating prose: a dropped qualifier makes
+    // the claim broader than the evidence supports.
+    EXPECT_NE(text.find("qualifier"), std::string::npos) << text;
+    // And it must not rewrite the argument it is translating.
+    EXPECT_NE(text.find("Do not change the English"), std::string::npos) << text;
 }
 
 TEST(McpServer, ReportsAnUnknownPrompt) {
