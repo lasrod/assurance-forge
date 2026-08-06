@@ -1,0 +1,1238 @@
+{
+  "schema": 1,
+  "generator": "tools/quality/collect_baseline.py",
+  "identity": {
+    "commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
+    "commit_date": "2026-08-05T21:50:03+09:00",
+    "branch": "chore/288-repository-quality-baseline",
+    "first_commit_date": "2026-04-17T00:13:04+09:00",
+    "total_commits": 274,
+    "working_tree_dirty_entries": 7
+  },
+  "code_size": {
+    "by_category": {
+      "assets_data": {
+        "files": 13,
+        "physical_lines": 0,
+        "code_lines": 0
+      },
+      "ci_config": {
+        "files": 14,
+        "physical_lines": 1581,
+        "code_lines": 1319
+      },
+      "documentation": {
+        "files": 86,
+        "physical_lines": 0,
+        "code_lines": 0
+      },
+      "first_party_production": {
+        "files": 527,
+        "physical_lines": 92198,
+        "code_lines": 71524
+      },
+      "first_party_tests": {
+        "files": 170,
+        "physical_lines": 37222,
+        "code_lines": 27441
+      },
+      "first_party_tooling": {
+        "files": 19,
+        "physical_lines": 4830,
+        "code_lines": 4095
+      },
+      "other": {
+        "files": 48,
+        "physical_lines": 491,
+        "code_lines": 423
+      }
+    },
+    "by_subsystem": {
+      "libs/sacm": {
+        "files": 44,
+        "physical_lines": 9020,
+        "code_lines": 7124
+      },
+      "libs/sacm (tests)": {
+        "files": 13,
+        "physical_lines": 3803,
+        "code_lines": 2156
+      },
+      "src/agent": {
+        "files": 5,
+        "physical_lines": 1696,
+        "code_lines": 1374
+      },
+      "src/ai": {
+        "files": 19,
+        "physical_lines": 2084,
+        "code_lines": 1787
+      },
+      "src/app": {
+        "files": 122,
+        "physical_lines": 21546,
+        "code_lines": 17067
+      },
+      "src/bridge": {
+        "files": 6,
+        "physical_lines": 1160,
+        "code_lines": 836
+      },
+      "src/core": {
+        "files": 179,
+        "physical_lines": 30769,
+        "code_lines": 23186
+      },
+      "src/export": {
+        "files": 9,
+        "physical_lines": 1567,
+        "code_lines": 1312
+      },
+      "src/mcp": {
+        "files": 11,
+        "physical_lines": 1917,
+        "code_lines": 1440
+      },
+      "src/parser": {
+        "files": 8,
+        "physical_lines": 1468,
+        "code_lines": 1245
+      },
+      "src/sacm": {
+        "files": 7,
+        "physical_lines": 1389,
+        "code_lines": 1026
+      },
+      "src/sacm_adapter": {
+        "files": 10,
+        "physical_lines": 3330,
+        "code_lines": 2297
+      },
+      "src/ui": {
+        "files": 95,
+        "physical_lines": 16252,
+        "code_lines": 12830
+      },
+      "tests (app suite)": {
+        "files": 116,
+        "physical_lines": 33419,
+        "code_lines": 25285
+      }
+    },
+    "generated_committed": {
+      "files": 11,
+      "physical_lines": 3158
+    }
+  },
+  "tests": {
+    "test_source_files": 129,
+    "test_cases": 1199,
+    "test_suites": 164,
+    "cases_by_subsystem_overlapping": {
+      "libs/sacm": {
+        "files": 14,
+        "cases": 114
+      },
+      "src/agent": {
+        "files": 3,
+        "cases": 26
+      },
+      "src/ai": {
+        "files": 6,
+        "cases": 40
+      },
+      "src/app": {
+        "files": 30,
+        "cases": 217
+      },
+      "src/bridge": {
+        "files": 4,
+        "cases": 40
+      },
+      "src/core": {
+        "files": 86,
+        "cases": 866
+      },
+      "src/export": {
+        "files": 1,
+        "cases": 35
+      },
+      "src/mcp": {
+        "files": 3,
+        "cases": 40
+      },
+      "src/parser": {
+        "files": 30,
+        "cases": 378
+      },
+      "src/sacm": {
+        "files": 36,
+        "cases": 380
+      },
+      "src/sacm_adapter": {
+        "files": 17,
+        "cases": 173
+      },
+      "src/ui": {
+        "files": 16,
+        "cases": 161
+      }
+    },
+    "unattributed_test_files": [
+      "tests/test_xml_parser.cpp"
+    ],
+    "largest_test_files": [
+      {
+        "path": "tests/test_draft_workspace.cpp",
+        "cases": 68
+      },
+      {
+        "path": "tests/test_sacm_library_edit.cpp",
+        "cases": 42
+      },
+      {
+        "path": "tests/test_gsn_svg_exporter.cpp",
+        "cases": 35
+      },
+      {
+        "path": "tests/test_dialectic_challenge.cpp",
+        "cases": 29
+      },
+      {
+        "path": "libs/sacm/tests/test_roundtrip.cpp",
+        "cases": 28
+      },
+      {
+        "path": "tests/test_gsn_wellformedness.cpp",
+        "cases": 25
+      },
+      {
+        "path": "tests/test_mcp_server.cpp",
+        "cases": 23
+      },
+      {
+        "path": "tests/test_element_factory.cpp",
+        "cases": 22
+      },
+      {
+        "path": "tests/test_layout.cpp",
+        "cases": 20
+      },
+      {
+        "path": "tests/test_change_sets.cpp",
+        "cases": 19
+      },
+      {
+        "path": "tests/test_assurance_tree.cpp",
+        "cases": 18
+      },
+      {
+        "path": "tests/test_terminology_scope_service.cpp",
+        "cases": 18
+      },
+      {
+        "path": "tests/test_xml_parser.cpp",
+        "cases": 18
+      },
+      {
+        "path": "tests/test_ai_review_controller.cpp",
+        "cases": 17
+      },
+      {
+        "path": "tests/test_save_from_library.cpp",
+        "cases": 17
+      }
+    ],
+    "ambiguous_include_prefixes": {
+      "sacm/": [
+        "libs/sacm/include",
+        "src"
+      ]
+    },
+    "ctest_registered": {
+      "available": true,
+      "build_dir": "build",
+      "config": "Debug",
+      "count": 1207
+    }
+  },
+  "hotspots": {
+    "largest_production_files": [
+      {
+        "path": "libs/sacm/src/io/xmi_reader.cpp",
+        "physical_lines": 2299,
+        "code_lines": 1874
+      },
+      {
+        "path": "src/core/audit/event_replayer.cpp",
+        "physical_lines": 1979,
+        "code_lines": 1700
+      },
+      {
+        "path": "src/app/app_runtime_project.cpp",
+        "physical_lines": 1973,
+        "code_lines": 1589
+      },
+      {
+        "path": "libs/sacm/src/commands/commands.cpp",
+        "physical_lines": 1923,
+        "code_lines": 1758
+      },
+      {
+        "path": "src/sacm_adapter/document_edit.cpp",
+        "physical_lines": 1690,
+        "code_lines": 1329
+      },
+      {
+        "path": "src/core/element_factory.cpp",
+        "physical_lines": 1600,
+        "code_lines": 1315
+      },
+      {
+        "path": "src/app/app_runtime.cpp",
+        "physical_lines": 1271,
+        "code_lines": 1006
+      },
+      {
+        "path": "src/app/areas/perf_overlay_area.cpp",
+        "physical_lines": 1247,
+        "code_lines": 956
+      },
+      {
+        "path": "src/ui/gsn/gsn_canvas.cpp",
+        "physical_lines": 912,
+        "code_lines": 718
+      },
+      {
+        "path": "src/core/gsn_layout.cpp",
+        "physical_lines": 900,
+        "code_lines": 691
+      },
+      {
+        "path": "src/ui/panels/element_panel.cpp",
+        "physical_lines": 888,
+        "code_lines": 754
+      },
+      {
+        "path": "src/core/drafts/draft_workspace_store.cpp",
+        "physical_lines": 834,
+        "code_lines": 661
+      },
+      {
+        "path": "src/ai/ai_claim_review.cpp",
+        "physical_lines": 820,
+        "code_lines": 746
+      },
+      {
+        "path": "src/app/actions/terminology_actions.cpp",
+        "physical_lines": 814,
+        "code_lines": 726
+      },
+      {
+        "path": "src/core/project_service.cpp",
+        "physical_lines": 775,
+        "code_lines": 640
+      }
+    ],
+    "highest_fan_out": [
+      {
+        "path": "src/app/app_runtime.cpp",
+        "first_party_includes": 49
+      },
+      {
+        "path": "src/app/app_runtime_project.cpp",
+        "first_party_includes": 41
+      },
+      {
+        "path": "src/app/app_runtime_state.h",
+        "first_party_includes": 28
+      },
+      {
+        "path": "src/app/app_runtime_frame.cpp",
+        "first_party_includes": 26
+      },
+      {
+        "path": "src/core/audit/event_replayer.cpp",
+        "first_party_includes": 25
+      },
+      {
+        "path": "src/app/areas/canvas_history_overlay.cpp",
+        "first_party_includes": 24
+      },
+      {
+        "path": "src/app/actions/proposal_actions.cpp",
+        "first_party_includes": 19
+      },
+      {
+        "path": "src/app/areas/workbench_area.cpp",
+        "first_party_includes": 19
+      },
+      {
+        "path": "src/app/areas/inspector_area.cpp",
+        "first_party_includes": 18
+      },
+      {
+        "path": "src/app/areas/modal_host.cpp",
+        "first_party_includes": 16
+      },
+      {
+        "path": "src/sacm_adapter/document_edit.cpp",
+        "first_party_includes": 15
+      },
+      {
+        "path": "src/app/actions/terminology_actions.cpp",
+        "first_party_includes": 14
+      },
+      {
+        "path": "src/core/audit/audit_recovery.cpp",
+        "first_party_includes": 14
+      },
+      {
+        "path": "src/app/actions/terminology_actions_helpers.cpp",
+        "first_party_includes": 13
+      },
+      {
+        "path": "src/app/app_runtime_undo.cpp",
+        "first_party_includes": 13
+      }
+    ],
+    "highest_fan_in": [
+      {
+        "header": "ui/i18n/localization.h",
+        "included_by": 52
+      },
+      {
+        "header": "parser/xml_parser.h",
+        "included_by": 46
+      },
+      {
+        "header": "ui/ui_state.h",
+        "included_by": 43
+      },
+      {
+        "header": "ui/theme.h",
+        "included_by": 40
+      },
+      {
+        "header": "app/app_runtime_state.h",
+        "included_by": 39
+      },
+      {
+        "header": "core/string_utils.h",
+        "included_by": 38
+      },
+      {
+        "header": "sacm/sacm_model.h",
+        "included_by": 34
+      },
+      {
+        "header": "core/sacm_model.h",
+        "included_by": 34
+      },
+      {
+        "header": "core/terminology_package_service.h",
+        "included_by": 29
+      },
+      {
+        "header": "core/element_factory.h",
+        "included_by": 23
+      },
+      {
+        "header": "app/app_events.h",
+        "included_by": 22
+      },
+      {
+        "header": "core/reviews/review_proposal.h",
+        "included_by": 21
+      },
+      {
+        "header": "core/project_model.h",
+        "included_by": 21
+      },
+      {
+        "header": "parser/model_utils.h",
+        "included_by": 19
+      },
+      {
+        "header": "sacm_adapter/library_load.h",
+        "included_by": 19
+      }
+    ],
+    "most_changed_production_files": [
+      {
+        "path": "src/app/app_runtime.cpp",
+        "commits": 62
+      },
+      {
+        "path": "src/app/app_runtime.h",
+        "commits": 48
+      },
+      {
+        "path": "src/app/app_runtime_project.cpp",
+        "commits": 43
+      },
+      {
+        "path": "src/app/app_runtime_state.h",
+        "commits": 34
+      },
+      {
+        "path": "src/app/app_runtime_frame.cpp",
+        "commits": 31
+      },
+      {
+        "path": "src/ui/gsn/gsn_canvas.cpp",
+        "commits": 29
+      },
+      {
+        "path": "src/ui/ui_state.h",
+        "commits": 27
+      },
+      {
+        "path": "src/core/app_state.cpp",
+        "commits": 25
+      },
+      {
+        "path": "src/ui/panels/element_panel.cpp",
+        "commits": 23
+      },
+      {
+        "path": "src/app/main.cpp",
+        "commits": 20
+      },
+      {
+        "path": "src/app/areas/workbench_area.cpp",
+        "commits": 19
+      },
+      {
+        "path": "src/ui/tree_view.cpp",
+        "commits": 19
+      },
+      {
+        "path": "src/core/element_factory.cpp",
+        "commits": 19
+      },
+      {
+        "path": "src/core/audit/event_replayer.cpp",
+        "commits": 17
+      },
+      {
+        "path": "src/app/areas/inspector_area.cpp",
+        "commits": 16
+      }
+    ],
+    "churn_window": "full history, merge commits excluded"
+  },
+  "layer_gates": {
+    "available": true,
+    "layers_checked": [
+      "parser",
+      "sacm",
+      "sacm_adapter",
+      "core",
+      "ai",
+      "export",
+      "ui",
+      "bridge",
+      "agent",
+      "mcp"
+    ],
+    "forbidden_rules": {
+      "parser": [
+        "sacm/",
+        "ai/",
+        "export/",
+        "ui/",
+        "app/"
+      ],
+      "sacm": [
+        "ai/",
+        "export/",
+        "ui/",
+        "app/"
+      ],
+      "sacm_adapter": [
+        "ai/",
+        "export/",
+        "ui/",
+        "app/"
+      ],
+      "core": [
+        "ai/",
+        "export/",
+        "ui/",
+        "app/"
+      ],
+      "ai": [
+        "export/",
+        "ui/",
+        "app/"
+      ],
+      "export": [
+        "ai/",
+        "ui/",
+        "app/"
+      ],
+      "ui": [
+        "ai/",
+        "export/",
+        "app/"
+      ],
+      "bridge": [
+        "ai/",
+        "export/",
+        "ui/",
+        "agent/",
+        "mcp/",
+        "app/"
+      ],
+      "agent": [
+        "ai/",
+        "export/",
+        "ui/",
+        "mcp/",
+        "app/"
+      ],
+      "mcp": [
+        "ai/",
+        "export/",
+        "ui/",
+        "app/"
+      ]
+    },
+    "exceptions": [
+      "ui:ui/panels/preferences_panel.h=ai/",
+      "ui:ui/panels/welcome_modal.h=app/"
+    ],
+    "exception_count": 2,
+    "enforced_at": "configure time (FATAL_ERROR)"
+  },
+  "matrices": {
+    "sacm_conformance": {
+      "available": true,
+      "rows": 33,
+      "by_status": {
+        "implemented": 1,
+        "verified": 32
+      },
+      "non_verified_ids": [
+        "SACM23-LIB-002"
+      ]
+    },
+    "capability": {
+      "available": true,
+      "rows": 130,
+      "by_status": {
+        "candidate": 4,
+        "in-development": 1,
+        "planned": 36,
+        "prototype": 11,
+        "supported": 78
+      },
+      "by_area": {
+        "ACP": 8,
+        "AI": 18,
+        "DIA": 8,
+        "ENG": 20,
+        "GSN": 12,
+        "METH": 11,
+        "MOD": 14,
+        "PAT": 10,
+        "PLAT": 12,
+        "STD": 17
+      },
+      "rows_without_tests": [
+        "AF-ACP-009",
+        "AF-ACP-010",
+        "AF-AI-012",
+        "AF-AI-013",
+        "AF-DIA-005",
+        "AF-DIA-006",
+        "AF-DIA-007",
+        "AF-DIA-008",
+        "AF-ENG-004",
+        "AF-ENG-014",
+        "AF-ENG-018",
+        "AF-GSN-013",
+        "AF-METH-005",
+        "AF-METH-006",
+        "AF-METH-007",
+        "AF-METH-009",
+        "AF-MOD-001",
+        "AF-MOD-002",
+        "AF-MOD-003",
+        "AF-MOD-004",
+        "AF-MOD-005",
+        "AF-MOD-006",
+        "AF-MOD-007",
+        "AF-MOD-008",
+        "AF-MOD-009",
+        "AF-MOD-010",
+        "AF-MOD-011",
+        "AF-MOD-012",
+        "AF-MOD-013",
+        "AF-MOD-014",
+        "AF-PAT-003",
+        "AF-PAT-004",
+        "AF-PAT-005",
+        "AF-PAT-006",
+        "AF-PAT-007",
+        "AF-PAT-008",
+        "AF-PAT-009",
+        "AF-PAT-010",
+        "AF-STD-008",
+        "AF-STD-015",
+        "AF-STD-017"
+      ]
+    }
+  },
+  "documentation": {
+    "markdown_files": 104,
+    "by_directory": {
+      "docs/sacm": 19,
+      "docs/sacm/verification": 16,
+      "docs/architecture/decisions": 12,
+      ".claude/agents": 10,
+      "docs/architecture": 10,
+      ".": 6,
+      "docs/sacm/prompts": 6,
+      "docs/features": 5,
+      "docs": 4,
+      ".claude/skills/gsn-expert/references": 3,
+      "docs/sacm/templates": 3,
+      "docs/developer-guide": 2,
+      "docs/roadmap": 2,
+      ".claude/skills/gsn-expert": 1,
+      ".claude/skills/run-assurance-forge": 1,
+      "docs/gsn": 1,
+      "docs/quality": 1,
+      "libs/sacm": 1,
+      "libs/sacm/tests/data/interop-thirdparty": 1
+    },
+    "broken_relative_links": [],
+    "broken_link_count": 0,
+    "mkdocs_nav_entries": 38,
+    "orphan_pages": [
+      "docs/ARCHITECTURE.md",
+      "docs/RELEASING.md",
+      "docs/sacm/agent-pack-readme.md",
+      "docs/sacm/prompts/README.md",
+      "docs/sacm/prompts/assurance-forge-adapter-prompt.md",
+      "docs/sacm/prompts/sacm-first-editable-slice-prompt.md",
+      "docs/sacm/prompts/sacm-first-slice-prompt.md",
+      "docs/sacm/prompts/sacm-library-master-prompt.md",
+      "docs/sacm/sacm-2.3-metamodel-inventory.md",
+      "docs/sacm/sacm-2.4-watch.md",
+      "docs/sacm/sacm-agent-operating-plan.md",
+      "docs/sacm/sacm-assurance-forge-integration-plan.md",
+      "docs/sacm/sacm-compliance-policy.md",
+      "docs/sacm/sacm-decisions-and-questions.md",
+      "docs/sacm/sacm-diagnostics-catalog.md",
+      "docs/sacm/sacm-editing-policy.md",
+      "docs/sacm/sacm-layout-policy.md",
+      "docs/sacm/sacm-library-architecture.md",
+      "docs/sacm/sacm-library-implementation-plan.md",
+      "docs/sacm/sacm-research-notes.md",
+      "docs/sacm/sacm-stage3-projection-baseline.md",
+      "docs/sacm/sacm-test-strategy.md",
+      "docs/sacm/templates/sacm-interop-case.md",
+      "docs/sacm/templates/sacm-requirement-record.md",
+      "docs/sacm/templates/sacm-slice-brief.md",
+      "docs/sacm/verification/2026-07-20-phases-0-8.md",
+      "docs/sacm/verification/2026-07-21-xmi-003-generated-id-collision.md",
+      "docs/sacm/verification/2026-07-25-compat-mode-separation.md",
+      "docs/sacm/verification/2026-07-26-lib-002-strategy-migration-round-2-FAIL.md",
+      "docs/sacm/verification/2026-07-26-lib-002-undo-library-primary-round-1-FAIL.md"
+    ],
+    "orphan_page_count": 30
+  },
+  "root_surface": {
+    "root_entries": [
+      {
+        "name": ".clang-format",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": ".clang-uml",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": ".claude/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": ".codex/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": ".editorconfig",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": ".gitattributes",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": ".githooks/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": ".github/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": ".gitignore",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": ".gitmodules",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": ".venv/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": ".vscode/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "AGENTS.md",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "assets/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "build/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "build-docs/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "build-sacm-standalone/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "build_out.txt",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "CLAUDE.md",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "cmake/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "cmake_test_discovery_59830ebc3a.json",
+        "kind": "file",
+        "tracked": false
+      },
+      {
+        "name": "cmake_test_discovery_e3b0c44298.json",
+        "kind": "file",
+        "tracked": false
+      },
+      {
+        "name": "CMakeFiles/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "CMakeLists.txt",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "CMakePresets.json",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "CONTRIBUTING.md",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "data/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "docs/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "examples/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "external/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "full_tests.txt",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "gcovr-logic.cfg",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "gcovr-sacm.cfg",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "imgui.ini",
+        "kind": "file",
+        "tracked": false
+      },
+      {
+        "name": "issue-body.md",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "libs/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "LICENSE.md",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "mkdocs.yml",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "README.md",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "requirements-docs.txt",
+        "kind": "file",
+        "tracked": true
+      },
+      {
+        "name": "scripts/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "shots/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "site/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "src/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "Testing/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "tests/",
+        "kind": "directory",
+        "tracked": true
+      },
+      {
+        "name": "third_party/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "tmp/",
+        "kind": "directory",
+        "tracked": false
+      },
+      {
+        "name": "tools/",
+        "kind": "directory",
+        "tracked": true
+      }
+    ],
+    "tracked_root_files": 21,
+    "committed_artifact_candidates": [
+      "build_out.txt",
+      "full_tests.txt",
+      "issue-body.md"
+    ],
+    "committed_artifact_candidate_count": 3
+  },
+  "ai_assets": {
+    "claude_agents": [
+      "assurance-forge-adapter-engineer",
+      "feature-matrix-steward",
+      "sacm-conformance-verifier",
+      "sacm-implementation-lead",
+      "sacm-interop-researcher",
+      "sacm-library-architect",
+      "sacm-library-implementer",
+      "sacm-metamodel-cartographer",
+      "sacm-spec-analyst",
+      "sacm-xmi-test-engineer"
+    ],
+    "codex_agents": [
+      "assurance-forge-adapter-engineer",
+      "sacm-conformance-verifier",
+      "sacm-implementation-lead",
+      "sacm-interop-researcher",
+      "sacm-library-architect",
+      "sacm-library-implementer",
+      "sacm-metamodel-cartographer",
+      "sacm-spec-analyst",
+      "sacm-xmi-test-engineer"
+    ],
+    "duplicated_agent_roles": [
+      "assurance-forge-adapter-engineer",
+      "sacm-conformance-verifier",
+      "sacm-implementation-lead",
+      "sacm-interop-researcher",
+      "sacm-library-architect",
+      "sacm-library-implementer",
+      "sacm-metamodel-cartographer",
+      "sacm-spec-analyst",
+      "sacm-xmi-test-engineer"
+    ],
+    "claude_only": [
+      "feature-matrix-steward"
+    ],
+    "codex_only": [],
+    "skills": [
+      "gsn-expert",
+      "run-assurance-forge"
+    ],
+    "top_level_instruction_files": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "CONTRIBUTING.md",
+      "README.md"
+    ],
+    "canonical_source": null,
+    "note": "No generator or drift check exists; each platform directory is hand-maintained."
+  },
+  "build_and_analysis": {
+    "warning_flags_in_cmake": [],
+    "warnings_as_errors": false,
+    "workflows": [
+      "ci.yml",
+      "coverage.yml",
+      "docs-pages.yml",
+      "docs.yml",
+      "release.yml",
+      "roadmap-create-epic.yml",
+      "roadmap-request-opened.yml",
+      "roadmap-scripts-tests.yml"
+    ],
+    "quality_tooling_present": {
+      "clang-format": true,
+      "clang-tidy": false,
+      "cppcheck": false,
+      "sanitizers": false,
+      "fuzzing": false,
+      "coverage": true
+    },
+    "compiler_warning_count": {
+      "available": false,
+      "reason": "requires a clean build per compiler; not reproducible from a source scan",
+      "command": "cmake --build --preset release 2>&1 | grep -c warning"
+    },
+    "coverage": {
+      "available": true,
+      "run_id": 31007382290,
+      "run_commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
+      "run_date": "2026-08-05T12:50:07Z",
+      "matches_baseline_commit": true,
+      "by_scope": {
+        "logic scope, headline": {
+          "lines": {
+            "percent": 71.7,
+            "covered": 19949,
+            "total": 27827
+          },
+          "functions": {
+            "percent": 84.2,
+            "covered": 2166,
+            "total": 2572
+          },
+          "branches": {
+            "percent": 62.0,
+            "covered": 20839,
+            "total": 33622
+          },
+          "conditions": {
+            "percent": 51.2,
+            "covered": 10777,
+            "total": 21064
+          }
+        },
+        "full src/": {
+          "lines": {
+            "percent": 48.6,
+            "covered": 21092,
+            "total": 43403
+          },
+          "functions": {
+            "percent": 60.3,
+            "covered": 2276,
+            "total": 3772
+          },
+          "branches": {
+            "percent": 42.1,
+            "covered": 21525,
+            "total": 51184
+          },
+          "conditions": {
+            "percent": 36.8,
+            "covered": 11146,
+            "total": 30250
+          }
+        },
+        "core scope": {
+          "lines": {
+            "percent": 77.0,
+            "covered": 17758,
+            "total": 23050
+          },
+          "functions": {
+            "percent": 91.2,
+            "covered": 1876,
+            "total": 2056
+          },
+          "branches": {
+            "percent": 66.1,
+            "covered": 19024,
+            "total": 28778
+          },
+          "conditions": {
+            "percent": 53.6,
+            "covered": 9950,
+            "total": 18566
+          }
+        },
+        "SACM library scope": {
+          "lines": {
+            "percent": 84.6,
+            "covered": 3654,
+            "total": 4320
+          },
+          "functions": {
+            "percent": 93.7,
+            "covered": 569,
+            "total": 607
+          },
+          "branches": {
+            "percent": 65.7,
+            "covered": 3725,
+            "total": 5673
+          },
+          "conditions": {
+            "percent": 54.8,
+            "covered": 1924,
+            "total": 3512
+          }
+        }
+      },
+      "note": "Linux / GCC 14 only. No threshold gates on these numbers."
+    }
+  },
+  "ci": {
+    "available": true,
+    "platforms": [
+      {
+        "name": "Windows",
+        "runner": "windows-latest"
+      },
+      {
+        "name": "Linux",
+        "runner": "ubuntu-latest"
+      },
+      {
+        "name": "macOS",
+        "runner": "macos-latest"
+      }
+    ],
+    "build_type": "Debug",
+    "observed_durations": {
+      "available": true,
+      "successful_runs_sampled": 20,
+      "median_minutes": 12.7,
+      "min_minutes": 10.6,
+      "max_minutes": 14.4,
+      "note": "whole-workflow wall clock including queueing, not per-job CPU time"
+    }
+  },
+  "submodules": {
+    "available": true,
+    "count": 6,
+    "modules": [
+      {
+        "commit": "c91a72bc6f593b1f9a6ee2b406be775b44b6e8ba",
+        "path": "examples"
+      },
+      {
+        "commit": "e24530d0591a346f7869a007ad4b17d995cd01c7",
+        "path": "external/hello_imgui"
+      },
+      {
+        "commit": "e092bbb4578583c6fd0edc2cd14fb9c658194a4d",
+        "path": "external/nativefiledialog-extended"
+      },
+      {
+        "commit": "161cb3fc4170fa7a3eca9e582cebd27cc4d1fe29",
+        "path": "external/picosha2"
+      },
+      {
+        "commit": "59f944c46746bec4f5f6ad312a7ac8e389d0f6ba",
+        "path": "external/pugixml"
+      },
+      {
+        "commit": "9b4f4c534d89bc0869695e01fc34382590f9c15c",
+        "path": "external/safety-case-core-guidelines"
+      }
+    ],
+    "note": "Submodule contents are upstream code and are excluded from all line counts."
+  }
+}
