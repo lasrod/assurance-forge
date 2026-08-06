@@ -96,3 +96,5 @@ nav:
   - Developer Guide:
       - Overview: developer-guide/index.md
       - Generating Class Diagrams: developer-guide/generating-class-diagrams.md
+      - Repository Quality Baseline: quality/repository-baseline.md
+      - Code Coverage: COVERAGE.md
