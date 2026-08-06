@@ -532,16 +532,25 @@ def collect_root_surface(files):
 
     # Committed artifacts that look machine-produced or single-use. Flagged, not
     # deleted: removal is issue #289's scope, this baseline only records them.
+    #
+    # Scanned across the whole tree, not just the root. The first version matched
+    # against root-level paths only and therefore reported three artifacts when
+    # there were four -- it could not see Testing/Temporary/LastTest.log, a CTest
+    # log committed by accident and still claiming 383 tests long after the suite
+    # reached 1207. A hygiene measure blind to subdirectories understates by
+    # exactly the amount that is easiest to miss by hand.
     suspicious_re = re.compile(
-        r"^(build_out\.txt|full_tests\.txt|issue-body\.md|cmake_test_discovery_.*\.json|imgui\.ini|.*\.log)$"
+        r"(^|/)(build_out\.txt|full_tests\.txt|issue-body\.md|cmake_test_discovery_.*\.json"
+        r"|imgui\.ini|[^/]*\.log)$"
     )
-    suspicious = sorted(f for f in tracked_root if suspicious_re.match(f))
+    suspicious = sorted(f for f in files if suspicious_re.search(f))
 
     return {
         "root_entries": entries,
         "tracked_root_files": len(tracked_root),
         "committed_artifact_candidates": suspicious,
         "committed_artifact_candidate_count": len(suspicious),
+        "scan_scope": "all tracked files, not only the repository root",
     }
 
 

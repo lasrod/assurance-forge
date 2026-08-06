@@ -2,12 +2,12 @@
   "schema": 1,
   "generator": "tools/quality/collect_baseline.py",
   "identity": {
-    "commit": "78c361805ce3f76a29131dc4457184c1ae27e9e4",
-    "commit_date": "2026-08-06T20:57:40+09:00",
+    "commit": "28173a44229b1b717bad7ad7a7140b7d851dfc18",
+    "commit_date": "2026-08-06T21:19:53+09:00",
     "base_commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
     "branch": "chore/288-repository-quality-baseline",
     "first_commit_date": "2026-04-17T00:13:04+09:00",
-    "total_commits": 276,
+    "total_commits": 277,
     "working_tree_dirty_entries": 5
   },
   "code_size": {
@@ -39,8 +39,8 @@
       },
       "first_party_tooling": {
         "files": 19,
-        "physical_lines": 4891,
-        "code_lines": 4153
+        "physical_lines": 4900,
+        "code_lines": 4162
       },
       "other": {
         "files": 48,
@@ -996,11 +996,13 @@
     ],
     "tracked_root_files": 21,
     "committed_artifact_candidates": [
+      "Testing/Temporary/LastTest.log",
       "build_out.txt",
       "full_tests.txt",
       "issue-body.md"
     ],
-    "committed_artifact_candidate_count": 3
+    "committed_artifact_candidate_count": 4,
+    "scan_scope": "all tracked files, not only the repository root"
   },
   "ai_assets": {
     "claude_agents": [

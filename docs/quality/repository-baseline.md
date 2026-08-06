@@ -62,7 +62,7 @@ not to line counts, which is why those rows show `—`.
 |---|---|---|---|
 | First-party production | 527 | 92,198 | 71,524 |
 | First-party tests | 170 | 37,222 | 27,441 |
-| First-party tooling | 19 | 4,891 | 4,153 |
+| First-party tooling | 19 | 4,900 | 4,162 |
 | CI and repository config | 14 | 1,581 | 1,319 |
 | Documentation | 86 | — | — |
 | Assets and data | 13 | — | — |
@@ -285,15 +285,27 @@ the point of the measurement is that today there is no way to tell which.
 | Measure | Value |
 |---|---|
 | Tracked files in root | 21 |
-| Committed build/scratch artifacts | 3 |
+| Committed build/scratch artifacts | 4 |
 
-The three are `build_out.txt`, `full_tests.txt`, and `issue-body.md` — a captured
-build log, a captured test log, and a one-off issue body. Additional untracked
-residue is present locally (`cmake_test_discovery_*.json`, `imgui.ini`,
-`CMakeFiles/`, `Testing/`, `tmp/`, `shots/`) but is not in source control.
-Removing these and preventing recurrence is
+| File | What it is |
+|---|---|
+| `build_out.txt` | Captured MSBuild output from one local Release build |
+| `full_tests.txt` | Captured CTest output, recording 383 tests |
+| `issue-body.md` | Two-line scratch body for a one-off issue |
+| `Testing/Temporary/LastTest.log` | CTest log from one local run |
+
+The scan covers **all tracked files, not only the repository root**. Its first
+version matched root-level paths only and reported three, missing
+`Testing/Temporary/LastTest.log` — which is also the one no reader would spot by
+looking at the root listing. It was committed by accident and still claims 383
+tests, a number the suite passed months ago on its way to 1,207. A stale
+committed test log is worse than none: it reads as evidence.
+
+Additional untracked residue is present locally
+(`cmake_test_discovery_*.json`, `imgui.ini`, `CMakeFiles/`, `tmp/`, `shots/`) but
+is not in source control. Removing all of this and preventing recurrence is
 [#289](https://github.com/lasrod/assurance-forge/issues/289); this baseline only
-records them.
+records it.
 
 ## Quality tooling
 
@@ -415,7 +427,7 @@ because each has a defensible interpretation and a baseline value above.
 | Indicator | Baseline | Why this one |
 |---|---|---|
 | Layer-gate exceptions | 2 | Directly measures architectural erosion; should trend to 0 |
-| Committed build/scratch artifacts | 3 | Cheap, unambiguous hygiene signal; should stay 0 once cleared |
+| Committed build/scratch artifacts | 4 | Cheap, unambiguous hygiene signal; should stay 0 once cleared |
 | Unreachable documentation pages | 30 | Measures whether documentation is navigable, not merely present |
 | Broken internal links | 0 | Currently clean; worth a gate to keep it so |
 | Hand-duplicated agent roles | 9 | Should trend to 0 as generation replaces copies |
@@ -432,7 +444,7 @@ and file count. Each can be moved without improving anything.
 
 | Finding | Workstream |
 |---|---|
-| 3 committed build/scratch artifacts in the root | [#289](https://github.com/lasrod/assurance-forge/issues/289) |
+| 4 committed build/scratch artifacts, one of them nested under `Testing/` | [#289](https://github.com/lasrod/assurance-forge/issues/289) |
 | 30 documentation pages reachable from nothing, including `ARCHITECTURE.md` and `RELEASING.md` | [#290](https://github.com/lasrod/assurance-forge/issues/290) |
 | No CI link check, so today's zero broken links is unprotected | [#290](https://github.com/lasrod/assurance-forge/issues/290) |
 | `sacm/` include prefix served by two subsystems | [#291](https://github.com/lasrod/assurance-forge/issues/291) |
