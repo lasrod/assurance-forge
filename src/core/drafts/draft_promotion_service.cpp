@@ -28,6 +28,22 @@ void NamespaceElementRef(const std::string& group_id, std::optional<reviews::Ele
     ref->create_ref = NamespaceRef(group_id, ref->create_ref.value());
 }
 
+// Whether an operation actually gives an element secondary-language text.
+//
+// A non-empty `translations` map is not the same question. An empty value is a
+// removal -- `WriteLanguage` erases that language -- so an agent tidying away a
+// stale Japanese sentence carries a populated map while adding nothing to read.
+// Flagging that for translation review asks a human to re-read text that is no
+// longer there, and every warning that turns out to be nothing makes the next
+// real one easier to wave through.
+bool AddsSecondaryLanguageText(const reviews::PatchOperation& operation) {
+    for (const std::pair<const std::string, std::string>& entry : operation.translations) {
+        if (entry.first != reviews::kPatchPrimaryLanguage && !entry.second.empty())
+            return true;
+    }
+    return false;
+}
+
 } // namespace
 
 std::string DraftPromotionAuthor(const DraftWorkspace& workspace,
@@ -127,7 +143,7 @@ std::vector<std::string> MachineTranslatedElementIds(const DraftWorkspace& works
             continue;
 
         for (const reviews::PatchOperation& operation : group->operations) {
-            if (operation.translations.empty())
+            if (!AddsSecondaryLanguageText(operation))
                 continue;
 
             // A create names its element by the ref it was staged under; an

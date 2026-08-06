@@ -277,7 +277,7 @@ bool ApplyCreateOperation(const PatchOperation& operation,
     element.id = id_it->second;
     element.type = ElementTypeFor(operation.type);
     element.name = DefaultNameFor(operation.type);
-    element.name_langs["en"] = element.name;
+    element.name_langs[kPatchPrimaryLanguage] = element.name;
     element.assertion_declaration = AssertionDeclarationFor(operation.type);
     if (!operation.text.empty()) {
         SetElementText(element, operation.text, operation.translations);

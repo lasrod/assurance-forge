@@ -2100,6 +2100,39 @@ TEST(DraftWorkspace, PromotionReportsMachineWrittenTranslationsForReview) {
     EXPECT_EQ(flagged.front(), IdentityFor(fixture.store, mcp_group, "$sub"));
 }
 
+TEST(DraftWorkspace, RemovingATranslationIsNotFlaggedForReview) {
+    Fixture fixture;
+    const std::string mcp_group = fixture.BeginGroup("Drop the stale Japanese");
+
+    // An empty value is a removal, not a translation: WriteLanguage erases that
+    // language rather than storing a blank string.
+    fixture.Stage(mcp_group, {TranslateTextOp("G1", "")});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    // The map is populated, but nothing was added for anyone to read. Asking a
+    // human to review text that is no longer there teaches them the warning
+    // means nothing, and the next real one gets waved through with it.
+    EXPECT_TRUE(core::drafts::MachineTranslatedElementIds(*fixture.store.workspace(), {mcp_group}).empty());
+}
+
+TEST(DraftWorkspace, AddingOneTranslationWhileRemovingAnotherIsStillFlagged) {
+    Fixture fixture;
+    const std::string mcp_group = fixture.BeginGroup("Retranslate the top goal");
+
+    core::reviews::PatchOperation operation = TranslateTextOp("G1", "制動サブシステムは所定の性能目標を満たす。");
+    operation.translations["sv"] = "";
+    fixture.Stage(mcp_group, {operation});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    // A removal alongside an addition must not suppress the flag. Skipping the
+    // whole operation because one entry is empty would hide a machine-written
+    // sentence behind a tidy-up in the same edit.
+    const std::vector<std::string> flagged =
+        core::drafts::MachineTranslatedElementIds(*fixture.store.workspace(), {mcp_group});
+    ASSERT_EQ(flagged.size(), 1u);
+    EXPECT_EQ(flagged.front(), "G1");
+}
+
 TEST(DraftWorkspace, AHumanTypedTranslationIsNotFlaggedForReview) {
     Fixture fixture;
     core::drafts::DraftGroupRequest request;
