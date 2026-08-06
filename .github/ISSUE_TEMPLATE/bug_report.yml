@@ -1,0 +1,88 @@
+name: Bug report
+description: Something in Assurance Forge does not work as it should.
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        **Do not use this form for security vulnerabilities.** Report those
+        privately — see [SECURITY.md](https://github.com/lasrod/assurance-forge/blob/main/SECURITY.md).
+
+        **Please redact anything confidential.** Assurance cases routinely
+        contain proprietary system detail, and attachments on a public issue
+        cannot be reliably unpublished. A cut-down file that still reproduces
+        the problem is more useful than a complete one.
+
+  - type: checkboxes
+    id: data_loss
+    attributes:
+      label: Does this involve your assurance data?
+      description: >
+        Tick anything that applies. These are the most serious bugs this project
+        has, and ticking a box changes how the report is prioritized.
+      options:
+        - label: Content from my safety case was lost or dropped
+        - label: My safety case was changed in a way I did not ask for
+        - label: The tool displayed something the source file does not say
+        - label: A file saved by Assurance Forge no longer loads
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: What you did, what happened, and what you expected instead.
+      placeholder: |
+        1. Opened examples/projects/.../af.proj
+        2. Selected a goal on the canvas and pressed Delete
+        3. Expected the goal to be removed; instead the whole strategy vanished
+    validations:
+      required: true
+
+  - type: textarea
+    id: file
+    attributes:
+      label: Input file
+      description: >
+        The smallest SACM or project file that reproduces the problem, if the
+        problem involves a particular file. Paste it or attach it — redacted.
+      render: xml
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: "Help → About, or the release you downloaded, or a commit SHA."
+      placeholder: "0.2.0, or 84cd98c"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how_built
+    attributes:
+      label: How did you get Assurance Forge?
+      options:
+        - Downloaded a release binary
+        - Built from source
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        Logs, screenshots, or what you already tried. If the application crashed,
+        anything it printed to the console is useful.

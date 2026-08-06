@@ -35,6 +35,24 @@ Makefile
 compile_commands.json
 cmake_test_discovery_*.json
 
+# CTest working directory (created by running ctest from the repository root)
+Testing/
+
+# Captured build and test output. These belong in a terminal or a CI log, not in
+# git: they are machine- and moment-specific, and a stale one is worse than none
+# (a committed test log claiming 383 tests outlived the suite reaching 1207).
+build_out.txt
+build_output.txt
+*_tests.txt
+*build*.log
+test-results.xml
+LastTest.log
+
+# One-off scratch files for composing issues, PRs and commit messages.
+issue-body.md
+pr-body.md
+commit-msg.txt
+
 # FetchContent downloads
 _deps/
 
