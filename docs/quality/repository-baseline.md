@@ -62,7 +62,7 @@ not to line counts, which is why those rows show `—`.
 |---|---|---|---|
 | First-party production | 527 | 92,198 | 71,524 |
 | First-party tests | 170 | 37,222 | 27,441 |
-| First-party tooling | 19 | 4,855 | 4,120 |
+| First-party tooling | 19 | 4,891 | 4,153 |
 | CI and repository config | 14 | 1,581 | 1,319 |
 | Documentation | 86 | — | — |
 | Assets and data | 13 | — | — |
@@ -77,10 +77,18 @@ same as the 104 tracked markdown files reported under
 [Documentation](#documentation) — the latter counts `.md` everywhere in the
 repository, including `README.md`, `CONTRIBUTING.md`, and the agent definitions.
 
-There are 6 submodules (`examples`, `external/hello_imgui`,
-`external/nativefiledialog-extended`, `external/picosha2`, `external/pugixml`,
-`external/safety-case-core-guidelines`) and one in-tree vendored directory
-(`third_party/sacm-2.3`, normative specification material).
+The table has no vendored row because **no vendored code is committed to this
+repository**. Third-party code arrives two ways, both outside every count above:
+
+- **6 submodules** — `examples`, `external/hello_imgui`,
+  `external/nativefiledialog-extended`, `external/picosha2`, `external/pugixml`,
+  `external/safety-case-core-guidelines`. Tracked as gitlinks; their contents are
+  upstream code and are excluded from all line counts by design.
+- **`third_party/`** — the normative SACM 2.3 specification and machine-readable
+  model, which every conformance claim is checked against. It is **gitignored and
+  fetched by script** (`bash scripts/fetch-sacm23-references.sh`), so it is not in
+  the repository at all and contributes to no file or line count here. A working
+  copy that has never run the fetch script is missing it entirely.
 
 ### By subsystem
 

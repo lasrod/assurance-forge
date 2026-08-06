@@ -2,12 +2,12 @@
   "schema": 1,
   "generator": "tools/quality/collect_baseline.py",
   "identity": {
-    "commit": "7da226f59f309ac06535c3ba619a5ebfa0672585",
-    "commit_date": "2026-08-06T20:22:45+09:00",
+    "commit": "78c361805ce3f76a29131dc4457184c1ae27e9e4",
+    "commit_date": "2026-08-06T20:57:40+09:00",
     "base_commit": "84cd98c89bfc2ec461d54dc045c7748c96f68400",
     "branch": "chore/288-repository-quality-baseline",
     "first_commit_date": "2026-04-17T00:13:04+09:00",
-    "total_commits": 275,
+    "total_commits": 276,
     "working_tree_dirty_entries": 5
   },
   "code_size": {
@@ -39,8 +39,8 @@
       },
       "first_party_tooling": {
         "files": 19,
-        "physical_lines": 4855,
-        "code_lines": 4120
+        "physical_lines": 4891,
+        "code_lines": 4153
       },
       "other": {
         "files": 48,
@@ -1236,5 +1236,14 @@
       }
     ],
     "note": "Submodule contents are upstream code and are excluded from all line counts."
+  },
+  "vendored_reference": {
+    "path": "third_party/",
+    "tracked": false,
+    "gitignored": true,
+    "present_in_this_working_copy": true,
+    "file_count_on_disk": 4,
+    "fetch_command": "bash scripts/fetch-sacm23-references.sh",
+    "note": "Normative SACM 2.3 specification and machine-readable model. Not committed, so it contributes to no file or line count in this report."
   }
 }

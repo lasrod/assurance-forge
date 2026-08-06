@@ -57,6 +57,10 @@ CLASSIFICATION = [
     ("first_party_tests", "First-party tests", ["tests/", "libs/sacm/tests/"]),
     ("first_party_production", "First-party production", ["src/", "libs/sacm/include/", "libs/sacm/src/"]),
     ("first_party_tooling", "First-party tooling", ["tools/", "scripts/", "cmake/", ".githooks/", "libs/sacm/tools/"]),
+    # Retained so that vendored code would be classified rather than silently
+    # falling into "other" if any is ever committed. Today nothing matches:
+    # third_party/ is gitignored reference material, reported separately by
+    # collect_vendored_reference().
     ("vendored", "Vendored / third-party (in tree)", ["third_party/"]),
     ("documentation", "Documentation", ["docs/"]),
     ("assets_data", "Assets and data", ["assets/", "data/"]),
@@ -742,6 +746,33 @@ def ci_durations():
     }
 
 
+def collect_vendored_reference():
+    """Reference material present in a working copy but absent from the repository.
+
+    `third_party/` holds the normative SACM sources every conformance claim is
+    checked against, but it is gitignored and fetched by script, so it appears in
+    no tracked-file count. Reporting it only as "vendored" alongside the
+    submodules would imply it sits in the tree; reporting nothing would hide a
+    dependency the build and the conformance work both rely on.
+    """
+    directory = REPO / "third_party"
+    ignored = run("git", "check-ignore", "third_party/") is not None
+    present = directory.is_dir()
+    files = sorted(p.name for p in directory.rglob("*") if p.is_file()) if present else []
+    return {
+        "path": "third_party/",
+        "tracked": False,
+        "gitignored": ignored,
+        "present_in_this_working_copy": present,
+        "file_count_on_disk": len(files),
+        "fetch_command": "bash scripts/fetch-sacm23-references.sh",
+        "note": (
+            "Normative SACM 2.3 specification and machine-readable model. Not committed, "
+            "so it contributes to no file or line count in this report."
+        ),
+    }
+
+
 def collect_submodules():
     out = run("git", "submodule", "status")
     if out is None:
@@ -960,6 +991,7 @@ def collect():
         "build_and_analysis": collect_build_and_analysis(),
         "ci": collect_ci_matrix(),
         "submodules": collect_submodules(),
+        "vendored_reference": collect_vendored_reference(),
     }
 
     # Coverage describes this tree only if nothing compiled has moved since the run
@@ -998,6 +1030,10 @@ def volatile_free(data):
     copy.get("identity", {}).pop("branch", None)
     copy.get("tests", {}).pop("ctest_registered", None)
     copy.get("build_and_analysis", {}).pop("coverage", None)
+    # Whether the untracked reference material has been fetched is a property of
+    # this working copy, not of the committed tree.
+    copy.get("vendored_reference", {}).pop("present_in_this_working_copy", None)
+    copy.get("vendored_reference", {}).pop("file_count_on_disk", None)
     return copy
 
 
