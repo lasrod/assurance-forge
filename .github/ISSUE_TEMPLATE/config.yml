@@ -1,0 +1,16 @@
+# Blank issues stay enabled: not every report fits a form, and a rigid chooser
+# turns a would-be reporter away more often than it improves triage.
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/lasrod/assurance-forge/security/advisories/new
+    about: Please do not open a public issue. This opens a private advisory.
+  - name: Ask a question
+    url: https://github.com/lasrod/assurance-forge/discussions/categories/q-a
+    about: How do I do X, can the tool do Y — Discussions are a better fit than issues.
+  - name: Share an idea
+    url: https://github.com/lasrod/assurance-forge/discussions/categories/ideas
+    about: For an idea you want to discuss before it becomes a concrete request.
+  - name: Getting help and support expectations
+    url: https://github.com/lasrod/assurance-forge/blob/main/SUPPORT.md
+    about: What is supported, what is not, and where to go.

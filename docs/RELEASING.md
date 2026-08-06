@@ -43,6 +43,34 @@ To build a packaged zip without creating a GitHub Release, use **workflow_dispat
 
 > Note: `workflow_dispatch` only works for workflow files that exist on the repository's default branch. To run an experimental build from a feature branch, the workflow file must already be present on `main`.
 
+## Release notes policy
+
+**The GitHub Releases page is this project's changelog.** There is no
+`CHANGELOG.md`. A hand-maintained changelog alongside hand-written release notes
+gives two sources that drift, and the one people actually read is the one
+attached to the download.
+
+Every release note must state, in this order:
+
+1. **What changed for users** — new capabilities, changed behaviour, fixes.
+   Written so someone who has not read the commits can understand the effect.
+2. **Anything affecting existing files** — a change to how a project or SACM
+   file is read, written, or migrated. Say explicitly whether files written by
+   an older version still load, and whether files written by this version load
+   in an older one.
+3. **Known limitations** introduced or still outstanding.
+4. **The commit SHA** the release was built from.
+
+A release that changes parsing, serialization, migration, audit or undo
+behaviour **must** say so even when the change is an improvement. Someone
+deciding whether to upgrade a tool holding their safety argument needs to know
+that the file handling moved, not only that a bug was fixed.
+
+Do not describe a release as conformant, certified, qualified or approved. State
+what was implemented and what was tested, and link to the evidence. The
+repository README's "Status and limitations" section is the reference for what
+this project does and does not claim.
+
 ## Platform support
 
 Releases are currently **Windows x64 only**, built with the `Visual Studio 17 2022` generator on GitHub-hosted `windows-latest` runners. Cross-platform release artifacts are tracked separately on the roadmap.

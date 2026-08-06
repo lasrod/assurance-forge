@@ -485,13 +485,23 @@ if(Python3_Interpreter_FOUND)
         NAME feature_matrix_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/features/check_feature_matrix.py"
     )
+
+    # Repository hygiene gate: fails if a captured build log, test output, CTest
+    # working directory, generated file or scratch file is tracked by git.
+    # .gitignore cannot enforce this on its own -- it is ignored for files
+    # already in the index, and silent when someone uses `git add -f`.
+    add_test(
+        NAME no_committed_artifacts_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/repo/check_no_committed_artifacts.py"
+    )
 else()
     # These are compliance gates, not conveniences. A silently absent gate reads
     # as a passing one, so say so loudly rather than skipping in silence.
     message(WARNING
-        "Python3 not found: the i18n_catalog_check, sacm_matrix_check, gsn_matrix_check and "
-        "feature_matrix_check gates will NOT run. CI installs Python explicitly; "
-        "a local build without it cannot verify the translation catalog, the SACM "
-        "or GSN conformance matrices, or the capability matrix.")
+        "Python3 not found: the i18n_catalog_check, sacm_matrix_check, gsn_matrix_check, "
+        "feature_matrix_check and no_committed_artifacts_check gates will NOT run. "
+        "CI installs Python explicitly; a local build without it cannot verify the "
+        "translation catalog, the SACM or GSN conformance matrices, the capability "
+        "matrix, or that no build artifacts have been committed.")
 endif()
 

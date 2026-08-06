@@ -7,6 +7,64 @@ Assurance Forge is an open-source tool for safety case development, review, and 
 
 ---
 
+## Status and limitations
+
+**Assurance Forge is alpha software under active development.** Read this before
+trusting it with a safety argument you care about.
+
+| | |
+|---|---|
+| Maturity | Alpha. Latest release `0.1.0-alpha.8`; every release so far is a prerelease. |
+| Released binaries | Windows x64 only. `main` is substantially ahead of the latest release — build from source for current behaviour. |
+| CI | Windows, Linux and macOS are built and tested on every change. |
+| Licence | [MIT](LICENSE.md) |
+
+### What is claimed
+
+Capability claims are recorded per feature in the
+[capability matrix](docs/features/feature-matrix.md), which distinguishes
+`supported` (available, backed by code and tests) from `prototype`,
+`in-development`, `planned` and `candidate`. A `supported` row must cite a test
+that exists; CI enforces this. If a capability is not in that matrix, treat it as
+not claimed.
+
+Standards support is recorded separately:
+
+- [SACM 2.3 conformance matrix](docs/sacm/sacm-conformance-matrix.md)
+- [GSN v3 conformance matrix](docs/gsn/gsn-v3-conformance-matrix.md)
+
+### On SACM conformance
+
+Assurance Forge implements the SACM 2.3 metamodel and has extensive automated
+evidence covering the Assurance Case, Argumentation, Artifact and Terminology
+Model compliance points. **A release-bound conformance assessment is being
+finalized** ([#295](https://github.com/lasrod/assurance-forge/issues/295)), and
+the SACM UML Profile compliance point is **not claimed**.
+
+Until that assessment is published, please read "implements and tests SACM 2.3"
+rather than "is a conformant SACM 2.3 implementation".
+
+### What is not claimed
+
+- **No certification or qualification.** Assurance Forge is not certified,
+  assessed, or approved for use in any regulatory, functional-safety or
+  tool-qualification process. Nothing in this repository constitutes evidence of
+  tool qualification under ISO 26262, UL 4600, DO-330 or any comparable scheme.
+- **No safety judgement.** The tool cannot tell you whether your safety case is
+  adequate. AI-assisted review surfaces suggestions against the Safety Case Core
+  Guidelines; it does not validate an argument, and its output requires human
+  review.
+- **No guarantee against data loss.** SACM XML is treated as the source of truth
+  and preserving it is a primary design constraint, but this is alpha software.
+  Keep your assurance data in version control and keep backups.
+
+Known limitations and open questions are tracked as
+[GitHub issues](https://github.com/lasrod/assurance-forge/issues). If you find a
+case where the tool loses or reinterprets assurance content, please
+[report it](SUPPORT.md) — that is the most serious class of bug this project has.
+
+---
+
 ## ✨ Vision
 
 Safety cases are critical artifacts in safety-critical systems engineering, yet the tooling available today is often heavyweight, expensive, or disconnected from the engineering lifecycle. Assurance Forge aims to change that.
@@ -18,7 +76,7 @@ The vision is to make safety cases **easier to develop, review, and navigate** �
 - **Automatic layout** — Assurance arguments are visualized automatically. Engineers focus on content, not diagram maintenance. No manual positioning of nodes.
 - **GSN visualization** — Safety arguments are rendered using Goal Structuring Notation (GSN), providing a clear, standardized view of the assurance case.
 - **Manual and AI-assisted reviews** — Integrated AI assistance evaluates arguments against the Safety Case Core Guidelines (SCCG), helping teams identify weaknesses and improve argument quality.
-- **SACM-first** — The tool consumes and produces SACM 2.3 XML. Internal structures closely follow SACM concepts, ensuring standards conformance.
+- **SACM-first** — The tool consumes and produces SACM 2.3 XML, and internal structures follow SACM concepts closely. See [Status and limitations](#status-and-limitations) for what is and is not claimed about conformance.
 - **Fully open source** — MIT licensed with no vendor lock-in for AI providers.
 
 ### Future direction
@@ -222,6 +280,21 @@ https://github.com/EdgeCaseResearch/oasc
 - [GoogleTest](https://github.com/google/googletest) - Testing framework, fetched via CMake (BSD-3-Clause)
 - [Noto Sans JP](https://github.com/notofonts/noto-cjk) - Bundled font for Latin and Japanese rendering (SIL Open Font License 1.1)
 
+
+## Project documentation and governance
+
+| | |
+|---|---|
+| Documentation site | <https://lasrod.github.io/assurance-forge/> |
+| What the tool can do | [Capability matrix](docs/features/feature-matrix.md) |
+| Standards support | [SACM 2.3](docs/sacm/sacm-conformance-matrix.md) · [GSN v3](docs/gsn/gsn-v3-conformance-matrix.md) · [SACM–GSN mapping](docs/sacm/sacm-gsn-mapping.md) |
+| Architecture and decisions | [Architecture](docs/architecture/index.md) · [ADRs](docs/architecture/decisions/index.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Getting help | [SUPPORT.md](SUPPORT.md) |
+| Reporting a vulnerability | [SECURITY.md](SECURITY.md) |
+| Community expectations | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| Releases and release notes | [Releasing](docs/RELEASING.md) · [Releases page](https://github.com/lasrod/assurance-forge/releases) |
+| Roadmap | [Product roadmap](docs/roadmap/public.md) |
 
 ## Copyright and license
 Code and documentation copyright 2026 Jesper Brännström. Code released under the [MIT License](LICENSE.md)

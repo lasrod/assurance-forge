@@ -1,0 +1,65 @@
+name: Feature request
+description: Suggest a capability Assurance Forge should have.
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, it is worth a look at the
+        [capability matrix](https://github.com/lasrod/assurance-forge/blob/main/docs/features/feature-matrix.md)
+        — the capability may already exist, or already be planned or explicitly
+        out of scope.
+
+        If you would rather discuss an idea than propose a specific change, the
+        [Ideas discussion board](https://github.com/lasrod/assurance-forge/discussions/categories/ideas)
+        is a better fit.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >
+        Describe the situation, not the solution. What are you doing when you
+        hit this, and what does it cost you today?
+      placeholder: >
+        When reviewing a large argument I cannot tell which goals have no
+        supporting evidence without opening each one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: Your suggested solution, if you have one in mind.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do instead today?
+      description: Workarounds, other tools, or manual steps this would replace.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this touch?
+      description: A rough guess is fine.
+      options:
+        - GSN canvas and visualization
+        - SACM import, export, or standards conformance
+        - Review and AI assistance
+        - Project storage, save/load, or migration
+        - Editing and the element inspector
+        - Documentation
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: standard
+    attributes:
+      label: Is this required by a standard or method?
+      description: >
+        If this comes from SACM, GSN, SCCG, ISO 26262, UL 4600 or similar, name
+        it and the clause if you can. Requests traceable to a published standard
+        are easier to scope and to verify.
