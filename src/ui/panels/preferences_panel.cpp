@@ -12,85 +12,76 @@
 namespace ui::panels {
 namespace {
 
-ImVec4 StatusColor(const ai::AiConnectionStatus& status) {
+ImVec4 StatusColor(AiStatusSeverity severity) {
     const ui::Theme& theme = ui::GetTheme();
-    if (status.state == ai::AiTaskState::Running)
+    switch (severity) {
+    case AiStatusSeverity::Running:
         return ImGui::ColorConvertU32ToFloat4(theme.warning);
-    if (status.state == ai::AiTaskState::Success)
+    case AiStatusSeverity::Success:
         return ImGui::ColorConvertU32ToFloat4(theme.success);
-    if (status.state == ai::AiTaskState::Error || status.errorCode != ai::AiErrorCode::None)
+    case AiStatusSeverity::Error:
         return ImGui::ColorConvertU32ToFloat4(theme.danger);
+    case AiStatusSeverity::Idle:
+        break;
+    }
     return ImGui::ColorConvertU32ToFloat4(theme.text_secondary);
 }
 
-void SyncModelBuffer(PreferencesPanelModel& model) {
-    if (!model.settings || !model.modelBuffer || model.modelBufferSize == 0)
-        return;
-    size_t count = std::min(model.modelBufferSize - 1, model.settings->model.size());
-    std::memcpy(model.modelBuffer, model.settings->model.data(), count);
-    model.modelBuffer[count] = '\0';
-}
-
-void RenderConnectionStatus(const ai::AiConnectionStatus& status) {
-    if (status.message.empty())
+void RenderConnectionStatus(AiStatusSeverity severity, const std::string& message) {
+    if (message.empty())
         return;
 
-    ImVec4 color = StatusColor(status);
-    if (status.state == ai::AiTaskState::Running || status.state == ai::AiTaskState::Success) {
+    ImVec4 color = StatusColor(severity);
+    if (severity == AiStatusSeverity::Running || severity == AiStatusSeverity::Success) {
         ImGui::SameLine();
-        ImGui::TextColored(color, "%s", status.message.c_str());
+        ImGui::TextColored(color, "%s", message.c_str());
         return;
     }
 
     ImGui::Spacing();
     ImGui::PushStyleColor(ImGuiCol_Text, color);
-    ImGui::TextWrapped("%s", status.message.c_str());
+    ImGui::TextWrapped("%s", message.c_str());
     ImGui::PopStyleColor();
 }
 
 void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallbacks& callbacks) {
-    if (!model.settings) {
+    if (!model.aiAvailable) {
         ImGui::TextDisabled("%s", AF_TR("AI settings are unavailable.").c_str());
         return;
     }
 
-    ai::AiProviderSettings draft = *model.settings;
-
     ImGui::TextUnformatted(AF_TR("AI").c_str());
     ImGui::Separator();
 
-    bool enabled = draft.enabled;
+    bool enabled = model.aiEnabled;
     if (ImGui::Checkbox(AF_TR("Enable AI support").c_str(), &enabled)) {
-        draft.enabled = enabled;
-        *model.settings = draft;
+        if (callbacks.set_ai_enabled)
+            callbacks.set_ai_enabled(enabled);
     }
 
     ImGui::TextUnformatted(AF_TR("Provider").c_str());
     ImGui::SetNextItemWidth(220.0f);
     ImGui::BeginDisabled();
-    static char provider_name[] = "OpenAI";
-    ImGui::InputText("##ai_provider", provider_name, sizeof(provider_name), ImGuiInputTextFlags_ReadOnly);
+    std::string provider_name = model.aiProviderName;
+    provider_name.resize(provider_name.size() + 1, '\0');
+    ImGui::InputText("##ai_provider", provider_name.data(), provider_name.size(), ImGuiInputTextFlags_ReadOnly);
     ImGui::EndDisabled();
 
     ImGui::TextUnformatted(AF_TR("Model").c_str());
     ImGui::SetNextItemWidth(280.0f);
-    if (model.modelBuffer && model.modelBufferSize > 0 &&
-        ImGui::InputText("##ai_model", model.modelBuffer, model.modelBufferSize)) {
-        model.settings->model = model.modelBuffer;
+    if (model.modelBuffer && model.modelBufferSize > 0) {
+        ImGui::InputText("##ai_model", model.modelBuffer, model.modelBufferSize);
     }
 
     if (ImGui::Button(AF_TR("Save AI Settings").c_str())) {
-        if (model.modelBuffer && model.modelBufferSize > 0) {
-            model.settings->model = model.modelBuffer;
-        }
         if (callbacks.save_settings)
-            callbacks.save_settings(*model.settings);
+            callbacks.save_settings(model.aiEnabled, model.modelBuffer ? model.modelBuffer : "");
     }
 
     ImGui::Spacing();
     ImGui::TextUnformatted(AF_TR("API Key").c_str());
     if (!model.secureStoreAvailable) {
-        ImGui::TextColored(StatusColor(ai::ErrorStatus(ai::AiErrorCode::SecureStoreUnavailable, "")),
+        ImGui::TextColored(StatusColor(AiStatusSeverity::Error),
                            "%s",
                            AF_TR("Secure storage is unavailable on this platform.").c_str());
     } else if (model.keyStored) {
@@ -124,8 +115,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
         ImGui::EndDisabled();
 
     ImGui::Spacing();
-    const bool can_test =
-        model.secureStoreAvailable && model.keyStored && model.settings->enabled && !model.testRunning;
+    const bool can_test = model.secureStoreAvailable && model.keyStored && model.aiEnabled && !model.testRunning;
     if (!can_test)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Test Connection").c_str())) {
@@ -135,7 +125,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     if (!can_test)
         ImGui::EndDisabled();
 
-    RenderConnectionStatus(model.connectionStatus);
+    RenderConnectionStatus(model.connectionSeverity, model.connectionMessage);
 
     ImGui::Spacing();
     ImGui::TextWrapped(
@@ -276,7 +266,6 @@ void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const Prefer
         return;
     }
 
-    SyncModelBuffer(model);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal(preferences_popup_id.c_str(),

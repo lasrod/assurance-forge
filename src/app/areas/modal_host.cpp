@@ -24,6 +24,29 @@
 #include "app/areas/modal_host_internal.h"
 
 namespace app::areas {
+namespace {
+
+// An `ai::AiConnectionStatus` says what went wrong; the panel only needs to know
+// how loudly to say it. Collapsing the error code here keeps `ui` from having to
+// know what an `AiErrorCode` is.
+ui::panels::AiStatusSeverity ToPanelSeverity(const ai::AiConnectionStatus& status) {
+    switch (status.state) {
+    case ai::AiTaskState::Running:
+        return ui::panels::AiStatusSeverity::Running;
+    case ai::AiTaskState::Success:
+        return ui::panels::AiStatusSeverity::Success;
+    case ai::AiTaskState::Error:
+        return ui::panels::AiStatusSeverity::Error;
+    case ai::AiTaskState::Idle:
+        break;
+    }
+    // An idle state carrying an error code is still an error: the previous
+    // attempt failed and the message on screen is that failure.
+    return status.errorCode != ai::AiErrorCode::None ? ui::panels::AiStatusSeverity::Error
+                                                     : ui::panels::AiStatusSeverity::Idle;
+}
+
+} // namespace
 
 void ModalHost::Render() {
     RenderPreferencesWindow();
@@ -62,12 +85,20 @@ void ModalHost::RenderPreferencesWindow() {
         }
     }
 
+    // The panel used to hold `ai::AiProviderSettings*` and an `ai::AiConnectionStatus`,
+    // which made `ui` include `ai` -- one of the layer gate's two exceptions.
+    // Translating here keeps the AI vocabulary on this side of the boundary.
+    CopyToBuffer(state_.ai.model_buf, sizeof(state_.ai.model_buf), state_.ai.settings.model);
+
     ui::panels::PreferencesPanelModel model;
-    model.settings = &state_.ai.settings;
+    model.aiAvailable = true;
+    model.aiEnabled = state_.ai.settings.enabled;
+    model.aiProviderName = ai::ToString(state_.ai.settings.provider);
     model.keyStored = state_.ai.key_stored;
     model.secureStoreAvailable = state_.ai.secure_store_available;
     model.testRunning = test_running;
-    model.connectionStatus = state_.ai.connection_status;
+    model.connectionSeverity = ToPanelSeverity(state_.ai.connection_status);
+    model.connectionMessage = state_.ai.connection_status.message;
     model.apiKeyBuffer = state_.ai.api_key_buf;
     model.apiKeyBufferSize = sizeof(state_.ai.api_key_buf);
     model.modelBuffer = state_.ai.model_buf;
@@ -90,8 +121,10 @@ void ModalHost::RenderPreferencesWindow() {
     }
 
     ui::panels::PreferencesPanelCallbacks callbacks;
-    callbacks.save_settings = [this](const ai::AiProviderSettings& settings) {
-        state_.ai.settings = settings;
+    callbacks.set_ai_enabled = [this](bool enabled) { state_.ai.settings.enabled = enabled; };
+    callbacks.save_settings = [this](bool enabled, const char* model_text) {
+        state_.ai.settings.enabled = enabled;
+        state_.ai.settings.model = model_text != nullptr ? model_text : "";
         if (state_.ai.settings.model.empty())
             state_.ai.settings.model = ai::kDefaultOpenAiModel;
         std::string error;
@@ -363,8 +396,16 @@ void ModalHost::RenderStartupProjectWindow() {
             }
         },
     };
-    ui::panels::ShowWelcomeModal(
-        state_.project_controller->show_startup_project_window, state_.project_controller->recent_projects, callbacks);
+    // The panel owns the shape it draws, so `app` maps onto it here rather than
+    // making `ui` include an `app` header.
+    std::vector<ui::panels::RecentProjectEntry> recent;
+    recent.reserve(state_.project_controller->recent_projects.size());
+    for (const app::RecentProjectEntry& entry : state_.project_controller->recent_projects) {
+        recent.push_back(ui::panels::RecentProjectEntry{
+            entry.name, entry.path, entry.claims, entry.strategies, entry.evidence, entry.undeveloped});
+    }
+
+    ui::panels::ShowWelcomeModal(state_.project_controller->show_startup_project_window, recent, callbacks);
 }
 
 void ModalHost::RenderCreateProjectModal() {

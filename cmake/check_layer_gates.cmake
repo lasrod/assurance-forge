@@ -63,9 +63,17 @@ set(_AF_FORBIDDEN_mcp    "ai/;export/;ui/;app/")
 # Known cross-layer includes recorded as exceptions. Format:
 #   <layer>:<relative-path-from-src>=<allowed-include-prefix>
 # Multiple allowed prefixes for the same file can be listed as separate entries.
+# Empty, and worth keeping that way. The two entries that used to live here --
+# preferences_panel.h reaching into `ai/` and welcome_modal.h into `app/` -- were
+# removed by giving each panel its own view type and mapping onto it in `app`,
+# not by rewording the rule. An allow-list is where a dependency rule goes to
+# die: each entry is individually reasonable and collectively they mean the gate
+# no longer describes the architecture.
+#
+# Before adding one, try the three things that removed the last two: invert the
+# dependency, extract an interface, or relocate the type. If an entry is truly
+# unavoidable it needs an ADR and an issue to remove it.
 set(_AF_ALLOWLIST
-    "ui:ui/panels/preferences_panel.h=ai/"
-    "ui:ui/panels/welcome_modal.h=app/"
 )
 
 set(_AF_LAYERS parser sacm sacm_adapter core ai export ui bridge agent mcp)

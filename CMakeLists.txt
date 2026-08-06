@@ -505,6 +505,16 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/docs/check_documentation.py"
     )
 
+    # Layer-gate self-test. The gate is the only mechanical guard on the
+    # architecture and it passes on every clean build -- which is also what a
+    # silently broken gate looks like. This feeds it violations it must reject
+    # and allowed dependencies it must not, using synthetic fixtures so that
+    # proving the gate works does not require leaving a real violation in src/.
+    add_test(
+        NAME layer_gate_negative_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/repo/check_layer_gate_detects_violations.py"
+    )
+
     # The verification-record index is generated from each record's front matter.
     # Built by hand it misreports: the one failing record whose filename lacks a
     # `-FAIL` suffix reads as a pass.

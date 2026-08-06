@@ -1,14 +1,27 @@
 #pragma once
 
-#include "app/recent_projects.h"
-
 #include <functional>
 #include <string>
 #include <vector>
 
 namespace ui::panels {
 
-using RecentProjectEntry = app::RecentProjectEntry;
+// What the welcome modal renders for one recent project.
+//
+// Deliberately not `app::RecentProjectEntry`. A panel that names an `app` type
+// in its own interface makes `ui` depend on the layer above it, which is the
+// dependency the layer gate exists to prevent -- this was one of its two
+// recorded exceptions. The panel owns the shape it draws, and `app` maps its
+// own type onto it, the same way the MCP fields on the preferences panel are
+// passed as plain data rather than by reaching into `mcp`.
+struct RecentProjectEntry {
+    std::string name;
+    std::string path;
+    int claims = 0;
+    int strategies = 0;
+    int evidence = 0;
+    int undeveloped = 0;
+};
 
 struct WelcomeModalCallbacks {
     std::function<void()> create_empty_project;

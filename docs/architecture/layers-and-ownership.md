@@ -84,17 +84,37 @@ Dependencies run one way: lower layers never include higher ones. The gate scans
 `#include` directives at configure time and fails the build with a
 `FATAL_ERROR`, so a violation cannot reach `main` unnoticed.
 
-Two exceptions are recorded in the gate itself:
+**The allow-list is empty, and stays that way.** It previously held two entries —
+`preferences_panel.h` reaching into `ai/` and `welcome_modal.h` into `app/` —
+both removed by giving each panel its own view type and mapping onto it in `app`.
+See [ADR 0011](decisions/0011-panels-own-their-view-types.md).
 
-- `ui/panels/preferences_panel.h` includes `ai/`
-- `ui/panels/welcome_modal.h` includes `app/`
+Removing an exception means inverting the dependency, extracting an interface, or
+relocating the type, never rewording the rule. An entry that is genuinely
+unavoidable needs its own ADR and an issue to remove it.
 
-Each is an allow-list entry, not a general permission. The intent is to reach
-zero; [#291](https://github.com/lasrod/assurance-forge/issues/291) tracks
-removing them by dependency inversion rather than by widening the list.
+The gate is itself tested. `layer_gate_negative_check` feeds it nine forbidden
+dependencies it must reject and four allowed ones it must not — a gate that
+passes on a clean tree is indistinguishable from one that has stopped working.
 
-The gate checks source-level includes only. It does **not** check CMake target
-dependencies, so a subsystem can still link more than its headers suggest.
+### What the gate does not cover
+
+It checks source-level `#include` directives, not CMake target dependencies.
+`af_common` is an INTERFACE target giving every subsystem the whole `src/`
+include path and the full third-party link surface, so each layer can already
+compile against every other layer's headers — the source scan is the only thing
+stopping it. Measured against actual usage:
+
+| Subsystem | Actually uses | Also links |
+|---|---|---|
+| `core` | picosha2, nlohmann_json | imgui, pugixml, nfd, yaml-cpp, curl |
+| `parser` | pugixml, nlohmann_json, yaml-cpp | imgui, nfd, picosha2, curl |
+| `ui` | imgui | pugixml, nfd, picosha2, nlohmann_json, yaml-cpp, curl |
+| `app` | imgui, nfd, nlohmann_json | pugixml, picosha2, yaml-cpp, curl |
+| `export`, `sacm_adapter` | *(none)* | all seven |
+
+Narrowing this is open under
+[#291](https://github.com/lasrod/assurance-forge/issues/291).
 
 UI code should not depend on `app` directly. When a panel needs to request a
 command, `AppRuntime` passes a small action object into it — which keeps the

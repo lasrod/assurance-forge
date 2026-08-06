@@ -95,6 +95,7 @@ nav:
           - 0008 One owner for the open project: architecture/decisions/0008-one-owner-for-the-open-project.md
           - 0009 One integrated working draft per argument file: architecture/decisions/0009-one-integrated-working-draft-per-argument.md
           - 0010 Draft provenance, persistence and human promotion: architecture/decisions/0010-draft-provenance-persistence-and-human-promotion.md
+          - 0011 Panels own their view types: architecture/decisions/0011-panels-own-their-view-types.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md
