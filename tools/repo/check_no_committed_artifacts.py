@@ -37,6 +37,14 @@ FORBIDDEN = [
     (re.compile(r"(^|/)build[-_]?out(put)?\.txt$"), "captured build output"),
     (re.compile(r"(^|/)[a-z0-9_-]*_?tests?\.txt$", re.I), "captured test output"),
     (re.compile(r"(^|/)[a-z0-9_-]*build[a-z0-9_-]*\.log$", re.I), "captured build log"),
+    # Machine-written report formats. Matched by name rather than by extension so
+    # that genuine XML content -- SACM fixtures, the normative model -- is never
+    # caught. `.gitignore` names test-results.xml; the two lists are maintained by
+    # hand and had already drifted apart by the time this was noticed.
+    (
+        re.compile(r"(^|/)(test-results|test_results|junit|coverage|cobertura|gcovr)[a-z0-9._-]*\.xml$", re.I),
+        "captured test or coverage report",
+    ),
     (re.compile(r"(^|/)(issue-body|pr-body|commit-msg)\.(md|txt)$"), "scratch file for composing an issue, PR or commit"),
     (re.compile(r"(^|/)compile_commands\.json$"), "generated compilation database"),
     (re.compile(r"(^|/)cmake_test_discovery_.*\.json$"), "generated CMake test-discovery output"),
@@ -54,6 +62,69 @@ ALLOWED = {
 }
 
 
+# Names the patterns must catch, and names they must not. A gate is only worth
+# the confidence placed in it if it has been shown to fail on the right inputs,
+# and an over-broad pattern that swallows a real fixture is as bad as a gap.
+# Checked on every run: it costs microseconds and turns a one-off manual check
+# into something that keeps holding.
+MUST_CATCH = [
+    "build_out.txt",
+    "build_output.txt",
+    "full_tests.txt",
+    "Testing/Temporary/LastTest.log",
+    "issue-body.md",
+    "pr-body.md",
+    "test-results.xml",
+    "junit.xml",
+    "coverage.xml",
+    "nested/dir/build.log",
+    "compile_commands.json",
+    "cmake_test_discovery_abc123.json",
+    "imgui.ini",
+    "CMakeCache.txt",
+    "build/foo.obj",
+    "coverage_full/index.html",
+    ".DS_Store",
+]
+
+MUST_NOT_CATCH = [
+    "data/sample.sacm.xml",
+    "tests/data/argument_with_evidence.xml",
+    "third_party/SACM-2.3-ptc-22-03-13.xml",
+    "docs/features/feature-matrix.json",
+    "docs/quality/repository-baseline.json",
+    "assets/locale/ja/LC_MESSAGES/assurance_forge.mo",
+    "assets/locale/ja/LC_MESSAGES/assurance_forge.po",
+    "src/app/app_runtime.cpp",
+    "libs/sacm/include/sacm/model/document.h",
+    "CMakeLists.txt",
+    "CMakePresets.json",
+    "tools/i18n/check_catalog.py",
+    "README.md",
+    "docs/RELEASING.md",
+]
+
+
+def first_match(path):
+    for pattern, reason in FORBIDDEN:
+        if pattern.search(path):
+            return reason
+    return None
+
+
+def self_test():
+    """Return a list of pattern regressions, empty when the patterns behave."""
+    failures = []
+    for path in MUST_CATCH:
+        if first_match(path) is None:
+            failures.append(f"should be caught but is not: {path}")
+    for path in MUST_NOT_CATCH:
+        reason = first_match(path)
+        if reason is not None:
+            failures.append(f"must not be caught but matched '{reason}': {path}")
+    return failures
+
+
 def tracked_files():
     result = subprocess.run(
         ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, encoding="utf-8", errors="replace"
@@ -65,14 +136,22 @@ def tracked_files():
 
 
 def main():
+    regressions = self_test()
+    if regressions:
+        print(f"[0] FAIL: the artifact patterns no longer behave as intended\n")
+        for line in regressions:
+            print(f"  {line}")
+        print("\nFix FORBIDDEN, or update MUST_CATCH / MUST_NOT_CATCH if the intent changed.")
+        return 2
+    print(f"[0] OK: patterns catch {len(MUST_CATCH)} known artifacts and spare {len(MUST_NOT_CATCH)} real files")
+
     offenders = []
     for path in tracked_files():
         if path in ALLOWED:
             continue
-        for pattern, reason in FORBIDDEN:
-            if pattern.search(path):
-                offenders.append((path, reason))
-                break
+        reason = first_match(path)
+        if reason is not None:
+            offenders.append((path, reason))
 
     if offenders:
         print(f"[1] FAIL: {len(offenders)} committed artifact(s) found\n")

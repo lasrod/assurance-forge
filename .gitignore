@@ -45,8 +45,13 @@ build_out.txt
 build_output.txt
 *_tests.txt
 *build*.log
-test-results.xml
 LastTest.log
+# Machine-written test and coverage reports.
+test-results.xml
+test_results.xml
+junit*.xml
+coverage*.xml
+cobertura*.xml
 
 # One-off scratch files for composing issues, PRs and commit messages.
 issue-body.md
