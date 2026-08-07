@@ -307,7 +307,7 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
 
     const parser::ReviewProfile* strategy_profile = result.value().FindReviewProfileById("strategy_review");
     ASSERT_NE(strategy_profile, nullptr);
-    for (const std::string& applicable_element : {"GSN Strategy", "CAE Argument"}) {
+    for (const std::string applicable_element : {"GSN Strategy", "CAE Argument"}) {
         const bool applies =
             std::find(strategy_profile->applies_to.begin(), strategy_profile->applies_to.end(), applicable_element) !=
             strategy_profile->applies_to.end();

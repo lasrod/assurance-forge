@@ -124,7 +124,7 @@ TEST(DraftExampleProject, EveryScenarioKeepsTheAcceptedBlenderBaselineByteIdenti
         core::ReadTextFile(projects / "kitchen-blender" / "arguments" / "main.sacm");
     ASSERT_TRUE(baseline.has_value()) << baseline.error();
 
-    for (const std::string& scenario : {"kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
+    for (const std::string scenario : {"kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
         const std::expected<std::string, std::string> accepted =
             core::ReadTextFile(projects / scenario / "arguments" / "main.sacm");
         ASSERT_TRUE(accepted.has_value()) << scenario << ": " << accepted.error();
@@ -139,7 +139,7 @@ TEST(DraftExampleProject, EveryBlenderManifestOpensWithoutProjectHealthWarnings)
         GTEST_SKIP() << "examples/projects not found";
     }
 
-    for (const std::string& name : {"kitchen-blender", "kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
+    for (const std::string name : {"kitchen-blender", "kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
         core::AssuranceProject project;
         core::ProjectLoadReport report;
         std::string error;

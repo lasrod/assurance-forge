@@ -69,6 +69,15 @@ to be skipped.
 A local check that reports clean on code CI rejects is worse than no check: it
 turns "I did not look" into "I looked and it was fine".
 
+Sweep **`tests/` and `libs/sacm/tests/` too**, not just `src/`. The warning
+policy covers the test targets, so a sweep that skips them checks less than the
+build does — that gap let three `-Wrange-loop-construct` diagnostics reach CI.
+
+Pass the same defines the build passes, at minimum `SACM_REPO_FIXTURES_DIR` and
+`_CRT_SECURE_NO_WARNINGS`. Without the first, `test_metamodel_coverage.cpp`
+compiles its `#ifndef` branch and reports a constant as unused that the real
+build uses — deleting it on that advice would have broken the build.
+
 This is still a proxy, not a build. CI remains the authority.
 
 ### Warnings are errors in CI, not locally
