@@ -124,6 +124,7 @@ if(SACM_BUILD_TESTS)
         tests/test_delete_preview.cpp
         tests/test_xmi_io.cpp
         tests/test_roundtrip.cpp
+        tests/test_attribute_preservation.cpp
         tests/test_base_model.cpp
         tests/test_repo_fixture_interop.cpp
         tests/test_interop_corpus.cpp
@@ -143,6 +144,12 @@ if(SACM_BUILD_TESTS)
     # Tests live inside the library and may assert on internal tables, e.g. the
     # losslessness attribute table in src/io/name_tables.h.
     target_include_directories(sacm_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    # pugixml stays PRIVATE to `sacm` so it never reaches a public header, but
+    # the preservation test needs it deliberately: it reads the source and the
+    # saved XML through a parser that is not the library's, so an attribute the
+    # library's own reader drops has nowhere to hide. Linking it to the test
+    # target does not put it in the public surface.
+    target_link_libraries(sacm_tests PRIVATE pugixml)
     if(DEFINED SACM_REPO_FIXTURES_DIR)
         target_compile_definitions(sacm_tests PRIVATE
             SACM_REPO_FIXTURES_DIR="${SACM_REPO_FIXTURES_DIR}"

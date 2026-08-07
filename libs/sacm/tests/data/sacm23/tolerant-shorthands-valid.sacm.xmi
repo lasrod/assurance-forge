@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Exercises the tolerant-mode shorthands and legacy spellings the reader
+  accepts, none of which any fixture contained (issue #292).
+
+  Each is a compatibility promise the library makes to files it did not write:
+
+    name / description   LangString content written as an attribute instead of
+                         the child element SACM models.
+    key                  A TaggedValue key as an attribute.
+    referencedArtifact   Alias for referencedArtifactElement.
+    undeveloped          Pre-SACM GSN marking for a goal not yet argued;
+                         normalized to assertionDeclaration=needsSupport and
+                         reported as SACM23-COMPAT-001.
+    occurece / occurence Both misspellings of Event.date. ptc/22-03-13 spells
+                         it `occurece`; `occurence` is the other one seen in
+                         the wild. Two events, because a document can only
+                         spell an attribute one way per element.
+
+  These are normalized on write rather than echoed back, so the preservation
+  test lists them as permitted to disappear. What this fixture proves is that
+  they are still understood on read: if the reader stopped accepting one, the
+  content would silently become vendor data instead of the SACM it is.
+-->
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1" name="Tolerant Shorthand Case" description="Uses the attribute forms a tolerant reader accepts.">
+  <artifactPackage xmi:id="artpkg_1" name="Evidence">
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="artifact_report" name="Test Report" version="2.1"/>
+    <artifactElement xsi:type="sacm:Event" xmi:id="event_ptc_spelling" name="Release (ptc spelling)" occurece="2026-02-02"/>
+    <artifactElement xsi:type="sacm:Event" xmi:id="event_other_spelling" name="Review (other spelling)" occurence="2026-02-03"/>
+  </artifactPackage>
+  <argumentPackage xmi:id="argpkg_1" name="Argument">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_undeveloped" name="Not yet argued" undeveloped="true"/>
+    <!-- An ArtifactReference belongs to the argument, not the artifact package:
+         SACM23-XMI-001 rejects it as an ArtifactPackage child. -->
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="artref_report" name="Reference to the report" referencedArtifact="artifact_report"/>
+  </argumentPackage>
+  <taggedValue xmi:id="tv_acp" key="reviewStatus">
+    <content>
+      <value content="approved"/>
+    </content>
+  </taggedValue>
+</sacm:AssuranceCasePackage>

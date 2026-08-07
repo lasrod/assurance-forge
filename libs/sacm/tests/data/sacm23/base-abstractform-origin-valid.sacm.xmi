@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Exercises two association ends the library reads and writes but that no
+  fixture contained: SACMElement.abstractForm and Term.origin (issue #292).
+
+  abstractForm was demonstrably unguarded. Making the reader discard it and
+  running the whole repository suite produced no failure, because the
+  round-trip comparison puts two documents from the same reader side by side
+  and neither one has the attribute.
+
+  claim_instance is an instantiation of the abstract claim_pattern, which is
+  what abstractForm records. term_severity takes its origin from a term in
+  another package, which is what origin records.
+-->
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Abstract Form and Origin Case"/>
+  <terminologyPackage xmi:id="termpkg_1">
+    <name content="Vocabulary"/>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="term_iso_severity" value="S3">
+      <name content="ISO 26262 severity S3"/>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="term_severity" value="severity" origin="term_iso_severity">
+      <name content="Severity"/>
+    </terminologyElement>
+  </terminologyPackage>
+  <argumentPackage xmi:id="argpkg_1">
+    <name content="Argument"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_pattern" isAbstract="true">
+      <name content="Pattern Claim"/>
+      <implementationConstraint xmi:id="ic_1">
+        <content>
+          <value lang="en" content="Bind the hazard before use."/>
+        </content>
+      </implementationConstraint>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_instance" abstractForm="claim_pattern">
+      <name content="Instantiated Claim"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
