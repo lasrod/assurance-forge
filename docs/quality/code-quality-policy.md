@@ -26,6 +26,12 @@ Subsystems are listed explicitly in `src/CMakeLists.txt` rather than globbed. A
 new subsystem should have to state that it builds warning-clean, not inherit the
 claim by being in the right folder.
 
+Coverage is not limited to the per-layer object libraries. `assurance-forge`,
+`assurance-forge-mcp`, `tests`, `sacm_cli` and `sacm_tests` carry translation
+units of their own -- `src/app/main.cpp`, `src/mcp/main.cpp`, and every test
+source -- and warning only on the libraries would leave the ratchet with a hole
+in the files a newcomer opens first.
+
 ### Warnings are errors in CI, not locally
 
 `AF_WARNINGS_AS_ERRORS` defaults to `OFF`. CI passes `-DAF_WARNINGS_AS_ERRORS=ON`
@@ -44,6 +50,7 @@ suppression is indistinguishable from a fixed problem.
 | Suppression | Scope | Why |
 |---|---|---|
 | `_CRT_SECURE_NO_WARNINGS` | First-party targets, MSVC only | `std::getenv` and `std::fopen` are standard C++ that MSVC deprecates on its own authority. Its replacements (`_dupenv_s`, `fopen_s`) are not portable, and this code builds on three toolchains, so the warning has no action behind it. It does **not** cover STL deprecations. |
+| `-Wno-missing-field-initializers` | First-party targets, GCC and Clang | Fires on partial aggregate initialization, which this codebase uses deliberately: a callbacks struct is built positionally for the members that have one, and the rest are assigned by name immediately below. Listing every member in the braces would duplicate those assignments. Both compilers already exempt `{}` from it. |
 | `/wd4456` | `sacm` target, MSVC only | Sixteen instances of one pattern in the XMI reader and writer: `else if (auto* pkg = dynamic_cast<...>)` chains where MSVC counts the previous branch's variable as still in scope. None is a live shadowing bug. Renaming means editing `libs/sacm/src`, which carries a conformance obligation that does not belong in a change about warning levels. |
 
 Neither suppression hides a defect. Where a warning did point at one, it was

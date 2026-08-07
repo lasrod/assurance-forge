@@ -44,7 +44,14 @@ function(af_set_warning_level target)
             target_compile_options(${target} PRIVATE /WX)
         endif()
     else()
-        target_compile_options(${target} PRIVATE -Wall -Wextra)
+        # -Wmissing-field-initializers (part of -Wextra) fires on partial
+        # aggregate initialization, which this codebase uses deliberately: a
+        # callbacks struct is built positionally for the members that have one
+        # and the rest are assigned by name immediately below. Listing every
+        # member inside the braces would duplicate those assignments to satisfy
+        # a warning that has found nothing. GCC and Clang both already exempt
+        # `{}` from it, so the diagnostic is about style, not correctness.
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
         if(AF_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE -Werror)
         endif()
@@ -442,6 +449,15 @@ target_link_libraries(tests PRIVATE
     hello_imgui
     af_app af_ui af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
 )
+
+# The per-layer object libraries are not the whole of the first-party code. The
+# executables carry their own translation units -- src/app/main.cpp,
+# src/mcp/main.cpp -- and the test sources are first-party code that gets read
+# and copied like any other. Warning on the libraries alone would leave the
+# ratchet with a hole in exactly the files newcomers open first.
+af_set_warning_level(assurance-forge)
+af_set_warning_level(assurance-forge-mcp)
+af_set_warning_level(tests)
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)
 

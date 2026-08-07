@@ -101,6 +101,9 @@ endif()
 
 add_executable(sacm_cli tools/sacm_cli.cpp)
 target_link_libraries(sacm_cli PRIVATE sacm::sacm)
+if(COMMAND af_set_warning_level)
+    af_set_warning_level(sacm_cli)
+endif()
 
 option(SACM_BUILD_TESTS "Build SACM library tests" ON)
 if(SACM_BUILD_TESTS)
@@ -131,6 +134,9 @@ if(SACM_BUILD_TESTS)
         tests/test_metamodel_coverage.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
+    if(COMMAND af_set_warning_level)
+        af_set_warning_level(sacm_tests)
+    endif()
     target_compile_definitions(sacm_tests PRIVATE
         SACM_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
     )
