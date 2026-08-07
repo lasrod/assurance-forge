@@ -55,28 +55,25 @@ MSVC has no equivalent for some `-Wextra` diagnostics. Before pushing, sweep the
 first-party sources with **clang**:
 
 ```bash
+# run the same command with g++ as well
 clang++ -std=c++23 -fsyntax-only -Wall -Wextra     -Wno-missing-field-initializers -D_CRT_SECURE_NO_WARNINGS     -Isrc -Ilibs/sacm/include -Ilibs/sacm/src     -Iexternal/hello_imgui/src -Iexternal/hello_imgui/external/imgui     -Iexternal/hello_imgui/external/imgui/backends     -Iexternal/hello_imgui/external/imgui/misc/cpp     -Iexternal/pugixml/src -Iexternal/picosha2     -Iexternal/nativefiledialog-extended/src/include     $(for d in build/_deps/*-src/include build/_deps/*-src/single_include; do echo -I"$d"; done)     <file>.cpp
 ```
 
-**Use clang, not the MinGW GCC.** That distinction is the whole point of this
-section. A GCC sweep on this machine reported all 254 first-party files clean
-while CI's Linux GCC and macOS Clang both rejected `src/ui/theme.cpp` for two
-unused variables — and it stayed silent under `-fsyntax-only`, `-c -O0` and
-`-c -O1` alike, so it was the compiler build rather than the mode. Clang
-reproduces CI's findings exactly, and parses all 254 files without needing any
-to be skipped.
+**Run both clang and GCC. Neither alone is sufficient**, and this was
+established by testing rather than assumed:
 
-A local check that reports clean on code CI rejects is worse than no check: it
-turns "I did not look" into "I looked and it was fine".
+| Diagnostic | MinGW GCC | Clang |
+|---|---|---|
+| `panel_hover` unused variable in `theme.cpp` | silent | **caught** |
+| `-Wdangling-else` on an unbraced `if` guarding a gtest macro | **caught** | silent |
 
-Sweep **`tests/` and `libs/sacm/tests/` too**, not just `src/`. The warning
-policy covers the test targets, so a sweep that skips them checks less than the
-build does — that gap let three `-Wrange-loop-construct` diagnostics reach CI.
+The GCC miss is not about `-fsyntax-only` — it stayed silent under `-c -O0` and
+`-c -O1` too, so it is the compiler build. The clang miss is specific to gtest:
+clang reports the same pattern in a hand-written macro, but gtest's expansion
+suppresses it while GCC still warns. A synthetic test of that pattern therefore
+says both compilers catch it, and is wrong about the code that matters.
 
-Pass the same defines the build passes, at minimum `SACM_REPO_FIXTURES_DIR` and
-`_CRT_SECURE_NO_WARNINGS`. Without the first, `test_metamodel_coverage.cpp`
-compiles its `#ifndef` branch and reports a constant as unused that the real
-build uses — deleting it on that advice would have broken the build.
+Each of these reached CI because a sweep with one compiler reported clean.
 
 This is still a proxy, not a build. CI remains the authority.
 

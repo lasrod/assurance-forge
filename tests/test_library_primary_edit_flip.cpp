@@ -611,8 +611,9 @@ TEST(LibraryPrimaryEditFlip, GidAssignmentMatchesLegacyCanonicalHash) {
         EXPECT_TRUE(RunCommand(fixture, add_solution, ctx).success);
         const parser::SacmElement* created = FindElement(fixture.model, add_solution.GeneratedId());
         EXPECT_NE(created, nullptr);
-        if (created != nullptr)
+        if (created != nullptr) {
             EXPECT_TRUE(created->gid.empty()) << "a freshly created element unexpectedly has a gid";
+        }
         return add_solution.GeneratedId();
     };
     const std::string library_solution = create_solution(*library_side);

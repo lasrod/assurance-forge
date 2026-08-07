@@ -1030,9 +1030,10 @@ TEST(DialecticChallengeLayout, HeightBalancedContextsUseBothLanes) {
         // A context sharing the challenge's lane must sit above it (host row), so
         // the challenge edge fanning up to the host never crosses the context.
         const bool same_side_as_challenge = (c_cx - g1_cx) * (counter_cx - g1_cx) > 0.0f;
-        if (same_side_as_challenge)
+        if (same_side_as_challenge) {
             EXPECT_LT(c->position.y, counter->position.y)
                 << "C" << i << " shares the challenge lane and must stack above the challenge";
+        }
     }
     EXPECT_GT(left_contexts, 0) << "contexts should be balanced across both lanes";
     EXPECT_GT(right_contexts, 0) << "contexts should be balanced across both lanes";
