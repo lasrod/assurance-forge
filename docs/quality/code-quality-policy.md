@@ -14,7 +14,7 @@ warnings had not been suppressed, they had never been requested.
 
 | Compiler | Level |
 |---|---|
-| MSVC | `/W4` |
+| MSVC | `/W4 /w14505 /w15245` |
 | GCC, Clang | `-Wall -Wextra` |
 
 Applied **per target**, never globally. A global `add_compile_options()` would
@@ -31,6 +31,17 @@ Coverage is not limited to the per-layer object libraries. `assurance-forge`,
 units of their own -- `src/app/main.cpp`, `src/mcp/main.cpp`, and every test
 source -- and warning only on the libraries would leave the ratchet with a hole
 in the files a newcomer opens first.
+
+`/w14505` and `/w15245` are off by default even at `/W4`. They are MSVC's
+equivalent of `-Wunused-function` — a `static` or anonymous-namespace function
+nothing calls — and enabling them is what makes a clean Windows build mean
+something. Without them a Windows developer builds clean and CI rejects the
+branch on GCC and Clang, which teaches people that the local build is not worth
+running.
+
+Turning them on found **ten** dead functions that MSVC had been silent about,
+six of them in `terminology_package_service.cpp` duplicating helpers that also
+live in `terminology_internal.cpp`.
 
 ### Warnings are errors in CI, not locally
 

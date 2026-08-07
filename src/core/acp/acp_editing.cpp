@@ -274,13 +274,6 @@ int NumericSuffix(const std::string& value, const std::string& prefix) {
     return number;
 }
 
-std::string NextArgumentPackageId(const sacm::AssuranceCasePackage& package) {
-    int max_number = 0;
-    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages)
-        max_number = std::max(max_number, NumericSuffix(argument_package.id, "AP"));
-    return "AP" + std::to_string(max_number + 1);
-}
-
 bool ArgumentPackageIdExists(const sacm::AssuranceCasePackage& package, const std::string& id) {
     return std::any_of(package.argumentPackages.begin(),
                        package.argumentPackages.end(),

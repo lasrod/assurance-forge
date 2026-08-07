@@ -12,14 +12,6 @@ bool IsRelationshipType(const std::string& type) {
     return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
 }
 
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.id == id)
-            return &element;
-    }
-    return nullptr;
-}
-
 bool IsDescendant(const TreeNode* root, const std::string& potential_descendant) {
     if (!root)
         return false;

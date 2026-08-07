@@ -109,10 +109,6 @@ bool MatchesRef(const sacm::ArgumentPackage& package, const TerminologyArgumentP
            (!package_ref.gid.empty() && package.gid == package_ref.gid);
 }
 
-bool MatchesRef(const sacm::Term& term, const TerminologyTermRef& term_ref) {
-    return (!term_ref.id.empty() && term.id == term_ref.id) || (!term_ref.gid.empty() && term.gid == term_ref.gid);
-}
-
 bool HasRef(const TerminologyTermRef& ref) {
     return !ref.id.empty() || !ref.gid.empty();
 }

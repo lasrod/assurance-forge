@@ -286,13 +286,6 @@ bool ApplyCreateOperation(const PatchOperation& operation,
     return true;
 }
 
-bool AddUnique(std::vector<std::string>& values, const std::string& value) {
-    if (std::find(values.begin(), values.end(), value) != values.end())
-        return false;
-    values.push_back(value);
-    return true;
-}
-
 bool RemoveValue(std::vector<std::string>& values, const std::string& value) {
     const auto old_size = values.size();
     values.erase(std::remove(values.begin(), values.end(), value), values.end());

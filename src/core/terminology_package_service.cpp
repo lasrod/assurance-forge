@@ -144,24 +144,8 @@ bool MatchesRef(const sacm::Term& term, const TerminologyTermRef& term_ref) {
     return false;
 }
 
-bool MatchesRef(const sacm::Category& category, const TerminologyCategoryRef& category_ref) {
-    if (!category_ref.id.empty() && category.id == category_ref.id)
-        return true;
-    if (!category_ref.gid.empty() && category.gid == category_ref.gid)
-        return true;
-    return false;
-}
-
 TerminologyTermRef RefFor(const sacm::Term& term) {
     return TerminologyTermRef{term.id, term.gid};
-}
-
-TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package) {
-    return TerminologyPackageRef{package.id, package.gid};
-}
-
-TerminologyCategoryRef RefFor(const sacm::Category& category) {
-    return TerminologyCategoryRef{category.id, category.gid};
 }
 
 std::vector<std::string> NormalizeCategoryRefs(const std::vector<std::string>& refs) {
@@ -188,29 +172,6 @@ void ApplyTermDraft(sacm::Term& term, const TerminologyTermDraft& draft) {
     term.category_refs = NormalizeCategoryRefs(draft.category_refs);
     term.externalReference = TrimWhitespace(draft.externalReference);
     term.origin = TrimWhitespace(draft.origin);
-}
-
-void ApplyCategoryDraft(sacm::Category& category, const TerminologyCategoryDraft& draft) {
-    category.name = TrimWhitespace(draft.name);
-    category.name_ml.set("en", category.name);
-    category.description = TrimWhitespace(draft.description);
-    category.description_ml.texts.erase("en");
-    if (!category.description.empty())
-        category.description_ml.set("en", category.description);
-}
-
-bool MatchesCategoryRefString(const sacm::Category& category, const std::string& raw_ref) {
-    const std::string ref = NormalizeRef(raw_ref);
-    if (ref.empty())
-        return false;
-    return (!category.id.empty() && category.id == ref) || (!category.gid.empty() && category.gid == ref);
-}
-
-bool MatchesRawRef(const std::string& raw_ref, const std::string& id, const std::string& gid) {
-    const std::string ref = NormalizeRef(raw_ref);
-    if (ref.empty())
-        return false;
-    return (!id.empty() && ref == id) || (!gid.empty() && ref == gid);
 }
 
 } // namespace
