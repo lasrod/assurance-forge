@@ -494,14 +494,35 @@ if(Python3_Interpreter_FOUND)
         NAME no_committed_artifacts_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/repo/check_no_committed_artifacts.py"
     )
+
+    # Documentation gate: broken internal links, pages reachable from neither the
+    # nav nor any other page, generated documents that do not name their
+    # generator, and an architecture page that has stopped describing a subsystem
+    # the layer gate enforces. Twenty-nine unreachable pages and four mutually
+    # inconsistent architecture documents accumulated without anything noticing.
+    add_test(
+        NAME documentation_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/docs/check_documentation.py"
+    )
+
+    # The verification-record index is generated from each record's front matter.
+    # Built by hand it misreports: the one failing record whose filename lacks a
+    # `-FAIL` suffix reads as a pass.
+    add_test(
+        NAME verification_index_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/docs/generate_verification_index.py" --check
+    )
 else()
     # These are compliance gates, not conveniences. A silently absent gate reads
     # as a passing one, so say so loudly rather than skipping in silence.
     message(WARNING
         "Python3 not found: the i18n_catalog_check, sacm_matrix_check, gsn_matrix_check, "
-        "feature_matrix_check and no_committed_artifacts_check gates will NOT run. "
+        "feature_matrix_check, no_committed_artifacts_check, documentation_check and "
+        "verification_index_check gates will NOT run. "
         "CI installs Python explicitly; a local build without it cannot verify the "
         "translation catalog, the SACM or GSN conformance matrices, the capability "
-        "matrix, or that no build artifacts have been committed.")
+        "matrix, that no build artifacts have been committed, that documentation "
+        "links resolve and pages are reachable, or that the verification index "
+        "matches the records.")
 endif()
 

@@ -65,12 +65,15 @@ nav:
     - Product Roadmap: roadmap/public.md
     - Workflow: roadmap/workflow.md
   - Standards:
+    - Overview: sacm/index.md
     - GSN v3 Conformance: gsn/gsn-v3-conformance-matrix.md
     - SACM 2.3 Conformance: sacm/sacm-conformance-matrix.md
+    - Verification Records: sacm/verification/README.md
     - SACM–GSN Mapping: sacm/sacm-gsn-mapping.md
     - GSN Metamodel Gaps: sacm/sacm-gsn-metamodel-gaps.md
   - Architecture:
       - Overview: architecture/index.md
+      - Layers and Ownership: architecture/layers-and-ownership.md
       - Runtime and State: architecture/runtime-state.md
       - Parser and SACM: architecture/parser-sacm.md
       - App Shell and UI Areas: architecture/app-shell.md
@@ -95,6 +98,8 @@ nav:
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md
+      - Documentation Map: documentation-map.md
       - Generating Class Diagrams: developer-guide/generating-class-diagrams.md
       - Repository Quality Baseline: quality/repository-baseline.md
       - Code Coverage: COVERAGE.md
+      - Releasing: RELEASING.md
