@@ -53,7 +53,7 @@ suppression is indistinguishable from a fixed problem.
 | `-Wno-missing-field-initializers` | First-party targets, GCC and Clang | Fires on partial aggregate initialization, which this codebase uses deliberately: a callbacks struct is built positionally for the members that have one, and the rest are assigned by name immediately below. Listing every member in the braces would duplicate those assignments. Both compilers already exempt `{}` from it. |
 | `/wd4456` | `sacm` target, MSVC only | Sixteen instances of one pattern in the XMI reader and writer: `else if (auto* pkg = dynamic_cast<...>)` chains where MSVC counts the previous branch's variable as still in scope. None is a live shadowing bug. Renaming means editing `libs/sacm/src`, which carries a conformance obligation that does not belong in a change about warning levels. |
 
-Neither suppression hides a defect. Where a warning did point at one, it was
+None of the three hides a defect. Where a warning did point at one, it was
 fixed:
 
 - `std::filesystem::u8path` is deprecated in C++20 and was **replaced**, not
