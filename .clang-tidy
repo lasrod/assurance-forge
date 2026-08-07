@@ -1,0 +1,91 @@
+# clang-tidy configuration for Assurance Forge (issue #293).
+#
+# Selection principle: a check earns its place by finding defects in THIS
+# codebase, not by being enabled in someone else's. Every family below was run
+# over all 255 production translation units before being kept or dropped, and
+# every exclusion names what it actually fired on. An unexplained exclusion is
+# indistinguishable from a check nobody dared turn on.
+#
+# The enabled set produces 90 findings. The four families with no exclusions
+# produce 4,784, and the nine exclusions below account for 4,694 of them —
+# 98%, with five checks alone contributing 4,586. Baselining all of it would
+# have meant baselining noise, and a baseline that is mostly noise is one
+# nobody reads.
+#
+# Re-derive these counts rather than trusting them:
+#   python tools/quality/run_clang_tidy.py --all-checks
+#
+# Rationale in prose, with the measured counts:
+#   docs/quality/static-analysis.md
+#
+# Run it with:
+#   python tools/quality/run_clang_tidy.py
+
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  misc-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -clang-analyzer-optin.performance.Padding,
+  -misc-include-cleaner,
+  -misc-const-correctness,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  -misc-use-anonymous-namespace,
+  -performance-enum-size
+
+# Why each exclusion, with the count it contributed to the unfiltered 4,784:
+#
+#   misc-include-cleaner (3,357) — demands include-what-you-use discipline and
+#     would rewrite nearly every include block. CLAUDE.md states the opposite
+#     policy: SortIncludes is disabled and include order is preserved by hand,
+#     because Windows and some third-party headers have order dependencies.
+#     Enforcing this check would break the build it is meant to protect.
+#
+#   misc-const-correctness (756) — flags locals that could be const. Real but
+#     purely stylistic, and 756 edits across every subsystem is exactly the
+#     "broad stylistic churn" #293 exists to avoid. A candidate for a later,
+#     deliberate pass; not for the first baseline.
+#
+#   misc-non-private-member-variables-in-classes (241) — ui::UiState,
+#     core::AppState and the SACM element structs are deliberately public data
+#     aggregates. Making them private would add accessors that carry no
+#     invariant, which is not an improvement.
+#
+#   bugprone-easily-swappable-parameters (141) — flags any two adjacent
+#     same-typed parameters. Its own documentation concedes a high false
+#     positive rate, and here it fires on (id, name) string pairs throughout
+#     the model, where the names already distinguish them.
+#
+#   performance-enum-size (91) — asks for smaller underlying enum types. A
+#     micro-optimization with no measured motivation in a GUI application.
+#
+#   bugprone-exception-escape (50) — measured, not assumed: it fires on the
+#     implicitly-generated move constructors of aggregate structs holding
+#     std::string/std::vector (SacmElement, MultiLangText, ReviewProposal ...)
+#     and on main(). It found no hand-written noexcept function that can throw,
+#     which is the defect the check is for.
+#
+#   misc-no-recursion (28) — this codebase walks trees (assurance tree, GSN
+#     layout, XMI element nesting). Recursion is the design, not an accident.
+#
+#   misc-use-anonymous-namespace (28) — flags `static` at file scope where the
+#     function already sits inside an anonymous namespace. Removing a redundant
+#     but harmless keyword at 28 sites is naming-only churn.
+#
+#   clang-analyzer-optin.performance.Padding (2) — reports struct field ordering
+#     for padding. Reordering ui::UiState's 38 fields to save bytes would
+#     scramble a struct people read, for memory nobody has measured a need for.
+
+# Third-party code is passed with -isystem by the runner, so it is suppressed
+# before this filter applies. This keeps first-party headers reported once
+# rather than once per translation unit that includes them.
+HeaderFilterRegex: '(^|[/\\])(src|libs)[/\\]'
+
+# Findings are recorded and ratcheted, never auto-fixed. A tool rewriting
+# safety-case handling code unattended is not a trade this project makes.
+FormatStyle: none
+WarningsAsErrors: ''

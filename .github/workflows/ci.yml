@@ -85,3 +85,40 @@ jobs:
 
       - name: Run tests
         run: ${{ matrix.test }}
+
+  # Static analysis runs as its own job rather than inside the build matrix.
+  # It takes ~9 minutes, needs no test run, and its result is a ratchet against
+  # a committed baseline rather than a pass/fail property of the build.
+  #
+  # Windows, because the baseline is generated there. Analysing a different
+  # platform than the baseline records would compare two different sets of
+  # #ifdef branches and report the difference as new findings.
+  static-analysis:
+    name: Static analysis
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Pinned deliberately. A different clang-tidy runs different checks and
+      # finds different things, which would show up as regressions nobody
+      # introduced. The runner warns when its version differs from the one the
+      # baseline records.
+      - name: Install LLVM
+        run: choco install llvm --version=22.1.4 -y --no-progress
+
+      # Configure only. The analysis needs the FetchContent dependency headers
+      # under build/_deps, not compiled objects, so the build itself is skipped.
+      - name: Configure CMake
+        run: cmake -B build -A x64
+
+      - name: Check static-analysis ratchet
+        run: python tools/quality/run_clang_tidy.py --check
