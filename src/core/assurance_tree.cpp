@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace core {
 
@@ -58,33 +57,29 @@ static TreeNode* FindFirstNode(const std::vector<std::string>& refs,
 }
 
 // Wire a child node as a Group1 child of the given parent (if not already wired).
-static void WireGroup1Child(TreeNode* child, TreeNode* parent, std::unordered_set<std::string>& wired_ids) {
+static void WireGroup1Child(TreeNode* child, TreeNode* parent) {
     if (child->parent != nullptr)
         return; // already wired
     child->parent = parent;
     parent->group1_children.push_back(child);
-    wired_ids.insert(child->id);
 }
 
 // Wire a child node as a Group2 attachment of the given parent with the specified role.
 // Preserves an already-classified Assumption or Justification role rather than forcing it.
-static void
-WireGroup2Attachment(TreeNode* child, TreeNode* parent, NodeRole role, std::unordered_set<std::string>& wired_ids) {
+static void WireGroup2Attachment(TreeNode* child, TreeNode* parent, NodeRole role) {
     if (child->role != NodeRole::Assumption && child->role != NodeRole::Justification) {
         child->role = role;
     }
     child->group = ElementGroup::Group2;
     child->parent = parent;
     parent->group2_attachments.push_back(child);
-    wired_ids.insert(child->id);
 }
 
 // Process an AssertedInference relationship.
 // Wires source claims as Group1 children of the target claim.
 // If a reasoning node (Strategy) is specified, it is inserted between target and sources.
 static void ProcessInference(const parser::SacmElement& relationship,
-                             const std::unordered_map<std::string, TreeNode*>& node_by_id,
-                             std::unordered_set<std::string>& wired_ids) {
+                             const std::unordered_map<std::string, TreeNode*>& node_by_id) {
     TreeNode* target_node = FindFirstNode(relationship.target_refs, node_by_id);
     if (!target_node)
         return;
@@ -102,7 +97,6 @@ static void ProcessInference(const parser::SacmElement& relationship,
             if (reasoning_node->parent == nullptr) {
                 reasoning_node->parent = target_node;
                 target_node->group1_children.push_back(reasoning_node);
-                wired_ids.insert(reasoning_node->id);
             }
             attach_parent = reasoning_node;
         }
@@ -113,16 +107,14 @@ static void ProcessInference(const parser::SacmElement& relationship,
         auto source_it = node_by_id.find(source_ref);
         if (source_it == node_by_id.end())
             continue;
-        WireGroup1Child(source_it->second, attach_parent, wired_ids);
+        WireGroup1Child(source_it->second, attach_parent);
     }
-    wired_ids.insert(target_node->id);
 }
 
 // Process an AssertedContext relationship.
 // Source artifacts become Group2 Context attachments of the target claim.
 static void ProcessContext(const parser::SacmElement& relationship,
-                           const std::unordered_map<std::string, TreeNode*>& node_by_id,
-                           std::unordered_set<std::string>& wired_ids) {
+                           const std::unordered_map<std::string, TreeNode*>& node_by_id) {
     if (relationship.target_refs.empty() || relationship.source_refs.empty())
         return;
 
@@ -134,16 +126,14 @@ static void ProcessContext(const parser::SacmElement& relationship,
         auto source_it = node_by_id.find(source_ref);
         if (source_it == node_by_id.end())
             continue;
-        WireGroup2Attachment(source_it->second, target_node, NodeRole::Context, wired_ids);
+        WireGroup2Attachment(source_it->second, target_node, NodeRole::Context);
     }
-    wired_ids.insert(target_node->id);
 }
 
 // Process an AssertedEvidence relationship.
 // Source artifacts become Group1 Solution leaf children of the target claim.
 static void ProcessEvidence(const parser::SacmElement& relationship,
-                            const std::unordered_map<std::string, TreeNode*>& node_by_id,
-                            std::unordered_set<std::string>& wired_ids) {
+                            const std::unordered_map<std::string, TreeNode*>& node_by_id) {
     if (relationship.target_refs.empty() || relationship.source_refs.empty())
         return;
 
@@ -159,9 +149,8 @@ static void ProcessEvidence(const parser::SacmElement& relationship,
         TreeNode* source_node = source_it->second;
         source_node->role = NodeRole::Solution;
         source_node->group = ElementGroup::Group1;
-        WireGroup1Child(source_node, target_node, wired_ids);
+        WireGroup1Child(source_node, target_node);
     }
-    wired_ids.insert(target_node->id);
 }
 
 // Resolve the element node a challenge edge should hang off / anchor near.
@@ -190,9 +179,9 @@ static TreeNode* ResolveChallengeAnchorElement(const std::string& target_id,
 // (strategies, solutions, context, ...). It is flagged with the data the layout
 // engine needs to position the cluster relative to the target and the renderer
 // needs to draw the dashed open-arrow challenge edge.
-// No `wired_ids` parameter, unlike its siblings. A challenge is not structural
-// support, so it must not mark its target as wired into the tree -- the omission
-// is the point, not an oversight.
+// It sets no parent on the source, unlike its siblings. A challenge is not
+// structural support, so it must not attach its source into the tree -- the
+// omission is the point, not an oversight.
 static void ProcessChallenge(const parser::SacmElement& relationship,
                              const std::unordered_map<std::string, TreeNode*>& node_by_id,
                              const std::unordered_map<std::string, std::string>& rel_first_target,
@@ -249,7 +238,6 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
 
     std::unordered_map<std::string, const parser::SacmElement*> element_by_id;
     std::unordered_map<std::string, TreeNode*> node_by_id;
-    std::unordered_set<std::string> wired_ids;
 
     // Step 1: Create a TreeNode for every non-relationship element.
     for (const auto& element : ac.elements) {
@@ -339,11 +327,11 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         }
 
         if (element.type == "assertedinference") {
-            ProcessInference(element, node_by_id, wired_ids);
+            ProcessInference(element, node_by_id);
         } else if (element.type == "assertedcontext") {
-            ProcessContext(element, node_by_id, wired_ids);
+            ProcessContext(element, node_by_id);
         } else if (element.type == "assertedevidence") {
-            ProcessEvidence(element, node_by_id, wired_ids);
+            ProcessEvidence(element, node_by_id);
         }
     }
 
