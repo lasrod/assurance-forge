@@ -65,6 +65,53 @@ function(af_set_warning_level target)
     endif()
 endfunction()
 
+# --------------------------------------------------------------------
+# Sanitizers.
+#
+# Global, and deliberately so -- the opposite of the warning policy above. A
+# warning in hello_imgui is not ours to fix, but an allocation made by
+# uninstrumented code and freed by instrumented code is how ASan produces
+# results that are wrong in both directions. Sanitizers only tell the truth
+# when everything in the process is built the same way.
+#
+# -fno-sanitize-recover=all matters more than it looks. UBSan's default is to
+# print and carry on, which exits zero: the job goes green while reporting
+# undefined behaviour. Aborting is what makes this a check rather than a log.
+# --------------------------------------------------------------------
+set(AF_SANITIZE "" CACHE STRING
+    "Comma-separated sanitizers to instrument the whole build with, e.g. address,undefined. Empty disables.")
+
+if(AF_SANITIZE)
+    if(MSVC)
+        # Refused rather than half-supported. MSVC has no UBSan at all, and its
+        # /fsanitize=address needs the optional "C++ AddressSanitizer" Visual
+        # Studio component: without it the build compiles and then fails at link
+        # with "cannot open file clang_rt.asan_dynamic_runtime_thunk-x86_64.lib".
+        # Measured on this toolchain, not assumed.
+        #
+        # Nothing in CI exercises MSVC here, so shipping the path would be an
+        # untested claim that this option works on Windows. It does not, unless
+        # that component happens to be installed, and a build that dies at link
+        # is a worse answer than one that says why up front.
+        message(FATAL_ERROR
+            "AF_SANITIZE is not supported with MSVC.\n"
+            "  MSVC has no UndefinedBehaviorSanitizer, and its AddressSanitizer needs the\n"
+            "  optional 'C++ AddressSanitizer' Visual Studio component to link.\n"
+            "  Use Clang or GCC:\n"
+            "    cmake -B build-asan -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \\\n"
+            "          -DCMAKE_BUILD_TYPE=Debug -DAF_SANITIZE=address,undefined")
+    else()
+        message(STATUS "Sanitizers: ${AF_SANITIZE}")
+        add_compile_options(
+            -fsanitize=${AF_SANITIZE}
+            -fno-sanitize-recover=all
+            -fno-omit-frame-pointer
+            -g
+        )
+        add_link_options(-fsanitize=${AF_SANITIZE})
+    endif()
+endif()
+
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (Linux/GCC 14+ only)" OFF)
 if(ENABLE_COVERAGE)
     if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
