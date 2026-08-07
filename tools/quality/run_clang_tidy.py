@@ -147,7 +147,16 @@ def normalize(path: str) -> str | None:
         return None
 
 
-def analyze_one(exe: str, flags: list[str], source: str, checks: str | None = None) -> list[dict]:
+def analyze_one(
+    exe: str, flags: list[str], source: str, checks: str | None = None
+) -> tuple[list[dict], str | None]:
+    """Return (findings, failure). A non-None failure means this TU was not analyzed.
+
+    clang-tidy reports a translation unit it could not compile on stderr and
+    exits non-zero, while stdout stays empty. Parsing stdout alone would read
+    that as "no findings here" and let the ratchet pass on code nothing looked
+    at, which is the one way a green gate can be actively misleading.
+    """
     command = [exe, "--quiet"]
     if checks:
         command.append(f"--checks={checks}")
@@ -157,6 +166,26 @@ def analyze_one(exe: str, flags: list[str], source: str, checks: str | None = No
         capture_output=True,
         text=True,
     )
+
+    failure = None
+    if proc.returncode != 0:
+        # Prefer the diagnostic that says what went wrong ("'x.h' file not
+        # found") over clang-tidy's trailing "Error while processing <file>",
+        # which only repeats the name already being reported. The cause can
+        # land on either stream depending on the diagnostic.
+        cause = next(
+            (
+                line.strip()
+                for line in proc.stderr.splitlines() + proc.stdout.splitlines()
+                if "error:" in line
+            ),
+            None,
+        )
+        if cause is None:
+            remainder = proc.stderr.strip().splitlines()
+            cause = remainder[0].strip() if remainder else "no diagnostic on either stream"
+        failure = f"{source}\n      exit {proc.returncode}: {cause}"
+
     findings = []
     for line in proc.stdout.splitlines():
         match = FINDING_RE.match(line.strip())
@@ -174,18 +203,22 @@ def analyze_one(exe: str, flags: list[str], source: str, checks: str | None = No
                     "message": match.group("message"),
                 }
             )
-    return findings
+    return findings, failure
 
 
 def analyze(
     exe: str, flags: list[str], sources: list[str], jobs: int, checks: str | None = None
-) -> list[dict]:
+) -> tuple[list[dict], list[str]]:
     collected: list[dict] = []
+    failures: list[str] = []
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
         futures = {pool.submit(analyze_one, exe, flags, s, checks): s for s in sources}
         for future in concurrent.futures.as_completed(futures):
-            collected.extend(future.result())
+            findings, failure = future.result()
+            collected.extend(findings)
+            if failure:
+                failures.append(failure)
             done += 1
             if done % 25 == 0 or done == len(sources):
                 print(f"  analyzed {done}/{len(sources)} translation units", flush=True)
@@ -193,7 +226,7 @@ def analyze(
     # A finding in a header is reported by every translation unit that includes
     # it. Deduplicate so the count describes the code, not the include graph.
     unique = {(f["file"], f["line"], f["check"], f["message"]): f for f in collected}
-    return sorted(unique.values(), key=lambda f: (f["file"], f["line"], f["check"]))
+    return sorted(unique.values(), key=lambda f: (f["file"], f["line"], f["check"])), sorted(failures)
 
 
 def tally(findings: list[dict]) -> dict[str, int]:
@@ -285,7 +318,25 @@ def main() -> int:
     all_checks = "-*,bugprone-*,clang-analyzer-*,performance-*,misc-*" if args.all_checks else None
 
     print(f"clang-tidy {version} over {len(sources)} translation units, {args.jobs} at a time")
-    findings = analyze(exe, flags, sources, args.jobs, all_checks)
+    findings, failures = analyze(exe, flags, sources, args.jobs, all_checks)
+
+    # Before anything else. A translation unit clang-tidy could not compile
+    # contributes no findings, which is indistinguishable from a clean one
+    # unless it is said out loud. Refusing to continue is the point: a baseline
+    # written from a partly-failed run would record unanalyzed code as clean,
+    # and every later run would compare against that.
+    if failures:
+        print(f"\n{len(failures)} translation unit(s) could not be analyzed:\n", file=sys.stderr)
+        for failure in failures:
+            print(f"  {failure}", file=sys.stderr)
+        print(
+            "\nThese contribute no findings, so continuing would report unanalyzed code\n"
+            "as clean. Fix the analysis (usually a missing include path or define) and\n"
+            "run again.",
+            file=sys.stderr,
+        )
+        return 2
+
     current = snapshot(findings, version, sources)
 
     print(f"\n{current['total_findings']} findings")

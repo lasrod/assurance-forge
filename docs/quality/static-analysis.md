@@ -160,6 +160,23 @@ Findings are never auto-fixed. `FormatStyle: none`, and no `--fix` anywhere: a
 tool rewriting safety-case handling code unattended is not a trade this project
 makes.
 
+### A translation unit that fails to analyze
+
+clang-tidy reports a translation unit it could not compile on stderr and exits
+non-zero, while stdout stays empty. Reading stdout alone would take that as
+"no findings here" — so a missing include path or define could make the ratchet
+pass on code nothing actually looked at, which is the one way a green gate is
+worse than no gate.
+
+The runner therefore checks the exit status of every translation unit and
+**aborts the whole run** if any failed, naming each one and the diagnostic that
+caused it. It does not write a baseline from a partly-failed run, because every
+later comparison would then be against a baseline that recorded unanalyzed code
+as clean.
+
+All 255 currently analyze cleanly, so this guards a failure that has not
+happened rather than one that has.
+
 ### Verifying the gate can fail
 
 A gate that has never failed is a gate nobody has tested. This one was verified
@@ -170,7 +187,22 @@ by breaking the code on purpose: an `(int)(2.5 + 0.5)` cast was added to
 src/core/assurance_tree.cpp: bugprone-incorrect-roundings went from 0 to 1
 ```
 
-and exited 1. The cast was then removed and the check passed again.
+and exited 1. The cast was then removed and the check passed again. The same
+was verified for `--paths`, which is what the pull-request job actually runs,
+rather than assuming the two share a code path.
+
+The incomplete-run guard was verified the same way: an `#include` of a header
+that does not exist produced
+
+```
+1 translation unit(s) could not be analyzed:
+
+  src/bridge/transport.cpp
+      exit 1: ...error: 'this_header_does_not_exist_af.h' file not found
+```
+
+and exited 2 — rather than reporting the file clean, which is what it did
+before the check existed.
 
 ## Known gaps
 

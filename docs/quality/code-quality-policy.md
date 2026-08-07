@@ -128,8 +128,9 @@ current findings and known gaps are in [static analysis](static-analysis.md).
 | Aspect | Position |
 |---|---|
 | Configuration | `.clang-tidy` at the repository root, so an IDE reports what CI reports |
-| Enabled set | 90 findings. The unfiltered set is 4,793, 94% of it from five checks that are wrong for this codebase — each excluded with its count and reason |
-| Enforcement | `run_clang_tidy.py --check` as its own CI job, ~9 min |
+| Enabled set | 90 findings. The four families with no exclusions give 4,784; nine excluded checks account for 4,694 of them (98%), each recorded with its count and reason |
+| Enforcement | `run_clang_tidy.py --check` as its own CI job: changed `.cpp` files on a pull request, the full sweep on `main` |
+| Incomplete runs | A translation unit clang-tidy cannot compile aborts the run. It contributes no findings, so continuing would record unanalyzed code as clean |
 | Auto-fixing | **Never.** No `--fix`; a tool rewriting safety-case handling code unattended is not a trade this project makes |
 | Known gap | Windows only, so `#ifndef _WIN32` branches are unanalyzed |
 
