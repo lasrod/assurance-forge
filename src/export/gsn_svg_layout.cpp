@@ -70,9 +70,7 @@ size_t WrappedLineCount(const GsnNode& node, double width) {
         std::istringstream words(paragraph);
         std::string word;
         size_t line_chars = 0;
-        bool has_word = false;
         while (words >> word) {
-            has_word = true;
             if (line_chars == 0) {
                 line_chars = word.size();
             } else if (line_chars + 1 + word.size() <= max_chars) {

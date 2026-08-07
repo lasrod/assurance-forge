@@ -32,16 +32,36 @@ units of their own -- `src/app/main.cpp`, `src/mcp/main.cpp`, and every test
 source -- and warning only on the libraries would leave the ratchet with a hole
 in the files a newcomer opens first.
 
-`/w14505` and `/w15245` are off by default even at `/W4`. They are MSVC's
-equivalent of `-Wunused-function` — a `static` or anonymous-namespace function
-nothing calls — and enabling them is what makes a clean Windows build mean
-something. Without them a Windows developer builds clean and CI rejects the
-branch on GCC and Clang, which teaches people that the local build is not worth
-running.
+`/w14505`, `/w15245` and `/w15264` are off by default even at `/W4`. Each is
+MSVC's equivalent of a GCC/Clang diagnostic that already fails this build:
 
-Turning them on found **ten** dead functions that MSVC had been silent about,
-six of them in `terminology_package_service.cpp` duplicating helpers that also
-live in `terminology_internal.cpp`.
+| MSVC | Equivalent | Catches |
+|---|---|---|
+| `/w14505`, `/w15245` | `-Wunused-function` | A `static` or anonymous-namespace function nothing calls |
+| `/w15264` | `-Wunused-const-variable` | A constant nothing reads |
+
+Without them a Windows developer builds clean and CI rejects the branch on GCC
+and Clang, which teaches people that the local build is not worth running.
+
+Turning them on found **twelve** pieces of dead code MSVC had been silent about
+— ten functions and two constants. Six of the functions were in
+`terminology_package_service.cpp`, duplicating helpers that also live in
+`terminology_internal.cpp`; the two constants were in `project_service.cpp`,
+duplicating ones that `project_manifest.cpp` actually reads.
+
+### Checking GCC diagnostics without waiting for CI
+
+MSVC has no equivalent for some `-Wextra` diagnostics —
+`-Wunused-but-set-variable` among them. A syntax-only GCC pass covers the gap:
+
+```bash
+g++ -std=c++23 -fsyntax-only -Wall -Wextra -Wno-missing-field-initializers     -Isrc -Ilibs/sacm/include -Ilibs/sacm/src     -Iexternal/hello_imgui/src -Iexternal/hello_imgui/external/imgui     -Iexternal/hello_imgui/external/imgui/misc/cpp     -Iexternal/pugixml/src <file>.cpp
+```
+
+It is not a build, so it will not catch everything, but it turns a sequence of
+CI round trips into one local pass. CI compiles translation units in parallel
+and stops after the first failure, so it reports roughly one new diagnostic per
+run — four consecutive rounds of this PR each surfaced exactly one.
 
 ### Warnings are errors in CI, not locally
 

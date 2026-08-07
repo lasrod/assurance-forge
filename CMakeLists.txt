@@ -32,12 +32,14 @@ function(af_set_warning_level target)
         message(FATAL_ERROR "af_set_warning_level: no such target '${target}'")
     endif()
     if(MSVC)
-        # /w14505 and /w15245 are off by default even at /W4, and they are the
-        # MSVC equivalents of -Wunused-function: a `static` or anonymous-namespace
-        # function that nothing calls. Without them a Windows developer builds
-        # clean and CI rejects the branch on GCC and Clang, which teaches people
-        # that the local build means nothing.
-        target_compile_options(${target} PRIVATE /W4 /w14505 /w15245)
+        # These three are off by default even at /W4, and each is MSVC's
+        # equivalent of a GCC/Clang diagnostic that already fails this build:
+        #   /w14505, /w15245 -> -Wunused-function      (dead static / anon-namespace fn)
+        #   /w15264          -> -Wunused-const-variable (dead constant)
+        # Without them a Windows developer builds clean and CI rejects the branch
+        # on GCC and Clang, which teaches people that the local build means
+        # nothing. Every one of them found real dead code the first time it ran.
+        target_compile_options(${target} PRIVATE /W4 /w14505 /w15245 /w15264)
         # std::getenv and std::fopen are standard C++ that MSVC deprecates on its
         # own authority. The suggested replacements (_dupenv_s, fopen_s) are not
         # portable, and this code builds on three toolchains, so the warning has
