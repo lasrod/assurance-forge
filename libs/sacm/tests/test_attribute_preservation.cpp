@@ -73,6 +73,16 @@ std::string local_name(std::string_view qualified) {
     return std::string(colon == std::string_view::npos ? qualified : qualified.substr(colon + 1));
 }
 
+// A namespace declaration: exactly `xmlns`, or a prefix binding `xmlns:foo`.
+//
+// Deliberately not starts_with("xmlns"), which would also swallow an ordinary
+// attribute named `xmlnsFoo`. A preservation test that quietly skips an
+// attribute is the failure this file exists to prevent, so the one place it
+// skips anything has to be exact.
+bool is_namespace_declaration(std::string_view name) {
+    return name == "xmlns" || name.starts_with("xmlns:");
+}
+
 // Every attribute in the document, keyed by the element's xmi:id.
 //
 // Elements without an id are skipped rather than guessed at: the EMF dialect
@@ -94,7 +104,7 @@ std::map<std::string, std::set<std::string>> attributes_by_element_id(const pugi
             // declare prefixes where it needs them rather than where the source
             // did, and the vendor-extension tests already assert the ones that
             // must survive.
-            if (name.starts_with("xmlns")) {
+            if (is_namespace_declaration(name)) {
                 continue;
             }
             names.insert(name);
@@ -212,6 +222,15 @@ TEST(Sacm23AttributePreservation, SACM23_RT_001_EveryKnownAttributeIsExercisedBy
         }
         for (const pugi::xpath_node& hit : document.select_nodes("//*")) {
             for (const pugi::xml_attribute& attribute : hit.node().attributes()) {
+                // Namespace declarations are excluded, and not only for tidiness:
+                // the local name of `xmlns:origin` is `origin`, so counting them
+                // would let a prefix binding stand in as coverage for an
+                // attribute of the same name. Declaring a namespace is not
+                // exercising an attribute, and this test exists to refuse
+                // exactly that kind of false coverage.
+                if (is_namespace_declaration(attribute.name())) {
+                    continue;
+                }
                 exercised.insert(local_name(attribute.name()));
             }
         }
