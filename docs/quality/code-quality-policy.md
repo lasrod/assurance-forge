@@ -119,6 +119,25 @@ The test uses Japanese and accented paths deliberately. An ASCII-only test
 passes against both the correct and the broken conversion, so it would prove
 nothing.
 
+## Static analysis
+
+clang-tidy runs over the 255 production translation units and is ratcheted
+against a committed baseline: findings may fall, never rise. Full rationale,
+current findings and known gaps are in [static analysis](static-analysis.md).
+
+| Aspect | Position |
+|---|---|
+| Configuration | `.clang-tidy` at the repository root, so an IDE reports what CI reports |
+| Enabled set | 90 findings. The four families with no exclusions give 4,784; nine excluded checks account for 4,694 of them (98%), each recorded with its count and reason |
+| Enforcement | `run_clang_tidy.py --check` as its own CI job: changed `.cpp` files on a pull request, the full sweep on `main` |
+| Incomplete runs | A translation unit clang-tidy cannot compile aborts the run. It contributes no findings, so continuing would record unanalyzed code as clean |
+| Auto-fixing | **Never.** No `--fix`; a tool rewriting safety-case handling code unattended is not a trade this project makes |
+| Known gap | Windows only, so `#ifndef _WIN32` branches are unanalyzed |
+
+The selection principle is that a check earns its place by finding defects
+*here*. Enabling everything and suppressing the fallout produces a baseline
+that is mostly noise, which is a baseline nobody reads.
+
 ## What is not enforced
 
 Listed rather than omitted, because a gap nobody has written down reads as a
@@ -126,7 +145,7 @@ gap nobody has.
 
 | Control | State |
 |---|---|
-| Static analysis (clang-tidy, cppcheck) | **Not configured.** No baseline exists yet. |
+| Static analysis (cppcheck) | **Not configured.** clang-tidy is — see [static analysis](static-analysis.md). A second opinion would catch what clang-tidy misses; no baseline exists for one. |
 | Sanitizers (ASan, UBSan) | **Not configured.** Tracked in [#292](https://github.com/lasrod/assurance-forge/issues/292). |
 | Fuzzing | **Not configured.** Tracked in [#292](https://github.com/lasrod/assurance-forge/issues/292). |
 | Cyclomatic / cognitive complexity | **Not measured.** No tool configured. |
