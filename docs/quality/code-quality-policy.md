@@ -198,10 +198,15 @@ imgui_widgets.cpp:7219:32: runtime error: shift exponent 11999 is too large
   #2 ui::ShowTreeViewPanel   src/ui/tree_view.cpp:363
 ```
 
-ImGui computes `1 << window->DC.TreeDepth` on a signed `int`, so the shift is
-undefined once the tree is **32 levels deep** — the 12,000-node test only made
-it easy to see. `ShowTreeViewPanel` pushes one ImGui tree level per level of the
-user's argument, so a large safety case reaches it too.
+`TreePop` decrements `TreeDepth` and then computes `1 << TreeDepth` on a signed
+`int`, so popping the innermost of *N* nested levels shifts by *N−1*. On a
+32-bit `int` that is undefined once the exponent reaches 32 — **from 33 levels
+deep**. The 12,000-node test only made it easy to see: it reported exponent
+11999, which is 12000 − 1 and confirms the relationship.
+
+`ShowTreeViewPanel` pushes one ImGui tree level per level of the user's
+argument, so a large safety case reaches this too — it does not need a
+synthetic tree.
 
 The defect is in a submodule this project does not own, and the fix on our side
 is a UI decision about how a very deep argument should render. It is tracked in
