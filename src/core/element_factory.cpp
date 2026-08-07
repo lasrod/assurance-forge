@@ -1272,14 +1272,18 @@ bool UpdateSacmTexts(Element& e, ElementTextField field, const std::string& lang
         write_ml(e.description_ml, e.description);
         return true;
     case ElementTextField::Content:
+        // The `return false` belongs in the else branch: for a type that does
+        // have content_ml, the if-constexpr always returns and a statement after
+        // it is unreachable.
         if constexpr (requires {
                           e.content_ml;
                           e.content;
                       }) {
             write_ml(e.content_ml, e.content);
             return true;
+        } else {
+            return false;
         }
-        return false;
     }
     return false;
 }

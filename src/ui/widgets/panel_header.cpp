@@ -12,7 +12,6 @@ namespace ui::widgets {
 
 void PanelHeader(const char* icon, std::string_view title) {
     const Theme& theme = GetTheme();
-    const ImGuiStyle& style = ImGui::GetStyle();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
     // Anchored to the cursor, and taking part in layout, rather than painted at

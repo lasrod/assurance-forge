@@ -13,6 +13,44 @@ if(MSVC)
     add_compile_options(/FS /utf-8 /MP)
 endif()
 
+# --------------------------------------------------------------------
+# Warning policy.
+#
+# Applied per target rather than globally, because a global
+# add_compile_options() would also hit hello_imgui, curl, yaml-cpp and the rest
+# of the fetched dependencies. Their warnings are not ours to fix, and drowning
+# our own in thousands of theirs is how a warning level gets switched back off.
+#
+# AF_WARNINGS_AS_ERRORS defaults OFF so that a new compiler version emitting a
+# new diagnostic does not break a contributor's local build. CI turns it on, so
+# the same diagnostic does block a merge.
+# --------------------------------------------------------------------
+option(AF_WARNINGS_AS_ERRORS "Treat compiler warnings as errors (CI turns this on)" OFF)
+
+function(af_set_warning_level target)
+    if(NOT TARGET ${target})
+        message(FATAL_ERROR "af_set_warning_level: no such target '${target}'")
+    endif()
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+        # std::getenv and std::fopen are standard C++ that MSVC deprecates on its
+        # own authority. The suggested replacements (_dupenv_s, fopen_s) are not
+        # portable, and this code builds on three toolchains, so the warning has
+        # no action behind it. Scoped to first-party targets, and it does not
+        # cover STL deprecations such as std::filesystem::u8path -- that one was
+        # a real signal and is fixed rather than silenced.
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+        if(AF_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra)
+        if(AF_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
+    endif()
+endfunction()
+
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (Linux/GCC 14+ only)" OFF)
 if(ENABLE_COVERAGE)
     if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

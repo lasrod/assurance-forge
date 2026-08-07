@@ -41,4 +41,9 @@ std::string PathToUtf8(const std::filesystem::path& path) {
     return std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
 }
 
+std::filesystem::path PathFromUtf8(const std::string& value) {
+    const std::u8string u8(reinterpret_cast<const char8_t*>(value.data()), value.size());
+    return std::filesystem::path(u8);
+}
+
 } // namespace core

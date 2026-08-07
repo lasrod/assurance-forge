@@ -35,7 +35,7 @@ std::string ExistingFolderForDialog(const std::string& raw_path) {
     if (raw_path.empty())
         return AbsoluteFolderForDialog(fallback);
 
-    std::filesystem::path path = std::filesystem::u8path(raw_path);
+    std::filesystem::path path = core::PathFromUtf8(raw_path);
     if (std::filesystem::is_directory(path, ec))
         return AbsoluteFolderForDialog(path);
 

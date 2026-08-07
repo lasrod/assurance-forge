@@ -18,7 +18,8 @@ static std::string get_local_name(const char* name) {
     std::string s(name);
     size_t pos = s.find(':');
     std::string local = (pos != std::string::npos) ? s.substr(pos + 1) : s;
-    std::transform(local.begin(), local.end(), local.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(
+        local.begin(), local.end(), local.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return local;
 }
 
@@ -45,7 +46,7 @@ static bool read_bool_attr(pugi::xml_node node, const char* attr_name, bool defa
     if (!raw || !*raw)
         return default_value;
     std::string s(raw);
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (s == "true" || s == "1")
         return true;
     if (s == "false" || s == "0")

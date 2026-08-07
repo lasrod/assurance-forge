@@ -76,6 +76,29 @@ endif()
 # PRIVATE: pugixml must never appear in public sacm headers.
 target_link_libraries(sacm PRIVATE pugixml)
 
+# The library builds standalone, so it cannot rely on the parent project having
+# defined the warning policy.
+if(COMMAND af_set_warning_level)
+    af_set_warning_level(sacm)
+elseif(MSVC)
+    target_compile_options(sacm PRIVATE /W4)
+else()
+    target_compile_options(sacm PRIVATE -Wall -Wextra)
+endif()
+
+if(MSVC)
+    # C4456: `else if (auto* pkg = dynamic_cast<...>)` chains in the XMI reader
+    # and writer, where each branch reuses the same name and MSVC counts the
+    # previous branch's variable as still in scope. Sixteen instances, all in
+    # that one pattern, none of them a live shadowing bug.
+    #
+    # Suppressed rather than renamed because renaming means editing
+    # libs/sacm/src, which carries a conformance obligation -- a matrix update or
+    # a verification record -- that does not belong in a change about warning
+    # levels. Cleaning up the pattern is worth doing on its own terms.
+    target_compile_options(sacm PRIVATE /wd4456)
+endif()
+
 add_executable(sacm_cli tools/sacm_cli.cpp)
 target_link_libraries(sacm_cli PRIVATE sacm::sacm)
 

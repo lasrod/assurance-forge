@@ -29,19 +29,19 @@ jobs:
             # rather than pinning a version — windows-latest's VS rolls forward.
             # No ccache: MSVC caching needs embedded debug info (/Z7) and is
             # fragile to set up blind; left for a follow-up.
-            configure: cmake -B build -A x64
+            configure: cmake -B build -A x64 -DAF_WARNINGS_AS_ERRORS=ON
             build: cmake --build build --config Debug
             test: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
             use_ccache: false
           - name: Linux
             os: ubuntu-latest
-            configure: cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build
             test: ctest --test-dir build --output-on-failure --no-tests=error
             use_ccache: true
           - name: macOS
             os: macos-latest
-            configure: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build
             test: ctest --test-dir build --output-on-failure --no-tests=error
             use_ccache: true

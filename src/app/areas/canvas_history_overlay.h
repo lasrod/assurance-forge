@@ -7,7 +7,7 @@
 #include <string>
 
 namespace ui {
-class UiState;
+struct UiState;
 struct ElementContextActions;
 } // namespace ui
 namespace ui::gsn {
