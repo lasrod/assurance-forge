@@ -53,10 +53,13 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::TextUnformatted(AF_TR("AI").c_str());
     ImGui::Separator();
 
-    bool enabled = model.aiEnabled;
-    if (ImGui::Checkbox(AF_TR("Enable AI support").c_str(), &enabled)) {
+    // `model` is a by-value copy, so a toggle this frame must be written back
+    // into it as well as reported. Reading `model.aiEnabled` further down would
+    // otherwise use the pre-toggle value, and Save would quietly restore the
+    // state the user had just changed.
+    if (ImGui::Checkbox(AF_TR("Enable AI support").c_str(), &model.aiEnabled)) {
         if (callbacks.set_ai_enabled)
-            callbacks.set_ai_enabled(enabled);
+            callbacks.set_ai_enabled(model.aiEnabled);
     }
 
     ImGui::TextUnformatted(AF_TR("Provider").c_str());

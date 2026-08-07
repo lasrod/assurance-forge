@@ -88,8 +88,13 @@ void ModalHost::RenderPreferencesWindow() {
     // The panel used to hold `ai::AiProviderSettings*` and an `ai::AiConnectionStatus`,
     // which made `ui` include `ai` -- one of the layer gate's two exceptions.
     // Translating here keeps the AI vocabulary on this side of the boundary.
-    CopyToBuffer(state_.ai.model_buf, sizeof(state_.ai.model_buf), state_.ai.settings.model);
-
+    //
+    // `model_buf` is deliberately NOT reseeded from settings here. This function
+    // runs every frame the window is open, and the panel no longer writes each
+    // keystroke back into the settings record, so copying settings into the
+    // buffer per frame would erase whatever the user was typing before they
+    // could finish. The buffer is seeded once at startup and refreshed only
+    // where settings change to something the user did not type.
     ui::panels::PreferencesPanelModel model;
     model.aiAvailable = true;
     model.aiEnabled = state_.ai.settings.enabled;
@@ -160,8 +165,12 @@ void ModalHost::RenderPreferencesWindow() {
         state_.ai.connection_status =
             ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, AF_TR("Testing connection..."));
         state_.ai.settings.model = state_.ai.model_buf;
-        if (state_.ai.settings.model.empty())
+        if (state_.ai.settings.model.empty()) {
             state_.ai.settings.model = ai::kDefaultOpenAiModel;
+            // Testing an empty field substitutes the default, so show the value
+            // actually being tested rather than leaving the box blank.
+            CopyToBuffer(state_.ai.model_buf, sizeof(state_.ai.model_buf), state_.ai.settings.model);
+        }
         std::string error;
         if (!state_.ai.service->SaveSettings(state_.ai.settings, error)) {
             state_.ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);

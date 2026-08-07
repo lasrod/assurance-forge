@@ -50,7 +50,13 @@ CASES = [
 
 
 def run_gate(source_dir):
-    """Run the gate standalone against a fixture tree. True when it passes."""
+    """Run the gate standalone against a fixture tree.
+
+    Returns (passed, output). The output is captured rather than inherited so
+    that thirteen expected CMake errors do not bury the result, but it is kept
+    and printed for any case that behaves unexpectedly -- a gate failure with no
+    diagnostics is the hardest kind to debug from a CTest log.
+    """
     result = subprocess.run(
         [
             "cmake",
@@ -64,7 +70,7 @@ def run_gate(source_dir):
         encoding="utf-8",
         errors="replace",
     )
-    return result.returncode == 0
+    return result.returncode == 0, (result.stdout + result.stderr).strip()
 
 
 def main():
@@ -82,16 +88,19 @@ def main():
             (root / layer).mkdir(parents=True, exist_ok=True)
             (root / layer / filename).write_text(contents, encoding="utf-8")
 
-            passed = run_gate(root)
+            passed, output = run_gate(root)
             if must_fail and passed:
-                failures.append(f"gate ACCEPTED a forbidden include: {label}")
+                failures.append((f"gate ACCEPTED a forbidden include: {label}", output))
             elif not must_fail and not passed:
-                failures.append(f"gate REJECTED an allowed include: {label}")
+                failures.append((f"gate REJECTED an allowed include: {label}", output))
 
     if failures:
         print(f"[1] FAIL: the layer gate no longer behaves as documented\n")
-        for line in failures:
+        for line, output in failures:
             print(f"  {line}")
+            if output:
+                for detail in output.splitlines():
+                    print(f"      {detail}")
         print(
             "\nThe gate passing on a clean tree does not show that it works.\n"
             "Fix cmake/check_layer_gates.cmake, or update these cases if the\n"
