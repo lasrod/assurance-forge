@@ -150,12 +150,20 @@ rank where cleanup is most likely to pay for itself.
 
 ### Found by turning warnings on
 
-`core::AssuranceTree` threads a `wired_ids` set through five functions. It is
-inserted into in five places and **never read**: orphan collection uses
-`node->parent == nullptr` instead, and the "already wired" check tests
-`child->parent`. The set is superseded state that no longer affects anything.
+The `/W4` unreferenced-parameter warning pointed at a `ProcessChallenge`
+parameter that was passed but never used. That omission was deliberate — a
+counter relationship is a dialectic challenge, not structural support — but
+pulling on it showed the mechanism behind it was dead.
 
-The `/W4` unreferenced-parameter warning pointed at one symptom of this — a
-`ProcessChallenge` parameter that was passed but unused. Removing the whole
-mechanism touches tree building, so it is worth doing on its own terms rather
-than inside a change about warning levels.
+`core::AssuranceTree` threaded a `wired_ids` set through five functions,
+inserted into it in six places, and **never read it**. Orphan collection tested
+`node->parent == nullptr` instead, and the "already wired" check tested
+`child->parent`. The set was superseded state: whatever it once decided was
+already decided by the parent pointer, and nothing kept the two in agreement.
+
+Removing it touched tree building, so it was done on its own terms in
+[#303](https://github.com/lasrod/assurance-forge/issues/303) rather than inside
+a change about warning levels. The whole suite passed unchanged afterwards, with
+no test edited to accommodate the removal — which is what distinguishes deleting
+dead state from changing behaviour. Had a test needed adjusting, the set was
+being read after all and the removal would have been wrong.
