@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ai/ai_types.h"
 #include "ui/i18n/language.h"
 #include "ui/theme.h"
 
@@ -10,12 +9,32 @@
 
 namespace ui::panels {
 
+// How an AI connection attempt is going, in the only terms the panel needs:
+// which colour to draw and whether a spinner belongs on screen.
+//
+// Deliberately not `ai::AiConnectionStatus`. Naming an `ai` type here would make
+// `ui` depend on `ai`, which the layer gate forbids and which was one of its two
+// recorded exceptions. The panel renders a severity; deciding what an
+// `AiErrorCode` means is `app`'s job, not the renderer's.
+enum class AiStatusSeverity {
+    Idle,
+    Running,
+    Success,
+    Error,
+};
+
 struct PreferencesPanelModel {
-    ai::AiProviderSettings* settings = nullptr;
+    // AI settings, as plain data. `aiAvailable` is false when there is nothing
+    // to edit, which the panel shows instead of an empty form.
+    bool aiAvailable = false;
+    bool aiEnabled = false;
+    // Read-only provider name. One provider is supported today.
+    std::string aiProviderName;
     bool keyStored = false;
     bool secureStoreAvailable = false;
     bool testRunning = false;
-    ai::AiConnectionStatus connectionStatus;
+    AiStatusSeverity connectionSeverity = AiStatusSeverity::Idle;
+    std::string connectionMessage;
     char* apiKeyBuffer = nullptr;
     size_t apiKeyBufferSize = 0;
     char* modelBuffer = nullptr;
@@ -40,7 +59,9 @@ struct PreferencesPanelModel {
 };
 
 struct PreferencesPanelCallbacks {
-    std::function<void(const ai::AiProviderSettings&)> save_settings;
+    // Enabled state and model text. `app` owns the rest of the settings record.
+    std::function<void(bool enabled, const char* model)> save_settings;
+    std::function<void(bool enabled)> set_ai_enabled;
     std::function<void(const char*)> save_api_key;
     std::function<void()> remove_api_key;
     std::function<void()> test_connection;
