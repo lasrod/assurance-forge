@@ -97,9 +97,10 @@ if(AF_SANITIZE)
             "AF_SANITIZE is not supported with MSVC.\n"
             "  MSVC has no UndefinedBehaviorSanitizer, and its AddressSanitizer needs the\n"
             "  optional 'C++ AddressSanitizer' Visual Studio component to link.\n"
-            "  Use Clang or GCC:\n"
-            "    cmake -B build-asan -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \\\n"
-            "          -DCMAKE_BUILD_TYPE=Debug -DAF_SANITIZE=address,undefined")
+            "  Use GCC 14, which is what CI sanitizes with:\n"
+            "    cmake -B build-asan -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 \\\n"
+            "          -DCMAKE_BUILD_TYPE=Debug -DAF_SANITIZE=address,undefined\n"
+            "  Clang works too, but must be new enough for std::expected: 18 is not.")
     else()
         message(STATUS "Sanitizers: ${AF_SANITIZE}")
         add_compile_options(

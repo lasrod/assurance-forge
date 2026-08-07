@@ -142,7 +142,12 @@ that is mostly noise, which is a baseline nobody reads.
 
 `AF_SANITIZE` instruments the whole build. The `Sanitizers` workflow runs
 AddressSanitizer and UndefinedBehaviorSanitizer over the full test suite on
-Linux with Clang.
+Linux with GCC 14 — the compiler Coverage already pins, and the one known to
+build this project. The job's first run used Clang 18 and could not compile the
+codebase at all (`no template named 'expected' in namespace 'std'`, a C++23
+library feature the GCC build compiles happily). Sanitizing with a compiler that
+cannot build the project measures nothing, so the preference for Clang's
+symbolized traces gave way to the compiler that works.
 
 ```bash
 # Both compilers, not just CXX: the project enables C and C++, and leaving
@@ -158,7 +163,7 @@ ctest --test-dir build-asan --output-on-failure
 | Aspect | Position |
 |---|---|
 | Scope | **Global**, deliberately — see below |
-| Compilers | Clang or GCC. **MSVC is refused**, with the reason — see below |
+| Compilers | GCC (CI uses 14). Clang 18 cannot build this codebase — see above. **MSVC is refused**, with the reason — see below |
 | Failure mode | `-fno-sanitize-recover=all`, so a finding aborts |
 | When | Push to `main`, weekly, and on demand — **not** on pull requests |
 
