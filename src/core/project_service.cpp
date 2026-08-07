@@ -24,8 +24,8 @@
 namespace core {
 namespace {
 
-constexpr const char* kProjectFormat = "assurance-forge-project";
-constexpr const char* kProjectFormatVersion = "0.1.0";
+// The format name and version constants live in project_manifest.cpp, which is
+// what reads and validates them. The copies here were never referenced.
 constexpr const char* kManifestFileName = "af.proj";
 
 const std::array<const char*, 11> kProjectDirectories = {

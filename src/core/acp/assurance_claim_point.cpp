@@ -19,7 +19,8 @@ constexpr const char* kPackagePurposeKey = "assuranceForge.argumentPackage.purpo
 constexpr const char* kPackagePurposeConfidence = "confidence";
 
 std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(
+        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
 

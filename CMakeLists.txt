@@ -13,6 +13,58 @@ if(MSVC)
     add_compile_options(/FS /utf-8 /MP)
 endif()
 
+# --------------------------------------------------------------------
+# Warning policy.
+#
+# Applied per target rather than globally, because a global
+# add_compile_options() would also hit hello_imgui, curl, yaml-cpp and the rest
+# of the fetched dependencies. Their warnings are not ours to fix, and drowning
+# our own in thousands of theirs is how a warning level gets switched back off.
+#
+# AF_WARNINGS_AS_ERRORS defaults OFF so that a new compiler version emitting a
+# new diagnostic does not break a contributor's local build. CI turns it on, so
+# the same diagnostic does block a merge.
+# --------------------------------------------------------------------
+option(AF_WARNINGS_AS_ERRORS "Treat compiler warnings as errors (CI turns this on)" OFF)
+
+function(af_set_warning_level target)
+    if(NOT TARGET ${target})
+        message(FATAL_ERROR "af_set_warning_level: no such target '${target}'")
+    endif()
+    if(MSVC)
+        # These three are off by default even at /W4, and each is MSVC's
+        # equivalent of a GCC/Clang diagnostic that already fails this build:
+        #   /w14505, /w15245 -> -Wunused-function      (dead static / anon-namespace fn)
+        #   /w15264          -> -Wunused-const-variable (dead constant)
+        # Without them a Windows developer builds clean and CI rejects the branch
+        # on GCC and Clang, which teaches people that the local build means
+        # nothing. Every one of them found real dead code the first time it ran.
+        target_compile_options(${target} PRIVATE /W4 /w14505 /w15245 /w15264)
+        # std::getenv and std::fopen are standard C++ that MSVC deprecates on its
+        # own authority. The suggested replacements (_dupenv_s, fopen_s) are not
+        # portable, and this code builds on three toolchains, so the warning has
+        # no action behind it. Scoped to first-party targets, and it does not
+        # cover STL deprecations such as std::filesystem::u8path -- that one was
+        # a real signal and is fixed rather than silenced.
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+        if(AF_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+    else()
+        # -Wmissing-field-initializers (part of -Wextra) fires on partial
+        # aggregate initialization, which this codebase uses deliberately: a
+        # callbacks struct is built positionally for the members that have one
+        # and the rest are assigned by name immediately below. Listing every
+        # member inside the braces would duplicate those assignments to satisfy
+        # a warning that has found nothing. GCC and Clang both already exempt
+        # `{}` from it, so the diagnostic is about style, not correctness.
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
+        if(AF_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
+    endif()
+endfunction()
+
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (Linux/GCC 14+ only)" OFF)
 if(ENABLE_COVERAGE)
     if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -404,6 +456,15 @@ target_link_libraries(tests PRIVATE
     hello_imgui
     af_app af_ui af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
 )
+
+# The per-layer object libraries are not the whole of the first-party code. The
+# executables carry their own translation units -- src/app/main.cpp,
+# src/mcp/main.cpp -- and the test sources are first-party code that gets read
+# and copied like any other. Warning on the libraries alone would leave the
+# ratchet with a hole in exactly the files newcomers open first.
+af_set_warning_level(assurance-forge)
+af_set_warning_level(assurance-forge-mcp)
+af_set_warning_level(tests)
 if(WIN32)
     target_link_libraries(tests PRIVATE bcrypt advapi32 dwmapi)
 

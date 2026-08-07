@@ -80,12 +80,6 @@ const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackag
     return core::FindArgumentPackageByIdentity(package, tab.package_id, tab.package_gid);
 }
 
-parser::AssuranceCase BuildArgumentPackageProjection(const parser::AssuranceCase& source_model,
-                                                     const sacm::ArgumentPackage& argument_package,
-                                                     const std::string& fallback_name) {
-    return core::BuildArgumentPackageProjection(source_model, argument_package, fallback_name);
-}
-
 ui::ElementContextActions MakeProposalContextActions(const WorkbenchAreaCallbacks& callbacks) {
     return ui::ElementContextActions{
         callbacks.add_proposal_child,

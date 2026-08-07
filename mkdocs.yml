@@ -102,5 +102,6 @@ nav:
       - Documentation Map: documentation-map.md
       - Generating Class Diagrams: developer-guide/generating-class-diagrams.md
       - Repository Quality Baseline: quality/repository-baseline.md
+      - Code Quality Policy: quality/code-quality-policy.md
       - Code Coverage: COVERAGE.md
       - Releasing: RELEASING.md

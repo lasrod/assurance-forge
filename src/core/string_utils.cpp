@@ -41,4 +41,15 @@ std::string PathToUtf8(const std::filesystem::path& path) {
     return std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
 }
 
+std::filesystem::path PathFromUtf8(const std::string& value) {
+    // Converts each byte rather than reinterpreting the buffer. Casting the
+    // std::string's storage to char8_t* would read char objects through a
+    // different type, which strict aliasing does not permit -- the reverse
+    // direction in PathToUtf8 is fine only because char may alias anything.
+    // char -> char8_t is a conversion to an unsigned type, so bytes above 127
+    // keep their value whether char is signed or not.
+    const std::u8string u8(value.begin(), value.end());
+    return std::filesystem::path(u8);
+}
+
 } // namespace core

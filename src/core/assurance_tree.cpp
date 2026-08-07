@@ -190,11 +190,13 @@ static TreeNode* ResolveChallengeAnchorElement(const std::string& target_id,
 // (strategies, solutions, context, ...). It is flagged with the data the layout
 // engine needs to position the cluster relative to the target and the renderer
 // needs to draw the dashed open-arrow challenge edge.
+// No `wired_ids` parameter, unlike its siblings. A challenge is not structural
+// support, so it must not mark its target as wired into the tree -- the omission
+// is the point, not an oversight.
 static void ProcessChallenge(const parser::SacmElement& relationship,
                              const std::unordered_map<std::string, TreeNode*>& node_by_id,
                              const std::unordered_map<std::string, std::string>& rel_first_target,
-                             const std::unordered_map<std::string, std::string>& rel_source,
-                             std::unordered_set<std::string>& wired_ids) {
+                             const std::unordered_map<std::string, std::string>& rel_source) {
     if (relationship.source_refs.empty() || relationship.target_refs.empty())
         return;
 
@@ -332,7 +334,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
 
         // Counter relationships are dialectic challenges, not structural support.
         if (element.is_counter) {
-            ProcessChallenge(element, node_by_id, rel_first_target, rel_source, wired_ids);
+            ProcessChallenge(element, node_by_id, rel_first_target, rel_source);
             continue;
         }
 

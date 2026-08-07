@@ -32,6 +32,26 @@ TEST(StringUtilsTest, LowercasesStartsWithAndNormalizesRefs) {
     EXPECT_EQ(core::NormalizeRef("  #term-1\n"), "term-1");
 }
 
+TEST(StringUtilsTest, PathFromUtf8RoundTripsNonAsciiThroughPathToUtf8) {
+    // The replacement for std::filesystem::u8path, which C++20 deprecated.
+    //
+    // `std::filesystem::path(value)` would compile and pass an ASCII test while
+    // being wrong: that constructor reads a narrow string in the native
+    // encoding, so on Windows it decodes UTF-8 bytes as the active code page and
+    // mangles exactly the paths a Latin-1 developer never types. These cases are
+    // non-ASCII on purpose -- an ASCII-only test cannot tell the two apart.
+    const std::string japanese = "プロジェクト/ブレーキ.sacm";
+    EXPECT_EQ(core::PathToUtf8(core::PathFromUtf8(japanese)), japanese);
+
+    const std::string accented = "Sécurité/Freinage.sacm";
+    EXPECT_EQ(core::PathToUtf8(core::PathFromUtf8(accented)), accented);
+
+    const std::string ascii = "projects/brake.sacm";
+    EXPECT_EQ(core::PathToUtf8(core::PathFromUtf8(ascii)), ascii);
+
+    EXPECT_TRUE(core::PathFromUtf8("").empty());
+}
+
 TEST(TimeUtilsTest, FormatsUtcTimestamp) {
     const std::string value = core::NowUtcString();
     EXPECT_TRUE(std::regex_match(value, std::regex(R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"))) << value;

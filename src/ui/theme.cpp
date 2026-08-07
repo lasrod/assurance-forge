@@ -111,7 +111,6 @@ void ApplyDarkColors() {
 
     const ImVec4 bg = Color(0x0B, 0x0F, 0x14);
     const ImVec4 panel = Color(0x11, 0x17, 0x20);
-    const ImVec4 panel_hover = Color(0x19, 0x23, 0x31);
     const ImVec4 control = Color(0x18, 0x21, 0x2D);
     const ImVec4 control_hover = Color(0x22, 0x30, 0x44);
     const ImVec4 control_active = Color(0x2D, 0x45, 0x64);
@@ -179,7 +178,6 @@ void ApplyLightColors() {
 
     const ImVec4 bg = Color(0xF5, 0xF7, 0xFA);
     const ImVec4 panel = Color(0xFF, 0xFF, 0xFF);
-    const ImVec4 panel_hover = Color(0xEF, 0xF3, 0xF8);
     const ImVec4 control = Color(0xF0, 0xF3, 0xF7);
     const ImVec4 control_hover = Color(0xE3, 0xEC, 0xF8);
     const ImVec4 control_active = Color(0xCF, 0xDF, 0xF4);

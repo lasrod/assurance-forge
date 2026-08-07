@@ -38,3 +38,11 @@ add_subdirectory(bridge)
 add_subdirectory(agent)
 add_subdirectory(mcp)
 add_subdirectory(app)
+
+# Listed explicitly rather than globbed: a new subsystem should have to say that
+# it builds warning-clean, not inherit the claim by being in the right folder.
+foreach(af_target
+    af_parser af_sacm af_sacm_adapter af_core af_ai af_export af_ui
+    af_bridge af_agent af_mcp af_app)
+    af_set_warning_level(${af_target})
+endforeach()

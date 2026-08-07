@@ -616,7 +616,6 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     ImGui::PushID(elem->id.c_str());
 
     const std::string sec_lang = state.active_secondary_lang;
-    bool has_secondary = element_has_secondary(*elem, sec_lang);
 
     RenderElementMetadata(*elem);
     RenderDraftChangeSection(elem->id, draft_callbacks);

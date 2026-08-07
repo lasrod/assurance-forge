@@ -61,6 +61,7 @@ canonical source wins on conflict.
 | Where to get help | [SUPPORT.md](https://github.com/lasrod/assurance-forge/blob/main/SUPPORT.md) |
 | How releases are cut and what release notes must say | [Releasing](RELEASING.md) |
 | Measured repository state at a point in time | [Quality baseline](quality/repository-baseline.md) |
+| Warning levels, suppressions, and what is not enforced | [Code quality policy](quality/code-quality-policy.md) |
 
 ## What belongs where
 

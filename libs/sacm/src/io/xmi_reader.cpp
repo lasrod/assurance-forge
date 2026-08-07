@@ -198,7 +198,11 @@ struct Reader {
         return {};
     }
 
-    ElementId generate_id(ElementKind kind) {
+    // `kind` is unused: generated ids are deliberately kind-independent, and
+    // uniqueness comes from checking `used_ids` rather than from the name
+    // carrying a type (SACM23-XMI-003). Kept in the signature so callers stay
+    // explicit about what they are generating an id for.
+    ElementId generate_id([[maybe_unused]] ElementKind kind) {
         while (true) {
             ++generated_counter;
             std::string candidate = std::format("generated_{}", generated_counter);

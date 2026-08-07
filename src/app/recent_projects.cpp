@@ -21,7 +21,7 @@ std::string RecentProjectKey(const std::string& path) {
 }
 
 std::string DefaultProjectNameForPath(const std::string& path) {
-    std::filesystem::path manifest_path = std::filesystem::u8path(path);
+    std::filesystem::path manifest_path = core::PathFromUtf8(path);
     if (manifest_path.has_parent_path()) {
         std::filesystem::path project_folder = manifest_path.parent_path().filename();
         if (!project_folder.empty())
@@ -81,7 +81,7 @@ std::string NormalizeRecentProjectPath(const std::string& path) {
     if (path.empty())
         return {};
 
-    std::filesystem::path raw_path = std::filesystem::u8path(path);
+    std::filesystem::path raw_path = core::PathFromUtf8(path);
     std::error_code ec;
     std::filesystem::path normalized = std::filesystem::weakly_canonical(raw_path, ec);
     if (ec || normalized.empty()) {

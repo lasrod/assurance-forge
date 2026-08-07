@@ -58,7 +58,8 @@ static std::string local_name(const char* qualified_name) {
     std::string s(qualified_name);
     auto colon_pos = s.find(':');
     std::string local = (colon_pos != std::string::npos) ? s.substr(colon_pos + 1) : s;
-    std::transform(local.begin(), local.end(), local.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(
+        local.begin(), local.end(), local.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return local;
 }
 
@@ -107,7 +108,7 @@ static bool read_bool_attr(pugi::xml_node node, const char* attr_name, bool defa
     if (!raw || !*raw)
         return default_value;
     std::string s(raw);
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (s == "true" || s == "1")
         return true;
     if (s == "false" || s == "0")
@@ -451,8 +452,9 @@ static void detect_sacm_namespace(pugi::xml_node root, std::string& out_prefix, 
         std::string candidate_uri = attr.as_string();
 
         std::string lower_uri = candidate_uri;
-        std::transform(
-            lower_uri.begin(), lower_uri.end(), lower_uri.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::transform(lower_uri.begin(), lower_uri.end(), lower_uri.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
 
         if (lower_uri.find("sacm") != std::string::npos) {
             out_prefix = candidate_prefix;
