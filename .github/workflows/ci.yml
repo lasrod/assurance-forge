@@ -87,12 +87,25 @@ jobs:
         run: ${{ matrix.test }}
 
   # Static analysis runs as its own job rather than inside the build matrix.
-  # It takes ~9 minutes, needs no test run, and its result is a ratchet against
-  # a committed baseline rather than a pass/fail property of the build.
+  # It needs no test run, and its result is a ratchet against a committed
+  # baseline rather than a pass/fail property of the build.
   #
   # Windows, because the baseline is generated there. Analysing a different
   # platform than the baseline records would compare two different sets of
   # #ifdef branches and report the difference as new findings.
+  #
+  # Scope differs by trigger, because a full sweep is far too slow to sit in
+  # front of every pull request. The first attempt at this job ran all 255
+  # translation units on a 4-core runner and was still going after 30 minutes,
+  # against a repository whose median CI wall clock is 12.7 minutes.
+  #
+  #   pull_request -> only the .cpp files the branch touched
+  #   push to main -> the full sweep, which is the authoritative one
+  #
+  # The gap that leaves is real and worth naming: a pull request that edits a
+  # header can add findings in .cpp files it did not touch, and those are not
+  # analysed until the full sweep runs after the merge. Catching it before the
+  # merge would mean resolving the include graph, which this does not do.
   static-analysis:
     name: Static analysis
     runs-on: windows-latest
@@ -102,6 +115,8 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: recursive
+          # Need the base commit to diff against on a pull request.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -110,14 +125,13 @@ jobs:
 
       # The runner image ships LLVM; use it rather than installing one. Pinning
       # the exact version the baseline was generated with (22.1.4) is not
-      # possible here — Chocolatey has no such package, which is how the first
+      # possible here -- Chocolatey has no such package, which is how the first
       # attempt at this job failed.
       #
       # So the versions can differ, and that matters: a different clang-tidy
       # runs different checks and finds different things. run_clang_tidy.py
-      # warns when its version does not match the baseline's, and the version is
-      # printed below so a surprising result can be read against it rather than
-      # guessed at. Aligning the two exactly is tracked in the follow-up.
+      # warns when its version does not match the baseline's, and both are
+      # printed here so a surprising result can be read against them.
       - name: Report clang-tidy version
         run: |
           clang-tidy --version
@@ -128,5 +142,21 @@ jobs:
       - name: Configure CMake
         run: cmake -B build -A x64
 
-      - name: Check static-analysis ratchet
-        run: python tools/quality/run_clang_tidy.py --check
+      - name: Check changed sources (pull request)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          base="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" || true
+          mapfile -t changed < <(git diff --name-only --diff-filter=d "$base"...HEAD -- '*.cpp')
+          if [ ${#changed[@]} -eq 0 ]; then
+            echo "no .cpp files changed; the full sweep on main covers the rest"
+            exit 0
+          fi
+          echo "changed .cpp files:"
+          for f in "${changed[@]}"; do echo "  $f"; done
+          python tools/quality/run_clang_tidy.py --check --jobs 4 --paths "${changed[@]}"
+
+      - name: Check every source (main)
+        if: github.event_name != 'pull_request'
+        run: python tools/quality/run_clang_tidy.py --check --jobs 4

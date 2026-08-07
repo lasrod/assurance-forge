@@ -240,6 +240,14 @@ def main() -> int:
         "narrows coverage, so it must not be used to produce a baseline or gate a merge.",
     )
     parser.add_argument(
+        "--paths",
+        nargs="+",
+        metavar="FILE",
+        help="analyze only these files. Used by the pull-request job to check what a "
+        "branch touched; the full sweep on main is what covers everything. Like --filter, "
+        "it narrows coverage and cannot write a baseline.",
+    )
+    parser.add_argument(
         "--all-checks",
         action="store_true",
         help="ignore the exclusions in .clang-tidy and enable every check in the four "
@@ -253,6 +261,8 @@ def main() -> int:
 
     if args.filter and not args.check:
         fail("--filter narrows coverage; combine it with --check, never use it to write a baseline")
+    if args.paths and not args.check:
+        fail("--paths narrows coverage; combine it with --check, never use it to write a baseline")
 
     exe = find_clang_tidy()
     version = tool_version(exe)
@@ -260,6 +270,14 @@ def main() -> int:
     sources = list_sources()
     if args.filter:
         sources = [s for s in sources if args.filter in s]
+    if args.paths:
+        requested = {p.replace("\\", "/").lstrip("./") for p in args.paths}
+        sources = [s for s in sources if s in requested]
+        if not sources:
+            # Not a failure: a branch touching only docs or tests analyzes
+            # nothing, and that is a correct outcome rather than a broken run.
+            print("no analyzable production sources among the given paths; nothing to check")
+            return 0
     if not sources:
         fail("no sources matched: refusing to report an empty run as clean")
 
@@ -318,9 +336,9 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        if args.filter:
-            print(f"\nNo new findings in paths matching '{args.filter}'.")
-            print("Partial run: the full sweep is what gates a merge.")
+        if args.filter or args.paths:
+            print(f"\nNo new findings in the {len(sources)} source(s) analyzed.")
+            print("Partial run: the full sweep on main is what covers everything.")
             return 0
         removed = current["total_findings"] - baseline.get("total_findings", 0)
         if removed < 0:
