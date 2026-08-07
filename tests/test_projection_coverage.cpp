@@ -45,6 +45,13 @@ const std::set<std::string>& KnownUnrepresentableKinds() {
         "assertedartifactsupport", // clause 11.17
         "assertedartifactcontext", // clause 11.18
         "terminologygroup",        // clause 10.3
+        // clause 12.4. Added when a fixture first put an Event in a document
+        // the bridge can round-trip. The only Event-bearing fixture before it
+        // was artifact-full-valid, which the bridge rejects outright -- so this
+        // loss was never measured, exactly as the note on KnownRejectedFixtures
+        // below warns. It is a new disclosure, not a new regression: the
+        // projection has never carried Event (issue #292).
+        "event",
     };
     return kinds;
 }
