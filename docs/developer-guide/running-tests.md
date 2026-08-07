@@ -1,6 +1,6 @@
 # Running tests
 
-The suite is 1,230 CTest tests and takes about 40 seconds in Release. This page
+The suite is 1,231 CTest tests and takes about 40 seconds in Release. This page
 is about running less than all of it, and about what the labels mean.
 
 ## The whole suite
@@ -26,13 +26,15 @@ compound label such as `app.conformance` answer to both `-L app` and
 | `app` | 1,109 | The Assurance Forge suite: core, app, ui, ai, parser, adapters |
 | `conformance` | 226 | Evidence for a numbered requirement in the SACM 2.3 or GSN v3 matrix |
 | `library` | 112 | `libs/sacm`, the reusable SACM 2.3 library, plus its CLI |
-| `gate` | 10 | Repository checks: catalogues, matrices, documentation, artifacts |
+| `gate` | 8 | Repository checks: catalogues, matrices, documentation, artifacts. Need no build |
+| `build` | 2 | Checks a build output rather than the repository, so it does need one |
 | `cli` | 4 | The `sacm_cli` executable driven as a process |
 | `contract` | 2 | The MCP stdio wire protocol, driven through real pipes |
 | `slow` | 2 | Anything that starts a process |
 
 ```bash
-# Before pushing: the repository gates. About a second, no build needed.
+# Before pushing: the repository gates. About two seconds, and no build
+# needed -- they read the repository, not its output.
 ctest --test-dir build -C Release -L gate
 
 # Working on the SACM library.

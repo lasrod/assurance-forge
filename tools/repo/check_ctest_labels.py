@@ -69,16 +69,23 @@ def load_tests(build_dir: str, config: str) -> list[dict]:
     if not ctest:
         print("error: ctest not found on PATH", file=sys.stderr)
         raise SystemExit(2)
+    # Bytes, then an explicit UTF-8 decode. `text=True` would decode using the
+    # platform locale, which on a Windows console is a legacy code page -- and
+    # CTest emits UTF-8 regardless, so a non-ASCII test name would either raise
+    # or arrive mangled.
+    #
+    # `utf-8-sig` consumes the byte-order mark CTest writes on Windows. Naming
+    # the codec beats stripping the character, which puts an invisible BOM in
+    # this file for a reader to trip over.
     result = subprocess.run(
         [ctest, "--test-dir", build_dir, "-C", config, "--show-only=json-v1"],
         capture_output=True,
-        text=True,
     )
     if result.returncode != 0:
-        print(f"error: ctest --show-only failed:\n{result.stderr}", file=sys.stderr)
+        detail = result.stderr.decode("utf-8", errors="replace")
+        print(f"error: ctest --show-only failed:\n{detail}", file=sys.stderr)
         raise SystemExit(2)
-    # CTest writes UTF-8 with a BOM on Windows.
-    return json.loads(result.stdout.lstrip("﻿"))["tests"]
+    return json.loads(result.stdout.decode("utf-8-sig"))["tests"]
 
 
 def labels_of(test: dict) -> list[str]:
@@ -101,6 +108,25 @@ def main() -> int:
     if not tests:
         print("error: ctest reported no tests; refusing to call that a pass", file=sys.stderr)
         return 2
+
+    # Non-vacuity. Test discovery runs the executables, so in a tree that has
+    # been configured but not built, CTest reports only the add_test() entries --
+    # every one of them correctly labelled. Everything below would pass while
+    # having inspected none of the 1,200 gtest cases this exists to check.
+    #
+    # Both gtest executables must therefore have contributed. This is a
+    # structural check rather than a threshold on the count, so it does not go
+    # stale as tests are added.
+    contributed = {label for test in tests for label in labels_of(test)}
+    for family in ("app", "library"):
+        if not any(label.startswith(family) for label in contributed):
+            print(
+                f"error: no test carries a `{family}` label, so the {family} test executable\n"
+                f"       contributed nothing to the list. That is what a configured but\n"
+                f"       unbuilt tree looks like; build first rather than trusting this pass.",
+                file=sys.stderr,
+            )
+            return 2
 
     unlabelled: list[str] = []
     combined: list[str] = []

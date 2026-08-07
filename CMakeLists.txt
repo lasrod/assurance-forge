@@ -530,7 +530,12 @@ add_test(
     "${AF_SCCG_DIST_DIR}/review_profiles.json"
     "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
 )
-set_tests_properties(SccgDataRuntimeCopy PROPERTIES LABELS "gate")
+# `build`, not `gate`. It compares against a file af_copy_sccg_data() puts in
+# the runtime directory in a POST_BUILD step, so unlike the repository gates it
+# does need the `tests` target built -- and `ctest -L gate` in a configure-only
+# tree would fail on it while the surrounding documentation says that subset
+# needs no build.
+set_tests_properties(SccgDataRuntimeCopy PROPERTIES LABELS "build")
 
 # --- MCP stdio transport gates ---
 # The unit tests cover dispatch; these drive the real process through real pipes,
@@ -656,9 +661,15 @@ if(Python3_Interpreter_FOUND)
         documentation_check
         layer_gate_negative_check
         verification_index_check
-        ctest_label_check
         PROPERTIES LABELS "gate"
     )
+
+    # `build`, not `gate`, for the same reason as SccgDataRuntimeCopy: it runs
+    # `ctest --show-only`, which triggers PRE_TEST discovery and therefore runs
+    # the test executables. In a configure-only tree it would see only the
+    # add_test() entries and pass having checked almost nothing, so the script
+    # refuses a test list that is missing whole executables.
+    set_tests_properties(ctest_label_check PROPERTIES LABELS "build")
 else()
     # These are compliance gates, not conveniences. A silently absent gate reads
     # as a passing one, so say so loudly rather than skipping in silence.
