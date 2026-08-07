@@ -165,7 +165,7 @@ if(SACM_BUILD_TESTS)
         DISCOVERY_MODE PRE_TEST
         DISCOVERY_TIMEOUT 60
         TEST_FILTER "*SACM23_*:*GSN3_*"
-        PROPERTIES LABELS "library\;conformance"
+        PROPERTIES LABELS "library.conformance"
     )
     gtest_discover_tests(sacm_tests
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

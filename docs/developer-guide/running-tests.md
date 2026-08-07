@@ -16,7 +16,10 @@ proxy, not a guarantee — see
 
 ## Subsets
 
-Every test carries at least one label, and `ctest -L` selects by them.
+Every test carries at least one label, and `ctest -L` selects by them. **`-L`
+matches a regular expression, not an exact label**, which is what lets a single
+compound label such as `app.conformance` answer to both `-L app` and
+`-L conformance`.
 
 | Label | Tests | What it selects |
 |---|---:|---|
@@ -111,8 +114,16 @@ A new `add_test()` needs `LABELS` set explicitly, and `ctest_label_check` fails
 if it does not — an unlabelled test is invisible to every `-L` selection above,
 which is a quiet way to stop being run.
 
-Beware one trap when adding labels to `gtest_discover_tests`: the list must be
-escaped as `LABELS "a\;b"`. Unescaped, CMake expands it into two arguments and
-`PROPERTIES` silently keeps only the first. A direct `set_tests_properties()`
-call needs no escape. Both forms are in the build files, and the gate catches
-the mistake either way.
+One trap when adding labels to `gtest_discover_tests`: **it cannot carry a
+multi-value `LABELS` portably.** GoogleTest.cmake expands the property list
+unquoted into `set_tests_properties()`, so `LABELS "a;b"` arrives as two
+arguments and `PROPERTIES` silently keeps only `LABELS=a`. Escaping it as
+`"a\;b"` is no better — that produced two labels on CMake 4.3 and one combined
+label `'a;b'` on the CI runners, so the fix was version-dependent and CI caught
+it only because this gate existed.
+
+Use **one compound label** instead, `app.conformance` rather than `app` plus
+`conformance`. `ctest -L` matches labels as a regular expression, so `-L app`
+and `-L conformance` both select it and nothing has to survive a CMake list
+expansion. A direct `set_tests_properties()` is not re-expanded and can still
+take a real list, which is why both forms appear in the build files.

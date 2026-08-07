@@ -17,7 +17,16 @@ Three things are checked, all mechanical:
    `ctest -L` selection, so it silently stops being run by anyone using them.
 
 2. No label contains a semicolon. That is the signature of the expansion bug
-   above -- "app;contract;slow" arriving as one label rather than three.
+   above -- "app;contract;slow" arriving as one label rather than three. This
+   check caught the same mistake a second time, in its other form: escaping the
+   list as "app\\;conformance" produced two labels on CMake 4.3 and one combined
+   label on the CI runners, so the escape was version-dependent and the CI
+   failure was the gate doing its job.
+
+   Tests discovered by gtest therefore carry ONE compound label, `app.conformance`
+   rather than `app` plus `conformance`. `ctest -L` matches labels as a regular
+   expression, so the selection is identical and nothing has to survive a CMake
+   list expansion.
 
 3. `conformance` means exactly "the name embeds a requirement id", in BOTH
    directions. A test whose name carries an id must be labelled, or the
@@ -109,7 +118,10 @@ def main() -> int:
                 combined.append(f"{name}: {label!r}")
 
         has_id = bool(REQUIREMENT_ID.search(name))
-        is_conformance = "conformance" in labels
+        # Substring, not equality: a gtest-discovered test carries the compound
+        # label `app.conformance`, and `ctest -L conformance` selects it by the
+        # same regex match this mirrors.
+        is_conformance = any("conformance" in label for label in labels)
         if has_id and not is_conformance:
             missing_conformance.append(name)
         if is_conformance and not has_id and name not in CONFORMANCE_WITHOUT_ID_IN_NAME:
@@ -125,7 +137,9 @@ def main() -> int:
         (
             "labels containing a semicolon",
             combined,
-            'A list arrived as one string. In gtest_discover_tests use LABELS "a\\;b".',
+            "A list arrived as one string. gtest_discover_tests cannot carry a "
+            'multi-value LABELS portably: use one compound label ("app.conformance"), '
+            "which `ctest -L` selects by regex either way.",
         ),
         (
             "requirement-id tests missing the `conformance` label",
@@ -152,7 +166,7 @@ def main() -> int:
     if problems:
         return 1
 
-    conformance = sum(1 for test in tests if "conformance" in labels_of(test))
+    conformance = sum(1 for test in tests if any("conformance" in l for l in labels_of(test)))
     print(f"{len(tests)} tests, all labelled; {conformance} carry conformance evidence")
     return 0
 

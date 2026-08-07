@@ -496,20 +496,26 @@ include(GoogleTest)
 # but a loaded Windows runner overran 5s and reported "Process terminated due to
 # timeout" -- which reads as a broken build rather than a busy machine.
 #
-# The `\;` in LABELS is required and is not a typo. GoogleTest.cmake expands
-# ${arg_TEST_PROPERTIES} unquoted into set_tests_properties(), so a plain
-# "app;conformance" arrives as two arguments: PROPERTIES pairs them as
-# LABELS=app and silently drops the rest. That failure is invisible -- the build
-# succeeds, `ctest -N` counts every test, and only the second label is missing.
-# Escaping keeps it one value through that expansion. A direct
-# set_tests_properties() call further down needs NO escape, because nothing
-# re-expands it; both forms appear in this file for that reason.
+# Each pass sets ONE label, and `app.conformance` is one label rather than two.
+# That is deliberate and portable: a multi-value LABELS through
+# gtest_discover_tests does not survive consistently. GoogleTest.cmake expands
+# ${arg_TEST_PROPERTIES} unquoted into set_tests_properties(), so "app;conformance"
+# arrives as two arguments and PROPERTIES silently keeps only LABELS=app --
+# while escaping it as "app\;conformance" produced two labels on CMake 4.3 and
+# ONE combined label on the CI runners. Version-dependent either way, and the
+# failure is invisible: the build succeeds and `ctest -N` counts every test.
+#
+# `ctest -L` matches labels as a REGULAR EXPRESSION, so one compound label gives
+# the same selection with none of that: `-L app` matches `app` and
+# `app.conformance`, `-L conformance` matches `app.conformance` and
+# `library.conformance`. A direct set_tests_properties() call is not re-expanded
+# and can still take a real list; both forms appear in this file for that reason.
 gtest_discover_tests(tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     DISCOVERY_MODE PRE_TEST
     DISCOVERY_TIMEOUT 60
     TEST_FILTER "*SACM23_*:*GSN3_*"
-    PROPERTIES LABELS "app\;conformance"
+    PROPERTIES LABELS "app.conformance"
 )
 gtest_discover_tests(tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
