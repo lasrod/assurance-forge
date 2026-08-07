@@ -145,8 +145,12 @@ AddressSanitizer and UndefinedBehaviorSanitizer over the full test suite on
 Linux with Clang.
 
 ```bash
+# Both compilers, not just CXX: the project enables C and C++, and leaving
+# CMAKE_C_COMPILER at the default mixes toolchains — which is the one thing
+# global instrumentation exists to avoid.
 cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_COMPILER=clang++ -DAF_SANITIZE=address,undefined
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+  -DAF_SANITIZE=address,undefined
 cmake --build build-asan
 ctest --test-dir build-asan --output-on-failure
 ```
@@ -154,9 +158,17 @@ ctest --test-dir build-asan --output-on-failure
 | Aspect | Position |
 |---|---|
 | Scope | **Global**, deliberately — see below |
-| Compilers | GCC or Clang for both; MSVC has `/fsanitize=address` only, and the build refuses `undefined` there rather than ignoring it |
+| Compilers | Clang or GCC. **MSVC is refused**, with the reason — see below |
 | Failure mode | `-fno-sanitize-recover=all`, so a finding aborts |
 | When | Push to `main`, weekly, and on demand — **not** on pull requests |
+
+**MSVC is refused rather than half-supported.** It has no UndefinedBehaviorSanitizer
+at all, and its `/fsanitize=address` needs the optional *C++ AddressSanitizer*
+Visual Studio component: without it the build compiles and then dies at link
+with `cannot open file clang_rt.asan_dynamic_runtime_thunk-x86_64.lib`. That was
+measured on this repository's own toolchain, not assumed. Nothing in CI
+exercises it, so supporting it would be a claim nobody has tested — and a
+configure-time refusal naming the reason beats a link error twenty minutes in.
 
 **Global, unlike the warning policy.** A warning in hello_imgui is not ours to
 fix, so warnings are per-target. Sanitizers are the opposite: memory allocated

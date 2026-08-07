@@ -83,14 +83,23 @@ set(AF_SANITIZE "" CACHE STRING
 
 if(AF_SANITIZE)
     if(MSVC)
-        # MSVC has /fsanitize=address only; there is no UBSan.
-        if(NOT AF_SANITIZE STREQUAL "address")
-            message(FATAL_ERROR
-                "AF_SANITIZE=${AF_SANITIZE}: MSVC supports 'address' only. "
-                "Use GCC or Clang for undefined behaviour.")
-        endif()
-        message(STATUS "Sanitizers: address (MSVC)")
-        add_compile_options(/fsanitize=address)
+        # Refused rather than half-supported. MSVC has no UBSan at all, and its
+        # /fsanitize=address needs the optional "C++ AddressSanitizer" Visual
+        # Studio component: without it the build compiles and then fails at link
+        # with "cannot open file clang_rt.asan_dynamic_runtime_thunk-x86_64.lib".
+        # Measured on this toolchain, not assumed.
+        #
+        # Nothing in CI exercises MSVC here, so shipping the path would be an
+        # untested claim that this option works on Windows. It does not, unless
+        # that component happens to be installed, and a build that dies at link
+        # is a worse answer than one that says why up front.
+        message(FATAL_ERROR
+            "AF_SANITIZE is not supported with MSVC.\n"
+            "  MSVC has no UndefinedBehaviorSanitizer, and its AddressSanitizer needs the\n"
+            "  optional 'C++ AddressSanitizer' Visual Studio component to link.\n"
+            "  Use Clang or GCC:\n"
+            "    cmake -B build-asan -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \\\n"
+            "          -DCMAKE_BUILD_TYPE=Debug -DAF_SANITIZE=address,undefined")
     else()
         message(STATUS "Sanitizers: ${AF_SANITIZE}")
         add_compile_options(
