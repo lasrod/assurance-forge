@@ -90,8 +90,9 @@ def measure(gcovr_json: Path) -> dict[str, dict]:
         if component is None:
             continue  # external/, build/, tests/ -- not a component
         for line in entry.get("lines", []):
-            # gcovr emits non-executable lines too; only counted ones are
-            # coverable, which is the denominator gcovr itself reports.
+            # Every entry in gcovr's `lines` array is a coverable line -- it
+            # does not emit blanks, comments or declarations -- so the count of
+            # entries is the denominator, and `count > 0` is the numerator.
             totals[component][0] += 1
             if line.get("count", 0) > 0:
                 totals[component][1] += 1
@@ -103,7 +104,11 @@ def measure(gcovr_json: Path) -> dict[str, dict]:
         measured[name] = {
             "lines": total,
             "covered": covered,
-            "percent": round(100.0 * covered / total, 1),
+            # Display only. Comparisons use `lines` and `covered` directly, so
+            # no rounding sits between a real regression and the tolerance: a
+            # 0.25-point drop rounded to 0.2 would otherwise slip through a
+            # 0.2-point threshold.
+            "percent": round(100.0 * covered / total, 2),
         }
     if not measured:
         fail("no component matched any file in the report; the path prefixes are wrong")
@@ -118,9 +123,39 @@ def render(measured: dict[str, dict]) -> str:
             continue
         entry = measured[name]
         rows.append(
-            f"{name.ljust(width)}  {entry['lines']:6d}  {entry['covered']:7d}  {entry['percent']:6.1f}%"
+            f"{name.ljust(width)}  {entry['lines']:6d}  {entry['covered']:7d}  {entry['percent']:6.2f}%"
         )
     return "\n".join(rows)
+
+
+def load_baseline() -> dict[str, dict]:
+    """Read the committed baseline, failing with one line rather than a traceback.
+
+    This runs as a workflow gate. A stack trace in the log says "the tool broke"
+    when the actual message is "the file you are gating on is not usable", and
+    the two want different responses.
+    """
+    relative = BASELINE_PATH.relative_to(REPO)
+    try:
+        document = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"{relative} is not readable JSON: {error}")
+
+    components = document.get("components") if isinstance(document, dict) else None
+    if not isinstance(components, dict) or not components:
+        fail(f"{relative} has no 'components' object; regenerate it without --check")
+
+    for name, entry in components.items():
+        if not isinstance(entry, dict) or not {"lines", "covered"} <= entry.keys():
+            fail(f"{relative}: component '{name}' is missing 'lines' or 'covered'")
+        if not isinstance(entry["lines"], int) or entry["lines"] <= 0:
+            fail(f"{relative}: component '{name}' has a non-positive line count")
+    return components
+
+
+def exact_percent(entry: dict) -> float:
+    """Percentage from the raw counts, so no rounding precedes a comparison."""
+    return 100.0 * entry["covered"] / entry["lines"]
 
 
 def compare(measured: dict[str, dict], baseline: dict[str, dict]) -> tuple[list[str], list[str]]:
@@ -131,11 +166,10 @@ def compare(measured: dict[str, dict], baseline: dict[str, dict]) -> tuple[list[
         if now is None:
             missing.append(name)
             continue
-        drop = was["percent"] - now["percent"]
+        before, after = exact_percent(was), exact_percent(now)
+        drop = before - after
         if drop > TOLERANCE_POINTS:
-            regressions.append(
-                f"{name}: {was['percent']:.1f}% -> {now['percent']:.1f}% ({drop:.1f} points)"
-            )
+            regressions.append(f"{name}: {before:.2f}% -> {after:.2f}% ({drop:.2f} points)")
     return regressions, missing
 
 
@@ -167,7 +201,7 @@ def main() -> int:
         )
         return 1
 
-    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))["components"]
+    baseline = load_baseline()
     regressions, missing = compare(measured, baseline)
 
     if missing:
@@ -192,10 +226,12 @@ def main() -> int:
     if missing or regressions:
         return 1
 
+    # Same exact-count comparison as the regression path, so a gain and a drop
+    # are judged on the same footing.
     gains = [
-        f"{name}: {baseline[name]['percent']:.1f}% -> {measured[name]['percent']:.1f}%"
+        f"{name}: {exact_percent(baseline[name]):.2f}% -> {exact_percent(measured[name]):.2f}%"
         for name in baseline
-        if measured[name]["percent"] - baseline[name]["percent"] > TOLERANCE_POINTS
+        if exact_percent(measured[name]) - exact_percent(baseline[name]) > TOLERANCE_POINTS
     ]
     if gains:
         print(f"\n{len(gains)} component(s) improved. Regenerate the baseline to lock this in:")
