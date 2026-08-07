@@ -1,0 +1,74 @@
+name: Sanitizers
+
+# Not on pull requests, for the same reason Coverage is not: the build cannot
+# reuse the ordinary ccache (the flags differ, so every object is a miss) and
+# ASan roughly doubles the test runtime. That is a long time to add to the PR
+# feedback loop for a job whose value is finding latent defects rather than
+# reviewing a diff.
+#
+# It runs after merge, weekly to catch slow drift, and on demand. A failure here
+# names a real defect on main rather than blocking someone's branch, which is
+# the same trade Coverage makes.
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Mondays 07:00 UTC, an hour after Coverage so the two do not contend.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: sanitizers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sanitizers:
+    name: ASan + UBSan (Linux, Clang)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev \
+            libssl-dev libcurl4-openssl-dev \
+            clang
+
+      # The catalog and matrix gates only register when CMake finds Python.
+      # They are not what this job is for, but a silently absent gate reads as a
+      # passing one, so keep them present here too.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Clang rather than GCC: its ASan and UBSan diagnostics carry better
+      # symbolized traces, and Coverage already pins GCC 14, so between the two
+      # jobs both toolchains see the suite.
+      - name: Configure CMake (sanitizer build)
+        run: |
+          cmake -B build-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON \
+            -DAF_SANITIZE=address,undefined
+
+      - name: Build
+        run: cmake --build build-asan
+
+      # detect_leaks is left ON. abort_on_error makes ASan stop at the first
+      # fault rather than continuing into undefined territory, and
+      # print_stacktrace gives UBSan a trace instead of a bare source location.
+      - name: Run tests
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_leaks=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build-asan --output-on-failure --no-tests=error

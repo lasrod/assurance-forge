@@ -138,6 +138,44 @@ The selection principle is that a check earns its place by finding defects
 *here*. Enabling everything and suppressing the fallout produces a baseline
 that is mostly noise, which is a baseline nobody reads.
 
+## Sanitizers
+
+`AF_SANITIZE` instruments the whole build. The `Sanitizers` workflow runs
+AddressSanitizer and UndefinedBehaviorSanitizer over the full test suite on
+Linux with Clang.
+
+```bash
+cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_COMPILER=clang++ -DAF_SANITIZE=address,undefined
+cmake --build build-asan
+ctest --test-dir build-asan --output-on-failure
+```
+
+| Aspect | Position |
+|---|---|
+| Scope | **Global**, deliberately — see below |
+| Compilers | GCC or Clang for both; MSVC has `/fsanitize=address` only, and the build refuses `undefined` there rather than ignoring it |
+| Failure mode | `-fno-sanitize-recover=all`, so a finding aborts |
+| When | Push to `main`, weekly, and on demand — **not** on pull requests |
+
+**Global, unlike the warning policy.** A warning in hello_imgui is not ours to
+fix, so warnings are per-target. Sanitizers are the opposite: memory allocated
+by uninstrumented code and freed by instrumented code is how ASan produces
+results that are wrong in both directions. They only tell the truth when
+everything in the process is built the same way.
+
+**`-fno-sanitize-recover=all` is the load-bearing flag.** UBSan's default is to
+print a diagnostic and carry on, which exits zero — the job would go green while
+reporting undefined behaviour. Aborting is what makes this a check rather than a
+log.
+
+**Not on pull requests**, for the reason [Coverage](../COVERAGE.md) gives for
+itself: the sanitizer build shares no ccache with the ordinary one (every flag
+differs, so every object is a miss) and ASan roughly doubles the test runtime.
+That is a long time to add to the PR loop for a job whose value is finding
+latent defects rather than reviewing a diff. A failure on `main` names a real
+defect instead of blocking someone's branch.
+
 ## What is not enforced
 
 Listed rather than omitted, because a gap nobody has written down reads as a
@@ -146,7 +184,7 @@ gap nobody has.
 | Control | State |
 |---|---|
 | Static analysis (cppcheck) | **Not configured.** clang-tidy is — see [static analysis](static-analysis.md). A second opinion would catch what clang-tidy misses; no baseline exists for one. |
-| Sanitizers (ASan, UBSan) | **Not configured.** Tracked in [#292](https://github.com/lasrod/assurance-forge/issues/292). |
+| Sanitizers (ASan, UBSan) | **Configured** — see [Sanitizers](#sanitizers) below. Not on pull requests. |
 | Fuzzing | **Not configured.** Tracked in [#292](https://github.com/lasrod/assurance-forge/issues/292). |
 | Cyclomatic / cognitive complexity | **Not measured.** No tool configured. |
 | Duplicated-code detection | **Not measured.** |

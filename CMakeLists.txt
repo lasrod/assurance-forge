@@ -65,6 +65,44 @@ function(af_set_warning_level target)
     endif()
 endfunction()
 
+# --------------------------------------------------------------------
+# Sanitizers.
+#
+# Global, and deliberately so -- the opposite of the warning policy above. A
+# warning in hello_imgui is not ours to fix, but an allocation made by
+# uninstrumented code and freed by instrumented code is how ASan produces
+# results that are wrong in both directions. Sanitizers only tell the truth
+# when everything in the process is built the same way.
+#
+# -fno-sanitize-recover=all matters more than it looks. UBSan's default is to
+# print and carry on, which exits zero: the job goes green while reporting
+# undefined behaviour. Aborting is what makes this a check rather than a log.
+# --------------------------------------------------------------------
+set(AF_SANITIZE "" CACHE STRING
+    "Comma-separated sanitizers to instrument the whole build with, e.g. address,undefined. Empty disables.")
+
+if(AF_SANITIZE)
+    if(MSVC)
+        # MSVC has /fsanitize=address only; there is no UBSan.
+        if(NOT AF_SANITIZE STREQUAL "address")
+            message(FATAL_ERROR
+                "AF_SANITIZE=${AF_SANITIZE}: MSVC supports 'address' only. "
+                "Use GCC or Clang for undefined behaviour.")
+        endif()
+        message(STATUS "Sanitizers: address (MSVC)")
+        add_compile_options(/fsanitize=address)
+    else()
+        message(STATUS "Sanitizers: ${AF_SANITIZE}")
+        add_compile_options(
+            -fsanitize=${AF_SANITIZE}
+            -fno-sanitize-recover=all
+            -fno-omit-frame-pointer
+            -g
+        )
+        add_link_options(-fsanitize=${AF_SANITIZE})
+    endif()
+endif()
+
 option(ENABLE_COVERAGE "Enable code coverage instrumentation (Linux/GCC 14+ only)" OFF)
 if(ENABLE_COVERAGE)
     if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
