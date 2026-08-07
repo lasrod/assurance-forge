@@ -101,6 +101,7 @@ nav:
       - Overview: developer-guide/index.md
       - Documentation Map: documentation-map.md
       - Generating Class Diagrams: developer-guide/generating-class-diagrams.md
+      - Running Tests: developer-guide/running-tests.md
       - Repository Quality Baseline: quality/repository-baseline.md
       - Code Quality Policy: quality/code-quality-policy.md
       - Static Analysis: quality/static-analysis.md

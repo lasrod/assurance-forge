@@ -480,9 +480,43 @@ add_dependencies(tests assurance-forge-mcp)
 af_copy_sccg_data(tests)
 include(GoogleTest)
 
+# Registered in two passes so that conformance evidence carries a label the
+# ordinary tests do not (issue #292). The split rule is mechanical rather than
+# editorial: a test whose name embeds a requirement id IS the evidence for that
+# requirement, which `sacm_matrix_check` already enforces in the other
+# direction. Nothing here decides what counts as conformance; the test's own
+# name does.
+#
+# The two filters are exact complements in gtest's own filter semantics -- a
+# leading `-` means "everything except" -- so every test lands in exactly one
+# pass. Union and disjointness hold by construction, not by a list kept in step
+# by hand, and `ctest -N` counts the same total before and after.
+#
+# DISCOVERY_TIMEOUT is raised from the 5s default. Listing takes ~0.4s locally,
+# but a loaded Windows runner overran 5s and reported "Process terminated due to
+# timeout" -- which reads as a broken build rather than a busy machine.
+#
+# The `\;` in LABELS is required and is not a typo. GoogleTest.cmake expands
+# ${arg_TEST_PROPERTIES} unquoted into set_tests_properties(), so a plain
+# "app;conformance" arrives as two arguments: PROPERTIES pairs them as
+# LABELS=app and silently drops the rest. That failure is invisible -- the build
+# succeeds, `ctest -N` counts every test, and only the second label is missing.
+# Escaping keeps it one value through that expansion. A direct
+# set_tests_properties() call further down needs NO escape, because nothing
+# re-expands it; both forms appear in this file for that reason.
 gtest_discover_tests(tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 60
+    TEST_FILTER "*SACM23_*:*GSN3_*"
+    PROPERTIES LABELS "app\;conformance"
+)
+gtest_discover_tests(tests
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 60
+    TEST_FILTER "-*SACM23_*:*GSN3_*"
+    PROPERTIES LABELS "app"
 )
 add_test(
     NAME SccgDataRuntimeCopy
@@ -490,6 +524,7 @@ add_test(
     "${AF_SCCG_DIST_DIR}/review_profiles.json"
     "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
 )
+set_tests_properties(SccgDataRuntimeCopy PROPERTIES LABELS "gate")
 
 # --- MCP stdio transport gates ---
 # The unit tests cover dispatch; these drive the real process through real pipes,
@@ -507,6 +542,10 @@ foreach(_mcp_mode granted withheld)
             -DAF_MCP_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -P ${CMAKE_SOURCE_DIR}/cmake/run_mcp_smoke_test.cmake
     )
+    # `contract`: these assert the wire behaviour an external client depends on,
+    # driving the real process through real pipes. `slow` because each starts a
+    # process, which is the thing worth excluding when iterating.
+    set_tests_properties(McpStdioSmoke_${_mcp_mode} PROPERTIES LABELS "app;contract;slow")
 endforeach()
 
 # Localization catalog consistency gate: fails if any source msgid is missing
@@ -582,6 +621,37 @@ if(Python3_Interpreter_FOUND)
     add_test(
         NAME verification_index_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/docs/generate_verification_index.py" --check
+    )
+
+    # CTest label gate. Labels decide what `ctest -L` runs and which tests count
+    # as conformance evidence, and a wrong label is silent: the build succeeds,
+    # `ctest -N` still counts every test, and only the selection is wrong. This
+    # asserts every test carries a label, that no label is a semicolon-joined
+    # string (the signature of the CMake list-expansion trap documented at the
+    # discovery calls), and that `conformance` means exactly "the name embeds a
+    # requirement id" in both directions.
+    add_test(
+        NAME ctest_label_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/repo/check_ctest_labels.py"
+                --build-dir "${CMAKE_BINARY_DIR}" --config "$<CONFIG>"
+    )
+
+    # `gate`: these check the repository rather than the product -- catalogues,
+    # matrices, documentation, committed artifacts. They need no build, run in
+    # about a second together, and are the set worth running before pushing.
+    # Listed by name rather than swept up by a pattern, so a new gate has to say
+    # it is one.
+    set_tests_properties(
+        i18n_catalog_check
+        sacm_matrix_check
+        gsn_matrix_check
+        feature_matrix_check
+        no_committed_artifacts_check
+        documentation_check
+        layer_gate_negative_check
+        verification_index_check
+        ctest_label_check
+        PROPERTIES LABELS "gate"
     )
 else()
     # These are compliance gates, not conveniences. A silently absent gate reads

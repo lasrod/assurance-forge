@@ -156,9 +156,23 @@ if(SACM_BUILD_TESTS)
         )
     endif()
     include(GoogleTest)
+    # Two passes, so conformance evidence is selectable apart from the rest.
+    # The filters are exact complements in gtest's own semantics, so every test
+    # lands in exactly one. See the longer note at the `tests` registration in
+    # the top-level CMakeLists (issue #292).
     gtest_discover_tests(sacm_tests
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         DISCOVERY_MODE PRE_TEST
+        DISCOVERY_TIMEOUT 60
+        TEST_FILTER "*SACM23_*:*GSN3_*"
+        PROPERTIES LABELS "library\;conformance"
+    )
+    gtest_discover_tests(sacm_tests
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        DISCOVERY_MODE PRE_TEST
+        DISCOVERY_TIMEOUT 60
+        TEST_FILTER "-*SACM23_*:*GSN3_*"
+        PROPERTIES LABELS "library"
     )
     # CLI smoke workflows (SACM23-CLI-001). These cover the round-trip and
     # validate paths that were previously only exercised by hand, so the
@@ -184,4 +198,16 @@ if(SACM_BUILD_TESTS)
              COMMAND sacm_cli validate "${SACM_CLI_FIXTURES}/invalid/ids-duplicate-invalid.sacm.xmi")
     set_tests_properties(SacmCliValidateReportsDuplicateIdDiagnostic PROPERTIES
         PASS_REGULAR_EXPRESSION "SACM-ID-001")
+
+    # `cli` because they drive the real executable rather than the library API,
+    # and `conformance` because SACM23-CLI-001 rests on them -- the same rule
+    # the gtest split uses, applied by hand here because these names carry the
+    # requirement in the matrix rather than in the test name.
+    set_tests_properties(
+        SacmCliVersionSmoke
+        SacmCliRoundtripStrict
+        SacmCliValidateRejectsDuplicateIds
+        SacmCliValidateReportsDuplicateIdDiagnostic
+        PROPERTIES LABELS "library;cli;conformance"
+    )
 endif()
