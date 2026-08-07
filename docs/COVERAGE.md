@@ -19,9 +19,12 @@ Two reasons:
   the toolchain bump only affects this single workflow. `ci.yml` and
   `release.yml` continue to use the default GCC 13 unchanged.
 
-## Why two report views
+## Why several report views
 
-The workflow produces two HTML reports as a single artifact:
+The workflow produces four HTML reports as a single artifact (this section
+described two of them for some time after the other two were added, which is
+why it now names them all), plus the per-component figures below. The two that
+carry the argument:
 
 - `coverage_full/` — every translation unit under `src/`. Honest
   picture of the whole codebase, including UI panels and the
@@ -37,6 +40,46 @@ of code that cannot be tested headlessly with the current test
 infrastructure. Reporting only the core view hides the gap that GUI
 code has no automated coverage. Publishing both lets a reviewer see
 both perspectives.
+
+Two more are published alongside them: `coverage_logic/` (the headline logic
+scope, defined in `gcovr-logic.cfg`) and `coverage_sacm/` (the SACM library
+alone, because it is the surface every conformance claim rests on and a
+combined number would let a library regression hide behind application
+coverage).
+
+## Per-component coverage, and the ratchet
+
+Each of the four scopes above is an average, and an average is exactly what
+hides a subsystem getting worse: a drop in `src/parser` disappears inside a
+number dominated by `src/core`. The workflow therefore also reports **coverage
+per component** — `libs/sacm`, `src/core`, `src/ui`, `src/app`, `src/parser`
+and the rest — from a single machine-readable `gcovr --json` run.
+
+```bash
+python tools/quality/coverage_components.py --gcovr-json coverage.json
+python tools/quality/coverage_components.py --gcovr-json coverage.json --check
+```
+
+**Each component is held to its own measured value**, recorded in
+`docs/quality/coverage-baseline.json`. That is deliberate and is what
+[#292](https://github.com/lasrod/assurance-forge/issues/292) asks for: a single
+repository-wide floor would be satisfied by `libs/sacm` at 84% while `src/ui`
+fell straight through it.
+
+Three rules the check follows:
+
+- **Only decreases fail.** A rise updates nothing automatically — the baseline
+  is regenerated deliberately, so an improvement is a commit somebody made
+  rather than a number that drifted upward on its own.
+- **A component that vanishes from the report is a failure, not an absence.**
+  That is what a build which stopped compiling a subsystem looks like, and it
+  would otherwise read as "nothing to report here".
+- **Generate or check, never both in one run.** Checking a baseline generated
+  moments earlier is a gate that cannot fail. The workflow generates only when
+  no baseline is committed, and says so.
+
+Tolerance is 0.2 percentage points: enough to absorb a line moving between
+files, not enough to absorb a subsystem losing tests.
 
 ## Why these gcovr flags
 

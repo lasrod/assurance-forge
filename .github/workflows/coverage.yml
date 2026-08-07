@@ -106,7 +106,40 @@ jobs:
             --html-details coverage_sacm/index.html \
             --print-summary
 
+      # Per-component figures (issue #292). The four scopes above are each a
+      # useful view and none answers "did the subsystem I just changed get
+      # worse": a drop in src/parser is invisible inside a number averaged over
+      # src/core. One machine-readable gcovr run feeds the aggregation.
+      - name: Generate machine-readable coverage
+        run: |
+          gcovr -r . build-coverage \
+            --gcov-executable gcov-14 \
+            --exclude 'external/' \
+            --exclude 'build-coverage/' \
+            --exclude '_deps/' \
+            --exclude-throw-branches \
+            --exclude-unreachable-branches \
+            --json coverage.json
+
+      # Generate OR check, never both in one run. Generating and then checking
+      # what was just generated is a gate that cannot fail -- the exact shape of
+      # vacuous evidence this workstream exists to remove.
+      - name: Per-component coverage
+        run: |
+          if [ -f docs/quality/coverage-baseline.json ]; then
+            python tools/quality/coverage_components.py --gcovr-json coverage.json --check
+          else
+            echo "No committed baseline yet: generating one for this run."
+            echo "Download the coverage-reports artifact, commit"
+            echo "docs/quality/coverage-baseline.json, and this becomes a ratchet."
+            python tools/quality/coverage_components.py --gcovr-json coverage.json
+          fi
+
       - name: Upload coverage HTML reports
+        # Upload even when the ratchet above failed: the reports are how anyone
+        # works out which lines went uncovered, which is exactly what a failure
+        # needs next.
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: coverage-reports
@@ -115,3 +148,5 @@ jobs:
             coverage_full/
             coverage_core/
             coverage_sacm/
+            coverage.json
+            docs/quality/coverage-baseline.json
