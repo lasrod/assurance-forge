@@ -4,10 +4,12 @@
 #include "core/string_utils.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <iomanip>
 #include <nlohmann/json.hpp>
 #include <sstream>
+#include <system_error>
 #include <unordered_map>
 
 namespace core::confidence {
@@ -423,9 +425,23 @@ std::string NextAssessmentId(const ConfidenceStore& store) {
         const std::string prefix = "conf-";
         if (assessment.id.rfind(prefix, 0) != 0)
             continue;
-        try {
-            max_id = std::max(max_id, std::stoi(assessment.id.substr(prefix.size())));
-        } catch (...) {}
+        // An id whose suffix is not a number is one this function did not
+        // generate, and it cannot constrain the next number. Asked rather than
+        // caught: `std::stoi` said the same thing by throwing into an empty
+        // `catch (...)`, which also stood ready to swallow anything else thrown
+        // in the loop. Nothing else throws there today -- and an empty catch is
+        // how that stops being something anyone has to keep true.
+        //
+        // Deliberately parses a numeric *prefix*, as `std::stoi` did, rather
+        // than requiring the whole suffix to be digits: for "what is the highest
+        // number already used", counting more is the safe direction. The two
+        // agree on every input except a suffix led by whitespace or '+', which
+        // `stoi` accepted and no id this function generates can contain.
+        const std::string suffix = assessment.id.substr(prefix.size());
+        int parsed = 0;
+        const std::from_chars_result result = std::from_chars(suffix.data(), suffix.data() + suffix.size(), parsed);
+        if (result.ec == std::errc())
+            max_id = std::max(max_id, parsed);
     }
     std::ostringstream out;
     out << "conf-" << std::setw(6) << std::setfill('0') << (max_id + 1);

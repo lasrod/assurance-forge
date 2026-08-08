@@ -9,6 +9,8 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <regex>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -224,6 +226,57 @@ TEST(ConfidenceStoreTest, GenerateSacmGidUsesFullUuidShapeAndEntropy) {
             saw_nonzero_final_prefix = true;
     }
     EXPECT_TRUE(saw_nonzero_final_prefix);
+}
+
+// Characterization, added in #306 alongside replacing the `std::stoi` /
+// `catch (...) {}` pair in NextAssessmentId with `std::from_chars`. These
+// assertions describe the behaviour that existed before that change and must
+// still hold after it -- they were run against both implementations, and pass
+// on both. The parsing is what decides whether a new assessment can be given an
+// id that is already taken, so it is worth pinning before it is rewritten.
+namespace {
+
+core::confidence::ConfidenceStore StoreWithAssessmentIds(const std::vector<std::string>& ids) {
+    core::confidence::ConfidenceStore store;
+    for (const std::string& id : ids) {
+        core::confidence::ConfidenceAssessment assessment;
+        assessment.id = id;
+        store.assessments.push_back(std::move(assessment));
+    }
+    return store;
+}
+
+} // namespace
+
+TEST(ConfidenceStoreTest, NextAssessmentIdContinuesFromTheHighestNumberInUse) {
+    EXPECT_EQ(core::confidence::NextAssessmentId(StoreWithAssessmentIds({})), "conf-000001");
+    EXPECT_EQ(core::confidence::NextAssessmentId(StoreWithAssessmentIds({"conf-000001"})), "conf-000002");
+    // The highest wins, not the last, and not the count.
+    EXPECT_EQ(core::confidence::NextAssessmentId(StoreWithAssessmentIds({"conf-000009", "conf-000003"})),
+              "conf-000010");
+    EXPECT_EQ(core::confidence::NextAssessmentId(StoreWithAssessmentIds({"conf-000042"})), "conf-000043");
+}
+
+TEST(ConfidenceStoreTest, NextAssessmentIdSkipsIdsItCouldNotHaveGenerated) {
+    // Wrong prefix, and an unparseable suffix: neither constrains the next
+    // number, and neither may abandon the scan of the ids that do.
+    const core::confidence::ConfidenceStore store =
+        StoreWithAssessmentIds({"other-000500", "conf-", "conf-abc", "conf-000007"});
+    EXPECT_EQ(core::confidence::NextAssessmentId(store), "conf-000008");
+}
+
+TEST(ConfidenceStoreTest, NextAssessmentIdReadsTheNumericPrefixOfASuffix) {
+    // `std::stoi` stopped at the first non-digit rather than rejecting the id,
+    // and `std::from_chars` is asked here without requiring full consumption so
+    // that it still does. Counting more is the safe direction for "the highest
+    // number already used".
+    EXPECT_EQ(core::confidence::NextAssessmentId(StoreWithAssessmentIds({"conf-000012corrupt"})), "conf-000013");
+}
+
+TEST(ConfidenceStoreTest, NextAssessmentIdIgnoresANumberTooLargeToBeAnId) {
+    // Out of `int` range. This threw `std::out_of_range` before and reports
+    // `result_out_of_range` now; both mean the id does not constrain the next.
+    EXPECT_EQ(core::confidence::NextAssessmentId(StoreWithAssessmentIds({"conf-99999999999999999999"})), "conf-000001");
 }
 
 TEST(ConfidenceControllerTest, RefreshStaleFlagsDoesNotEmitDirtyEvent) {
