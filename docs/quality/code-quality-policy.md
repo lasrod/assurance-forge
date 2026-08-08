@@ -2,7 +2,31 @@
 
 What is enforced mechanically, what is only measured, and what is not checked at
 all. Companion to the [repository quality baseline](repository-baseline.md),
-which records the numbers at a point in time; this page records the rules.
+which records the numbers at a point in time; this page records the rules —
+including, under [Refactoring discipline](#refactoring-discipline), the ones a
+reviewer enforces rather than a machine. Where cleanup should start is the
+[hotspot register](hotspot-register.md).
+
+## Formatting
+
+C++ formatting is enforced at commit time, not in CI. `cmake --preset default`
+installs `.githooks/pre-commit` via `core.hooksPath`, and the hook runs
+clang-format over what is staged. A file staged with unstaged edits alongside
+it is reported rather than rewritten, so formatting never sweeps
+work-in-progress into a commit.
+
+**There is no CI format gate, and the absence is deliberate**, recorded here so
+it is not read as an oversight. The hook runs on every machine that configured
+the project the documented way; the failure a gate would catch is a contributor
+who bypassed hooks, which has not happened. If it does, this decision gets
+revisited with that evidence in hand.
+
+Configuration is `.clang-format` at the repository root: `ColumnLimit: 120`,
+and `SortIncludes: Never` because include order is semantic on Windows and for
+some third-party headers — a formatter must not reorder it.
+
+Only C++ has a formatter. CMake, Python, Markdown, YAML and JSON do not — see
+[Not yet enforced](#not-yet-enforced).
 
 ## Compiler warnings
 
@@ -223,36 +247,67 @@ That is a long time to add to the PR loop for a job whose value is finding
 latent defects rather than reviewing a diff. A failure on `main` names a real
 defect instead of blocking someone's branch.
 
-## What is not enforced
+## Repository gates
 
-Listed rather than omitted, because a gap nobody has written down reads as a
-gap nobody has.
+The mechanical enforcement points, gathered in one place. Which page is
+canonical for each policy the gates protect is the
+[documentation map](../documentation-map.md)'s to say.
 
-| Control | State |
+The repository gates run under `ctest` (`ctest -L gate` runs the no-build
+subset in about a second):
+
+| Gate | Fails when |
 |---|---|
-| Static analysis (cppcheck) | **Not configured.** clang-tidy is — see [static analysis](static-analysis.md). A second opinion would catch what clang-tidy misses; no baseline exists for one. |
-| Sanitizers (ASan, UBSan) | **Configured** — see [Sanitizers](#sanitizers) below. Not on pull requests. |
-| Fuzzing | **Not configured.** Tracked in [#292](https://github.com/lasrod/assurance-forge/issues/292). |
-| Cyclomatic / cognitive complexity | **Not measured.** No tool configured. |
-| Duplicated-code detection | **Not measured.** |
-| Formatting | `clang-format` on commit via `.githooks/pre-commit`. No CI gate. |
-| Per-subsystem CMake dependency narrowing | **Open.** See [layers and ownership](../architecture/layers-and-ownership.md). |
+| `i18n_catalog_check` | A source msgid is missing from the `.po`, the committed `.mo` is stale, or a translation carries a printf specifier |
+| `sacm_matrix_check` | A `verified` conformance row has no ID-bearing test, a test names a requirement that does not exist, or a cited path moved |
+| `gsn_matrix_check` | GSN taxonomy, statuses, or cited evidence drift |
+| `feature_matrix_check` | A `supported` capability row cites no existing test, or the exported JSON is stale |
+| `no_committed_artifacts_check` | A build log, test output, or scratch file is tracked by git |
+| `documentation_check` | A broken internal link, an unreachable page, an unmarked generated doc, or an architecture page missing a subsystem |
+| `layer_gate_negative_check` | The layer gate stops rejecting a synthetic violation — a self-test of the only mechanical guard on the architecture |
+| `verification_index_check` | The verification index no longer matches the records' front matter |
+| `evidence_package_check` | The release evidence-package generator no longer works against the current checkout |
+| `agent_definition_check` | A generated agent definition under `.claude/agents/` or `.codex/agents/` was hand-edited or diverges from `.agents/agents/` |
+| `ctest_label_check` | A test carries no label, a malformed one, or a `conformance` label that does not match an ID-bearing test name |
 
-## Hotspots
+More controls run outside `ctest`:
 
-From the [baseline](repository-baseline.md), ranked by size and change
-frequency together rather than either alone. Neither is a defect count; they
-rank where cleanup is most likely to pay for itself.
+| Control | Where | What it rejects |
+|---|---|---|
+| Layer dependency gate | Configure time, `cmake/check_layer_gates.cmake` | An `#include` that crosses a layer boundary |
+| Warnings as errors | CI, all three platforms | Any new compiler warning — see [above](#warnings-are-errors-in-ci-not-locally) |
+| clang-tidy ratchet | Its own CI job | A finding count that grew — see [static analysis](static-analysis.md) |
+| clang-format | `.githooks/pre-commit` | Unformatted staged C++ — see [Formatting](#formatting) |
 
-| Area | Signal |
-|---|---|
-| `src/app/app_runtime.*` | Leads both lists — 62 and 48 commits, 1,271 lines |
-| `src/app/app_runtime_project.cpp` | Near the top of both — 43 commits, 1,973 lines |
-| `libs/sacm/src/io/xmi_reader.cpp` | Largest file at 2,299 lines; also the shadowing cluster above |
-| `src/core/audit/event_replayer.cpp` | 1,979 lines |
-| `src/core` overall | A third of production code, under a standing instruction to keep it small |
+## Refactoring discipline
 
-### Found by turning warnings on
+The cleanup programme's rules, from
+[#293](https://github.com/lasrod/assurance-forge/issues/293). Nothing
+mechanical rejects a pull request that breaks them; review does. They are
+written down so a review argument can cite a rule rather than a taste.
+
+1. **Mechanical and behavioural changes never share a PR.** A rename, move, or
+   extraction that also changes behavior hides the behavior change behind the
+   diff noise, which is where regressions in safety-case handling would live.
+2. **Characterization tests come before risky change.** Before restructuring
+   code that is complex or weakly understood — the
+   [hotspot register](hotspot-register.md)'s top rows — add tests that record
+   current behavior, land them first, and leave them untouched by the
+   restructuring. A characterization test edited in the same PR as the change
+   it guards proves nothing.
+3. **Every refactoring PR states what it reduces** — a responsibility, a
+   dependency, a complexity, a defect risk — in terms someone can check
+   afterwards. "Cleanup" is not a rationale. A PR targeting a register row
+   cites the row and its stated reduction criterion.
+4. **Extract and narrow rather than relocate.** Moving complexity between
+   files without reducing a responsibility or an interface moves the problem
+   to where the next reader has not learned to look for it.
+5. **No large naming-only PRs** unless they resolve a documented ambiguity —
+   the `sacm/` include-prefix collision
+   ([#341](https://github.com/lasrod/assurance-forge/issues/341)) being the
+   standing example of one that would qualify.
+
+### A worked example of rule 1
 
 The `/W4` unreferenced-parameter warning pointed at a `ProcessChallenge`
 parameter that was passed but never used. That omission was deliberate — a
@@ -271,3 +326,26 @@ a change about warning levels. The whole suite passed unchanged afterwards, with
 no test edited to accommodate the removal — which is what distinguishes deleting
 dead state from changing behaviour. Had a test needed adjusting, the set was
 being read after all and the removal would have been wrong.
+
+## Hotspots
+
+Ranked in the [hotspot register](hotspot-register.md), by measured size, churn,
+fan-in and domain risk together rather than any alone. The register states, for
+each entry, what a reduction would observably look like — the criterion rule 3
+above asks a refactoring PR to cite.
+
+## Not yet enforced
+
+Listed rather than omitted, because a gap nobody has written down reads as a
+gap nobody has. Each row states the intended shape, so the follow-up issue that
+picks it up has a spec to point at.
+
+| Control | State | Intended shape when picked up |
+|---|---|---|
+| cppcheck | Not configured | A second opinion beside clang-tidy under the same arrangement: report mode against a committed, version-pinned baseline first, ratchet after triage. |
+| Cyclomatic / cognitive complexity | Not measured | Report-mode measurement (lizard, or clang-tidy's `readability-function-cognitive-complexity`) feeding the [hotspot register](hotspot-register.md)'s ranking. No gate until a baseline exists. |
+| Duplicated-code detection | Not measured | A clone detector in report mode first. Turning warnings on found six duplicated helpers in one file pair by accident, so there is reason to expect signal. |
+| Dead code across translation units | Compiler warnings only | `-Wunused-function` and its MSVC equivalents catch file-local dead code; cross-TU dead code needs linker-assisted or dedicated tooling. |
+| Formatting beyond C++ | Not configured | The same hook-first arrangement as clang-format: one pinned tool per language for CMake, Python, Markdown, YAML and JSON, applied on commit, no CI gate. |
+| Fuzzing | Not configured | Tracked in [#292](https://github.com/lasrod/assurance-forge/issues/292). |
+| Per-layer include roots | Open | An undeclared cross-layer include fails to compile — [#340](https://github.com/lasrod/assurance-forge/issues/340). |

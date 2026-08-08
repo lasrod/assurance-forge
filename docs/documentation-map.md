@@ -64,6 +64,7 @@ canonical source wins on conflict.
 | How releases are cut and what release notes must say | [Releasing](RELEASING.md) |
 | Measured repository state at a point in time | [Quality baseline](quality/repository-baseline.md) |
 | Warning levels, suppressions, and what is not enforced | [Code quality policy](quality/code-quality-policy.md) |
+| Where cleanup pays for itself, ranked by measured risk | [Hotspot register](quality/hotspot-register.md) |
 
 ## What belongs where
 
