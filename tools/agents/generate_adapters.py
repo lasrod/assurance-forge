@@ -55,6 +55,22 @@ def render_claude(agent: dict, manifest: dict) -> str:
     return "\n".join(lines) + body.strip() + "\n"
 
 
+def toml_basic_string(value: str) -> str:
+    """Quote a value as a TOML basic string, escaping what TOML requires.
+
+    Without this, a description containing a double quote emitted TOML that
+    `tomllib` refuses to parse -- and the generator wrote it out happily, because
+    nothing downstream tried to read the result back. A generator that can emit a
+    file its own platform cannot load is worse than a hand-written one.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    for char, replacement in (("\n", "\\n"), ("\r", "\\r"), ("\t", "\\t"), ("\b", "\\b"), ("\f", "\\f")):
+        escaped = escaped.replace(char, replacement)
+    # Remaining control characters have no short escape and must be \uXXXX.
+    escaped = "".join(c if c >= " " or c in "\\" else f"\\u{ord(c):04X}" for c in escaped)
+    return f'"{escaped}"'
+
+
 def render_codex(agent: dict, manifest: dict) -> str:
     """TOML with the three keys the Codex agent format carries.
 
@@ -75,8 +91,8 @@ def render_codex(agent: dict, manifest: dict) -> str:
     # files had it. A newline before it would land inside the string: TOML trims
     # one after the opening `"""` and none before the closing one.
     return (
-        f'name = "{fields["name"]}"\n'
-        f'description = "{fields["description"]}"\n'
+        f"name = {toml_basic_string(fields['name'])}\n"
+        f"description = {toml_basic_string(fields['description'])}\n"
         f'developer_instructions = """\n{body.strip()}"""\n'
     )
 

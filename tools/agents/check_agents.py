@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tomllib
 
 from agent_defs import (
     REPO,
@@ -33,6 +34,7 @@ from agent_defs import (
     load_agents,
     load_manifest,
     load_schema,
+    parse_list,
 )
 from generate_adapters import planned_outputs
 
@@ -67,6 +69,12 @@ def check_frontmatter(agent: dict, schema: dict, manifest: dict) -> list[str]:
             )
         if rule.get("must_match_filename") and value != agent["stem"]:
             problems.append(f"{source}: `{key}` is {value!r} but the file is named {agent['stem']!r}")
+        # A list field is checked after parsing, not before. `tools: ,` is a
+        # non-empty string that parses to no entries, and it reached the
+        # generator, which emitted a bare `tools:` line into the Claude adapter
+        # and "Your tools are ." into the authority section.
+        if rule.get("type") == "list" and not parse_list(value):
+            problems.append(f"{source}: `{key}` is {value!r}, which lists nothing")
 
     for key in fields:
         if key not in rules:
@@ -211,6 +219,18 @@ def main() -> int:
             stale.append(f"{path.relative_to(REPO).as_posix()}: missing")
         elif path.read_text(encoding="utf-8") != content:
             stale.append(f"{path.relative_to(REPO).as_posix()}: differs from its canonical definition")
+        # Read the generated file back with the platform's own parser. Comparing
+        # a string against a string says the adapter matches the definition; it
+        # says nothing about whether the platform can load it. An unescaped quote
+        # in a description produced TOML `tomllib` rejects, and the generator
+        # wrote it out without complaint because nothing tried to read it.
+        if path.suffix == ".toml":
+            try:
+                tomllib.loads(content)
+            except tomllib.TOMLDecodeError as error:
+                stale.append(
+                    f"{path.relative_to(REPO).as_posix()}: generated content is not valid TOML ({error})"
+                )
 
     for platform, spec in manifest["platforms"].items():
         directory = REPO / spec["output_dir"]
