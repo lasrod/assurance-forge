@@ -322,12 +322,20 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
     return has_children && open;
 }
 
+namespace {
+
 // One entry of the tree-view work stack: either a node to render, or a sentinel that closes the
 // level opened for the node it follows.
+//
+// Internal, like the walk that owns it: it exists only for `RenderTreeNode`, which is already
+// `static`. At file scope it had external linkage, which is a name in every translation unit's
+// namespace for a type nothing outside this one can use.
 struct TreeWalkEntry {
     const core::TreeNode* node = nullptr; // null marks the end of a subtree
     bool opened_imgui_level = false;      // sentinel only: TreePop (nested) vs PopID (capped)
 };
+
+} // namespace
 
 // Iterative depth-first walk of the tree. A recursive renderer would overflow the call stack on
 // very deep argument chains (the tree is expanded by default), silently terminating the app. An

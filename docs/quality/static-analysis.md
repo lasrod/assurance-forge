@@ -15,8 +15,18 @@ therefore no claim about the codebase in either direction.
 | Runner | `tools/quality/run_clang_tidy.py` |
 | Machine-readable | [clang-tidy-baseline.json](clang-tidy-baseline.json) |
 | Scope | 255 production translation units |
-| Findings | 90 |
+| Findings | 69 (was 90; [#306](https://github.com/lasrod/assurance-forge/issues/306) closed the 21 correctness findings) |
 | Runtime | ~9 minutes at 14-way parallelism |
+
+!!! warning "CI runs a different clang-tidy than this baseline records"
+
+    The baseline above is generated with 22.1.4. CI runs **20.1.8** — whatever
+    the runner image ships — so the ratchet compares one tool against another.
+    It has produced failures on findings nobody introduced *and* let a finding
+    through that the baseline's version reports. Tracked in
+    [#317](https://github.com/lasrod/assurance-forge/issues/317); until it is
+    fixed, treat a surprising result from the pull-request job as a version
+    question first.
 
 ## Running it
 
@@ -43,7 +53,8 @@ codebase**, not by being enabled in someone else's.
 
 Every family was run over all 255 translation units before being kept or
 dropped. The four enabled families with no exclusions produce **4,784**
-findings; the enabled set produces **90**. The difference is not leniency —
+findings; the enabled set produced **90** when it was first measured. The
+difference is not leniency —
 nine checks account for 4,694 of the raw count (98%), five of them for 4,586
 between them, and each is wrong here for a reason:
 
@@ -71,49 +82,59 @@ reinstated; the argument against each is recorded so it can be contested.
 
 ## Current findings
 
-90 findings, none yet fixed. They are baselined so the count cannot grow, and
-triaged into a follow-up rather than fixed here — configuring a tool and
-changing behaviour are separate responsibilities, and the second needs tests.
+69 findings. All 21 that described a **correctness** problem were triaged and
+closed by [#306](https://github.com/lasrod/assurance-forge/issues/306); what
+remains is style and performance preferences, baselined so the count cannot
+grow.
 
 ### By area
 
 | Area | Findings |
 |---|---|
-| `src/core` | 34 |
-| `src/ui` | 25 |
-| `src/app` | 20 |
-| `src/bridge` | 3 |
+| `src/core` | 24 |
+| `src/ui` | 22 |
+| `src/app` | 14 |
 | `libs/sacm` | 2 |
-| `src/mcp` | 2 |
+| `src/bridge` | 2 |
 | `src/sacm_adapter` | 2 |
 | `src/ai` | 1 |
 | `src/export` | 1 |
+| `src/mcp` | 1 |
 
-`libs/sacm` contributing 2 of 90 is worth noting: the reusable library every
+`libs/sacm` contributing 2 of 69 is worth noting: the reusable library every
 SACM conformance claim rests on is the cleanest part of the tree by this
-measure. `src/core`, `src/ui` and `src/app` hold 79 of the 90 between them,
+measure. `src/core`, `src/ui` and `src/app` hold 60 of the 69 between them,
 which is roughly what their share of the code predicts — this ranks nothing on
 its own, and is not a defect density.
 
-### The ones that look like defects
+### What the correctness findings turned out to be
 
-Not all 90 are bugs. These are the subset where the check describes a
-correctness problem rather than a style or performance preference:
+The 21 findings whose checks describe a correctness problem — rather than a
+style or performance preference — were the subject of #306. The result is worth
+recording, because it is not the one the triage expected:
 
-| Finding | Where | Risk |
-|---|---|---|
-| Unchecked `std::optional` access (×12) | `draft_workspace_store.cpp` ×3, `app_state.cpp` ×3 + header, `proposal_actions.cpp`, `app_runtime_io.cpp`, `canvas_history_overlay.cpp`, `element_edit_controller.cpp`, `mcp/server.cpp` | Dereferencing an empty optional is undefined behaviour. These sit in draft and project state — the data this tool exists to not lose. |
-| `bugprone-unused-return-value` | `core/project_service.cpp:78` | A result that "should not be disregarded" is disregarded. Unchecked errors are named explicitly in #293's scope. |
-| `bugprone-empty-catch` | `core/confidence/confidence_store.cpp:428` | An exception is swallowed silently. |
-| `bugprone-return-const-ref-from-parameter` (×2) | `app/app_runtime.cpp:500,524` | Use-after-free if the argument is a temporary. |
-| `bugprone-incorrect-roundings` (×2) | `ui/gsn/gsn_canvas.cpp:682`, `ui/panels/history_timeline_panel.cpp:87` | `(double + 0.5)` cast rounds incorrectly for negatives. |
-| `bugprone-inc-dec-in-conditions` | `ui/gsn/gsn_terminology_card.cpp:318` | Modification and reference in one condition; evaluation order. |
-| `bugprone-implicit-widening-of-multiplication-result` | `bridge/transport.cpp:35` | A multiplication in `unsigned int` widened to `size_t` afterwards — overflow before the widening. |
-| `bugprone-narrowing-conversions` | `core/project_file_io.cpp:153` | `size_type` to `streamsize`, implementation-defined. |
+**None of the 21 was reachable.** Every one was a real observation about code
+being harder to read than it needed to be; none was a defect a user could hit.
+For the largest group, twelve unchecked `std::optional` accesses, the deciding
+fact was that `core::AppState::current_project` is assigned in two places and
+never `reset()`, so no path can empty it once a project is open.
 
-None is confirmed to be a live bug — a static-analysis finding is a question,
-not a verdict, and several may be unreachable in practice. Confirming or
-dismissing each is the follow-up's job.
+Outcomes: 20 restructured so the invariant is visible to both a reader and the
+analyser, and 1 justified as a false positive with its reason recorded in the
+source. One `NOLINT` carries a rationale; a second, in `bridge/transport.cpp`,
+suppresses an unrelated Windows-SDK false positive and is tracked for removal
+under #317.
+
+**And the one genuine defect in that code was not among them.** Reviewing the
+`bugprone-narrowing-conversions` fix in `core/project_file_io.cpp` surfaced that
+`ReadFileBytes` reported success on a short read, returning a zero-padded
+buffer — into `Sha256File`, which produces the hashes `af.proj` records for
+every tracked file. No enabled check reported it; a reviewer reading the
+surrounding function did.
+
+That is not an argument against the tool. It is the argument for baselining and
+ratcheting one rather than treating it as the definition of correctness:
+**"clang-tidy is clean" and "this code is right" are different claims.**
 
 ## The ratchet
 
