@@ -1,6 +1,7 @@
 #include "core/assurance_tree.h"
 #include "core/gsn_layout.h"
 #include "imgui.h"
+#include "imgui_internal.h" // ImGuiContext::TreeNodeStack, to check the tree-depth cap holds
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_layout.h"
@@ -744,6 +745,38 @@ TEST(LayoutTest, DeepChainTreeViewRendersWithoutStackOverflow) {
     ImGui::End();
 
     SUCCEED();
+}
+
+TEST(LayoutTest, DeepChainTreeViewStopsNestingAtImGuiTreeDepthLimit) {
+    // ImGui indexes a 32-bit per-depth mask with `1 << window->DC.TreeDepth` on a signed int. At
+    // depth 32 the shift is undefined and, on x86-64 and AArch64, aliases onto depth 0 instead of
+    // vanishing, so TreePop pops an ImGuiTreeNodeStackData belonging to another node
+    // (ocornut/imgui#9509). The navigator therefore stops handing ImGui new tree levels at depth
+    // 31 and renders deeper nodes flat.
+    //
+    // Tree lines are what make the defect observable: stack data is only recorded when they are
+    // enabled, and ImGui's own TreePop assert then fires on the mismatch. With the cap in place
+    // g.TreeNodeStack must balance back to empty. The chain is deeper than the cap but short
+    // enough to keep the test fast -- the property is about depth 32, not about 12,000 nodes.
+    constexpr int kChainLength = 64;
+    const std::string xml = make_deep_chain_xml(kChainLength);
+
+    ScopedImGuiFrame imgui_frame;
+    ImGui::GetStyle().TreeLinesFlags = ImGuiTreeNodeFlags_DrawLinesFull;
+
+    AssuranceTree tree = AssuranceTree::Build(*parse_sacm_xml_string(xml));
+    ASSERT_NE(tree.root, nullptr);
+
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 600.0f));
+    ImGui::Begin("##tree_view_depth_cap");
+    ui::ElementContextActions actions;
+    ui::ShowTreeViewPanel(&tree, nullptr, ui::GetUiState(), actions, nullptr);
+    ImGui::End();
+
+    // Every ImGuiTreeNodeStackData pushed during the frame was popped by its own TreePop. Without
+    // the cap this is non-zero: the aliased depth-0 bit is cleared early, so the root's entry is
+    // never popped.
+    EXPECT_EQ(ImGui::GetCurrentContext()->TreeNodeStack.Size, 0);
 }
 
 TEST(LayoutTest, DeepLinearChainDoesNotOverflowStack) {

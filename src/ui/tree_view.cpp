@@ -6,6 +6,7 @@
 #include "ui/widgets/text_ellipsis.h"
 
 #include "imgui.h"
+#include "imgui_internal.h" // ImGuiWindowTempData::TreeDepth, for the nesting cap below
 
 #include <algorithm>
 #include <cstring>
@@ -117,13 +118,29 @@ static std::string PayloadElementId(const ImGuiPayload* payload) {
     return std::string(begin, end);
 }
 
+// ImGui tracks which tree depths carry stack data in a 32-bit mask, and indexes it with
+// `1 << window->DC.TreeDepth` on a signed int. At depth 32 that shift is undefined, and on x86-64
+// and AArch64 the count is masked to five bits, so it aliases onto depth 0 rather than vanishing
+// as ImGui's own comment assumes -- TreePop then pops the wrong ImGuiTreeNodeStackData. Reported
+// upstream as ocornut/imgui#9509. An argument nested this deep is unusual but not absurd for a
+// large safety case, so the navigator stops handing ImGui new tree levels at the limit. Deeper
+// nodes still render, and their ImGui IDs are still scoped by ancestor (see kMaxImGuiTreeDepth's
+// use below); they simply stop indenting further.
+//
+// The value is the deepest ImGui tree depth a node may be rendered at. Nesting is allowed while
+// the current depth is below it, so nodes occupy depths 0..31 -- the 32 levels ImGui supports.
+constexpr int kMaxImGuiTreeDepth = 31;
+
 // Renders one tree row. Returns true when the node is open and has children, meaning the caller
-// should render its children and then emit a matching ImGui::TreePop.
+// should render its children and then close the level it opened. `nest` asks ImGui for a real tree
+// level; when false the row still renders and still opens/closes, but ImGui's TreeDepth is left
+// alone and the caller scopes the id itself.
 static bool RenderSingleTreeNode(const core::TreeNode* node,
                                  const parser::AssuranceCase* active_case,
                                  UiState& state,
                                  const ElementContextActions& actions,
-                                 const TreeEditActions* tree_edit_actions) {
+                                 const TreeEditActions* tree_edit_actions,
+                                 bool nest) {
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);
 
@@ -134,6 +151,8 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
     bool has_children = !node->group1_children.empty() || !node->group2_attachments.empty();
     if (!has_children)
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    else if (!nest)
+        flags |= ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
     if (state.selected_element_id == node->id)
         flags |= ImGuiTreeNodeFlags_Selected;
@@ -303,37 +322,58 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
     return has_children && open;
 }
 
+// One entry of the tree-view work stack: either a node to render, or a sentinel that closes the
+// level opened for the node it follows.
+struct TreeWalkEntry {
+    const core::TreeNode* node = nullptr; // null marks the end of a subtree
+    bool opened_imgui_level = false;      // sentinel only: TreePop (nested) vs PopID (capped)
+};
+
 // Iterative depth-first walk of the tree. A recursive renderer would overflow the call stack on
 // very deep argument chains (the tree is expanded by default), silently terminating the app. An
-// explicit work stack is used instead; a null entry is a sentinel that emits the matching
-// ImGui::TreePop once a subtree's children have all been rendered.
+// explicit work stack is used instead; a null entry is a sentinel that closes the level once a
+// subtree's children have all been rendered.
 static void RenderTreeNode(const core::TreeNode* root,
                            const parser::AssuranceCase* active_case,
                            UiState& state,
                            const ElementContextActions& actions,
                            const TreeEditActions* tree_edit_actions) {
-    std::vector<const core::TreeNode*> stack;
-    stack.push_back(root);
+    std::vector<TreeWalkEntry> stack;
+    stack.push_back({root, false});
 
     while (!stack.empty()) {
-        const core::TreeNode* node = stack.back();
+        const TreeWalkEntry entry = stack.back();
         stack.pop_back();
 
-        if (node == nullptr) {
-            ImGui::TreePop();
+        if (entry.node == nullptr) {
+            if (entry.opened_imgui_level)
+                ImGui::TreePop();
+            else
+                ImGui::PopID();
             continue;
         }
 
-        if (!RenderSingleTreeNode(node, active_case, state, actions, tree_edit_actions))
+        // Past the cap the row is rendered with NoTreePushOnOpen, so ImGui's TreeDepth stops
+        // climbing. The id scope must not stop with it: a Group2 attachment shared by two parents
+        // appears twice in the tree, and only the ancestor ids keep the two rows distinct.
+        //
+        // ImGui's own counter is read rather than one kept here, because this walk does not always
+        // start at depth 0 -- the orphans list runs it inside a wrapping TreeNodeEx. A local
+        // counter would be off by that wrapper, and being off is exactly the bug being avoided.
+        const bool nest = ImGui::GetCurrentWindow()->DC.TreeDepth < kMaxImGuiTreeDepth;
+        if (!RenderSingleTreeNode(entry.node, active_case, state, actions, tree_edit_actions, nest))
             continue;
 
-        // Render group1 children (structural) then group2 attachments (contextual), then TreePop.
+        if (!nest)
+            ImGui::PushID(entry.node->id.c_str());
+
+        // Render group1 children (structural) then group2 attachments (contextual), then close.
         // Push in reverse so they render in the original order; the null sentinel runs last.
-        stack.push_back(nullptr);
-        for (auto it = node->group2_attachments.rbegin(); it != node->group2_attachments.rend(); ++it)
-            stack.push_back(*it);
-        for (auto it = node->group1_children.rbegin(); it != node->group1_children.rend(); ++it)
-            stack.push_back(*it);
+        stack.push_back({nullptr, nest});
+        for (auto it = entry.node->group2_attachments.rbegin(); it != entry.node->group2_attachments.rend(); ++it)
+            stack.push_back({*it, false});
+        for (auto it = entry.node->group1_children.rbegin(); it != entry.node->group1_children.rend(); ++it)
+            stack.push_back({*it, false});
     }
 }
 
