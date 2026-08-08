@@ -149,9 +149,9 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
         error = "Refused: this edit goes through a conversion that cannot represent part of this "
                 "case, and applying it would delete " +
                 unrepresentable +
-                ". The case is unchanged. This is a known gap in the legacy edit path "
-                "(SACM23-LIB-002); creating, deleting and challenging elements still work, as "
-                "they do not use it.";
+                ". The case is unchanged. This is a known limitation of the legacy edit path "
+                "(SACM23-LIB-002): edits on a case carrying these elements are refused until "
+                "the affected commands move off that path.";
         return false;
     }
 

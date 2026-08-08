@@ -69,9 +69,10 @@ would overstate how settled it is.
 
 Also here: [TEMPLATE.md](TEMPLATE.md), the starting point for a new record.
 
-`SACM23-LIB-002` reached `verified` in round 5, after seven recorded rounds in
-which the verifier's probes twice measured silent-loss paths the tests had not
-— the strongest argument this directory makes for adversarial verification.
+`SACM23-LIB-002` reached `verified` on its eighth recorded round — six of the
+eight are FAILs, and two of those FAILs were probe-measured silent-loss paths
+the whole test suite had missed: the strongest argument this directory makes
+for adversarial verification.
 Every non-`out-of-scope` matrix row is now `verified`; what that claim does and
 does not mean is bounded by the
 [compliance points](../sacm-compliance-points.md) and the
