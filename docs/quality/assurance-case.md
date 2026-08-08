@@ -5,9 +5,9 @@ same discipline the tool exists to support, and challenged in the open. Required
 by [#296](https://github.com/lasrod/assurance-forge/issues/296).
 
 The **source model is SACM 2.3**:
-[`assurance-case.sacm.xmi`](https://github.com/lasrod/assurance-forge/blob/main/docs/quality/assurance-case.sacm.xmi),
-in this project's own interchange format, strict-validated by this project's own
-library:
+[`assurance-case.sacm.xmi`](assurance-case.sacm.xmi), beside this page so the
+model and its rendering stay pinned to the same commit, in this project's own
+interchange format, strict-validated by this project's own library:
 
 ```bash
 sacm_cli validate --strict docs/quality/assurance-case.sacm.xmi

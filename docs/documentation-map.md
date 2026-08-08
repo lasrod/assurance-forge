@@ -63,7 +63,7 @@ canonical source wins on conflict.
 | Where to get help | [SUPPORT.md](https://github.com/lasrod/assurance-forge/blob/main/SUPPORT.md) |
 | How releases are cut and what release notes must say | [Releasing](RELEASING.md) |
 | Measured repository state at a point in time | [Quality baseline](quality/repository-baseline.md) |
-| The repository-quality argument and its challenges | [Assurance case](quality/assurance-case.md) — SACM source `assurance-case.sacm.xmi` wins on conflict |
+| The repository-quality argument and its challenges | [Assurance case](quality/assurance-case.md) — the SACM source [`assurance-case.sacm.xmi`](quality/assurance-case.sacm.xmi) wins on conflict |
 | Where each class of quality evidence lives | [Evidence index](quality/evidence-index.md) |
 | Warning levels, suppressions, and what is not enforced | [Code quality policy](quality/code-quality-policy.md) |
 | Where cleanup pays for itself, ranked by measured risk | [Hotspot register](quality/hotspot-register.md) |
