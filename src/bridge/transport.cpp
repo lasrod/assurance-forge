@@ -32,7 +32,13 @@ constexpr std::size_t kReadChunk = 4096;
 // A safety case can be large, and a single `get_argument_tree` reply carries a
 // lot of JSON. This is not a protocol limit so much as a refusal to grow a
 // buffer without bound on a peer that never sends a newline.
-constexpr std::size_t kMaxMessageBytes = 64u * 1024u * 1024u;
+//
+// Written in the destination type. `64u * 1024u * 1024u` multiplied in
+// `unsigned int` and widened afterwards, which is the shape that overflows
+// silently when the operands are larger -- here they are not, and a constant
+// expression that did overflow would fail to compile rather than wrap. Spelling
+// the type once removes the question instead of leaving it to be re-answered.
+constexpr std::size_t kMaxMessageBytes = std::size_t{64} * 1024 * 1024;
 
 } // namespace
 
