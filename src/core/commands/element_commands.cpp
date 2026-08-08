@@ -212,8 +212,23 @@ bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
             applied_to_library = true;
         }
     }
-    if (!applied_to_library && !core::AddTopGoal(ctx.model, &ctx.package, generated_id_, out_error))
-        return false;
+    // The seam-unsupported fallback goes through the GUARDED bridge, never the
+    // raw legacy mutator. The invariant, held file-wide: no command mutates the
+    // legacy package while a library document is present except inside
+    // BridgeLegacyMutationToLibrary, whose guard refuses any document the
+    // projection cannot fully represent. Round-4 verification measured the raw
+    // fallback on artifact-full-valid.sacm.xmi (no ArgumentPackage, so the seam
+    // reports unsupported): success reported, 8 of 9 clause-12 elements deleted
+    // from the tracked file. Without a document, ApplyLibraryPrimaryOrLegacy
+    // runs the legacy mutator directly -- the pre-flip behavior.
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::AddTopGoal(model, &package, generated_id_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "CreateTopGoal";
     out_event.payload = nlohmann::ordered_json::object();
@@ -251,10 +266,17 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
             applied_to_library = true;
         }
     }
-    if (!applied_to_library &&
-        !core::AddChildElement(
-            ctx.model, &ctx.package, parent_id_, kind_, generated_id_, generated_relationship_id_, out_error))
-        return false;
+    // Same invariant as CreateTopGoal above: seam-unsupported falls to the
+    // guarded bridge, not the raw legacy mutator.
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::AddChildElement(
+                model, &package, parent_id_, kind_, generated_id_, generated_relationship_id_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "CreateChildElement";
     out_event.payload = nlohmann::ordered_json::object();
@@ -298,10 +320,17 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
             applied_to_library = true;
         }
     }
-    if (!applied_to_library &&
-        !core::AddChallenge(
-            ctx.model, &ctx.package, target_, source_type_, generated_id_, generated_relationship_id_, out_error))
-        return false;
+    // Same invariant as CreateTopGoal above: seam-unsupported falls to the
+    // guarded bridge, not the raw legacy mutator.
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::AddChallenge(
+                model, &package, target_, source_type_, generated_id_, generated_relationship_id_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "CreateChallenge";
     out_event.payload = nlohmann::ordered_json::object();

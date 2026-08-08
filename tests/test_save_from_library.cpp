@@ -684,6 +684,96 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnreprese
     EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused edit still rewrote the tracked file";
 }
 
+// CreateTopGoal on a document with NO ArgumentPackage: the library seam reports
+// `supported == false`, and the fallback used to run the raw legacy mutator --
+// which succeeded, after which the bus wrote lossy projection bytes over the
+// tracked file while reporting success (round-4 probe A: 8 of 9 clause-12
+// elements deleted from disk on the exact interchange shape SACM23-CP-003
+// certifies, with `has_unsaved_changes` cleared). The fallback now goes through
+// the guarded bridge, whose document-inventory sweep refuses this document by
+// construction.
+TEST(SaveFromLibrary, SACM23_LIB_002_TopGoalFallbackRefusesRatherThanDeleteArtifactContent) {
+    const std::string artifact_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" /
+                                               "data" / "sacm23" / "artifact-full-valid.sacm.xmi");
+    ASSERT_FALSE(artifact_case.empty());
+    ProjectFixture fixture = MakeProject("topgoal-artifact", artifact_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "event_release"))
+        << "fixture carries no clause-12 content; this test measures nothing";
+
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CreateTopGoalCommand command;
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+
+    EXPECT_FALSE(result.success) << "the top-goal fallback was applied and degraded the artifact case";
+    EXPECT_TRUE(Contains(result.error, "Refused")) << "the failure is not the guard's refusal: " << result.error;
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused command still rewrote the tracked file";
+
+    // Live-document content, per the round-4 record's required pin.
+    bool event_alive = false;
+    bool property_alive = false;
+    bool group_alive = false;
+    for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*state.library_document)) {
+        if (element.id == "event_release")
+            event_alive = true;
+        if (element.id == "prop_confidentiality")
+            property_alive = true;
+        if (element.id == "group_evidence")
+            group_alive = true;
+    }
+    EXPECT_TRUE(event_alive && property_alive && group_alive) << "the refused command still degraded the live document";
+}
+
+// The bare-reasoning shape from round-4 probe B: adding a child under an
+// ArgumentReasoning is seam-unsupported, and the legacy mutator's visible
+// failure was the only thing standing between that shape and the probe-A
+// class. The fallback now runs inside the guarded bridge, so the safe-fail is
+// structural rather than accidental -- pinned here so a change to the legacy
+// mutator cannot silently reopen it.
+TEST(SaveFromLibrary, SACM23_LIB_002_ChildUnderReasoningFallbackFailsWithFileUntouched) {
+    // BARE: no inference references AR_bare, so the seam cannot extend an
+    // existing inference (the supported strategy-materialization shape) and
+    // reports unsupported.
+    constexpr const char* kBareReasoningSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <argumentReasoning id="AR_bare" name="Unattached reasoning"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("child-under-reasoning", kBareReasoningSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CreateChildElementCommand command("AR_bare", core::NewElementKind::Goal);
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+
+    EXPECT_FALSE(result.success) << "a child was created under a bare ArgumentReasoning";
+    EXPECT_FALSE(result.error.empty()) << "the failure is silent";
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the failed command still rewrote the tracked file";
+}
+
 // NodeOnly removal REPARENTS, which the scrub seam cannot express, so it is the
 // one element command that must go through the guarded bridge. It used to fall
 // through to the raw legacy mutator instead: the bus then autosaved lossy

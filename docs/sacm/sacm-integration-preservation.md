@@ -275,7 +275,7 @@ with the guard disabled.
 **The underlying representability gap is unchanged and disclosed here rather than
 claimed away**: the projection still cannot carry `AssertedArtifactSupport` (11.17),
 `AssertedArtifactContext` (11.18), `ArgumentGroup` (11.2), `TerminologyGroup` (10.3),
-`Event` (12.4), `Artifact` (12.2), `Activity` (12.3), `Term` (10.2), `Category` (10.5)
+`Event` (12.9), `Artifact` (12.7), `Activity` (12.8), `Term` (10.7), `Category` (10.8)
 or a nested `ArgumentPackage` (11.4) -- but a bridged edit on a document carrying any of
 them is now REFUSED by the guard above rather than applied, and the NodeOnly removal
 that used to bypass the guard entirely (round-3 probe a: silent deletion from the
@@ -301,13 +301,13 @@ measured. The lost-kind list can only be trusted to be complete once the rejecte
 is empty. That warning was borne out a second time under #295: the interchange-unit
 fixtures for SACM23-CP-002/003/004 are rooted at a bare
 `ArgumentPackage`/`ArtifactPackage`/`TerminologyPackage`, which no earlier fixture was,
-and immediately measured four more lost kinds -- `Artifact` (12.2), `Activity` (12.3),
-`Term` (10.2) and `Category` (10.5). New disclosures rather than new regressions: the
+and immediately measured four more lost kinds -- `Artifact` (12.7), `Activity` (12.8),
+`Term` (10.7) and `Category` (10.8). New disclosures rather than new regressions: the
 legacy POD has never carried any of them, and the only artifact-rich fixture that would
 have shown it (`artifact-full-valid`) is on the rejected list. The rejected list is
 still not empty. That warning has now been borne out: a fixture carrying an `Event` in a
 document the bridge CAN round-trip (`tolerant-shorthands-valid.sacm.xmi`, added for
-SACM23-RT-001 attribute coverage) immediately measured `Event` (12.4) as lost -- a kind
+SACM23-RT-001 attribute coverage) immediately measured `Event` (12.9) as lost -- a kind
 no verifier pass had named, masked only because the single Event-bearing fixture was on
 the rejected list. The lost-kind list above is correspondingly longer, this is a new
 disclosure rather than a new regression (the projection has never carried Event), and
