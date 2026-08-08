@@ -132,8 +132,8 @@ current findings and known gaps are in [static analysis](static-analysis.md).
 | Enforcement | `run_clang_tidy.py --check` as its own CI job: changed `.cpp` files on a pull request, the full sweep on `main` |
 | Incomplete runs | A translation unit clang-tidy cannot compile aborts the run. It contributes no findings, so continuing would record unanalyzed code as clean |
 | Auto-fixing | **Never.** No `--fix`; a tool rewriting safety-case handling code unattended is not a trade this project makes |
+| Tool version | Pinned. The baseline records it, CI installs exactly that from PyPI, and `--check` refuses to compare across a mismatch. Comparing two versions cost a phantom failure and a missed finding before [#317](https://github.com/lasrod/assurance-forge/issues/317) |
 | Known gap | Windows only, so `#ifndef _WIN32` branches are unanalyzed |
-| Known gap | **CI runs clang-tidy 20.1.8; the baseline records 22.1.4.** The ratchet compares one tool against another — [#317](https://github.com/lasrod/assurance-forge/issues/317) |
 
 The selection principle is that a check earns its place by finding defects
 *here*. Enabling everything and suppressing the fallout produces a baseline

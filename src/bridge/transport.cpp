@@ -119,14 +119,6 @@ namespace {
 HANDLE CreatePipeInstance(const std::string& address) {
     return CreateNamedPipeA(address.c_str(),
                             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-                            // All three of these Windows SDK macros are 0x00000000 -- byte type,
-                            // byte read mode and blocking are the defaults -- so clang-tidy 20
-                            // reads the line as `0 | 0 | 0` and reports equivalent operands.
-                            // Naming the modes the pipe is created with is worth more than the
-                            // bare 0 that would silence it. clang-tidy 22 does not report this;
-                            // CI runs 20, so the suppression has to be here rather than assumed
-                            // away. See #317 for the version mismatch itself.
-                            // NOLINTNEXTLINE(misc-redundant-expression)
                             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
                             PIPE_UNLIMITED_INSTANCES,
                             static_cast<DWORD>(kReadChunk),

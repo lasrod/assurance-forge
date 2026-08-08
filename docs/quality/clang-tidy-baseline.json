@@ -1,6 +1,6 @@
 {
   "tool": "clang-tidy",
-  "tool_version": "22.1.4",
+  "tool_version": "22.1.8",
   "platform": "Windows",
   "config": ".clang-tidy",
   "translation_units": 255,
