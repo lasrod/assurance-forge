@@ -42,7 +42,15 @@
     </artifactElement>
     <artifactElement xsi:type="sacm:Artifact" xmi:id="art_verification_records">
       <name content="Independent verification records, failures included"/>
-      <description content="docs/sacm/verification/; 14 records, 8 of them FAIL rounds"/>
+      <description content="docs/sacm/verification/ (generated index is the count source); at this update 17 records, 10 of them FAIL verdicts"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_conformance_statement">
+      <name content="Release-bound conformance statement and evidence-package mechanism"/>
+      <description content="docs/sacm/sacm-conformance-statement.md; evidence_package_check gate; release workflow attachment"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_pr_template">
+      <name content="Pull-request template carrying the one-responsibility and disclosure checks"/>
+      <description content=".github/pull_request_template.md"/>
     </artifactElement>
     <artifactElement xsi:type="sacm:Artifact" xmi:id="art_documentation_map">
       <name content="Documentation authority map and documentation_check gate"/>
@@ -117,7 +125,16 @@
       <name content="Open challenge: the completeness audit found prose-constraint obligations with no owning matrix row (issues 333-337)"/>
     </argumentElement>
     <argumentElement xsi:type="sacm:Claim" xmi:id="counter_bridge" assertionDeclaration="asserted">
-      <name content="Open challenge: twenty-six commands still edit through a lossy legacy bridge that refuses rather than represents (migration plan phases 1-4)"/>
+      <name content="Open challenge: twenty-six commands still edit through a lossy legacy bridge that refuses rather than represents (issue 350; migration plan phases 1-4)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_suite_blindness" assertionDeclaration="asserted">
+      <name content="Open challenge: the automated suite twice passed in full while probes measured silent data loss; silent-loss protection is pinned only for the probed shapes (issue 347)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_solo_review" assertionDeclaration="asserted">
+      <name content="Open challenge: all review is performed by AI agents or by the sole maintainer who directed them; no independent human review exists (issue 348)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_deps" assertionDeclaration="asserted">
+      <name content="Open challenge: no automated dependency review exists; submodule pinning is manual (issue 349)"/>
     </argumentElement>
     <argumentElement xsi:type="sacm:Claim" xmi:id="counter_include" assertionDeclaration="asserted">
       <name content="Open challenge: any layer can still compile against any other layer's headers; only the source scan prevents it (issue 340)"/>
@@ -129,7 +146,7 @@
       <name content="Open challenge: the OS-backed secret store exists only on Windows (issue 53)"/>
     </argumentElement>
     <argumentElement xsi:type="sacm:Claim" xmi:id="counter_release_unbound" assertionDeclaration="asserted">
-      <name content="Open challenge: no shipped release carries an evidence package yet; the mechanism is merged but unexercised by a real tag"/>
+      <name content="Open challenge: no shipped release carries an evidence package yet; the mechanism is merged but unexercised by a real tag (issue 351)"/>
     </argumentElement>
     <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="ar_strands">
       <name content="Argument over the eight quality dimensions issue 296 requires, each supported by mechanically gated evidence where a gate exists, and challenged explicitly where one does not"/>
@@ -153,11 +170,14 @@
     <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_security_policy" referencedArtifactElement="art_security_policy"/>
     <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_quality_controls" referencedArtifactElement="art_quality_controls"/>
     <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_baseline" referencedArtifactElement="art_baseline"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_conformance_statement" referencedArtifactElement="art_conformance_statement"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_pr_template" referencedArtifactElement="art_pr_template"/>
     <argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_boundary" source="claim_boundary" target="claim_top"/>
     <argumentElement xsi:type="sacm:AssertedInference" xmi:id="inf_top" reasoning="ar_strands" source="claim_public claim_arch claim_data claim_verif claim_review claim_release claim_ai claim_sec" target="claim_top"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_1" source="ref_feature_matrix" target="claim_public"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_2" source="ref_compliance_points" target="claim_public"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_3" source="ref_completeness_audit" target="claim_public"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_4" source="ref_conformance_statement" target="claim_public"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_arch_1" source="ref_layer_gate" target="claim_arch"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_arch_2" source="ref_layers_doc" target="claim_arch"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_arch_3" source="ref_migration_plan" target="claim_arch"/>
@@ -168,6 +188,8 @@
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_verif_3" source="ref_completeness_audit" target="claim_verif"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_review_1" source="ref_documentation_map" target="claim_review"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_review_2" source="ref_adrs" target="claim_review"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_review_3" source="ref_pr_template" target="claim_review"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_review_4" source="ref_release_notes_policy" target="claim_review"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_release_1" source="ref_release_workflow" target="claim_release"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_release_2" source="ref_release_notes_policy" target="claim_release"/>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_ai_1" source="ref_agent_definitions" target="claim_ai"/>
@@ -181,5 +203,10 @@
     <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_ai" isCounter="true" source="counter_agent_tools" target="claim_ai"/>
     <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_sec" isCounter="true" source="counter_secret_store" target="claim_sec"/>
     <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_release" isCounter="true" source="counter_release_unbound" target="claim_release"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_verif_suite" isCounter="true" source="counter_suite_blindness" target="claim_verif"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_data_suite" isCounter="true" source="counter_suite_blindness" target="claim_data"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_ai_solo" isCounter="true" source="counter_solo_review" target="claim_ai"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_review_solo" isCounter="true" source="counter_solo_review" target="claim_review"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_sec_deps" isCounter="true" source="counter_deps" target="claim_sec"/>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
