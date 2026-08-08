@@ -212,8 +212,23 @@ bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
             applied_to_library = true;
         }
     }
-    if (!applied_to_library && !core::AddTopGoal(ctx.model, &ctx.package, generated_id_, out_error))
-        return false;
+    // The seam-unsupported fallback goes through the GUARDED bridge, never the
+    // raw legacy mutator. The invariant, held file-wide: no command mutates the
+    // legacy package while a library document is present except inside
+    // BridgeLegacyMutationToLibrary, whose guard refuses any document the
+    // projection cannot fully represent. Round-4 verification measured the raw
+    // fallback on artifact-full-valid.sacm.xmi (no ArgumentPackage, so the seam
+    // reports unsupported): success reported, 8 of 9 clause-12 elements deleted
+    // from the tracked file. Without a document, ApplyLibraryPrimaryOrLegacy
+    // runs the legacy mutator directly -- the pre-flip behavior.
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::AddTopGoal(model, &package, generated_id_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "CreateTopGoal";
     out_event.payload = nlohmann::ordered_json::object();
@@ -251,10 +266,17 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
             applied_to_library = true;
         }
     }
-    if (!applied_to_library &&
-        !core::AddChildElement(
-            ctx.model, &ctx.package, parent_id_, kind_, generated_id_, generated_relationship_id_, out_error))
-        return false;
+    // Same invariant as CreateTopGoal above: seam-unsupported falls to the
+    // guarded bridge, not the raw legacy mutator.
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::AddChildElement(
+                model, &package, parent_id_, kind_, generated_id_, generated_relationship_id_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "CreateChildElement";
     out_event.payload = nlohmann::ordered_json::object();
@@ -298,10 +320,17 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
             applied_to_library = true;
         }
     }
-    if (!applied_to_library &&
-        !core::AddChallenge(
-            ctx.model, &ctx.package, target_, source_type_, generated_id_, generated_relationship_id_, out_error))
-        return false;
+    // Same invariant as CreateTopGoal above: seam-unsupported falls to the
+    // guarded bridge, not the raw legacy mutator.
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::AddChallenge(
+                model, &package, target_, source_type_, generated_id_, generated_relationship_id_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "CreateChallenge";
     out_event.payload = nlohmann::ordered_json::object();
@@ -337,15 +366,19 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // sources (the inference survives, scrubbed to the rest, rather than cascading
     // away).
     //
-    // NodeOnly is the exception and stays on the legacy mutator: it REPARENTS the
+    // NodeOnly is the exception and cannot use the scrub seam: it REPARENTS the
     // removed node's structural children onto its parent (core::ReparentChildren-
     // ToParent RETARGETS a child's inference from the node to the parent, or clears
     // a strategy's reasoning). A retarget is not expressible as a set of per-id
     // deletes, so the seam cannot reproduce it -- it would leave the child inference
-    // target-less, drop it, and orphan the promoted node. NodeOnly therefore falls
-    // through to `core::RemoveElement` below (library_primary stays false; the bus
-    // re-derives the library from the mutated package). A native retarget op would
-    // let the seam take it too.
+    // target-less, drop it, and orphan the promoted node. NodeOnly therefore goes
+    // through the GUARDED bridge below (project -> mutate -> reload), exactly as
+    // `ApplyEventToLibrary` replays it. It previously fell through to the raw
+    // legacy mutator with library_primary false, which autosaved lossy
+    // projection bytes over the tracked file -- silently deleting every element
+    // kind the projection cannot hold, with no refusal, on a context-menu
+    // action (round-3 verification, probe a). A native retarget op would let
+    // the scrub seam take NodeOnly too.
     bool applied_to_library = false;
     if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeAndDescendants) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
@@ -365,8 +398,18 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
             applied_to_library = true;
         }
     }
-    if (!applied_to_library && !core::RemoveElement(ctx.model, &ctx.package, element_id_, mode_, out_error))
-        return false;
+    if (!applied_to_library) {
+        if (mode_ == RemoveMode::NodeOnly) {
+            const LibraryBridgeMutator mutate =
+                [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+                return core::RemoveElement(model, &package, element_id_, RemoveMode::NodeOnly, err);
+            };
+            if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+                return false;
+        } else if (!core::RemoveElement(ctx.model, &ctx.package, element_id_, mode_, out_error)) {
+            return false;
+        }
+    }
 
     removed_count_ = deleted_ids.size();
 

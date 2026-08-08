@@ -22,6 +22,7 @@ void IndexRepresentedIds(const sacm::AssuranceCasePackage& package, std::set<std
         if (!id.empty())
             ids.insert(id);
     };
+    add(package.id);
     const auto index_terminology = [&](const sacm::TerminologyPackage& terminology) {
         add(terminology.id);
         for (const sacm::Category& category : terminology.categories)
@@ -61,18 +62,25 @@ void IndexRepresentedIds(const sacm::AssuranceCasePackage& package, std::set<std
 // Human-readable summary of what this edit would destroy, or empty when the
 // projection accounts for every element in the document.
 //
-// SCOPE: element-level. `sacm_adapter::project_case` does not emit package
-// kinds, so a lost *package* (a nested ArgumentPackage) is not detected here.
-// That gap is disclosed on SACM23-LIB-002 rather than silently implied away.
-std::string DescribeUnrepresentableElements(const parser::AssuranceCase& model,
+// SCOPE: the sweep runs over `list_document_elements` -- every element the
+// LIBRARY holds, packages included -- not over the projected POD. The
+// element-level sweep this replaced could not see a lost *package*: a nested
+// ArgumentPackage is omitted by `project_case` (a container, not a drawn node),
+// so a document carrying one passed the guard and the bridge deleted it
+// silently. Utility elements are the one exclusion: clause 8.7 metadata is
+// carried ON its element, so it has no standalone legacy representation to
+// index and survives with its carrier.
+std::string DescribeUnrepresentableElements(const sacm_adapter::LibraryDocument& document,
                                             const sacm::AssuranceCasePackage& package) {
     std::set<std::string> represented;
     IndexRepresentedIds(package, represented);
 
     std::vector<std::string> lost;
-    for (const parser::SacmElement& element : model.elements) {
+    for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(document)) {
+        if (element.is_utility || element.id.empty())
+            continue;
         if (represented.count(element.id) == 0)
-            lost.push_back(sacm_adapter::sacm_class_name_for_pod_type(element.type) + " '" + element.id + "'");
+            lost.push_back(sacm_adapter::sacm_class_name_for_pod_type(element.kind) + " '" + element.id + "'");
     }
     if (lost.empty())
         return {};
@@ -136,13 +144,14 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
     // every argument in the repository's sample projects, projects completely.
     // Only a document carrying one of the unrepresentable kinds is refused, and
     // for those the alternative was losing the content.
-    if (const std::string unrepresentable = DescribeUnrepresentableElements(model, package); !unrepresentable.empty()) {
+    if (const std::string unrepresentable = DescribeUnrepresentableElements(document, package);
+        !unrepresentable.empty()) {
         error = "Refused: this edit goes through a conversion that cannot represent part of this "
                 "case, and applying it would delete " +
                 unrepresentable +
-                ". The case is unchanged. This is a known gap in the legacy edit path "
-                "(SACM23-LIB-002); creating, deleting and challenging elements still work, as "
-                "they do not use it.";
+                ". The case is unchanged. This is a known limitation of the legacy edit path "
+                "(SACM23-LIB-002): edits on a case carrying these elements are refused until "
+                "the affected commands move off that path.";
         return false;
     }
 

@@ -208,11 +208,14 @@ static void serialize_claim(pugi::xml_node parent, const Claim& c) {
         node.append_attribute("undeveloped") = "true";
     add_content_ml(node, c.content, c.content_ml);
     add_description(node, c.description, c.description_ml);
+    add_refs(node, "metaClaim", c.metaClaims);
 }
 
 static void serialize_argument_reasoning(pugi::xml_node parent, const ArgumentReasoning& ar) {
     auto node = parent.append_child("argumentReasoning");
     set_base(node, ar);
+    if (!ar.structure.empty())
+        node.append_attribute("structure") = ar.structure.c_str();
     if (ar.undeveloped)
         node.append_attribute("undeveloped") = "true";
     add_content_ml(node, ar.content, ar.content_ml);

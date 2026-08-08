@@ -31,7 +31,6 @@
 //   - PackageInterface / PackageBinding for any package type (9.3, 9.4, 11.5,
 //     11.6, 12.4, 12.5, 10.5, 10.6).
 //   - ArgumentGroup / ArtifactGroup / TerminologyGroup (11.2, 12.3, 10.3).
-//   - Assertion::metaClaim association (11.10).
 //   - AssertedArtifactSupport (11.17), AssertedArtifactContext (11.18).
 //   - Full Artifact metamodel: Property, Event, Resource, Activity, Technique,
 //     Participant, ArtifactAssetRelationship (12.8 - 12.14).
@@ -172,6 +171,7 @@ struct Claim : SacmElement {
     std::string assertionDeclaration;
     MultiLangText content_ml;
     bool undeveloped = false;
+    std::vector<std::string> metaClaims; // 11.10: id references to claims about this claim
 };
 
 // ArgumentReasoning (11.12): provides additional explanation of a relationship.
@@ -179,6 +179,7 @@ struct ArgumentReasoning : SacmElement {
     std::string content;
     MultiLangText content_ml;
     bool undeveloped = false;
+    std::string structure; // 11.12: id of an ArgumentPackage detailing this reasoning
 };
 
 // ArtifactReference (11.9): citation of an artifact from within an argument.

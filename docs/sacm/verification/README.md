@@ -47,6 +47,9 @@ would overstate how settled it is.
 
 | Date | Requirements | Verdict | Record |
 |---|---|---|---|
+| 2026-08-08 | `SACM23-LIB-002` | Pass | [Lib 002 resolution](2026-08-08-lib-002-resolution-round-5.md) |
+| 2026-08-08 | `SACM23-LIB-002` | **FAIL** | [Lib 002 resolution](2026-08-08-lib-002-resolution-round-4-FAIL.md) |
+| 2026-08-08 | `SACM23-LIB-002` | **FAIL** | [Lib 002 resolution](2026-08-08-lib-002-resolution-round-3-FAIL.md) |
 | 2026-07-26 | `SACM23-LIB-002` | **FAIL** | [Undo library primary](2026-07-26-lib-002-undo-library-primary-round-1-FAIL.md) |
 | 2026-07-26 | `SACM23-LIB-002` | **FAIL** | [Strategy migration preserves unknown content](2026-07-26-lib-002-strategy-migration-round-2-FAIL.md) |
 | 2026-07-25 | `SACM23-LIB-002` | Pass | [Phase 9 stage 7 source of truth](2026-07-25-lib-002-source-of-truth.md) |
@@ -66,6 +69,11 @@ would overstate how settled it is.
 
 Also here: [TEMPLATE.md](TEMPLATE.md), the starting point for a new record.
 
-`SACM23-LIB-002` is the only conformance-matrix row still short of `verified`,
-and the five records above are why. Closing or reclassifying it is
-[#295](https://github.com/lasrod/assurance-forge/issues/295).
+`SACM23-LIB-002` reached `verified` on its eighth recorded round — six of the
+eight are FAILs, and two of those FAILs were probe-measured silent-loss paths
+the whole test suite had missed: the strongest argument this directory makes
+for adversarial verification.
+Every non-`out-of-scope` matrix row is now `verified`; what that claim does and
+does not mean is bounded by the
+[compliance points](../sacm-compliance-points.md) and the
+[completeness audit](../sacm-matrix-completeness-audit.md).

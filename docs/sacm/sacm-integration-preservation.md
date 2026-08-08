@@ -260,20 +260,32 @@ reinterpret safety arguments" constraint requires. Measured cost on ordinary cas
 -- every fixture under tests/data and every argument in the repository's sample projects
 projects completely, so only a document carrying one of the kinds below is refused, and
 for those the alternative was losing the content. Two scope limits, stated rather than
-implied: the check is ELEMENT-level, so a lost nested `ArgumentPackage` is not detected
-(`project_case` does not emit package kinds); and refusing is not repairing -- the
-underlying loss is unchanged, and the real fix is retiring the bridge as commands go
-native. Pinned by SaveFromLibrary.SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnrep
-resentableElements, which asserts the refusal names the class AND that the tracked file
-is byte-unchanged, and was confirmed to fail (edit applied, file rewritten) with the
-guard disabled.
+implied: the check compares ids against the DOCUMENT inventory
+(`list_document_elements`, packages included), so it catches a lost container -- the
+round-3 probe showed the earlier element-level sweep passing a document whose empty
+nested `ArgumentPackage` the bridge then deleted silently, now pinned by
+SaveFromLibrary.SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNestedArgumentPackage
+-- but it cannot see a lost ATTRIBUTE on a surviving element; and refusing is not
+repairing -- the underlying loss is unchanged, and the real fix is retiring the bridge as
+commands go native. Pinned by SaveFromLibrary.SACM23_LIB_002_BridgedEditRefusesRatherThan
+DeleteUnrepresentableElements, which asserts the refusal names the class AND that the
+tracked file is byte-unchanged, and was confirmed to fail (edit applied, file rewritten)
+with the guard disabled.
 
 **The underlying representability gap is unchanged and disclosed here rather than
-claimed away**: a bridged edit still deletes `AssertedArtifactSupport` (11.17),
+claimed away**: the projection still cannot carry `AssertedArtifactSupport` (11.17),
 `AssertedArtifactContext` (11.18), `ArgumentGroup` (11.2), `TerminologyGroup` (10.3),
-`Event` (12.4), `Artifact` (12.2), `Activity` (12.3), `Term` (10.2), `Category` (10.5)
-and nested `ArgumentPackage` (11.4), and drops `ArgumentReasoning@structure` (11.12) and
-`AssertedInference@metaClaim` (11.10), with no warning to the user. That list is no
+`Event` (12.9), `Artifact` (12.7), `Activity` (12.8), `Term` (10.7), `Category` (10.8)
+or a nested `ArgumentPackage` (11.4) -- but a bridged edit on a document carrying any of
+them is now REFUSED by the guard above rather than applied, and the NodeOnly removal
+that used to bypass the guard entirely (round-3 probe a: silent deletion from the
+tracked file AND the live document, reachable from the context menu) now routes through
+the same bridge, pinned by SaveFromLibrary.SACM23_LIB_002_UnflippedNodeOnlyRemovalRefuses
+RatherThanDeleteUnrepresentableElements. `ArgumentReasoning@structure` (11.12) and
+`Assertion@metaClaim` (11.10) came OFF the lost list in round 4: the legacy POD carries
+both and the bridge round-trips them
+(SaveFromLibrary.SACM23_LIB_002_BridgedEditPreservesMetaClaimAndReasoningStructure,
+confirmed to fail with the rebuild copy removed). The kind list is no
 longer maintained by hand:
 ProjectionCoverage.SACM23_LIB_002_BridgeRoundTripLosesOnlyTheKnownKinds sweeps the
 library's own conforming SACM 2.3 fixtures, round-trips each through the bridge's
@@ -289,25 +301,30 @@ measured. The lost-kind list can only be trusted to be complete once the rejecte
 is empty. That warning was borne out a second time under #295: the interchange-unit
 fixtures for SACM23-CP-002/003/004 are rooted at a bare
 `ArgumentPackage`/`ArtifactPackage`/`TerminologyPackage`, which no earlier fixture was,
-and immediately measured four more lost kinds -- `Artifact` (12.2), `Activity` (12.3),
-`Term` (10.2) and `Category` (10.5). New disclosures rather than new regressions: the
+and immediately measured four more lost kinds -- `Artifact` (12.7), `Activity` (12.8),
+`Term` (10.7) and `Category` (10.8). New disclosures rather than new regressions: the
 legacy POD has never carried any of them, and the only artifact-rich fixture that would
 have shown it (`artifact-full-valid`) is on the rejected list. The rejected list is
 still not empty. That warning has now been borne out: a fixture carrying an `Event` in a
 document the bridge CAN round-trip (`tolerant-shorthands-valid.sacm.xmi`, added for
-SACM23-RT-001 attribute coverage) immediately measured `Event` (12.4) as lost -- a kind
+SACM23-RT-001 attribute coverage) immediately measured `Event` (12.9) as lost -- a kind
 no verifier pass had named, masked only because the single Event-bearing fixture was on
 the rejected list. The lost-kind list above is correspondingly longer, this is a new
 disclosure rather than a new regression (the projection has never carried Event), and
-the rejected list is still not empty. Until the bridge either preserves those or refuses
-the command, this row cannot reach `verified`, and the disclosure is not a substitute
-for the fix -- the round-2 record also requires a visible load-time warning while it
-stands. Assurance Forge's own repository fixtures contain none of these constructs,
+the rejected list is still not empty. The bridge now refuses ANY document its projection
+cannot fully account for -- the whole document inventory, packages included -- so the
+disclosure duty has moved below kind level: the sweep compares kinds, not attributes, so
+per-attribute fidelity on surviving elements (isCounter, metaClaim, structure,
+assertionDeclaration) is maintained by hand and pinned test by test, and extending the
+sweep to attribute fingerprints is an open follow-up from the round-3 record. Assurance
+Forge's own repository fixtures contain none of these constructs,
 which is why the Stage-3 projection baseline reported the projection "field-complete and
 lossless": that claim is true over that corpus and false in general (SACM23-INT-001
-carries the same sentence and needs the same qualifier). Last verifier pass:
-docs/sacm/verification/2026-07-26-lib-002-strategy-migration-round-2-FAIL.md; earlier
-records: docs/sacm/verification/2026-07-25-lib-002-source-of-truth.md (round 3 PASS,
+carries the same sentence and needs the same qualifier). Latest verifier round:
+docs/sacm/verification/2026-08-08-lib-002-resolution-round-3-FAIL.md, whose two blocking
+findings the fixes above close and whose remaining conditions govern the flip; earlier
+records: docs/sacm/verification/2026-07-26-lib-002-strategy-migration-round-2-FAIL.md,
+docs/sacm/verification/2026-07-25-lib-002-source-of-truth.md (round 3 PASS,
 rounds 1 and 2 FAILED alongside it) and docs/sacm/verification/2026-07-26-lib-002-undo-
 library-primary-round-1-FAIL.md.
 

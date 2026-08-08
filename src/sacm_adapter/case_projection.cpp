@@ -233,6 +233,12 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         }
     }
 
+    if (const auto* reasoning = dynamic_cast<const sacm::model::ArgumentReasoning*>(&element)) {
+        if (reasoning->structure().has_value()) {
+            projected.structure_ref = reasoning->structure()->value();
+        }
+    }
+
     return projected;
 }
 

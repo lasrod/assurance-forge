@@ -171,8 +171,9 @@ CommandResult CommandBus::Execute(ICommand& command,
     // library), but the saved file is legacy XML rather than XMI, which the
     // caller should know about.
     if (library_save_fell_back && result.error.empty()) {
-        result.error = "Library XMI save failed; wrote the legacy serialization "
-                       "(audit remains consistent).";
+        result.error = "Library XMI save failed; wrote the LEGACY serialization instead. "
+                       "The saved file is legacy XML, not SACM 2.3 XMI, and carries only "
+                       "what the legacy model can represent. The audit trail is intact.";
     } else if (lossy_document_fallback && result.error.empty()) {
         result.error = "Could not serialize the SACM library document; saved a projection "
                        "instead, which does not preserve unknown or vendor-specific content.";

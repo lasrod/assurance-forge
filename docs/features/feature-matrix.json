@@ -229,12 +229,12 @@
       "name": "Refusal to lose unrepresentable SACM on edit",
       "status": "supported",
       "evidence": [
-        "src/sacm_adapter/projection_diff.cpp"
+        "src/core/commands/library_bridge.cpp"
       ],
       "tests": [
-        "tests/test_projection_coverage.cpp"
+        "tests/test_save_from_library.cpp"
       ],
-      "notes": "SACM23-LIB-002. Bridged edits that would delete unrepresentable SACM are refused, not silently applied."
+      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included, and NodeOnly removals route through it too. Attribute fidelity below element level is pinned per test, not swept."
     },
     {
       "id": "AF-STD-012",
