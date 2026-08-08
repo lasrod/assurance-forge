@@ -33,8 +33,11 @@ on all three platforms. Chocolatey has no package at that granularity, which is
 what defeated the first attempt and left the job using whatever LLVM the runner
 image shipped.
 
-To move to a new clang-tidy, regenerate the baseline with it; CI reads the
-version out of the baseline, so there is one place to change.
+To move to a new clang-tidy, regenerate the baseline with it. **The workflow
+needs no edit** — it reads the version out of the baseline and installs that.
+The version is still written out on this page and in `code-quality-policy.md`
+for readers, so a bump means the baseline plus those prose mentions; grep for the
+old number.
 
 ### Why a mismatch is fatal rather than noted
 
