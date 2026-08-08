@@ -1,0 +1,42 @@
+{
+  "$comment": [
+    "The platforms this repository generates agent adapters for, and what each",
+    "one can actually enforce. Read by tools/agents/generate_adapters.py and",
+    "tools/agents/check_agents.py.",
+    "",
+    "The roster is not listed here: it is whatever exists under .agents/agents/,",
+    "so adding an agent is adding one file. A manifest that also lists the",
+    "agents is a second place to forget."
+  ],
+  "canonical_dir": ".agents/agents",
+  "platforms": {
+    "claude": {
+      "output_dir": ".claude/agents",
+      "extension": ".md",
+      "enforces_write_denial": true,
+      "how": [
+        "The `tools:` frontmatter key is the mechanism. An agent listed without",
+        "Write, Edit or NotebookEdit cannot call them -- the restriction is",
+        "applied by the harness, not requested of the model."
+      ]
+    },
+    "codex": {
+      "output_dir": ".codex/agents",
+      "extension": ".toml",
+      "enforces_write_denial": false,
+      "how": [
+        "The agent file carries only name, description and",
+        "developer_instructions. There is no tools or permissions key, so a",
+        "`writes: none` agent is restricted by instruction alone.",
+        "",
+        "This is a real limitation and is why the generator writes an explicit",
+        "paragraph into the Codex body rather than relying on the canonical",
+        "prose: on this platform the sentence *is* the whole enforcement.",
+        "",
+        "If Codex gains a tool-restriction key, set enforces_write_denial true",
+        "and emit it -- and the eval case `verifier-cannot-write` becomes",
+        "checkable there rather than reviewable."
+      ]
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "$comment": [
+    "The contract every canonical agent definition must satisfy. Validated by",
+    "tools/agents/check_agents.py, which runs as the `agent_definition_check`",
+    "CTest and reads this file rather than hard-coding the rules -- a schema",
+    "the checker ignores is a schema nobody maintains.",
+    "",
+    "Deliberately not JSON Schema: the checker is stdlib-only, because it runs",
+    "as a repository gate on three CI platforms and no other tool under tools/",
+    "takes a third-party dependency. This is the subset the checker enforces,",
+    "written so a reader can see exactly what is required."
+  ],
+  "frontmatter": {
+    "name": {
+      "required": true,
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "must_match_filename": true,
+      "description": "Stable identifier. Renaming one breaks every reference to it."
+    },
+    "description": {
+      "required": true,
+      "type": "string",
+      "min_length": 40,
+      "description": "What the agent is for, in the third person. This is the text a model reads when deciding whether to delegate, so it states the trigger, not just the topic."
+    },
+    "model": {
+      "required": true,
+      "type": "string",
+      "enum": ["inherit", "opus", "sonnet", "haiku"]
+    },
+    "memory": {
+      "required": true,
+      "type": "string",
+      "enum": ["project", "none"]
+    },
+    "color": {
+      "required": true,
+      "type": "string",
+      "pattern": "^[a-z]+$",
+      "description": [
+        "Deliberately not an enumeration. The set of colours a platform accepts",
+        "is the platform's to define, and the first draft of this schema listed",
+        "eight guessed values -- which rejected `sacm-interop-researcher`, whose",
+        "`brown` had been shipping since #198. A gate encoding a guess fails on",
+        "working data and teaches people to edit the data."
+      ]
+    },
+    "writes": {
+      "required": true,
+      "type": "string",
+      "enum": ["none", "repository"],
+      "description": [
+        "The authority boundary, stated once and mechanically derived into each",
+        "adapter. `none` means the agent must not create, edit, move or delete a",
+        "file; `repository` means it may.",
+        "",
+        "This field exists because it is the one that drifted. The conformance",
+        "verifier's Claude copy said 'you have no write or edit tools' while its",
+        "Codex copy said 'you must not create, edit, move, or delete any file' --",
+        "a mechanical fact on one platform and a request on the other, for the",
+        "role whose entire value is that it cannot fix what it judges."
+      ]
+    },
+    "tools": {
+      "required": true,
+      "type": "list",
+      "description": [
+        "The tools the agent may use, as a comma-separated list, or `all`.",
+        "Must be consistent with `writes`: a `writes: none` agent may not list",
+        "Write, Edit or NotebookEdit, and may not use `all`. The checker enforces",
+        "that, so the boundary cannot be stated in one field and contradicted in",
+        "the other."
+      ]
+    },
+    "writes_rationale": {
+      "required_when": {"writes": "none"},
+      "type": "string",
+      "min_length": 30,
+      "description": "Why this agent is denied writes. Required only for the restriction, because an unexplained restriction is the one that gets relaxed by the next person who finds it inconvenient."
+    },
+    "adapters": {
+      "required": true,
+      "type": "list",
+      "description": "Which platform adapters to generate. Every entry must be a platform declared in manifest.json."
+    }
+  },
+  "body": {
+    "required": true,
+    "min_length": 200,
+    "description": "The agent prompt, in Markdown, below the frontmatter. Carried into every adapter verbatim."
+  },
+  "write_denied_tools": ["Write", "Edit", "NotebookEdit"]
+}

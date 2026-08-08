@@ -58,6 +58,7 @@ canonical source wins on conflict.
 | Project maturity and what is claimed | [README → Status and limitations](https://github.com/lasrod/assurance-forge#status-and-limitations) |
 | How to contribute, and code style | [CONTRIBUTING.md](https://github.com/lasrod/assurance-forge/blob/main/CONTRIBUTING.md) |
 | How to report a vulnerability | [SECURITY.md](https://github.com/lasrod/assurance-forge/blob/main/SECURITY.md) |
+| What an AI development agent may do, and what it may write | [`.agents/`](https://github.com/lasrod/assurance-forge/blob/main/.agents/README.md) — `.claude/agents/` and `.codex/agents/` are generated from it |
 | Where to get help | [SUPPORT.md](https://github.com/lasrod/assurance-forge/blob/main/SUPPORT.md) |
 | How releases are cut and what release notes must say | [Releasing](RELEASING.md) |
 | Measured repository state at a point in time | [Quality baseline](quality/repository-baseline.md) |
@@ -82,12 +83,27 @@ canonical source wins on conflict.
 
 ## AI-facing instruction files
 
-`CLAUDE.md` and `AGENTS.md` are hand-maintained copies of overlapping
-instructions for different tools. That is the arrangement most likely to drift,
-and it has: see the measurements above.
+Two different things live here, and only one of them is now under control.
 
-Until [#294](https://github.com/lasrod/assurance-forge/issues/294) replaces them
-with adapters generated from one canonical source, the interim rule is:
+### Agent definitions — canonical, generated
+
+`.agents/agents/` is the canonical source for every maintained agent.
+`.claude/agents/` and `.codex/agents/` are **generated** from it, and the
+`agent_definition_check` CTest fails when one is hand-edited, when an adapter has
+no definition behind it, or when an agent's authority is stated one way in
+`writes` and granted another in `tools`.
+
+This replaced nine roles hand-written twice with nothing comparing them. One had
+already drifted — in the write-authority clause of the conformance verifier, for
+the one role whose value is that it cannot fix what it judges. See
+[`.agents/README.md`](https://github.com/lasrod/assurance-forge/blob/main/.agents/README.md).
+
+### `CLAUDE.md` and `AGENTS.md` — still hand-maintained copies
+
+These are overlapping instructions for different tools, maintained by hand. That
+is the arrangement most likely to drift, and it has: see the measurements above.
+[#294](https://github.com/lasrod/assurance-forge/issues/294) covered the agent
+definitions and **not** these two files, so the interim rule stands:
 
 - Neither file is a canonical source for anything in the table above. Each may
   restate a rule for convenience, but on conflict the canonical source wins.

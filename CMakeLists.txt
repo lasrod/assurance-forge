@@ -682,6 +682,20 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/docs/generate_verification_index.py" --check
     )
 
+    # Agent-definition gate. `.claude/agents/` and `.codex/agents/` are generated
+    # from `.agents/agents/`; this fails when one is hand-edited, when an adapter
+    # has no definition behind it, and when an agent's authority is stated one way
+    # in `writes` and granted another in `tools`.
+    #
+    # It exists because the drift already happened. Nine roles were hand-written
+    # twice with nothing comparing them, and `sacm-conformance-verifier` had
+    # diverged in its write-authority clause -- for the one role whose value is
+    # that it cannot fix what it judges.
+    add_test(
+        NAME agent_definition_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/agents/check_agents.py"
+    )
+
     # CTest label gate. Labels decide what `ctest -L` runs and which tests count
     # as conformance evidence, and a wrong label is silent: the build succeeds,
     # `ctest -N` still counts every test, and only the selection is wrong. This
@@ -709,6 +723,7 @@ if(Python3_Interpreter_FOUND)
         documentation_check
         layer_gate_negative_check
         verification_index_check
+        agent_definition_check
         PROPERTIES LABELS "gate"
     )
 
