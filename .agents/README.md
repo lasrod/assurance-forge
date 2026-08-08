@@ -136,18 +136,29 @@ count of each so the suite cannot be read as more than it is.
 
 ## Known gaps
 
-- **The reviewable cases are not executed.** Eight of the twelve. Running them
-  needs a harness that invokes a model and judges free-text output, which does
-  not exist here yet.
-- **`feature-matrix-steward` is Claude-only.** It always was. Giving it a Codex
-  adapter is now one word in `adapters:`, but it is a roster change rather than
-  a migration, so it was left for a deliberate decision.
-- **Skills and workflows are not yet canonical.** `.claude/skills/` still holds
-  two hand-written skills with no equivalent for other platforms, and #294's
-  workflow layer — sequencing and hand-offs between roles — is not modelled at
-  all. Only agents are covered.
-- **Skills are where the merged modes belong.** `sacm-researcher` carries
-  specification analysis, metamodel cartography and interoperability research as
-  three modes in one body, and `sacm-implementer` carries two scopes. Under
-  #294's own principle those are knowledge, not authority, so they should be
-  skills the role loads — which is blocked on skills becoming canonical.
+Each is tracked, because a gap recorded only as prose is one nobody is assigned
+to close. #294 is closed on what it delivered; these are what it did not.
+
+- **The reviewable cases are not executed** — [#327](https://github.com/lasrod/assurance-forge/issues/327).
+  Eight of the twelve. Running them needs a harness that invokes a model and
+  judges free-text output, and a judge that errs permissively about safety
+  behaviours is worse than no result.
+- **Skills and workflows are not canonical** — [#328](https://github.com/lasrod/assurance-forge/issues/328).
+  `.claude/skills/` still holds two hand-written skills with no equivalent for
+  other platforms, and the workflow layer — sequencing and hand-offs between
+  roles — is not modelled at all. Only agents are covered.
+  This is also where the merged modes belong: `sacm-researcher` carries three
+  modes and `sacm-implementer` two scopes, and under #294's own principle those
+  are knowledge rather than authority. They are prompt sections because there is
+  nowhere better yet.
+- **`feature-matrix-steward` is Claude-only** — [#329](https://github.com/lasrod/assurance-forge/issues/329).
+  It always was. Adding a Codex adapter is one word in `adapters:`, but that is
+  a roster change rather than a migration, so it is a decision to make rather
+  than a default to take.
+- **The runtime may grant more than the definitions declare** —
+  [#326](https://github.com/lasrod/assurance-forge/issues/326). The Claude
+  session roster has listed write-denied agents with `Write` and `Edit`,
+  including one created in the same session, which rules out a stale file. If
+  that is real, the `tools:` mechanism this package treats as enforcement is
+  weaker than the generated paragraph claims — the same error as #324, in the
+  opposite direction. It needs an experiment, not more reading.
