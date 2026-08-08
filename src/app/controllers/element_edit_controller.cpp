@@ -25,7 +25,14 @@ bool TryGetWorkingModel(AppRuntimeState& state,
                         AppEvents& events,
                         parser::AssuranceCase*& out_model,
                         sacm::AssuranceCasePackage*& out_package) {
-    if (!state.app_state.loaded_case.has_value() || !state.app_state.has_projected_package()) {
+    // Guarded on `sacm_package` itself rather than through
+    // `has_projected_package()`. This function hands out a *mutable* pointer to
+    // that field, so the field is what has to be there; the projection accessor
+    // is the read-only view and is documented to be computed differently once
+    // the library document owns it. Checking the one and dereferencing the other
+    // was also invisible to static analysis, which cannot see through the
+    // accessor to know the guard and the access name the same optional.
+    if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
         events.Emit(StatusMessageEvent{std::string(action_label) + " failed: no SACM model loaded."});
         return false;
     }

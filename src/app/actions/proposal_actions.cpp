@@ -358,6 +358,16 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
     // flush the review-controller side files.
     state_.app_state.mark_dirty();
 
+    // Re-read after the dispatch. `DispatchAuditedCommand` takes the whole
+    // runtime state, applies a command, writes SACM and rebuilds the model; the
+    // guard at the top of this function stops describing anything once a call
+    // that wide sits in front of the dereference. Closing the project is not
+    // among the things it does, and this branch says so out loud rather than
+    // relying on it.
+    if (!state_.app_state.current_project.has_value()) {
+        SetStatus(state_, "Proposal applied, but the project is no longer open.");
+        return false;
+    }
     core::AssuranceProject& project = state_.app_state.current_project.value();
     if (!DeleteProposalPatchFile(state_, item.proposal_id.value(), error)) {
         SetStatus(state_, "Proposal applied in memory, but proposal file removal failed: " + error);
