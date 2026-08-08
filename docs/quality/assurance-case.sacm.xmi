@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_repo_quality">
+  <name content="Assurance Forge repository quality"/>
+  <description content="The repository-quality assurance case required by issue 296. Human-readable rendering: docs/quality/assurance-case.md. Evidence identifiers resolve through docs/quality/evidence-index.md at the commit this file is read from."/>
+  <artifactPackage xmi:id="artpkg_evidence">
+    <name content="Evidence"/>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_feature_matrix">
+      <name content="Capability matrix with feature_matrix_check gate"/>
+      <description content="docs/features/feature-matrix.md; supported rows must cite an existing test"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_compliance_points">
+      <name content="Compliance-point decisions with unit-of-interchange tests"/>
+      <description content="docs/sacm/sacm-compliance-points.md; SACM23_CP_001..004"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_completeness_audit">
+      <name content="Independent matrix-completeness audit"/>
+      <description content="docs/sacm/sacm-matrix-completeness-audit.md"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_layer_gate">
+      <name content="Configure-time layer gate and its negative self-test"/>
+      <description content="cmake/check_layer_gates.cmake; layer_gate_negative_check"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_layers_doc">
+      <name content="Layers and ownership record"/>
+      <description content="docs/architecture/layers-and-ownership.md"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_migration_plan">
+      <name content="Legacy-bridge migration plan"/>
+      <description content="docs/architecture/legacy-bridge-migration-plan.md"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_lib002_tests">
+      <name content="Byte-pinned preservation and refusal tests"/>
+      <description content="SACM23_LIB_002 test set; refusal asserts the tracked file is byte-unchanged"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_preservation_record">
+      <name content="Integration preservation record"/>
+      <description content="docs/sacm/sacm-integration-preservation.md; every measured loss and verifier round"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_matrix_gate">
+      <name content="Conformance matrix with sacm_matrix_check gate"/>
+      <description content="docs/sacm/sacm-conformance-matrix.md; verified requires an ID-bearing test"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_verification_records">
+      <name content="Independent verification records, failures included"/>
+      <description content="docs/sacm/verification/; 14 records, 8 of them FAIL rounds"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_documentation_map">
+      <name content="Documentation authority map and documentation_check gate"/>
+      <description content="docs/documentation-map.md"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_adrs">
+      <name content="Architecture decision records"/>
+      <description content="docs/architecture/decisions/"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_release_workflow">
+      <name content="Release workflow with attached evidence package"/>
+      <description content=".github/workflows/release.yml; tools/sacm/generate_evidence_package.py; evidence_package_check"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_release_notes_policy">
+      <name content="Release notes policy"/>
+      <description content="docs/RELEASING.md; file-handling changes must be disclosed"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_agent_definitions">
+      <name content="Canonical agent definitions with authority gate"/>
+      <description content=".agents/; agent_definition_check; generated adapters"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_consent_adrs">
+      <name content="Consent ADRs and human-promotion draft policy"/>
+      <description content="ADR 0005, ADR 0007, ADR 0010"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_security_policy">
+      <name content="Security policy and XML parser hardening"/>
+      <description content="SECURITY.md; SACM23_SEC_001_RejectsDoctype"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_quality_controls">
+      <name content="Warning, static-analysis and sanitizer controls"/>
+      <description content="docs/quality/code-quality-policy.md; warnings-as-errors CI, clang-tidy ratchet, ASan/UBSan workflow"/>
+    </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="art_baseline">
+      <name content="Measured repository baseline"/>
+      <description content="docs/quality/repository-baseline.md"/>
+    </artifactElement>
+  </artifactPackage>
+  <argumentPackage xmi:id="argpkg_repo_quality">
+    <name content="Repository quality argument"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_top" assertionDeclaration="needsSupport">
+      <name content="The Assurance Forge repository provides credible evidence for the quality claimed for its declared maturity and intended use"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_boundary" assertionDeclaration="axiomatic">
+      <name content="Declared maturity and intended use: a pre-1.0 open engineering tool for authoring and reviewing structured assurance cases; not certified, qualified, or approved for any regulatory purpose"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_public" assertionDeclaration="needsSupport">
+      <name content="Public feature, maturity and standards claims are accurate, bounded, and traceable to evidence"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_arch" assertionDeclaration="needsSupport">
+      <name content="Architectural responsibilities and dependency directions are defined and mechanically enforced"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_data" assertionDeclaration="needsSupport">
+      <name content="Supported safety-case data survives import, editing, audit, undo, recovery and save without silent loss or reinterpretation"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_verif" assertionDeclaration="needsSupport">
+      <name content="Verification is requirement-linked, non-vacuous, independently reviewed, and reproducible"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_review" assertionDeclaration="needsSupport">
+      <name content="Material changes are reviewable: one responsibility per PR, recorded decisions, disclosed file-handling changes"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_release" assertionDeclaration="needsSupport">
+      <name content="Releases identify their source revision, build environment, test evidence and known limitations"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_ai" assertionDeclaration="needsSupport">
+      <name content="AI-assisted development remains human-controlled: bounded agent authority, human review, explicit consent for data flow"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_sec" assertionDeclaration="needsSupport">
+      <name content="Security reporting, parser safety and dependency risks are documented and evidenced"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_completeness" assertionDeclaration="asserted">
+      <name content="Open challenge: the completeness audit found prose-constraint obligations with no owning matrix row (issues 333-337)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_bridge" assertionDeclaration="asserted">
+      <name content="Open challenge: twenty-six commands still edit through a lossy legacy bridge that refuses rather than represents (migration plan phases 1-4)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_include" assertionDeclaration="asserted">
+      <name content="Open challenge: any layer can still compile against any other layer's headers; only the source scan prevents it (issue 340)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_agent_tools" assertionDeclaration="asserted">
+      <name content="Open challenge: the agent runtime has granted tools beyond the declared set, so tool-list enforcement is weaker than documented (issue 326); agent evaluations are defined but unexecuted (issue 327)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_secret_store" assertionDeclaration="asserted">
+      <name content="Open challenge: the OS-backed secret store exists only on Windows (issue 53)"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="counter_release_unbound" assertionDeclaration="asserted">
+      <name content="Open challenge: no shipped release carries an evidence package yet; the mechanism is merged but unexercised by a real tag"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="ar_strands">
+      <name content="Argument over the eight quality dimensions issue 296 requires, each supported by mechanically gated evidence where a gate exists, and challenged explicitly where one does not"/>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_feature_matrix" referencedArtifactElement="art_feature_matrix"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_compliance_points" referencedArtifactElement="art_compliance_points"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_completeness_audit" referencedArtifactElement="art_completeness_audit"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_layer_gate" referencedArtifactElement="art_layer_gate"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_layers_doc" referencedArtifactElement="art_layers_doc"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_migration_plan" referencedArtifactElement="art_migration_plan"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_lib002_tests" referencedArtifactElement="art_lib002_tests"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_preservation_record" referencedArtifactElement="art_preservation_record"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_matrix_gate" referencedArtifactElement="art_matrix_gate"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_verification_records" referencedArtifactElement="art_verification_records"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_documentation_map" referencedArtifactElement="art_documentation_map"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_adrs" referencedArtifactElement="art_adrs"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_release_workflow" referencedArtifactElement="art_release_workflow"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_release_notes_policy" referencedArtifactElement="art_release_notes_policy"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_agent_definitions" referencedArtifactElement="art_agent_definitions"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_consent_adrs" referencedArtifactElement="art_consent_adrs"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_security_policy" referencedArtifactElement="art_security_policy"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_quality_controls" referencedArtifactElement="art_quality_controls"/>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ref_baseline" referencedArtifactElement="art_baseline"/>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_boundary" source="claim_boundary" target="claim_top"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="inf_top" reasoning="ar_strands" source="claim_public claim_arch claim_data claim_verif claim_review claim_release claim_ai claim_sec" target="claim_top"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_1" source="ref_feature_matrix" target="claim_public"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_2" source="ref_compliance_points" target="claim_public"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_public_3" source="ref_completeness_audit" target="claim_public"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_arch_1" source="ref_layer_gate" target="claim_arch"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_arch_2" source="ref_layers_doc" target="claim_arch"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_arch_3" source="ref_migration_plan" target="claim_arch"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_data_1" source="ref_lib002_tests" target="claim_data"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_data_2" source="ref_preservation_record" target="claim_data"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_verif_1" source="ref_matrix_gate" target="claim_verif"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_verif_2" source="ref_verification_records" target="claim_verif"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_verif_3" source="ref_completeness_audit" target="claim_verif"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_review_1" source="ref_documentation_map" target="claim_review"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_review_2" source="ref_adrs" target="claim_review"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_release_1" source="ref_release_workflow" target="claim_release"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_release_2" source="ref_release_notes_policy" target="claim_release"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_ai_1" source="ref_agent_definitions" target="claim_ai"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_ai_2" source="ref_consent_adrs" target="claim_ai"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_sec_1" source="ref_security_policy" target="claim_sec"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_sec_2" source="ref_quality_controls" target="claim_sec"/>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_top_baseline" source="ref_baseline" target="claim_top"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_verif" isCounter="true" source="counter_completeness" target="claim_verif"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_data" isCounter="true" source="counter_bridge" target="claim_data"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_arch" isCounter="true" source="counter_include" target="claim_arch"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_ai" isCounter="true" source="counter_agent_tools" target="claim_ai"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_sec" isCounter="true" source="counter_secret_store" target="claim_sec"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="cnt_release" isCounter="true" source="counter_release_unbound" target="claim_release"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
