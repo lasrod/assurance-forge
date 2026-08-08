@@ -15,28 +15,36 @@
       "extension": ".md",
       "enforces_write_denial": true,
       "how": [
-        "The `tools:` frontmatter key is the mechanism. An agent listed without",
-        "Write, Edit or NotebookEdit cannot call them -- the restriction is",
-        "applied by the harness, not requested of the model."
-      ]
+        "The `tools:` frontmatter key. An agent listed without Write, Edit or",
+        "NotebookEdit cannot call them -- the harness applies that, rather than",
+        "asking the model to remember it.",
+        "",
+        "It covers those tools and nothing else. `Bash` is still granted, because a",
+        "read-only role has to be able to build and run things, and a shell can write",
+        "a file. So on this platform the prohibition on writing *through a shell* is",
+        "an instruction, and the generated paragraph says which half is which."
+      ],
+      "enforcement_scope": "tools"
     },
     "codex": {
       "output_dir": ".codex/agents",
       "extension": ".toml",
-      "enforces_write_denial": false,
+      "enforces_write_denial": true,
       "how": [
-        "The agent file carries only name, description and",
-        "developer_instructions. There is no tools or permissions key, so a",
-        "`writes: none` agent is restricted by instruction alone.",
+        "`sandbox_mode = \"read-only\"` in the agent file. Codex agent files accept",
+        "config.toml keys beyond the three required ones, and this is the one that",
+        "restricts writes; the documented example of a read-only explorer agent has",
+        "exactly this shape.",
         "",
-        "This is a real limitation and is why the generator writes an explicit",
-        "paragraph into the Codex body rather than relying on the canonical",
-        "prose: on this platform the sentence *is* the whole enforcement.",
+        "Unlike Claude's `tools:` list, the sandbox covers shell commands too, so",
+        "there is no instruction-only remainder to state here.",
         "",
-        "If Codex gains a tool-restriction key, set enforces_write_denial true",
-        "and emit it -- and the eval case `verifier-cannot-write` becomes",
-        "checkable there rather than reviewable."
-      ]
+        "This was recorded as unenforceable when the package landed, on the strength",
+        "of the committed .toml files carrying only name, description and",
+        "developer_instructions. That was a fact about what had been written, not",
+        "about what the format supports."
+      ],
+      "enforcement_scope": "sandbox"
     }
   }
 }
