@@ -4,7 +4,7 @@ Everything the project maintains about OMG SACM 2.3: what the standard requires,
 what `libs/sacm` implements, what has been verified, and the working material
 behind those decisions.
 
-Nineteen pages live in this section. Before this index existed, four were
+Twenty pages live in this section. Before this index existed, four were
 reachable from the site and the rest could only be found by browsing the
 repository tree — which meant a normative project policy and a superseded plan
 were equally hard to find, and equally easy to mistake for each other.
@@ -26,6 +26,7 @@ reader actually has:
 |---|---|---|
 | [SACM 2.3 conformance matrix](sacm-conformance-matrix.md) | Normative | The canonical source of requirement IDs. Test names embed them. `sacm_matrix_check` gates it. |
 | [SACM 2.3 compliance points](sacm-compliance-points.md) | Normative | Which of the standard's five compliance points are claimed, and which is not. Read before quoting any conformance claim. |
+| [Matrix completeness audit](sacm-matrix-completeness-audit.md) | Evidence | The 2026-08-08 independent answer to "is a normative obligation missing from the matrix entirely?" Findings tracked in [#333](https://github.com/lasrod/assurance-forge/issues/333)–[#337](https://github.com/lasrod/assurance-forge/issues/337). |
 | [SACM integration preservation](sacm-integration-preservation.md) | Evidence | The long-form record behind the integration rows: every measured loss at the library/legacy-projection seam, and every verifier round. |
 | [Verification records](verification/README.md) | Evidence | One record per `sacm-conformance-verifier` pass, failures included. |
 | [SACM 2.3 metamodel inventory](sacm-2.3-metamodel-inventory.md) | Generated | Classes, attributes and containments derived from the normative OMG model. |
