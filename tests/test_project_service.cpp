@@ -1,4 +1,6 @@
 #include "core/project_service.h"
+
+#include "core/project_file_io.h"
 #include "parser/xml_parser.h"
 #include "sacm/io/xmi.h"
 #include "sacm/metadata/namespaces.h"
@@ -346,4 +348,55 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     EXPECT_EQ(evidence_it->state, core::ProjectFileState::Missing);
     EXPECT_TRUE(missing_report.has_failures());
     EXPECT_TRUE(missing_report.showPopup);
+}
+// `ReadFileBytes` had no test. It measures the file with `tellg`, sizes a buffer
+// to that, and reads. The read now has to deliver every byte it asked for, so
+// these pin the sizes that must keep succeeding -- most of all the empty file,
+// where no read happens at all and `gcount()` has nothing to report.
+//
+// What they deliberately do not cover is the case the check exists for: a file
+// that shrinks between `tellg` and `read`. That needs the truncation to land
+// inside ReadFileBytes, between two adjacent statements, and nothing outside the
+// function can place it there. The stream states it produces were confirmed
+// separately -- a `read` of 20 bytes from a 10-byte file reports
+// `good=0 eof=1 fail=1 gcount=10`, so the old `!good() && !eof()` guard returned
+// success with the buffer's tail left as zeros.
+TEST(ProjectFileIoTest, ReadFileBytesReturnsEveryByteOrSaysWhyNot) {
+    TempDir tmp(MakeTempParent());
+
+    const std::filesystem::path empty_path = tmp.path / "empty.bin";
+    { std::ofstream out(empty_path, std::ios::binary); }
+    const std::expected<std::vector<unsigned char>, std::string> empty = core::ReadFileBytes(empty_path);
+    ASSERT_TRUE(empty.has_value()) << empty.error();
+    EXPECT_TRUE(empty->empty());
+
+    const std::filesystem::path sized_path = tmp.path / "sized.bin";
+    const std::string content(4096, 'x');
+    {
+        std::ofstream out(sized_path, std::ios::binary);
+        out << content;
+    }
+    const std::expected<std::vector<unsigned char>, std::string> sized = core::ReadFileBytes(sized_path);
+    ASSERT_TRUE(sized.has_value()) << sized.error();
+    ASSERT_EQ(sized->size(), content.size());
+    EXPECT_EQ(std::string(sized->begin(), sized->end()), content);
+
+    // A byte that is not text, in a stream opened binary: a translated read
+    // would come up short and is now an error rather than a zero-padded buffer.
+    const std::filesystem::path binary_path = tmp.path / "crlf.bin";
+    const std::string raw("a\r\nb\r\n\x1a"
+                          "trailing",
+                          15);
+    {
+        std::ofstream out(binary_path, std::ios::binary);
+        out.write(raw.data(), static_cast<std::streamsize>(raw.size()));
+    }
+    const std::expected<std::vector<unsigned char>, std::string> binary = core::ReadFileBytes(binary_path);
+    ASSERT_TRUE(binary.has_value()) << binary.error();
+    EXPECT_EQ(binary->size(), raw.size());
+    EXPECT_EQ(std::string(binary->begin(), binary->end()), raw);
+
+    const std::expected<std::vector<unsigned char>, std::string> missing =
+        core::ReadFileBytes(tmp.path / "not-here.bin");
+    EXPECT_FALSE(missing.has_value());
 }

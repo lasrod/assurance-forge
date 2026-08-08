@@ -149,13 +149,29 @@ std::expected<std::vector<unsigned char>, std::string> ReadFileBytes(const std::
         return std::unexpected("Could not determine size of " + path.string());
     file.seekg(0, std::ios::beg);
     std::vector<unsigned char> bytes(static_cast<size_t>(size));
-    // Read back the `std::streamoff` the size came from rather than converting
-    // the vector's `size_type` to `std::streamsize`. It is the same number, but
-    // one is an unsigned-to-signed conversion whose behaviour is
-    // implementation-defined for large values, and the other is the signed value
-    // this function already checked is not negative.
-    if (!bytes.empty())
-        file.read(reinterpret_cast<char*>(bytes.data()), size);
+    if (!bytes.empty()) {
+        // Convert the `std::streamoff` the size came from rather than the
+        // vector's `size_type`. Both reach `std::streamsize`, but one is an
+        // unsigned-to-signed conversion whose result is implementation-defined
+        // for large values, and the other is the signed value already checked
+        // above not to be negative.
+        file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size));
+
+        // A short read is invisible to the check below. Reading fewer bytes than
+        // asked for sets eofbit *and* failbit, so `!good() && !eof()` is false
+        // and the read reports success -- which is the right reading everywhere
+        // that treats end-of-file as an ending. Here the length was measured
+        // first, so short means the file shrank between `tellg` and `read`, and
+        // the tail of `bytes` is still the zeros it was constructed with.
+        //
+        // Returning that quietly is the damaging part: `Sha256File` is the only
+        // caller, and it feeds the hashes `af.proj` records for every tracked
+        // file. A zero-padded read produces a confident, wrong, stable hash --
+        // so the project would either accuse a colleague of editing a safety
+        // argument or fail to notice when someone had.
+        if (file.gcount() != static_cast<std::streamsize>(size))
+            return std::unexpected("File changed size while reading " + path.string());
+    }
     if (!file.good() && !file.eof())
         return std::unexpected("Could not read " + path.string());
     return bytes;
