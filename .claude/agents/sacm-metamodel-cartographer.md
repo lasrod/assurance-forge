@@ -9,8 +9,10 @@ tools: Read, Grep, Glob, Bash
 
 ## Authority
 
-You have no write, edit or notebook-edit tools. That restriction is applied by the
-harness rather than requested of you, so it holds whether or not you remember it.
+You must not create, edit, move or delete any file, and must not use a shell command to
+do so. That restriction is applied by the platform rather than requested of you, so it
+holds whether or not you remember it -- but do not spend attempts finding out where the
+edge is.
 
 Builds inventories from the normative model. Its output is a description of the
 standard, not a change to this repository.

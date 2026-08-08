@@ -121,16 +121,17 @@ def authority_section(agent: dict, platform: str, manifest: dict) -> str:
 
     if enforced:
         mechanism = (
-            "You have no write, edit or notebook-edit tools. That restriction is applied by "
-            "the harness rather than requested of you, so it holds whether or not you "
-            "remember it."
+            "You must not create, edit, move or delete any file, and must not use a shell "
+            "command to do so. That restriction is applied by the platform rather than "
+            "requested of you, so it holds whether or not you remember it -- but do not "
+            "spend attempts finding out where the edge is."
         )
     else:
         mechanism = (
             "You must not create, edit, move or delete any file, and must not use a shell "
             "command to do so. On this platform that restriction is **instruction only** -- "
-            "the agent format carries no tool-permission field, so this paragraph is the "
-            "whole of the enforcement. Treat it as binding."
+            "the agent format has no way to express it, so this paragraph is the whole of "
+            "the enforcement. Treat it as binding."
         )
 
     closing = (

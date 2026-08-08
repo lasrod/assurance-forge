@@ -67,11 +67,23 @@ restriction is the one the next person relaxes when it becomes inconvenient.
 | Platform | Enforces `writes: none`? | How |
 |---|---|---|
 | Claude | **yes** | The `tools:` frontmatter key. The harness applies it. |
-| Codex | **no** | The format carries no tool-permission key. The generated paragraph is the whole enforcement. |
+| Codex | **yes** | `sandbox_mode = "read-only"` in the agent file. |
 
-This asymmetry is real and the generator says so out loud in the Codex output
-rather than papering over it. Inventing a `tools = [...]` key that Codex ignores
-would be worse than omitting it — it would read as enforcement.
+Both are emitted by the generator and both are checked: `check_agents.py` parses
+each generated `.toml` and fails if a `writes: none` agent's file does not carry
+the read-only sandbox. Asserting `writes: none` in the definition says what was
+intended; parsing the artifact says what the platform will actually load.
+
+> **This table said "no" for Codex when the package landed**, on the strength of
+> the hand-written `.toml` files carrying only `name`, `description` and
+> `developer_instructions`. That was a fact about what somebody had written, not
+> about what the format supports — and the generator turned it into a paragraph
+> telling four agents their restriction was advisory. If a platform looks unable
+> to enforce something, check its documentation rather than its existing files.
+
+Where a platform genuinely cannot express a restriction, say so in the output
+rather than papering over it. Emitting a key the platform ignores would be worse
+than omitting it — it would read as enforcement.
 
 ## Evals
 

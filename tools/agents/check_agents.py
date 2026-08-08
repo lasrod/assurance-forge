@@ -226,10 +226,23 @@ def main() -> int:
         # wrote it out without complaint because nothing tried to read it.
         if path.suffix == ".toml":
             try:
-                tomllib.loads(content)
+                parsed = tomllib.loads(content)
             except tomllib.TOMLDecodeError as error:
                 stale.append(
                     f"{path.relative_to(REPO).as_posix()}: generated content is not valid TOML ({error})"
+                )
+                continue
+            # The restriction must be in the artifact, not only in the definition
+            # it was generated from. Asserting `writes: none` in `.agents/` says
+            # what was intended; this says the file Codex will actually load
+            # carries it. The two came apart once already -- the first version of
+            # this generator emitted no sandbox key at all, and told the agent its
+            # restriction was advisory.
+            denied = {a["stem"] for a in agents if a["fields"].get("writes") == "none"}
+            if path.stem in denied and parsed.get("sandbox_mode") != "read-only":
+                stale.append(
+                    f"{path.relative_to(REPO).as_posix()}: `writes: none` but the generated "
+                    f"file has sandbox_mode={parsed.get('sandbox_mode')!r}, not 'read-only'"
                 )
 
     for platform, spec in manifest["platforms"].items():

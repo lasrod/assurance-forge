@@ -72,16 +72,22 @@ def toml_basic_string(value: str) -> str:
 
 
 def render_codex(agent: dict, manifest: dict) -> str:
-    """TOML with the three keys the Codex agent format carries.
+    """TOML with the required keys, plus the sandbox mode when writes are denied.
 
-    There is no tools or permissions key, which is why a `writes: none` agent
-    gets a paragraph here saying the restriction is instruction only. Inventing
-    a `tools = [...]` key that Codex ignores would be worse than omitting it: it
-    would read as enforcement.
+    A Codex agent file accepts `config.toml` keys beyond the three required ones,
+    and `sandbox_mode = "read-only"` is the one that restricts writes -- the
+    documented example of a read-only explorer agent has exactly this shape.
+
+    The first version of this generator omitted it and told the reader Codex
+    could not enforce anything, because the hand-written files it replaced
+    carried only the three required keys. That was a fact about what somebody had
+    written, not about what the format supports, and stating it as the latter
+    made a real boundary look advisory.
     """
     fields = agent["fields"]
     authority = authority_section(agent, "codex", manifest)
     body = f"{authority}\n{agent['body']}" if authority else agent["body"]
+    sandbox = 'sandbox_mode = "read-only"\n' if fields.get("writes") == "none" else ""
 
     if '"""' in body:
         raise DefinitionError(
@@ -93,6 +99,7 @@ def render_codex(agent: dict, manifest: dict) -> str:
     return (
         f"name = {toml_basic_string(fields['name'])}\n"
         f"description = {toml_basic_string(fields['description'])}\n"
+        f"{sandbox}"
         f'developer_instructions = """\n{body.strip()}"""\n'
     )
 
