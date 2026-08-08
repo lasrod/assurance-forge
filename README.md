@@ -33,6 +33,12 @@ Standards support is recorded separately:
 - [SACM 2.3 conformance matrix](docs/sacm/sacm-conformance-matrix.md)
 - [GSN v3 conformance matrix](docs/gsn/gsn-v3-conformance-matrix.md)
 
+The repository's own engineering quality is argued the way the tool argues
+safety cases: a [repository-quality assurance case](docs/quality/assurance-case.md)
+— written in SACM, challenges included — with an
+[evidence index](docs/quality/evidence-index.md) for reviewers who want the
+evidence chain without the full argument.
+
 ### On SACM conformance
 
 Assurance Forge implements the SACM 2.3 metamodel and has extensive automated
