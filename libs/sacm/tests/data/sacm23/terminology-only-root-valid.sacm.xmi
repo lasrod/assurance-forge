@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Clause 2.5 unit of interchange: a document whose root is TerminologyPackage.
+     "The top object of the Terminology package as a unit of interchange shall be
+     the Terminology::TerminologyPackage element of the SACM." -->
+<sacm:TerminologyPackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+                         xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xmi:version="2.0" xmi:id="TP1">
+  <name><value content="Terminology-only interchange unit"/></name>
+  <terminologyElement xsi:type="sacm:Category" xmi:id="CAT1">
+    <name><value content="Safety vocabulary"/></name>
+  </terminologyElement>
+  <terminologyElement xsi:type="sacm:Term" xmi:id="T1">
+    <name><value content="Hazard"/></name>
+  </terminologyElement>
+</sacm:TerminologyPackage>

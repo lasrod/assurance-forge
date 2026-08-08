@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Clause 2.3 unit of interchange: a document whose root is ArtifactPackage.
+     "The top object of the Evidence package as a unit of interchange shall be
+     the Artifact::ArtifactPackage element of the SACM."
+     Conformance at this point does not entail Argumentation or Terminology
+     support, so this file deliberately carries neither. -->
+<sacm:ArtifactPackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+                      xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xmi:version="2.0" xmi:id="ARP1">
+  <name><value content="Artifact-only interchange unit"/></name>
+  <artifactElement xsi:type="sacm:Artifact" xmi:id="A1">
+    <name><value content="Hazard analysis report"/></name>
+  </artifactElement>
+  <artifactElement xsi:type="sacm:Activity" xmi:id="ACT1">
+    <name><value content="Hazard analysis workshop"/></name>
+  </artifactElement>
+</sacm:ArtifactPackage>
