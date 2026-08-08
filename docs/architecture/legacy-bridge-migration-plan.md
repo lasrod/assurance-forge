@@ -8,13 +8,18 @@ exist only to carry the migration from the legacy SACM model
 and what has to be observably true before each of them can be deleted.
 
 Where the migration stands: the library-owned document is authoritative for
-load and for every save site (`SACM23-LIB-002` in the
+load, and every bus-dispatched edit reaches disk through it — natively or via
+the guarded bridge (`SACM23-LIB-002` in the
 [conformance matrix](../sacm/sacm-conformance-matrix.md)); the legacy parser
-load fallback is gone. Edits are split: some commands mutate the library
+load fallback is gone, and the one save path outside the bus (the no-bus
+dispatch for a file opened without a project) is a disclosed, tracked
+exception ([#347](https://github.com/lasrod/assurance-forge/issues/347)).
+Edits are split: some commands mutate the library
 natively, the rest go through a bridge that projects the document into the
 legacy model, mutates that, and re-derives the document. The bridge is lossy
-for standard SACM outside the legacy POD subset and now *refuses* rather than
-silently deletes — the full history, including the six sites that each rebuilt
+for standard SACM outside the legacy POD subset and therefore *refuses* any
+document its projection cannot fully represent rather than silently deleting —
+the full history, including the six sites that each rebuilt
 the live document from a lossy projection, is the
 [integration preservation record](../sacm/sacm-integration-preservation.md).
 The [historical integration plan](../sacm/sacm-assurance-forge-integration-plan.md)
@@ -80,13 +85,21 @@ default `true`, assigned nowhere under `src/app/`).
   RemoveArtifactPackage ([`package_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/package_commands.cpp))
 - All ten terminology commands ([`terminology_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/terminology_commands.cpp))
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
+- RemoveElement `NodeOnly` (reparent — the library has no retarget operation,
+  see [GSN metamodel gaps](../sacm/sacm-gsn-metamodel-gaps.md)) and the
+  seam-unsupported create fallbacks (CreateTopGoal / CreateChildElement /
+  CreateChallenge on shapes the seams cannot express) — routed through the
+  guarded bridge by the `SACM23-LIB-002` round-4/5 fixes, after the verifier's
+  probes measured the earlier raw-mutator fallbacks silently degrading the
+  tracked file ([verification records](../sacm/verification/README.md))
 
-**Unflipped** (pure legacy; the Stage-5 net re-derives the document, and the
-autosave writes lossy `library_xmi_from_package` projection bytes until the
-next document-serializing save): RemoveElement `NodeOnly` (reparent — the
-library has no retarget operation, see
-[GSN metamodel gaps](../sacm/sacm-gsn-metamodel-gaps.md)), and any dispatch
-with `ctx.library_document == nullptr`.
+**Unflipped** (pure legacy): only a dispatch with
+`ctx.library_document == nullptr` remains — the no-bus path
+([#347](https://github.com/lasrod/assurance-forge/issues/347)). With a
+document present, every bus command either applies through the seams or routes
+through the guarded bridge; the Stage-5 net and its lossy
+`library_xmi_from_package` autosave survive as machinery for that residual
+path and for the `allow_library_primary` test seam only.
 
 **Replay-side asymmetry, and why it matters**: `ApplyEventToLibrary` in
 [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp)
