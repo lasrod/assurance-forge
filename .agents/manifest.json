@@ -15,10 +15,16 @@
       "extension": ".md",
       "enforces_write_denial": true,
       "how": [
-        "The `tools:` frontmatter key is the mechanism. An agent listed without",
-        "Write, Edit or NotebookEdit cannot call them -- the restriction is",
-        "applied by the harness, not requested of the model."
-      ]
+        "The `tools:` frontmatter key. An agent listed without Write, Edit or",
+        "NotebookEdit cannot call them -- the harness applies that, rather than",
+        "asking the model to remember it.",
+        "",
+        "It covers those tools and nothing else. `Bash` is still granted, because a",
+        "read-only role has to be able to build and run things, and a shell can write",
+        "a file. So on this platform the prohibition on writing *through a shell* is",
+        "an instruction, and the generated paragraph says which half is which."
+      ],
+      "enforcement_scope": "tools"
     },
     "codex": {
       "output_dir": ".codex/agents",
@@ -30,12 +36,15 @@
         "restricts writes; the documented example of a read-only explorer agent has",
         "exactly this shape.",
         "",
-        "This was recorded as `false` when the package landed, on the strength of the",
-        "committed .toml files carrying only name, description and",
+        "Unlike Claude's `tools:` list, the sandbox covers shell commands too, so",
+        "there is no instruction-only remainder to state here.",
+        "",
+        "This was recorded as unenforceable when the package landed, on the strength",
+        "of the committed .toml files carrying only name, description and",
         "developer_instructions. That was a fact about what had been written, not",
-        "about what the format supports, and the generator turned it into a sentence",
-        "telling five agents their restriction was advisory."
-      ]
+        "about what the format supports."
+      ],
+      "enforcement_scope": "sandbox"
     }
   }
 }

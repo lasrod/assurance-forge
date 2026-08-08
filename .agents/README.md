@@ -64,10 +64,14 @@ restriction is the one the next person relaxes when it becomes inconvenient.
 
 ## What each platform can actually enforce
 
-| Platform | Enforces `writes: none`? | How |
-|---|---|---|
-| Claude | **yes** | The `tools:` frontmatter key. The harness applies it. |
-| Codex | **yes** | `sandbox_mode = "read-only"` in the agent file. |
+| Platform | Mechanism | Covers | Left to the prompt |
+|---|---|---|---|
+| Claude | `tools:` frontmatter | Write, Edit, NotebookEdit | Writing via `Bash`, which is granted |
+| Codex | `sandbox_mode = "read-only"` | All writes, shell included | — |
+
+The two are **not the same boundary**, and the generated paragraph says which is
+which on each platform. Claude's tool list cannot stop a shell command, because a
+read-only role still needs `Bash` to build and run things; Codex's sandbox can.
 
 Both are emitted by the generator and both are checked: `check_agents.py` parses
 each generated `.toml` and fails if a `writes: none` agent's file does not carry
