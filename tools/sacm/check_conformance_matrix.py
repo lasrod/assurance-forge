@@ -85,6 +85,7 @@ def parse_matrix():
             "status": cells[5],
             "files": cells[6],
             "tests": cells[7],
+            "notes": cells[8],
             "line": lineno,
         })
     return rows
@@ -166,6 +167,28 @@ def check_no_manual_verification(rows):
     return ok
 
 
+# A notes cell is a summary with links, not a history. Four of them had grown to
+# 41,400 characters between them -- SACM23-LIB-002 alone held 20,800, roughly
+# 2,800 words in one Markdown table cell, which renders as an unreadable wall and
+# is therefore unread. The detail is not the problem and was not deleted; it
+# moved to docs/sacm/sacm-integration-preservation.md, where it can be read.
+#
+# The limit is generous on purpose. It is not a style rule -- it is the point at
+# which a cell has stopped being a cell, and the fix is always the same: move the
+# history to a linked record and leave a summary.
+MAX_NOTES_CHARS = 2000
+
+
+def check_notes_are_summaries(rows):
+    offenders = [r for r in rows if len(r["notes"]) > MAX_NOTES_CHARS]
+    for row in offenders:
+        print(f"  line {row['line']}: {row['id']} notes cell is {len(row['notes'])} characters "
+              f"(limit {MAX_NOTES_CHARS}); move the history to a linked record and leave a summary")
+    ok = not offenders
+    print(f"[6] {'OK' if ok else 'FAIL'}: every notes cell is a summary rather than a history")
+    return ok
+
+
 def main():
     if not MATRIX_PATH.exists():
         print(f"error: matrix not found at {MATRIX_PATH}", file=sys.stderr)
@@ -194,6 +217,7 @@ def main():
         check_cited_paths_exist(rows),
         check_status_vocabulary(rows),
         check_no_manual_verification(rows),
+        check_notes_are_summaries(rows),
     ]
     return 0 if all(results) else 1
 
