@@ -28,7 +28,8 @@ cannot disagree.
 
 ## The roles
 
-Seven, after the merge in #294. The test applied was whether a role needs its own
+Seven. There were ten until issue #294 consolidated overlapping roles — a change
+to the roster, not a git merge. The test applied was whether a role needs its own
 **authority boundary**, not whether it does a distinguishable job.
 
 | Role | Writes | Covers |

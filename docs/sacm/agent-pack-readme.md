@@ -70,14 +70,18 @@ docs/sacm/prompts/sacm-first-editable-slice-prompt.md
 ## Suggested agent order per slice
 
 1. `sacm-implementation-lead`
-2. `sacm-researcher`
-3. `sacm-researcher`
+2. `sacm-researcher` — **specification analysis**: the normative obligations for the slice
+3. `sacm-researcher` — **metamodel cartography**: the class, attribute and association inventory
 4. `sacm-library-architect`
 5. `sacm-xmi-test-engineer`
-6. `sacm-implementer`
+6. `sacm-implementer` — **library scope**
 7. `sacm-conformance-verifier`
-8. `sacm-implementer`, when the library slice needs application integration
-9. `sacm-researcher`, when external examples or tool behavior are needed
+8. `sacm-implementer` — **adapter scope**, when the library slice needs application integration
+9. `sacm-researcher` — **interoperability research**, when external examples or tool behavior are needed
+
+`sacm-researcher` and `sacm-implementer` each cover more than one kind of work, so
+name the mode or scope when you invoke them. Steps 2 and 3 are the same agent
+answering two different questions, and their outputs go to different places.
 
 ## Core policy
 

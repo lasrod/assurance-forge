@@ -1,4 +1,4 @@
-Use the sacm-implementer agent.
+Use the sacm-implementer agent, in **adapter scope**. The role also covers the library itself; this prompt is about the seam between the two, so say which you mean before starting.
 
 The SACM library now owns the loaded SACM source of truth for the current slice. Integrate Assurance Forge as a client without changing the reusable library API to fit Assurance Forge internals.
 
