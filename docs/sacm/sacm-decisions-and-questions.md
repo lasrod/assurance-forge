@@ -31,6 +31,7 @@ This document records the current project decisions for the SACM 2.3 library-fir
 | 23 | Partial implementation | Not a high-priority design area. Choose the easiest safe approach: preserve unsupported valid content where practical; otherwise reject or block operations that would risk silent loss. |
 | 24 | Diagnostics | Yes. Diagnostics must be machine-readable with stable codes, severity, requirement IDs, and locations where practical. |
 | 25 | External API | Start with a clean C++23 API plus CLI test utility. Do not add other bindings until the model stabilizes. |
+| 26 | SACM23-LIB-002 resolution | #295 outcome 2: library interchange conformance and application editing coverage are separate claims. An application edit the library-primary path cannot represent must refuse visibly and leave the document unchanged — never silently degrade it — and refused or guarded paths are disclosed application limitations (capability matrix), not unclaimed library capability. Verified in round 5 after two FAIL rounds; see the verification records. |
 
 ## Non-negotiable boundary
 
