@@ -41,7 +41,14 @@ std::string ClientLabelFrom(const nlohmann::json& params) {
 
 std::optional<nlohmann::json> Server::HandleMessage(const std::string& message) {
     jsonrpc::ParseOutcome parsed = jsonrpc::ParseRequest(message);
-    if (parsed.error_response.has_value()) {
+    // Keyed on the request rather than on the error, because the request is what
+    // gets dereferenced below. `ParseRequest` fills exactly one of the two --
+    // every early return produces an error response, and the one path that
+    // produces a request produces no error -- but that invariant lives in the
+    // function rather than in the type, and reading it off the wrong field left
+    // this line one refactor away from throwing `bad_optional_access` inside a
+    // server whose whole job is to survive whatever a client sends.
+    if (!parsed.request.has_value()) {
         return parsed.error_response;
     }
 
