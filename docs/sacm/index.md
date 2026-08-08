@@ -26,6 +26,7 @@ reader actually has:
 |---|---|---|
 | [SACM 2.3 conformance matrix](sacm-conformance-matrix.md) | Normative | The canonical source of requirement IDs. Test names embed them. `sacm_matrix_check` gates it. |
 | [SACM 2.3 compliance points](sacm-compliance-points.md) | Normative | Which of the standard's five compliance points are claimed, and which is not. Read before quoting any conformance claim. |
+| [SACM integration preservation](sacm-integration-preservation.md) | Evidence | The long-form record behind the integration rows: every measured loss at the library/legacy-projection seam, and every verifier round. |
 | [Verification records](verification/README.md) | Evidence | One record per `sacm-conformance-verifier` pass, failures included. |
 | [SACM 2.3 metamodel inventory](sacm-2.3-metamodel-inventory.md) | Generated | Classes, attributes and containments derived from the normative OMG model. |
 | [Interoperability corpus](sacm-interop-corpus.md) | Reference | Every dialect the library claims to read, with provenance. |

@@ -71,23 +71,61 @@ def normalize(requirement_id):
     return requirement_id.replace("-", "_")
 
 
+# Column order of the matrix table, taken from its header rather than assumed, so
+# adding a column is caught here instead of silently shifting every read below.
+EXPECTED_COLUMNS = ["ID", "Area", "Source", "Requirement", "Type", "Status", "Library files", "Tests", "Notes"]
+
+
+def split_row(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
 def parse_matrix():
-    """Return [{id, status, files, tests, line}] for each data row."""
-    rows = []
+    """Return ([{id, status, files, tests, notes, line}], [malformed-row messages]).
+
+    A row that names a requirement but does not have the expected number of cells
+    is REPORTED, never skipped. Skipping it -- which this did until #295 -- means
+    the gate proceeds with an incomplete row list and every downstream check
+    passes over content nothing looked at. Two ways to trip it, both plausible:
+    dropping the Notes column, and an unescaped `|` inside a cell, which splits
+    into extra cells and shifts Status, Tests and Notes onto the wrong text. The
+    second is the dangerous one, because the row still parses and the checks then
+    measure the wrong things.
+    """
+    rows, malformed = [], []
+    header_seen = False
     for lineno, line in enumerate(MATRIX_PATH.read_text(encoding="utf-8").splitlines(), 1):
         if not line.startswith("|"):
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 9 or not cells[0].startswith("SACM23"):
-            continue  # header, separator, or a non-matrix table
+        cells = split_row(line)
+
+        if not header_seen and cells == EXPECTED_COLUMNS:
+            header_seen = True
+            continue
+        if not cells[0].startswith("SACM23"):
+            continue  # separator, or a table that is not the matrix
+
+        if len(cells) != len(EXPECTED_COLUMNS):
+            malformed.append(
+                f"line {lineno}: {cells[0]} has {len(cells)} cells, expected {len(EXPECTED_COLUMNS)} "
+                f"({', '.join(EXPECTED_COLUMNS)}). An unescaped `|` inside a cell shifts every column "
+                r"after it; escape it as `\|`."
+            )
+            continue
         rows.append({
             "id": cells[0],
             "status": cells[5],
             "files": cells[6],
             "tests": cells[7],
+            "notes": cells[8],
             "line": lineno,
         })
-    return rows
+
+    if not header_seen:
+        malformed.append(
+            f"the matrix header row was not found. Expected exactly: | {' | '.join(EXPECTED_COLUMNS)} |"
+        )
+    return rows, malformed
 
 
 def collect_test_ids():
@@ -166,6 +204,28 @@ def check_no_manual_verification(rows):
     return ok
 
 
+# A notes cell is a summary with links, not a history. Four of them had grown to
+# 41,400 characters between them -- SACM23-LIB-002 alone held 20,800, roughly
+# 2,800 words in one Markdown table cell, which renders as an unreadable wall and
+# is therefore unread. The detail is not the problem and was not deleted; it
+# moved to docs/sacm/sacm-integration-preservation.md, where it can be read.
+#
+# The limit is generous on purpose. It is not a style rule -- it is the point at
+# which a cell has stopped being a cell, and the fix is always the same: move the
+# history to a linked record and leave a summary.
+MAX_NOTES_CHARS = 2000
+
+
+def check_notes_are_summaries(rows):
+    offenders = [r for r in rows if len(r["notes"]) > MAX_NOTES_CHARS]
+    for row in offenders:
+        print(f"  line {row['line']}: {row['id']} notes cell is {len(row['notes'])} characters "
+              f"(limit {MAX_NOTES_CHARS}); move the history to a linked record and leave a summary")
+    ok = not offenders
+    print(f"[6] {'OK' if ok else 'FAIL'}: every notes cell is a summary rather than a history")
+    return ok
+
+
 def main():
     if not MATRIX_PATH.exists():
         print(f"error: matrix not found at {MATRIX_PATH}", file=sys.stderr)
@@ -178,7 +238,15 @@ def main():
             print(f"error: test directory not found at {tests_dir}", file=sys.stderr)
             return 1
 
-    rows = parse_matrix()
+    rows, malformed = parse_matrix()
+    # Before any check runs. A malformed row is not a finding to weigh against the
+    # others -- it means the gate cannot see part of the matrix, and every result
+    # below would describe a subset while reading as a verdict on the whole.
+    if malformed:
+        print(f"error: {len(malformed)} malformed matrix row(s):", file=sys.stderr)
+        for problem in malformed:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
     if not rows:
         # Guards against a silently-passing gate if the table format changes.
         print("error: no requirement rows parsed from the matrix", file=sys.stderr)
@@ -194,6 +262,7 @@ def main():
         check_cited_paths_exist(rows),
         check_status_vocabulary(rows),
         check_no_manual_verification(rows),
+        check_notes_are_summaries(rows),
     ]
     return 0 if all(results) else 1
 

@@ -68,6 +68,7 @@ nav:
     - Overview: sacm/index.md
     - GSN v3 Conformance: gsn/gsn-v3-conformance-matrix.md
     - SACM 2.3 Compliance points: sacm/sacm-compliance-points.md
+    - SACM integration preservation: sacm/sacm-integration-preservation.md
     - SACM 2.3 Conformance: sacm/sacm-conformance-matrix.md
     - Verification Records: sacm/verification/README.md
     - SACM–GSN Mapping: sacm/sacm-gsn-mapping.md
