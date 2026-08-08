@@ -253,7 +253,8 @@ The mechanical enforcement points, gathered in one place. Which page is
 canonical for each policy the gates protect is the
 [documentation map](../documentation-map.md)'s to say.
 
-Eleven gates run under `ctest`:
+The repository gates run under `ctest` (`ctest -L gate` runs the no-build
+subset in about a second):
 
 | Gate | Fails when |
 |---|---|
@@ -269,7 +270,7 @@ Eleven gates run under `ctest`:
 | `agent_definition_check` | A generated agent definition under `.claude/agents/` or `.codex/agents/` was hand-edited or diverges from `.agents/agents/` |
 | `ctest_label_check` | A test carries no label, a malformed one, or a `conformance` label that does not match an ID-bearing test name |
 
-Four more controls run outside `ctest`:
+More controls run outside `ctest`:
 
 | Control | Where | What it rejects |
 |---|---|---|
