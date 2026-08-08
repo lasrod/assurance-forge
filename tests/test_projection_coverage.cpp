@@ -52,6 +52,25 @@ const std::set<std::string>& KnownUnrepresentableKinds() {
         // below warns. It is a new disclosure, not a new regression: the
         // projection has never carried Event (issue #292).
         "event",
+        // Clauses 12.2 (Artifact), 12.3 (Activity), 10.2 (Term) and 10.5
+        // (Category). Surfaced by the SACM23-CP-002/003/004 interchange-unit
+        // fixtures added for issue #295: those are rooted at a bare
+        // ArtifactPackage/TerminologyPackage, which no earlier fixture was, and
+        // the only artifact-rich fixture before them (artifact-full-valid) is on
+        // the rejected list below -- so these losses were never measured. Exactly
+        // the blind spot the note on KnownRejectedFixtures warns about.
+        //
+        // New disclosures, not new regressions: the legacy POD has never carried
+        // any of the four. They are disclosed rather than fixed because carrying
+        // them means growing the POD to cover SACM 2.3 -- the model the library
+        // migration exists to retire -- and because the bridge already REFUSES a
+        // command whose document holds unrepresentable content rather than
+        // dropping it silently (SACM23_LIB_002_BridgedEditRefusesRatherThanDelete-
+        // UnrepresentableElements). Tracked on SACM23-LIB-002.
+        "artifact",
+        "activity",
+        "term",
+        "category",
     };
     return kinds;
 }

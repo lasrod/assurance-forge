@@ -52,6 +52,7 @@ canonical source wins on conflict.
 | Why an architectural choice was made | [ADRs](architecture/decisions/index.md) |
 | What the tool can do for a user | [Capability matrix](features/feature-matrix.md) |
 | What SACM 2.3 requires and what is verified | [SACM conformance matrix](sacm/sacm-conformance-matrix.md) |
+| Which SACM 2.3 compliance points are claimed | [SACM compliance points](sacm/sacm-compliance-points.md) |
 | GSN → SACM mappings | [SACM–GSN mapping](sacm/sacm-gsn-mapping.md) |
 | SACM library policy (compliance, editing, layout, tests) | [SACM index → Policy](sacm/index.md#policy) |
 | Whether a verification actually passed | [Verification records](sacm/verification/README.md) |

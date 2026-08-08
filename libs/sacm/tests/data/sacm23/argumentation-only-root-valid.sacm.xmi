@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Clause 2.2 unit of interchange: a document whose root is ArgumentPackage.
+     "The top object of the Argumentation package as a unit of interchange shall
+     be the Argumentation::ArgumentPackage element of the SACM."
+     Conformance at this point does not entail Artifact or Terminology support,
+     so this file deliberately carries neither. -->
+<sacm:ArgumentPackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+                      xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xmi:version="2.0" xmi:id="AP1">
+  <name><value content="Argumentation-only interchange unit"/></name>
+  <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+    <name><value content="The system is acceptably safe"/></name>
+  </argumentElement>
+  <argumentElement xsi:type="sacm:Claim" xmi:id="G2">
+    <name><value content="Hazards have been identified"/></name>
+  </argumentElement>
+  <argumentElement xsi:type="sacm:AssertedInference" xmi:id="AI1" source="G2" target="G1">
+    <name><value content="Hazard identification supports the safety claim"/></name>
+  </argumentElement>
+</sacm:ArgumentPackage>

@@ -133,6 +133,7 @@ if(SACM_BUILD_TESTS)
         tests/test_argumentation.cpp
         tests/test_artifact.cpp
         tests/test_metamodel_coverage.cpp
+        tests/test_compliance_points.cpp
     )
     target_link_libraries(sacm_tests PRIVATE sacm::sacm GTest::gtest_main)
     if(COMMAND af_set_warning_level)

@@ -269,12 +269,33 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
     const sacm::model::Document& source = LibraryDocumentAccess::document(document);
 
     core::AssuranceCase projected;
+    // Identity comes from whichever interchange root the document has. SACM 2.3
+    // clause 2 permits four of them -- AssuranceCasePackage (2.4, mandatory),
+    // ArgumentPackage (2.2), ArtifactPackage (2.3) and TerminologyPackage (2.5)
+    // -- and only the first lands in `roots()`; the other three arrive in
+    // `other_roots()`.
+    //
+    // Reading only `roots()` left the projection with an empty id and name for
+    // those three. `for_each_element` walks both lists, so the CONTENT projected
+    // correctly and only the identity was lost, which is why nothing caught it
+    // until a fixture was rooted at a bare package: an empty id survives
+    // `library_canonical_hash_from_file` (which projects the file directly) but
+    // gets materialized by `library_canonical_hash` (which round-trips through
+    // the legacy writer first), so the two disagreed permanently. That is a
+    // project reporting divergence forever -- the failure
+    // MultilingualRoundTrip.EveryFixtureHashesTheSameThroughEitherPipeline
+    // exists to catch, and it caught this one.
+    const sacm::model::ModelElement* root = nullptr;
     if (!source.roots().empty()) {
-        const sacm::model::AssuranceCasePackage& root = *source.roots().front();
-        projected.id = root.id().value();
-        projected.name = root.name().content;
-        if (!root.description().empty()) {
-            projected.description = root.description().primary();
+        root = source.roots().front().get();
+    } else if (!source.other_roots().empty()) {
+        root = dynamic_cast<const sacm::model::ModelElement*>(source.other_roots().front().get());
+    }
+    if (root != nullptr) {
+        projected.id = root->id().value();
+        projected.name = root->name().content;
+        if (!root->description().empty()) {
+            projected.description = root->description().primary();
         }
     }
 
