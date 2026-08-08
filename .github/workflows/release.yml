@@ -56,6 +56,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
 
+      # The evidence-package gate and generator verify the normative OMG
+      # sources against the pins carried in the generator. The sources are
+      # fetched, not committed (OMG licensing); release runners fetch them so
+      # the pin comparison actually runs where a release is produced.
+      - name: Fetch SACM normative references
+        shell: bash
+        run: bash scripts/fetch-sacm23-references.sh
+
       - name: Configure CMake
         run: ${{ matrix.configure }}
 
