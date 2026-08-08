@@ -6,14 +6,14 @@ Use specialized agents rather than asking one agent to do everything. The goal i
 
 ```text
 sacm-implementation-lead
-  -> sacm-spec-analyst
-  -> sacm-metamodel-cartographer
+  -> sacm-researcher
+  -> sacm-researcher
   -> sacm-library-architect
   -> sacm-xmi-test-engineer
-  -> sacm-library-implementer
+  -> sacm-implementer
   -> sacm-conformance-verifier
-  -> assurance-forge-adapter-engineer
-  -> sacm-interop-researcher when needed
+  -> sacm-implementer
+  -> sacm-researcher when needed
 ```
 
 ## Slice rules

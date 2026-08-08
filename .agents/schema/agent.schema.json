@@ -41,9 +41,9 @@
       "description": [
         "Deliberately not an enumeration. The set of colours a platform accepts",
         "is the platform's to define, and the first draft of this schema listed",
-        "eight guessed values -- which rejected `sacm-interop-researcher`, whose",
-        "`brown` had been shipping since #198. A gate encoding a guess fails on",
-        "working data and teaches people to edit the data."
+        "eight guessed values -- which rejected the interoperability researcher (since",
+        "merged into `sacm-researcher`), whose `brown` had been shipping since #198.",
+        "A gate encoding a guess fails on working data and teaches people to edit it."
       ]
     },
     "writes": {

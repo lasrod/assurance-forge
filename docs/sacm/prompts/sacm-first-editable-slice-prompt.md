@@ -22,11 +22,11 @@ Required behavior:
 
 Required sequence:
 
-1. Ask sacm-spec-analyst to refine requirement rows for SACM23-LIB-001, SACM23-LIB-003, SACM23-CMD-001 through SACM23-CMD-005, SACM23-PKG-001, SACM23-ARG-001, SACM23-XMI-001, SACM23-VAL-001, SACM23-VAL-002, SACM23-RT-002, and SACM23-CLI-001.
-2. Ask sacm-metamodel-cartographer to identify the exact minimal metamodel structure, namespace/root expectations, Claim containment expectations, and unresolved questions.
+1. Ask sacm-researcher to refine requirement rows for SACM23-LIB-001, SACM23-LIB-003, SACM23-CMD-001 through SACM23-CMD-005, SACM23-PKG-001, SACM23-ARG-001, SACM23-XMI-001, SACM23-VAL-001, SACM23-VAL-002, SACM23-RT-002, and SACM23-CLI-001.
+2. Ask sacm-researcher to identify the exact minimal metamodel structure, namespace/root expectations, Claim containment expectations, and unresolved questions.
 3. Ask sacm-library-architect to confirm the library directory, target, namespace, command API, preview API, delete policies, CLI target, and public API boundary for this slice.
 4. Ask sacm-xmi-test-engineer to write failing library-level tests and fixtures before production code.
-5. Only after tests fail for the expected reason, ask sacm-library-implementer to implement the minimum behavior.
+5. Only after tests fail for the expected reason, ask sacm-implementer to implement the minimum behavior.
 6. Ask sacm-conformance-verifier to verify tests, source traceability, editing behavior, XMI behavior, no layout leakage, and library independence.
 
 Do not integrate Assurance Forge UI layout in this slice. A small adapter smoke test may follow after the library test slice is passing and verified.

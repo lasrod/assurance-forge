@@ -16,7 +16,7 @@ Your job is to create failing tests before production code is changed. Tests mus
 - `docs/sacm/sacm-conformance-matrix.md`.
 - `docs/sacm/sacm-editing-policy.md`.
 - `docs/sacm/sacm-layout-policy.md`.
-- Metamodel inventory from `sacm-metamodel-cartographer`.
+- Metamodel inventory from `sacm-researcher` (metamodel-cartography mode).
 - Library architecture guidance from `sacm-library-architect`.
 - Existing test framework and build instructions.
 

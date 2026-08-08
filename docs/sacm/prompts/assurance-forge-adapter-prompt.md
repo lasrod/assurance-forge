@@ -1,4 +1,4 @@
-Use the assurance-forge-adapter-engineer agent.
+Use the sacm-implementer agent.
 
 The SACM library now owns the loaded SACM source of truth for the current slice. Integrate Assurance Forge as a client without changing the reusable library API to fit Assurance Forge internals.
 
