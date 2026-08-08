@@ -149,8 +149,13 @@ std::expected<std::vector<unsigned char>, std::string> ReadFileBytes(const std::
         return std::unexpected("Could not determine size of " + path.string());
     file.seekg(0, std::ios::beg);
     std::vector<unsigned char> bytes(static_cast<size_t>(size));
+    // Read back the `std::streamoff` the size came from rather than converting
+    // the vector's `size_type` to `std::streamsize`. It is the same number, but
+    // one is an unsigned-to-signed conversion whose behaviour is
+    // implementation-defined for large values, and the other is the signed value
+    // this function already checked is not negative.
     if (!bytes.empty())
-        file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
+        file.read(reinterpret_cast<char*>(bytes.data()), size);
     if (!file.good() && !file.eof())
         return std::unexpected("Could not read " + path.string());
     return bytes;
