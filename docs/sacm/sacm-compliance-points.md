@@ -13,7 +13,9 @@ before any public conformance statement does.
     Nothing here has been assessed by OMG or by any certification body. It states
     what the project has evidence for, and links to that evidence. Standards
     conformance is not regulatory approval and is not a safety argument about
-    your system.
+    your system. The specification's own compliance page additionally conditions
+    claims on completing OMG-approved test suites where such suites exist; none
+    is known to exist for SACM 2.3.
 
 ## The five points
 
@@ -106,6 +108,15 @@ Stated here rather than left to be discovered:
 - **Strict output and compatibility mode are different things.** A strict save
   emits conformant SACM 2.3; compatibility mode re-emits preserved content that
   the standard does not define. Only the former is what these claims are about.
+- **Completeness has been measured, and the exceptions are tracked.** The
+  2026-08-08 [matrix-completeness audit](sacm-matrix-completeness-audit.md)
+  confirmed the structural inventory chain behind these claims and found the
+  matrix's gaps to be prose constraints, tracked in
+  [#333](https://github.com/lasrod/assurance-forge/issues/333)–[#337](https://github.com/lasrod/assurance-forge/issues/337).
+  Two findings touch import capability directly: `xmi:type` dispatch
+  ([#336](https://github.com/lasrod/assurance-forge/issues/336)) and
+  `Resource.location`
+  ([#337](https://github.com/lasrod/assurance-forge/issues/337)).
 - **No release binding yet.** [#295](https://github.com/lasrod/assurance-forge/issues/295)
   requires an evidence package bound to an exact release — version, commit,
   toolchain, machine-readable results. Until that exists, these claims describe
