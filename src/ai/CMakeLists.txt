@@ -9,4 +9,7 @@ add_library(af_ai OBJECT
     openai_provider.cpp
     secret_store.cpp
 )
+# libcurl is reached through one file, libcurl_http_client.cpp. Keeping it
+# private is what stops a second HTTP path appearing elsewhere by accident.
 target_link_libraries(af_ai PUBLIC af_common)
+target_link_libraries(af_ai PRIVATE CURL::libcurl)

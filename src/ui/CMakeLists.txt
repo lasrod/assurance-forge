@@ -45,5 +45,8 @@ add_library(af_ui OBJECT
     widgets/splitter.cpp
     widgets/text_ellipsis.cpp
 )
-target_link_libraries(af_ui PUBLIC af_common hello_imgui)
+# imgui is PUBLIC: it is in twenty of this layer's headers, so `app` meets it
+# by including them. hello_imgui is private -- only sources call the runner.
+target_link_libraries(af_ui PUBLIC af_common af_imgui)
+target_link_libraries(af_ui PRIVATE hello_imgui)
 

@@ -5,27 +5,35 @@
 #   af_parser, af_sacm, af_sacm_adapter, af_core, af_ai, af_export, af_ui,
 #   af_bridge, af_agent, af_mcp, af_app
 #
-# All libraries depend on `af_common` (INTERFACE) which carries the
-# include dirs and the third-party link surface. This keeps per-layer
-# CMakeLists.txt small (Godot-style) without requiring a granular
-# per-layer dependency audit. Layer-gate tightening can be performed
-# incrementally later.
+# Each declares the third-party libraries it actually uses. The map is in
+# docs/architecture/layers-and-ownership.md; `af_sacm_adapter` was the pattern
+# the rest were brought up to.
+#
+# `af_common` used to carry the whole third-party surface -- imgui, pugixml,
+# nfd, picosha2, nlohmann_json, yaml-cpp and libcurl -- on all eleven targets.
+# #301 measured what that meant: `export` and `sacm_adapter` used none of the
+# seven, `core` used two, `ui` used one. A target that links what it does not
+# use cannot say what it depends on, and neither can anyone reading it.
 # --------------------------------------------------------------------
 
+# The include root, so a cross-layer include reads as "core/app_state.h", plus
+# the one library too widely reachable to attribute usefully: nlohmann_json is
+# in the public headers of core, bridge, agent and mcp, so most of the tree
+# meets it by inclusion rather than by convenience. Header-only, so this is an
+# include path rather than a link.
+#
+# It is not a place to put the next dependency. Adding one here gives it to
+# eleven targets to spare one of them a line.
 add_library(af_common INTERFACE)
-target_include_directories(af_common INTERFACE
-    ${CMAKE_SOURCE_DIR}/src
-    ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS}
-)
-target_link_libraries(af_common INTERFACE
-    imgui
-    pugixml
-    nfd
-    picosha2
-    nlohmann_json::nlohmann_json
-    ${AF_YAML_CPP_TARGET}
-    CURL::libcurl
-)
+target_include_directories(af_common INTERFACE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(af_common INTERFACE nlohmann_json::nlohmann_json)
+
+# Dear ImGui's headers, needed by the two layers that draw. Attached to those
+# targets rather than to af_common, which is what put `imgui.h` on the include
+# path of the SACM parser.
+add_library(af_imgui INTERFACE)
+target_include_directories(af_imgui INTERFACE ${ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS})
+target_link_libraries(af_imgui INTERFACE imgui)
 
 add_subdirectory(parser)
 add_subdirectory(sacm)

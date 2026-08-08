@@ -97,24 +97,50 @@ The gate is itself tested. `layer_gate_negative_check` feeds it nine forbidden
 dependencies it must reject and four allowed ones it must not — a gate that
 passes on a clean tree is indistinguishable from one that has stopped working.
 
+### Third-party dependencies
+
+Each target declares what it uses. This is the map; `src/*/CMakeLists.txt` is
+what the build enforces.
+
+| Subsystem | Public — in its headers | Private — sources only |
+|---|---|---|
+| `parser` | — | pugixml, yaml-cpp |
+| `sacm` | — | pugixml |
+| `sacm_adapter` | `sacm::sacm` | — |
+| `core` | — | picosha2 |
+| `ai` | — | libcurl |
+| `export` | — | — |
+| `ui` | Dear ImGui | hello_imgui |
+| `bridge`, `agent`, `mcp` | — | — |
+| `app` | Dear ImGui | hello_imgui, nfd |
+
+`nlohmann_json` is not in the table: it is in the public headers of `core`,
+`bridge`, `agent` and `mcp`, so most of the tree meets it by inclusion rather
+than by convenience, and it stays on `af_common` with the `src/` include root.
+Header-only, so that is an include path rather than a link. **`af_common` is not
+a place to put the next dependency** — anything added there goes to eleven
+targets to spare one of them a line.
+
+Until [#291](https://github.com/lasrod/assurance-forge/issues/291), `af_common`
+carried all seven third-party libraries for every target. `export` and
+`sacm_adapter` used none of them, `core` used two, `ui` used one — and the SVG
+exporter could `#include "imgui.h"` and compile. It no longer can.
+
+`af_sacm_adapter` was already built this way, and is where the pattern came
+from: the src include root, `sacm::sacm`, and a comment saying why it is the
+only target that links the library.
+
 ### What the gate does not cover
 
 It checks source-level `#include` directives, not CMake target dependencies.
-`af_common` is an INTERFACE target giving every subsystem the whole `src/`
-include path and the full third-party link surface, so each layer can already
-compile against every other layer's headers — the source scan is the only thing
-stopping it. Measured against actual usage:
+Every subsystem still receives the whole `src/` include path from `af_common`,
+because a cross-layer include is written as `core/app_state.h` and has to
+resolve from the tree root. So each layer can still *compile* against every
+other layer's headers, and the source scan remains the only thing stopping it.
 
-| Subsystem | Actually uses | Also links |
-|---|---|---|
-| `core` | picosha2, nlohmann_json | imgui, pugixml, nfd, yaml-cpp, curl |
-| `parser` | pugixml, nlohmann_json, yaml-cpp | imgui, nfd, picosha2, curl |
-| `ui` | imgui | pugixml, nfd, picosha2, nlohmann_json, yaml-cpp, curl |
-| `app` | imgui, nfd, nlohmann_json | pugixml, picosha2, yaml-cpp, curl |
-| `export`, `sacm_adapter` | *(none)* | all seven |
-
-Narrowing this is open under
-[#291](https://github.com/lasrod/assurance-forge/issues/291).
+Confining that too would mean giving each layer its own include root and prefix
+directory. That is a larger restructure than narrowing the link surface was, and
+it is not scheduled.
 
 UI code should not depend on `app` directly. When a panel needs to request a
 command, `AppRuntime` passes a small action object into it — which keeps the
