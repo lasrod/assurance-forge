@@ -26,6 +26,33 @@ asks nicely. Nothing reported the difference.
 That sentence is now generated from the `writes` field, per platform, so the two
 cannot disagree.
 
+## The roles
+
+Seven. There were ten until issue #294 consolidated overlapping roles — a change
+to the roster, not a git merge. The test applied was whether a role needs its own
+**authority boundary**, not whether it does a distinguishable job.
+
+| Role | Writes | Covers |
+|---|---|---|
+| `sacm-implementation-lead` | repository | Sequences the rest |
+| `sacm-library-architect` | repository | Decides boundaries; does not implement them |
+| `sacm-implementer` | repository | The library, and the adapter that consumes it |
+| `sacm-xmi-test-engineer` | repository | The failing test, written before the fix |
+| `sacm-researcher` | **none** | Specification, metamodel, interoperability |
+| `sacm-conformance-verifier` | **none** | Judges whether a slice can honestly be called verified |
+| `feature-matrix-steward` | **none** | Audits capability claims |
+
+Three merged into `sacm-researcher` because they shared a boundary exactly: all
+read-only, all producing a document, differing only in **what they read**. Two
+merged into `sacm-implementer` for the same reason — the adapter engineer's rule
+about not contaminating the library with Assurance Forge vocabulary is a
+constraint the merged role carries, not a separate authority.
+
+The verifier was not merged into anything: it is the only role whose value comes
+from what it *cannot* do. The test engineer stayed separate from the implementer
+because that seam is what makes test-first observable — whoever writes the
+failing test should not also be the one who decides it was too hard to write.
+
 ## Adding or changing an agent
 
 1. Edit or add a file under `agents/`. One file is one agent; the roster is the
@@ -119,6 +146,8 @@ count of each so the suite cannot be read as more than it is.
   two hand-written skills with no equivalent for other platforms, and #294's
   workflow layer — sequencing and hand-offs between roles — is not modelled at
   all. Only agents are covered.
-- **The role set is unchanged.** #294 asks whether ten roles should become
-  roughly five. This package deliberately migrates what exists so the move is
-  verifiable; the merge proposal is on the issue.
+- **Skills are where the merged modes belong.** `sacm-researcher` carries
+  specification analysis, metamodel cartography and interoperability research as
+  three modes in one body, and `sacm-implementer` carries two scopes. Under
+  #294's own principle those are knowledge, not authority, so they should be
+  skills the role loads — which is blocked on skills becoming canonical.

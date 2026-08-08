@@ -49,13 +49,13 @@ Treat `docs/sacm/sacm-decisions-and-questions.md` as project policy. Key decisio
 
 For each slice, choose a small coherent set of SACM elements, XMI mechanisms, or edit operations.
 
-1. Ask `sacm-spec-analyst` to extract the relevant normative obligations and update `docs/sacm/sacm-conformance-matrix.md`.
-2. Ask `sacm-metamodel-cartographer` to compare the slice against the normative SACM XML/metamodel and create a class/attribute/association inventory.
+1. Ask `sacm-researcher`, in specification-analysis mode, to extract the relevant normative obligations and update `docs/sacm/sacm-conformance-matrix.md`.
+2. Ask `sacm-researcher`, in metamodel-cartography mode, to compare the slice against the normative SACM XML/metamodel and create a class/attribute/association inventory.
 3. Ask `sacm-library-architect` to confirm where the feature belongs in the neutral library API and whether the design keeps Assurance Forge-specific concepts outside the boundary.
 4. Ask `sacm-xmi-test-engineer` to create failing tests and fixtures for the exact slice before production implementation.
-5. Ask `sacm-library-implementer` to implement the minimum library behavior needed to pass the tests.
+5. Ask `sacm-implementer`, in library scope, to implement the minimum library behavior needed to pass the tests.
 6. Ask `sacm-conformance-verifier` to independently verify traceability, tests, XMI behavior, editing behavior, and no data loss.
-7. Ask `assurance-forge-adapter-engineer` to integrate the new library behavior into Assurance Forge only after the library slice is credible.
+7. Ask `sacm-implementer`, in adapter scope, to integrate the new library behavior into Assurance Forge only after the library slice is credible. Name the scope: the library half lands first, and the adapter cannot be reviewed against an API that does not exist yet.
 8. Update docs and mark the matrix only after verification passes.
 
 ## Planning rules
