@@ -23,7 +23,7 @@ jobs:
             os: windows-latest
             configure: cmake -B build -G "Visual Studio 17 2022" -A x64
             build: cmake --build build --config Release
-            test: ctest --test-dir build -C Release --output-on-failure --no-tests=error
+            test: ctest --test-dir build -C Release --output-on-failure --no-tests=error --output-junit test-results.xml
             binary_path: build/Release/assurance-forge.exe
             archive_suffix: windows-x64
             archive_ext: zip
@@ -55,6 +55,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
+
+      # The evidence-package gate and generator verify the normative OMG
+      # sources against the pins carried in the generator. The sources are
+      # fetched, not committed (OMG licensing); release runners fetch them so
+      # the pin comparison actually runs where a release is produced.
+      - name: Fetch SACM normative references
+        shell: bash
+        run: bash scripts/fetch-sacm23-references.sh
 
       - name: Configure CMake
         run: ${{ matrix.configure }}
@@ -90,6 +98,37 @@ jobs:
           cp -R data "$stage/"
           cp README.md "$stage/"
           cp LICENSE.md "$stage/"
+
+      - name: Generate conformance evidence package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ctest writes --output-junit relative to the test dir on some
+          # versions and the invocation dir on others; accept either.
+          junit=""
+          for candidate in build/test-results.xml test-results.xml; do
+            if [ -f "$candidate" ]; then junit="$candidate"; break; fi
+          done
+          if [ -z "$junit" ]; then
+            echo "test-results.xml not found; the evidence package requires machine-readable test results" >&2
+            exit 1
+          fi
+          python tools/sacm/generate_evidence_package.py \
+            --version "${{ steps.version.outputs.version }}" \
+            --toolchain "MSVC (Visual Studio 17 2022), windows-latest, Release" \
+            --test-results "$junit" \
+            --require-clean \
+            --out package/evidence \
+            --zip "package/assurance-forge.${{ steps.version.outputs.version }}-evidence-package.zip"
+
+      - name: Upload evidence package artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: assurance-forge-${{ steps.version.outputs.version }}-evidence-package
+          path: package/assurance-forge.${{ steps.version.outputs.version }}-evidence-package.zip
+          if-no-files-found: error
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
@@ -134,4 +173,14 @@ jobs:
           name: assurance-forge ${{ steps.version.outputs.version }}
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           files: package/assurance-forge.${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}.${{ matrix.archive_ext }}
+          fail_on_unmatched_files: true
+
+      # The evidence package (#295) binds the conformance claim to this exact
+      # release. Attached from the Windows job only -- one package per release,
+      # generated on the platform whose binaries the release ships.
+      - name: Attach evidence package to Release (Windows)
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Windows'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: package/assurance-forge.${{ steps.version.outputs.version }}-evidence-package.zip
           fail_on_unmatched_files: true
