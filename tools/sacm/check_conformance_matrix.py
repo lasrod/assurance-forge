@@ -71,15 +71,47 @@ def normalize(requirement_id):
     return requirement_id.replace("-", "_")
 
 
+# Column order of the matrix table, taken from its header rather than assumed, so
+# adding a column is caught here instead of silently shifting every read below.
+EXPECTED_COLUMNS = ["ID", "Area", "Source", "Requirement", "Type", "Status", "Library files", "Tests", "Notes"]
+
+
+def split_row(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
 def parse_matrix():
-    """Return [{id, status, files, tests, line}] for each data row."""
-    rows = []
+    """Return ([{id, status, files, tests, notes, line}], [malformed-row messages]).
+
+    A row that names a requirement but does not have the expected number of cells
+    is REPORTED, never skipped. Skipping it -- which this did until #295 -- means
+    the gate proceeds with an incomplete row list and every downstream check
+    passes over content nothing looked at. Two ways to trip it, both plausible:
+    dropping the Notes column, and an unescaped `|` inside a cell, which splits
+    into extra cells and shifts Status, Tests and Notes onto the wrong text. The
+    second is the dangerous one, because the row still parses and the checks then
+    measure the wrong things.
+    """
+    rows, malformed = [], []
+    header_seen = False
     for lineno, line in enumerate(MATRIX_PATH.read_text(encoding="utf-8").splitlines(), 1):
         if not line.startswith("|"):
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 9 or not cells[0].startswith("SACM23"):
-            continue  # header, separator, or a non-matrix table
+        cells = split_row(line)
+
+        if not header_seen and cells == EXPECTED_COLUMNS:
+            header_seen = True
+            continue
+        if not cells[0].startswith("SACM23"):
+            continue  # separator, or a table that is not the matrix
+
+        if len(cells) != len(EXPECTED_COLUMNS):
+            malformed.append(
+                f"line {lineno}: {cells[0]} has {len(cells)} cells, expected {len(EXPECTED_COLUMNS)} "
+                f"({', '.join(EXPECTED_COLUMNS)}). An unescaped `|` inside a cell shifts every column "
+                r"after it; escape it as `\|`."
+            )
+            continue
         rows.append({
             "id": cells[0],
             "status": cells[5],
@@ -88,7 +120,12 @@ def parse_matrix():
             "notes": cells[8],
             "line": lineno,
         })
-    return rows
+
+    if not header_seen:
+        malformed.append(
+            f"the matrix header row was not found. Expected exactly: | {' | '.join(EXPECTED_COLUMNS)} |"
+        )
+    return rows, malformed
 
 
 def collect_test_ids():
@@ -201,7 +238,15 @@ def main():
             print(f"error: test directory not found at {tests_dir}", file=sys.stderr)
             return 1
 
-    rows = parse_matrix()
+    rows, malformed = parse_matrix()
+    # Before any check runs. A malformed row is not a finding to weigh against the
+    # others -- it means the gate cannot see part of the matrix, and every result
+    # below would describe a subset while reading as a verdict on the whole.
+    if malformed:
+        print(f"error: {len(malformed)} malformed matrix row(s):", file=sys.stderr)
+        for problem in malformed:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
     if not rows:
         # Guards against a silently-passing gate if the table format changes.
         print("error: no requirement rows parsed from the matrix", file=sys.stderr)
