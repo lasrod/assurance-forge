@@ -1,0 +1,65 @@
+{
+  "tolerance_points": 0.2,
+  "components": {
+    "libs/sacm": {
+      "lines": 6946,
+      "covered": 6103,
+      "percent": 87.86
+    },
+    "src/sacm": {
+      "lines": 786,
+      "covered": 652,
+      "percent": 82.95
+    },
+    "src/parser": {
+      "lines": 921,
+      "covered": 787,
+      "percent": 85.45
+    },
+    "src/sacm_adapter": {
+      "lines": 1482,
+      "covered": 1164,
+      "percent": 78.54
+    },
+    "src/core": {
+      "lines": 15722,
+      "covered": 12163,
+      "percent": 77.36
+    },
+    "src/ai": {
+      "lines": 1027,
+      "covered": 753,
+      "percent": 73.32
+    },
+    "src/export": {
+      "lines": 938,
+      "covered": 791,
+      "percent": 84.33
+    },
+    "src/bridge": {
+      "lines": 364,
+      "covered": 309,
+      "percent": 84.89
+    },
+    "src/agent": {
+      "lines": 1084,
+      "covered": 648,
+      "percent": 59.78
+    },
+    "src/mcp": {
+      "lines": 814,
+      "covered": 629,
+      "percent": 77.27
+    },
+    "src/ui": {
+      "lines": 8678,
+      "covered": 970,
+      "percent": 11.18
+    },
+    "src/app": {
+      "lines": 11691,
+      "covered": 2363,
+      "percent": 20.21
+    }
+  }
+}
