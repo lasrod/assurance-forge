@@ -6,11 +6,12 @@
 # every exclusion names what it actually fired on. An unexplained exclusion is
 # indistinguishable from a check nobody dared turn on.
 #
-# The enabled set produces 90 findings. The four families with no exclusions
-# produce 4,784, and the nine exclusions below account for 4,694 of them —
-# 98%, with five checks alone contributing 4,586. Baselining all of it would
-# have meant baselining noise, and a baseline that is mostly noise is one
-# nobody reads.
+# The enabled set produced 90 findings when first measured, and 69 now that
+# issue #306 has closed the 21 describing correctness problems. The four
+# families with no exclusions produce 4,784, and the nine exclusions below
+# account for 4,694 of them — 98%, with five checks alone contributing 4,586.
+# Baselining all of it would have meant baselining noise, and a baseline that
+# is mostly noise is one nobody reads.
 #
 # Re-derive these counts rather than trusting them:
 #   python tools/quality/run_clang_tidy.py --all-checks

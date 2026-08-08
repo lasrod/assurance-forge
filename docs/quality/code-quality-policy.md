@@ -128,11 +128,12 @@ current findings and known gaps are in [static analysis](static-analysis.md).
 | Aspect | Position |
 |---|---|
 | Configuration | `.clang-tidy` at the repository root, so an IDE reports what CI reports |
-| Enabled set | 90 findings. The four families with no exclusions give 4,784; nine excluded checks account for 4,694 of them (98%), each recorded with its count and reason |
+| Enabled set | 69 findings (90 when first measured; [#306](https://github.com/lasrod/assurance-forge/issues/306) closed the 21 correctness ones). The four families with no exclusions give 4,784; nine excluded checks account for 4,694 of them (98%), each recorded with its count and reason |
 | Enforcement | `run_clang_tidy.py --check` as its own CI job: changed `.cpp` files on a pull request, the full sweep on `main` |
 | Incomplete runs | A translation unit clang-tidy cannot compile aborts the run. It contributes no findings, so continuing would record unanalyzed code as clean |
 | Auto-fixing | **Never.** No `--fix`; a tool rewriting safety-case handling code unattended is not a trade this project makes |
 | Known gap | Windows only, so `#ifndef _WIN32` branches are unanalyzed |
+| Known gap | **CI runs clang-tidy 20.1.8; the baseline records 22.1.4.** The ratchet compares one tool against another — [#317](https://github.com/lasrod/assurance-forge/issues/317) |
 
 The selection principle is that a check earns its place by finding defects
 *here*. Enabling everything and suppressing the fallout produces a baseline
