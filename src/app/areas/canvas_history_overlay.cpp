@@ -251,18 +251,27 @@ void RenderHistoricalCanvas(CanvasHistoryState& tab_state,
                                               overlay_buttons);
 }
 
+// Both audit questions below are about a project on disk, so both take one.
+// Asking them of the runtime state instead meant the open-project check lived in
+// one function and the dereference in the other, where neither a reader nor
+// static analysis could tell they were the same project.
+bool HasAuditStore(const core::AssuranceProject& project) {
+    return std::filesystem::exists(core::audit::ManifestPath(project.rootPath));
+}
+
 } // namespace
 
 bool ProjectHasAuditStore(const AppRuntimeState& state) {
-    if (!state.app_state.current_project.has_value())
-        return false;
-    return std::filesystem::exists(core::audit::ManifestPath(state.app_state.current_project->rootPath));
+    return state.app_state.current_project.has_value() && HasAuditStore(*state.app_state.current_project);
 }
 
 bool ProjectAuditLogHasTransactions(const AppRuntimeState& state) {
-    if (!ProjectHasAuditStore(state))
+    if (!state.app_state.current_project.has_value())
         return false;
-    const auto log = core::audit::EventLogPath(state.app_state.current_project->rootPath);
+    const core::AssuranceProject& project = *state.app_state.current_project;
+    if (!HasAuditStore(project))
+        return false;
+    const std::filesystem::path log = core::audit::EventLogPath(project.rootPath);
     std::error_code ec;
     if (!std::filesystem::exists(log, ec))
         return false;

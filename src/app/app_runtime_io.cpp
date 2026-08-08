@@ -84,8 +84,17 @@ bool AppRuntime::SaveProject() {
 
     // Either we just flushed everything, or there was nothing to flush. In
     // both cases the project is consistent on disk now.
+    //
+    // The project is re-read rather than held across the saves above, the same
+    // way each block above re-reads it. Nothing in them closes a project, but
+    // this is the one dereference that would be undefined if something did, and
+    // it exists only to name the project in a status line -- not worth an error
+    // path, and not worth trusting either.
+    const core::AssuranceProject* saved_project =
+        impl_->app_state.current_project.has_value() ? &*impl_->app_state.current_project : nullptr;
     impl_->app_state.has_unsaved_changes = false;
-    impl_->app_state.status_message = "Project saved: " + impl_->app_state.current_project->name;
+    impl_->app_state.status_message =
+        saved_project != nullptr ? "Project saved: " + saved_project->name : "Project saved.";
     return true;
 }
 
