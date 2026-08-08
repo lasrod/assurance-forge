@@ -47,6 +47,7 @@ would overstate how settled it is.
 
 | Date | Requirements | Verdict | Record |
 |---|---|---|---|
+| 2026-08-08 | `SACM23-LIB-002` | **FAIL** | [Lib 002 resolution](2026-08-08-lib-002-resolution-round-3-FAIL.md) |
 | 2026-07-26 | `SACM23-LIB-002` | **FAIL** | [Undo library primary](2026-07-26-lib-002-undo-library-primary-round-1-FAIL.md) |
 | 2026-07-26 | `SACM23-LIB-002` | **FAIL** | [Strategy migration preserves unknown content](2026-07-26-lib-002-strategy-migration-round-2-FAIL.md) |
 | 2026-07-25 | `SACM23-LIB-002` | Pass | [Phase 9 stage 7 source of truth](2026-07-25-lib-002-source-of-truth.md) |
