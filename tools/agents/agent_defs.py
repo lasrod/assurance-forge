@@ -117,14 +117,38 @@ def authority_section(agent: dict, platform: str, manifest: dict) -> str:
 
     rationale = agent["fields"].get("writes_rationale", "").strip()
     tools = ", ".join(f"`{tool}`" for tool in agent["tools"])
-    enforced = manifest["platforms"][platform]["enforces_write_denial"]
+    spec = manifest["platforms"][platform]
+    if not spec["enforces_write_denial"]:
+        scope = "none"
+    elif "enforcement_scope" not in spec:
+        raise DefinitionError(
+            f"manifest: platform {platform!r} claims to enforce write denial but does not say "
+            "what that covers. Set `enforcement_scope` to 'tools' or 'sandbox' -- the generated "
+            "paragraph has to state the boundary, and the two are not the same boundary."
+        )
+    else:
+        scope = spec["enforcement_scope"]
 
-    if enforced:
+    # What each platform actually stops, said separately, because they differ and
+    # the difference is the part that matters. An earlier version of this
+    # collapsed both into "applied by the platform", which was true of Codex's
+    # sandbox and false of Claude's tool list -- `Bash` is granted there, so a
+    # shell can still write a file. Overstating an enforcement boundary is the
+    # same mistake as understating one, and this generator has now made both.
+    if scope == "tools":
         mechanism = (
-            "You must not create, edit, move or delete any file, and must not use a shell "
-            "command to do so. That restriction is applied by the platform rather than "
-            "requested of you, so it holds whether or not you remember it -- but do not "
-            "spend attempts finding out where the edge is."
+            "You have no write, edit or notebook-edit tools. The harness applies that, so it "
+            "holds whether or not you remember it.\n\n"
+            "It does not cover `Bash`, which you do have. Writing a file through a shell "
+            "command is therefore prohibited by this paragraph rather than by the platform -- "
+            "the one part of your boundary that depends on you. Do not create, edit, move or "
+            "delete a file that way."
+        )
+    elif scope == "sandbox":
+        mechanism = (
+            "You run in a read-only sandbox. Creating, editing, moving or deleting a file is "
+            "refused by the platform, including through a shell command, so the boundary does "
+            "not depend on you remembering it. Do not spend attempts finding its edge."
         )
     else:
         mechanism = (
@@ -139,6 +163,10 @@ def authority_section(agent: dict, platform: str, manifest: dict) -> str:
         "judge what you have not executed -- and never for changing them."
     )
 
-    paragraphs = [mechanism, rationale, closing]
+    # `mechanism` may itself be more than one paragraph -- the tools-scoped one is
+    # two, because what the platform enforces and what it leaves to you are
+    # different claims and running them together is how the last version got it
+    # wrong. Split before wrapping so the blank line survives.
+    paragraphs = [*mechanism.split("\n\n"), rationale, closing]
     wrapped = "\n\n".join(textwrap.fill(p, width=88) for p in paragraphs if p)
     return f"## Authority\n\n{wrapped}\n"
