@@ -90,4 +90,7 @@ add_library(af_core OBJECT
     tree_editing.cpp
     user_settings.cpp
 )
+# picosha2 backs core/sha256.cpp and appears nowhere else, including in
+# core's own headers -- callers get Sha256, not the implementation.
 target_link_libraries(af_core PUBLIC af_common)
+target_link_libraries(af_core PRIVATE picosha2)

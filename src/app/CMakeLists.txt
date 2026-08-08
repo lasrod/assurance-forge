@@ -64,5 +64,7 @@ add_library(af_app OBJECT
     terminology_problem_sync.cpp
     translation_review_sync.cpp
 )
-target_link_libraries(af_app PUBLIC af_common hello_imgui)
+# nfd opens the one native file dialog, in native_file_dialogs.cpp.
+target_link_libraries(af_app PUBLIC af_common af_imgui)
+target_link_libraries(af_app PRIVATE hello_imgui nfd)
 
