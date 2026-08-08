@@ -682,6 +682,15 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/docs/generate_verification_index.py" --check
     )
 
+    # Release-evidence gate. The release workflow generates a conformance
+    # evidence package (#295); this proves the generator still works against the
+    # current checkout -- matrix parseable, spec pins recomputable, frozen docs
+    # present -- so the first time it runs for real is not on a release tag.
+    add_test(
+        NAME evidence_package_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/sacm/generate_evidence_package.py" --check
+    )
+
     # Agent-definition gate. `.claude/agents/` and `.codex/agents/` are generated
     # from `.agents/agents/`; this fails when one is hand-edited, when an adapter
     # has no definition behind it, and when an agent's authority is stated one way
@@ -724,6 +733,7 @@ if(Python3_Interpreter_FOUND)
         layer_gate_negative_check
         verification_index_check
         agent_definition_check
+        evidence_package_check
         PROPERTIES LABELS "gate"
     )
 

@@ -117,8 +117,10 @@ Stated here rather than left to be discovered:
   ([#336](https://github.com/lasrod/assurance-forge/issues/336)) and
   `Resource.location`
   ([#337](https://github.com/lasrod/assurance-forge/issues/337)).
-- **No release binding yet.** [#295](https://github.com/lasrod/assurance-forge/issues/295)
-  requires an evidence package bound to an exact release — version, commit,
-  toolchain, machine-readable results. Until that exists, these claims describe
-  `main` at the commit you are reading, which is weaker than a release claim and
-  is said so deliberately.
+- **Release binding starts with the next release.** The release workflow now
+  generates and attaches a
+  [conformance evidence package](sacm-conformance-statement.md) — version,
+  commit, toolchain, machine-readable results, frozen matrix. No release cut
+  before that mechanism existed carries one, and until the first that does,
+  these claims describe `main` at the commit you are reading, which is weaker
+  than a release claim and is said so deliberately.

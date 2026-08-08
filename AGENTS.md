@@ -146,6 +146,7 @@ All run under `ctest`. A change that trips one is not ready:
 | `no_committed_artifacts_check` | A build log, test output or scratch file is tracked by git |
 | `documentation_check` | A broken internal link, an unreachable page, an unmarked generated doc, or an architecture page missing a subsystem |
 | `verification_index_check` | The verification index no longer matches the records' front matter |
+| `evidence_package_check` | The release evidence package cannot be generated from this checkout — matrix unparseable, spec pins mismatch, or a frozen doc missing |
 
 Formatting is applied on commit by the `.githooks/pre-commit` hook, installed by `cmake --preset default`. There is no CI format gate.
 

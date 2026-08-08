@@ -43,6 +43,26 @@ To build a packaged zip without creating a GitHub Release, use **workflow_dispat
 
 > Note: `workflow_dispatch` only works for workflow files that exist on the repository's default branch. To run an experimental build from a feature branch, the workflow file must already be present on `main`.
 
+## Conformance evidence package
+
+Alongside the binaries, the Windows job generates and attaches
+`assurance-forge.<tag>-evidence-package.zip` — the release-bound SACM 2.3
+conformance evidence required by
+[#295](https://github.com/lasrod/assurance-forge/issues/295): the frozen
+conformance matrix and decision pages, requirement-to-test traceability, the
+release build's machine-readable test results, the pinned normative-source
+hashes, and a generated conformance statement naming the exact release. See
+[the conformance statement page](sacm/sacm-conformance-statement.md) for what
+the package means and `tools/sacm/generate_evidence_package.py` for how it is
+built. To reproduce one locally:
+
+```bash
+python tools/sacm/generate_evidence_package.py --allow-missing-test-results
+```
+
+The `evidence_package_check` CTest gate runs the generator's `--check` mode on
+every gate run, so a broken generator is caught before a release tag needs it.
+
 ## Release notes policy
 
 **The GitHub Releases page is this project's changelog.** There is no
