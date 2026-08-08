@@ -186,6 +186,35 @@ print a diagnostic and carry on, which exits zero — the job would go green whi
 reporting undefined behaviour. Aborting is what makes this a check rather than a
 log.
 
+### What the first run found
+
+1,231 of 1,232 tests pass under ASan and UBSan. The one failure is a genuine
+undefined-behaviour report, and it is not a test artifact:
+
+```
+imgui_widgets.cpp:7219:32: runtime error: shift exponent 11999 is too large
+                          for 32-bit type 'int'
+  #1 RenderTreeNode          src/ui/tree_view.cpp:323
+  #2 ui::ShowTreeViewPanel   src/ui/tree_view.cpp:363
+```
+
+`TreePop` decrements `TreeDepth` and then computes `1 << TreeDepth` on a signed
+`int`, so popping the innermost of *N* nested levels shifts by *N−1*. On a
+32-bit `int` that is undefined once the exponent reaches 32 — **from 33 levels
+deep**. The 12,000-node test only made it easy to see: it reported exponent
+11999, which is 12000 − 1 and confirms the relationship.
+
+`ShowTreeViewPanel` pushes one ImGui tree level per level of the user's
+argument, so a large safety case reaches this too — it does not need a
+synthetic tree.
+
+The defect is in a submodule this project does not own, and the fix on our side
+is a UI decision about how a very deep argument should render. It is tracked in
+[#312](https://github.com/lasrod/assurance-forge/issues/312), and that one test
+is excluded from the sanitizer run **by name, with the issue in the comment**,
+so the exclusion cannot quietly become permanent. A parked finding is not a
+clean bill.
+
 **Not on pull requests**, for the reason [Coverage](../COVERAGE.md) gives for
 itself: the sanitizer build shares no ccache with the ordinary one (every flag
 differs, so every object is a miss) and ASan roughly doubles the test runtime.
