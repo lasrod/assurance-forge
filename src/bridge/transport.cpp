@@ -32,7 +32,14 @@ constexpr std::size_t kReadChunk = 4096;
 // A safety case can be large, and a single `get_argument_tree` reply carries a
 // lot of JSON. This is not a protocol limit so much as a refusal to grow a
 // buffer without bound on a peer that never sends a newline.
-constexpr std::size_t kMaxMessageBytes = 64u * 1024u * 1024u;
+//
+// Written in the destination type. `64u * 1024u * 1024u` multiplied in
+// `unsigned int` and widened only on assignment, and unsigned overflow wraps
+// silently rather than being diagnosed: raising the 64 to 8192 would have made
+// this constant exactly 0, and a 0-byte limit rejects every message. The
+// product fits today. Spelling the type is what stops that being something to
+// re-check on each edit.
+constexpr std::size_t kMaxMessageBytes = std::size_t{64} * 1024 * 1024;
 
 } // namespace
 
@@ -112,6 +119,14 @@ namespace {
 HANDLE CreatePipeInstance(const std::string& address) {
     return CreateNamedPipeA(address.c_str(),
                             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+                            // All three of these Windows SDK macros are 0x00000000 -- byte type,
+                            // byte read mode and blocking are the defaults -- so clang-tidy 20
+                            // reads the line as `0 | 0 | 0` and reports equivalent operands.
+                            // Naming the modes the pipe is created with is worth more than the
+                            // bare 0 that would silence it. clang-tidy 22 does not report this;
+                            // CI runs 20, so the suppression has to be here rather than assumed
+                            // away. See #317 for the version mismatch itself.
+                            // NOLINTNEXTLINE(misc-redundant-expression)
                             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
                             PIPE_UNLIMITED_INSTANCES,
                             static_cast<DWORD>(kReadChunk),

@@ -191,7 +191,13 @@ private:
     // the model the canvas should draw: the preview when one is open, otherwise
     // the committed case unchanged. Also refreshes the per-element change status
     // the canvas decorates nodes with.
+    //
+    // Returning `committed` unchanged means the caller's argument has to outlive
+    // the returned reference. The rvalue overload is deleted so that a caller
+    // passing a temporary is a compile error rather than a dangling reference
+    // the canvas would then read from for a frame.
     const parser::AssuranceCase& RefreshAgentChangePreview(const parser::AssuranceCase& committed);
+    const parser::AssuranceCase& RefreshAgentChangePreview(parser::AssuranceCase&&) = delete;
 
     // Points the draft workspace store at whatever argument is open, opening its
     // recovery data when there is any and closing the previous one first.
