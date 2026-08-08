@@ -26,6 +26,12 @@ struct AppState {
     // cached `sacm_package` field; a later Phase 3 slice will compute it from
     // `library_document` and delete the field. Callers must guard with has_projected_package().
     const sacm::AssuranceCasePackage& projected_package() const {
+        // clang-tidy reports this as an unchecked optional access. It is not:
+        // `.value()` throws `std::bad_optional_access` on a broken precondition,
+        // where `operator*` would be undefined behaviour. The check does not
+        // distinguish the two, and the throw is the backstop that makes the
+        // documented precondition above safe to state rather than enforce.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         return sacm_package.value();
     }
     bool has_projected_package() const {

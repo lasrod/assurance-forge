@@ -252,15 +252,27 @@ bool AppState::save_project() {
         }
     }
 
-    ProjectService::RefreshFileStatus(current_project.value());
+    // Re-read the project rather than hold a reference across `save_file`.
+    // `save_file` writes the SACM document and touches no project state, so this
+    // branch is not reachable today -- but the guard at the top of this function
+    // stops meaning anything the moment a mutating call sits between it and the
+    // dereference, and the only thing keeping it true is that somebody read
+    // `save_file` recently. One branch is cheaper than that assumption.
+    if (!current_project.has_value()) {
+        status_message = "Project save failed: no project is open.";
+        return false;
+    }
+    AssuranceProject& project = current_project.value();
+
+    ProjectService::RefreshFileStatus(project);
 
     std::string error;
-    if (!ProjectService::WriteManifestSafely(current_project.value(), error)) {
+    if (!ProjectService::WriteManifestSafely(project, error)) {
         status_message = "Project save failed: " + error;
         return false;
     }
 
-    status_message = "Project saved: " + current_project->name;
+    status_message = "Project saved: " + project.name;
     return true;
 }
 

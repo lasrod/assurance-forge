@@ -441,11 +441,17 @@ bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id, std::strin
         error = "There is no draft workspace for this argument.";
         return false;
     }
-    if (workspace_->pending_promotion.has_value()) {
+    // Unwrapped once, under the guard above. `PushEditUndo` copies the workspace
+    // into the undo stack and never resets the optional, which is already what
+    // the `group` pointer below depends on -- it points into this workspace and
+    // is used after that call too. Naming the workspace says so once instead of
+    // re-deriving it at every `workspace_->`.
+    DraftWorkspace& workspace = workspace_.value();
+    if (workspace.pending_promotion.has_value()) {
         error = "A draft promotion is awaiting durable completion.";
         return false;
     }
-    DraftChangeGroup* group = workspace_->FindGroup(group_id);
+    DraftChangeGroup* group = workspace.FindGroup(group_id);
     if (group == nullptr) {
         error = "No draft change group with id " + group_id + ".";
         return false;
@@ -458,7 +464,7 @@ bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id, std::strin
 
     group->state = DraftGroupState::Ready;
     group->updated_utc = NowUtcString();
-    ++workspace_->working_revision;
+    ++workspace.working_revision;
     RecordEvent("group_ready", group_id, group->title);
     InvalidateMaterialization();
     return Save(error);
@@ -470,11 +476,12 @@ bool DraftWorkspaceStore::RejectGroup(const std::string& group_id, std::string& 
         error = "There is no draft workspace for this argument.";
         return false;
     }
-    if (workspace_->pending_promotion.has_value()) {
+    DraftWorkspace& workspace = workspace_.value();
+    if (workspace.pending_promotion.has_value()) {
         error = "A draft promotion is awaiting durable completion and cannot be rejected.";
         return false;
     }
-    DraftChangeGroup* group = workspace_->FindGroup(group_id);
+    DraftChangeGroup* group = workspace.FindGroup(group_id);
     if (group == nullptr) {
         error = "No draft change group with id " + group_id + ".";
         return false;
@@ -486,7 +493,7 @@ bool DraftWorkspaceStore::RejectGroup(const std::string& group_id, std::string& 
 
     group->state = DraftGroupState::Rejected;
     group->updated_utc = NowUtcString();
-    ++workspace_->working_revision;
+    ++workspace.working_revision;
     RecordEvent("group_rejected", group_id, group->title);
     InvalidateMaterialization();
     return Save(error);
@@ -498,11 +505,12 @@ bool DraftWorkspaceStore::MarkGroupNeedsAttention(const std::string& group_id, s
         error = "There is no draft workspace for this argument.";
         return false;
     }
-    if (workspace_->pending_promotion.has_value()) {
+    DraftWorkspace& workspace = workspace_.value();
+    if (workspace.pending_promotion.has_value()) {
         error = "A draft promotion is awaiting durable completion.";
         return false;
     }
-    DraftChangeGroup* group = workspace_->FindGroup(group_id);
+    DraftChangeGroup* group = workspace.FindGroup(group_id);
     if (group == nullptr) {
         error = "No draft change group with id " + group_id + ".";
         return false;
@@ -516,7 +524,7 @@ bool DraftWorkspaceStore::MarkGroupNeedsAttention(const std::string& group_id, s
 
     group->state = DraftGroupState::NeedsAttention;
     group->updated_utc = NowUtcString();
-    ++workspace_->working_revision;
+    ++workspace.working_revision;
     RecordEvent("group_needs_attention", group_id, group->title);
     InvalidateMaterialization();
     return Save(error);
