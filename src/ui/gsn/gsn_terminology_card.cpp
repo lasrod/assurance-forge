@@ -315,7 +315,13 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
                 }
             }
             ImGui::PopID();
-            if (++shown >= 4 && static_cast<int>(card_state.candidates.size()) > shown) {
+            // Incremented before the test rather than inside it. `&&` sequences
+            // its operands, so `++shown >= 4 && ... > shown` was well defined and
+            // this changes nothing -- but a variable modified and read across one
+            // condition reads like it depends on evaluation order, and the reader
+            // has to know that rule to see that it does not.
+            ++shown;
+            if (shown >= 4 && static_cast<int>(card_state.candidates.size()) > shown) {
                 const int remaining = static_cast<int>(card_state.candidates.size()) - shown;
                 ImGui::TextDisabled(
                     "%s", ui::i18n::trnf("{0} more candidate.", "{0} more candidates.", remaining, remaining).c_str());

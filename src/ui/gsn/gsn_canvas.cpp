@@ -679,7 +679,11 @@ void ShowGsnCanvasContentWithRenderer(GsnCanvas& renderer,
         ImGui::SameLine(0.0f, 0.0f);
         // Zoom percentage label
         char zoom_label[16];
-        snprintf(zoom_label, sizeof(zoom_label), "%d%%", static_cast<int>(renderer.GetZoom() * 100.0f + 0.5f));
+        // `lround`, not `(int)(x + 0.5f)`. The zoom factor is positive, so the
+        // two agree here and this is a clarity fix rather than a defect -- the
+        // add-and-truncate idiom rounds -0.5 to 0 instead of -1, which is what
+        // the check is about and what the next reader would have to re-derive.
+        snprintf(zoom_label, sizeof(zoom_label), "%d%%", static_cast<int>(std::lround(renderer.GetZoom() * 100.0f)));
         ImVec2 label_slot_pos = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton("##zoom_label", ImVec2(label_width, button_size));
         ImVec2 text_size = ImGui::CalcTextSize(zoom_label);

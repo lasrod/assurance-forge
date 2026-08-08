@@ -8,6 +8,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -84,7 +85,12 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v, const HistoryTim
 
     if (active && ImGui::IsMouseDown(ImGuiMouseButton_Left) && max_v > min_v) {
         const float t = std::clamp((ImGui::GetIO().MousePos.x - cursor.x) / std::max(1.0f, size.x), 0.0f, 1.0f);
-        const int next_value = min_v + static_cast<int>(t * static_cast<float>(max_v - min_v) + 0.5f);
+        // `t` is clamped to [0, 1] and `max_v > min_v` is checked above, so the
+        // product cannot be negative and `lround` agrees with the old
+        // add-and-truncate. Changed for the same reason as the canvas zoom
+        // label: the idiom rounds the wrong way below zero, and a reader should
+        // not have to prove the operands are positive to know this line is right.
+        const int next_value = min_v + static_cast<int>(std::lround(t * static_cast<float>(max_v - min_v)));
         if (next_value != value) {
             value = next_value;
             if (callbacks.on_select_sequence)

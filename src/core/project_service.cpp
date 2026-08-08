@@ -17,6 +17,7 @@
 #include <iomanip>
 #include <random>
 #include <sstream>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -75,7 +76,12 @@ void EnsureInternalDirectoryIgnored(const std::filesystem::path& root) {
         return;
     // Best effort. A project on read-only media, or one whose owner deleted the
     // file deliberately, is not a reason to refuse to open it.
-    (void)WriteTextFile(ignore_path, kInternalDirectoryIgnoreFile);
+    //
+    // `std::ignore` rather than a `(void)` cast: this returns
+    // `std::expected<void, std::string>`, and clang-tidy reports a cast-to-void
+    // as a disregarded result all the same. Both say "deliberate"; only one says
+    // it to the reader and the analyser at once.
+    std::ignore = WriteTextFile(ignore_path, kInternalDirectoryIgnoreFile);
 }
 
 bool MakeUtcTime(std::time_t time, std::tm& utc) {
