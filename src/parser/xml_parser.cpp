@@ -243,6 +243,23 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
             if (local_name == "claim" || local_name == "argumentreasoning") {
                 element.undeveloped = read_bool_attr(child, "undeveloped", false);
             }
+            if (local_name == "claim") {
+                for (pugi::xml_node ref_child : child.children()) {
+                    if (get_local_name(ref_child.name()) == "metaclaim") {
+                        std::string ref = get_ref(ref_child);
+                        if (!ref.empty())
+                            element.meta_claim_refs.push_back(ref);
+                    }
+                }
+            }
+            if (local_name == "argumentreasoning") {
+                std::string attr_structure = child.attribute("structure").as_string();
+                if (!attr_structure.empty()) {
+                    if (attr_structure[0] == '#')
+                        attr_structure = attr_structure.substr(1);
+                    element.structure_ref = attr_structure;
+                }
+            }
 
             if (local_name == "expression") {
                 element.content = child.attribute("value").as_string();

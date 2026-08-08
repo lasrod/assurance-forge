@@ -43,6 +43,7 @@ struct SacmElement {
     std::vector<std::string> target_refs;     // ids from <target ref="..."/>
     std::vector<std::string> meta_claim_refs; // ids from <metaClaim ref="..."/>
     std::string reasoning_ref;                // from reasoning attribute (assertedinference)
+    std::string structure_ref;                // from structure attribute (argumentreasoning, 11.12)
     std::string assertion_declaration;        // from assertionDeclaration attribute
     bool is_counter = false;                  // from isCounter attribute (GSN dialectic challenge)
 };

@@ -366,9 +366,11 @@ TEST(LibraryPrimaryEditFlip, RemoveKeepsSiblingUnderSharedStrategyInference) {
 // grandparent -- legacy core::RemoveElement RETARGETS the child's inference from
 // the removed node to the parent. That retarget is not a delete, so the pure
 // delete+scrub seam cannot reproduce it (it would leave the child inference
-// target-less, drop it, and orphan the grandchild). The flip must route NodeOnly
-// through the legacy mutator and re-derive the library, NOT the seam. Both routings
-// of `G1 -> E -> C`, remove E NodeOnly, must hash identically with C promoted to G1.
+// target-less, drop it, and orphan the grandchild). NodeOnly therefore routes
+// through the GUARDED bridge (project -> legacy reparent -> reload), the same
+// path the audit replayer uses -- library-primary, but never the scrub seam.
+// Both routings of `G1 -> E -> C`, remove E NodeOnly, must hash identically
+// with C promoted to G1.
 TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
     std::unique_ptr<EditFixture> library_side = MakeFixture("node_only_library", /*library_backed=*/true);
     std::unique_ptr<EditFixture> legacy_side = MakeFixture("node_only_legacy", /*library_backed=*/false);
@@ -385,7 +387,10 @@ TEST(LibraryPrimaryEditFlip, RemoveNodeOnlyInteriorReparentsMatchesLegacy) {
 
         core::commands::RemoveElementCommand remove(e_id, core::RemoveMode::NodeOnly);
         EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
-        EXPECT_FALSE(ctx.library_primary) << "NodeOnly took the library-primary seam, which cannot reparent";
+        if (fixture.document != nullptr) {
+            EXPECT_TRUE(ctx.library_primary)
+                << "NodeOnly bypassed the guarded bridge -- the unflipped path autosaves lossy projection bytes";
+        }
         // E is gone; C survives, reparented onto G1.
         EXPECT_EQ(FindElement(fixture.model, e_id), nullptr);
         EXPECT_NE(FindElement(fixture.model, c_id), nullptr);

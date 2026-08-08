@@ -144,6 +144,7 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
                 claim.content_ml.set("en", element.content);
             claim.assertionDeclaration = element.assertion_declaration;
             claim.undeveloped = element.undeveloped;
+            claim.metaClaims = element.meta_claim_refs;
             argument_package.claims.push_back(std::move(claim));
         } else if (element.type == "argumentreasoning") {
             sacm::ArgumentReasoning reasoning;
@@ -153,6 +154,10 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             if (reasoning.content_ml.texts.empty() && !element.content.empty())
                 reasoning.content_ml.set("en", element.content);
             reasoning.undeveloped = element.undeveloped;
+            // Clause 11.12. The structure reference points at the ArgumentPackage
+            // detailing this reasoning; dropping it silently severs a whole
+            // sub-argument from the reasoning that cites it.
+            reasoning.structure = element.structure_ref;
             argument_package.argumentReasonings.push_back(std::move(reasoning));
         } else if (element.type == "artifactreference" || element.type == "artifact") {
             sacm::ArtifactReference artifact_reference;
@@ -174,6 +179,9 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             // lose a decoration, it reverses the relationship's meaning -- a rebuttal
             // comes back as support for the claim it attacks.
             inference.isCounter = element.is_counter;
+            // Clause 11.10. Same shape as isCounter: a metaClaim is standard SACM
+            // the round trip must carry, not a decoration.
+            inference.metaClaims = element.meta_claim_refs;
             argument_package.assertedInferences.push_back(std::move(inference));
         } else if (element.type == "assertedcontext") {
             sacm::AssertedContext context;
@@ -182,6 +190,7 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             context.targets = element.target_refs;
             context.assertionDeclaration = element.assertion_declaration;
             context.isCounter = element.is_counter;
+            context.metaClaims = element.meta_claim_refs;
             argument_package.assertedContexts.push_back(std::move(context));
         } else if (element.type == "assertedevidence") {
             sacm::AssertedEvidence evidence;
@@ -190,6 +199,7 @@ void RebuildSacmArgumentPackageFromParser(const parser::AssuranceCase& model, sa
             evidence.targets = element.target_refs;
             evidence.assertionDeclaration = element.assertion_declaration;
             evidence.isCounter = element.is_counter;
+            evidence.metaClaims = element.meta_claim_refs;
             argument_package.assertedEvidences.push_back(std::move(evidence));
         }
     }

@@ -561,6 +561,89 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
     EXPECT_TRUE(Contains(autosaved, "Renamed top claim")) << autosaved;
 }
 
+// Standard SACM the legacy POD can now carry but the rebuild used to drop:
+// a metaClaim on a relationship (clause 11.10) and an ArgumentReasoning's
+// structure reference (11.12). Both passed the element-level guard -- every
+// ELEMENT was representable -- and both vanished from the saved bytes on any
+// bridged edit (round-3 verification, probe b). Asserted on saved bytes, like
+// isCounter above, because the canonical hash projects through the same
+// rebuild on both sides and cannot see the loss.
+constexpr const char* kMetaClaimStructureSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="CG1" name="Sub goal" description="Hazards are controlled."/>
+    <claim id="MC1" name="Meta claim" description="The inference is sufficiently strong."/>
+    <argumentReasoning id="AR1" name="Decomposition" structure="AP_detail"/>
+    <assertedInference id="R1" source="CG1" target="G1" reasoning="AR1" metaClaim="MC1"/>
+  </argumentPackage>
+  <argumentPackage id="AP_detail" name="Detailed reasoning"/>
+</sacm:AssuranceCasePackage>
+)";
+
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesMetaClaimAndReasoningStructure) {
+    ProjectFixture fixture = MakeProject("bridged-metaclaim", kMetaClaimStructureSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    // Non-vacuity: the tracked file really carries both references.
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "MC1")) << "fixture carries no metaClaim; this test measures nothing";
+    ASSERT_TRUE(Contains(before, "AP_detail")) << "fixture carries no structure target; this test measures nothing";
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_TRUE(library_primary)
+        << "the rename did not take the bridged library-primary path; this test measures nothing";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "metaClaim"))
+        << "a bridged rename dropped the relationship's metaClaim (clause 11.10):\n"
+        << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "MC1")) << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "structure"))
+        << "a bridged rename severed the reasoning's structure reference (clause 11.12):\n"
+        << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "Renamed top goal")) << autosaved;
+}
+
+// An EMPTY nested ArgumentPackage: every element in the document is
+// representable, so the old element-level guard passed -- and the bridge
+// deleted the package silently, because `sacm::ArgumentPackage` has no field
+// for a nested package (round-3 verification, probe b). The guard now sweeps
+// the document inventory, packages included, so this refuses.
+TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNestedArgumentPackage) {
+    constexpr const char* kNestedPackageSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("bridged-nested-pkg", kNestedPackageSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "AP_nested")) << "fixture carries no nested package; this test measures nothing";
+
+    bool library_primary = false;
+    const core::commands::CommandResult result =
+        RunBridgedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+
+    EXPECT_FALSE(result.success) << "the bridged edit was applied and dropped the nested ArgumentPackage";
+    EXPECT_TRUE(Contains(result.error, "ArgumentPackage"))
+        << "the refusal does not say what would have been destroyed: " << result.error;
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused edit still rewrote the tracked file";
+}
+
 // The projection the bridge round-trips through cannot express every SACM 2.3
 // element kind, and it is RELOADED over the live document rather than compared --
 // so an unrepresentable element is deleted, on a command that reaches disk.
@@ -599,6 +682,54 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnreprese
     // The case is untouched -- a refusal that still rewrote the file would be the
     // same data loss with a worse message.
     EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused edit still rewrote the tracked file";
+}
+
+// NodeOnly removal REPARENTS, which the scrub seam cannot express, so it is the
+// one element command that must go through the guarded bridge. It used to fall
+// through to the raw legacy mutator instead: the bus then autosaved lossy
+// projection bytes over the tracked file, silently deleting the ArgumentGroup,
+// both artifact relationships, the nested package, every metaClaim and every
+// structure reference -- from the tracked file AND the live document, reachable
+// from the element context menu, with zero diagnostics (round-3 verification,
+// probe a). The same event REPLAYED through the guarded bridge and would have
+// refused, so live and replay also disagreed.
+TEST(SaveFromLibrary, SACM23_LIB_002_UnflippedNodeOnlyRemovalRefusesRatherThanDeleteUnrepresentableElements) {
+    const std::string full_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                           "sacm23" / "argumentation-full-valid.sacm.xmi");
+    ASSERT_FALSE(full_case.empty());
+    ProjectFixture fixture = MakeProject("nodeonly-unrepresentable", full_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "ArgumentGroup"))
+        << "fixture carries no unrepresentable element; this test measures nothing";
+
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::RemoveElementCommand command("claim_sub1", core::RemoveMode::NodeOnly);
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+
+    EXPECT_FALSE(result.success) << "the NodeOnly removal was applied and deleted part of the case";
+    EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
+        << "the refusal does not say what would have been destroyed: " << result.error;
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused removal still rewrote the tracked file";
+
+    // The LIVE document is intact too -- the round-3 probe showed this path
+    // degrading both the file and the in-memory document, so byte-identity of
+    // the file alone would not prove the session is safe to keep working in.
+    bool group_alive = false;
+    for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*state.library_document)) {
+        if (element.id == "group_core")
+            group_alive = true;
+    }
+    EXPECT_TRUE(group_alive) << "the refused removal still deleted the ArgumentGroup from the live document";
 }
 
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
@@ -856,11 +987,14 @@ TEST(SaveFromLibrary, SACM23_INT_001_UnflippedBusCommandPreservesUnknownContentI
         core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
     ASSERT_TRUE(bus) << error;
 
-    // NodeOnly reparents rather than deletes, so it has no library seam and
-    // stays unflipped -- which is exactly the branch under test.
+    // No production command is unflipped any more -- NodeOnly, the last one,
+    // now goes through the guarded bridge. The Stage-5 net still guards any
+    // future unflipped dispatch, so this test reaches it the only way left:
+    // the kill switch, the same seam the undo kill-switch test uses.
     core::commands::RemoveElementCommand command("G1", core::RemoveMode::NodeOnly);
     core::commands::CommandContext ctx{
         state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    ctx.allow_library_primary = false;
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_FALSE(ctx.library_primary)

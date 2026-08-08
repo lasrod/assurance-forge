@@ -355,6 +355,12 @@ static Claim parse_claim(pugi::xml_node node) {
     }
     claim.assertionDeclaration = node.attribute("assertionDeclaration").as_string();
     claim.undeveloped = read_bool_attr(node, "undeveloped", false);
+    for (auto child : node.children()) {
+        if (local_name(child.name()) == "metaclaim") {
+            std::string ref = read_id_ref(child);
+            append_ref_if_present(claim.metaClaims, ref);
+        }
+    }
     return claim;
 }
 
@@ -363,6 +369,9 @@ static ArgumentReasoning parse_argument_reasoning(pugi::xml_node node) {
     parse_element_base(node, reasoning);
     parse_content_field(node, reasoning.content, reasoning.content_ml);
     reasoning.undeveloped = read_bool_attr(node, "undeveloped", false);
+    reasoning.structure = node.attribute("structure").as_string();
+    if (!reasoning.structure.empty() && reasoning.structure[0] == '#')
+        reasoning.structure = reasoning.structure.substr(1);
     return reasoning;
 }
 
