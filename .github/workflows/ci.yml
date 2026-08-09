@@ -100,18 +100,23 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y gnome-keyring dbus-x11
+          # Create the login keyring ON DISK rather than letting the daemon do
+          # it. Both --unlock and --login route creation through gcr-prompter,
+          # which is a GTK application: headlessly it dies with "cannot open
+          # display", the collection is never created, and the first save fails
+          # with "Object does not exist at path
+          # /org/freedesktop/secrets/collection/login". A password-less keyring
+          # is a plain text file the daemon reads directly, so no prompter is
+          # involved at all.
+          #
+          # A keyring with no password is acceptable here and nowhere else: it
+          # is a throwaway runner keyring holding one test value for the length
+          # of one job, on a machine that is destroyed afterwards.
+          mkdir -p ~/.local/share/keyrings
+          printf '[keyring]\ndisplay-name=login\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n' > ~/.local/share/keyrings/login.keyring
+          printf 'login' > ~/.local/share/keyrings/default
           dbus-run-session -- bash -c '
-            # --login, not --unlock. `--unlock` starts the daemon against an
-            # EXISTING login keyring; it does not create one, so the first save
-            # asked libsecret to create the default collection, which needs a
-            # graphical prompter and failed with "Object does not exist at path
-            # /org/freedesktop/secrets/collection/login". `--login` is the mode
-            # PAM uses at sign-in: it reads the password from stdin and creates
-            # the keyring when absent. Empty password, because this is a
-            # throwaway runner keyring holding one test value.
-            echo -n "" | gnome-keyring-daemon --daemonize --login >/dev/null
-            eval "$(echo -n "" | gnome-keyring-daemon --start --components=secrets)"
-            export GNOME_KEYRING_CONTROL SSH_AUTH_SOCK
+            eval "$(printf "\n" | gnome-keyring-daemon --unlock --components=secrets)"
             ./build/tests --gtest_filter=SecretStore.* 2>&1 | tee /tmp/secret-store.log
             exit ${PIPESTATUS[0]}
           '
