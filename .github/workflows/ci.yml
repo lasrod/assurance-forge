@@ -173,3 +173,15 @@ jobs:
       - name: Check every source (main)
         if: github.event_name != 'pull_request'
         run: python tools/quality/run_clang_tidy.py --check --jobs 4
+
+      # Complexity is REPORT MODE, deliberately (#343). It measures and prints;
+      # it does not gate. `--check` exists and is tested, so turning the ratchet
+      # on later is this line gaining four characters rather than a project --
+      # but the policy says report before ratchet, and 172 functions over the
+      # threshold is a number to triage, not to freeze by accident.
+      - name: Measure complexity (report only)
+        shell: bash
+        run: |
+          pinned=$(python -c "import json;print(json.load(open('docs/quality/complexity-baseline.json'))['tool_version'])")
+          python -m pip install --disable-pip-version-check "lizard==$pinned"
+          python tools/quality/run_complexity.py --report
