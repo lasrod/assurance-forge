@@ -23,6 +23,10 @@
     </artifactElement>
     <artifactElement xsi:type="sacm:Resource" xmi:id="resource_lab">
       <name content="HIL Lab"/>
+      <location>
+        <value lang="en" content="file:///srv/hil/lab-bench-3"/>
+        <value lang="ja" content="file:///srv/hil/ラボベンチ3"/>
+      </location>
     </artifactElement>
     <artifactElement xsi:type="sacm:ArtifactAssetRelationship" xmi:id="rel_produced" source="activity_review" target="artifact_report">
       <name content="producedBy"/>

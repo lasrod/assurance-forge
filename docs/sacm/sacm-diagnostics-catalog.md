@@ -36,6 +36,7 @@ Every `sacm::validation::Diagnostic` carries: `code`, `severity`
 | --- | --- | --- |
 | SACM-ID-001 | Error | Duplicate element ID. |
 | SACM-ID-002 | Error | Invalid element ID syntax. |
+| SACM-ID-003 | Error | Duplicate `gid` (clause 8.2: "unique within the scope of the model instance"). Distinct from SACM-ID-001: `gid` is SACM's own model-global identifier rather than the XMI serialization id, and it is the handle third-party tools key on, so a document can be clean on one and broken on the other. An absent or empty `gid` is not an identity and is not compared. |
 | SACM-REF-001 | Error | Dangling reference: target ID does not resolve. |
 | SACM-REF-002 | Error | Reference resolves to an element of the wrong type. |
 | SACM-REF-003 | Warning | Reference resolves to an element the document carries only as preserved compatibility content, so it cannot be type-checked. Distinct from SACM-REF-001: the target is present in the source, it is merely untyped. Conflating them reports an intact argument as structurally broken. |
@@ -45,8 +46,11 @@ Every `sacm::validation::Diagnostic` carries: `code`, `severity`
 | Code | Severity | Meaning |
 | --- | --- | --- |
 | SACM-ENUM-001 | Error | Invalid enumeration literal (e.g. `assertionDeclaration`). |
-| SACM-MULT-001 | Error | Multiplicity violation (e.g. `AssertedRelationship` requires at least one source and one target). |
+| SACM-MULT-001 | Error | Multiplicity violation: `AssertedRelationship` requires at least one source (clause 11.13 `source[1..*]`) and exactly one target (`target[1]`); a binding requires at least two participant packages. |
 | SACM-CITE-001 | Error | `isCitation` is true but `citedElement` is absent (or vice-versa constraints per clause 8.2). |
+| SACM-ABS-001 | Error / Warning | An `isAbstract`/`abstractForm` combination the standard rules out. Error: an abstract element using `abstractForm` (clause 8.2 gives it to concrete elements), or a concrete `Expression` referencing abstract `ExpressionElement`s (clause 10.10 OCL). Warning: the referred `abstractForm` target is not abstract, or is a different type — clause 8.2 words both with "should". |
+| SACM-EXPR-001 | Warning | An `ExpressionLangString` carries both an `expression` reference and literal `content`. Clause 8.4: "If expression is not empty, then +content should be empty." A warning because the clause says "should", but a real one: the two carry the same meaning twice and a reader has no rule for which wins. |
+| SACM-PKG-001 | Error / Warning | Content the owning package clause does not allow. Error: an `ArgumentPackage` that nests an `ArgumentPackage` but contains something else (clause 11.4), interface or binding content that is not a citation (clauses 11.5, 11.6, 12.4, 12.5), or an `AssuranceCasePackageInterface` holding a non-interface sub-package (clause 9.3 OCL). Warning: an interface citation pointing outside the package it implements, and a binding named as another binding's participant — see the recorded resolutions in `sacm-decisions-and-questions.md`, since the parallel clauses disagree. |
 
 ## Commands
 

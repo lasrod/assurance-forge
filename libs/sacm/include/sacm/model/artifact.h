@@ -104,6 +104,25 @@ public:
 class Resource final : public ArtifactAsset {
 public:
     explicit Resource(ElementId id) : ArtifactAsset(ElementKind::Resource, std::move(id)) {}
+
+    // location: Base::MultiLangString (composition) -- "the path or URL
+    // specifying the location of the Resource, can be in multiple languages"
+    // (clause 12.10).
+    //
+    // The normative text declares it; ptc/22-03-13 omits it, which is why it
+    // was absent here. It is the only payload a Resource has, so a
+    // text-conformant producer emits it and a reader without it keeps a
+    // Resource that says nothing about where anything is. Recorded as a
+    // prose-vs-model divergence resolved toward the TEXT in
+    // docs/sacm/sacm-2.3-metamodel-inventory.md.
+    const MultiLangString& location() const {
+        return location_;
+    }
+
+private:
+    friend struct sacm::detail::Access;
+
+    MultiLangString location_;
 };
 
 // Named property of an ArtifactAsset (clause 12.13).

@@ -4,6 +4,7 @@
 #include "core/problems/problem_utils.h"
 #include "core/project_service.h"
 #include "export/gsn_svg_exporter.h"
+#include "ui/i18n/localization.h"
 #include "ui/text_edit_session.h"
 
 #include <filesystem>
@@ -29,7 +30,7 @@ bool AppRuntime::SaveProject() {
     FlushPendingTextEdits();
 
     if (!impl_->app_state.current_project.has_value()) {
-        impl_->app_state.status_message = "Create or open a project first.";
+        impl_->app_state.status_message = AF_TR("Create or open a project first.");
         return false;
     }
 
@@ -41,7 +42,7 @@ bool AppRuntime::SaveProject() {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         std::string error;
         if (!impl_->review_controller->SaveIfDirty(project, error)) {
-            impl_->app_state.status_message = "Review item save failed: " + error;
+            impl_->app_state.status_message = ui::i18n::trf("Review item save failed: {0}", error);
             return false;
         }
     }
@@ -50,7 +51,7 @@ bool AppRuntime::SaveProject() {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         std::string error;
         if (!impl_->confidence_controller->SaveIfDirty(project, error)) {
-            impl_->app_state.status_message = "Confidence save failed: " + error;
+            impl_->app_state.status_message = ui::i18n::trf("Confidence save failed: {0}", error);
             return false;
         }
     }
@@ -59,7 +60,7 @@ bool AppRuntime::SaveProject() {
         core::AssuranceProject& project = impl_->app_state.current_project.value();
         std::string error;
         if (!impl_->register_controller->SaveIfDirty(project, error)) {
-            impl_->app_state.status_message = "Register assessment save failed: " + error;
+            impl_->app_state.status_message = ui::i18n::trf("Register assessment save failed: {0}", error);
             return false;
         }
     }
@@ -103,11 +104,11 @@ void AppRuntime::ExportGsnSvg() {
     core::ClearProblemsByIdPrefix(impl_->problems_manager, kExportProblemPrefix);
 
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("GSN SVG export failed: no project is open.");
+        SetStatus(AF_TR("GSN SVG export failed: no project is open."));
         return;
     }
     if (!impl_->app_state.loaded_case.has_value()) {
-        SetStatus("GSN SVG export failed: no SACM safety case is open.");
+        SetStatus(AF_TR("GSN SVG export failed: no SACM safety case is open."));
         return;
     }
 
@@ -121,7 +122,7 @@ void AppRuntime::ExportGsnSvg() {
     export_gsn::GsnSvgExportResult export_result = export_gsn::ExportCurrentSafetyCaseToGsnSvg(
         impl_->app_state.loaded_case.value(), impl_->app_state.current_project->rootPath, source_stem);
     if (!export_result.success) {
-        SetStatus("GSN SVG export failed: " + export_result.error_message);
+        SetStatus(ui::i18n::trf("GSN SVG export failed: {0}", export_result.error_message));
         return;
     }
 
@@ -157,9 +158,9 @@ void AppRuntime::ExportGsnSvg() {
     }
 
     if (!export_result.warnings.empty()) {
-        SetStatus("GSN SVG exported with warnings. See Problems/Export log.");
+        SetStatus(AF_TR("GSN SVG exported with warnings. See Problems/Export log."));
     } else {
-        SetStatus("GSN SVG exported to " + display_path.generic_string());
+        SetStatus(ui::i18n::trf("GSN SVG exported to {0}", display_path.generic_string()));
     }
 }
 

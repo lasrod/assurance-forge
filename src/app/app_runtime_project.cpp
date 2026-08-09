@@ -207,7 +207,7 @@ void AppRuntime::BeginCreateProject() {
         }
         impl_->project_controller->show_create_project_modal = true;
     } else if (result == dialogs::DialogResult::Failed) {
-        SetStatus("Browse failed: " + error_message);
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error_message));
     }
 }
 
@@ -226,7 +226,7 @@ void AppRuntime::BeginOpenProject() {
                      selected_path);
         TryOpenProjectManifest(selected_path);
     } else if (result == dialogs::DialogResult::Failed) {
-        SetStatus("Browse failed: " + error_message);
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error_message));
     }
 }
 
@@ -236,7 +236,7 @@ void AppRuntime::TouchCurrentProjectRecent() {
 
 void AppRuntime::BeginCreateProjectSacmFile() {
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Create or open a project first.");
+        SetStatus(AF_TR("Create or open a project first."));
         return;
     }
     impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::Sacm, "main.sacm");
@@ -244,7 +244,7 @@ void AppRuntime::BeginCreateProjectSacmFile() {
 
 void AppRuntime::BeginCreateProjectEvidenceRegister() {
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Create or open a project first.");
+        SetStatus(AF_TR("Create or open a project first."));
         return;
     }
     impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::EvidenceRegister,
@@ -253,7 +253,7 @@ void AppRuntime::BeginCreateProjectEvidenceRegister() {
 
 void AppRuntime::BeginCreateProjectJ3377CaeRegister() {
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Create or open a project first.");
+        SetStatus(AF_TR("Create or open a project first."));
         return;
     }
     impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::J3377CaeRegister,
@@ -271,7 +271,7 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
             impl_->workbench.force_center_tab_selection = true;
             if (impl_->workbench.argument_package_canvas_tabs.empty())
                 OpenFirstArgumentPackageCanvas();
-            SetStatus("SACM file is already open: " + entry.relativePath.generic_string());
+            SetStatus(ui::i18n::trf("SACM file is already open: {0}", entry.relativePath.generic_string()));
             return;
         }
     }
@@ -295,7 +295,7 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
         std::string migration_error;
         if (!core::audit::MigrateStrategyEncodingIfNeeded(
                 impl_->app_state.current_project.value(), entry.relativePath, strategy_migration, migration_error)) {
-            SetStatus("Strategy encoding migration failed: " + migration_error);
+            SetStatus(ui::i18n::trf("Strategy encoding migration failed: {0}", migration_error));
         }
     }
 
@@ -331,7 +331,7 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
             auto bus = core::commands::CommandBus::Open(
                 impl_->app_state.current_project.value(), ProjectFilePath(impl_->app_state, entry), bus_error);
             if (!bus) {
-                SetStatus("Audit bus init failed: " + bus_error);
+                SetStatus(ui::i18n::trf("Audit bus init failed: {0}", bus_error));
             } else {
                 impl_->command_bus = std::move(bus);
             }
@@ -393,11 +393,11 @@ void AppRuntime::ConfirmPendingProjectFileOpen(bool save_current) {
 
 bool AppRuntime::ReconcileAuditStore() {
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Cannot reconcile audit log: no project is open.");
+        SetStatus(AF_TR("Cannot reconcile audit log: no project is open."));
         return false;
     }
     if (impl_->app_state.active_project_file_role != core::ProjectFileRole::SacmArgument) {
-        SetStatus("Cannot reconcile audit log: no SACM file is active.");
+        SetStatus(AF_TR("Cannot reconcile audit log: no SACM file is active."));
         return false;
     }
 
@@ -412,7 +412,7 @@ bool AppRuntime::ReconcileAuditStore() {
         }
     }
     if (!active_entry) {
-        SetStatus("Cannot reconcile audit log: active SACM file is no longer listed in the project.");
+        SetStatus(AF_TR("Cannot reconcile audit log: active SACM file is no longer listed in the project."));
         return false;
     }
 
@@ -420,7 +420,7 @@ bool AppRuntime::ReconcileAuditStore() {
     // from the on-disk SACM bytes, so we want them to reflect live state.
     if (impl_->document_dirty) {
         if (!SaveProject()) {
-            SetStatus("Cannot reconcile audit log: failed to save current SACM file.");
+            SetStatus(AF_TR("Cannot reconcile audit log: failed to save current SACM file."));
             return false;
         }
     }
@@ -434,14 +434,14 @@ bool AppRuntime::ReconcileAuditStore() {
     core::audit::ReconcileAuditStoreResult result;
     std::string error;
     if (!core::audit::ReconcileAuditStore(project, entry_copy.relativePath, result, error)) {
-        SetStatus("Audit reconciliation failed: " + error);
+        SetStatus(ui::i18n::trf("Audit reconciliation failed: {0}", error));
         // Best-effort: re-open the project so the user retains a working
         // session against the original (now-restored) audit artifacts.
         PerformOpenProjectFile(entry_copy);
         return false;
     }
 
-    SetStatus("Audit log reconciled. Previous artifacts backed up to " + result.backup_dir + ".");
+    SetStatus(ui::i18n::trf("Audit log reconciled. Previous artifacts backed up to {0}.", result.backup_dir));
 
     // Re-open the SACM file: this reinstalls the command bus over the fresh
     // event store and re-runs replay verification (which should now succeed).
@@ -458,7 +458,7 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
 
     if (node.type == sacm::SacmPackageNodeType::ArgumentPackage) {
         if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
-            SetStatus("Save the current SACM file before opening another package.");
+            SetStatus(AF_TR("Save the current SACM file before opening another package."));
             return;
         }
         const bool same_file_loaded = IsLoadedProjectSacmFile(impl_->app_state, entry);
@@ -482,7 +482,7 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
                 ui_state.selected_element_id = first_id;
                 ui_state.center_on_selection = true;
             } else {
-                SetStatus("Opened argument package; no focusable argument element was found in the package.");
+                SetStatus(AF_TR("Opened argument package; no focusable argument element was found in the package."));
             }
         }
         OpenArgumentPackageCanvas(node.id, node.gid, node.displayName, first_id);
@@ -491,13 +491,13 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
 
     if (node.type == sacm::SacmPackageNodeType::TerminologyPackage) {
         if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
-            SetStatus("Save the current SACM file before opening another package.");
+            SetStatus(AF_TR("Save the current SACM file before opening another package."));
             return;
         }
         if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
             return;
         if (!impl_->app_state.has_projected_package()) {
-            SetStatus("Opened SACM file, but no editable package model was available.");
+            SetStatus(AF_TR("Opened SACM file, but no editable package model was available."));
             return;
         }
 
@@ -505,7 +505,7 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         const sacm::TerminologyPackage* terminology_package =
             core::FindTerminologyPackage(impl_->app_state.projected_package(), package_ref);
         if (!terminology_package) {
-            SetStatus("Terminology package was not found in the editable model.");
+            SetStatus(AF_TR("Terminology package was not found in the editable model."));
             return;
         }
 
@@ -528,7 +528,7 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
 
 bool AppRuntime::RemoveProjectFile(const core::ProjectFileEntry& entry) {
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Open a project before removing files.");
+        SetStatus(AF_TR("Open a project before removing files."));
         return false;
     }
 
@@ -551,32 +551,32 @@ bool AppRuntime::RemoveProjectFile(const core::ProjectFileEntry& entry) {
     } else if (role == core::ProjectFileRole::ExportedReport) {
         removed = core::ProjectService::RemoveTrackedFile(project, relative_path, true, error);
     } else {
-        SetStatus("Removing this file type is not supported here.");
+        SetStatus(AF_TR("Removing this file type is not supported here."));
         return false;
     }
 
     if (!removed) {
-        SetStatus("Remove file failed: " + error);
+        SetStatus(ui::i18n::trf("Remove file failed: {0}", error));
         return false;
     }
 
     impl_->events.Emit(DocumentDirtyEvent{});
     impl_->events.Emit(ProjectFilesChangedEvent{});
     core::ProjectService::RefreshFileStatus(project);
-    SetStatus("Removed " + relative_path.generic_string() + ".");
+    SetStatus(ui::i18n::trf("Removed {0}.", relative_path.generic_string()));
     return true;
 }
 
 bool AppRuntime::RevealProjectFileInExplorer(const core::ProjectFileEntry& entry) {
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Open a project before revealing files.");
+        SetStatus(AF_TR("Open a project before revealing files."));
         return false;
     }
 
     const std::filesystem::path absolute_path = impl_->app_state.current_project->rootPath / entry.relativePath;
     std::string error;
     if (!app::dialogs::RevealPathInFileExplorer(absolute_path, error)) {
-        SetStatus("Could not open File Explorer: " + error);
+        SetStatus(ui::i18n::trf("Could not open File Explorer: {0}", error));
         return false;
     }
     return true;
@@ -659,13 +659,13 @@ void AppRuntime::ConfirmDeleteTerminologyPackage() {
 
 void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const sacm::SacmPackageTreeNode& node) {
     if (!CanSwitchProjectSacmFile(impl_->app_state, entry)) {
-        SetStatus("Save the current SACM file before removing a package.");
+        SetStatus(AF_TR("Save the current SACM file before removing a package."));
         return;
     }
     if (!EnsureProjectSacmFileOpen(*impl_, entry, false))
         return;
     if (!impl_->app_state.has_projected_package()) {
-        SetStatus("Could not load an editable SACM package model.");
+        SetStatus(AF_TR("Could not load an editable SACM package model."));
         return;
     }
 
@@ -677,27 +677,27 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
     switch (node.type) {
     case sacm::SacmPackageNodeType::TerminologyPackage: {
         command = std::make_unique<core::commands::RemoveTerminologyPackageCommand>(node.id, node.gid);
-        kind_label = "terminology package";
+        kind_label = AF_TR("terminology package");
         break;
     }
     case sacm::SacmPackageNodeType::ArgumentPackage: {
         command = std::make_unique<core::commands::RemoveArgumentPackageCommand>(node.id, node.gid);
-        kind_label = "argument package";
+        kind_label = AF_TR("argument package");
         break;
     }
     case sacm::SacmPackageNodeType::ArtifactPackage: {
         command = std::make_unique<core::commands::RemoveArtifactPackageCommand>(node.id, node.gid);
-        kind_label = "artifact package";
+        kind_label = AF_TR("artifact package");
         break;
     }
     default:
-        SetStatus("Removing this package type is not supported yet.");
+        SetStatus(AF_TR("Removing this package type is not supported yet."));
         return;
     }
 
     const auto outcome = app::commands::DispatchAuditedCommand(*impl_, *command);
     if (!outcome.success) {
-        SetStatus("Remove " + kind_label + " failed: " + outcome.error);
+        SetStatus(ui::i18n::trf("Remove {0} failed: {1}", kind_label, outcome.error));
         return;
     }
 
@@ -711,7 +711,7 @@ void AppRuntime::RemoveProjectPackage(const core::ProjectFileEntry& entry, const
         impl_->tree_needs_rebuild = true;
     }
 
-    status_message = "Removed " + kind_label + " " + label + ".";
+    status_message = ui::i18n::trf("Removed {0} {1}.", kind_label, label);
     impl_->sacm_package_tree_cache.erase(entry.relativePath.generic_string());
     impl_->problems_dirty.terminology = true;
     impl_->problems_dirty.acp = true;
@@ -903,12 +903,12 @@ void AppRuntime::EnsureTranslationReviewStorage() {
 void AppRuntime::DiscardOrphanedRegisterAssessment(const core::ProblemItem& problem) {
     RegisterAssessmentRef ref;
     if (!DecodeRegisterAssessmentPayload(problem.quick_fix_payload, ref)) {
-        SetStatus("Register problem does not identify an assessment.");
+        SetStatus(AF_TR("Register problem does not identify an assessment."));
         return;
     }
     if (impl_->register_controller->HasStorageError()) {
-        SetStatus("Register assessments could not be loaded, so nothing can be discarded: " +
-                  impl_->register_controller->StorageError());
+        SetStatus(ui::i18n::trf("Register assessments could not be loaded, so nothing can be discarded: {0}",
+                                impl_->register_controller->StorageError()));
         return;
     }
 
@@ -916,14 +916,15 @@ void AppRuntime::DiscardOrphanedRegisterAssessment(const core::ProblemItem& prob
                                ? impl_->register_controller->DiscardCseAssessment(ref.key)
                                : impl_->register_controller->DiscardEvidenceAssessment(ref.key);
     if (!discarded) {
-        SetStatus("That register assessment was already discarded.");
+        SetStatus(AF_TR("That register assessment was already discarded."));
         impl_->problems_dirty.registers = true;
         return;
     }
 
     // The file is only rewritten on save, so say so: this is the one undo the
     // register store has.
-    SetStatus("Discarded the assessment of " + ref.key + ". Close the project without saving to keep it after all.");
+    SetStatus(ui::i18n::trf("Discarded the assessment of {0}. Close the project without saving to keep it after all.",
+                            ref.key));
 }
 
 // Applies the repair a GSN v3 well-formedness finding offers. Returns false when
@@ -966,7 +967,7 @@ bool AppRuntime::ApplyGsnWellFormednessQuickFix(const core::ProblemItem& problem
 void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
     if (problem.type.rfind("Acp", 0) == 0) {
         if (problem.quick_fix_payload.empty()) {
-            SetStatus("ACP problem does not identify an ACP.");
+            SetStatus(AF_TR("ACP problem does not identify an ACP."));
             return;
         }
         ui::UiState& ui_state = ui::GetUiState();
@@ -976,7 +977,7 @@ void AppRuntime::HandleProblemQuickFix(const core::ProblemItem& problem) {
         ui_state.selected_relationship_edge_key.clear();
         ui_state.center_view = ui::CenterView::GsnCanvas;
         impl_->workbench.force_center_tab_selection = true;
-        SetStatus("Opened " + problem.quick_fix_payload);
+        SetStatus(ui::i18n::trf("Opened {0}", problem.quick_fix_payload));
         return;
     }
     if (problem.type == "TranslationReviewNeeded") {
@@ -1097,7 +1098,7 @@ bool AppRuntime::OpenFirstProjectSacmFile() {
             return true;
     }
 
-    SetStatus("Project opened, but no SACM file could be loaded.");
+    SetStatus(AF_TR("Project opened, but no SACM file could be loaded."));
     return false;
 }
 
@@ -1121,7 +1122,7 @@ bool AppRuntime::EnsureReviewItemStorage() {
     }
 
     impl_->problems_dirty.review = true;
-    SetStatus("Review items could not be loaded: " + error);
+    SetStatus(ui::i18n::trf("Review items could not be loaded: {0}", error));
     return false;
 }
 
@@ -1144,7 +1145,7 @@ bool AppRuntime::EnsureConfidenceStorage() {
     }
 
     impl_->problems_dirty.confidence = true;
-    SetStatus("Confidence assessments could not be loaded: " + error);
+    SetStatus(ui::i18n::trf("Confidence assessments could not be loaded: {0}", error));
     return false;
 }
 
@@ -1166,7 +1167,7 @@ bool AppRuntime::EnsureRegisterStorage() {
 
     // The register tab tells the user the same thing for as long as the failure
     // stands; this status line is for the moment it happens.
-    SetStatus("Register assessments could not be loaded: " + error);
+    SetStatus(ui::i18n::trf("Register assessments could not be loaded: {0}", error));
     return false;
 }
 
@@ -1193,7 +1194,7 @@ void AppRuntime::UpdateAgentBridgeForProject() {
     if (!impl_->agent_bridge->Start(impl_->app_state.current_project->rootPath, kAppVersion, error)) {
         // Not fatal. The application is perfectly usable without an AI client
         // attached, and failing an project open over it would be a poor trade.
-        SetStatus("AI clients cannot connect to this project: " + error);
+        SetStatus(ui::i18n::trf("AI clients cannot connect to this project: {0}", error));
     }
 }
 
@@ -1734,14 +1735,15 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     std::string snapshot_error;
     if (outcome.transaction_sequence != 0 &&
         !impl_->draft_workspace.SavePromotionSnapshot(outcome.transaction_sequence, pre_promotion, snapshot_error)) {
-        impl_->app_state.status_message = "Accepted, but undoing this will not bring the draft back: " + snapshot_error;
+        impl_->app_state.status_message =
+            ui::i18n::trf("Accepted, but undoing this will not bring the draft back: {0}", snapshot_error);
     }
 
     // Promoted groups leave the active workspace; the rest stay visible against
     // the new baseline. The base hash moves with it, or the next open would call
     // the draft stale against an argument the user just accepted into.
     if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) {
-        impl_->app_state.status_message = "Accepted, but the draft could not be updated: " + error;
+        impl_->app_state.status_message = ui::i18n::trf("Accepted, but the draft could not be updated: {0}", error);
     }
     // Accepting the argument is not the same as accepting a translation of it.
     // Applied at the next rebuild, when the accepted model contains what was
@@ -1951,7 +1953,7 @@ bool AppRuntime::OpenAgentRequestedCaseFile(const std::string& relative_path, st
 bool AppRuntime::TryOpenProjectManifest(const std::string& selected_path) {
     std::filesystem::path manifest_path(selected_path);
     if (!IsProjectManifestPath(manifest_path)) {
-        SetStatus("Please select an af.proj file.");
+        SetStatus(AF_TR("Please select an af.proj file."));
         return false;
     }
     if (!impl_->app_state.open_project(selected_path)) {

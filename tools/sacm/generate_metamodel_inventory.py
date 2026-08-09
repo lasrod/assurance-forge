@@ -354,6 +354,34 @@ def emit(classes: dict[str, Clazz], enums: list[Enum], output: Path, source_name
     push("- Clauses 12.7/12.8/12.9 type `date`, `startTime`, `endTime`, and Artifact `date` as `date`; the machine-readable model references an undefined MagicDraw datatype id for them.")
     push("- Clause 11.3 marks `ArgumentationElement` abstract; the machine-readable model does not.")
     push("")
+    push(
+        "### Divergences resolved toward the MODEL, and why (issue #337)"
+    )
+    push("")
+    push(
+        "The rule above -- \"where they disagree, follow the text\" -- was applied "
+        "unevenly: the divergences below were resolved toward ptc/22-03-13 and the "
+        "resolution went unrecorded, which made the stated rule read as absolute "
+        "when it is not. Each is listed with the direction taken, so a reader can "
+        "tell a decision from an oversight."
+    )
+    push("")
+    push("- Clause 8.5 `MultiLangString.value`: the text declares `LangString[1..*]` (composition); the model gives no bounds, so it reads `[1..1]`. **Model followed** in the bounds, text followed in practice -- the library stores a vector and validates language uniqueness (clause 8.5's own constraint), which is meaningless at `[1..1]`.")
+    push("- Clause 8.7 `UtilityElement.content`: text `[0..1]`, model `[1..1]`. **Model followed.** The library stores a MultiLangString that may be empty, which satisfies both readings.")
+    push("- Clause 8.6 `ModelElement.description`: text `Description[0..1]`, model `[0..*]`. **Model followed** in representation -- the library stores a vector so a file carrying several descriptions round-trips rather than losing all but one -- and the TEXT is enforced in validation, which warns above one (SACM-MULT-001, citing 8.6).")
+    push("- Clause 8.4 `ExpressionLangString.expression`: the text marks it \"(composition)\" while wording it as a reference; the model makes it a plain reference. **Model followed** -- a composition would mean the ExpressionElement lives inside the LangString rather than in the TerminologyPackage the same clause points at.")
+    push("- Clauses 11.2/11.4 `ArgumentGroup`/`ArgumentPackage` member role: the text spells it `argumentationElement`, the model `argumentElement`. **Model followed** for output; import accepts both, because the EMF dialect uses the prose spelling.")
+    push("- Clause 10.5 `TerminologyPackageInterface` superclass: the text says \"TerminologyElement\", the model and the clause's own diagram say `TerminologyPackage`. **Model followed.** An interface that is not a package could not contain the citations the same clause requires it to contain.")
+    push("- Clause 12.10 `Resource.location`: the text declares `location: Base::MultiLangString (composition)` -- the resource's path or URL; the model omits it entirely. **TEXT followed** (the only one of these seven that goes that way): it is the only payload `Resource` carries, so a reader without it keeps resources that say nothing about where anything is, and a text-conformant `<location>` fell into preserved content, which strict save then refused. Represented as `sacm::model::Resource::location()`.")
+    push("")
+    push(
+        "Two further defects in the specification TEXT, recorded because they "
+        "affect what can be enforced rather than what is represented:"
+    )
+    push("")
+    push("- Clause 10.5 (`TerminologyPackageInterface`) prints the Constraints section of 10.6 (`TerminologyPackageBinding`) -- participant-package typing -- so the interface's own content constraint, which its siblings 11.6 and 12.5 both state, is missing from the published text.")
+    push("- Clauses 9.4, 10.5/10.6 and 11.5 give three different participant-typing rules for the same concept: `oclIsTypeOf(Package) or oclIsTypeOf(PackageInterface)`, `oclIsKindOf(Package)`, and `oclIsTypeOf(PackageInterface)` respectively -- while 11.5's own Associations block declares the general package type. The library's resolution is recorded in `sacm-decisions-and-questions.md`.")
+    push("")
     push("## Package summary")
     push("")
     push("| Package | Classes | Abstract | Enumerations |")

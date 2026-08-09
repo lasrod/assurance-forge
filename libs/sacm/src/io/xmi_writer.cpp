@@ -283,6 +283,12 @@ void write_model_element_children(pugi::xml_node node, const model::ModelElement
 
 // Writes the containment children specific to the element's family.
 void write_containment_children(pugi::xml_node node, const SACMElement& element) {
+    // Resource.location (clause 12.10) is the resource's only payload. It sits
+    // here rather than with the attributes above because it is a MultiLangString
+    // composition, not a string attribute.
+    if (const auto* resource = dynamic_cast<const model::Resource*>(&element)) {
+        write_multi_lang(node, "location", resource->location());
+    }
     if (const auto* asset = dynamic_cast<const model::ArtifactAsset*>(&element)) {
         for (const auto& property : asset->properties()) {
             write_element(node, *property, "property", ElementKind::Property);

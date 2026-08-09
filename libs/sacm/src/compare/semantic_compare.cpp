@@ -125,6 +125,13 @@ std::map<std::string, std::string> attribute_snapshot(const SACMElement& element
             snapshot["date"] = event->date();
         }
     }
+    if (const auto* resource = dynamic_cast<const model::Resource*>(&element)) {
+        // Clause 12.10's only payload. Without it here a round trip that lost
+        // every resource path would still compare equal.
+        for (const model::LangString& entry : resource->location().values) {
+            snapshot["location@" + (entry.lang.empty() ? std::string("") : entry.lang)] = entry.content;
+        }
+    }
     if (const auto* expr_element = dynamic_cast<const model::ExpressionElement*>(&element)) {
         if (!expr_element->value().empty()) {
             snapshot["value"] = expr_element->value();

@@ -36,6 +36,15 @@ struct DocumentElement {
     std::string kind; // lowercased SACM class name, matching SacmElement::type
     bool is_package = false;
     bool is_utility = false;
+    // Stable rendering of the element's SACM attributes and reference ends, as
+    // `name=value;` pairs in a fixed order.
+    //
+    // Exists so a loss sweep can compare an element with itself across a round
+    // trip instead of only counting kinds. Counting kinds cannot see an
+    // attribute going missing from an element that survives -- which is exactly
+    // how `isCounter` was lost, turning a rebuttal into a supporting inference,
+    // with the element still present and the inventory still balanced.
+    std::string attributes;
 };
 
 // Every element in `document`, including the ones `project_case` filters out.

@@ -16,6 +16,9 @@ msgstr " (プレビューするにはパッケージキャンバスを開いて�
 msgid " | Showing {0} of {1} (filtered)"
 msgstr " | {0} / {1} 件を表示 (フィルター適用)"
 
+msgid " — but the draft it came from was not restored: {0}"
+msgstr " — ただし元のドラフトは復元されませんでした: {0}"
+
 msgid "\"{0}\" cannot be edited while a working draft is active."
 msgstr "作業ドラフトが有効な間は「{0}」を編集できません。"
 
@@ -82,6 +85,9 @@ msgstr "この関係では ACP はサポートされていません。"
 msgid "ACP not found: {0}"
 msgstr "ACP が見つかりません: {0}"
 
+msgid "ACP problem does not identify an ACP."
+msgstr "ACP の問題が ACP を特定していません。"
+
 msgid "ACP target:"
 msgstr "ACP 対象:"
 
@@ -99,6 +105,9 @@ msgstr "AI レビュー"
 
 msgid "AI client"
 msgstr "AI クライアント"
+
+msgid "AI clients cannot connect to this project: {0}"
+msgstr "AI クライアントはこのプロジェクトに接続できません: {0}"
 
 msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
 msgstr "AI 機能は、選択した安全ケースの内容とプロンプトを構成された AI プロバイダーに送信することがあります。Assurance Forge はプロジェクトデータを自動的には送信しません。データは明示的に AI アクションを使用した場合のみ送信されます。"
@@ -156,6 +165,12 @@ msgstr "変更を受理しました。ドラフトの残りは未受理のまま
 
 msgid "Accepted the working draft."
 msgstr "作業ドラフトを受理しました。"
+
+msgid "Accepted, but the draft could not be updated: {0}"
+msgstr "受け入れましたが、ドラフトを更新できませんでした: {0}"
+
+msgid "Accepted, but undoing this will not bring the draft back: {0}"
+msgstr "受け入れましたが、これを元に戻してもドラフトは復元されません: {0}"
 
 msgid "Accepting this also accepts:"
 msgstr "これを受理すると次も受理されます:"
@@ -307,8 +322,17 @@ msgstr "保証主張点"
 msgid "Assurance case"
 msgstr "保証ケース"
 
+msgid "Audit bus init failed: {0}"
+msgstr "監査バスの初期化に失敗しました: {0}"
+
 msgid "Audit log divergence detected"
 msgstr "監査ログの不一致を検出しました"
+
+msgid "Audit log reconciled. Previous artifacts backed up to {0}."
+msgstr "監査ログを整合しました。以前の成果物は {0} にバックアップしました。"
+
+msgid "Audit reconciliation failed: {0}"
+msgstr "監査ログの整合に失敗しました: {0}"
 
 msgid "Audit store error: {0}"
 msgstr "監査ストアのエラー: {0}"
@@ -352,6 +376,9 @@ msgstr "ブロック"
 msgid "Browse SCCG Guidelines"
 msgstr "SCCG ガイドラインを参照"
 
+msgid "Browse failed: {0}"
+msgstr "参照に失敗しました: {0}"
+
 msgid "Bucket"
 msgstr "バケット"
 
@@ -372,6 +399,27 @@ msgstr "CSE 行"
 
 msgid "Cancel"
 msgstr "キャンセル"
+
+msgid "Cannot reconcile audit log: active SACM file is no longer listed in the project."
+msgstr "監査ログを整合できません: 有効な SACM ファイルがプロジェクトに登録されていません。"
+
+msgid "Cannot reconcile audit log: failed to save current SACM file."
+msgstr "監査ログを整合できません: 現在の SACM ファイルを保存できませんでした。"
+
+msgid "Cannot reconcile audit log: no SACM file is active."
+msgstr "監査ログを整合できません: 有効な SACM ファイルがありません。"
+
+msgid "Cannot reconcile audit log: no project is open."
+msgstr "監査ログを整合できません: プロジェクトが開かれていません。"
+
+msgid "Cannot undo this acceptance here: it belongs to {0}. Open that argument and undo there, so its draft is restored with it."
+msgstr "この受け入れはここでは元に戻せません: {0} に属しています。その議論を開いてそこで元に戻すと、ドラフトも一緒に復元されます。"
+
+msgid "Cannot undo this acceptance: the draft it came from could not be read ({0}). Remove {1} to undo without restoring it."
+msgstr "この受け入れを元に戻せません: 元のドラフトを読み込めませんでした ({0})。復元せずに元に戻すには {1} を削除してください。"
+
+msgid "Cannot undo while viewing history. Return to Latest to make changes."
+msgstr "履歴表示中は元に戻せません。変更するには「最新」に戻ってください。"
 
 msgid "Canvas render stats"
 msgstr "キャンバス描画統計"
@@ -405,6 +453,18 @@ msgstr "反証 {0} はこのケースに存在しない {1} を対象にして�
 
 msgid "Change Proposals"
 msgstr "変更提案"
+
+msgid "Change accepted. Undo reverses it like any other edit."
+msgstr "変更を受け入れました。他の編集と同様に元に戻せます。"
+
+msgid "Change could not be accepted: {0}"
+msgstr "変更を受け入れられませんでした: {0}"
+
+msgid "Change could not be rejected: {0}"
+msgstr "変更を却下できませんでした: {0}"
+
+msgid "Change rejected."
+msgstr "変更を却下しました。"
 
 msgid "Changed since baseline"
 msgstr "ベースライン以降に変更"
@@ -478,11 +538,14 @@ msgstr "信頼度論証ツリー"
 msgid "Confidence argument tree is not linked."
 msgstr "信頼度論証ツリーがリンクされていません。"
 
+msgid "Confidence assessments could not be loaded: {0}"
+msgstr "確信度評価を読み込めませんでした: {0}"
+
 msgid "Confidence reset failed: {0}"
 msgstr "信頼度のリセットに失敗しました: {0}"
 
 msgid "Confidence save failed: {0}"
-msgstr "信頼度の保存に失敗しました: {0}"
+msgstr "確信度の保存に失敗しました: {0}"
 
 msgid "Confidence update failed: {0}"
 msgstr "信頼度の更新に失敗しました: {0}"
@@ -532,6 +595,12 @@ msgstr "信頼度保存用の SACM gid を割り当てられませんでした�
 msgid "Could not discard the working draft: {0}"
 msgstr "作業ドラフトを破棄できませんでした: {0}"
 
+msgid "Could not load an editable SACM package model."
+msgstr "編集可能な SACM パッケージモデルを読み込めませんでした。"
+
+msgid "Could not open File Explorer: {0}"
+msgstr "エクスプローラーを開けませんでした: {0}"
+
 msgid "Could not record the edit in the draft: {0}"
 msgstr "ドラフトに編集を記録できませんでした: {0}"
 
@@ -546,6 +615,9 @@ msgstr "提案編集のためのこのプレビュー要素を解決できませ
 
 msgid "Could not save the MCP setting: {0}"
 msgstr "MCP 設定を保存できませんでした: {0}"
+
+msgid "Could not update manual review status."
+msgstr "手動レビュー状態を更新できませんでした。"
 
 msgid "Create"
 msgstr "作成"
@@ -591,6 +663,9 @@ msgstr "新しい信頼度論証ツリーを作成"
 
 msgid "Create new meaning"
 msgstr "新しい意味を作成"
+
+msgid "Create or open a project first."
+msgstr "まずプロジェクトを作成するか開いてください。"
 
 msgid "Create snapshot at current state"
 msgstr "現在の状態でスナップショットを作成"
@@ -697,6 +772,12 @@ msgstr "評価を破棄"
 msgid "Discard draft"
 msgstr "ドラフトを破棄"
 
+msgid "Discarded proposal draft."
+msgstr "提案ドラフトを破棄しました。"
+
+msgid "Discarded the assessment of {0}. Close the project without saving to keep it after all."
+msgstr "{0} の評価を破棄しました。保存せずにプロジェクトを閉じれば元に戻せます。"
+
 msgid "Discarded the working draft. The accepted argument is unchanged."
 msgstr "作業ドラフトを破棄しました。受理済みの議論は変更されていません。"
 
@@ -771,6 +852,9 @@ msgstr "AI サポートを有効にする"
 
 msgid "Enable confidence for this element"
 msgstr "この要素の信頼度を有効化"
+
+msgid "Enter a reviewer name before changing review status."
+msgstr "レビュー状態を変更する前にレビュー担当者名を入力してください。"
 
 msgid "Enter an API key before saving."
 msgstr "保存する前に API キーを入力してください。"
@@ -894,6 +978,21 @@ msgstr "GSN キャンバス"
 
 msgid "GSN SVG"
 msgstr "GSN SVG"
+
+msgid "GSN SVG export failed: no SACM safety case is open."
+msgstr "GSN SVG のエクスポートに失敗しました: SACM セーフティケースが開かれていません。"
+
+msgid "GSN SVG export failed: no project is open."
+msgstr "GSN SVG のエクスポートに失敗しました: プロジェクトが開かれていません。"
+
+msgid "GSN SVG export failed: {0}"
+msgstr "GSN SVG のエクスポートに失敗しました: {0}"
+
+msgid "GSN SVG exported to {0}"
+msgstr "GSN SVG を {0} にエクスポートしました"
+
+msgid "GSN SVG exported with warnings. See Problems/Export log."
+msgstr "GSN SVG を警告付きでエクスポートしました。問題／エクスポートログを確認してください。"
 
 msgid "GSN identifier"
 msgstr "GSN 識別子"
@@ -1273,6 +1372,9 @@ msgstr "未レビュー"
 msgid "Notes"
 msgstr "メモ"
 
+msgid "Nothing to undo."
+msgstr "元に戻す操作はありません。"
+
 msgid "OK"
 msgstr "OK"
 
@@ -1303,6 +1405,12 @@ msgstr "最近のプロジェクトを開く"
 msgid "Open a SACM model and use any model-mutating action (add or remove a node) — each command will appear here."
 msgstr "SACM モデルを開いて、モデルを変更するアクション (ノードの追加または削除) を使用してください — 各コマンドがここに表示されます。"
 
+msgid "Open a project before removing files."
+msgstr "ファイルを削除する前にプロジェクトを開いてください。"
+
+msgid "Open a project before revealing files."
+msgstr "ファイルの場所を表示する前にプロジェクトを開いてください。"
+
 msgid "Open a project to see its client configuration."
 msgstr "クライアント設定を表示するにはプロジェクトを開いてください。"
 
@@ -1327,6 +1435,9 @@ msgstr "用語集を開く"
 msgid "Open in File Explorer"
 msgstr "ファイルエクスプローラーで開く"
 
+msgid "Open or create a project before changing review status."
+msgstr "レビュー状態を変更する前にプロジェクトを開くか作成してください。"
+
 msgid "Open or create a project before marking review status."
 msgstr "レビュー状態を記録する前にプロジェクトを開くか作成してください。"
 
@@ -1347,6 +1458,15 @@ msgstr "用語を開く"
 
 msgid "Open the Problems panel"
 msgstr "問題パネルを開く"
+
+msgid "Opened SACM file, but no editable package model was available."
+msgstr "SACM ファイルを開きましたが、編集可能なパッケージモデルがありませんでした。"
+
+msgid "Opened argument package; no focusable argument element was found in the package."
+msgstr "議論パッケージを開きましたが、フォーカスできる議論要素が見つかりませんでした。"
+
+msgid "Opened {0}"
+msgstr "{0} を開きました"
 
 msgid "Opinion triangle"
 msgstr "意見三角形"
@@ -1420,6 +1540,9 @@ msgstr "パフォーマンスオーバーレイ"
 msgid "Pin a named baseline to transaction sequence {0}."
 msgstr "トランザクションシーケンス {0} に名前付きベースラインを固定します。"
 
+msgid "Please select an af.proj file."
+msgstr "af.proj ファイルを選択してください。"
+
 msgid "Preferences"
 msgstr "設定"
 
@@ -1465,6 +1588,12 @@ msgstr "プロジェクトファイル: {0}"
 msgid "Project name"
 msgstr "プロジェクト名"
 
+msgid "Project opened, but no SACM file could be loaded."
+msgstr "プロジェクトを開きましたが、SACM ファイルを読み込めませんでした。"
+
+msgid "Project saved: {0}"
+msgstr "プロジェクトを保存しました: {0}"
+
 msgid "Projected confidence"
 msgstr "投影信頼度"
 
@@ -1508,7 +1637,7 @@ msgid "Raw bucket table"
 msgstr "生バケットテーブル"
 
 msgid "Reached snapshot or baseline — restore from history to go further back."
-msgstr "スナップショットまたはベースラインに到達しました — さらに戻すには履歴から復元してください。"
+msgstr "スナップショットまたは基準点に到達しました — さらに遡るには履歴から復元してください。"
 
 msgid "Reason: {0}"
 msgstr "理由: {0}"
@@ -1537,8 +1666,20 @@ msgstr "提案プロパティの変更を記録しました。"
 msgid "Reference: {0}"
 msgstr "参照: {0}"
 
+msgid "Register assessment save failed: {0}"
+msgstr "登録簿評価の保存に失敗しました: {0}"
+
 msgid "Register assessments could not be loaded, so edits cannot be saved: {0}"
 msgstr "登録簿の評価を読み込めなかったため、編集を保存できません: {0}"
+
+msgid "Register assessments could not be loaded, so nothing can be discarded: {0}"
+msgstr "登録簿の評価を読み込めなかったため、破棄できるものがありません: {0}"
+
+msgid "Register assessments could not be loaded: {0}"
+msgstr "登録簿評価を読み込めませんでした: {0}"
+
+msgid "Register problem does not identify an assessment."
+msgstr "登録簿の問題が評価を特定していません。"
 
 msgid "Reject"
 msgstr "却下"
@@ -1585,6 +1726,9 @@ msgstr "サブツリーを除去"
 msgid "Remove challenge"
 msgstr "反証を削除"
 
+msgid "Remove file failed: {0}"
+msgstr "ファイルの削除に失敗しました: {0}"
+
 msgid "Remove relationship"
 msgstr "関係を削除"
 
@@ -1594,8 +1738,23 @@ msgstr "対象から SACM ベースの ACP メタデータを除去します。"
 msgid "Remove {0}"
 msgstr "{0}を除去"
 
+msgid "Remove {0} failed: {1}"
+msgstr "{0} の削除に失敗しました: {1}"
+
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
+
+msgid "Removed {0} {1}."
+msgstr "{0} {1} を削除しました。"
+
+msgid "Removed {0}."
+msgstr "{0} を削除しました。"
+
+msgid "Removing this file type is not supported here."
+msgstr "この種類のファイルの削除はここではサポートされていません。"
+
+msgid "Removing this package type is not supported yet."
+msgstr "この種類のパッケージの削除はまだサポートされていません。"
 
 msgid "Renumber"
 msgstr "採番し直す"
@@ -1651,6 +1810,12 @@ msgstr "レビューコメント"
 msgid "Review element"
 msgstr "要素を確認"
 
+msgid "Review item save failed: {0}"
+msgstr "レビュー項目の保存に失敗しました: {0}"
+
+msgid "Review items could not be loaded: {0}"
+msgstr "レビュー項目を読み込めませんでした: {0}"
+
 msgid "Review items: {0}"
 msgstr "レビュー項目: {0}"
 
@@ -1680,6 +1845,9 @@ msgstr "用語カードまたは用語表の行から使用箇所検索を実行
 
 msgid "SACM Viewer"
 msgstr "SACM ビューア"
+
+msgid "SACM file is already open: {0}"
+msgstr "SACM ファイルは既に開かれています: {0}"
 
 msgid "SACM relationship: {0}"
 msgstr "SACM 関係: {0}"
@@ -1729,6 +1897,12 @@ msgstr "レビュー担当者名を保存"
 msgid "Save report to file"
 msgstr "レポートをファイルに保存"
 
+msgid "Save the current SACM file before opening another package."
+msgstr "別のパッケージを開く前に現在の SACM ファイルを保存してください。"
+
+msgid "Save the current SACM file before removing a package."
+msgstr "パッケージを削除する前に現在の SACM ファイルを保存してください。"
+
 msgid "Saved"
 msgstr "保存済み"
 
@@ -1752,6 +1926,9 @@ msgstr "SCCG プロファイルレビューを実行する前に GSN/SACM 要素
 
 msgid "Select a proposal preview element to edit its proposed properties."
 msgstr "提案するプロパティを編集するには、提案プレビュー要素を選択してください。"
+
+msgid "Select an element before changing manual review status."
+msgstr "手動レビュー状態を変更する前に要素を選択してください。"
 
 msgid "Select an element to review."
 msgstr "レビューする要素を選択してください。"
@@ -1846,6 +2023,9 @@ msgstr "戦略"
 msgid "Strategy"
 msgstr "戦略"
 
+msgid "Strategy encoding migration failed: {0}"
+msgstr "ストラテジ表現の移行に失敗しました: {0}"
+
 msgid "Strategy {0} is wired as an end of relationship {1}. A Strategy is the reasoning of an inference, not one of its ends."
 msgstr "戦略 {0} が関係 {1} の端点として接続されています。戦略は推論の理由付けであり、その端点ではありません。"
 
@@ -1912,6 +2092,9 @@ msgstr "用語パッケージに用語が含まれています。"
 msgid "Terminology package not found."
 msgstr "用語パッケージが見つかりません。"
 
+msgid "Terminology package was not found in the editable model."
+msgstr "編集可能なモデルに用語パッケージが見つかりませんでした。"
+
 msgid "Terminology spans"
 msgstr "用語スパン"
 
@@ -1941,6 +2124,9 @@ msgstr "テキスト信頼度論証"
 
 msgid "Text confidence argument is empty."
 msgstr "テキスト信頼度論証が空です。"
+
+msgid "That register assessment was already discarded."
+msgstr "その登録簿評価は既に破棄されています。"
 
 msgid "The MCP server program was not found next to Assurance Forge."
 msgstr "Assurance Forge の隣に MCP サーバープログラムが見つかりませんでした。"
@@ -2074,8 +2260,20 @@ msgstr "不確実性"
 msgid "Undeveloped"
 msgstr "未展開"
 
+msgid "Undid: {0}{1}"
+msgstr "元に戻しました: {0}{1}"
+
 msgid "Undo"
 msgstr "元に戻す"
+
+msgid "Undo failed: {0}"
+msgstr "元に戻す操作に失敗しました: {0}"
+
+msgid "Undo unavailable: no project audit bus."
+msgstr "元に戻せません: プロジェクトの監査バスがありません。"
+
+msgid "Undo unavailable: no project loaded."
+msgstr "元に戻せません: プロジェクトが読み込まれていません。"
 
 msgid "Unlink"
 msgstr "リンク解除"
@@ -2137,6 +2335,9 @@ msgstr "ウォークスルーは未実装です。"
 msgid "Warning"
 msgstr "警告"
 
+msgid "Warning: could not read the draft for this argument: {0}"
+msgstr "警告: この議論のドラフトを読み込めませんでした: {0}"
+
 msgid "Warnings"
 msgstr "警告"
 
@@ -2187,6 +2388,12 @@ msgstr "既存のトランザクション履歴はバックアップフォルダ
 
 msgid "Your most recent change is recorded in the audit log but the on-disk SACM file may be out of date. Try a manual Save (File → Save) or verify free disk space, file permissions, and any external sync agent."
 msgstr "直近の変更は監査ログに記録されていますが、ディスク上の SACM ファイルが古い可能性があります。手動で保存 (ファイル → 保存) を試すか、空きディスク容量、ファイル権限、外部同期エージェントを確認してください。"
+
+msgid "argument package"
+msgstr "議論パッケージ"
+
+msgid "artifact package"
+msgstr "成果物パッケージ"
 
 msgid "author"
 msgstr "作成者"
@@ -2247,6 +2454,9 @@ msgstr "再生={0}  ディスク={1}"
 
 msgid "session {0}"
 msgstr "セッション {0}"
+
+msgid "terminology package"
+msgstr "用語パッケージ"
 
 msgid "the selected project file"
 msgstr "選択したプロジェクトファイル"

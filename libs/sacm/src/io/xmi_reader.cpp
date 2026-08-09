@@ -62,6 +62,152 @@ std::string_view prefix_of(std::string_view qualified) {
     return colon == std::string_view::npos ? std::string_view{} : qualified.substr(0, colon);
 }
 
+bool is_xml_name_char(char c) {
+    const unsigned char value = static_cast<unsigned char>(c);
+    return std::isalnum(value) != 0 || c == '_' || c == '-' || c == '.' || c == ':' || value >= 0x80;
+}
+
+std::string_view read_xml_name_at(std::string_view xml, std::size_t position) {
+    const std::size_t begin = position;
+    while (position < xml.size() && is_xml_name_char(xml[position])) {
+        ++position;
+    }
+    return xml.substr(begin, position - begin);
+}
+
+// One past the '>' that closes the tag starting at `tag_start`, skipping any
+// '>' inside a quoted attribute value.
+std::size_t find_tag_end(std::string_view xml, std::size_t tag_start) {
+    char quote = '\0';
+    for (std::size_t i = tag_start; i < xml.size(); ++i) {
+        const char c = xml[i];
+        if (quote != '\0') {
+            if (c == quote) {
+                quote = '\0';
+            }
+            continue;
+        }
+        if (c == '"' || c == '\'') {
+            quote = c;
+        } else if (c == '>') {
+            return i + 1;
+        }
+    }
+    return xml.size();
+}
+
+void collect_declared_prefixes(std::string_view tag, std::unordered_set<std::string>& out) {
+    std::size_t i = 0;
+    while ((i = tag.find("xmlns:", i)) != std::string_view::npos) {
+        const std::string_view name = read_xml_name_at(tag, i + 6);
+        if (!name.empty()) {
+            out.emplace(name);
+        }
+        i += 6 + std::max<std::size_t>(name.size(), 1);
+    }
+}
+
+// What pugixml's own wording leaves out about a document it could not parse.
+struct MalformedXmlDetail {
+    // The innermost element still open where a closing tag disagreed with it,
+    // spelled as the source spells it (prefix included).
+    std::string open_tag;
+    // The name on the closing tag that disagreed.
+    std::string close_tag;
+    // Prefixes used by those two tags that no xmlns declaration in the document
+    // defines.
+    std::vector<std::string> undeclared_prefixes;
+
+    bool has_tag_mismatch() const {
+        return !open_tag.empty() || !close_tag.empty();
+    }
+};
+
+// Text-level diagnosis of a document that failed to parse.
+//
+// There is no DOM to inspect at this point, so this re-scans the source. That
+// is worth doing because the population of files that reach here is mostly
+// files the *user did not write* -- another tool's export -- where "Start-end
+// tags mismatch" with no tag names and no position is not something anyone can
+// act on (#285, carried out of #16).
+//
+// The scan walks tags until a closing tag disagrees with the innermost open
+// one. It is deliberately independent of `parse_result.offset`, which is used
+// only for the reported line/column: the offset's meaning varies by error
+// status, while "the first tag that does not match" is the thing being
+// described.
+//
+// Prefix scoping is not modelled: a prefix declared anywhere in the document
+// counts as declared. That can only ever suppress a complaint, never invent
+// one, which is the right direction for a diagnostic.
+MalformedXmlDetail diagnose_malformed_xml(std::string_view xml) {
+    MalformedXmlDetail detail;
+    std::vector<std::string> open_tags;
+    std::unordered_set<std::string> declared_prefixes{"xml", "xmlns"};
+
+    std::size_t i = 0;
+    while (i < xml.size()) {
+        const std::size_t lt = xml.find('<', i);
+        if (lt == std::string_view::npos) {
+            break;
+        }
+        if (xml.compare(lt, 4, "<!--") == 0) {
+            const std::size_t end = xml.find("-->", lt + 4);
+            i = end == std::string_view::npos ? xml.size() : end + 3;
+            continue;
+        }
+        if (xml.compare(lt, 9, "<![CDATA[") == 0) {
+            const std::size_t end = xml.find("]]>", lt + 9);
+            i = end == std::string_view::npos ? xml.size() : end + 3;
+            continue;
+        }
+        if (lt + 1 < xml.size() && (xml[lt + 1] == '?' || xml[lt + 1] == '!')) {
+            i = find_tag_end(xml, lt);
+            continue;
+        }
+        if (lt + 1 < xml.size() && xml[lt + 1] == '/') {
+            const std::string_view name = read_xml_name_at(xml, lt + 2);
+            if (open_tags.empty()) {
+                detail.close_tag = std::string(name);
+                break;
+            }
+            if (open_tags.back() != name) {
+                detail.open_tag = open_tags.back();
+                detail.close_tag = std::string(name);
+                break;
+            }
+            open_tags.pop_back();
+            i = find_tag_end(xml, lt);
+            continue;
+        }
+        const std::string_view name = read_xml_name_at(xml, lt + 1);
+        const std::size_t end = find_tag_end(xml, lt);
+        const std::string_view tag = xml.substr(lt, end - lt);
+        collect_declared_prefixes(tag, declared_prefixes);
+        // A self-closing tag never needs a partner.
+        if (tag.size() >= 2 && tag[tag.size() - 2] == '/') {
+            i = end;
+            continue;
+        }
+        if (!name.empty()) {
+            open_tags.emplace_back(name);
+        }
+        i = end;
+    }
+
+    for (const std::string& tag : {detail.open_tag, detail.close_tag}) {
+        const std::string_view prefix = prefix_of(tag);
+        if (prefix.empty() || declared_prefixes.contains(std::string(prefix))) {
+            continue;
+        }
+        const std::string value(prefix);
+        if (std::ranges::find(detail.undeclared_prefixes, value) == detail.undeclared_prefixes.end()) {
+            detail.undeclared_prefixes.push_back(value);
+        }
+    }
+    return detail;
+}
+
 // True when the writer declares `uri` itself, so recording it on the document
 // would be redundant -- and, for a SACM namespace, actively wrong: re-declaring
 // the source dialect's URI would fight the export-namespace override.
@@ -128,12 +274,8 @@ struct Reader {
         return mode == Mode::Strict;
     }
 
-    std::optional<validation::SourceLocation> locate(const pugi::xml_node& node) const {
-        if (buffer == nullptr) {
-            return std::nullopt;
-        }
-        const std::ptrdiff_t offset = node.offset_debug();
-        if (offset < 0) {
+    std::optional<validation::SourceLocation> locate_offset(std::ptrdiff_t offset) const {
+        if (buffer == nullptr || offset < 0) {
             return std::nullopt;
         }
         int line = 1;
@@ -147,6 +289,10 @@ struct Reader {
             }
         }
         return validation::SourceLocation{source_file, line, column};
+    }
+
+    std::optional<validation::SourceLocation> locate(const pugi::xml_node& node) const {
+        return locate_offset(node.offset_debug());
     }
 
     void report(std::string_view code,
@@ -419,7 +565,8 @@ struct XsiTypeResult {
     }
 };
 
-// xsi:type="sacm:Claim" -> class name, validating the prefix namespace.
+// xsi:type="sacm:Claim" (or xmi:type) -> class name, validating the prefix
+// namespace.
 XsiTypeResult read_xsi_type(Reader& reader, const pugi::xml_node& node) {
     for (const pugi::xml_attribute& attr : node.attributes()) {
         const std::string_view name = attr.name();
@@ -430,7 +577,15 @@ XsiTypeResult read_xsi_type(Reader& reader, const pugi::xml_node& node) {
         const std::string attr_ns = reader.resolve_prefix(attr_prefix);
         const bool is_xsi = attr_ns == metadata::namespaces::kXsi ||
                             (attr_ns.empty() && attr_prefix == metadata::namespaces::kXsiPrefix);
-        if (!is_xsi) {
+        // XMI 2.5.1 spells the type discriminator `xmi:type`, and OMG-toolchain
+        // output uses it -- including the pinned normative metamodel file in
+        // third_party/sacm-2.3 and MagicDraw-family exports. Accepting only the
+        // XSI spelling left such an element to fall through to role/class-name
+        // inference and be preserved-or-rejected rather than typed, which is the
+        // opposite of what clause 2 asks of an importer (#336).
+        const bool is_xmi = (!attr_ns.empty() && metadata::namespaces::is_xmi_namespace(attr_ns)) ||
+                            (attr_ns.empty() && attr_prefix == metadata::namespaces::kXmiPrefix);
+        if (!is_xsi && !is_xmi) {
             continue;
         }
         const std::string_view value = attr.value();
@@ -921,12 +1076,21 @@ void read_containment_child(Reader& reader,
             kind = detail::kind_from_class_name_ci(xsi_type.type_name);
         }
         if (!kind.has_value()) {
+            // "Unknown" and "abstract" are different mistakes with different
+            // fixes: an unknown type means the file names a class this reader
+            // does not have, an abstract one means the file instantiated a
+            // class the metamodel forbids instantiating. Saying "unknown" for
+            // both sends the reader looking for a typo that is not there.
+            const bool abstract_class = detail::is_abstract_sacm_class_name(xsi_type.type_name);
             reader.report(validation::codes::kXmiUnknownElement,
                           reader.mode_severity(),
                           "SACM23-XMI-001",
                           node,
                           {parent.id()},
-                          std::format("unknown xsi:type '{}'", xsi_type.type_name));
+                          abstract_class
+                              ? std::format("type '{}' names an abstract SACM class, which cannot be instantiated",
+                                            xsi_type.type_name)
+                              : std::format("unknown xsi:type '{}'", xsi_type.type_name));
             return;
         }
     } else if (declared_kind.has_value()) {
@@ -1047,6 +1211,13 @@ void read_model_element_children(Reader& reader, model::ModelElement& element, c
                                   "(clause 8.6 allows one name LangString)");
                 }
             }
+        } else if (role == "location" && dynamic_cast<model::Resource*>(&element) != nullptr) {
+            // Resource.location (clause 12.10): a MultiLangString composition,
+            // and the only payload a Resource carries. Declared by the normative
+            // text and absent from ptc/22-03-13; without this branch a
+            // text-conformant file's <location> fell into preserved content,
+            // which strict save then refused.
+            read_multi_lang_values(reader, child, Access::location(static_cast<model::Resource&>(element)));
         } else if (role == "description") {
             Access::descriptions(element).push_back(
                 read_utility<model::Description>(reader, ElementKind::Description, child));
@@ -1725,6 +1896,15 @@ bool is_common_role(std::string_view role) {
     return false;
 }
 
+// Roles `read_model_element_children` already consumed for THIS element's class,
+// so the containment pass below must not see them as unknown children. Kept
+// separate from `kCommonRoles`, which is class-independent: `location` is a
+// child of Resource (clause 12.10) and nothing else, and a `<location>` under
+// any other class is genuinely unknown and should still be reported.
+bool is_class_specific_model_child(const SACMElement& element, std::string_view role) {
+    return role == "location" && dynamic_cast<const model::Resource*>(&element) != nullptr;
+}
+
 // Legacy Assurance Forge terminology shorthand: a TerminologyPackage/Group's
 // contained elements are written with their concrete class name as the element
 // name -- <expression id=.. value=..>, <term>, <category> -- instead of the
@@ -1801,7 +1981,7 @@ void populate(Reader& reader, SACMElement& element, const pugi::xml_node& node) 
             continue;
         }
         const std::string_view role = normalize_role(local_name(child.name()));
-        if (is_common_role(role) || is_reference_role(element, role)) {
+        if (is_common_role(role) || is_class_specific_model_child(element, role) || is_reference_role(element, role)) {
             continue;
         }
         const std::size_t role_index = next_role_index[std::string(role)]++;
@@ -2183,14 +2363,31 @@ LoadResult load_impl(std::string_view xml, std::string source_file, const LoadOp
     pugi::xml_document parsed;
     const pugi::xml_parse_result parse_result = parsed.load_buffer(xml.data(), xml.size(), pugi::parse_default);
     if (!parse_result) {
+        // pugixml names the failure ("Start-end tags mismatch") but not where it
+        // is, which tag pair caused it, or that an undeclared prefix is what
+        // made the two spellings differ. All three are recoverable from the
+        // source, and all three are what a user needs to fix a file another
+        // tool produced (#285).
+        std::string message = std::format("XML parse error: {}", parse_result.description());
+        const MalformedXmlDetail detail = diagnose_malformed_xml(xml);
+        if (detail.has_tag_mismatch()) {
+            if (detail.open_tag.empty()) {
+                message += std::format(" -- '</{}>' closes an element that was never opened", detail.close_tag);
+            } else {
+                message += std::format(" -- '<{}>' is closed by '</{}>'", detail.open_tag, detail.close_tag);
+            }
+        }
+        for (const std::string& prefix : detail.undeclared_prefixes) {
+            message += std::format("; namespace prefix '{}' is not declared", prefix);
+        }
         result.diagnostics.push_back(Diagnostic{
             .code = std::string(validation::codes::kXmlMalformed),
             .severity = Severity::Error,
             .requirement_id = "SACM23-VAL-001",
             .operation = "",
             .affected = {},
-            .location = std::nullopt,
-            .message = std::format("XML parse error: {}", parse_result.description()),
+            .location = reader.locate_offset(static_cast<std::ptrdiff_t>(parse_result.offset)),
+            .message = std::move(message),
         });
         return result;
     }

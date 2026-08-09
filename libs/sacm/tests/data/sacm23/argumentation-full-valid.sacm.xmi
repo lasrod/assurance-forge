@@ -6,6 +6,9 @@
     <artifactElement xsi:type="sacm:Artifact" xmi:id="artifact_fmea" version="1.2" date="2026-01-15">
       <name content="Brake FMEA"/>
     </artifactElement>
+    <artifactElement xsi:type="sacm:Artifact" xmi:id="artifact_test_report" version="3.0" date="2026-02-02">
+      <name content="Brake Test Report"/>
+    </artifactElement>
   </artifactPackage>
   <argumentPackage xmi:id="argpkg_1">
     <name content="Braking Argument"/>
@@ -33,19 +36,26 @@
     <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ev_fmea" referencedArtifactElement="artifact_fmea">
       <name content="FMEA Reference"/>
     </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ev_test_report" referencedArtifactElement="artifact_test_report">
+      <name content="Test Report Reference"/>
+    </argumentElement>
     <argumentElement xsi:type="sacm:AssertedInference" xmi:id="inf_1" reasoning="ar_decompose" source="claim_sub1 claim_sub2" target="claim_top" metaClaim="claim_meta">
       <name content="Main inference"/>
     </argumentElement>
     <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ev_rel_1" source="ev_fmea" target="claim_sub1"/>
     <argumentElement xsi:type="sacm:AssertedContext" xmi:id="ctx_1" source="claim_context" target="claim_top"/>
     <argumentElement xsi:type="sacm:AssertedInference" xmi:id="counter_1" isCounter="true" source="claim_counter" target="claim_top"/>
-    <argumentElement xsi:type="sacm:AssertedArtifactSupport" xmi:id="support_1" source="ev_fmea" target="claim_sub2"/>
-    <argumentElement xsi:type="sacm:AssertedArtifactContext" xmi:id="actx_1" source="ev_fmea" target="claim_context"/>
+    <argumentElement xsi:type="sacm:AssertedArtifactSupport" xmi:id="support_1" source="ev_fmea" target="ev_test_report"/>
+    <argumentElement xsi:type="sacm:AssertedArtifactContext" xmi:id="actx_1" source="ev_test_report" target="ev_fmea"/>
     <argumentElement xsi:type="sacm:ArgumentGroup" xmi:id="group_core" argumentElement="claim_top claim_sub1 claim_sub2">
       <name content="Core Claims"/>
     </argumentElement>
-    <argumentElement xsi:type="sacm:ArgumentPackage" xmi:id="argpkg_detail">
-      <name content="Detailed Reasoning"/>
-    </argumentElement>
+  </argumentPackage>
+  <!-- Sibling rather than nested inside argpkg_1: clause 11.4 allows an
+       ArgumentPackage that nests ArgumentPackages to contain nothing else, and
+       ArgumentReasoning@structure is a reference, so the detail package does
+       not have to live inside the package whose reasoning cites it. -->
+  <argumentPackage xmi:id="argpkg_detail">
+    <name content="Detailed Reasoning"/>
   </argumentPackage>
 </sacm:AssuranceCasePackage>

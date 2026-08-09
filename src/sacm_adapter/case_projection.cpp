@@ -244,6 +244,100 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
 
 } // namespace
 
+namespace {
+
+// `name=a b c;` for a reference list, so the fingerprint stays diffable and its
+// order is the model's rather than a hash's.
+std::string reference_field(std::string_view name, const std::vector<sacm::model::ElementId>& ids) {
+    if (ids.empty()) {
+        return {};
+    }
+    std::string out(name);
+    out += '=';
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        if (i > 0) {
+            out += ' ';
+        }
+        out += ids[i].value();
+    }
+    out += ';';
+    return out;
+}
+
+std::string reference_field(std::string_view name, const std::optional<sacm::model::ElementId>& id) {
+    return id.has_value() ? std::string(name) + "=" + id->value() + ";" : std::string{};
+}
+
+// The SACM attributes and reference ends whose silent disappearance changes what
+// the argument MEANS: a dropped `isCounter` turns a rebuttal into support, a
+// dropped `metaClaim` or `structure` severs the reasoning about a step, a
+// dropped `assertionDeclaration` turns an assumption into an assertion.
+std::string describe_attributes(const sacm::model::SACMElement& element) {
+    std::string out;
+    if (element.gid().has_value()) {
+        out += "gid=" + *element.gid() + ";";
+    }
+    if (element.is_citation()) {
+        out += "isCitation=true;";
+    }
+    if (element.is_abstract()) {
+        out += "isAbstract=true;";
+    }
+    out += reference_field("citedElement", element.cited_element());
+    out += reference_field("abstractForm", element.abstract_form());
+
+    if (const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element)) {
+        out += "assertionDeclaration=";
+        out += sacm::model::assertion_declaration_name(assertion->assertion_declaration());
+        out += ";";
+        out += reference_field("metaClaim", assertion->meta_claims());
+    }
+    if (const auto* relationship = dynamic_cast<const sacm::model::AssertedRelationship*>(&element)) {
+        if (relationship->is_counter()) {
+            out += "isCounter=true;";
+        }
+        out += reference_field("reasoning", relationship->reasoning());
+        out += reference_field("source", relationship->sources());
+        out += reference_field("target", relationship->targets());
+    }
+    if (const auto* reasoning = dynamic_cast<const sacm::model::ArgumentReasoning*>(&element)) {
+        out += reference_field("structure", reasoning->structure());
+    }
+    if (const auto* reference = dynamic_cast<const sacm::model::ArtifactReference*>(&element)) {
+        out += reference_field("referencedArtifactElement", reference->referenced_artifact_elements());
+    }
+    if (const auto* group = dynamic_cast<const sacm::model::ArgumentGroup*>(&element)) {
+        out += reference_field("argumentElement", group->argument_elements());
+    }
+    if (const auto* group = dynamic_cast<const sacm::model::TerminologyGroup*>(&element)) {
+        out += reference_field("terminologyElement", group->terminology_elements());
+    }
+    if (const auto* expression = dynamic_cast<const sacm::model::ExpressionElement*>(&element)) {
+        out += "value=" + expression->value() + ";";
+        out += reference_field("category", expression->categories());
+    }
+    if (const auto* term = dynamic_cast<const sacm::model::Term*>(&element)) {
+        if (!term->external_reference().empty()) {
+            out += "externalReference=" + term->external_reference() + ";";
+        }
+        out += reference_field("origin", term->origin());
+    }
+    if (const auto* expression = dynamic_cast<const sacm::model::Expression*>(&element)) {
+        out += reference_field("element", expression->elements());
+    }
+    if (const auto* artifact = dynamic_cast<const sacm::model::Artifact*>(&element)) {
+        if (!artifact->version().empty()) {
+            out += "version=" + artifact->version() + ";";
+        }
+        if (!artifact->date().empty()) {
+            out += "date=" + artifact->date() + ";";
+        }
+    }
+    return out;
+}
+
+} // namespace
+
 std::vector<DocumentElement> list_document_elements(const LibraryDocument& document) {
     const sacm::model::Document& source = LibraryDocumentAccess::document(document);
     std::vector<DocumentElement> elements;
@@ -253,6 +347,7 @@ std::vector<DocumentElement> list_document_elements(const LibraryDocument& docum
         summary.kind = lowercase_kind_name(element.kind());
         summary.is_package = sacm::metadata::is_package_kind(element.kind());
         summary.is_utility = dynamic_cast<const sacm::model::UtilityElement*>(&element) != nullptr;
+        summary.attributes = describe_attributes(element);
         elements.push_back(std::move(summary));
     });
     return elements;

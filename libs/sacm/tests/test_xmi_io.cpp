@@ -1,6 +1,7 @@
 #include "sacm/io/xmi.h"
 
 #include "sacm/compare/semantic_compare.h"
+#include "sacm/model/document.h"
 #include "sacm/validation/codes.h"
 
 #include <gtest/gtest.h>
@@ -8,6 +9,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -208,6 +212,113 @@ TEST(Sacm23Library, SACM23_LIB_003_PublicApiDoesNotExposeLayoutOrGoalTerminology
                 << entry.path().string() << " contains forbidden term '" << term << "'";
         }
     }
+}
+
+bool message_contains(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view fragment) {
+    return std::ranges::any_of(diagnostics, [&](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.message.find(fragment) != std::string::npos;
+    });
+}
+
+// The shape reported in #16: the root opens with a prefix that was never
+// declared and closes with the one that was. Rejecting it is correct; rejecting
+// it with "Start-end tags mismatch" and nothing else is what made it
+// unactionable, because the reporter did not write the file and cannot guess
+// what the exporter did.
+constexpr std::string_view kUndeclaredPrefixMismatch =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<sacm:AssuranceCasePackage xmlns:sacm2=\"http://www.omg.org/spec/SACM/20220301\">\n"
+    "  <name content=\"Case\"/>\n"
+    "</sacm2:AssuranceCasePackage>\n";
+
+TEST(Sacm23Validation, SACM23_VAL_001_MalformedXmlReportsWhereItFailed) {
+    const LoadResult result = sacm::io::load_xmi_string(kUndeclaredPrefixMismatch, LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(result.ok);
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    const sacm::validation::Diagnostic& diagnostic = result.diagnostics.front();
+    EXPECT_EQ(diagnostic.code, sacm::validation::codes::kXmlMalformed);
+
+    // The assertion is on the position, not on the wording: pugixml's own
+    // description already says "mismatch", so a substring check against the
+    // message would pass without any of this being present.
+    ASSERT_TRUE(diagnostic.location.has_value()) << diagnostic.message;
+    EXPECT_EQ(diagnostic.location->line, 4) << diagnostic.message;
+    EXPECT_GT(diagnostic.location->column, 0);
+}
+
+TEST(Sacm23Validation, SACM23_VAL_001_MalformedXmlNamesBothTagsOfAMismatch) {
+    const LoadResult result = sacm::io::load_xmi_string(kUndeclaredPrefixMismatch, LoadOptions{.mode = Mode::Strict});
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    const std::string& message = result.diagnostics.front().message;
+    // Both spellings, so the reader can see that the two differ and how.
+    EXPECT_NE(message.find("<sacm:AssuranceCasePackage>"), std::string::npos) << message;
+    EXPECT_NE(message.find("</sacm2:AssuranceCasePackage>"), std::string::npos) << message;
+}
+
+TEST(Sacm23Validation, SACM23_VAL_001_MalformedXmlNamesAnUndeclaredNamespacePrefix) {
+    const LoadResult result = sacm::io::load_xmi_string(kUndeclaredPrefixMismatch, LoadOptions{.mode = Mode::Strict});
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    const std::string& message = result.diagnostics.front().message;
+    EXPECT_NE(message.find("prefix 'sacm' is not declared"), std::string::npos) << message;
+    // 'sacm2' IS declared on the root, so naming it too would send the reader
+    // after the wrong half of the pair.
+    EXPECT_EQ(message.find("prefix 'sacm2'"), std::string::npos) << message;
+}
+
+TEST(Sacm23Validation, SACM23_VAL_001_MalformedXmlNamesAStrayClosingTag) {
+    const LoadResult result = sacm::io::load_xmi_string("<?xml version=\"1.0\"?>\n"
+                                                        "<AssuranceCasePackage/>\n"
+                                                        "</AssuranceCasePackage>\n",
+                                                        LoadOptions{.mode = Mode::Strict});
+    ASSERT_FALSE(result.diagnostics.empty());
+    const std::string& message = result.diagnostics.front().message;
+    EXPECT_NE(message.find("</AssuranceCasePackage>"), std::string::npos) << message;
+    EXPECT_NE(message.find("never opened"), std::string::npos) << message;
+}
+
+// XMI 2.5.1's own document form. The pinned normative metamodel in
+// third_party/sacm-2.3 is serialized this way, as is MagicDraw-family output,
+// so an importer that accepts only the XSI spelling fails at exactly the job
+// clause 2 sets it (#336).
+TEST(Sacm23XmiConformance, SACM23_XMI_001_XmiTypeIsAcceptedAsATypeDiscriminator) {
+    const auto document_with = [](std::string_view type_attribute) {
+        return std::string(R"(<?xml version="1.0" encoding="UTF-8"?>)"
+                           R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+                           R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+                           R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+                           R"(<argumentPackage xmi:id="ap_1"><argumentElement )") +
+               std::string(type_attribute) + R"( xmi:id="G1"><name content="Top"/>)" +
+               R"(</argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+    };
+
+    const LoadResult xsi =
+        sacm::io::load_xmi_string(document_with(R"(xsi:type="sacm:Claim")"), LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(xsi.ok) << (xsi.diagnostics.empty() ? "" : xsi.diagnostics.front().message);
+    const LoadResult xmi =
+        sacm::io::load_xmi_string(document_with(R"(xmi:type="sacm:Claim")"), LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(xmi.ok) << (xmi.diagnostics.empty() ? "" : xmi.diagnostics.front().message);
+
+    // Typed, not inferred and not preserved: the element is a Claim in both.
+    ASSERT_NE(xmi.document->find_as<sacm::model::Claim>(ElementId{"G1"}), nullptr);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*xsi.document, *xmi.document).empty());
+}
+
+// "Unknown" and "abstract" are different mistakes: one means this reader lacks
+// the class, the other means the metamodel forbids instantiating it.
+TEST(Sacm23XmiConformance, SACM23_XMI_001_InstantiatingAnAbstractClassIsDiagnosed) {
+    const LoadResult result = sacm::io::load_xmi_string(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Assertion" xmi:id="a_1"><name content="Abstract"/></argumentElement>)"
+        R"(</argumentPackage></sacm:AssuranceCasePackage>)",
+        LoadOptions{.mode = Mode::Strict});
+    EXPECT_FALSE(result.ok);
+    EXPECT_TRUE(has_code(result.diagnostics, sacm::validation::codes::kXmiUnknownElement));
+    EXPECT_TRUE(message_contains(result.diagnostics, "abstract SACM class"))
+        << (result.diagnostics.empty() ? "" : result.diagnostics.front().message);
 }
 
 } // namespace

@@ -5,6 +5,7 @@
 #include "app/project_workflow.h"
 #include "core/project_service.h"
 #include "parser/model_utils.h"
+#include "ui/i18n/localization.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -316,7 +317,7 @@ bool DeleteProposalPatchFile(AppRuntimeState& state, const std::string& proposal
 
 bool SaveProject(AppRuntimeState& state) {
     if (!state.app_state.current_project.has_value()) {
-        state.app_state.status_message = "Create or open a project first.";
+        state.app_state.status_message = AF_TR("Create or open a project first.");
         return false;
     }
 
@@ -324,7 +325,7 @@ bool SaveProject(AppRuntimeState& state) {
         core::AssuranceProject& project = state.app_state.current_project.value();
         std::string error;
         if (!state.review_controller->SaveIfDirty(project, error)) {
-            state.app_state.status_message = "Review item save failed: " + error;
+            state.app_state.status_message = ui::i18n::trf("Review item save failed: {0}", error);
             return false;
         }
     }
@@ -339,7 +340,7 @@ bool SaveProject(AppRuntimeState& state) {
 
     if (state.app_state.has_unsaved_changes) {
         state.app_state.has_unsaved_changes = false;
-        state.app_state.status_message = "Project saved: " + state.app_state.current_project->name;
+        state.app_state.status_message = ui::i18n::trf("Project saved: {0}", state.app_state.current_project->name);
         return true;
     }
 

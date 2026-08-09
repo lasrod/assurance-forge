@@ -360,18 +360,18 @@ void AppRuntime::RenderFrame(bool& done) {
     review_panel_callbacks.accept_agent_change_set = [this](const std::string& change_set_id) {
         std::string error;
         if (!AcceptAgentChangeSet(change_set_id, error)) {
-            SetStatus("Change could not be accepted: " + error);
+            SetStatus(ui::i18n::trf("Change could not be accepted: {0}", error));
             return;
         }
-        SetStatus("Change accepted. Undo reverses it like any other edit.");
+        SetStatus(AF_TR("Change accepted. Undo reverses it like any other edit."));
     };
     review_panel_callbacks.reject_agent_change_set = [this](const std::string& change_set_id) {
         std::string error;
         if (!RejectAgentChangeSet(change_set_id, error)) {
-            SetStatus("Change could not be rejected: " + error);
+            SetStatus(ui::i18n::trf("Change could not be rejected: {0}", error));
             return;
         }
-        SetStatus("Change rejected.");
+        SetStatus(AF_TR("Change rejected."));
     };
 
     areas::FeedbackDockAreaCallbacks feedback_dock_callbacks;

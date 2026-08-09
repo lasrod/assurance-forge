@@ -22,6 +22,13 @@ std::optional<ElementKind> kind_from_class_name(std::string_view name);
 // Case-insensitive lookup for tolerant mode ("claim", "CLAIM").
 std::optional<ElementKind> kind_from_class_name_ci(std::string_view name);
 
+// True for the SACM 2.3 classes the metamodel marks abstract, which therefore
+// have no ElementKind and cannot be instantiated. Lets a document that types an
+// element `sacm:Assertion` be told what is actually wrong with it instead of
+// being told the class is unknown. Seeded from the "(abstract)" headings in
+// docs/sacm/sacm-2.3-metamodel-inventory.md.
+bool is_abstract_sacm_class_name(std::string_view name);
+
 // Resolution of types from metamodels that specialize SACM.
 //
 // SACM is designed to be extended, and real interchange files exercise that:

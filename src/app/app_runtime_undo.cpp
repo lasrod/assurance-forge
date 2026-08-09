@@ -12,6 +12,7 @@
 #include "core/drafts/draft_persistence.h"
 #include "core/drafts/draft_workspace.h"
 #include "sacm_adapter/case_projection.h"
+#include "ui/i18n/localization.h"
 
 #include <string>
 
@@ -88,7 +89,7 @@ bool AppRuntime::Undo() {
         const std::string label = state.draft_workspace.NextDraftUndoLabel();
         std::string draft_error;
         if (!state.draft_workspace.UndoDraftEdit(draft_error)) {
-            state.app_state.status_message = "Undo failed: " + draft_error;
+            state.app_state.status_message = ui::i18n::trf("Undo failed: {0}", draft_error);
             return false;
         }
         // No `DocumentDirtyEvent`: the accepted `.sacm` did not change and must
@@ -101,23 +102,23 @@ bool AppRuntime::Undo() {
     }
 
     if (!state.command_bus) {
-        state.app_state.status_message = "Undo unavailable: no project audit bus.";
+        state.app_state.status_message = AF_TR("Undo unavailable: no project audit bus.");
         return false;
     }
     if (!state.app_state.current_project.has_value() || !state.app_state.loaded_case.has_value() ||
         !state.app_state.has_projected_package()) {
-        state.app_state.status_message = "Undo unavailable: no project loaded.";
+        state.app_state.status_message = AF_TR("Undo unavailable: no project loaded.");
         return false;
     }
     if (ActiveCanvasInHistoricalPreview(state)) {
-        state.app_state.status_message = "Cannot undo while viewing history. Return to Latest to make changes.";
+        state.app_state.status_message = AF_TR("Cannot undo while viewing history. Return to Latest to make changes.");
         return false;
     }
 
     const auto& transactions = state.command_bus->Store().Transactions();
     const auto target = core::audit::FindUndoTarget(transactions);
     if (!target.has_target) {
-        state.app_state.status_message = "Nothing to undo.";
+        state.app_state.status_message = AF_TR("Nothing to undo.");
         return false;
     }
 
@@ -126,7 +127,8 @@ bool AppRuntime::Undo() {
     const auto& baselines = areas::GetCachedBaselines(project.rootPath);
     const auto boundary = core::audit::FindUndoBoundary(snapshots, baselines, target.target_sequence);
     if (!core::audit::CanUndo(target.target_sequence, boundary)) {
-        state.app_state.status_message = "Reached snapshot or baseline — restore from history to go further back.";
+        state.app_state.status_message =
+            AF_TR("Reached snapshot or baseline — restore from history to go further back.");
         return false;
     }
 
@@ -152,17 +154,19 @@ bool AppRuntime::Undo() {
     const bool undo_restores_draft =
         state.draft_workspace.LoadPromotionSnapshot(target.target_sequence, promotion_snapshot, snapshot_error);
     if (!undo_restores_draft && !snapshot_error.empty()) {
-        state.app_state.status_message =
-            "Cannot undo this acceptance: the draft it came from could not be read (" + snapshot_error + "). Remove " +
-            core::drafts::DraftPromotionSnapshotPath(project.rootPath, target.target_sequence).generic_string() +
-            " to undo without restoring it.";
+        state.app_state.status_message = ui::i18n::trf(
+            "Cannot undo this acceptance: the draft it came from could not be read ({0}). Remove {1} to undo "
+            "without restoring it.",
+            snapshot_error,
+            core::drafts::DraftPromotionSnapshotPath(project.rootPath, target.target_sequence).generic_string());
         return false;
     }
     if (undo_restores_draft &&
         !core::drafts::WorkspaceTargetsArgumentFile(promotion_snapshot, state.draft_workspace.argument_file())) {
-        state.app_state.status_message = "Cannot undo this acceptance here: it belongs to " +
-                                         promotion_snapshot.argument_file.filename().generic_string() +
-                                         ". Open that argument and undo there, so its draft is restored with it.";
+        state.app_state.status_message = ui::i18n::trf(
+            "Cannot undo this acceptance here: it belongs to {0}. Open that argument and undo there, so its "
+            "draft is restored with it.",
+            promotion_snapshot.argument_file.filename().generic_string());
         return false;
     }
 
@@ -171,7 +175,7 @@ bool AppRuntime::Undo() {
     // and redos compose correctly without special-casing here.
     auto prior = core::audit::ReconstructAtSequence(project, target.target_sequence - 1);
     if (!prior.has_value()) {
-        state.app_state.status_message = "Undo failed: " + prior.error();
+        state.app_state.status_message = ui::i18n::trf("Undo failed: {0}", prior.error());
         return false;
     }
 
@@ -195,7 +199,7 @@ bool AppRuntime::Undo() {
 
     const auto outcome = commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        state.app_state.status_message = "Undo failed: " + outcome.error;
+        state.app_state.status_message = ui::i18n::trf("Undo failed: {0}", outcome.error);
         return false;
     }
 
@@ -214,7 +218,7 @@ bool AppRuntime::Undo() {
             // The accepted model has already moved, so this is not a failed undo.
             // Say what was and was not done rather than reporting a clean one: the
             // snapshot file is still there and is still the only copy of that work.
-            draft_note = " — but the draft it came from was not restored: " + restore_error;
+            draft_note = ui::i18n::trf(" — but the draft it came from was not restored: {0}", restore_error);
         }
     }
 
@@ -226,7 +230,7 @@ bool AppRuntime::Undo() {
     state.events.Emit(SelectionChangedEvent{});
     state.events.Emit(DocumentDirtyEvent{});
 
-    state.app_state.status_message = "Undid: " + target.target_command_name + draft_note;
+    state.app_state.status_message = ui::i18n::trf("Undid: {0}{1}", target.target_command_name, draft_note);
     PrunePromotionSnapshots();
     return true;
 }

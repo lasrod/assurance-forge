@@ -406,6 +406,25 @@ void AppRuntime::SetStatus(const std::string& message) {
     impl_->events.Emit(StatusMessageEvent{message});
 }
 
+// Status text is TRANSLATED AT ITS SOURCE and stored translated, so it bakes the
+// language in force at the moment it was set. A message already on screen when
+// the user switches language therefore stays in the old one until the next
+// action replaces it.
+//
+// That is a decision, not an oversight (#252). The alternative is the hook
+// `AppRuntime::RenderFrame` already runs for `ui::i18n::LanguageEpoch()` changes,
+// which would clear `status_message` on a language switch -- and clearing it
+// would silently discard a message the user may not have read yet, including a
+// failure report. A stale-language sentence is recoverable by reading it; a
+// deleted one is not. The status line is transient by design and the next action
+// overwrites it in the new language.
+//
+// The other option -- storing the msgid plus its arguments and translating at
+// display -- is what `core` would need, since the layer rule keeps `ui/i18n` out
+// of it. That is why the 27 sites in `core::AppState` (file and project
+// load/save reporting) are still English and are tracked on #252 rather than
+// converted here: `app/` may call `ui::i18n` directly, and `core/` may not.
+
 void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
     impl_->events.Emit(ModalRequestEvent{ModalKind::NotImplemented, true, feature});
 }
@@ -854,7 +873,8 @@ void AppRuntime::SyncDraftWorkspace() {
         // Recovery data that cannot be read is reported rather than deleted. The
         // work in it may be hours of an agent's conversation, and the file is the
         // only copy.
-        impl_->app_state.status_message = "Warning: could not read the draft for this argument: " + error;
+        impl_->app_state.status_message =
+            ui::i18n::trf("Warning: could not read the draft for this argument: {0}", error);
     }
 
     // Snapshots accumulate one per promotion and are only consumed by an undo,
@@ -1020,7 +1040,7 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
                 impl_->tree_needs_rebuild = true;
             }
             if (was_creator)
-                SetStatus("Discarded proposal draft.");
+                SetStatus(AF_TR("Discarded proposal draft."));
         },
         [this](const core::TerminologyPackageRef& package_ref, const core::TerminologyTermRef& term_ref) {
             OpenTerminologyTermFromCanvas(package_ref, term_ref);
@@ -1178,23 +1198,23 @@ void AppRuntime::SyncRegisterProblems() {
 
 bool AppRuntime::SetManualReviewOk(const std::string& element_id, bool manual_ok) {
     if (element_id.empty()) {
-        SetStatus("Select an element before changing manual review status.");
+        SetStatus(AF_TR("Select an element before changing manual review status."));
         return false;
     }
     if (!impl_->app_state.current_project.has_value()) {
-        SetStatus("Open or create a project before changing review status.");
+        SetStatus(AF_TR("Open or create a project before changing review status."));
         return false;
     }
     if (!EnsureReviewItemStorage())
         return false;
     if (impl_->reviewer_name.empty()) {
         impl_->modal_coordinator->show_reviewer_name_prompt = true;
-        SetStatus("Enter a reviewer name before changing review status.");
+        SetStatus(AF_TR("Enter a reviewer name before changing review status."));
         return false;
     }
     if (!impl_->review_controller->SetManualReviewOk(
             element_id, manual_ok, impl_->reviewer_name, core::NowUtcString())) {
-        SetStatus("Could not update manual review status.");
+        SetStatus(AF_TR("Could not update manual review status."));
         return false;
     }
     return true;

@@ -328,6 +328,41 @@ docs/sacm/verification/2026-07-25-lib-002-source-of-truth.md (round 3 PASS,
 rounds 1 and 2 FAILED alongside it) and docs/sacm/verification/2026-07-26-lib-002-undo-
 library-primary-round-1-FAIL.md.
 
+**Attribute-level loss, measured for the first time (#347).** Every sweep on this row
+until now compared element KINDS. A kind sweep is blind to the failure mode where the
+element survives and its meaning does not — the inventory balances perfectly while an
+attribute is gone — and that is not hypothetical here: `isCounter` was dropped by the
+bridge once already, re-serializing a rebuttal of the top claim as an inference
+*supporting* it, and the fix was one hand-written assertion for that one attribute. Which
+is the arrangement that let it through in the first place.
+`ProjectionCoverage.SACM23_LIB_002_BridgeRoundTripKeepsEveryAttributeOfASurvivingElement`
+replaces the hand-maintained assertions with a sweep: it fingerprints every
+meaning-bearing attribute and reference end of every element, round-trips the same
+conforming fixtures through `project_library_package_with_tags` +
+`reload_document_keeping_compatibility_content`, and compares each surviving element with
+itself.
+
+Writing it found four losses nobody had measured:
+
+| Lost | Clause | What it means when it goes |
+|---|---|---|
+| `Claim@isCitation` + `@citedElement` | 8.2 | A citation of another package's claim becomes an original claim. The argument gains a proposition it never asserted. |
+| `Claim@abstractForm` | 8.2 | A concrete element's link to the pattern element it instantiates. Pattern provenance is severed. |
+| `AssuranceCasePackage@gid` | 8.2 | SACM's model-global identifier on the case package — the handle other tools key on. |
+| `Expression@element` | 10.10 | The ExpressionElements a structured Expression is built from; the production rule is left naming things that resolve to nothing. |
+
+These are **disclosures, not regressions** — the legacy POD has never had a field for any
+of them. But they differ from the lost *kinds* in the way that decides whether a user is
+protected: the bridge's guard sweeps ELEMENTS. A document that would lose only attributes
+is not refused. It goes through, the command reports success, and the attribute is gone
+from the tracked file. The refusal guarantee this row rests on therefore covers element
+deletion and not attribute deletion, and that gap is what closing the bridge
+([#350](https://github.com/lasrod/assurance-forge/issues/350)) removes. Until then the
+sweep gates the known-lost list in both directions, and a *changed* attribute value fails
+outright — that has never been disclosed and never will be, because an element that keeps
+an attribute and changes what it says is the reinterpretation the project's own hard
+constraint forbids.
+
 ## SACM23-INT-001 — Assurance Forge adapter — load, project, edit, save through the library
 
 The adapter seam itself: whether the application's load, projection, edit and save paths go through the library rather than around it.

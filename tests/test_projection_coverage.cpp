@@ -90,6 +90,61 @@ const std::set<std::string>& KnownRejectedFixtures() {
     return files;
 }
 
+// Attributes the bridge round trip DROPS from an element that survives it,
+// keyed `kind.attribute` so a loss on one class cannot mask the same attribute
+// still being carried on another.
+//
+// Every entry here was found the day the attribute sweep below was written --
+// the kind sweep could not see them, because the element itself survives and the
+// inventory stays balanced. They are new DISCLOSURES, not new regressions: the
+// legacy POD has never had a field for any of them. They are disclosed rather
+// than fixed for the same reason as the lost kinds: carrying them means growing
+// a model the library migration exists to retire.
+//
+// The difference from the lost kinds matters and is stated on SACM23-LIB-002:
+// the bridge's guard sweeps ELEMENTS, so a document that would lose only
+// attributes is NOT refused -- it goes through, and the attribute is gone. That
+// is the silent half these four occupy, and closing it is bridge-retirement work
+// (issue #350), not a list entry.
+const std::set<std::string>& KnownLostAttributes() {
+    static const std::set<std::string> attributes = {
+        // clause 8.2. A concrete element's link to the abstract pattern element
+        // it instantiates.
+        "claim.abstractForm",
+        // clause 8.2. The pair that makes an element a CITATION of another
+        // rather than an assertion in its own right -- dropping them turns a
+        // reference into an original claim.
+        "claim.isCitation",
+        "claim.citedElement",
+        // clause 8.2. SACM's model-global identifier on the case package. The
+        // POD carries gid on elements but has no field for it on the package.
+        "assurancecasepackage.gid",
+        // clause 10.10. The ExpressionElements a structured Expression is built
+        // from; without them the production rule references names that resolve
+        // to nothing.
+        "expression.element",
+    };
+    return attributes;
+}
+
+// A `name=value;name=value;` fingerprint split into its fields, so a dropped
+// attribute and a changed one can be told apart -- comparing whole fingerprints
+// reports every field of an element as different when only one of them moved.
+std::map<std::string, std::string> ParseFields(const std::string& fingerprint) {
+    std::map<std::string, std::string> fields;
+    std::size_t start = 0;
+    while (start < fingerprint.size()) {
+        const std::size_t end = fingerprint.find(';', start);
+        if (end == std::string::npos)
+            break;
+        const std::size_t equals = fingerprint.find('=', start);
+        if (equals != std::string::npos && equals < end)
+            fields[fingerprint.substr(start, equals - start)] = fingerprint.substr(equals + 1, end - equals - 1);
+        start = end + 1;
+    }
+    return fields;
+}
+
 std::map<std::string, int> InventoryByKind(const sacm_adapter::LibraryDocument& document) {
     std::map<std::string, int> counts;
     const core::AssuranceCase projected = sacm_adapter::project_case(document);
@@ -252,5 +307,99 @@ TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripLosesOnlyTheKnownKinds) {
             << "'" << known
             << "' now survives the bridge round trip but is still listed as unrepresentable. "
                "Remove it from the list and from the SACM23-LIB-002 disclosure.";
+    }
+}
+
+// The kind sweep above cannot see an ELEMENT SURVIVE WITH ITS MEANING CHANGED.
+// That is not hypothetical here: `isCounter` was dropped by the bridge while the
+// relationship itself survived, re-serializing a rebuttal of the top claim as an
+// inference supporting it, with the inventory perfectly balanced. Attribute
+// fidelity was hand-maintained per test afterwards -- one assertion per attribute
+// somebody thought to write -- which is the arrangement that let the first one
+// through (#347, sweep depth).
+//
+// This sweeps every attribute of every surviving element across the same round
+// trip, so a newly-lost attribute fails here rather than waiting to be noticed.
+TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripKeepsEveryAttributeOfASurvivingElement) {
+    const std::vector<std::filesystem::path> fixtures = ConformingFixtures();
+    ASSERT_FALSE(fixtures.empty()) << "no conforming SACM 2.3 fixtures found; this test measures nothing";
+
+    std::size_t compared = 0;
+    std::set<std::string> attributes_seen;
+    std::set<std::string> lost_attributes;
+
+    for (const std::filesystem::path& fixture : fixtures) {
+        sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(fixture);
+        ASSERT_TRUE(loaded.ok) << fixture.filename().string();
+        ASSERT_NE(loaded.document, nullptr) << fixture.filename().string();
+
+        std::map<std::string, std::string> before;
+        for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*loaded.document)) {
+            if (element.id.empty())
+                continue;
+            before[element.id] = element.attributes;
+            for (const auto& [field, value] : ParseFields(element.attributes))
+                attributes_seen.insert(field);
+        }
+
+        const sacm::AssuranceCasePackage package = core::project_library_package_with_tags(*loaded.document);
+        if (!sacm_adapter::reload_document_keeping_compatibility_content(*loaded.document,
+                                                                         sacm::serialize_sacm(package))) {
+            // Already measured, and named, by the kind sweep above.
+            continue;
+        }
+
+        for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*loaded.document)) {
+            const auto it = before.find(element.id);
+            // An element the round trip DELETED is the kind sweep's business;
+            // this one only speaks for elements that survived.
+            if (it == before.end())
+                continue;
+            ++compared;
+            if (it->second == element.attributes)
+                continue;
+
+            const std::map<std::string, std::string> was = ParseFields(it->second);
+            const std::map<std::string, std::string> is = ParseFields(element.attributes);
+            for (const auto& [field, value] : was) {
+                const std::string key = element.kind + "." + field;
+                if (const auto after = is.find(field); after != is.end()) {
+                    // Present on both sides: the attribute survived, so what
+                    // matters is whether it still says the same thing. A CHANGED
+                    // value is never disclosed and never acceptable -- the
+                    // element still claims the attribute and now claims
+                    // something different by it.
+                    EXPECT_EQ(value, after->second)
+                        << fixture.filename().string() << ": a bridged edit CHANGES '" << key << "' on '" << element.id
+                        << "' from '" << value << "' to '" << after->second << "'.";
+                    continue;
+                }
+                EXPECT_TRUE(KnownLostAttributes().count(key) > 0)
+                    << fixture.filename().string() << ": a bridged edit now DROPS '" << key << "' from '" << element.id
+                    << "', which SURVIVED the round trip, and it is not on the known-lost list. An element that "
+                    << "survives with an attribute missing is a silent reinterpretation of the argument -- worse "
+                    << "than deleting it visibly, because the inventory still balances. Either teach the "
+                    << "projection to carry it, or add it to the list AND to the SACM23-LIB-002 disclosure.";
+                lost_attributes.insert(key);
+            }
+        }
+    }
+
+    // The list must not outlive the loss: an attribute that starts surviving
+    // has to come off it, or the disclosure overstates the damage forever.
+    for (const std::string& known : KnownLostAttributes()) {
+        EXPECT_TRUE(lost_attributes.count(known) > 0)
+            << "'" << known
+            << "' now survives the bridge round trip (or no fixture carries it any more), but it is still listed "
+               "as known-lost. Remove it from the list and from the SACM23-LIB-002 disclosure.";
+    }
+
+    EXPECT_GT(compared, 0u) << "the sweep compared no elements at all";
+    // Non-vacuity in the dimension that matters: the corpus must actually carry
+    // the meaning-bearing attributes, or an all-empty fingerprint would compare
+    // equal forever and prove nothing.
+    for (const char* meaningful : {"isCounter", "assertionDeclaration", "source", "target"}) {
+        EXPECT_TRUE(attributes_seen.count(meaningful) > 0)
+            << "no fixture carries '" << meaningful << "', so this sweep no longer measures it";
     }
 }

@@ -943,6 +943,157 @@ TRANSLATIONS = {
     'rejected': '却下済み',
     'session {0}': 'セッション {0}',
     'unknown': '不明',
+
+    # ===== Status-bar messages (#252) =====
+    # The status line was the one user-visible surface that bypassed ui::i18n:
+    # 65 sites in src/app, exactly one of them localized, so a Japanese user got
+    # a fully translated UI and an English status line. Converted at the source,
+    # because the render site (sacm_viewer_panel.cpp) prints the stored string
+    # and cannot translate a message that was built at runtime.
+    "Create or open a project first.":
+        "まずプロジェクトを作成するか開いてください。",
+    "Review item save failed: {0}":
+        "レビュー項目の保存に失敗しました: {0}",
+    "Project saved: {0}":
+        "プロジェクトを保存しました: {0}",
+    "Warning: could not read the draft for this argument: {0}":
+        "警告: この議論のドラフトを読み込めませんでした: {0}",
+    "Discarded proposal draft.":
+        "提案ドラフトを破棄しました。",
+    "Select an element before changing manual review status.":
+        "手動レビュー状態を変更する前に要素を選択してください。",
+    "Open or create a project before changing review status.":
+        "レビュー状態を変更する前にプロジェクトを開くか作成してください。",
+    "Enter a reviewer name before changing review status.":
+        "レビュー状態を変更する前にレビュー担当者名を入力してください。",
+    "Could not update manual review status.":
+        "手動レビュー状態を更新できませんでした。",
+    "Change could not be accepted: {0}":
+        "変更を受け入れられませんでした: {0}",
+    "Change accepted. Undo reverses it like any other edit.":
+        "変更を受け入れました。他の編集と同様に元に戻せます。",
+    "Change could not be rejected: {0}":
+        "変更を却下できませんでした: {0}",
+    "Change rejected.":
+        "変更を却下しました。",
+    "Confidence save failed: {0}":
+        "確信度の保存に失敗しました: {0}",
+    "Register assessment save failed: {0}":
+        "登録簿評価の保存に失敗しました: {0}",
+    "GSN SVG export failed: no project is open.":
+        "GSN SVG のエクスポートに失敗しました: プロジェクトが開かれていません。",
+    "GSN SVG export failed: no SACM safety case is open.":
+        "GSN SVG のエクスポートに失敗しました: SACM セーフティケースが開かれていません。",
+    "GSN SVG export failed: {0}":
+        "GSN SVG のエクスポートに失敗しました: {0}",
+    "GSN SVG exported with warnings. See Problems/Export log.":
+        "GSN SVG を警告付きでエクスポートしました。問題／エクスポートログを確認してください。",
+    "GSN SVG exported to {0}":
+        "GSN SVG を {0} にエクスポートしました",
+    "Browse failed: {0}":
+        "参照に失敗しました: {0}",
+    "SACM file is already open: {0}":
+        "SACM ファイルは既に開かれています: {0}",
+    "Strategy encoding migration failed: {0}":
+        "ストラテジ表現の移行に失敗しました: {0}",
+    "Audit bus init failed: {0}":
+        "監査バスの初期化に失敗しました: {0}",
+    "Cannot reconcile audit log: no project is open.":
+        "監査ログを整合できません: プロジェクトが開かれていません。",
+    "Cannot reconcile audit log: no SACM file is active.":
+        "監査ログを整合できません: 有効な SACM ファイルがありません。",
+    "Cannot reconcile audit log: active SACM file is no longer listed in the project.":
+        "監査ログを整合できません: 有効な SACM ファイルがプロジェクトに登録されていません。",
+    "Cannot reconcile audit log: failed to save current SACM file.":
+        "監査ログを整合できません: 現在の SACM ファイルを保存できませんでした。",
+    "Audit reconciliation failed: {0}":
+        "監査ログの整合に失敗しました: {0}",
+    "Audit log reconciled. Previous artifacts backed up to {0}.":
+        "監査ログを整合しました。以前の成果物は {0} にバックアップしました。",
+    "Save the current SACM file before opening another package.":
+        "別のパッケージを開く前に現在の SACM ファイルを保存してください。",
+    "Opened argument package; no focusable argument element was found in the package.":
+        "議論パッケージを開きましたが、フォーカスできる議論要素が見つかりませんでした。",
+    "Opened SACM file, but no editable package model was available.":
+        "SACM ファイルを開きましたが、編集可能なパッケージモデルがありませんでした。",
+    "Terminology package was not found in the editable model.":
+        "編集可能なモデルに用語パッケージが見つかりませんでした。",
+    "Open a project before removing files.":
+        "ファイルを削除する前にプロジェクトを開いてください。",
+    "Removing this file type is not supported here.":
+        "この種類のファイルの削除はここではサポートされていません。",
+    "Remove file failed: {0}":
+        "ファイルの削除に失敗しました: {0}",
+    "Removed {0}.":
+        "{0} を削除しました。",
+    "Open a project before revealing files.":
+        "ファイルの場所を表示する前にプロジェクトを開いてください。",
+    "Could not open File Explorer: {0}":
+        "エクスプローラーを開けませんでした: {0}",
+    "Save the current SACM file before removing a package.":
+        "パッケージを削除する前に現在の SACM ファイルを保存してください。",
+    "Could not load an editable SACM package model.":
+        "編集可能な SACM パッケージモデルを読み込めませんでした。",
+    "Removing this package type is not supported yet.":
+        "この種類のパッケージの削除はまだサポートされていません。",
+    "terminology package":
+        "用語パッケージ",
+    "argument package":
+        "議論パッケージ",
+    "artifact package":
+        "成果物パッケージ",
+    "Remove {0} failed: {1}":
+        "{0} の削除に失敗しました: {1}",
+    "Removed {0} {1}.":
+        "{0} {1} を削除しました。",
+    "Register problem does not identify an assessment.":
+        "登録簿の問題が評価を特定していません。",
+    "Register assessments could not be loaded, so nothing can be discarded: {0}":
+        "登録簿の評価を読み込めなかったため、破棄できるものがありません: {0}",
+    "That register assessment was already discarded.":
+        "その登録簿評価は既に破棄されています。",
+    "Discarded the assessment of {0}. Close the project without saving to keep it after all.":
+        "{0} の評価を破棄しました。保存せずにプロジェクトを閉じれば元に戻せます。",
+    "ACP problem does not identify an ACP.":
+        "ACP の問題が ACP を特定していません。",
+    "Opened {0}":
+        "{0} を開きました",
+    "Project opened, but no SACM file could be loaded.":
+        "プロジェクトを開きましたが、SACM ファイルを読み込めませんでした。",
+    "Review items could not be loaded: {0}":
+        "レビュー項目を読み込めませんでした: {0}",
+    "Confidence assessments could not be loaded: {0}":
+        "確信度評価を読み込めませんでした: {0}",
+    "Register assessments could not be loaded: {0}":
+        "登録簿評価を読み込めませんでした: {0}",
+    "AI clients cannot connect to this project: {0}":
+        "AI クライアントはこのプロジェクトに接続できません: {0}",
+    "Accepted, but undoing this will not bring the draft back: {0}":
+        "受け入れましたが、これを元に戻してもドラフトは復元されません: {0}",
+    "Accepted, but the draft could not be updated: {0}":
+        "受け入れましたが、ドラフトを更新できませんでした: {0}",
+    "Please select an af.proj file.":
+        "af.proj ファイルを選択してください。",
+    "Undo failed: {0}":
+        "元に戻す操作に失敗しました: {0}",
+    "Undo unavailable: no project audit bus.":
+        "元に戻せません: プロジェクトの監査バスがありません。",
+    "Undo unavailable: no project loaded.":
+        "元に戻せません: プロジェクトが読み込まれていません。",
+    "Cannot undo while viewing history. Return to Latest to make changes.":
+        "履歴表示中は元に戻せません。変更するには「最新」に戻ってください。",
+    "Nothing to undo.":
+        "元に戻す操作はありません。",
+    "Reached snapshot or baseline — restore from history to go further back.":
+        "スナップショットまたは基準点に到達しました — さらに遡るには履歴から復元してください。",
+    "Cannot undo this acceptance: the draft it came from could not be read ({0}). Remove {1} to undo without restoring it.":
+        "この受け入れを元に戻せません: 元のドラフトを読み込めませんでした ({0})。復元せずに元に戻すには {1} を削除してください。",
+    "Cannot undo this acceptance here: it belongs to {0}. Open that argument and undo there, so its draft is restored with it.":
+        "この受け入れはここでは元に戻せません: {0} に属しています。その議論を開いてそこで元に戻すと、ドラフトも一緒に復元されます。",
+    " — but the draft it came from was not restored: {0}":
+        " — ただし元のドラフトは復元されませんでした: {0}",
+    "Undid: {0}{1}":
+        "元に戻しました: {0}{1}",
 }
 
 

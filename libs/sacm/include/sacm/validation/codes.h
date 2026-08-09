@@ -35,6 +35,12 @@ inline constexpr std::string_view kXmiForeignContainerRoot = "SACM-XMI-009";
 // Identity and references.
 inline constexpr std::string_view kIdDuplicate = "SACM-ID-001";
 inline constexpr std::string_view kIdInvalid = "SACM-ID-002";
+// A gid repeated within the model instance (clause 8.2: "unique within the
+// scope of the model instance"). Deliberately distinct from SACM-ID-001: gid is
+// SACM's own model-global identifier rather than the XMI serialization id, it
+// is the handle third-party tools key on, and a document can be clean on one
+// and broken on the other.
+inline constexpr std::string_view kGidDuplicate = "SACM-ID-003";
 inline constexpr std::string_view kRefDangling = "SACM-REF-001";
 inline constexpr std::string_view kRefWrongType = "SACM-REF-002";
 // The reference resolves to an element the document carries only as preserved
@@ -47,6 +53,17 @@ inline constexpr std::string_view kRefPreservedTarget = "SACM-REF-003";
 inline constexpr std::string_view kEnumInvalidLiteral = "SACM-ENUM-001";
 inline constexpr std::string_view kMultiplicityViolation = "SACM-MULT-001";
 inline constexpr std::string_view kCitationInvalid = "SACM-CITE-001";
+// An isAbstract/abstractForm combination the standard rules out: a concrete
+// element cited as an abstract form (clause 8.2), or a concrete Expression
+// built from abstract ExpressionElements (clause 10.10 OCL).
+inline constexpr std::string_view kAbstractnessInvalid = "SACM-ABS-001";
+// An ExpressionLangString carrying both an expression reference and literal
+// content (clause 8.4).
+inline constexpr std::string_view kExpressionContentConflict = "SACM-EXPR-001";
+// Content the owning package clause does not allow: a heterogeneous
+// ArgumentPackage (clause 11.4), or interface/binding content that is not a
+// citation (clauses 9.3, 11.5, 11.6, 12.4, 12.5).
+inline constexpr std::string_view kPackageContentInvalid = "SACM-PKG-001";
 
 // Commands.
 inline constexpr std::string_view kCmdTargetNotFound = "SACM-CMD-001";
