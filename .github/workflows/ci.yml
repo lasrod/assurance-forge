@@ -86,6 +86,34 @@ jobs:
       - name: Run tests
         run: ${{ matrix.test }}
 
+      # The libsecret path would otherwise be COMPILED but never EXECUTED.
+      # A GitHub Linux runner has no keyring, so SecretStore's round trip
+      # skips there and the save/lookup/delete calls go untested on the one
+      # platform that needed them written (#53). macOS runs them against the
+      # real Keychain in the step above; this gives Linux the same evidence
+      # by starting a keyring rather than by lowering the bar.
+      #
+      # Deliberately its own step rather than wrapping `matrix.test`:
+      # putting all 1281 tests inside a dbus session to serve six of them
+      # changes the environment of everything else for no reason.
+      - name: Secret store against a real keyring (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y gnome-keyring dbus-x11
+          dbus-run-session -- bash -c '
+            echo -n "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            ./build/tests --gtest_filter=SecretStore.* 2>&1 | tee /tmp/secret-store.log
+            exit ${PIPESTATUS[0]}
+          '
+          # gtest exits 0 on a SKIP, so a green step would otherwise prove only
+          # that the keyring package installed. The round trip is the whole
+          # point of this step: if it skipped, the keyring did not come up and
+          # the libsecret calls are still unexecuted.
+          if ! grep -q 'OK \] SecretStore.RoundTripsThroughThePlatformStore' /tmp/secret-store.log; then
+            echo '::error::the round trip did not RUN - the keyring did not come up, so libsecret is still untested'
+            exit 1
+          fi
+
   # Static analysis runs as its own job rather than inside the build matrix.
   # It needs no test run, and its result is a ratchet against a committed
   # baseline rather than a pass/fail property of the build.
