@@ -52,6 +52,7 @@ Binding on new work in and around the SACM library.
 |---|---|---|
 | [GSN to SACM 2.3 mapping](sacm-gsn-mapping.md) | Normative | Evidence-backed mappings. Never invent one in code. |
 | [GSN / SACM metamodel gaps](sacm-gsn-metamodel-gaps.md) | Reference | Analysis prepared for the SCSC ACWG and the OMG SACM RTF. |
+| [SACM 2.3 specification defects](sacm-23-specification-defects.md) | Reference | Defects in the published SACM 2.3 text and model, found by writing validators against the clauses. Input to the OMG submission. |
 | [SACM 2.4 watch](sacm-2.4-watch.md) | Reference | Draft-only tracking. Nothing in it is normative or implementable. |
 | [Research notes](sacm-research-notes.md) | Reference | Official references and where they came from. |
 
