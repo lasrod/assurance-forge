@@ -245,6 +245,15 @@ hid:
   File in parallel; the GSN v3 requirements are supporting evidence for the
   already-open SACM24-82 and SACM24-83.
 
+  Two separate submissions, not one. This page argues for *capability* the
+  metamodels lack. [SACM 2.3 specification defects](sacm-23-specification-defects.md)
+  reports seven concrete errors in the published 2.3 text and model — a clause
+  printing its neighbour's constraints, four mutually contradictory statements of
+  one rule, an OCL expression that does not parse, two clauses that cannot both
+  be satisfied, and an attribute the text declares and the model omits. Those are
+  corrections rather than proposals, they need no agreement about GSN v3, and
+  they are the cheaper thing for an RTF to accept.
+
 ## Evidence base
 
 - GSN Metamodel Specification v2.2 — https://scsc.uk/file/gc-main/GSN_metamodelV2-2-1210.pdf (CC-BY-4.0, quotable and adaptable with attribution)
