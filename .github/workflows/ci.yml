@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -62,7 +62,7 @@ jobs:
       # finds a Python interpreter. Pin one explicitly rather than relying on the
       # runner image shipping it, so the gates cannot silently disappear.
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -112,14 +112,14 @@ jobs:
 
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           # Need the base commit to diff against on a pull request.
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
