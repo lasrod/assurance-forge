@@ -1368,9 +1368,10 @@
         "src/ai/secret_store.cpp"
       ],
       "tests": [
-        "tests/test_ai_service.cpp"
+        "tests/test_ai_service.cpp",
+        "tests/test_secret_store.cpp"
       ],
-      "notes": "Tests exercise the `ISecretStore` seam through a fake, including the store-unavailable path. The platform-backed implementation in `src/ai/secret_store.cpp` has no direct test."
+      "notes": "Windows uses the Credential Manager, macOS uses Keychain Services, and Linux uses libsecret (GNOME Keyring, KWallet and anything else implementing the Secret Service API). Until [#53](https://github.com/lasrod/assurance-forge/issues/53) only Windows had an implementation, so the AI features did not work at all on the other two. `test_secret_store.cpp` round-trips save/overwrite/delete against the **real** platform store rather than a mock, which is what makes the Keychain and libsecret calls verified rather than merely written; it skips visibly where no store is reachable. **Bounded:** libsecret is optional at build time, because no keyring API is guaranteed on Linux. A build without it refuses and names the package to install — deliberately, rather than falling back to a file, since a key on disk that the user believes is in a keyring is worse than a refusal."
     },
     {
       "id": "AF-AI-005",

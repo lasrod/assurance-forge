@@ -37,7 +37,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev \
+            xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libsecret-1-dev \
             libssl-dev libcurl4-openssl-dev \
             gcc-14 g++-14
 

@@ -434,6 +434,7 @@ add_executable(tests
     tests/test_modal_coordinator.cpp
     tests/test_ai_settings.cpp
     tests/test_ai_service.cpp
+    tests/test_secret_store.cpp
     tests/test_ai_claim_review.cpp
     tests/test_openai_provider.cpp
     tests/test_ai_task_runner.cpp
