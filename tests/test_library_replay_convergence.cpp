@@ -83,11 +83,11 @@ struct ProjectFixture {
     parser::AssuranceCase model;
 };
 
-ProjectFixture MakeFixture(const std::string& tag) {
+ProjectFixture MakeFixture(const std::string& tag, const char* sacm_xml = kSampleSacm) {
     ProjectFixture f;
     const auto root = MakeTempProjectRoot(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
-    WriteFile(root / sacm_rel, kSampleSacm);
+    WriteFile(root / sacm_rel, sacm_xml);
 
     f.project.id = "p";
     f.project.name = "Project";
@@ -108,7 +108,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
     EXPECT_TRUE(pkg.has_value()) << (pkg.has_value() ? "" : pkg.error());
     if (pkg.has_value())
         f.package = std::move(pkg.value());
-    auto parsed = parser::parse_sacm_xml_string(kSampleSacm);
+    auto parsed = parser::parse_sacm_xml_string(sacm_xml);
     EXPECT_TRUE(parsed.has_value()) << (parsed.has_value() ? "" : parsed.error());
     if (parsed.has_value())
         f.model = std::move(parsed.value());
@@ -833,7 +833,9 @@ TEST(LibraryReplayConvergence, SetElementGidConvergesAndChangesCanonicalHash) {
 // library replay bridges -- applying the legacy mutator onto a projected package
 // and re-deriving the library. Creating then removing an (empty) terminology
 // package must leave the library replay converged with the legacy replay.
-TEST(LibraryReplayConvergence, RemoveTerminologyPackageBridgeConverges) {
+// Renamed from ...BridgeConverges in phase 2a: this event no longer bridges on
+// either side, so the old name asserted something untrue about what it measures.
+TEST(LibraryReplayConvergence, RemoveTerminologyPackageConverges) {
     auto f = MakeFixture("bridge_remove_terminology");
 
     std::string error;
@@ -859,4 +861,48 @@ TEST(LibraryReplayConvergence, RemoveTerminologyPackageBridgeConverges) {
     ASSERT_TRUE(library_hash.has_value());
     ASSERT_TRUE(legacy_hash.has_value());
     EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
+// Phase 2a: RemoveArtifactPackage is seam-mapped on both sides now, so this is a
+// genuine differential rather than the bridge agreeing with itself.
+//
+// The package here is EMPTY, deliberately. Removing one whose artifacts an
+// ArtifactReference cites is where the seam and the legacy mutator part company
+// (the seam scrubs the reference, the legacy mutator leaves it dangling), so the
+// legacy oracle cannot certify that case by construction -- it is measured
+// directly, live-against-legacy, by
+// LibraryPrimaryEditFlip.RemoveArtifactPackageScrubsTheReferenceTheLegacyMutatorLeftDangling,
+// and its live-against-replay agreement by the VerifyProject in that same test.
+TEST(LibraryReplayConvergence, RemoveArtifactPackageConverges) {
+    constexpr const char* kEmptyArtifactPackageSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <artifactPackage id="ARTP1" name="Evidence"/>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    auto f = MakeFixture("remove_artifact_package", kEmptyArtifactPackageSacm);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::RemoveArtifactPackageCommand remove("ARTP1", "");
+    ASSERT_TRUE(bus->Execute(remove, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+    EXPECT_TRUE(core::project_library_package(*library_doc).artifactPackages.empty())
+        << "the replay did not remove the artifact package at all";
 }

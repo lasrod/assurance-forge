@@ -2,6 +2,7 @@
 
 #include "core/commands/library_bridge.h"
 #include "core/sacm_identity.h"
+#include "sacm_adapter/document_edit.h"
 #include "parser/model_utils.h"
 
 namespace core::commands {
@@ -28,12 +29,31 @@ bool EnsureElementGidCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_
     if (generated_gid_.empty())
         generated_gid_ = core::GenerateUniqueElementGid(ctx.model);
 
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-        return core::SetElementGid(model, &package, element_id_, generated_gid_, err);
-    };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+    // Phase 2a of the legacy-bridge retirement. A gid write is one library
+    // operation, so this needs no bridge: the app decides the value (above) and
+    // the seam stores it. The audit payload is unchanged -- the recorded gid is
+    // still the one this command generated -- so replay reproduces it either way.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx)) {
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_gid(*ctx.library_document, element_id_, generated_gid_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the gid assignment for " + element_id_, outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::SetElementGid(model, &package, element_id_, generated_gid_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "SetElementGid";
     out_event.payload = nlohmann::ordered_json::object();

@@ -126,12 +126,52 @@ bool RemoveTerminologyPackageCommand::Apply(CommandContext& ctx, audit::AuditEve
         out_error = "RemoveTerminologyPackageCommand requires an id or gid.";
         return false;
     }
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-        return core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id_, gid_}, err);
-    };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+
+    // Phase 2a of the legacy-bridge retirement. `apply_delete_package` covers all
+    // three package kinds, so the seam is the same one RemoveArgumentPackage
+    // already uses -- but the legacy behaviour is NOT the same, and the difference
+    // is destructive in the direction that matters:
+    //
+    //   legacy -- REFUSES a package that still holds categories, terms or
+    //             expressions ("Terminology package contains terms.").
+    //   seam   -- deletes it and everything in it, recursively.
+    //
+    // The guard is an Assurance Forge editing rule, not a SACM invariant, so the
+    // seam has no opinion about it and flipping without re-stating it would turn
+    // "you must empty this first" into "the glossary is gone" on the same click.
+    // It is re-stated here, checked against the same projection the legacy mutator
+    // ran on. Offering an informed cascade instead -- as the term delete now does
+    // -- is a product decision, not a migration one, and is left out of the flip.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx) && !id_.empty()) {
+        const sacm::TerminologyPackage* terminology_package =
+            core::FindTerminologyPackage(ctx.package, core::TerminologyPackageRef{id_, gid_});
+        if (terminology_package == nullptr) {
+            out_error = "Terminology package not found.";
+            return false;
+        }
+        if (!core::CanDeleteTerminologyPackage(*terminology_package, out_error))
+            return false;
+
+        const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(*ctx.library_document, id_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the terminology package removal", outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id_, gid_}, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
+
     FillIdentityPayload(out_event, "RemoveTerminologyPackage", id_, gid_);
     return true;
 }
@@ -184,12 +224,34 @@ bool RemoveArtifactPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent&
         out_error = "RemoveArtifactPackageCommand requires an id or gid.";
         return false;
     }
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-        return core::DeleteArtifactPackage(package, id_, gid_, err);
-    };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+
+    // Phase 2a. Here the seam is CLEANER than the legacy mutator rather than more
+    // destructive: `core::DeleteArtifactPackage` erases the package and leaves
+    // every AssertedEvidence that cited its artifacts pointing at ids that no
+    // longer resolve, while the seam drops those relationships. Same direction as
+    // the term-delete disclosure in phase 1 -- the flip stops leaving wreckage --
+    // and the convergence test measures it rather than assuming it.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx) && !id_.empty()) {
+        const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(*ctx.library_document, id_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the artifact package removal", outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::DeleteArtifactPackage(package, id_, gid_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
+
     FillIdentityPayload(out_event, "RemoveArtifactPackage", id_, gid_);
     return true;
 }

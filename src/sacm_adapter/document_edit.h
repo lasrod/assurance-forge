@@ -272,6 +272,20 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
 // migration concern -- see Phase 1b.
 DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id);
 
+// Sets an element's clause-8.2 gid, mirroring `core::SetElementGid`. One library
+// operation, no composition: the app generates the value (a random UUID for an
+// element, `gid-<id>` for terminology) and this writes it.
+//
+// Wider than the legacy mutator by construction, and deliberately so: the legacy
+// one walks the projected POD and fails for anything the POD has no field for,
+// while the library addresses any element it holds. An element the projection
+// omits could not be given a gid before and can be now.
+//
+// Reports `supported == false` only when `element_id` is empty; a gid the library
+// rejects (an unknown element, a duplicate) comes back as `applied == false` with
+// diagnostics.
+EditOutcome apply_set_gid(LibraryDocument& document, const std::string& element_id, const std::string& gid);
+
 // ---------------------------------------------------------------------------
 // Terminology edit seams (Phase 0 part 2).
 //
