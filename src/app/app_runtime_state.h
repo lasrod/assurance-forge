@@ -156,6 +156,10 @@ struct TerminologyUiState {
     // Non-empty means the modal must ask before removing them; confirming sets
     // `DeleteTerminologyTermCommand`'s cascade flag.
     std::vector<app::controllers::ElementEditController::RemovalEffect> pending_delete_term_references;
+    // Why the library says the delete cannot go through at all. Populated instead
+    // of the list above, never alongside it: a modal must either offer the
+    // cascade or explain why there is none to offer.
+    std::vector<std::string> pending_delete_term_blockers;
     bool pending_delete_term_preview_available = false;
     bool show_category_editor_modal = false;
     bool editing_existing_category = false;

@@ -365,6 +365,7 @@ bool TerminologyActions::ConfirmTermEdit() {
 // and asked. An empty result means the plain delete is enough.
 void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTermRef& term_ref) {
     state_.terminology.pending_delete_term_references.clear();
+    state_.terminology.pending_delete_term_blockers.clear();
     state_.terminology.pending_delete_term_preview_available = false;
     if (state_.app_state.library_document == nullptr || term_ref.id.empty())
         return;
@@ -380,6 +381,18 @@ void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTerm
         sacm_adapter::preview_delete_terminology_element(*state_.app_state.library_document, term_ref.id);
     if (!preview.supported)
         return;
+
+    // `can_apply` here means the term itself would go. When it would not, the
+    // consequential list describes removals that lead to a refusal rather than to
+    // a delete, so offering it would collect consent for something that cannot
+    // happen. Show the library's reason instead and leave the plain delete to
+    // fail with the same one.
+    if (!preview.can_apply) {
+        for (const sacm_adapter::LoadDiagnostic& diagnostic : preview.diagnostics)
+            state_.terminology.pending_delete_term_blockers.push_back(diagnostic.code + ": " + diagnostic.message);
+        return;
+    }
+
     state_.terminology.pending_delete_term_preview_available = true;
     for (const sacm_adapter::DeleteEffect& effect : preview.consequential) {
         state_.terminology.pending_delete_term_references.push_back(
@@ -428,6 +441,7 @@ bool TerminologyActions::ConfirmDeleteTerm() {
 
     state_.terminology.selected_term_ref = core::TerminologyTermRef{};
     state_.terminology.pending_delete_term_references.clear();
+    state_.terminology.pending_delete_term_blockers.clear();
     state_.terminology.pending_delete_term_preview_available = false;
     state_.terminology.show_delete_term_modal = false;
     state_.events.Emit(DocumentDirtyEvent{});

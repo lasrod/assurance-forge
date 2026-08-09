@@ -440,8 +440,13 @@ TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& documen
 // What deleting `element_id` WITH the cascade opted in would do, leaving
 // `document` untouched. `requested` is the effect on the element itself;
 // `consequential` is everything the cascade drags with it -- the list the
-// confirmation exists to show. `can_apply` is whether the cascading delete would
-// succeed at all.
+// confirmation exists to show, including references the cascade merely CHANGES
+// (`deleted == false`) rather than removes.
+//
+// `can_apply` means the target itself would be deleted -- deliberately stricter
+// than `preview_delete_elements`, where it means only that some delete in the
+// set applied. A caller must not offer a cascade when this is false: the
+// consequential list would then describe removals leading to a refusal.
 //
 // An empty `consequential` means the plain, non-cascading delete is enough and
 // the caller should not ask: there is nothing to consent to.

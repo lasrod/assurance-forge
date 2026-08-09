@@ -407,7 +407,14 @@ Two behaviours changed, disclosed rather than absorbed:
   arguably worse than the dangling id it replaces. `plan_terminology_delete_cascade`
   instead deletes each reference that exists *solely* to name the term, then the term; a
   reference that also points elsewhere survives, scrubbed, and is reported as modified
-  rather than removed. **(2)** Preview and apply are the same plan in the same order under
+  rather than removed. Sparing that shared reference is what made the cross-package
+  policy matter: with the default (reject) the term delete that follows was refused
+  *after* the plan's earlier deletes had applied, reporting failure over a half-mutated
+  document — found in review of
+  [#360](https://github.com/lasrod/assurance-forge/pull/360) and pinned by
+  `LibraryPrimaryEditFlip.TerminologyTermCascadeSparesASharedReferenceWithoutStranding`.
+  The cascade reaches across instead, which hands the referrer to the scrub policy and
+  produces exactly the outcome the confirmation described. **(2)** Preview and apply are the same plan in the same order under
   the same policy (`preview_delete_elements` on a scratch copy), so the dialog cannot
   promise one thing and the command do another; the recorded `removed_ids` filters clause
   8.7 attachments exactly as the preview does, so the audit entry and the confirmation

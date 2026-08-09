@@ -432,6 +432,18 @@ void ModalHost::RenderQuickDefineTermModal() {
 // is the user's own text, so neither is translated -- only the sentence around
 // them is.
 void ModalHost::RenderTermDeleteReferences() {
+    // The library says the delete cannot go through. Say why here rather than
+    // only after the button is pressed -- and offer no cascade, because there is
+    // no delete for it to be part of.
+    if (!state_.terminology.pending_delete_term_blockers.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Reported by the SACM library:").c_str());
+        for (const std::string& blocker : state_.terminology.pending_delete_term_blockers) {
+            ImGui::Bullet();
+            ImGui::TextDisabled("%s", blocker.c_str());
+        }
+        return;
+    }
     if (state_.terminology.pending_delete_term_references.empty())
         return;
 

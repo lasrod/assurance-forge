@@ -1199,3 +1199,108 @@ TEST(LibraryPrimaryEditFlip, FlippedCommandLeavesLiveViewsUntouchedUntilRebuild)
                 has_new = true;
     EXPECT_TRUE(has_new) << "the committed claim is missing after the re-derive";
 }
+
+// Copilot review, PR #360: the cascade plan deliberately spares an
+// ArtifactReference that names the term AND something else, because deleting it
+// would take a second artifact's evidence with it. But the term delete that
+// follows then has a surviving cross-package referrer, and the default
+// cross-package policy REJECTS -- after the plan's earlier deletes have already
+// applied. The command reports failure over a half-mutated document.
+//
+// The right outcome is the one the preview already describes: the sole-purpose
+// reference is deleted, the shared one survives with the term scrubbed out of
+// it, and the term goes.
+TEST(LibraryPrimaryEditFlip, TerminologyTermCascadeSparesASharedReferenceWithoutStranding) {
+    constexpr const char* kSharedReferenceSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <terminologyPackage id="TP1" name="Terms">
+    <term id="T1" value="ODD" name="Operational Design Domain"/>
+  </terminologyPackage>
+  <artifactPackage id="ARTP1" name="Evidence">
+    <artifact id="A1" name="Test report"/>
+  </artifactPackage>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <artifactReference id="TC1" name="ODD" referencedArtifact="T1"/>
+    <assertedContext id="AC2" name="Context: ODD" source="TC1" target="G1"
+                     description="assurance-forge:visible-term-context"/>
+    <artifactReference id="AR_shared" name="ODD and the test report" referencedArtifact="T1 A1"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    std::unique_ptr<EditFixture> fixture =
+        MakeFixture("term_shared_ref", /*library_backed=*/true, kSharedReferenceSacm);
+    ASSERT_NE(fixture->document, nullptr);
+
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_terminology_element(*fixture->document, "T1");
+    ASSERT_TRUE(preview.supported);
+    // The shared reference is reported as CHANGED, not removed: that distinction
+    // is the reason the dialog lists effects rather than a bare count.
+    bool shared_listed_as_modified = false;
+    bool sole_purpose_listed_as_deleted = false;
+    for (const sacm_adapter::DeleteEffect& effect : preview.consequential) {
+        if (effect.element_id == "AR_shared")
+            shared_listed_as_modified = !effect.deleted;
+        if (effect.element_id == "TC1")
+            sole_purpose_listed_as_deleted = effect.deleted;
+    }
+    EXPECT_TRUE(sole_purpose_listed_as_deleted) << "the sole-purpose reference is not listed for removal";
+    EXPECT_TRUE(shared_listed_as_modified) << "the shared reference is not listed as merely changed";
+
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+    core::commands::DeleteTerminologyTermCommand delete_term(
+        core::TerminologyPackageRef{"TP1", ""}, core::TerminologyTermRef{"T1", ""}, /*cascade_references=*/true);
+    const core::commands::CommandResult result = RunCommand(*fixture, delete_term, ctx);
+    ASSERT_TRUE(result.success) << "the cascade stranded the document part-way: " << result.error;
+
+    EXPECT_EQ(core::FindTerminologyTerm(
+                  fixture->package, core::TerminologyPackageRef{"TP1", ""}, core::TerminologyTermRef{"T1", ""}),
+              nullptr);
+    bool shared_survives = false;
+    for (const sacm::ArgumentPackage& argument_package : fixture->package.argumentPackages) {
+        for (const sacm::ArtifactReference& reference : argument_package.artifactReferences) {
+            EXPECT_NE(reference.id, "TC1") << "the sole-purpose reference survived";
+            if (reference.id == "AR_shared") {
+                shared_survives = true;
+                EXPECT_EQ(reference.referencedArtifact.find("T1"), std::string::npos)
+                    << "the shared reference still names the deleted term: " << reference.referencedArtifact;
+            }
+        }
+    }
+    EXPECT_TRUE(shared_survives) << "the cascade took a reference that also pointed at other evidence";
+}
+
+// Copilot review, PR #360: the delete preview was consumed without checking
+// whether the delete would go through, so the dialog could list removals,
+// collect consent, and then refuse. `preview_delete_terminology_element` now
+// answers the caller's actual question -- "does the term go?" -- rather than the
+// sequence preview's looser "did anything happen".
+//
+// Honest limitation, stated because the test cannot state it: the two readings
+// only diverge when a sub-delete succeeds while the target's is rejected, and
+// the cross-package policy fix above is what stops that arising. So this pins
+// the contract on the input that is reachable today (a term the document does
+// not hold) and the app-side gate on it is defence-in-depth against a future
+// policy change re-opening the gap, not a guard with a live failure behind it.
+TEST(LibraryPrimaryEditFlip, TerminologyDeletePreviewReportsWhetherTheTargetItselfWouldGo) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("term_preview_contract", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+    ASSERT_TRUE(RunCommand(*fixture, create_pkg, ctx).success);
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+    ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
+
+    const sacm_adapter::DeletePreview real =
+        sacm_adapter::preview_delete_terminology_element(*fixture->document, create_term.GeneratedRef().id);
+    EXPECT_TRUE(real.can_apply) << "a term that plainly can be deleted was reported as unapplicable";
+
+    const sacm_adapter::DeletePreview absent =
+        sacm_adapter::preview_delete_terminology_element(*fixture->document, "T_not_in_this_document");
+    EXPECT_FALSE(absent.can_apply) << "a delete with no target to remove reported itself applicable";
+    EXPECT_TRUE(absent.consequential.empty());
+}

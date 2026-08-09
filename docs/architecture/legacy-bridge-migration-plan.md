@@ -174,8 +174,15 @@ rather than absorbed:
       still drawing a context node. The seam instead deletes each reference that
       exists solely to name the term, then the term; a reference that also points
       elsewhere survives, scrubbed, and the preview reports it as modified.
-    - Preview and apply are the same plan, in the same order, under the same
-      policy, so the dialog cannot promise one thing and do another.
+    - Preview and apply are the same plan, in the same order, under the same two
+      policies, so the dialog cannot promise one thing and do another. The
+      cross-package half of that pair is load-bearing: sparing the shared
+      reference leaves a cross-package referrer at the moment the term is
+      deleted, and rejecting there stranded the document part-way through the
+      sequence (review of #360).
+    - `preview_delete_terminology_element` reports `can_apply` as "the target
+      itself would go", stricter than the sequence preview's "something applied",
+      and the app refuses to offer a cascade without it.
     - The answer is recorded in the audit payload, never re-derived. A replay has
       nobody to ask, and deriving consent from a later document state would let
       the model answer a question the user answered differently. An event with no

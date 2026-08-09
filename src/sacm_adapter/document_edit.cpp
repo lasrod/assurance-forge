@@ -766,7 +766,17 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
     return outcome;
 }
 
-DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids) {
+namespace {
+
+// Models a SEQUENCE of deletes on a throwaway copy and reports their combined
+// effects. Both delete previews are this function with different policies --
+// `preview_delete_elements` for the GSN element path, and the terminology
+// cascade -- because a preview that describes a different operation than the one
+// the caller will perform is worse than no preview.
+DeletePreview preview_delete_sequence(const LibraryDocument& document,
+                                      const std::vector<std::string>& element_ids,
+                                      sacm::commands::ReferenceDeletePolicy reference_policy,
+                                      sacm::commands::CrossPackageReferencePolicy cross_package_policy) {
     DeletePreview preview;
     preview.supported = true;
 
@@ -868,9 +878,8 @@ DeletePreview preview_delete_elements(const LibraryDocument& document, const std
         }
         const sacm::commands::MutationResult result = scratch.document->apply(sacm::commands::DeleteElement{
             .target = id,
-            // Same policy as apply_delete_element, or the preview would
-            // describe an operation the caller never performs.
-            .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+            .reference_policy = reference_policy,
+            .cross_package_policy = cross_package_policy,
         });
         any_applied = any_applied || result.applied;
         for (const sacm::commands::ChangeRecord& change : result.changes) {
@@ -887,6 +896,18 @@ DeletePreview preview_delete_elements(const LibraryDocument& document, const std
 
     preview.can_apply = any_applied;
     return preview;
+}
+
+} // namespace
+
+DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids) {
+    // Same policies as `apply_delete_element`, or the preview would describe an
+    // operation the caller never performs: scrub-then-drop within the package,
+    // and reject rather than reach across a package boundary.
+    return preview_delete_sequence(document,
+                                   element_ids,
+                                   sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+                                   sacm::commands::CrossPackageReferencePolicy::RejectIfExternalReferencesExist);
 }
 
 DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id) {
@@ -1435,6 +1456,23 @@ void collect_removed_ids(std::vector<std::string>& out, const sacm::commands::Mu
     }
 }
 
+// Scrub rather than DeleteReferencingRelationships, for the same reason
+// `apply_delete_element` uses it: a relationship that still has a surviving
+// source and target survives, scrubbed, instead of cascading further.
+constexpr sacm::commands::ReferenceDeletePolicy kTerminologyCascadeReferencePolicy =
+    sacm::commands::ReferenceDeletePolicy::ScrubReferences;
+
+// The plan deliberately SPARES an ArtifactReference that names the term and
+// something else, so by the time the term itself is deleted a cross-package
+// referrer can still exist. Rejecting there (the default) would abort the
+// sequence after its earlier deletes had already applied, reporting failure over
+// a half-mutated document -- found in review of #360. Reaching across instead
+// hands that referrer to the reference policy above, which SCRUBS it: the shared
+// reference survives, minus the deleted term, which is exactly the "modified,
+// not removed" outcome the confirmation already showed for it.
+constexpr sacm::commands::CrossPackageReferencePolicy kTerminologyCascadeCrossPackagePolicy =
+    sacm::commands::CrossPackageReferencePolicy::DeleteExternalReferencingRelationships;
+
 std::vector<std::string> plan_terminology_delete_cascade(const sacm::model::Document& doc,
                                                          const std::string& element_id) {
     const sacm::model::ElementId target(element_id);
@@ -1473,16 +1511,14 @@ TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& documen
     }
 
     // The cascade is a SEQUENCE of ordinary deletes, applied in the same order
-    // and under the same ScrubReferences policy that
-    // `preview_delete_terminology_element` models on a scratch copy -- so what
-    // the confirmation showed and what happens here cannot come apart. Scrub
-    // rather than DeleteReferencingRelationships for the same reason
-    // `apply_delete_element` uses it: a relationship that still has a surviving
-    // source and target survives, scrubbed, instead of cascading further.
+    // and under the same policies `preview_delete_terminology_element` models on
+    // a scratch copy -- so what the confirmation showed and what happens here
+    // cannot come apart.
     for (const std::string& id : plan_terminology_delete_cascade(doc, element_id)) {
         const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
             .target = sacm::model::ElementId(id),
-            .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+            .reference_policy = kTerminologyCascadeReferencePolicy,
+            .cross_package_policy = kTerminologyCascadeCrossPackagePolicy,
         });
         fill_diagnostics(outcome.diagnostics, result);
         if (!result.applied) {
@@ -1501,10 +1537,13 @@ TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& documen
 DeletePreview preview_delete_terminology_element(const LibraryDocument& document, const std::string& element_id) {
     const sacm::model::Document& doc = LibraryDocumentAccess::document(document);
 
-    // Same plan, same order, same policy as the cascading apply above -- and
-    // `preview_delete_elements` is what models it, so the preview is the apply
-    // run on a throwaway copy rather than a second description of it.
-    DeletePreview preview = preview_delete_elements(document, plan_terminology_delete_cascade(doc, element_id));
+    // Same plan, same order, same policies as the cascading apply above, run on a
+    // throwaway copy -- the preview IS the apply rather than a second description
+    // of it.
+    DeletePreview preview = preview_delete_sequence(document,
+                                                    plan_terminology_delete_cascade(doc, element_id),
+                                                    kTerminologyCascadeReferencePolicy,
+                                                    kTerminologyCascadeCrossPackagePolicy);
 
     // The user asked to delete ONE thing. `preview_delete_elements` buckets by
     // what the caller named, and the caller here named the whole doomed set, so
@@ -1519,6 +1558,16 @@ DeletePreview preview_delete_terminology_element(const LibraryDocument& document
     }
     preview.requested = std::move(requested);
     preview.consequential = std::move(consequential);
+
+    // `can_apply` is STRICTER here than the sequence preview's "at least one
+    // delete applied". The caller's question is not "does anything happen" but
+    // "does the thing I asked for happen": a plan whose sub-deletes succeed while
+    // the term itself is rejected reports any-applied == true, which is exactly
+    // the reading that let a stranding cascade look previewable (review of #360).
+    // So: the target has to come back as deleted.
+    preview.can_apply = std::any_of(preview.requested.begin(), preview.requested.end(), [&](const DeleteEffect& e) {
+        return e.element_id == element_id && e.deleted;
+    });
     return preview;
 }
 
