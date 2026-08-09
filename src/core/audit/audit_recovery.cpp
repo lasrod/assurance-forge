@@ -9,8 +9,8 @@
 #include "core/library_package_projection.h"
 #include "core/project_file_io.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_parser.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "sacm_adapter/library_load.h"
 #include "core/sha256.h"
 

@@ -3,7 +3,7 @@
 #include "core/project_model.h"
 #include "core/project_summary.h"
 #include "imgui.h"
-#include "sacm/sacm_package_tree.h"
+#include "legacy_sacm/sacm_package_tree.h"
 
 #include <functional>
 #include <map>

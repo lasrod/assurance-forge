@@ -10,6 +10,7 @@
 #include "core/terminology_text_utils.h"
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
+#include "ai/secret_store.h"
 #include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/preferences_panel.h"
@@ -101,6 +102,16 @@ void ModalHost::RenderPreferencesWindow() {
     model.aiProviderName = ai::ToString(state_.ai.settings.provider);
     model.keyStored = state_.ai.key_stored;
     model.secureStoreAvailable = state_.ai.secure_store_available;
+    if (!model.secureStoreAvailable) {
+        // Two causes, two fixes. Telling a user their platform cannot do this
+        // when their build simply has no keyring linked -- or when their keyring
+        // is merely not running -- sends them after the wrong problem.
+        // Single-line literals so the catalog extractor sees each msgid whole.
+        model.secureStoreUnavailableReason =
+            ai::SecretStoreBackendName() == "none"
+                ? AF_TR("Secure storage is unavailable: this build has no keyring support.")
+                : AF_TR("Secure storage is unavailable: no keyring service is running.");
+    }
     model.testRunning = test_running;
     model.connectionSeverity = ToPanelSeverity(state_.ai.connection_status);
     model.connectionMessage = state_.ai.connection_status.message;

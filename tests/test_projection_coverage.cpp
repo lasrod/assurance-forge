@@ -20,7 +20,7 @@
 // function entirely and is carried by separate projections.
 
 #include "core/library_package_projection.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 

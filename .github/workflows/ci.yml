@@ -56,7 +56,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
+          sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libsecret-1-dev
 
       # The catalog and SACM/GSN/capability matrix gates only register when CMake
       # finds a Python interpreter. Pin one explicitly rather than relying on the
@@ -85,6 +85,49 @@ jobs:
 
       - name: Run tests
         run: ${{ matrix.test }}
+
+      # The libsecret path would otherwise be COMPILED but never EXECUTED.
+      # A GitHub Linux runner has no keyring, so SecretStore's round trip
+      # skips there and the save/lookup/delete calls go untested on the one
+      # platform that needed them written (#53). macOS runs them against the
+      # real Keychain in the step above; this gives Linux the same evidence
+      # by starting a keyring rather than by lowering the bar.
+      #
+      # Deliberately its own step rather than wrapping `matrix.test`:
+      # putting all 1281 tests inside a dbus session to serve six of them
+      # changes the environment of everything else for no reason.
+      - name: Secret store against a real keyring (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y gnome-keyring dbus-x11
+          # Create the login keyring ON DISK rather than letting the daemon do
+          # it. Both --unlock and --login route creation through gcr-prompter,
+          # which is a GTK application: headlessly it dies with "cannot open
+          # display", the collection is never created, and the first save fails
+          # with "Object does not exist at path
+          # /org/freedesktop/secrets/collection/login". A password-less keyring
+          # is a plain text file the daemon reads directly, so no prompter is
+          # involved at all.
+          #
+          # A keyring with no password is acceptable here and nowhere else: it
+          # is a throwaway runner keyring holding one test value for the length
+          # of one job, on a machine that is destroyed afterwards.
+          mkdir -p ~/.local/share/keyrings
+          printf '[keyring]\ndisplay-name=login\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n' > ~/.local/share/keyrings/login.keyring
+          printf 'login' > ~/.local/share/keyrings/default
+          dbus-run-session -- bash -c '
+            eval "$(printf "\n" | gnome-keyring-daemon --unlock --components=secrets)"
+            ./build/tests --gtest_filter=SecretStore.* 2>&1 | tee /tmp/secret-store.log
+            exit ${PIPESTATUS[0]}
+          '
+          # gtest exits 0 on a SKIP, so a green step would otherwise prove only
+          # that the keyring package installed. The round trip is the whole
+          # point of this step: if it skipped, the keyring did not come up and
+          # the libsecret calls are still unexecuted.
+          if ! grep -q 'OK \] SecretStore.RoundTripsThroughThePlatformStore' /tmp/secret-store.log; then
+            echo '::error::the round trip did not RUN - the keyring did not come up, so libsecret is still untested'
+            exit 1
+          fi
 
   # Static analysis runs as its own job rather than inside the build matrix.
   # It needs no test run, and its result is a ratchet against a committed
@@ -173,3 +216,15 @@ jobs:
       - name: Check every source (main)
         if: github.event_name != 'pull_request'
         run: python tools/quality/run_clang_tidy.py --check --jobs 4
+
+      # Complexity is REPORT MODE, deliberately (#343). It measures and prints;
+      # it does not gate. `--check` exists and is tested, so turning the ratchet
+      # on later is this line gaining four characters rather than a project --
+      # but the policy says report before ratchet, and 172 functions over the
+      # threshold is a number to triage, not to freeze by accident.
+      - name: Measure complexity (report only)
+        shell: bash
+        run: |
+          pinned=$(python -c "import json;print(json.load(open('docs/quality/complexity-baseline.json'))['tool_version'])")
+          python -m pip install --disable-pip-version-check "lizard==$pinned"
+          python tools/quality/run_complexity.py --report

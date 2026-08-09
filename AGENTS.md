@@ -41,7 +41,6 @@ Assurance Forge is a C++23 ImGui desktop application for safety case engineering
 
 **The dependency rule is enforced at build time** by `cmake/check_layer_gates.cmake`. `core`, `parser`, and `sacm` must never include ImGui or `app` headers. `ui` must not depend on `app` directly — panels receive action objects passed in from `AppRuntime`. `bridge` and `agent` must not include each other's transport or `mcp`.
 
-Note that `src/sacm` and `libs/sacm/include/sacm` share the `sacm/` include prefix: `sacm/model/document.h` is the library, `sacm/sacm_parser.h` is not.
 
 ### Frame & Interaction Flow
 

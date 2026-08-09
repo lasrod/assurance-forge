@@ -18,8 +18,8 @@ an aspiration.
 | Directory | Owns | Must not include |
 |---|---|---|
 | `libs/sacm` | The reusable SACM 2.3 library: model types, XMI import/export, validation, commands, semantic comparison. Independent of Assurance Forge — see [ADR 0006](decisions/0006-sacm-23-independent-library.md). | Any Assurance Forge header; ImGui; pugixml in public headers |
-| `src/sacm` | Legacy SACM model types, parsing and serialization, predating `libs/sacm`. | `ai/`, `export/`, `ui/`, `app/` |
-| `src/parser` | XML parsing into the flat POD model, SACM model building, and SCCG guideline-catalog loading. | `sacm/`, `ai/`, `export/`, `ui/`, `app/` |
+| `src/legacy_sacm` | Legacy SACM model types, parsing and serialization, predating `libs/sacm`. | `ai/`, `export/`, `ui/`, `app/` |
+| `src/parser` | XML parsing into the flat POD model, SACM model building, and SCCG guideline-catalog loading. | `legacy_sacm/`, `sacm/`, `ai/`, `export/`, `ui/`, `app/` |
 | `src/sacm_adapter` | The seam between `libs/sacm` and the application: case projection, library-backed document edits, library load, GSN role tagging. | `ai/`, `export/`, `ui/`, `app/` |
 | `src/core` | UI-independent domain behaviour: tree building, add/remove logic, project model, problems, reviews, drafts, audit. | `ai/`, `export/`, `ui/`, `app/` |
 | `src/ai` | AI settings, prompt construction, provider calls, response parsing, background task execution, secret storage. | `export/`, `ui/`, `app/` |
@@ -30,12 +30,12 @@ an aspiration.
 | `src/mcp` | The MCP server: JSON-RPC, session, tools, guidance. Its own executable entry point. | `ai/`, `export/`, `ui/`, `app/` |
 | `src/app` | Runtime orchestration, controllers, project workflow, modal state, command handling. May include anything. | — |
 
-`src/sacm` and `libs/sacm/include/sacm` both answer to the `sacm/` include
-prefix, so `#include "sacm/model/document.h"` is the library while
-`#include "sacm/sacm_parser.h"` is not. Resolving which one an include names
-requires checking the filesystem. That ambiguity is recorded in the
-[repository quality baseline](../quality/repository-baseline.md) and tracked in
-[#291](https://github.com/lasrod/assurance-forge/issues/291).
+`sacm/` now names exactly one thing: the reusable library under `libs/sacm`.
+The legacy model answers to `legacy_sacm/`, so an include states which
+subsystem it comes from instead of requiring a filesystem check to find out
+([#341](https://github.com/lasrod/assurance-forge/issues/341)). The layer gate's
+SACM-independence rule bans the whole `legacy_sacm/` prefix as a result, where it
+previously had to match on the header stem (`sacm/sacm_`) to tell the two apart.
 
 ## Ownership rules
 

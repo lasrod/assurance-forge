@@ -10,7 +10,7 @@
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_parser.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 #include "core/library_package_projection.h"

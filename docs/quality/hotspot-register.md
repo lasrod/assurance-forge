@@ -162,15 +162,58 @@ wc -l src/core/audit/event_replayer.cpp libs/sacm/src/io/xmi_reader.cpp ...
 
 # Fan-in, collapsed by eye to subsystems
 grep -rl '#include "core/app_state.h"' src libs tests
+
+# Complexity (pin the version the baseline records, or the numbers will not match)
+pip install "lizard==$(python -c "import json;print(json.load(open('docs/quality/complexity-baseline.json'))['tool_version'])")"
+python tools/quality/run_complexity.py --report
 ```
+
+## Complexity
+
+Measured on 2026-08-09 with lizard 1.17.31 over 3,476 production functions in
+515 files. 172 are at or over the tool's default cyclomatic-complexity threshold
+of 15. The full set is in `complexity-baseline.json`; the ten worst are here
+because they are the ones the ranking above will have to answer for.
+
+| CCN | NLOC | Function |
+|---|---|---|
+| 217 | 819 | `core::audit::ApplyEventToLibrary` — `src/core/audit/event_replayer.cpp` |
+| 194 | 711 | `core::audit::ApplyEvent` — `src/core/audit/event_replayer.cpp` |
+| 86 | 359 | `ui::gsn::ShowGsnCanvasContentWithRenderer` — `src/ui/gsn/gsn_canvas.cpp` |
+| 81 | 376 | `ui::gsn::GsnCanvas::Render` — `src/ui/gsn/gsn_canvas_renderer.cpp` |
+| 63 | 134 | `ui::panels::ShowTerminologyPackagePanel` — `src/ui/panels/terminology_package_panel.cpp` |
+| 62 | 254 | `app::areas::RenderInspectorArea` — `src/app/areas/inspector_area.cpp` |
+| 59 | 204 | `ui::gsn::DrawGsnNode` — `src/ui/gsn/gsn_canvas.cpp` |
+| 55 | 148 | `sacm::io::write_kind_specific_attributes` — `libs/sacm/src/io/xmi_writer.cpp` |
+| 54 | 301 | `sacm::validation::validate` — `libs/sacm/src/validation/validate.cpp` |
+| 54 | 183 | `core::LayoutGsnGraph` — `src/core/gsn_layout.cpp` |
+
+Two observations worth recording rather than leaving for the next reader to
+rediscover:
+
+- **The top two are the same function twice.** `ApplyEvent` and
+  `ApplyEventToLibrary` in the audit replayer are a branch-per-command-kind pair
+  at CCN 194 and 217, more than double anything else in the tree — in the code
+  whose defects the high-risk list says cost a safety argument rather than a
+  repaint. That is a ranking input the size-and-churn view had already put at the
+  top for other reasons, and complexity agrees with it emphatically.
+- **`sacm::validation::validate` is on this list because of work in
+  [#333](https://github.com/lasrod/assurance-forge/issues/333)/[#334](https://github.com/lasrod/assurance-forge/issues/334)/[#335](https://github.com/lasrod/assurance-forge/issues/335).**
+  Adding the clause checks grew one function rather than distributing them, which
+  the measurement now says out loud. Recording it here rather than quietly
+  baselining it is the point of having the measurement at all.
 
 ## Limitations
 
-- **No complexity measure.** clang-tidy is configured but no complexity check
-  is in its enabled set, and no dedicated tool (lizard or equivalent) exists.
-  The baseline lists this as an unavailable measurement; adding it is a
-  follow-up to [#293](https://github.com/lasrod/assurance-forge/issues/293),
-  and when it lands it becomes a ranking input here.
+- **Complexity is measured but not yet folded into the rank.** It was the first
+  limitation on this list and is now measured: `tools/quality/run_complexity.py`
+  (lizard, version-pinned, report mode — [#343](https://github.com/lasrod/assurance-forge/issues/343))
+  writes `complexity-baseline.json`, and the worst functions are listed under
+  [Complexity](#complexity) below. The *ranking* above still combines size, churn,
+  fan-in and domain risk only, and is deliberately not re-derived here: re-ranking
+  is a judgement pass over four inputs, not an arithmetic one, and doing it in the
+  same change that first produced the fourth input would leave nobody able to tell
+  which of the two moved a row.
 - **Churn counts commits, not diff size** — a typo fix and a rewrite weigh the
   same — and full-history churn favors files that existed early. The repository
   is under four months old, so the bias is mild; the recent column is the

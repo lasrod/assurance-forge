@@ -8,14 +8,14 @@
 #
 #   [model]    core/sacm_model.h, core/element_factory.h (POD types)
 #   [parser]   parser/*           → may include model
-#   [sacm]     sacm/*             → may include model, parser
-#   [core]     core/*             → may include model, parser, sacm
-#   [ai]       ai/*               → may include model, parser, sacm, core
-#   [export]   export/*           → may include model, parser, sacm, core
-#   [ui]       ui/*               → may include model, parser, sacm, core
-#   [bridge]   bridge/*           → may include model, parser, sacm, core
-#   [agent]    agent/*            → may include model, parser, sacm, core, bridge
-#   [mcp]      mcp/*              → may include model, parser, sacm, core, bridge, agent
+#   [legacy_sacm] legacy_sacm/*   → may include model, parser
+#   [core]     core/*             → may include model, parser, legacy_sacm
+#   [ai]       ai/*               → may include model, parser, legacy_sacm, core
+#   [export]   export/*           → may include model, parser, legacy_sacm, core
+#   [ui]       ui/*               → may include model, parser, legacy_sacm, core
+#   [bridge]   bridge/*           → may include model, parser, legacy_sacm, core
+#   [agent]    agent/*            → may include model, parser, legacy_sacm, core, bridge
+#   [mcp]      mcp/*              → may include model, parser, legacy_sacm, core, bridge, agent
 #   [app]      app/*              → may include everything
 #
 # `mcp` forbidding `ai/` is deliberate, not incidental: the MCP server and the
@@ -48,8 +48,8 @@ endif()
 get_filename_component(AF_SOURCE_DIR "${AF_SOURCE_DIR}" ABSOLUTE)
 
 # Forbidden include prefixes per layer. Format: LAYER -> list of forbidden prefixes.
-set(_AF_FORBIDDEN_parser "sacm/;ai/;export/;ui/;app/")
-set(_AF_FORBIDDEN_sacm   "ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_parser "legacy_sacm/;sacm/;ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_legacy_sacm "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_sacm_adapter "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_core   "ai/;export/;ui/;app/")
 set(_AF_FORBIDDEN_ai     "export/;ui/;app/")
@@ -76,7 +76,7 @@ set(_AF_FORBIDDEN_mcp    "ai/;export/;ui/;app/")
 set(_AF_ALLOWLIST
 )
 
-set(_AF_LAYERS parser sacm sacm_adapter core ai export ui bridge agent mcp)
+set(_AF_LAYERS parser legacy_sacm sacm_adapter core ai export ui bridge agent mcp)
 set(_AF_VIOLATIONS "")
 
 foreach(layer IN LISTS _AF_LAYERS)
@@ -131,10 +131,13 @@ endif()
 get_filename_component(AF_LIBS_SACM_DIR "${AF_LIBS_SACM_DIR}" ABSOLUTE)
 
 if(IS_DIRECTORY "${AF_LIBS_SACM_DIR}")
-    # Assurance Forge layer prefixes plus legacy app SACM headers (sacm/sacm_*;
-    # the library's own headers use sacm/<area>/... and sacm/version.h).
+    # Assurance Forge layer prefixes. `legacy_sacm/` is a whole prefix rather
+    # than the old `sacm/sacm_` special case: until issue #341 the legacy model
+    # and this library shared the `sacm/` prefix, so the gate had to match on
+    # the header STEM to tell "the app's legacy model" from "this library's own
+    # headers". Distinct roots mean the rule is now what it always meant.
     set(_SACM_FORBIDDEN_PREFIXES
-        "app/" "ui/" "ai/" "core/" "export/" "parser/" "sacm/sacm_"
+        "app/" "ui/" "ai/" "core/" "export/" "parser/" "legacy_sacm/"
     )
     # App third-party surface the library must not touch.
     set(_SACM_FORBIDDEN_THIRDPARTY

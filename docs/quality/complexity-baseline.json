@@ -1,0 +1,976 @@
+{
+  "tool": "lizard",
+  "tool_version": "1.17.31",
+  "ccn_threshold": 15,
+  "files_analyzed": 515,
+  "functions_analyzed": 3478,
+  "production_nloc": 72507,
+  "over_threshold": 172,
+  "functions": {
+    "libs/sacm/src/commands/commands.cpp::sacm::commands::detail::check": {
+      "ccn": 41,
+      "nloc": 154,
+      "parameters": 2
+    },
+    "libs/sacm/src/commands/commands.cpp::sacm::commands::detail::check_delete": {
+      "ccn": 26,
+      "nloc": 152,
+      "parameters": 3
+    },
+    "libs/sacm/src/commands/commands.cpp::sacm::commands::detail::perform": {
+      "ccn": 27,
+      "nloc": 62,
+      "parameters": 3
+    },
+    "libs/sacm/src/commands/commands.cpp::sacm::commands::detail::perform_delete": {
+      "ccn": 15,
+      "nloc": 39,
+      "parameters": 2
+    },
+    "libs/sacm/src/commands/commands.cpp::sacm::commands::detail::unlink_subtree": {
+      "ccn": 21,
+      "nloc": 36,
+      "parameters": 2
+    },
+    "libs/sacm/src/commands/operations.cpp::sacm::commands::operation_name": {
+      "ccn": 27,
+      "nloc": 62,
+      "parameters": 1
+    },
+    "libs/sacm/src/compare/semantic_compare.cpp::sacm::compare::attribute_snapshot": {
+      "ccn": 32,
+      "nloc": 82,
+      "parameters": 1
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::diagnose_malformed_xml": {
+      "ccn": 21,
+      "nloc": 64,
+      "parameters": 1
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::is_reference_role": {
+      "ccn": 19,
+      "nloc": 21,
+      "parameters": 2
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::load_impl": {
+      "ccn": 17,
+      "nloc": 101,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::make_element": {
+      "ccn": 39,
+      "nloc": 82,
+      "parameters": 2
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::populate": {
+      "ccn": 22,
+      "nloc": 113,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::read_kind_specific_attributes": {
+      "ccn": 18,
+      "nloc": 74,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::read_model_element_children": {
+      "ccn": 26,
+      "nloc": 89,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::read_reference_attributes": {
+      "ccn": 30,
+      "nloc": 90,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::read_reference_children": {
+      "ccn": 50,
+      "nloc": 164,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::read_root": {
+      "ccn": 16,
+      "nloc": 72,
+      "parameters": 3
+    },
+    "libs/sacm/src/io/xmi_reader.cpp::sacm::io::read_xsi_type": {
+      "ccn": 17,
+      "nloc": 68,
+      "parameters": 2
+    },
+    "libs/sacm/src/io/xmi_writer.cpp::sacm::io::write_containment_children": {
+      "ccn": 15,
+      "nloc": 43,
+      "parameters": 2
+    },
+    "libs/sacm/src/io/xmi_writer.cpp::sacm::io::write_kind_specific_attributes": {
+      "ccn": 55,
+      "nloc": 148,
+      "parameters": 2
+    },
+    "libs/sacm/src/metadata/element_kind.cpp::sacm::metadata::kind_name": {
+      "ccn": 39,
+      "nloc": 81,
+      "parameters": 1
+    },
+    "libs/sacm/src/model/traverse.cpp::sacm::model::traverse::for_each_child": {
+      "ccn": 19,
+      "nloc": 38,
+      "parameters": 2
+    },
+    "libs/sacm/src/model/traverse.cpp::sacm::model::traverse::for_each_reference": {
+      "ccn": 40,
+      "nloc": 128,
+      "parameters": 2
+    },
+    "libs/sacm/src/model/traverse.cpp::sacm::model::traverse::remove_references_to": {
+      "ccn": 28,
+      "nloc": 91,
+      "parameters": 2
+    },
+    "libs/sacm/src/validation/validate.cpp::sacm::validation::reference_target_kind_ok": {
+      "ccn": 36,
+      "nloc": 69,
+      "parameters": 3
+    },
+    "libs/sacm/src/validation/validate.cpp::sacm::validation::validate": {
+      "ccn": 54,
+      "nloc": 301,
+      "parameters": 1
+    },
+    "src/agent/change_operations.cpp::agent::DiffJson": {
+      "ccn": 15,
+      "nloc": 53,
+      "parameters": 2
+    },
+    "src/agent/placement.cpp::agent::SuggestPlacement": {
+      "ccn": 23,
+      "nloc": 93,
+      "parameters": 2
+    },
+    "src/ai/ai_claim_review.cpp::ai::AiReviewElementType": {
+      "ccn": 20,
+      "nloc": 34,
+      "parameters": 2
+    },
+    "src/ai/ai_claim_review.cpp::ai::CollectAiReviewDataPackages": {
+      "ccn": 44,
+      "nloc": 124,
+      "parameters": 6
+    },
+    "src/ai/ai_claim_review.cpp::ai::ParseAiReviewResponse": {
+      "ccn": 17,
+      "nloc": 59,
+      "parameters": 3
+    },
+    "src/ai/ai_claim_review.cpp::ai::SccgAppliesToNamesForElement": {
+      "ccn": 24,
+      "nloc": 76,
+      "parameters": 2
+    },
+    "src/app/acp_problem_sync.cpp::app::SyncAcpProblems": {
+      "ccn": 26,
+      "nloc": 94,
+      "parameters": 3
+    },
+    "src/app/actions/proposal_actions.cpp::app::actions::ProposalActions::CreateAiGenerated": {
+      "ccn": 19,
+      "nloc": 86,
+      "parameters": 1
+    },
+    "src/app/agent_request_handler.cpp::app::HandleAgentRequest": {
+      "ccn": 25,
+      "nloc": 64,
+      "parameters": 2
+    },
+    "src/app/agent_request_handler.cpp::app::IsDraftOperation": {
+      "ccn": 16,
+      "nloc": 8,
+      "parameters": 1
+    },
+    "src/app/app_runtime.cpp::app::AppRuntime::RebuildDerivedViewsIfNeeded": {
+      "ccn": 16,
+      "nloc": 60,
+      "parameters": 0
+    },
+    "src/app/app_runtime.cpp::app::AppRuntime::RefreshDraftDecorations": {
+      "ccn": 25,
+      "nloc": 65,
+      "parameters": 0
+    },
+    "src/app/app_runtime.cpp::app::AppRuntime::RefreshSelectedDraftDetail": {
+      "ccn": 17,
+      "nloc": 58,
+      "parameters": 0
+    },
+    "src/app/app_runtime.cpp::app::AppRuntime::RegisterAppEventListeners": {
+      "ccn": 20,
+      "nloc": 108,
+      "parameters": 0
+    },
+    "src/app/app_runtime_ai.cpp::app::AppRuntime::RenderAiReviewContextMenuForSelected": {
+      "ccn": 26,
+      "nloc": 53,
+      "parameters": 0
+    },
+    "src/app/app_runtime_frame.cpp::app::AppRuntime::RenderFrame": {
+      "ccn": 35,
+      "nloc": 427,
+      "parameters": 1
+    },
+    "src/app/app_runtime_project.cpp::app::AppRuntime::PerformOpenProjectFile": {
+      "ccn": 18,
+      "nloc": 70,
+      "parameters": 1
+    },
+    "src/app/app_runtime_project.cpp::app::AppRuntime::PromoteDraftGroups": {
+      "ccn": 32,
+      "nloc": 133,
+      "parameters": 2
+    },
+    "src/app/app_runtime_undo.cpp::app::AppRuntime::Undo": {
+      "ccn": 21,
+      "nloc": 99,
+      "parameters": 0
+    },
+    "src/app/areas/ai_debug_area.cpp::app::areas::RenderAiDebugPanelContent": {
+      "ccn": 31,
+      "nloc": 86,
+      "parameters": 1
+    },
+    "src/app/areas/baseline_modal.cpp::app::areas::RenderBaselineModal": {
+      "ccn": 17,
+      "nloc": 84,
+      "parameters": 4
+    },
+    "src/app/areas/canvas_history_overlay.cpp::app::areas::RebuildFilteredTransactions": {
+      "ccn": 19,
+      "nloc": 43,
+      "parameters": 3
+    },
+    "src/app/areas/canvas_history_overlay.cpp::app::areas::RenderArgumentPackageCanvasWithTimeline": {
+      "ccn": 19,
+      "nloc": 109,
+      "parameters": 8
+    },
+    "src/app/areas/canvas_history_overlay.cpp::app::areas::RenderWorkingDraftBanner": {
+      "ccn": 21,
+      "nloc": 80,
+      "parameters": 2
+    },
+    "src/app/areas/feedback_dock_area.cpp::app::areas::RenderFeedbackDockArea": {
+      "ccn": 17,
+      "nloc": 54,
+      "parameters": 4
+    },
+    "src/app/areas/history_panel_area.cpp::app::areas::RenderHistoryPanelContent": {
+      "ccn": 34,
+      "nloc": 121,
+      "parameters": 1
+    },
+    "src/app/areas/inspector_area.cpp::app::areas::RenderInspectorArea": {
+      "ccn": 62,
+      "nloc": 254,
+      "parameters": 4
+    },
+    "src/app/areas/modal_host.cpp::app::areas::ModalHost::RenderPreferencesWindow": {
+      "ccn": 22,
+      "nloc": 125,
+      "parameters": 0
+    },
+    "src/app/areas/modal_host_terminology.cpp::app::areas::ModalHost::RenderQuickDefineTermModal": {
+      "ccn": 21,
+      "nloc": 81,
+      "parameters": 0
+    },
+    "src/app/areas/perf_overlay_area.cpp::app::areas::RenderPerfOverlay": {
+      "ccn": 40,
+      "nloc": 339,
+      "parameters": 1
+    },
+    "src/app/areas/proposal_editor_area.cpp::app::areas::RenderProposalElementEditor": {
+      "ccn": 23,
+      "nloc": 100,
+      "parameters": 2
+    },
+    "src/app/areas/review_panel_area.cpp::app::areas::BuildReviewPanelModel": {
+      "ccn": 26,
+      "nloc": 126,
+      "parameters": 1
+    },
+    "src/app/areas/review_panel_area.cpp::app::areas::RenderReviewPanelContent": {
+      "ccn": 16,
+      "nloc": 72,
+      "parameters": 2
+    },
+    "src/app/areas/workbench_area.cpp::app::areas::RenderArgumentPackageCanvasTab": {
+      "ccn": 21,
+      "nloc": 82,
+      "parameters": 4
+    },
+    "src/app/areas/workbench_area.cpp::app::areas::RenderWorkbenchArea": {
+      "ccn": 41,
+      "nloc": 150,
+      "parameters": 4
+    },
+    "src/app/controllers/agent_bridge_controller.cpp::app::controllers::AgentBridgeController::ServeConnection": {
+      "ccn": 18,
+      "nloc": 80,
+      "parameters": 2
+    },
+    "src/app/controllers/ai_review_controller.cpp::app::controllers::AiReviewController::BeginReviewForSelection": {
+      "ccn": 25,
+      "nloc": 196,
+      "parameters": 4
+    },
+    "src/app/controllers/ai_review_controller.cpp::app::controllers::AiReviewController::PollTask": {
+      "ccn": 23,
+      "nloc": 155,
+      "parameters": 0
+    },
+    "src/app/frame/app_menu_bar.cpp::app::frame::RenderAppMenuBar": {
+      "ccn": 42,
+      "nloc": 109,
+      "parameters": 3
+    },
+    "src/app/frame/app_shell.cpp::app::frame::NormalizeCenterViewSelection": {
+      "ccn": 19,
+      "nloc": 40,
+      "parameters": 2
+    },
+    "src/core/acp/acp_editing.cpp::core::acp::CreateConfidenceArgumentTreeForAcpWithIds": {
+      "ccn": 19,
+      "nloc": 61,
+      "parameters": 5
+    },
+    "src/core/acp/acp_editing.cpp::core::acp::UpsertAcp": {
+      "ccn": 18,
+      "nloc": 36,
+      "parameters": 3
+    },
+    "src/core/acp/acp_relationship_index.cpp::core::acp::BuildAcpRelationshipTargets": {
+      "ccn": 25,
+      "nloc": 87,
+      "parameters": 1
+    },
+    "src/core/assurance_tree.cpp::core::AssuranceTree::Build": {
+      "ccn": 43,
+      "nloc": 99,
+      "parameters": 2
+    },
+    "src/core/audit/audit_diff.cpp::core::audit::AddAddedFromEvent": {
+      "ccn": 20,
+      "nloc": 39,
+      "parameters": 2
+    },
+    "src/core/audit/audit_recovery.cpp::core::audit::RestoreSacmFromAudit": {
+      "ccn": 17,
+      "nloc": 102,
+      "parameters": 5
+    },
+    "src/core/audit/audit_transaction.cpp::core::audit::ParseAuditTransaction": {
+      "ccn": 23,
+      "nloc": 45,
+      "parameters": 3
+    },
+    "src/core/audit/event_replayer.cpp::core::audit::ApplyEvent": {
+      "ccn": 194,
+      "nloc": 711,
+      "parameters": 4
+    },
+    "src/core/audit/event_replayer.cpp::core::audit::ApplyEventToLibrary": {
+      "ccn": 217,
+      "nloc": 819,
+      "parameters": 4
+    },
+    "src/core/audit/event_store.cpp::core::audit::EventStore::Open": {
+      "ccn": 19,
+      "nloc": 83,
+      "parameters": 2
+    },
+    "src/core/audit/replay_verifier.cpp::core::audit::VerifyProject": {
+      "ccn": 24,
+      "nloc": 135,
+      "parameters": 1
+    },
+    "src/core/audit/strategy_migration.cpp::core::audit::MigrateStrategyEncodingIfNeeded": {
+      "ccn": 19,
+      "nloc": 82,
+      "parameters": 4
+    },
+    "src/core/audit/strategy_migration.cpp::core::audit::NormalizeStrategyEncoding": {
+      "ccn": 16,
+      "nloc": 50,
+      "parameters": 1
+    },
+    "src/core/commands/command_bus.cpp::core::commands::CommandBus::Execute": {
+      "ccn": 23,
+      "nloc": 95,
+      "parameters": 4
+    },
+    "src/core/commands/library_bridge.cpp::core::commands::IndexRepresentedIds": {
+      "ccn": 16,
+      "nloc": 40,
+      "parameters": 2
+    },
+    "src/core/commands/package_commands.cpp::core::DeleteArgumentPackage": {
+      "ccn": 17,
+      "nloc": 57,
+      "parameters": 5
+    },
+    "src/core/confidence/confidence_store.cpp::core::confidence::RefreshStaleFlags": {
+      "ccn": 15,
+      "nloc": 37,
+      "parameters": 4
+    },
+    "src/core/derived_views.cpp::core::RefreshVisibleTerminologyContextDisplay": {
+      "ccn": 19,
+      "nloc": 52,
+      "parameters": 2
+    },
+    "src/core/drafts/draft_change_index.cpp::core::drafts::BuildChangesOnlyView": {
+      "ccn": 16,
+      "nloc": 45,
+      "parameters": 2
+    },
+    "src/core/drafts/draft_persistence.cpp::core::drafts::DeserializeDraftWorkspace": {
+      "ccn": 18,
+      "nloc": 62,
+      "parameters": 3
+    },
+    "src/core/drafts/draft_persistence.cpp::core::drafts::GroupFromJson": {
+      "ccn": 18,
+      "nloc": 51,
+      "parameters": 3
+    },
+    "src/core/drafts/draft_promotion_service.cpp::core::drafts::CompileSelectedPromotion": {
+      "ccn": 15,
+      "nloc": 51,
+      "parameters": 3
+    },
+    "src/core/drafts/draft_promotion_service.cpp::core::drafts::PlanDraftPromotion": {
+      "ccn": 15,
+      "nloc": 59,
+      "parameters": 5
+    },
+    "src/core/drafts/draft_workspace_store.cpp::core::drafts::DraftWorkspaceStore::MaterializeSnapshot": {
+      "ccn": 21,
+      "nloc": 64,
+      "parameters": 2
+    },
+    "src/core/element_factory.cpp::core::BuildTreeIndex": {
+      "ccn": 18,
+      "nloc": 35,
+      "parameters": 2
+    },
+    "src/core/element_factory.cpp::core::InstallChildElement": {
+      "ccn": 24,
+      "nloc": 108,
+      "parameters": 8
+    },
+    "src/core/element_factory.cpp::core::InstallSubGoalUnderStrategy": {
+      "ccn": 19,
+      "nloc": 78,
+      "parameters": 7
+    },
+    "src/core/element_factory.cpp::core::RemoveElement": {
+      "ccn": 19,
+      "nloc": 64,
+      "parameters": 5
+    },
+    "src/core/element_factory.cpp::core::ReparentChildrenToParent": {
+      "ccn": 20,
+      "nloc": 41,
+      "parameters": 3
+    },
+    "src/core/element_factory.cpp::core::UpdateSacmElementText": {
+      "ccn": 20,
+      "nloc": 37,
+      "parameters": 5
+    },
+    "src/core/element_factory.cpp::core::UpdateSacmGsnIdentifier": {
+      "ccn": 21,
+      "nloc": 61,
+      "parameters": 3
+    },
+    "src/core/gsn_layout.cpp::core::BuildLanes": {
+      "ccn": 24,
+      "nloc": 62,
+      "parameters": 2
+    },
+    "src/core/gsn_layout.cpp::core::ComputeOffsets": {
+      "ccn": 19,
+      "nloc": 63,
+      "parameters": 3
+    },
+    "src/core/gsn_layout.cpp::core::LayoutGsnGraph": {
+      "ccn": 54,
+      "nloc": 183,
+      "parameters": 3
+    },
+    "src/core/project_manifest.cpp::core::ParseJsonStringAt": {
+      "ccn": 16,
+      "nloc": 48,
+      "parameters": 3
+    },
+    "src/core/project_service.cpp::core::ProjectService::RefreshFileStatus": {
+      "ccn": 26,
+      "nloc": 64,
+      "parameters": 1
+    },
+    "src/core/project_summary.cpp::core::BuildProjectSummary": {
+      "ccn": 26,
+      "nloc": 84,
+      "parameters": 6
+    },
+    "src/core/registers/register_model.cpp::core::registers::DeserializeRegisterStore": {
+      "ccn": 16,
+      "nloc": 58,
+      "parameters": 3
+    },
+    "src/core/reviews/review_item.cpp::core::reviews::DeserializeReviewItems": {
+      "ccn": 15,
+      "nloc": 48,
+      "parameters": 4
+    },
+    "src/core/reviews/review_proposal.cpp::core::reviews::DeserializeReviewProposal": {
+      "ccn": 20,
+      "nloc": 68,
+      "parameters": 3
+    },
+    "src/core/reviews/review_proposal.cpp::core::reviews::EvaluateReviewProposalValidity": {
+      "ccn": 37,
+      "nloc": 109,
+      "parameters": 2
+    },
+    "src/core/reviews/review_proposal.cpp::core::reviews::PatchOperationTypeToString": {
+      "ccn": 16,
+      "nloc": 35,
+      "parameters": 1
+    },
+    "src/core/reviews/review_proposal_manager.cpp::core::reviews::ReviewProposalManager::ListProposals": {
+      "ccn": 18,
+      "nloc": 63,
+      "parameters": 1
+    },
+    "src/core/sacm_argument_sync.cpp::core::RebuildSacmArgumentPackageFromParser": {
+      "ccn": 37,
+      "nloc": 125,
+      "parameters": 2
+    },
+    "src/core/sacm_identity.cpp::core::SetPackageElementGid": {
+      "ccn": 23,
+      "nloc": 49,
+      "parameters": 3
+    },
+    "src/core/sccg/staged_checks.cpp::core::sccg::CheckStagedArgument": {
+      "ccn": 26,
+      "nloc": 101,
+      "parameters": 2
+    },
+    "src/core/terminology_context_service.cpp::core::AssociateTerminologyTermWithElementWithIds": {
+      "ccn": 16,
+      "nloc": 70,
+      "parameters": 5
+    },
+    "src/core/terminology_context_service.cpp::core::ValidateTerminologyContextReferences": {
+      "ccn": 17,
+      "nloc": 75,
+      "parameters": 1
+    },
+    "src/core/terminology_internal.cpp::core::detail::CollectElementIdsInto": {
+      "ccn": 16,
+      "nloc": 41,
+      "parameters": 2
+    },
+    "src/core/terminology_internal.cpp::core::detail::CollectGidsInto": {
+      "ccn": 16,
+      "nloc": 41,
+      "parameters": 2
+    },
+    "src/core/terminology_package_service.cpp::core::CollectElementIds": {
+      "ccn": 16,
+      "nloc": 43,
+      "parameters": 1
+    },
+    "src/core/terminology_package_service.cpp::core::CollectGids": {
+      "ccn": 16,
+      "nloc": 43,
+      "parameters": 1
+    },
+    "src/core/terminology_scope_service.cpp::core::TerminologyService::ResolveOccurrence": {
+      "ccn": 19,
+      "nloc": 63,
+      "parameters": 2
+    },
+    "src/core/terminology_term_usage.cpp::core::FindScopedTermRef": {
+      "ccn": 15,
+      "nloc": 33,
+      "parameters": 2
+    },
+    "src/core/tree_editing.cpp::core::BuildTreeEditIndex": {
+      "ccn": 15,
+      "nloc": 33,
+      "parameters": 1
+    },
+    "src/core/tree_editing.cpp::core::ValidateTreeDrop": {
+      "ccn": 20,
+      "nloc": 70,
+      "parameters": 5
+    },
+    "src/export/gsn_projection.cpp::export_gsn::BuildGsnProjection": {
+      "ccn": 49,
+      "nloc": 197,
+      "parameters": 1
+    },
+    "src/export/gsn_svg_layout.cpp::export_gsn::LayoutGsnSvgDiagram": {
+      "ccn": 19,
+      "nloc": 85,
+      "parameters": 1
+    },
+    "src/export/svg_writer.cpp::export_gsn::GenerateGsnSvg": {
+      "ccn": 17,
+      "nloc": 88,
+      "parameters": 1
+    },
+    "src/legacy_sacm/sacm_package_tree.cpp::sacm::SacmPackageNodeTypeToString": {
+      "ccn": 15,
+      "nloc": 33,
+      "parameters": 1
+    },
+    "src/mcp/session.cpp::mcp::Session::RunOffline": {
+      "ccn": 17,
+      "nloc": 71,
+      "parameters": 2
+    },
+    "src/parser/guidelines_parser.cpp::parser::ParseMetadata": {
+      "ccn": 23,
+      "nloc": 54,
+      "parameters": 1
+    },
+    "src/parser/sccg_dist_parser.cpp::parser::ValidateConsistency": {
+      "ccn": 16,
+      "nloc": 53,
+      "parameters": 2
+    },
+    "src/parser/xml_parser.cpp::parser::extract_elements_recursive": {
+      "ccn": 40,
+      "nloc": 93,
+      "parameters": 2
+    },
+    "src/sacm_adapter/case_projection.cpp::sacm_adapter::copy_library_tags_onto_package": {
+      "ccn": 20,
+      "nloc": 57,
+      "parameters": 2
+    },
+    "src/sacm_adapter/case_projection.cpp::sacm_adapter::describe_attributes": {
+      "ccn": 18,
+      "nloc": 61,
+      "parameters": 1
+    },
+    "src/sacm_adapter/case_projection.cpp::sacm_adapter::project_element": {
+      "ccn": 22,
+      "nloc": 75,
+      "parameters": 1
+    },
+    "src/sacm_adapter/document_edit.cpp::sacm_adapter::apply_add_child": {
+      "ccn": 21,
+      "nloc": 93,
+      "parameters": 5
+    },
+    "src/sacm_adapter/document_edit.cpp::sacm_adapter::apply_add_terminology_visible_context": {
+      "ccn": 15,
+      "nloc": 92,
+      "parameters": 5
+    },
+    "src/sacm_adapter/document_edit.cpp::sacm_adapter::apply_associate_terminology_term": {
+      "ccn": 20,
+      "nloc": 87,
+      "parameters": 5
+    },
+    "src/sacm_adapter/document_edit.cpp::sacm_adapter::preview_delete_elements": {
+      "ccn": 23,
+      "nloc": 95,
+      "parameters": 2
+    },
+    "src/sacm_adapter/projection_diff.cpp::sacm_adapter::diff_cases": {
+      "ccn": 26,
+      "nloc": 122,
+      "parameters": 2
+    },
+    "src/ui/gsn/gsn_acp_decorator.cpp::ui::gsn::DrawAcpElementDecorator": {
+      "ccn": 15,
+      "nloc": 79,
+      "parameters": 8
+    },
+    "src/ui/gsn/gsn_acp_decorator.cpp::ui::gsn::DrawAcpRelationshipDecorator": {
+      "ccn": 16,
+      "nloc": 79,
+      "parameters": 7
+    },
+    "src/ui/gsn/gsn_acp_decorator.cpp::ui::gsn::RenderAcpRelationshipContextMenu": {
+      "ccn": 29,
+      "nloc": 86,
+      "parameters": 8
+    },
+    "src/ui/gsn/gsn_canvas.cpp::ui::gsn::DrawGsnNode": {
+      "ccn": 59,
+      "nloc": 204,
+      "parameters": 11
+    },
+    "src/ui/gsn/gsn_canvas.cpp::ui::gsn::ShowGsnCanvasContentWithRenderer": {
+      "ccn": 86,
+      "nloc": 359,
+      "parameters": 6
+    },
+    "src/ui/gsn/gsn_canvas_renderer.cpp::ui::gsn::GsnCanvas::Render": {
+      "ccn": 81,
+      "nloc": 376,
+      "parameters": 5
+    },
+    "src/ui/gsn/gsn_hit_tester.cpp::ui::gsn::PickRelationshipEdge": {
+      "ccn": 23,
+      "nloc": 66,
+      "parameters": 6
+    },
+    "src/ui/gsn/gsn_terminology_card.cpp::ui::gsn::BuildAndDrawTerminologySpans": {
+      "ccn": 15,
+      "nloc": 69,
+      "parameters": 9
+    },
+    "src/ui/gsn/gsn_terminology_card.cpp::ui::gsn::BuildAndDrawTerminologySpansForText": {
+      "ccn": 21,
+      "nloc": 67,
+      "parameters": 10
+    },
+    "src/ui/gsn/gsn_terminology_card.cpp::ui::gsn::RenderTerminologyCardContents": {
+      "ccn": 26,
+      "nloc": 70,
+      "parameters": 4
+    },
+    "src/ui/panels/acp_panel.cpp::ui::panels::ShowAcpPanel": {
+      "ccn": 41,
+      "nloc": 153,
+      "parameters": 3
+    },
+    "src/ui/panels/confidence_panel.cpp::ui::panels::DrawOpinionSliderBar": {
+      "ccn": 15,
+      "nloc": 51,
+      "parameters": 4
+    },
+    "src/ui/panels/confidence_panel.cpp::ui::panels::DrawOpinionTriangle": {
+      "ccn": 26,
+      "nloc": 143,
+      "parameters": 3
+    },
+    "src/ui/panels/confidence_panel.cpp::ui::panels::ShowConfidencePanel": {
+      "ccn": 27,
+      "nloc": 81,
+      "parameters": 2
+    },
+    "src/ui/panels/draft_changes_panel.cpp::ui::panels::RenderRow": {
+      "ccn": 23,
+      "nloc": 74,
+      "parameters": 2
+    },
+    "src/ui/panels/element_panel.cpp::ui::panels::RenderDraftChangeSection": {
+      "ccn": 28,
+      "nloc": 85,
+      "parameters": 2
+    },
+    "src/ui/panels/element_panel.cpp::ui::panels::RenderTerminologySuggestions": {
+      "ccn": 22,
+      "nloc": 66,
+      "parameters": 4
+    },
+    "src/ui/panels/element_panel.cpp::ui::panels::ShowElementPanel": {
+      "ccn": 54,
+      "nloc": 257,
+      "parameters": 9
+    },
+    "src/ui/panels/element_panel.cpp::ui::panels::sync_to_sacm": {
+      "ccn": 21,
+      "nloc": 78,
+      "parameters": 9
+    },
+    "src/ui/panels/history_timeline_panel.cpp::ui::panels::DrawTransactionSliderBar": {
+      "ccn": 17,
+      "nloc": 52,
+      "parameters": 4
+    },
+    "src/ui/panels/preferences_panel.cpp::ui::panels::RenderAiSection": {
+      "ccn": 31,
+      "nloc": 79,
+      "parameters": 2
+    },
+    "src/ui/panels/project_explorer_panel.cpp::ui::panels::RenderAdvancedFile": {
+      "ccn": 22,
+      "nloc": 40,
+      "parameters": 3
+    },
+    "src/ui/panels/project_explorer_panel.cpp::ui::panels::RenderPackageNode": {
+      "ccn": 17,
+      "nloc": 36,
+      "parameters": 4
+    },
+    "src/ui/panels/project_overview_panel.cpp::ui::panels::ShowProjectOverviewPanel": {
+      "ccn": 24,
+      "nloc": 138,
+      "parameters": 2
+    },
+    "src/ui/panels/relationship_panel.cpp::ui::panels::ShowRelationshipPanel": {
+      "ccn": 22,
+      "nloc": 69,
+      "parameters": 2
+    },
+    "src/ui/panels/review_panel.cpp::ui::panels::DrawProposalActions": {
+      "ccn": 27,
+      "nloc": 64,
+      "parameters": 3
+    },
+    "src/ui/panels/review_panel.cpp::ui::panels::ShowAgentChangeSets": {
+      "ccn": 22,
+      "nloc": 75,
+      "parameters": 2
+    },
+    "src/ui/panels/review_panel.cpp::ui::panels::ShowReviewPanel": {
+      "ccn": 28,
+      "nloc": 116,
+      "parameters": 2
+    },
+    "src/ui/panels/status_bar_panel.cpp::ui::panels::ShowStatusBar": {
+      "ccn": 20,
+      "nloc": 82,
+      "parameters": 2
+    },
+    "src/ui/panels/terminology_package_panel.cpp::ui::panels::RenderTermsTable": {
+      "ccn": 17,
+      "nloc": 69,
+      "parameters": 2
+    },
+    "src/ui/panels/terminology_package_panel.cpp::ui::panels::ShowTerminologyPackagePanel": {
+      "ccn": 63,
+      "nloc": 134,
+      "parameters": 2
+    },
+    "src/ui/panels/welcome_modal.cpp::ui::panels::ShowWelcomeModal": {
+      "ccn": 39,
+      "nloc": 248,
+      "parameters": 3
+    },
+    "src/ui/timeline/timeline_widget.cpp::ui::timeline::RenderTimelineWidget": {
+      "ccn": 20,
+      "nloc": 117,
+      "parameters": 5
+    },
+    "src/ui/tree_view.cpp::ui::RenderSingleTreeNode": {
+      "ccn": 27,
+      "nloc": 144,
+      "parameters": 6
+    }
+  },
+  "worst_ccn_per_file": {
+    "src/core/audit/event_replayer.cpp": 217,
+    "src/ui/gsn/gsn_canvas.cpp": 86,
+    "src/ui/gsn/gsn_canvas_renderer.cpp": 81,
+    "src/ui/panels/terminology_package_panel.cpp": 63,
+    "src/app/areas/inspector_area.cpp": 62,
+    "libs/sacm/src/io/xmi_writer.cpp": 55,
+    "libs/sacm/src/validation/validate.cpp": 54,
+    "src/core/gsn_layout.cpp": 54,
+    "src/ui/panels/element_panel.cpp": 54,
+    "libs/sacm/src/io/xmi_reader.cpp": 50,
+    "src/export/gsn_projection.cpp": 49,
+    "src/ai/ai_claim_review.cpp": 44,
+    "src/core/assurance_tree.cpp": 43,
+    "src/app/frame/app_menu_bar.cpp": 42,
+    "libs/sacm/src/commands/commands.cpp": 41,
+    "src/app/areas/workbench_area.cpp": 41,
+    "src/ui/panels/acp_panel.cpp": 41,
+    "libs/sacm/src/model/traverse.cpp": 40,
+    "src/app/areas/perf_overlay_area.cpp": 40,
+    "src/parser/xml_parser.cpp": 40,
+    "libs/sacm/src/metadata/element_kind.cpp": 39,
+    "src/ui/panels/welcome_modal.cpp": 39,
+    "src/core/reviews/review_proposal.cpp": 37,
+    "src/core/sacm_argument_sync.cpp": 37,
+    "src/app/app_runtime_frame.cpp": 35,
+    "src/app/areas/history_panel_area.cpp": 34,
+    "libs/sacm/src/compare/semantic_compare.cpp": 32,
+    "src/app/app_runtime_project.cpp": 32,
+    "src/app/areas/ai_debug_area.cpp": 31,
+    "src/ui/panels/preferences_panel.cpp": 31,
+    "src/ui/gsn/gsn_acp_decorator.cpp": 29,
+    "src/ui/panels/review_panel.cpp": 28,
+    "libs/sacm/src/commands/operations.cpp": 27,
+    "src/ui/panels/confidence_panel.cpp": 27,
+    "src/ui/tree_view.cpp": 27,
+    "src/app/acp_problem_sync.cpp": 26,
+    "src/app/app_runtime_ai.cpp": 26,
+    "src/app/areas/review_panel_area.cpp": 26,
+    "src/core/project_service.cpp": 26,
+    "src/core/project_summary.cpp": 26,
+    "src/core/sccg/staged_checks.cpp": 26,
+    "src/sacm_adapter/projection_diff.cpp": 26,
+    "src/ui/gsn/gsn_terminology_card.cpp": 26,
+    "src/app/agent_request_handler.cpp": 25,
+    "src/app/app_runtime.cpp": 25,
+    "src/app/controllers/ai_review_controller.cpp": 25,
+    "src/core/acp/acp_relationship_index.cpp": 25,
+    "src/core/audit/replay_verifier.cpp": 24,
+    "src/core/element_factory.cpp": 24,
+    "src/ui/panels/project_overview_panel.cpp": 24,
+    "src/agent/placement.cpp": 23,
+    "src/app/areas/proposal_editor_area.cpp": 23,
+    "src/core/audit/audit_transaction.cpp": 23,
+    "src/core/commands/command_bus.cpp": 23,
+    "src/core/sacm_identity.cpp": 23,
+    "src/parser/guidelines_parser.cpp": 23,
+    "src/sacm_adapter/document_edit.cpp": 23,
+    "src/ui/gsn/gsn_hit_tester.cpp": 23,
+    "src/ui/panels/draft_changes_panel.cpp": 23,
+    "src/app/areas/modal_host.cpp": 22,
+    "src/sacm_adapter/case_projection.cpp": 22,
+    "src/ui/panels/project_explorer_panel.cpp": 22,
+    "src/ui/panels/relationship_panel.cpp": 22,
+    "src/app/app_runtime_undo.cpp": 21,
+    "src/app/areas/canvas_history_overlay.cpp": 21,
+    "src/app/areas/modal_host_terminology.cpp": 21,
+    "src/core/drafts/draft_workspace_store.cpp": 21,
+    "src/core/audit/audit_diff.cpp": 20,
+    "src/core/tree_editing.cpp": 20,
+    "src/ui/panels/status_bar_panel.cpp": 20,
+    "src/ui/timeline/timeline_widget.cpp": 20,
+    "src/app/actions/proposal_actions.cpp": 19,
+    "src/app/frame/app_shell.cpp": 19,
+    "src/core/acp/acp_editing.cpp": 19,
+    "src/core/audit/event_store.cpp": 19,
+    "src/core/audit/strategy_migration.cpp": 19,
+    "src/core/derived_views.cpp": 19,
+    "src/core/terminology_scope_service.cpp": 19,
+    "src/export/gsn_svg_layout.cpp": 19,
+    "src/app/controllers/agent_bridge_controller.cpp": 18,
+    "src/core/drafts/draft_persistence.cpp": 18,
+    "src/core/reviews/review_proposal_manager.cpp": 18,
+    "src/app/areas/baseline_modal.cpp": 17,
+    "src/app/areas/feedback_dock_area.cpp": 17,
+    "src/core/audit/audit_recovery.cpp": 17,
+    "src/core/commands/package_commands.cpp": 17,
+    "src/core/terminology_context_service.cpp": 17,
+    "src/export/svg_writer.cpp": 17,
+    "src/mcp/session.cpp": 17,
+    "src/ui/panels/history_timeline_panel.cpp": 17,
+    "src/core/commands/library_bridge.cpp": 16,
+    "src/core/drafts/draft_change_index.cpp": 16,
+    "src/core/project_manifest.cpp": 16,
+    "src/core/registers/register_model.cpp": 16,
+    "src/core/terminology_internal.cpp": 16,
+    "src/core/terminology_package_service.cpp": 16,
+    "src/parser/sccg_dist_parser.cpp": 16,
+    "src/agent/change_operations.cpp": 15,
+    "src/core/confidence/confidence_store.cpp": 15,
+    "src/core/drafts/draft_promotion_service.cpp": 15,
+    "src/core/reviews/review_item.cpp": 15,
+    "src/core/terminology_term_usage.cpp": 15,
+    "src/legacy_sacm/sacm_package_tree.cpp": 15
+  }
+}

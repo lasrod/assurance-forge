@@ -334,6 +334,24 @@ fan-in and domain risk together rather than any alone. The register states, for
 each entry, what a reduction would observably look like — the criterion rule 3
 above asks a refactoring PR to cite.
 
+## Measured, not enforced
+
+Controls that run and report, with a committed version-pinned baseline, but do
+not fail a build. The policy's order is report first and ratchet after triage,
+so a control appears here before it appears as a gate — and a control that never
+leaves this section is a control whose numbers nobody has looked at.
+
+| Control | Tool | Baseline | Runs |
+|---|---|---|---|
+| Cyclomatic complexity | lizard, version pinned by the baseline | `docs/quality/complexity-baseline.json` | `tools/quality/run_complexity.py`, reported by the Static analysis job |
+
+The complexity baseline records every function at or over lizard's own default
+CCN threshold of 15 — the tool's number rather than one invented here, because
+the policy forbids setting a target before there is a baseline to set it
+against. `--check` implements the ratchet and is exercised, so enabling it is a
+one-line CI change once the 172 functions currently over the threshold have been
+triaged rather than merely counted.
+
 ## Not yet enforced
 
 Listed rather than omitted, because a gap nobody has written down reads as a
@@ -343,7 +361,6 @@ picks it up has a spec to point at.
 | Control | State | Intended shape when picked up |
 |---|---|---|
 | cppcheck | Not configured | A second opinion beside clang-tidy under the same arrangement: report mode against a committed, version-pinned baseline first, ratchet after triage. |
-| Cyclomatic / cognitive complexity | Not measured | Report-mode measurement (lizard, or clang-tidy's `readability-function-cognitive-complexity`) feeding the [hotspot register](hotspot-register.md)'s ranking. No gate until a baseline exists. |
 | Duplicated-code detection | Not measured | A clone detector in report mode first. Turning warnings on found six duplicated helpers in one file pair by accident, so there is reason to expect signal. |
 | Dead code across translation units | Compiler warnings only | `-Wunused-function` and its MSVC equivalents catch file-local dead code; cross-TU dead code needs linker-assisted or dedicated tooling. |
 | Formatting beyond C++ | Not configured | The same hook-first arrangement as clang-format: one pinned tool per language for CMake, Python, Markdown, YAML and JSON, applied on commit, no CI gate. |

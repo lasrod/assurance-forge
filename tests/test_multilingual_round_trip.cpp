@@ -1,7 +1,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/library_package_projection.h"
 #include "parser/model_utils.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 

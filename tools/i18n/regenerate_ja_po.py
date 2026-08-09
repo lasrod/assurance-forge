@@ -1094,6 +1094,14 @@ TRANSLATIONS = {
         " — ただし元のドラフトは復元されませんでした: {0}",
     "Undid: {0}{1}":
         "元に戻しました: {0}{1}",
+
+    # Secure-storage unavailability (#53). Two causes, two fixes: a build
+    # with no keyring support needs a rebuild, a build whose keyring is not
+    # running needs the keyring started.
+    "Secure storage is unavailable: this build has no keyring support.":
+        "セキュアストレージを利用できません: このビルドにはキーリング対応が含まれていません。",
+    "Secure storage is unavailable: no keyring service is running.":
+        "セキュアストレージを利用できません: キーリングサービスが実行されていません。",
 }
 
 

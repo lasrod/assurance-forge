@@ -38,4 +38,14 @@ SecretLoadResult SecretLoadFailure(AiErrorCode errorCode, std::string message);
 
 std::shared_ptr<ISecretStore> CreatePlatformSecretStore();
 
+// Which backend this build compiled in: "Windows Credential Manager",
+// "macOS Keychain", "libsecret", or "none".
+//
+// Says what the build CONTAINS, not whether it currently works -- a libsecret
+// build on a machine with no keyring daemon reports "libsecret" and an
+// unavailable store. The two are different problems with different fixes
+// (rebuild with the package, versus start a keyring), and a caller that cannot
+// tell them apart cannot say anything useful to the user.
+std::string SecretStoreBackendName();
+
 } // namespace ai

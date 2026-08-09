@@ -1,7 +1,7 @@
 #include "core/terminology_text_utils.h"
 
 #include "core/string_utils.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <algorithm>
 #include <sstream>

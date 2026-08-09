@@ -32,6 +32,12 @@ struct PreferencesPanelModel {
     std::string aiProviderName;
     bool keyStored = false;
     bool secureStoreAvailable = false;
+    // Why storage is unavailable, when it is. Supplied by `app`, because
+    // the cause lives in `ai::SecretStoreBackendName()` and the layer rule
+    // keeps `ui` out of `ai`. A build with no keyring support and a build
+    // whose keyring is simply not running are different problems with
+    // different fixes, and the panel used to assert the first for both.
+    std::string secureStoreUnavailableReason;
     bool testRunning = false;
     AiStatusSeverity connectionSeverity = AiStatusSeverity::Idle;
     std::string connectionMessage;

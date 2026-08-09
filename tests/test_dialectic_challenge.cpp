@@ -5,9 +5,9 @@
 #include "core/assurance_tree.h"
 #include "core/element_factory.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
-#include "sacm/sacm_parser.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_model.h"
+#include "legacy_sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_layout.h"
 
 #include "imgui.h"

@@ -3,7 +3,7 @@
 #include "core/problems/problem_item.h"
 #include "core/project_model.h"
 #include "core/terminology_package_service.h"
-#include "sacm/sacm_package_tree.h"
+#include "legacy_sacm/sacm_package_tree.h"
 
 #include <cstddef>
 #include <string>

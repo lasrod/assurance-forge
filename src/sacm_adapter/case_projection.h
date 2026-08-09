@@ -14,7 +14,7 @@
 // as the library, not this projection, is what gets serialized.
 
 #include "core/sacm_model.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <string>
 #include <string_view>

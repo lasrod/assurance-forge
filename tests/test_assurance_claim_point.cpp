@@ -1,7 +1,7 @@
 #include "core/acp/assurance_claim_point.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_parser.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_serializer.h"
 
 #include <gtest/gtest.h>
 

@@ -26,7 +26,7 @@
 #include "core/problems/problems_manager.h"
 #include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
-#include "sacm/sacm_package_tree.h"
+#include "legacy_sacm/sacm_package_tree.h"
 #include "ui/timeline/timeline_state.h"
 
 namespace core::commands {

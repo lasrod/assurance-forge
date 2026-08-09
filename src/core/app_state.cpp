@@ -9,7 +9,7 @@
 #include "core/terminology_package_service.h"
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 

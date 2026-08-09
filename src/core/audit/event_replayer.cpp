@@ -20,7 +20,7 @@
 #include "core/sacm_identity.h"
 #include "core/terminology_context_projection.h"
 #include "core/terminology_package_service.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"

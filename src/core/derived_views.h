@@ -9,7 +9,7 @@
 // path and the upcoming library-primary edit path apply the same passes.
 
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 namespace sacm_adapter {
 class LibraryDocument;

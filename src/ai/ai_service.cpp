@@ -31,8 +31,17 @@ bool AiService::HasConfiguredProvider() const {
     return provider_ != nullptr && LoadSettings().provider == provider_->ProviderId();
 }
 
+// The three key operations deliberately DO NOT short-circuit on
+// `IsAvailable()`. They used to, and returned a flat "Secure storage is
+// unavailable." -- which is what the preferences panel showed the user, so the
+// store's own diagnosis never reached anyone. That diagnosis is the difference
+// between a user who installs libsecret and rebuilds, a user who starts their
+// keyring, and a user who concludes the feature does not exist on their
+// platform. Calling through lets the store say which of the three it is.
+//
+// A null store is still short-circuited here: there is no implementation to ask.
 SecretLoadResult AiService::LoadApiKey() const {
-    if (!secret_store_ || !secret_store_->IsAvailable()) {
+    if (!secret_store_) {
         return SecretLoadFailure(AiErrorCode::SecureStoreUnavailable, "Secure storage is unavailable.");
     }
     return secret_store_->LoadSecret(kSecretServiceName, kOpenAiSecretAccount);
@@ -44,14 +53,14 @@ bool AiService::HasStoredApiKey() const {
 }
 
 SecretStoreResult AiService::SaveApiKey(const std::string& api_key) const {
-    if (!secret_store_ || !secret_store_->IsAvailable()) {
+    if (!secret_store_) {
         return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, "Secure storage is unavailable.");
     }
     return secret_store_->SaveSecret(kSecretServiceName, kOpenAiSecretAccount, api_key);
 }
 
 SecretStoreResult AiService::DeleteApiKey() const {
-    if (!secret_store_ || !secret_store_->IsAvailable()) {
+    if (!secret_store_) {
         return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, "Secure storage is unavailable.");
     }
     return secret_store_->DeleteSecret(kSecretServiceName, kOpenAiSecretAccount);

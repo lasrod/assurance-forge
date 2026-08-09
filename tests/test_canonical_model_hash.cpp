@@ -1,5 +1,5 @@
 #include "core/audit/canonical_model_hash.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <gtest/gtest.h>
 

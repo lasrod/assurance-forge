@@ -34,7 +34,12 @@ CASES = [
     ("ui must not include ai", "ui", "panel.h", '#include "ai/ai_types.h"\n', True),
     ("core must not include ui", "core", "service.h", '#include "ui/theme.h"\n', True),
     ("core must not include app", "core", "service.h", '#include "app/runtime.h"\n', True),
-    ("parser must not include sacm", "parser", "reader.h", '#include "sacm/sacm_model.h"\n', True),
+    ("parser must not include legacy_sacm", "parser", "reader.h", '#include "legacy_sacm/sacm_model.h"\n', True),
+    # Added with the #341 rename. `sacm/` now names the reusable library only,
+    # and parser must not reach that either. Two prefixes need two cases: one
+    # case cannot fail for the other's rule, and a label that names the wrong
+    # prefix makes the failure output point at the wrong gate.
+    ("parser must not include the SACM library", "parser", "reader.h", '#include "sacm/model/document.h"\n', True),
     ("bridge must not include mcp", "bridge", "endpoint.h", '#include "mcp/server.h"\n', True),
     ("agent must not include mcp", "agent", "ops.h", '#include "mcp/server.h"\n', True),
     ("mcp must not include ui", "mcp", "server.h", '#include "ui/theme.h"\n', True),

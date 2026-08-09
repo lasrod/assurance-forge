@@ -29,7 +29,7 @@
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_parser.h"
 #include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>

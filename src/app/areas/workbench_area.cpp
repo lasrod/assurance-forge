@@ -15,7 +15,7 @@
 #include "ui/panels/project_overview_panel.h"
 #include "ui/panels/terminology_package_panel.h"
 #include "ui/register_views.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
 

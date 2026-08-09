@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <cstddef>
 #include <string>

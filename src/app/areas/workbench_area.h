@@ -4,7 +4,7 @@
 #include "core/sacm_model.h"
 #include "core/terminology_package_service.h"
 #include "imgui.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "ui/element_context_menu.h"
 #include "ui/panels/terminology_package_panel.h"
 

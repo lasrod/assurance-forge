@@ -131,7 +131,7 @@ sequenceDiagram
     Controller-->>Draft: stage ready SCCG correction groups
 ```
 
-Controllers should stay thin. Core rules belong in `src/core`, parser rules in `src/parser`, SACM round-trip rules in `src/sacm`, and provider-specific AI behavior in `src/ai`.
+Controllers should stay thin. Core rules belong in `src/core`, parser rules in `src/parser`, SACM round-trip rules in `src/legacy_sacm`, and provider-specific AI behavior in `src/ai`.
 
 Two current exceptions are worth calling out:
 

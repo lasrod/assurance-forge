@@ -1,5 +1,5 @@
-#include "sacm/sacm_package_tree.h"
-#include "sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_package_tree.h"
+#include "legacy_sacm/sacm_parser.h"
 
 #include <gtest/gtest.h>
 
