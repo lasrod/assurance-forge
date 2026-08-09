@@ -946,18 +946,7 @@ EditOutcome apply_set_gid(LibraryDocument& document, const std::string& element_
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::commands::MutationResult result =
         doc.apply(sacm::commands::SetGid{.element = sacm::model::ElementId(element_id), .gid = gid});
-    EditOutcome outcome;
-    outcome.applied = result.applied;
-    // Converted inline rather than through `fill_diagnostics`, which this
-    // translation unit does not define until the terminology section below.
-    for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
-        outcome.diagnostics.push_back(LoadDiagnostic{
-            .code = diagnostic.code,
-            .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
-            .message = diagnostic.message,
-        });
-    }
-    return outcome;
+    return applied_outcome(result);
 }
 
 // -------------------------------------------------------------- terminology

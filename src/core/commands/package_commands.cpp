@@ -226,11 +226,15 @@ bool RemoveArtifactPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent&
     }
 
     // Phase 2a. Here the seam is CLEANER than the legacy mutator rather than more
-    // destructive: `core::DeleteArtifactPackage` erases the package and leaves
-    // every AssertedEvidence that cited its artifacts pointing at ids that no
-    // longer resolve, while the seam drops those relationships. Same direction as
-    // the term-delete disclosure in phase 1 -- the flip stops leaving wreckage --
-    // and the convergence test measures it rather than assuming it.
+    // destructive. `core::DeleteArtifactPackage` erases the ArtifactPackage and
+    // nothing else, so every `ArtifactReference::referencedArtifact` naming one of
+    // its artifacts is left pointing at an id that no longer resolves; the seam
+    // scrubs that reference. The ArtifactReference itself survives either way --
+    // it is a drawn Solution node, and removing evidence from the argument is not
+    // what "delete this artifact package" asked for. Same direction as the
+    // term-delete disclosure in phase 1, and measured on both sides by
+    // LibraryPrimaryEditFlip.RemoveArtifactPackageScrubsTheReferenceTheLegacy-
+    // MutatorLeftDangling rather than assumed.
     bool applied_to_library = false;
     if (CanApplyLibraryPrimary(ctx) && !id_.empty()) {
         const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(*ctx.library_document, id_);
