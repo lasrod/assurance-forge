@@ -1918,6 +1918,12 @@ msgstr "プロジェクトを検索..."
 msgid "Secure storage is unavailable on this platform."
 msgstr "このプラットフォームでは安全な保存を使用できません。"
 
+msgid "Secure storage is unavailable: no keyring service is running."
+msgstr "セキュアストレージを利用できません: キーリングサービスが実行されていません。"
+
+msgid "Secure storage is unavailable: this build has no keyring support."
+msgstr "セキュアストレージを利用できません: このビルドにはキーリング対応が含まれていません。"
+
 msgid "Select a GSN/SACM element before marking review status."
 msgstr "レビュー状態を記録する前に GSN/SACM 要素を選択してください。"
 

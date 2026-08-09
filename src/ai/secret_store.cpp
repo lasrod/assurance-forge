@@ -303,23 +303,33 @@ public:
         // the contact now. It negotiates a transport only; unlocking a
         // collection, and any prompt that comes with it, still happens on the
         // first real read or write, which is where a user expects it.
-        static const bool available = [] {
-            GError* error = nullptr;
-            SecretService* service = secret_service_get_sync(SECRET_SERVICE_OPEN_SESSION, nullptr, &error);
-            if (error != nullptr) {
-                g_error_free(error);
-                if (service != nullptr) {
-                    g_object_unref(service);
-                }
-                return false;
-            }
-            if (service == nullptr) {
-                return false;
-            }
-            g_object_unref(service);
+        //
+        // Caching is ONE-WAY: a success is remembered, a failure is not. The
+        // first version cached both in a function-static, so a user who started
+        // or unlocked their keyring AFTER launching the application got
+        // "unavailable" for the rest of the session and had to restart to enter
+        // an API key -- and starting the keyring after the app is the ordinary
+        // order of events on a fresh login. Re-probing while unavailable costs a
+        // D-Bus round trip on a path that is already failing; not re-probing
+        // costs the user a restart.
+        if (available_) {
             return true;
-        }();
-        return available;
+        }
+        GError* error = nullptr;
+        SecretService* service = secret_service_get_sync(SECRET_SERVICE_OPEN_SESSION, nullptr, &error);
+        if (error != nullptr) {
+            g_error_free(error);
+            if (service != nullptr) {
+                g_object_unref(service);
+            }
+            return false;
+        }
+        if (service == nullptr) {
+            return false;
+        }
+        g_object_unref(service);
+        available_ = true;
+        return true;
     }
 
     // libsecret is linked but nothing answers on the bus. Distinct from the
@@ -411,6 +421,11 @@ public:
         // is the caller's intended end state.
         return SecretStoreSuccess();
     }
+
+private:
+    // Mutable because IsAvailable() is const on the interface and this is a
+    // cache of an observation, not part of the store's state.
+    mutable bool available_ = false;
 };
 #else
 class UnsupportedSecretStore final : public ISecretStore {

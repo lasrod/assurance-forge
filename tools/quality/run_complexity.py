@@ -62,13 +62,31 @@ def fail(message: str) -> None:
     raise SystemExit(2)
 
 
+def pinned_version() -> str | None:
+    """The version the committed baseline was generated with, if there is one."""
+    if not JSON_PATH.exists():
+        return None
+    try:
+        return json.loads(JSON_PATH.read_text(encoding="utf-8")).get("tool_version")
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def load_lizard():
     try:
         import lizard  # noqa: PLC0415  (imported here so the error message can be ours)
     except ImportError:
+        # Print the version, not a placeholder pointing at the file it lives in.
+        # The whole point of pinning is that a different version returns numbers
+        # this baseline cannot be compared against, and an instruction nobody can
+        # paste is one that gets replaced with a bare `pip install lizard` and
+        # the wrong version with it.
+        pinned = pinned_version()
+        if pinned:
+            fail(f"lizard is not installed. It is the pinned complexity tool: pip install lizard=={pinned}")
         fail(
-            "lizard is not installed. It is the pinned complexity tool: "
-            "pip install lizard==<version in docs/quality/complexity-baseline.json>"
+            "lizard is not installed, and there is no baseline to read a pinned version from. "
+            "Install it (pip install lizard), run this tool without --check, and commit the baseline it writes."
         )
     return lizard
 

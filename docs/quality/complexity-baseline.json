@@ -3,8 +3,8 @@
   "tool_version": "1.17.31",
   "ccn_threshold": 15,
   "files_analyzed": 515,
-  "functions_analyzed": 3476,
-  "production_nloc": 72471,
+  "functions_analyzed": 3478,
+  "production_nloc": 72507,
   "over_threshold": 172,
   "functions": {
     "libs/sacm/src/commands/commands.cpp::sacm::commands::detail::check": {
@@ -273,8 +273,8 @@
       "parameters": 4
     },
     "src/app/areas/modal_host.cpp::app::areas::ModalHost::RenderPreferencesWindow": {
-      "ccn": 20,
-      "nloc": 119,
+      "ccn": 22,
+      "nloc": 125,
       "parameters": 0
     },
     "src/app/areas/modal_host_terminology.cpp::app::areas::ModalHost::RenderQuickDefineTermModal": {
@@ -798,8 +798,8 @@
       "parameters": 4
     },
     "src/ui/panels/preferences_panel.cpp::ui::panels::RenderAiSection": {
-      "ccn": 30,
-      "nloc": 78,
+      "ccn": 31,
+      "nloc": 79,
       "parameters": 2
     },
     "src/ui/panels/project_explorer_panel.cpp::ui::panels::RenderAdvancedFile": {
@@ -898,7 +898,7 @@
     "libs/sacm/src/compare/semantic_compare.cpp": 32,
     "src/app/app_runtime_project.cpp": 32,
     "src/app/areas/ai_debug_area.cpp": 31,
-    "src/ui/panels/preferences_panel.cpp": 30,
+    "src/ui/panels/preferences_panel.cpp": 31,
     "src/ui/gsn/gsn_acp_decorator.cpp": 29,
     "src/ui/panels/review_panel.cpp": 28,
     "libs/sacm/src/commands/operations.cpp": 27,
@@ -928,6 +928,7 @@
     "src/sacm_adapter/document_edit.cpp": 23,
     "src/ui/gsn/gsn_hit_tester.cpp": 23,
     "src/ui/panels/draft_changes_panel.cpp": 23,
+    "src/app/areas/modal_host.cpp": 22,
     "src/sacm_adapter/case_projection.cpp": 22,
     "src/ui/panels/project_explorer_panel.cpp": 22,
     "src/ui/panels/relationship_panel.cpp": 22,
@@ -935,7 +936,6 @@
     "src/app/areas/canvas_history_overlay.cpp": 21,
     "src/app/areas/modal_host_terminology.cpp": 21,
     "src/core/drafts/draft_workspace_store.cpp": 21,
-    "src/app/areas/modal_host.cpp": 20,
     "src/core/audit/audit_diff.cpp": 20,
     "src/core/tree_editing.cpp": 20,
     "src/ui/panels/status_bar_panel.cpp": 20,

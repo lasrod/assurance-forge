@@ -84,9 +84,13 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::Spacing();
     ImGui::TextUnformatted(AF_TR("API Key").c_str());
     if (!model.secureStoreAvailable) {
-        ImGui::TextColored(StatusColor(AiStatusSeverity::Error),
-                           "%s",
-                           AF_TR("Secure storage is unavailable on this platform.").c_str());
+        // The reason comes from `app`: this panel cannot ask `ai` which backend
+        // the build has. The fallback is the old wording and is only reached if
+        // a caller forgets to supply one.
+        const std::string reason = model.secureStoreUnavailableReason.empty()
+                                       ? AF_TR("Secure storage is unavailable on this platform.")
+                                       : model.secureStoreUnavailableReason;
+        ImGui::TextColored(StatusColor(AiStatusSeverity::Error), "%s", reason.c_str());
     } else if (model.keyStored) {
         ImGui::TextDisabled("%s", AF_TR("Key stored: ********").c_str());
     } else {

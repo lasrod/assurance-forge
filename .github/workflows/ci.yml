@@ -101,7 +101,17 @@ jobs:
         run: |
           sudo apt-get install -y gnome-keyring dbus-x11
           dbus-run-session -- bash -c '
-            echo -n "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            # --login, not --unlock. `--unlock` starts the daemon against an
+            # EXISTING login keyring; it does not create one, so the first save
+            # asked libsecret to create the default collection, which needs a
+            # graphical prompter and failed with "Object does not exist at path
+            # /org/freedesktop/secrets/collection/login". `--login` is the mode
+            # PAM uses at sign-in: it reads the password from stdin and creates
+            # the keyring when absent. Empty password, because this is a
+            # throwaway runner keyring holding one test value.
+            echo -n "" | gnome-keyring-daemon --daemonize --login >/dev/null
+            eval "$(echo -n "" | gnome-keyring-daemon --start --components=secrets)"
+            export GNOME_KEYRING_CONTROL SSH_AUTH_SOCK
             ./build/tests --gtest_filter=SecretStore.* 2>&1 | tee /tmp/secret-store.log
             exit ${PIPESTATUS[0]}
           '
