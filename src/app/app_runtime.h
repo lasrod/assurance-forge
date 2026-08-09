@@ -9,7 +9,7 @@
 #include "core/reviews/review_item.h"
 #include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
-#include "sacm/sacm_package_tree.h"
+#include "legacy_sacm/sacm_package_tree.h"
 
 #include <cstddef>
 #include <memory>

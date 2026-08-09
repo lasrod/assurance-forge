@@ -1,7 +1,7 @@
 #pragma once
 
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <string>
 #include <unordered_set>

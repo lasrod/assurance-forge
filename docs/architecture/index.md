@@ -74,7 +74,7 @@ flowchart LR
 | --- | --- | --- |
 | Runtime | `src/app/app_runtime.*`, `src/app/app_runtime_state.h` | Owns frame rendering, controller wiring, dirty flags, and derived views. |
 | Events | `src/app/app_events.h` | Typed in-process pub-sub for selection, dirty state, modals, proposals, and center-view requests. |
-| Parser and SACM | `src/parser/xml_parser.*`, `src/sacm/*`, `src/core/assurance_tree.*` | XML is parsed into both a flat UI model and a typed SACM package. |
+| Parser and SACM | `src/parser/xml_parser.*`, `src/legacy_sacm/*`, `src/core/assurance_tree.*` | XML is parsed into both a flat UI model and a typed SACM package. |
 | Project storage | `src/core/project_model.h`, `src/core/project_service.*` | Project manifest, tracked files, hashes, file state, review files, and project directory layout. |
 | Editing | `src/core/element_factory.*`, `src/app/controllers/element_edit_controller.*`, `src/ui/panels/element_panel.*` | Add/remove operations update parser and SACM models together. Text edits sync back into SACM. |
 | UI | `src/ui/tree_view.*`, `src/ui/gsn/*`, `src/ui/panels/*`, `src/ui/register_views.*` | Panels render ImGui only and call runtime/controller callbacks. |

@@ -3,7 +3,7 @@
 #include "core/library_package_projection.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_serializer.h"
 
 #include <cstddef>
 #include <set>

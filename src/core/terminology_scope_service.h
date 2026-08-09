@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/terminology_package_service.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <cstddef>
 #include <optional>

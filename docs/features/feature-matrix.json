@@ -118,7 +118,7 @@
       "status": "supported",
       "evidence": [
         "libs/sacm/src/io",
-        "src/sacm/sacm_serializer.cpp"
+        "src/legacy_sacm/sacm_serializer.cpp"
       ],
       "tests": [
         "tests/test_sacm_roundtrip.cpp"
@@ -147,7 +147,7 @@
       "status": "supported",
       "evidence": [
         "libs/sacm/src",
-        "src/sacm/sacm_package_tree.cpp"
+        "src/legacy_sacm/sacm_package_tree.cpp"
       ],
       "tests": [
         "tests/test_sacm_package_tree.cpp",
@@ -293,7 +293,7 @@
       "name": "SACM argument packages as a substrate for GSN modularity",
       "status": "supported",
       "evidence": [
-        "src/sacm/sacm_package_tree.cpp",
+        "src/legacy_sacm/sacm_package_tree.cpp",
         "src/core/library_package_projection.cpp"
       ],
       "tests": [

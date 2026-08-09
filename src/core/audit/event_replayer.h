@@ -2,7 +2,7 @@
 
 #include "core/audit/audit_transaction.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <cstdint>
 #include <expected>

@@ -5,7 +5,7 @@
 #include "core/audit/canonical_model_hash.h"
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
-#include "sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_parser.h"
 
 #include <gtest/gtest.h>
 

@@ -9,7 +9,7 @@
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "ui/imgui_buffer_utils.h"
 
 #include <gtest/gtest.h>

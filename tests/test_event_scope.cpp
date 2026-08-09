@@ -1,6 +1,6 @@
 #include "core/audit/audit_transaction.h"
 #include "core/audit/event_scope.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <gtest/gtest.h>
 

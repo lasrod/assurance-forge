@@ -3,7 +3,7 @@
 The unchecked deliverable of
 [#291](https://github.com/lasrod/assurance-forge/issues/291): which components
 exist only to carry the migration from the legacy SACM model
-(`src/sacm`, `parser::AssuranceCase`) to the reusable library
+(`src/legacy_sacm`, `parser::AssuranceCase`) to the reusable library
 ([`libs/sacm`](https://github.com/lasrod/assurance-forge/tree/main/libs/sacm)),
 and what has to be observably true before each of them can be deleted.
 
@@ -44,7 +44,7 @@ Two ground rules, inherited from that history:
 | [`library_load.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/sacm_adapter/library_load.cpp) — `reload_document_keeping_compatibility_content` | Re-derives the document from projection bytes while restoring preserved vendor content | Exists only because projections get *reloaded*; used by the bridge, the Stage-5 net, and `AppState::sync_library_document` | `library_bridge.cpp`, `command_bus.cpp`, `app_state.cpp` |
 | [`command_bus.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/command_bus.cpp) flip plumbing — `library_primary` / `library_synced` / `allow_library_primary`, scratch rebuild, Stage-5 net, fallback serializations | Runs exactly one of two derivation directions per command | Both directions are still live | Every audited command |
 | [`projection_diff`](https://github.com/lasrod/assurance-forge/blob/main/src/sacm_adapter/projection_diff.h) | Stage-3 parallel-load baseline: library projection vs legacy parser | Still the only per-field fidelity evidence (`SACM23-INT-001`'s corpus qualifier) | Baseline tests only |
-| [`src/sacm`](https://github.com/lasrod/assurance-forge/tree/main/src/sacm) | Legacy model types, `parse_sacm` / `serialize_sacm` | The bridge serializes through it; the canonical hash hashes its types; guarded save fallbacks remain | `core`, `parser`, the bridge, hashing |
+| [`src/legacy_sacm`](https://github.com/lasrod/assurance-forge/tree/main/src/legacy_sacm) | Legacy model types, `parse_sacm` / `serialize_sacm` | The bridge serializes through it; the canonical hash hashes its types; guarded save fallbacks remain | `core`, `parser`, the bridge, hashing |
 | [`src/parser`](https://github.com/lasrod/assurance-forge/tree/main/src/parser) — `parser::AssuranceCase` | The flat POD model the UI renders from; legacy XML parsing | The POD is now a *derived view* (projected via [`case_projection`](https://github.com/lasrod/assurance-forge/blob/main/src/sacm_adapter/case_projection.h)), no longer a parse result; the legacy parse path has no load caller | `core`, `ui`, `export`, `app` (render + tree building) |
 
 Not migration-era, despite sitting on the same seam: `sacm_adapter`'s
@@ -186,7 +186,7 @@ bridge itself.
 
 Not scheduled; needs its own design. The canonical hash is currently defined
 over the legacy package (`library_canonical_hash*` →
-`project_library_package` → `CanonicalModelHash`), so `src/sacm` types and
+`project_library_package` → `CanonicalModelHash`), so `src/legacy_sacm` types and
 `RebuildSacmArgumentPackageFromParser` stay load-bearing even after Phase 4.
 Redefining the hash on the library model invalidates every stored
 `last_known_canonical_model_hash` and replay baseline, so it requires a
@@ -196,7 +196,7 @@ the legacy package types be deleted, with the
 
 *Exit criteria*: `sacm::serialize_sacm` has no caller in the working-file
 path (including guarded fallbacks); `VerifyProject` passes on a project
-recorded before the hash change; `src/sacm` shrinks to whatever the POD view
+recorded before the hash change; `src/legacy_sacm` shrinks to whatever the POD view
 still needs, or disappears.
 
 ## Risks, and which tests guard them
@@ -219,11 +219,11 @@ canonical hash drops the same content on both sides
 
 ## What this plan does not cover
 
-- **The `src/sacm` vs `libs/sacm/include/sacm` include-prefix ambiguity** —
-  [#341](https://github.com/lasrod/assurance-forge/issues/341), also recorded
-  in [Layers and ownership](layers-and-ownership.md) and the
-  [quality baseline](../quality/repository-baseline.md). If Phase 5 lands
-  first, that issue dissolves with the legacy tree.
+- ~~**The `src/sacm` vs `libs/sacm/include/sacm` include-prefix ambiguity**~~ —
+  closed by [#341](https://github.com/lasrod/assurance-forge/issues/341): the
+  legacy tree moved to `src/legacy_sacm` and answers to the `legacy_sacm/`
+  include prefix, so `sacm/` names only the library. Phase 5 still removes the
+  tree; it no longer has to remove an ambiguity as well.
 - **Per-layer include roots and CMake-enforced dependency direction** —
   [#340](https://github.com/lasrod/assurance-forge/issues/340).
 - **The POD render model's final home.** `parser::AssuranceCase` stays as the

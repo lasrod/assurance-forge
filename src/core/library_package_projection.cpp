@@ -2,7 +2,7 @@
 
 #include "core/audit/canonical_model_hash.h"
 #include "core/sacm_argument_sync.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_serializer.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 

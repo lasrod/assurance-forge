@@ -1,5 +1,5 @@
-#include "sacm/sacm_parser.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_serializer.h"
 
 #include <filesystem>
 #include <gtest/gtest.h>

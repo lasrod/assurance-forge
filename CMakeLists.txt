@@ -327,7 +327,7 @@ add_custom_target(check_layer_gates ALL
 # is linked in via the per-layer af_* targets.
 hello_imgui_add_app(assurance-forge src/app/main.cpp)
 target_link_libraries(assurance-forge PRIVATE
-    af_app af_ui af_ai af_export af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
+    af_app af_ui af_ai af_export af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32 dwmapi)
@@ -343,7 +343,7 @@ af_copy_sccg_data(assurance-forge)
 # review from growing a shared inference path (docs/features/mcp-server.md).
 add_executable(assurance-forge-mcp src/mcp/main.cpp)
 target_link_libraries(assurance-forge-mcp PRIVATE
-    af_mcp af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
+    af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge-mcp PRIVATE bcrypt advapi32)
@@ -502,7 +502,7 @@ target_compile_definitions(tests PRIVATE AF_REPO_ROOT="${CMAKE_SOURCE_DIR}")
 target_link_libraries(tests PRIVATE
     GTest::gtest_main
     hello_imgui
-    af_app af_ui af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_sacm af_parser
+    af_app af_ui af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
 
 # The per-layer object libraries are not the whole of the first-party code. The

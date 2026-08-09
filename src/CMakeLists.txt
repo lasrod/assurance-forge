@@ -2,7 +2,7 @@
 # Assurance-Forge source tree
 #
 # Each top-level src/ subdirectory is a thin CMake OBJECT library:
-#   af_parser, af_sacm, af_sacm_adapter, af_core, af_ai, af_export, af_ui,
+#   af_parser, af_legacy_sacm, af_sacm_adapter, af_core, af_ai, af_export, af_ui,
 #   af_bridge, af_agent, af_mcp, af_app
 #
 # Each declares the third-party libraries it actually uses. The map is in
@@ -36,7 +36,7 @@ target_include_directories(af_imgui INTERFACE ${ASSURANCE_FORGE_IMGUI_INCLUDE_DI
 target_link_libraries(af_imgui INTERFACE imgui)
 
 add_subdirectory(parser)
-add_subdirectory(sacm)
+add_subdirectory(legacy_sacm)
 add_subdirectory(sacm_adapter)
 add_subdirectory(core)
 add_subdirectory(ai)
@@ -50,7 +50,7 @@ add_subdirectory(app)
 # Listed explicitly rather than globbed: a new subsystem should have to say that
 # it builds warning-clean, not inherit the claim by being in the right folder.
 foreach(af_target
-    af_parser af_sacm af_sacm_adapter af_core af_ai af_export af_ui
+    af_parser af_legacy_sacm af_sacm_adapter af_core af_ai af_export af_ui
     af_bridge af_agent af_mcp af_app)
     af_set_warning_level(${af_target})
 endforeach()

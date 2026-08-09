@@ -17,7 +17,7 @@
 // packages -- which the canonical hash also covers -- are added before this is
 // wired into the audit readers, so audit coverage is never reduced.
 
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <filesystem>
 #include <optional>

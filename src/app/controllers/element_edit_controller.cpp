@@ -4,7 +4,7 @@
 #include "app/commands/dispatch.h"
 #include "core/commands/element_commands.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "sacm_adapter/document_edit.h"
 #include "ui/ui_state.h"
 

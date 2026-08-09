@@ -3,7 +3,7 @@
 #include "core/terminology_package_service.h" // kVisibleTerminologyContextMarker, TerminologyContextAssociationResult
 #include "core/terminology_text_utils.h"      // TermContextDisplayLabel
 #include "parser/model_utils.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <gtest/gtest.h>
 

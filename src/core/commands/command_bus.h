@@ -5,7 +5,7 @@
 #include "core/audit/event_store.h"
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <cstdint>
 #include <filesystem>

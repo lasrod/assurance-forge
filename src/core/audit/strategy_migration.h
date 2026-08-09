@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/project_model.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <filesystem>
 #include <string>

@@ -1,7 +1,7 @@
 #include "core/commands/package_commands.h"
 
 #include "core/acp/assurance_claim_point.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <gtest/gtest.h>
 

@@ -11,7 +11,7 @@
 #include "core/project_model.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
-#include "sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_parser.h"
 #include "ui/text_edit_session.h"
 
 #include <gtest/gtest.h>

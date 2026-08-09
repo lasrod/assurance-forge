@@ -2,7 +2,7 @@
 
 #include "core/terminology_package_service.h"
 #include "core/sacm_model.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "ui/panels/confidence_panel.h"
 
 #include <cstdint>

@@ -1,7 +1,7 @@
 #include "core/terminology_scope_service.h"
 #include "core/terminology_package_service.h"
-#include "sacm/sacm_parser.h"
-#include "sacm/sacm_serializer.h"
+#include "legacy_sacm/sacm_parser.h"
+#include "legacy_sacm/sacm_serializer.h"
 
 #include <gtest/gtest.h>
 

@@ -6,7 +6,7 @@
 #include "core/terminology_scope_service.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "ui/i18n/localization.h"
 
 #include <nlohmann/json.hpp>

@@ -1,7 +1,7 @@
 #include "app/terminology_problem_sync.h"
 
 #include "core/problems/problems_manager.h"
-#include "sacm/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 
 #include <gtest/gtest.h>
 
