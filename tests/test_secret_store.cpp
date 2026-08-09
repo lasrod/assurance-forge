@@ -48,9 +48,17 @@ TEST(SecretStore, IsAvailableWhereThePlatformShipsAStore) {
 #endif
 }
 
-// An unavailable store has to say what to do about it. A user on a Linux build
-// without libsecret who is told only "unavailable" concludes the feature does
-// not exist on their platform; one who is told the package name installs it.
+// An unavailable store has to say what to do about it, and the two ways to be
+// unavailable have different answers. A user told to rebuild when their build
+// is fine goes a long way in the wrong direction, and one told only
+// "unavailable" concludes the feature does not exist on their platform.
+//
+//   backend "none"      -> the build has no keyring support: install and rebuild
+//   backend "libsecret" -> the build is fine, nothing is running: start a keyring
+//
+// Which is why `SecretStoreBackendName()` exists: without it this test cannot
+// tell which refusal it is looking at, and would have to accept either message
+// for either cause.
 TEST(SecretStore, RefusalNamesWhatIsMissing) {
     const std::shared_ptr<ai::ISecretStore> store = ai::CreatePlatformSecretStore();
     ASSERT_NE(store, nullptr);
@@ -60,9 +68,41 @@ TEST(SecretStore, RefusalNamesWhatIsMissing) {
     const ai::SecretStoreResult result = store->SaveSecret(kTestService, kTestAccount, "value");
     EXPECT_FALSE(result.success);
     EXPECT_EQ(result.errorCode, ai::AiErrorCode::SecureStoreUnavailable);
-    EXPECT_FALSE(result.errorMessage.empty());
-    EXPECT_NE(result.errorMessage.find("libsecret"), std::string::npos)
-        << "the refusal does not name the package that would fix it: " << result.errorMessage;
+    ASSERT_FALSE(result.errorMessage.empty());
+
+    const std::string backend = ai::SecretStoreBackendName();
+    if (backend == "none") {
+        EXPECT_NE(result.errorMessage.find("libsecret"), std::string::npos)
+            << "this build has no keyring support, so the refusal must name the package that would add it: "
+            << result.errorMessage;
+    } else {
+        EXPECT_NE(result.errorMessage.find("keyring"), std::string::npos)
+            << "the build supports " << backend
+            << " but nothing is running, and the refusal does not say so: " << result.errorMessage;
+        EXPECT_EQ(result.errorMessage.find("rebuild"), std::string::npos)
+            << "the build is fine; telling the user to rebuild sends them after the wrong problem: "
+            << result.errorMessage;
+    }
+}
+
+// The backend a build compiled in, which is a different question from whether
+// it currently works. Reported so the settings UI and a bug report can tell a
+// missing package from a missing daemon.
+TEST(SecretStore, ReportsWhichBackendTheBuildContains) {
+    const std::string backend = ai::SecretStoreBackendName();
+#if defined(_WIN32)
+    EXPECT_EQ(backend, "Windows Credential Manager");
+#elif defined(__APPLE__)
+    EXPECT_EQ(backend, "macOS Keychain");
+#else
+    EXPECT_TRUE(backend == "libsecret" || backend == "none") << backend;
+#endif
+    // An available store must have come from somewhere.
+    const std::shared_ptr<ai::ISecretStore> store = ai::CreatePlatformSecretStore();
+    ASSERT_NE(store, nullptr);
+    if (store->IsAvailable()) {
+        EXPECT_NE(backend, "none") << "a store reports itself available in a build with no backend";
+    }
 }
 
 // Save, read back, overwrite, delete -- against the real platform store, which

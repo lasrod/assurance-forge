@@ -291,13 +291,26 @@ public:
     bool IsAvailable() const override {
         // Probed once: libsecret being linked says nothing about a keyring
         // daemon being reachable, and a headless session (CI, ssh, a minimal
-        // container) commonly has none. Reporting "available" there would make
-        // the UI offer secure storage that then fails on save.
+        // container) commonly has none. Reporting "available" there makes the
+        // UI offer secure storage that then fails on save.
+        //
+        // SECRET_SERVICE_OPEN_SESSION, not SECRET_SERVICE_NONE. With no flags
+        // libsecret hands back a proxy object WITHOUT contacting the service --
+        // the D-Bus name is activated lazily by the first real operation -- so
+        // the probe succeeded on a machine with no keyring at all and the
+        // failure surfaced later as "org.freedesktop.secrets was not provided
+        // by any .service files" from inside a save. Opening a session forces
+        // the contact now. It negotiates a transport only; unlocking a
+        // collection, and any prompt that comes with it, still happens on the
+        // first real read or write, which is where a user expects it.
         static const bool available = [] {
             GError* error = nullptr;
-            SecretService* service = secret_service_get_sync(SECRET_SERVICE_NONE, nullptr, &error);
+            SecretService* service = secret_service_get_sync(SECRET_SERVICE_OPEN_SESSION, nullptr, &error);
             if (error != nullptr) {
                 g_error_free(error);
+                if (service != nullptr) {
+                    g_object_unref(service);
+                }
                 return false;
             }
             if (service == nullptr) {
@@ -309,10 +322,23 @@ public:
         return available;
     }
 
+    // libsecret is linked but nothing answers on the bus. Distinct from the
+    // no-libsecret build's message: there the fix is to install a package and
+    // rebuild, here it is to start a keyring, and telling a user to rebuild
+    // when their build is fine sends them a long way in the wrong direction.
+    static std::string NoServiceReason() {
+        return "Secure storage is unavailable: this build supports the keyring, but no keyring service is "
+               "running (org.freedesktop.secrets). Start your desktop keyring, or install one such as "
+               "gnome-keyring.";
+    }
+
     SecretStoreResult
     SaveSecret(const std::string& service, const std::string& account, const std::string& secret) override {
         if (secret.empty()) {
             return SecretStoreFailure(AiErrorCode::MissingApiKey, "API key is empty.");
+        }
+        if (!IsAvailable()) {
+            return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, NoServiceReason());
         }
         const std::string label = service + ": " + account;
         GError* error = nullptr;
@@ -342,6 +368,9 @@ public:
     }
 
     SecretLoadResult LoadSecret(const std::string& service, const std::string& account) override {
+        if (!IsAvailable()) {
+            return SecretLoadFailure(AiErrorCode::SecureStoreUnavailable, NoServiceReason());
+        }
         GError* error = nullptr;
         gchar* raw = secret_password_lookup_sync(
             AssuranceForgeSchema(), nullptr, &error, "service", service.c_str(), "account", account.c_str(), nullptr);
@@ -365,6 +394,9 @@ public:
     }
 
     SecretStoreResult DeleteSecret(const std::string& service, const std::string& account) override {
+        if (!IsAvailable()) {
+            return SecretStoreFailure(AiErrorCode::SecureStoreUnavailable, NoServiceReason());
+        }
         GError* error = nullptr;
         secret_password_clear_sync(
             AssuranceForgeSchema(), nullptr, &error, "service", service.c_str(), "account", account.c_str(), nullptr);
@@ -442,6 +474,18 @@ SecretLoadResult SecretLoadFailure(AiErrorCode errorCode, std::string message) {
     result.errorCode = errorCode;
     result.errorMessage = std::move(message);
     return result;
+}
+
+std::string SecretStoreBackendName() {
+#ifdef _WIN32
+    return "Windows Credential Manager";
+#elif defined(__APPLE__)
+    return "macOS Keychain";
+#elif defined(AF_HAVE_LIBSECRET)
+    return "libsecret";
+#else
+    return "none";
+#endif
 }
 
 std::shared_ptr<ISecretStore> CreatePlatformSecretStore() {
