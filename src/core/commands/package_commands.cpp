@@ -3,6 +3,7 @@
 #include "core/acp/assurance_claim_point.h"
 #include "core/commands/library_bridge.h"
 #include "core/terminology_package_service.h"
+#include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -140,12 +141,40 @@ bool RemoveArgumentPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent&
         out_error = "RemoveArgumentPackageCommand requires an id or gid.";
         return false;
     }
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-        return core::DeleteArgumentPackage(package, model, id_, gid_, err);
-    };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+
+    // Phase 1 of the legacy-bridge retirement. `apply_delete_package` is the
+    // library's recursive DeleteElement, proven equivalent to
+    // `core::DeleteArgumentPackage` in test_sacm_library_edit, and the audit
+    // replayer has used it for this event since Phase 2 slice 2a -- the live
+    // command was the only side still bridging. The seam addresses the package by
+    // id, so a gid-only removal keeps the guarded bridge.
+    //
+    // The legacy mutator additionally scrubbed the removed elements out of the POD
+    // render model and cleared any ACP that pointed at the package as its
+    // confidence tree. Neither survives the bridge either (it discards the scratch
+    // model and re-derives from the serialized package), so nothing is lost here:
+    // the frame boundary re-projects both from the library.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx) && !id_.empty()) {
+        const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(*ctx.library_document, id_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the argument package removal", outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
+            return core::DeleteArgumentPackage(package, model, id_, gid_, err);
+        };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
+
     FillIdentityPayload(out_event, "RemoveArgumentPackage", id_, gid_);
     return true;
 }

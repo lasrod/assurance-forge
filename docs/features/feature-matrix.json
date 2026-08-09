@@ -1177,13 +1177,15 @@
       "status": "supported",
       "evidence": [
         "src/core/terminology_scope_service.cpp",
+        "src/core/commands/terminology_commands.cpp",
         "src/ui/panels/terminology_package_panel.cpp"
       ],
       "tests": [
         "tests/test_terminology_scope_service.cpp",
-        "tests/test_terminology_commands.cpp"
+        "tests/test_terminology_commands.cpp",
+        "tests/test_save_from_library.cpp"
       ],
-      "notes": "Documented in docs/features/terminology-assist.md."
+      "notes": "Documented in docs/features/terminology-assist.md. Glossary edits now apply straight to the SACM library rather than through the legacy conversion, so they work on cases the conversion could not represent (an ArgumentGroup, a nested ArgumentPackage) where every glossary edit used to be refused. Deleting a term that elements still reference now names them in the confirmation (\"also removes 2 elements that reference it\") and removes them on Yes, where before the reference was silently left pointing at nothing. The answer is recorded in the audit log, so a replay reproduces the decision rather than re-deciding it, and the status line reports the count actually removed. No cascade is offered for a file opened outside a project, where the edit path cannot honour it. A term still assigned to a category continues to block deleting that category, as before."
     },
     {
       "id": "AF-ENG-011",

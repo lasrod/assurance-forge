@@ -146,7 +146,17 @@ struct TerminologyUiState {
     core::TerminologyPackageRef quick_define_target_package_ref;
     std::unordered_set<std::string> ignored_suggestion_keys;
     bool show_delete_term_modal = false;
+    // How many times the term's VALUE appears in the argument's text. Advisory:
+    // deleting the term does not change that text, it only removes the
+    // definition behind it.
     int pending_delete_term_usage_count = 0;
+    // What the SACM library says deleting the term would take with it -- the
+    // ArtifactReference/AssertedContext pairs that reference it structurally,
+    // which is a different (and destructive) question from the text count above.
+    // Non-empty means the modal must ask before removing them; confirming sets
+    // `DeleteTerminologyTermCommand`'s cascade flag.
+    std::vector<app::controllers::ElementEditController::RemovalEffect> pending_delete_term_references;
+    bool pending_delete_term_preview_available = false;
     bool show_category_editor_modal = false;
     bool editing_existing_category = false;
     bool show_delete_category_modal = false;

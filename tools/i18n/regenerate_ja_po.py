@@ -1161,6 +1161,12 @@ PLURAL_TRANSLATIONS = {
     ("This term value appears {0} time in the current SACM model.",
      "This term value appears {0} times in the current SACM model."):
         ["この用語値は現在の SACM モデルに {0} 回出現します。"],
+    ("Deleting it also removes {0} element that references it:",
+     "Deleting it also removes {0} elements that reference it:"):
+        ["削除すると、この用語を参照する {0} 個の要素も削除されます:"],
+    ("Deleted term and {0} element that referenced it.",
+     "Deleted term and {0} elements that referenced it."):
+        ["用語と、それを参照していた {0} 個の要素を削除しました。"],
     ("This category is assigned to {0} term. Remove those assignments before deleting it.",
      "This category is assigned to {0} terms. Remove those assignments before deleting it."):
         ["この分類は {0} 件の用語に割り当てられています。削除前にそれらの割り当てを除去してください。"],

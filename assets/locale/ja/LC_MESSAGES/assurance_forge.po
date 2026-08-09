@@ -2586,6 +2586,14 @@ msgid "Accepted {0} draft change."
 msgid_plural "Accepted {0} draft changes."
 msgstr[0] "ドラフトの変更 {0} 件を受理しました。"
 
+msgid "Deleted term and {0} element that referenced it."
+msgid_plural "Deleted term and {0} elements that referenced it."
+msgstr[0] "用語と、それを参照していた {0} 個の要素を削除しました。"
+
+msgid "Deleting it also removes {0} element that references it:"
+msgid_plural "Deleting it also removes {0} elements that reference it:"
+msgstr[0] "削除すると、この用語を参照する {0} 個の要素も削除されます:"
+
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
 msgstr[0] "提案ドラフト: {0} 件の操作"

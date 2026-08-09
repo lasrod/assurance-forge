@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 26 commands have no native seam yet | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 15 commands have no native seam yet (was 26 before phase 1) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -71,6 +71,13 @@ default `true`, assigned nowhere under `src/app/`).
 | RemoveElement (`NodeAndDescendants` only) | `apply_delete_element` per planned id | `RemoveElementCommand::Apply` |
 | RemoveRelationship | `apply_delete_element` | `RemoveRelationshipCommand::Apply` |
 | Undo | move-assigns the replayed document; deliberately ignores the kill switch | [`undo_command.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/undo_command.cpp) `UndoLastTransactionCommand::Apply` |
+| All ten terminology commands | `apply_create/update/delete_terminology_*`, `apply_associate_terminology_term`, `apply_add_terminology_visible_context` | [`terminology_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/terminology_commands.cpp) (phase 1) |
+| RemoveArgumentPackage | `apply_delete_package` | [`package_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/package_commands.cpp) `RemoveArgumentPackageCommand::Apply` (phase 1) |
+
+Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
+seam does not support (and for a ref that carries only a gid, which the seams
+cannot address). No command mutates the legacy package in place while a document
+is present.
 
 **Bridged** (`ApplyLibraryPrimaryOrLegacy` → `BridgeLegacyMutationToLibrary`):
 
@@ -81,9 +88,8 @@ default `true`, assigned nowhere under `src/app/`).
 - Tree: ReorderSiblings, MoveSubtree ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
 - ACP: AddAcp, RemoveAcp, UpsertAcp, CreateConfidenceArgumentTree
   ([`acp_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/acp_commands.cpp))
-- Packages: RemoveTerminologyPackage, RemoveArgumentPackage,
-  RemoveArtifactPackage ([`package_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/package_commands.cpp))
-- All ten terminology commands ([`terminology_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/terminology_commands.cpp))
+- Packages: RemoveTerminologyPackage, RemoveArtifactPackage
+  ([`package_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/package_commands.cpp))
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
 - RemoveElement `NodeOnly` (reparent — the library has no retarget operation,
   see [GSN metamodel gaps](../sacm/sacm-gsn-metamodel-gaps.md)) and the
@@ -101,13 +107,14 @@ through the guarded bridge; the Stage-5 net and its lossy
 `library_xmi_from_package` autosave survive as machinery for that residual
 path and for the `allow_library_primary` test seam only.
 
-**Replay-side asymmetry, and why it matters**: `ApplyEventToLibrary` in
+**Replay-side asymmetry, and why it mattered**: `ApplyEventToLibrary` in
 [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp)
-already replays all ten terminology events, `RemoveArgumentPackage`
-(`apply_delete_package`) and `UpdateElementText(Name)` through native seams —
-the seams exist, mint the legacy `gid-<id>`, and are convergence-proven —
-while the corresponding *live* commands still bridge. That tranche is
-seam-ready. The one replay branch that can never go native as-is is
+already replayed all ten terminology events, `RemoveArgumentPackage`
+(`apply_delete_package`) and `UpdateElementText(Name)` through native seams,
+while the corresponding *live* commands bridged. Phase 1 closed that gap for the
+first two tranches: live and replay now run the same seams, so they agree by
+construction rather than by the projection happening to be faithful. The one
+replay branch that can never go native as-is is
 `UpdateElementText` Content/Description: the two legacy text slots collapse to
 one clause-8.9 Description in the library, an irreconcilable model difference
 diagnosed with measured hashes in the `UpdateElementText` branch of
@@ -119,22 +126,92 @@ Ordered by dependency: commands go native, then the bridge dies, then the
 plumbing, then the legacy model's remaining jobs. Each phase updates the
 `SACM23-LIB-002` / `SACM23-INT-001` matrix notes it touches.
 
-### Phase 1 — Flip the seam-ready live commands
+### Phase 1 — Flip the seam-ready live commands — **done**
 
-Terminology CRUD (ten commands) and RemoveArgumentPackage move onto the seams
-the replayer already uses. Audit payloads are unchanged (planned ids are
-passed to the seams verbatim; gids are deterministic `gid-<id>`).
+Terminology CRUD (ten commands) and RemoveArgumentPackage now apply through the
+seams the replayer already used. Each keeps the guarded bridge as a fallback for
+shapes the seam does not support, so the "never mutate the legacy package in
+place while a document is present" invariant is unchanged.
 
-*Exit criteria*: no `ApplyLibraryPrimaryOrLegacy` caller remains in
-`terminology_commands.cpp`; each flipped command gains a byte-pinned test that
-a vendor-content case survives the edit natively (pattern:
-`SaveFromLibrary.SACM23_LIB_002_BridgedEditPreservesUnknownContent`);
-`LibraryReplayConvergence.*` and `LibraryPrimaryEditFlip.*` pass unchanged.
+*Exit criteria, as met.* The exit criterion as originally written — "no
+`ApplyLibraryPrimaryOrLegacy` caller remains in `terminology_commands.cpp`" —
+was wrong, and is restated here as what actually has to hold: no terminology
+command *routes* through the bridge; the calls that remain are fallbacks for
+unsupported shapes, which is what phase 4 deletes.
+
+- **Native routing is measured, not asserted.** Both routes set
+  `library_primary` and both preserve vendor content, so neither distinguishes
+  them. The one observable that does is the bridge's refusal:
+  `SaveFromLibrary.SACM23_LIB_002_FlippedTerminologyCommandsRunOnACaseTheBridgeRefuses`
+  runs all ten commands against `argumentation-full-valid.sacm.xmi` (ArgumentGroup,
+  AssertedArtifactSupport, AssertedArtifactContext, a second ArgumentPackage), where
+  a bridged edit is refused outright. Same idea for the package removal, over a
+  nested-ArgumentPackage fixture.
+- **Byte pins.**
+  `SaveFromLibrary.SACM23_LIB_002_NativeTerminologyEditsPreserveUnknownContent`
+  and `...NativeArgumentPackageRemovalPreservesUnknownContent`.
+- **Convergence.** `LibraryPrimaryEditFlip.FlippedTerminologyTrancheMatches-`
+  `LegacyCanonicalHash` covers create/update/delete at all three levels plus both
+  association forms; `...RemoveArgumentPackageMatchesLegacyCanonicalHash` covers
+  the removal; `...FlippedTerminologyTrancheReplaysConvergently` verifies the log
+  the flipped commands wrote. The pre-existing suites pass unchanged.
+
+Two things the flip changed that the plan did not anticipate, both recorded
+rather than absorbed:
+
+- **Deleting a term an argument package still references now asks first, and
+  removes the references on consent.** The legacy mutator accepted such a delete
+  and left the ArtifactReference dangling; the seam refuses it (SACM-CMD-007),
+  because crossing a package boundary is a cascade and the library's policy
+  default is that cascades are opt-in. Refusal was the first landing and it was
+  the wrong end state -- the term's contexts are exactly what the user means to
+  be rid of. `DeleteTerminologyTermCommand` now takes a `cascade_references`
+  input, `preview_delete_terminology_element` lists what it would remove, and the
+  delete modal shows that list before the button. Three points worth keeping:
+    - The library's own cross-package cascade is NOT what is used. It removes the
+      *entry* -- the term leaves the reference's `referencedArtifact` list -- and
+      the ArtifactReference survives pointing at nothing, with its AssertedContext
+      still drawing a context node. The seam instead deletes each reference that
+      exists solely to name the term, then the term; a reference that also points
+      elsewhere survives, scrubbed, and the preview reports it as modified.
+    - Preview and apply are the same plan, in the same order, under the same
+      policy, so the dialog cannot promise one thing and do another.
+    - The answer is recorded in the audit payload, never re-derived. A replay has
+      nobody to ask, and deriving consent from a later document state would let
+      the model answer a question the user answered differently. An event with no
+      `cascade_references` field replays as `false`, which is the behaviour it was
+      written under.
+  Pinned by `LibraryPrimaryEditFlip.TerminologyTermDeleteRefusesWhileAnArgument-`
+  `PackageStillReferencesIt` (the un-consented default, asserting the legacy
+  behaviour it replaces so the difference cannot quietly disappear),
+  `...TerminologyTermDeleteWithConsentRemovesTheReferencesToo`,
+  `SaveFromLibrary.SACM23_LIB_002_ConsentedTermDeleteRemovesTheReferencesFromThe-`
+  `SavedFile` (bytes, where the hash is blind to a surviving husk), and
+  `TerminologyActions.*DeleteTerm*` for the app wiring that decides whether the
+  user is asked at all.
+- **Gids are planned, not reconstructed.** The seams took an id and minted
+  `gid-<id>`, on the argument that a fresh id's base gid is always free. Gid space
+  is independent of id space, so it is not: a document already carrying `gid-TP1`
+  makes `core::GenerateUniqueGid` emit `gid-TP1-2`. The create/associate seams now
+  take the gid alongside the id — the live command plans it with the legacy
+  generator, the replayer passes the one the payload recorded — closing a
+  divergence that existed on the replay side before this phase. Pinned by
+  `LibraryPrimaryEditFlip.TerminologyCreateKeepsTheLegacyGidWhenTheBaseFormIsTaken`.
+
+The app-level guards the legacy mutators carried (a required package name, a
+required term value, a category still assigned to terms) are editing rules rather
+than SACM invariants, so the seams do not enforce them; they moved into the
+commands and refuse exactly what they refused before.
 
 ### Phase 2 — Seam the small remaining state edits
 
 UpdateGsnIdentifier, SetElementUndeveloped, SetElementGid, the four ACP
-commands, and RemoveTerminologyPackage / RemoveArtifactPackage. These write
+commands, and RemoveTerminologyPackage / RemoveArtifactPackage.
+RemoveTerminologyPackage is the near-duplicate of a command phase 1 already
+flipped — `apply_delete_package` covers all three package kinds — but its legacy
+mutator *rejects a non-empty package* where the seam deletes recursively, so it
+needs the guard-preservation treatment phase 1 gave DeleteTerminologyCategory
+rather than a straight swap. These write
 vendor TaggedValues or gids the library already has operations for
 (`AddTaggedValue`, `SetGid`, recursive `DeleteElement`); what is missing is
 thin `sacm_adapter` seams plus replay-branch parity.

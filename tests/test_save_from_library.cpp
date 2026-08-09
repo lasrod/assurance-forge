@@ -21,6 +21,8 @@
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/package_commands.h"
+#include "core/commands/terminology_commands.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
@@ -820,6 +822,331 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnflippedNodeOnlyRemovalRefusesRatherThanDe
             group_alive = true;
     }
     EXPECT_TRUE(group_alive) << "the refused removal still deleted the ArgumentGroup from the live document";
+}
+
+// --- Phase 1 of the bridge retirement: the terminology tranche goes native ----
+//
+// The ten terminology commands and RemoveArgumentPackage no longer project the
+// document into the legacy POD; they call the `sacm_adapter` seams the audit
+// replayer has always used. Two things have to be measured on the SAVED BYTES,
+// because the canonical hash is computed through the same projection on both
+// sides of every comparison and is blind to exactly what these assert.
+
+namespace {
+
+// Runs one command through a real bus over `fixture`, reporting whether the flip
+// engaged. Unlike RunBridgedRename this takes any command, because the point is
+// which ROUTE the command took, not what it edited.
+core::commands::CommandResult
+RunOnBus(ProjectFixture& fixture, core::AppState& state, core::commands::ICommand& command, bool& out_library_primary) {
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    EXPECT_TRUE(bus) << error;
+    if (!bus)
+        return core::commands::CommandResult{};
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    out_library_primary = ctx.library_primary;
+    if (ctx.library_primary && state.library_document != nullptr) {
+        core::RebuildDerivedViewsFromLibrary(
+            *state.library_document, state.loaded_case.value(), state.sacm_package.value());
+    }
+    return result;
+}
+
+} // namespace
+
+// (1) The refusal shrinks, and this is the test that PROVES the flip -- the only
+// observable that separates a native seam call from the bridge, since both set
+// `library_primary` and both preserve vendor content.
+//
+// `argumentation-full-valid.sacm.xmi` carries an ArgumentGroup, an
+// AssertedArtifactSupport, an AssertedArtifactContext and a second
+// ArgumentPackage: four kinds the legacy POD has no field for, so a BRIDGED edit
+// on it is refused outright (pinned directly above by
+// SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnrepresentableElements). Every
+// command below therefore succeeds only if it reaches the library directly. Route
+// any one of them back through the bridge and it fails here.
+//
+// Both halves matter. Succeeding while quietly dropping the four kinds would be
+// strictly worse than the refusal it replaces, so the markers are re-checked
+// after every command.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedTerminologyCommandsRunOnACaseTheBridgeRefuses) {
+    const std::string full_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                           "sacm23" / "argumentation-full-valid.sacm.xmi");
+    ASSERT_FALSE(full_case.empty());
+    ProjectFixture fixture = MakeProject("native-terminology-unrepresentable", full_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::vector<std::string> unrepresentable = {
+        "ArgumentGroup", "AssertedArtifactSupport", "AssertedArtifactContext", "argpkg_detail"};
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    for (const std::string& marker : unrepresentable) {
+        ASSERT_TRUE(Contains(before, marker))
+            << "fixture no longer carries " << marker << "; this test measures nothing";
+    }
+
+    const auto run = [&](core::commands::ICommand& command, const char* what) {
+        bool library_primary = false;
+        const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+        EXPECT_TRUE(result.success) << what
+                                    << " was refused, so it is still going through the bridge: " << result.error;
+        EXPECT_TRUE(library_primary) << what << " did not reach the library at all";
+        const std::string autosaved = ReadFile(fixture.sacm_absolute);
+        for (const std::string& marker : unrepresentable) {
+            EXPECT_TRUE(Contains(autosaved, marker)) << what << " deleted " << marker << " from the tracked file:\n"
+                                                     << autosaved;
+        }
+    };
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Glossary", "Terms used by this argument.");
+    run(create_pkg, "CreateTerminologyPackage");
+    const core::TerminologyPackageRef pkg = create_pkg.GeneratedRef();
+
+    core::commands::UpdateTerminologyPackageCommand update_pkg(pkg, "Glossary v2", "Revised.");
+    run(update_pkg, "UpdateTerminologyPackage");
+
+    core::TerminologyCategoryDraft category_draft;
+    category_draft.name = "Domain";
+    core::commands::CreateTerminologyCategoryCommand create_category(pkg, category_draft);
+    run(create_category, "CreateTerminologyCategory");
+    const core::TerminologyCategoryRef category = create_category.GeneratedRef();
+
+    core::TerminologyCategoryDraft renamed_category;
+    renamed_category.name = "Operating domain";
+    core::commands::UpdateTerminologyCategoryCommand update_category(pkg, category, renamed_category);
+    run(update_category, "UpdateTerminologyCategory");
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    core::commands::CreateTerminologyTermCommand create_term(pkg, draft);
+    run(create_term, "CreateTerminologyTerm");
+    const core::TerminologyTermRef term = create_term.GeneratedRef();
+
+    core::TerminologyTermDraft updated = draft;
+    updated.description = "The operating conditions the system is designed for.";
+    core::commands::UpdateTerminologyTermCommand update_term(pkg, term, updated);
+    run(update_term, "UpdateTerminologyTerm");
+
+    core::commands::AssociateTerminologyTermWithElementCommand associate("claim_top", pkg, term);
+    run(associate, "AssociateTerminologyTermWithElement");
+
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible("claim_top", pkg, term);
+    run(add_visible, "AddTerminologyTermAsVisibleContext");
+
+    core::commands::DeleteTerminologyCategoryCommand delete_category(pkg, category);
+    run(delete_category, "DeleteTerminologyCategory");
+
+    // An unreferenced second term, so the delete is one the library accepts (a
+    // term an argument package still references is refused -- see
+    // LibraryPrimaryEditFlip.TerminologyTermDeleteRefusesWhileAnArgumentPackage-
+    // StillReferencesIt).
+    core::TerminologyTermDraft spare;
+    spare.value = "MRC";
+    core::commands::CreateTerminologyTermCommand create_spare(pkg, spare);
+    run(create_spare, "CreateTerminologyTerm (spare)");
+    core::commands::DeleteTerminologyTermCommand delete_spare(pkg, create_spare.GeneratedRef());
+    run(delete_spare, "DeleteTerminologyTerm");
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "Glossary v2")) << "the edits that reported success are not in the file:\n"
+                                                    << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "Operational Design Domain")) << autosaved;
+    EXPECT_FALSE(Contains(autosaved, "MRC")) << "the deleted term is still in the file:\n" << autosaved;
+}
+
+// (2) The exit criterion's byte pin: a case carrying vendor content survives the
+// whole terminology tranche. This one does NOT discriminate native from bridged
+// (the bridge preserves vendor content too, since the round-4 fix) -- test (1)
+// above is what proves the routing. What this adds is that going native did not
+// regress the preservation the bridge had earned, on every command, with the
+// audit log still replaying afterwards.
+TEST(SaveFromLibrary, SACM23_LIB_002_NativeTerminologyEditsPreserveUnknownContent) {
+    ProjectFixture fixture = MakeProject("native-terminology-vendor");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const auto run = [&](core::commands::ICommand& command, const char* what) {
+        bool library_primary = false;
+        const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+        EXPECT_TRUE(result.success) << what << " failed: " << result.error;
+        EXPECT_TRUE(library_primary) << what << " did not take the library-primary path";
+        const std::string autosaved = ReadFile(fixture.sacm_absolute);
+        EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << what << " dropped the vendor attribute:\n"
+                                                                 << autosaved;
+        EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << what << " dropped the vendor element:\n" << autosaved;
+    };
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "Shared definitions.");
+    run(create_pkg, "CreateTerminologyPackage");
+    const core::TerminologyPackageRef pkg = create_pkg.GeneratedRef();
+
+    core::commands::UpdateTerminologyPackageCommand update_pkg(pkg, "Glossary", "Project-wide definitions.");
+    run(update_pkg, "UpdateTerminologyPackage");
+
+    core::TerminologyCategoryDraft category_draft;
+    category_draft.name = "Domain";
+    core::commands::CreateTerminologyCategoryCommand create_category(pkg, category_draft);
+    run(create_category, "CreateTerminologyCategory");
+    const core::TerminologyCategoryRef category = create_category.GeneratedRef();
+
+    core::TerminologyCategoryDraft renamed_category;
+    renamed_category.name = "Operating domain";
+    core::commands::UpdateTerminologyCategoryCommand update_category(pkg, category, renamed_category);
+    run(update_category, "UpdateTerminologyCategory");
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    core::commands::CreateTerminologyTermCommand create_term(pkg, draft);
+    run(create_term, "CreateTerminologyTerm");
+    const core::TerminologyTermRef term = create_term.GeneratedRef();
+
+    core::TerminologyTermDraft updated = draft;
+    updated.description = "The operating conditions the system is designed for.";
+    core::commands::UpdateTerminologyTermCommand update_term(pkg, term, updated);
+    run(update_term, "UpdateTerminologyTerm");
+
+    core::commands::AssociateTerminologyTermWithElementCommand associate("G1", pkg, term);
+    run(associate, "AssociateTerminologyTermWithElement");
+
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible("G1", pkg, term);
+    run(add_visible, "AddTerminologyTermAsVisibleContext");
+
+    core::commands::DeleteTerminologyCategoryCommand delete_category(pkg, category);
+    run(delete_category, "DeleteTerminologyCategory");
+
+    // A second, unreferenced term, so the delete is one the library accepts (a
+    // term an argument package still references is refused -- see
+    // LibraryPrimaryEditFlip.TerminologyTermDeleteRefusesWhileAnArgumentPackage-
+    // StillReferencesIt).
+    core::TerminologyTermDraft spare;
+    spare.value = "MRC";
+    core::commands::CreateTerminologyTermCommand create_spare(pkg, spare);
+    run(create_spare, "CreateTerminologyTerm (spare)");
+    core::commands::DeleteTerminologyTermCommand delete_spare(pkg, create_spare.GeneratedRef());
+    run(delete_spare, "DeleteTerminologyTerm");
+
+    // ...and the edits are actually there, not just the vendor content.
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "Glossary")) << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "Operational Design Domain")) << autosaved;
+    EXPECT_FALSE(Contains(autosaved, "MRC")) << "the deleted term is still in the file:\n" << autosaved;
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// (2b) A cascading term delete -- the user having confirmed "this also removes N
+// elements that reference it" -- must remove exactly those and nothing else. The
+// canonical hash cannot see the difference between "removed the reference" and
+// "left an ArtifactReference pointing at nothing", so this asserts the saved
+// bytes: the husk is what the library's own cross-package cascade would have
+// left, and it renders as a context node on the canvas sourcing an empty
+// reference.
+TEST(SaveFromLibrary, SACM23_LIB_002_ConsentedTermDeleteRemovesTheReferencesFromTheSavedFile) {
+    ProjectFixture fixture = MakeProject("consented-term-delete");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const auto run = [&](core::commands::ICommand& command, const char* what) {
+        bool library_primary = false;
+        const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+        EXPECT_TRUE(result.success) << what << " failed: " << result.error;
+    };
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+    run(create_pkg, "CreateTerminologyPackage");
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+    run(create_term, "CreateTerminologyTerm");
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible(
+        "G1", create_pkg.GeneratedRef(), create_term.GeneratedRef());
+    run(add_visible, "AddTerminologyTermAsVisibleContext");
+
+    const std::string reference_id = add_visible.Result().artifact_reference_id;
+    const std::string context_id = add_visible.Result().asserted_context_id;
+    ASSERT_FALSE(reference_id.empty());
+    ASSERT_FALSE(context_id.empty());
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, reference_id)) << "the fixture never got its reference; this test measures nothing";
+    ASSERT_TRUE(Contains(before, context_id));
+
+    core::commands::DeleteTerminologyTermCommand delete_term(
+        create_pkg.GeneratedRef(), create_term.GeneratedRef(), /*cascade_references=*/true);
+    run(delete_term, "DeleteTerminologyTerm (cascade)");
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_FALSE(Contains(autosaved, "Operational Design Domain")) << "the term survived the delete:\n" << autosaved;
+    EXPECT_FALSE(Contains(autosaved, reference_id))
+        << "the ArtifactReference survived as a husk pointing at a deleted term:\n"
+        << autosaved;
+    EXPECT_FALSE(Contains(autosaved, context_id)) << "the AssertedContext survived, still drawing a context node:\n"
+                                                  << autosaved;
+    // The rest of the case is untouched -- a cascade that overshoots is worse
+    // than one that refuses.
+    EXPECT_TRUE(Contains(autosaved, "Top goal")) << autosaved;
+    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << autosaved;
+    EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << autosaved;
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// (3) RemoveArgumentPackage moved in the same phase, onto the library's recursive
+// DeleteElement. The fixture nests an empty ArgumentPackage inside the SURVIVING
+// package, which the legacy POD cannot express -- so a bridged removal is refused
+// (SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNestedArgumentPackage pins
+// that on the same shape) and success here means the seam ran. The vendor content
+// then has to survive the removal as well.
+TEST(SaveFromLibrary, SACM23_LIB_002_NativeArgumentPackageRemovalPreservesUnknownContent) {
+    constexpr const char* kTwoPackageVendorSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample" acme:owner="alice">
+  <acme:vendorMetadata reviewCycle="Q3-2026"/>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+  <argumentPackage id="AP2" name="Spare">
+    <claim id="G2" name="Spare goal" description="Retired branch."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("native-remove-package", kTwoPackageVendorSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+    ASSERT_EQ(state.sacm_package->argumentPackages.size(), 2u);
+    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "AP_nested"))
+        << "fixture carries no nested package, so a bridged removal would pass too";
+
+    bool library_primary = false;
+    core::commands::RemoveArgumentPackageCommand remove("AP2", "");
+    const core::commands::CommandResult result = RunOnBus(fixture, state, remove, library_primary);
+    ASSERT_TRUE(result.success) << "the removal was refused, so it is still going through the bridge: " << result.error;
+    ASSERT_TRUE(library_primary) << "the removal did not reach the library at all";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << autosaved;
+    EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "AP_nested")) << "the removal deleted the nested package:\n" << autosaved;
+    EXPECT_FALSE(Contains(autosaved, "Spare goal")) << "the removed package is still in the file:\n" << autosaved;
+    EXPECT_TRUE(Contains(autosaved, "Top goal")) << "the removal took the wrong package:\n" << autosaved;
+    EXPECT_EQ(state.sacm_package->argumentPackages.size(), 1u);
 }
 
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {

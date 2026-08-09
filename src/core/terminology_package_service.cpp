@@ -206,6 +206,20 @@ const sacm::TerminologyPackage* FindTerminologyPackage(const sacm::AssuranceCase
     return nullptr;
 }
 
+TerminologyPackageRef PlanTerminologyPackageIdentity(const sacm::AssuranceCasePackage& package) {
+    TerminologyPackageRef planned;
+    planned.id = GenerateUniqueId(package, "TP");
+    planned.gid = GenerateUniqueGid(package, planned.id);
+    return planned;
+}
+
+TerminologyTermRef PlanTerminologyTermIdentity(const sacm::AssuranceCasePackage& package) {
+    TerminologyTermRef planned;
+    planned.id = GenerateUniqueId(package, "T");
+    planned.gid = GenerateUniqueGid(package, planned.id);
+    return planned;
+}
+
 TerminologyPackageCreateResult CreateTerminologyPackageWithIds(sacm::AssuranceCasePackage& package,
                                                                const std::string& name,
                                                                const std::string& description,

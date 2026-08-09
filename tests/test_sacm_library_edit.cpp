@@ -1436,8 +1436,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DeleteTerminologyTermMatchesLegacy) {
 TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermMatchesLegacy) {
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::TerminologyContextOutcome associated =
-        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
+    const sacm_adapter::TerminologyContextOutcome associated = sacm_adapter::apply_associate_terminology_term(
+        *loaded.document, "G1", "T1", {.artifact_reference_id = "AR_X", .asserted_context_id = "AC_X"});
     ASSERT_TRUE(associated.applied) << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
     EXPECT_TRUE(associated.created_artifact_reference);
     EXPECT_TRUE(associated.created_asserted_context);
@@ -1472,8 +1472,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermMatchesLegacy) {
 TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextMatchesLegacy) {
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::TerminologyContextOutcome added =
-        sacm_adapter::apply_add_terminology_visible_context(*loaded.document, "G1", "T1", "VR_X", "VC_X");
+    const sacm_adapter::TerminologyContextOutcome added = sacm_adapter::apply_add_terminology_visible_context(
+        *loaded.document, "G1", "T1", {.artifact_reference_id = "VR_X", .asserted_context_id = "VC_X"});
     ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? "" : added.diagnostics.front().message);
     EXPECT_TRUE(added.created_artifact_reference);
     EXPECT_TRUE(added.created_asserted_context);
@@ -1536,8 +1536,8 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AssociateTerminologyTermReusesExisting) {
 TEST(SacmLibraryEdit, SACM23_INT_001_AddTerminologyVisibleContextPromotesExisting) {
     sacm_adapter::LoadOutcome loaded = load_terminology_fixture();
     ASSERT_NE(loaded.document, nullptr);
-    const sacm_adapter::TerminologyContextOutcome associated =
-        sacm_adapter::apply_associate_terminology_term(*loaded.document, "G1", "T1", "AR_X", "AC_X");
+    const sacm_adapter::TerminologyContextOutcome associated = sacm_adapter::apply_associate_terminology_term(
+        *loaded.document, "G1", "T1", {.artifact_reference_id = "AR_X", .asserted_context_id = "AC_X"});
     ASSERT_TRUE(associated.created_asserted_context)
         << (associated.diagnostics.empty() ? "" : associated.diagnostics.front().message);
     const sacm_adapter::TerminologyContextOutcome promoted =

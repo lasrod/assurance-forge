@@ -23,10 +23,12 @@
 
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
+#include "core/audit/replay_verifier.h"
 #include "core/commands/acp_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/gid_commands.h"
+#include "core/commands/package_commands.h"
 #include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/commands/tree_commands.h"
@@ -38,6 +40,7 @@
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_parser.h"
+#include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
@@ -90,11 +93,12 @@ struct EditFixture {
 // Builds a project whose in-memory views are derived exactly the way
 // `AppState::load_file` derives them, so both sides start from the identical
 // state and only the edit routing differs.
-std::unique_ptr<EditFixture> MakeFixture(const std::string& tag, bool library_backed) {
+std::unique_ptr<EditFixture>
+MakeFixture(const std::string& tag, bool library_backed, const char* sacm_xml = kSampleSacm) {
     auto fixture = std::make_unique<EditFixture>();
     const auto root = MakeTempProjectRoot(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
-    WriteFile(root / sacm_rel, kSampleSacm);
+    WriteFile(root / sacm_rel, sacm_xml);
 
     fixture->project.id = "p";
     fixture->project.name = "Project";
@@ -473,6 +477,375 @@ TEST(LibraryPrimaryEditFlip, TerminologyEditsMatchLegacyCanonicalHash) {
     run(*library_side);
     run(*legacy_side);
 
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// Phase 1 of the bridge retirement flipped the ten terminology commands and
+// RemoveArgumentPackage onto their native seams, so the test above no longer
+// measures the bridge. It also no longer covers everything that moved: category
+// CRUD, the non-visible association, and the two deletes were never in it. Run
+// the whole flipped tranche -- create, update and delete at all three levels plus
+// both association forms -- library-primary against legacy, on the quantity the
+// audit manifest caches.
+//
+// Deleting a term is deliberately last: it is the one edit where the seam and the
+// legacy mutator part company. `core::DeleteTerminologyTerm` erases the term and
+// leaves any ArtifactReference still naming it dangling; the seam's
+// DeleteReferencingRelationships policy scrubs the reference. The term deleted
+// here is therefore an UNREFERENCED one, where the two coincide; the referenced
+// case is pinned separately by
+// TerminologyTermDeleteScrubsTheReferenceTheLegacyMutatorLeftDangling below.
+TEST(LibraryPrimaryEditFlip, FlippedTerminologyTrancheMatchesLegacyCanonicalHash) {
+    std::unique_ptr<EditFixture> library_side = MakeFixture("term_all_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("term_all_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+
+        core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "Shared definitions.");
+        EXPECT_TRUE(RunCommand(fixture, create_pkg, ctx).success);
+        const core::TerminologyPackageRef pkg = create_pkg.GeneratedRef();
+
+        core::commands::UpdateTerminologyPackageCommand update_pkg(pkg, "Glossary", "Project-wide definitions.");
+        EXPECT_TRUE(RunCommand(fixture, update_pkg, ctx).success);
+
+        core::TerminologyCategoryDraft category_draft;
+        category_draft.name = "Domain";
+        core::commands::CreateTerminologyCategoryCommand create_category(pkg, category_draft);
+        EXPECT_TRUE(RunCommand(fixture, create_category, ctx).success);
+        const core::TerminologyCategoryRef category = create_category.GeneratedRef();
+
+        core::TerminologyCategoryDraft renamed_category;
+        renamed_category.name = "Operating domain";
+        renamed_category.description = "Terms describing where the system operates.";
+        core::commands::UpdateTerminologyCategoryCommand update_category(pkg, category, renamed_category);
+        EXPECT_TRUE(RunCommand(fixture, update_category, ctx).success);
+
+        core::TerminologyTermDraft draft;
+        draft.value = "ODD";
+        draft.name = "Operational Design Domain";
+        draft.category_refs.push_back(category.id);
+        core::commands::CreateTerminologyTermCommand create_term(pkg, draft);
+        EXPECT_TRUE(RunCommand(fixture, create_term, ctx).success);
+        const core::TerminologyTermRef term = create_term.GeneratedRef();
+
+        core::commands::AssociateTerminologyTermWithElementCommand associate("G1", pkg, term);
+        EXPECT_TRUE(RunCommand(fixture, associate, ctx).success);
+
+        core::commands::AddTerminologyTermAsVisibleContextCommand add_visible("G1", pkg, term);
+        EXPECT_TRUE(RunCommand(fixture, add_visible, ctx).success);
+
+        core::TerminologyTermDraft updated = draft;
+        updated.description = "The operating conditions the system is designed for.";
+        core::commands::UpdateTerminologyTermCommand update_term(pkg, term, updated);
+        EXPECT_TRUE(RunCommand(fixture, update_term, ctx).success);
+
+        // An unreferenced second term, created only so its delete can be compared.
+        core::TerminologyTermDraft spare;
+        spare.value = "MRC";
+        spare.name = "Minimal Risk Condition";
+        core::commands::CreateTerminologyTermCommand create_spare(pkg, spare);
+        EXPECT_TRUE(RunCommand(fixture, create_spare, ctx).success);
+        core::commands::DeleteTerminologyTermCommand delete_spare(pkg, create_spare.GeneratedRef());
+        EXPECT_TRUE(RunCommand(fixture, delete_spare, ctx).success);
+
+        // The category is still assigned to the ODD term, so clear it first --
+        // both paths refuse a category that is in use.
+        core::TerminologyTermDraft uncategorized = updated;
+        uncategorized.category_refs.clear();
+        core::commands::UpdateTerminologyTermCommand drop_category(pkg, term, uncategorized);
+        EXPECT_TRUE(RunCommand(fixture, drop_category, ctx).success);
+        core::commands::DeleteTerminologyCategoryCommand delete_category(pkg, category);
+        EXPECT_TRUE(RunCommand(fixture, delete_category, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// Deleting a term that an argument package still references, WITHOUT the user
+// having consented to the cascade. The three possible behaviours:
+//
+//   legacy   -- erases the term and leaves the ArtifactReference naming an id
+//               that no longer resolves. A dangling reference in a saved case.
+//   seam     -- refuses with SACM-CMD-007: removing the reference crosses a
+//               package boundary, and the library cascades only on opt-in.
+//   seam+opt -- removes both, which is what the confirmation dialog asks for
+//               (TerminologyTermDeleteWithConsentRemovesTheReferencesToo below).
+//
+// This pins the middle one: the default is still a refusal, so a caller that
+// never asked the user cannot cascade by accident. That default matters more than
+// it looks -- it is also what the audit REPLAY does for every event recorded
+// before the cascade existed, so old logs keep replaying under the behaviour they
+// were written under.
+TEST(LibraryPrimaryEditFlip, TerminologyTermDeleteRefusesWhileAnArgumentPackageStillReferencesIt) {
+    struct Attempt {
+        bool delete_succeeded = false;
+        std::string reference_id;
+        bool term_survives = false;
+        bool reference_survives = false;
+        std::string error;
+    };
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        Attempt attempt;
+
+        core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+        EXPECT_TRUE(RunCommand(fixture, create_pkg, ctx).success);
+        core::TerminologyTermDraft draft;
+        draft.value = "ODD";
+        core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+        EXPECT_TRUE(RunCommand(fixture, create_term, ctx).success);
+        core::commands::AssociateTerminologyTermWithElementCommand associate(
+            "G1", create_pkg.GeneratedRef(), create_term.GeneratedRef());
+        EXPECT_TRUE(RunCommand(fixture, associate, ctx).success);
+        attempt.reference_id = associate.Result().artifact_reference_id;
+
+        core::commands::DeleteTerminologyTermCommand delete_term(create_pkg.GeneratedRef(), create_term.GeneratedRef());
+        const core::commands::CommandResult deleted = RunCommand(fixture, delete_term, ctx);
+        attempt.delete_succeeded = deleted.success;
+        attempt.error = deleted.error;
+
+        attempt.term_survives = core::FindTerminologyTerm(
+                                    fixture.package, create_pkg.GeneratedRef(), create_term.GeneratedRef()) != nullptr;
+        for (const sacm::ArgumentPackage& argument_package : fixture.package.argumentPackages)
+            for (const sacm::ArtifactReference& reference : argument_package.artifactReferences)
+                if (reference.id == attempt.reference_id)
+                    attempt.reference_survives = true;
+        return attempt;
+    };
+
+    std::unique_ptr<EditFixture> library_side = MakeFixture("term_referenced_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("term_referenced_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+    const Attempt flipped = run(*library_side);
+    const Attempt legacy = run(*legacy_side);
+
+    ASSERT_FALSE(flipped.reference_id.empty());
+    ASSERT_EQ(flipped.reference_id, legacy.reference_id) << "the two paths minted different reference ids";
+
+    // Non-vacuity: the legacy mutator really does accept this and leave the husk,
+    // so the refusal below is a measured difference and not a fixture artefact.
+    EXPECT_TRUE(legacy.delete_succeeded);
+    EXPECT_FALSE(legacy.term_survives);
+    EXPECT_TRUE(legacy.reference_survives) << "the legacy delete no longer leaves a dangling reference";
+
+    EXPECT_FALSE(flipped.delete_succeeded) << "the flipped delete cascaded across the package boundary";
+    EXPECT_NE(flipped.error.find("SACM-CMD-007"), std::string::npos)
+        << "the refusal is not the library's cross-package guard: " << flipped.error;
+    EXPECT_TRUE(flipped.term_survives) << "the refused delete removed the term anyway";
+    EXPECT_TRUE(flipped.reference_survives) << "the refused delete removed the reference anyway";
+}
+
+// The other side of that refusal: with the user's confirmed consent, the delete
+// takes the references with it. Two things have to hold, and the second is the
+// one an audited tool lives or dies by.
+//
+//  1. The preview the confirmation is built from lists exactly what then goes.
+//     A dialog that says "also removes 2 elements" and then removes three is
+//     worse than no dialog.
+//  2. The consent is REPLAYABLE. The answer lives in the audit payload, not in
+//     the model, so a replay reproduces the decision the user actually made
+//     rather than re-deriving one from a later document state. Asserted by
+//     verifying the project, which replays the log and compares hashes.
+TEST(LibraryPrimaryEditFlip, TerminologyTermDeleteWithConsentRemovesTheReferencesToo) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("term_cascade", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+    ASSERT_TRUE(RunCommand(*fixture, create_pkg, ctx).success);
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+    ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible(
+        "G1", create_pkg.GeneratedRef(), create_term.GeneratedRef());
+    ASSERT_TRUE(RunCommand(*fixture, add_visible, ctx).success);
+    const std::string reference_id = add_visible.Result().artifact_reference_id;
+    const std::string context_id = add_visible.Result().asserted_context_id;
+    ASSERT_FALSE(reference_id.empty());
+    ASSERT_FALSE(context_id.empty());
+
+    // (1) What the confirmation would show.
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_terminology_element(*fixture->document, create_term.GeneratedRef().id);
+    ASSERT_TRUE(preview.supported);
+    EXPECT_TRUE(preview.can_apply) << "the cascading delete is not applicable, so the dialog would offer a lie";
+    std::vector<std::string> previewed;
+    for (const sacm_adapter::DeleteEffect& effect : preview.consequential)
+        previewed.push_back(effect.element_id);
+    std::sort(previewed.begin(), previewed.end());
+    EXPECT_EQ(previewed, (std::vector<std::string>{context_id, reference_id}))
+        << "the preview does not name the visible-context pair the delete removes";
+
+    core::commands::DeleteTerminologyTermCommand delete_term(
+        create_pkg.GeneratedRef(), create_term.GeneratedRef(), /*cascade_references=*/true);
+    ASSERT_TRUE(RunCommand(*fixture, delete_term, ctx).success);
+
+    // ...and what it actually removed matches, term included.
+    std::vector<std::string> removed = delete_term.RemovedIds();
+    std::sort(removed.begin(), removed.end());
+    std::vector<std::string> expected{context_id, reference_id, create_term.GeneratedRef().id};
+    std::sort(expected.begin(), expected.end());
+    EXPECT_EQ(removed, expected) << "the delete removed a different set than the preview promised";
+
+    EXPECT_EQ(core::FindTerminologyTerm(fixture->package, create_pkg.GeneratedRef(), create_term.GeneratedRef()),
+              nullptr);
+    for (const sacm::ArgumentPackage& argument_package : fixture->package.argumentPackages) {
+        for (const sacm::ArtifactReference& reference : argument_package.artifactReferences)
+            EXPECT_NE(reference.id, reference_id) << "the reference the user consented to remove survived";
+        for (const sacm::AssertedContext& context : argument_package.assertedContexts)
+            EXPECT_NE(context.id, context_id) << "the context the user consented to remove survived";
+    }
+
+    // (2) The recorded consent replays.
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// A term nothing references needs no consent and must not ask for any: the
+// preview is empty, so the confirmation stays the plain "Delete this term?" and
+// the command records `cascade_references: false`.
+TEST(LibraryPrimaryEditFlip, TerminologyTermDeletePreviewIsEmptyWhenNothingReferencesTheTerm) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("term_no_cascade", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+    ASSERT_TRUE(RunCommand(*fixture, create_pkg, ctx).success);
+    core::TerminologyTermDraft draft;
+    draft.value = "MRC";
+    core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+    ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
+
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_terminology_element(*fixture->document, create_term.GeneratedRef().id);
+    ASSERT_TRUE(preview.supported);
+    EXPECT_TRUE(preview.can_apply);
+    EXPECT_TRUE(preview.consequential.empty()) << "an unreferenced term reported consequences, so the dialog "
+                                                  "would ask for consent it does not need";
+
+    core::commands::DeleteTerminologyTermCommand delete_term(create_pkg.GeneratedRef(), create_term.GeneratedRef());
+    ASSERT_TRUE(RunCommand(*fixture, delete_term, ctx).success);
+    EXPECT_EQ(delete_term.RemovedIds(), (std::vector<std::string>{create_term.GeneratedRef().id}));
+}
+
+// The payoff Phase 1 is for: an audit log written by the flipped commands replays
+// through the seams that wrote it. Before the flip the live side bridged and the
+// replay side seamed, so the two only agreed where the projection happened to be
+// faithful -- this asserts they are now the same code.
+TEST(LibraryPrimaryEditFlip, FlippedTerminologyTrancheReplaysConvergently) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("term_replay", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "Shared definitions.");
+    ASSERT_TRUE(RunCommand(*fixture, create_pkg, ctx).success);
+    ASSERT_TRUE(ctx.library_primary) << "the create did not reach the library natively";
+
+    core::TerminologyCategoryDraft category_draft;
+    category_draft.name = "Domain";
+    core::commands::CreateTerminologyCategoryCommand create_category(create_pkg.GeneratedRef(), category_draft);
+    ASSERT_TRUE(RunCommand(*fixture, create_category, ctx).success);
+
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    draft.name = "Operational Design Domain";
+    draft.category_refs.push_back(create_category.GeneratedRef().id);
+    core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+    ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
+
+    core::commands::AddTerminologyTermAsVisibleContextCommand add_visible(
+        "G1", create_pkg.GeneratedRef(), create_term.GeneratedRef());
+    ASSERT_TRUE(RunCommand(*fixture, add_visible, ctx).success);
+    ASSERT_TRUE(ctx.library_primary) << "the visible context did not reach the library natively";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// The base gid `gid-<id>` is not always free: gid space is independent of id
+// space, so this fixture's top goal carries `gid-TP1` while `TP1` is still a
+// perfectly fresh id. `core::GenerateUniqueGid` therefore disambiguates to
+// `gid-TP1-2`, and a flipped create that reconstructed the gid from the id alone
+// would mint a DUPLICATE `gid-TP1` and diverge from both the legacy path and the
+// audit payload it just wrote. Pins that the planned gid is what reaches the
+// library.
+TEST(LibraryPrimaryEditFlip, TerminologyCreateKeepsTheLegacyGidWhenTheBaseFormIsTaken) {
+    constexpr const char* kGidCollisionSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" gid="gid-TP1" name="Top goal" description="The system is safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    std::unique_ptr<EditFixture> library_side =
+        MakeFixture("gid_collision_library", /*library_backed=*/true, kGidCollisionSacm);
+    std::unique_ptr<EditFixture> legacy_side =
+        MakeFixture("gid_collision_legacy", /*library_backed=*/false, kGidCollisionSacm);
+    ASSERT_NE(library_side->document, nullptr);
+
+    // Non-vacuity: the collision has to have survived the load, or the planned gid
+    // is the base form and this asserts nothing.
+    const parser::SacmElement* goal = FindElement(library_side->model, "G1");
+    ASSERT_NE(goal, nullptr);
+    ASSERT_EQ(goal->gid, "gid-TP1") << "the fixture's colliding gid did not survive the load";
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+        EXPECT_TRUE(RunCommand(fixture, create_pkg, ctx).success);
+        return create_pkg.GeneratedRef();
+    };
+    const core::TerminologyPackageRef library_ref = run(*library_side);
+    const core::TerminologyPackageRef legacy_ref = run(*legacy_side);
+
+    EXPECT_EQ(library_ref.id, "TP1");
+    EXPECT_EQ(legacy_ref.gid, "gid-TP1-2") << "the legacy generator no longer disambiguates; fixture is stale";
+    EXPECT_EQ(library_ref.gid, legacy_ref.gid) << "the flipped create minted a different gid than the legacy one";
+
+    // And the payload's claim has to be true of the document, not just of the ref.
+    const sacm::AssuranceCasePackage& projected = library_side->package;
+    ASSERT_EQ(projected.terminologyPackages.size(), 1u);
+    EXPECT_EQ(projected.terminologyPackages.front().gid, library_ref.gid)
+        << "the audit payload records a gid the saved document does not carry";
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+}
+
+// RemoveArgumentPackage moved onto `apply_delete_package` in the same phase.
+TEST(LibraryPrimaryEditFlip, RemoveArgumentPackageMatchesLegacyCanonicalHash) {
+    constexpr const char* kTwoPackageSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+  </argumentPackage>
+  <argumentPackage id="AP2" name="Spare">
+    <claim id="G2" name="Spare goal" description="Retired branch."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    std::unique_ptr<EditFixture> library_side =
+        MakeFixture("remove_ap_library", /*library_backed=*/true, kTwoPackageSacm);
+    std::unique_ptr<EditFixture> legacy_side =
+        MakeFixture("remove_ap_legacy", /*library_backed=*/false, kTwoPackageSacm);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(library_side->package.argumentPackages.size(), 2u);
+
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::RemoveArgumentPackageCommand remove("AP2", "");
+        EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
+    };
+    run(*library_side);
+    run(*legacy_side);
+
+    EXPECT_EQ(library_side->package.argumentPackages.size(), 1u) << "the flipped removal did not take";
+    EXPECT_EQ(FindElement(library_side->model, "G2"), nullptr) << "the removed package's claim is still projected";
     EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
 }
 

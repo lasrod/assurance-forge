@@ -2,14 +2,12 @@
 
 #include "core/commands/command_bus.h"
 #include "parser/xml_parser.h"
+#include "sacm_adapter/library_load.h" // LibraryDocument, LoadDiagnostic
 #include "legacy_sacm/sacm_model.h"
 
 #include <functional>
 #include <string>
-
-namespace sacm_adapter {
-class LibraryDocument;
-}
+#include <vector>
 
 namespace core::commands {
 
@@ -54,5 +52,23 @@ bool BridgeLegacyMutationToLibrary(sacm_adapter::LibraryDocument& document,
 // existing mutator once -- reproducing the legacy result, which the audit replay also
 // reproduces, so live and replay converge by construction.
 bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator& mutate, std::string& error);
+
+// True when this dispatch may apply a native library seam: a document is present
+// and the kill switch has not disabled the flip. The commands that have a seam
+// check this first and fall back to `ApplyLibraryPrimaryOrLegacy` -- the GUARDED
+// bridge -- when the seam does not support the shape, so no command ever mutates
+// the legacy package in place while a document is present.
+bool CanApplyLibraryPrimary(const CommandContext& ctx);
+
+// Library diagnostics, surfaced verbatim (code/severity/message) so the
+// application never has to reinterpret why the library refused an edit.
+std::string FormatLibraryDiagnostics(const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics);
+
+// The error a command reports when the library REJECTED a seam it supports:
+// "The SACM library rejected <what>: <diagnostics>". A rejection is a hard
+// failure, never a reason to quietly apply the legacy edit instead -- doing that
+// would reinterpret a library refusal, which is the divergence this migration
+// exists to remove.
+std::string LibraryRejection(const std::string& seam, const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics);
 
 } // namespace core::commands

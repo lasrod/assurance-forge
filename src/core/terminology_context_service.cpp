@@ -276,6 +276,31 @@ void RemoveUnreferencedTerminologyArtifacts(sacm::ArgumentPackage& argument_pack
 
 } // namespace
 
+namespace {
+
+// Shared by the two planners: the AssertedContext half is identical, only the
+// artifact-reference prefix differs ("AR" when associating, "TC" when adding a
+// visible context).
+TerminologyContextForcedIds PlanContextIdentities(const sacm::AssuranceCasePackage& package,
+                                                  const std::string& reference_prefix) {
+    TerminologyContextForcedIds planned;
+    planned.artifact_reference_id = GenerateUniqueId(package, reference_prefix);
+    planned.artifact_reference_gid = GenerateUniqueGid(package, planned.artifact_reference_id);
+    planned.asserted_context_id = GenerateUniqueId(package, "AC");
+    planned.asserted_context_gid = GenerateUniqueGid(package, planned.asserted_context_id);
+    return planned;
+}
+
+} // namespace
+
+TerminologyContextForcedIds PlanTerminologyAssociationIdentities(const sacm::AssuranceCasePackage& package) {
+    return PlanContextIdentities(package, "AR");
+}
+
+TerminologyContextForcedIds PlanVisibleTerminologyContextIdentities(const sacm::AssuranceCasePackage& package) {
+    return PlanContextIdentities(package, "TC");
+}
+
 TerminologyContextAssociationResult
 AssociateTerminologyTermWithElementWithIds(sacm::AssuranceCasePackage& package,
                                            const std::string& target_element_id,

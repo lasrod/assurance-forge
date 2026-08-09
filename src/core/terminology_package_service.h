@@ -171,6 +171,35 @@ sacm::TerminologyPackage* FindTerminologyPackage(sacm::AssuranceCasePackage& pac
 const sacm::TerminologyPackage* FindTerminologyPackage(const sacm::AssuranceCasePackage& package,
                                                        const TerminologyPackageRef& package_ref);
 
+// ---------------------------------------------------------------------------
+// Identity planning.
+//
+// Each `Plan*` function returns the (id, gid) the matching creator below WOULD
+// generate for `package`, without creating anything. A library-primary command
+// uses it to hand the library the identity the legacy generator would have
+// produced, so a flipped edit and a legacy edit are identical down to the gid --
+// including the `gid-<id>-2` disambiguation the base form does not cover.
+//
+// Planning is exact only against the package the creator would run on, and only
+// while that package is unmutated: two plans taken before one edit will collide.
+// Plan immediately before applying, one edit at a time -- the same discipline
+// `core::PlanTopGoalId` and the element commands already follow.
+
+TerminologyPackageRef PlanTerminologyPackageIdentity(const sacm::AssuranceCasePackage& package);
+TerminologyCategoryRef PlanTerminologyCategoryIdentity(const sacm::AssuranceCasePackage& package);
+TerminologyTermRef PlanTerminologyTermIdentity(const sacm::AssuranceCasePackage& package);
+
+// The ArtifactReference + AssertedContext identities
+// `AssociateTerminologyTermWithElement` would mint. Both are planned against the
+// unmutated package even though the creator generates the context's identity
+// after inserting the reference: the two use different id prefixes ("AR" and
+// "AC"), so the inserted reference cannot change what the context resolves to.
+TerminologyContextForcedIds PlanTerminologyAssociationIdentities(const sacm::AssuranceCasePackage& package);
+
+// As above for `AddTerminologyTermAsVisibleContext`, whose reference uses the
+// "TC" prefix rather than "AR".
+TerminologyContextForcedIds PlanVisibleTerminologyContextIdentities(const sacm::AssuranceCasePackage& package);
+
 TerminologyPackageCreateResult
 CreateTerminologyPackage(sacm::AssuranceCasePackage& package, const std::string& name, const std::string& description);
 
