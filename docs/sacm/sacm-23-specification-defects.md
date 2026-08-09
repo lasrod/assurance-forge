@@ -37,16 +37,21 @@ conforming tools can disagree about whether one may contain non-citations.
 **Suggested resolution.** Replace 10.5's Constraints with the terminology
 analogue of 11.6.
 
-## D2 — Three clauses give three different participant-typing rules
+## D2 — Three clauses state the participant rule four ways
 
 The same concept — what may be a participant of a package binding — is specified
 four times and agrees with itself nowhere:
 
+OCL below is written with `<code>` and `&#124;` rather than a backslash-escaped
+pipe inside backticks: a Markdown code span takes the backslash literally, so
+`\|` would render the operator as `\|` and quietly misquote the specification in
+a page whose whole purpose is quoting it accurately.
+
 | Clause | Rule as written |
 |---|---|
-| 9.4 `AssuranceCasePackageBinding` | `forall(pp \| pp.oclIsTypeOf(AssuranceCasePackage) or pp.oclIsTypeOf(AssuranceCasePackageInterface))` — exact type; **excludes** a binding |
-| 10.6 `TerminologyPackageBinding` | `forall(pp \| pp.oclIsKindOf(Terminology::TerminologyPackage))` — kind-of; **admits** a binding |
-| 11.5 `ArgumentPackageBinding` | `forall(pp \| pp.oclIsTypeOf(Argument::ArgumentPackageInterface))` — **interfaces only** |
+| 9.4 `AssuranceCasePackageBinding` | <code>forall(pp &#124; pp.oclIsTypeOf(AssuranceCasePackage) or pp.oclIsTypeOf(AssuranceCasePackageInterface))</code> — exact type; **excludes** a binding |
+| 10.6 `TerminologyPackageBinding` | <code>forall(pp &#124; pp.oclIsKindOf(Terminology::TerminologyPackage))</code> — kind-of; **admits** a binding |
+| 11.5 `ArgumentPackageBinding` | <code>forall(pp &#124; pp.oclIsTypeOf(Argument::ArgumentPackageInterface))</code> — **interfaces only** |
 | 11.5 Associations block | `participantPackage : ArgumentPackage[2..*]` — the general type |
 
 11.5 contradicts **itself**: its OCL admits only `ArgumentPackageInterface` while
@@ -81,8 +86,8 @@ in OCL form.
 
 11.6 Semantics:
 
-> An ArgumentPackageInterface resides insided the ArgumentPackage to which it
-> refers.
+> An ArgumentPackageInterface resides insided [sic] the ArgumentPackage to which
+> it refers.
 
 An `ArgumentPackageInterface` **is** an `ArgumentPackage` (11.6 Superclass), and
 11.6 requires it to reside inside the package it describes. So any package that
@@ -92,7 +97,6 @@ package with an interface is non-conformant by construction.
 
 **Suggested resolution.** Scope 11.4 to nested packages that are neither
 interfaces nor bindings, which is the reading that makes both clauses hold.
-(Note the same sentence carries the typo "insided".)
 
 ## D5 — `Resource.location` is in the text and absent from the model
 
@@ -112,11 +116,14 @@ it is the entire content of a class.
 
 **Suggested resolution.** Add it to the machine-readable model.
 
-## D6 — Seven further prose/model divergences
+## D6 — Six further prose/model divergences
 
 Found by holding the text against `ptc/22-03-13` attribute by attribute. Listed
 with the direction Assurance Forge resolved them and why, in
 [the metamodel inventory](sacm-2.3-metamodel-inventory.md).
+
+These six plus `Resource.location` (D5, reported separately because its
+consequence is different in kind) are the seven the completeness audit found.
 
 | Clause | Text | Model |
 |---|---|---|
@@ -126,7 +133,6 @@ with the direction Assurance Forge resolved them and why, in
 | 8.4 `ExpressionLangString.expression` | "(composition)" marker with reference wording | plain reference |
 | 11.2 / 11.4 member role | `argumentationElement` | `argumentElement` |
 | 10.5 `TerminologyPackageInterface` superclass | "TerminologyElement" | `TerminologyPackage` (the clause's own diagram agrees with the model) |
-| 12.10 `Resource.location` | present | absent (D5) |
 
 8.5's is the one with a consequence beyond spelling: at `[1..1]` a
 `MultiLangString` holds one language, which makes the clause's own uniqueness
