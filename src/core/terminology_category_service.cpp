@@ -44,6 +44,13 @@ const sacm::Category* FindTerminologyCategory(const sacm::AssuranceCasePackage& 
     return terminology_package ? FindTerminologyCategory(*terminology_package, category_ref) : nullptr;
 }
 
+TerminologyCategoryRef PlanTerminologyCategoryIdentity(const sacm::AssuranceCasePackage& package) {
+    TerminologyCategoryRef planned;
+    planned.id = GenerateUniqueId(package, "CAT");
+    planned.gid = GenerateUniqueGid(package, planned.id);
+    return planned;
+}
+
 TerminologyCategoryCreateResult CreateTerminologyCategoryWithIds(sacm::AssuranceCasePackage& package,
                                                                  const TerminologyPackageRef& package_ref,
                                                                  const TerminologyCategoryDraft& draft,

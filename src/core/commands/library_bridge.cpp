@@ -180,4 +180,24 @@ bool ApplyLibraryPrimaryOrLegacy(CommandContext& ctx, const LibraryBridgeMutator
     return mutate(ctx.model, ctx.package, error);
 }
 
+bool CanApplyLibraryPrimary(const CommandContext& ctx) {
+    return ctx.library_document != nullptr && ctx.allow_library_primary;
+}
+
+std::string FormatLibraryDiagnostics(const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
+    if (diagnostics.empty())
+        return "(no library diagnostics)";
+    std::string summary;
+    for (const sacm_adapter::LoadDiagnostic& diagnostic : diagnostics) {
+        if (!summary.empty())
+            summary += "; ";
+        summary += diagnostic.code + "/" + diagnostic.severity + ": " + diagnostic.message;
+    }
+    return summary;
+}
+
+std::string LibraryRejection(const std::string& seam, const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
+    return "The SACM library rejected " + seam + ": " + FormatLibraryDiagnostics(diagnostics);
+}
+
 } // namespace core::commands

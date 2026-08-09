@@ -4,6 +4,7 @@
 #include "core/terminology_package_service.h"
 
 #include <string>
+#include <vector>
 
 // Audited commands that mutate terminology packages, categories, and
 // terms. Each command captures the inputs and (on first execution) the
@@ -154,19 +155,44 @@ private:
 };
 
 // Delete an existing terminology term.
+//
+// `cascade_references` carries the user's answer to the confirmation "deleting
+// this term also removes N elements that reference it -- go ahead?". A term used
+// as a visible context is referenced from an ArgumentPackage, and the SACM
+// library refuses to delete across a package boundary unless the caller opts in
+// (SACM-CMD-007), so without this the delete is refused rather than silently
+// taking the reference with it.
+//
+// It is a COMMAND INPUT, recorded in the audit payload, and not something the
+// apply re-derives. A replay has no user to ask and must reproduce the decision
+// that was actually made; deriving it from the model at replay time would let a
+// later document state answer a question the user answered differently. Events
+// recorded before this field existed replay as `false`, which is the behaviour
+// they were written under.
 class DeleteTerminologyTermCommand final : public ICommand {
 public:
-    DeleteTerminologyTermCommand(core::TerminologyPackageRef package_ref, core::TerminologyTermRef term_ref)
-        : package_ref_(std::move(package_ref)), term_ref_(std::move(term_ref)) {}
+    DeleteTerminologyTermCommand(core::TerminologyPackageRef package_ref,
+                                 core::TerminologyTermRef term_ref,
+                                 bool cascade_references = false)
+        : package_ref_(std::move(package_ref)),
+          term_ref_(std::move(term_ref)),
+          cascade_references_(cascade_references) {}
 
     std::string Name() const override {
         return "DeleteTerminologyTerm";
     }
     bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
+    // Every element the delete removed, the term included. Empty until applied.
+    const std::vector<std::string>& RemovedIds() const {
+        return removed_ids_;
+    }
+
 private:
     core::TerminologyPackageRef package_ref_;
     core::TerminologyTermRef term_ref_;
+    bool cascade_references_ = false;
+    std::vector<std::string> removed_ids_;
 };
 
 // Associate an existing terminology term with a claim/strategy/solution

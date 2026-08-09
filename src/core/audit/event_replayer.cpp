@@ -87,6 +87,18 @@ sacm_adapter::TextField ToAdapterTextField(core::ElementTextField field) {
     return sacm_adapter::TextField::Name;
 }
 
+// The identities a terminology-association event recorded, in the shape the seam
+// takes. Each is consulted only if the seam creates that entity; a reused one
+// keeps what it has.
+sacm_adapter::TerminologyContextIdentities ToSeamIdentities(const core::TerminologyContextForcedIds& forced) {
+    sacm_adapter::TerminologyContextIdentities identities;
+    identities.artifact_reference_id = forced.artifact_reference_id;
+    identities.artifact_reference_gid = forced.artifact_reference_gid;
+    identities.asserted_context_id = forced.asserted_context_id;
+    identities.asserted_context_gid = forced.asserted_context_gid;
+    return identities;
+}
+
 std::string SummarizeDiagnostics(const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
     if (diagnostics.empty())
         return "(no library diagnostics)";
@@ -666,6 +678,19 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
             return false;
         if (!require_string("term_gid", term_gid))
             return false;
+        // A cascading delete has no legacy equivalent: `core::DeleteTerminologyTerm`
+        // erases the term and leaves the referencing ArtifactReference dangling,
+        // which is a different result, not a slower route to the same one. This
+        // path is the legacy ORACLE (no production caller replays through it), so
+        // quietly producing the other result would make it certify a convergence
+        // that does not hold. Fail instead.
+        if (const auto it = payload.find("cascade_references");
+            it != payload.end() && it->is_boolean() && it->get<bool>()) {
+            out_error = "DeleteTerminologyTerm with cascade_references has no legacy replay at " +
+                        FormatLocation(tx_seq, event.event_sequence, type) +
+                        ": the legacy mutator cannot remove the referencing elements.";
+            return false;
+        }
         std::string err;
         if (!core::DeleteTerminologyTerm(state.package,
                                          core::TerminologyPackageRef{package_id, package_gid},
@@ -1370,15 +1395,18 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
     }
 
     // ---- Terminology events ---------------------------------------------
-    // Phase 2 slice 2a routes the gid-minting CREATE and ASSOCIATE events back
-    // through the library seams. The seams now mint the legacy `gid-<id>` (via
-    // the SetGid operation, matching core::GenerateUniqueGid) on the created
-    // terminology package/category/term and on the association's
-    // ArtifactReference/AssertedContext, so these converge on the RAW canonical
-    // hash without bridging. The forced element ids the audit recorded are
-    // passed to the seams verbatim; each element's gid is `gid-<id>`, so the
-    // seam reconstructs the recorded gid from the id alone (no forced-gid
-    // plumbing needed). UPDATE/DELETE were already seam-mapped.
+    // Phase 2 slice 2a routed the gid-minting CREATE and ASSOCIATE events back
+    // through the library seams; Phase 1 of the bridge retirement flipped the
+    // matching LIVE commands onto the same seams, so both sides of the
+    // convergence check now run identical code.
+    //
+    // Both the recorded id AND the recorded gid are handed to the seam. Passing
+    // only the id used to be enough on the argument that a fresh element's gid is
+    // always the base `gid-<id>` -- but gid space is independent of id space, so a
+    // document already carrying `gid-TP1` on an unrelated element makes the legacy
+    // generator emit `gid-TP1-2`, and reconstructing from the id would have
+    // replayed a different gid than the one the audit log records.
+    // UPDATE/DELETE mint no identity and were already seam-mapped.
 
     if (type == "CreateTerminologyPackage") {
         std::string name, description, generated_id, generated_gid;
@@ -1391,7 +1419,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("generated_gid", generated_gid))
             return false;
         const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_package(document, name, description, generated_id);
+            sacm_adapter::apply_create_terminology_package(document, name, description, generated_id, generated_gid);
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure("apply_create_terminology_package",
                                           tx_seq,
@@ -1442,8 +1470,8 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("generated_gid", generated_gid))
             return false;
-        const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_category(document, package_id, name, description, generated_id);
+        const sacm_adapter::TerminologyCreateOutcome outcome = sacm_adapter::apply_create_terminology_category(
+            document, package_id, name, description, generated_id, generated_gid);
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure("apply_create_terminology_category",
                                           tx_seq,
@@ -1543,7 +1571,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             }
         }
         const sacm_adapter::TerminologyCreateOutcome outcome =
-            sacm_adapter::apply_create_terminology_term(document, package_id, fields, generated_id);
+            sacm_adapter::apply_create_terminology_term(document, package_id, fields, generated_id, generated_gid);
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure("apply_create_terminology_term",
                                           tx_seq,
@@ -1613,8 +1641,24 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("term_gid", term_gid))
             return false;
+        // The user's confirmed answer to "this also removes N references", read
+        // back rather than re-derived: a replay has nobody to ask, and deriving
+        // it from the document would let a later state answer the question
+        // differently than the user did. ABSENT means false -- events recorded
+        // before the cascade existed were written under the non-cascading
+        // behaviour and must keep replaying that way, so this is deliberately
+        // not `require_bool`.
+        bool cascade_references = false;
+        if (const auto it = payload.find("cascade_references"); it != payload.end()) {
+            if (!it->is_boolean()) {
+                out_error = "Non-boolean payload field 'cascade_references' at " +
+                            FormatLocation(tx_seq, event.event_sequence, type);
+                return false;
+            }
+            cascade_references = it->get<bool>();
+        }
         const sacm_adapter::TerminologyEditOutcome outcome =
-            sacm_adapter::apply_delete_terminology_element(document, term_id);
+            sacm_adapter::apply_delete_terminology_element(document, term_id, cascade_references);
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure("apply_delete_terminology_element(term)",
                                           tx_seq,
@@ -1628,8 +1672,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
     }
 
     // Reads the association payload including the FORCED artifact-reference /
-    // asserted-context ids AND gids. The bridged legacy mutators reproduce those
-    // gids verbatim -- the exact data the library seams could not assign.
+    // asserted-context ids AND gids, both of which the seams now take.
     auto read_context_association = [&](std::string& element_id,
                                         std::string& package_id,
                                         std::string& package_gid,
@@ -1665,8 +1708,8 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // The forced element ids are passed to the seam verbatim; the seam mints
         // each created element's `gid-<id>` from its id, reproducing the legacy
         // forced gids exactly.
-        const sacm_adapter::TerminologyContextOutcome outcome = sacm_adapter::apply_associate_terminology_term(
-            document, element_id, term_id, forced.artifact_reference_id, forced.asserted_context_id);
+        const sacm_adapter::TerminologyContextOutcome outcome =
+            sacm_adapter::apply_associate_terminology_term(document, element_id, term_id, ToSeamIdentities(forced));
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure("apply_associate_terminology_term",
                                           tx_seq,
@@ -1685,7 +1728,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!read_context_association(element_id, package_id, package_gid, term_id, term_gid, forced))
             return false;
         const sacm_adapter::TerminologyContextOutcome outcome = sacm_adapter::apply_add_terminology_visible_context(
-            document, element_id, term_id, forced.artifact_reference_id, forced.asserted_context_id);
+            document, element_id, term_id, ToSeamIdentities(forced));
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure("apply_add_terminology_visible_context",
                                           tx_seq,

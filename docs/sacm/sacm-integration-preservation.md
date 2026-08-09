@@ -363,6 +363,94 @@ outright — that has never been disclosed and never will be, because an element
 an attribute and changes what it says is the reinterpretation the project's own hard
 constraint forbids.
 
+**Phase 1 of the retirement: eleven commands off the bridge ([#350](https://github.com/lasrod/assurance-forge/issues/350)).**
+The ten terminology commands and `RemoveArgumentPackage` now apply through the
+`sacm_adapter` seams the audit replayer had already used for those same events since
+Phase 2 slice 2a. Each keeps the guarded bridge as a fallback for shapes the seam does
+not support, so the invariant that no command mutates the legacy package in place while a
+document is present is unchanged; what changed is which route runs first. Fifteen
+commands still bridge, listed on the
+[migration plan](../architecture/legacy-bridge-migration-plan.md).
+
+Proving a flip is harder than performing one, and the obvious assertions do not do it:
+both routes set `library_primary`, and since the round-4 fix both preserve vendor
+content, so neither `ctx.library_primary` nor a vendor-marker byte pin can tell them
+apart. The one observable that can is the guard's refusal. `SaveFromLibrary.SACM23_LIB_002_FlippedTerminologyCommandsRunOnACaseTheBridgeRefuses`
+runs all ten commands against `argumentation-full-valid.sacm.xmi` — the fixture the
+bridge refuses outright for its ArgumentGroup, AssertedArtifactSupport,
+AssertedArtifactContext and second ArgumentPackage — and re-checks all four markers in
+the saved bytes after each one. A command routed back through the bridge fails it, and
+disabling the flip wholesale was confirmed to fail it. `SACM23_LIB_002_NativeArgumentPackageRemovalPreservesUnknownContent`
+does the same for the removal over a nested-ArgumentPackage fixture.
+
+**The four lost attributes above are untouched by this phase.** They are lost in the POD
+round trip the remaining fifteen bridged commands still perform; they come off
+`KnownLostAttributes()` when phase 4 deletes the bridge, not before. What phase 1 does
+shrink is *how often a user meets the refusal*: glossary work on a case carrying an
+unrepresentable kind used to be impossible and now is not.
+
+Two behaviours changed, disclosed rather than absorbed:
+
+- **Deleting a term an argument package still references asks first, and removes the
+  references on consent.** `core::DeleteTerminologyTerm` accepted such a delete and left
+  the ArtifactReference naming an id that no longer resolved; the seam refuses it
+  (SACM-CMD-007, the library's cross-package cascade guard). The refusal is what the
+  *replayer* already did, so before the flip such a delete succeeded live and produced an
+  audit log that could not be replayed — a latent defect the flip removes rather than
+  introduces. But refusal is the wrong end state, because the term's contexts are exactly
+  what the user is trying to be rid of, so the delete now previews and asks.
+
+  Three things make that safe rather than merely convenient. **(1)** The library's own
+  cross-package cascade is deliberately not used: it removes the *entry* — the term leaves
+  the reference's `referencedArtifact` list — leaving an ArtifactReference that points at
+  nothing and an AssertedContext still drawing a context node on the canvas. A husk, and
+  arguably worse than the dangling id it replaces. `plan_terminology_delete_cascade`
+  instead deletes each reference that exists *solely* to name the term, then the term; a
+  reference that also points elsewhere survives, scrubbed, and is reported as modified
+  rather than removed. Sparing that shared reference is what made the cross-package
+  policy matter: with the default (reject) the term delete that follows was refused
+  *after* the plan's earlier deletes had applied, reporting failure over a half-mutated
+  document — found in review of
+  [#360](https://github.com/lasrod/assurance-forge/pull/360) and pinned by
+  `LibraryPrimaryEditFlip.TerminologyTermCascadeSparesASharedReferenceWithoutStranding`.
+  The cascade reaches across instead, which hands the referrer to the scrub policy and
+  produces exactly the outcome the confirmation described. **(2)** Preview and apply are the same plan in the same order under
+  the same policy (`preview_delete_elements` on a scratch copy), so the dialog cannot
+  promise one thing and the command do another; the recorded `removed_ids` filters clause
+  8.7 attachments exactly as the preview does, so the audit entry and the confirmation
+  count agree. **(3)** The consent is an audit payload field, never re-derived. A replay
+  has nobody to ask, and deriving it from the document would let a later state answer a
+  question the user answered differently; an event with no `cascade_references` field
+  replays as `false`, the behaviour it was written under. The legacy replay branch, which
+  has no cascade to offer, fails loudly on such an event rather than certifying a
+  convergence that does not hold.
+
+  Pinned by `LibraryPrimaryEditFlip.TerminologyTermDeleteRefusesWhileAnArgumentPackageStillReferencesIt`
+  (the un-consented default, asserting the legacy behaviour it replaces),
+  `...TerminologyTermDeleteWithConsentRemovesTheReferencesToo`,
+  `SaveFromLibrary.SACM23_LIB_002_ConsentedTermDeleteRemovesTheReferencesFromTheSavedFile`
+  (bytes — the canonical hash cannot distinguish a removed reference from a surviving
+  husk), and `TerminologyActions.*DeleteTerm*` for the wiring that decides whether the user
+  is asked at all. The last of those also pins that no cascade is offered without a command
+  bus: a file opened outside a project reaches the commands with no library document
+  (#347), so the dispatch could not honour a consent it had collected.
+- **Gids are planned by the caller, not reconstructed by the seam.** The create and
+  associate seams took an id and minted `gid-<id>`, on the reasoning that a fresh id's
+  base gid is always free. Gid space is independent of id space, so it is not: a
+  document already carrying `gid-TP1` on an unrelated element makes
+  `core::GenerateUniqueGid` emit `gid-TP1-2`. The seams now take the gid alongside the
+  id — the live command plans it with the legacy generator, the replayer passes the one
+  the payload recorded — which closes a divergence that had existed on the replay side
+  independently of this phase. `LibraryPrimaryEditFlip.TerminologyCreateKeepsTheLegacyGidWhenTheBaseFormIsTaken`
+  pins it, and fails when the seam ignores the requested gid.
+
+The app-level guards the legacy mutators carried — a required package name, a required
+term value, a category still assigned to terms — are Assurance Forge editing rules, not
+SACM invariants, so the seams do not enforce them. They moved into the commands, checked
+against the same projection the legacy mutator would have run on, and refuse exactly what
+they refused before with the same messages. A flip that had simply called the seams would
+have dropped all three without a test noticing.
+
 ## SACM23-INT-001 — Assurance Forge adapter — load, project, edit, save through the library
 
 The adapter seam itself: whether the application's load, projection, edit and save paths go through the library rather than around it.

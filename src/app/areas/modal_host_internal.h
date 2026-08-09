@@ -39,6 +39,7 @@ private:
     void RenderTerminologyTermEditorModal();
     void RenderQuickDefineTermModal();
     void RenderDeleteTerminologyTermModal();
+    void RenderTermDeleteReferences();
     void RenderTerminologyCategoryEditorModal();
     void RenderDeleteTerminologyCategoryModal();
     void RenderReviewerNamePromptModal();

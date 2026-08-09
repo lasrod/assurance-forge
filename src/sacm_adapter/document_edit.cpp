@@ -766,7 +766,17 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
     return outcome;
 }
 
-DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids) {
+namespace {
+
+// Models a SEQUENCE of deletes on a throwaway copy and reports their combined
+// effects. Both delete previews are this function with different policies --
+// `preview_delete_elements` for the GSN element path, and the terminology
+// cascade -- because a preview that describes a different operation than the one
+// the caller will perform is worse than no preview.
+DeletePreview preview_delete_sequence(const LibraryDocument& document,
+                                      const std::vector<std::string>& element_ids,
+                                      sacm::commands::ReferenceDeletePolicy reference_policy,
+                                      sacm::commands::CrossPackageReferencePolicy cross_package_policy) {
     DeletePreview preview;
     preview.supported = true;
 
@@ -868,9 +878,8 @@ DeletePreview preview_delete_elements(const LibraryDocument& document, const std
         }
         const sacm::commands::MutationResult result = scratch.document->apply(sacm::commands::DeleteElement{
             .target = id,
-            // Same policy as apply_delete_element, or the preview would
-            // describe an operation the caller never performs.
-            .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+            .reference_policy = reference_policy,
+            .cross_package_policy = cross_package_policy,
         });
         any_applied = any_applied || result.applied;
         for (const sacm::commands::ChangeRecord& change : result.changes) {
@@ -887,6 +896,18 @@ DeletePreview preview_delete_elements(const LibraryDocument& document, const std
 
     preview.can_apply = any_applied;
     return preview;
+}
+
+} // namespace
+
+DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids) {
+    // Same policies as `apply_delete_element`, or the preview would describe an
+    // operation the caller never performs: scrub-then-drop within the package,
+    // and reject rather than reach across a package boundary.
+    return preview_delete_sequence(document,
+                                   element_ids,
+                                   sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+                                   sacm::commands::CrossPackageReferencePolicy::RejectIfExternalReferencesExist);
 }
 
 DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id) {
@@ -1052,15 +1073,22 @@ set_terminology_description(sacm::model::Document& doc, const sacm::model::Eleme
     return doc.apply(sacm::commands::SetDescription{.element = id, .text = text, .language = language});
 }
 
-// Mint the legacy `gid-<id>` on a freshly created element so a library-seam
-// create matches the legacy `core::*WithIds` mutators, which stamp
+// Stamp the legacy gid on a freshly created element so a library-seam create
+// matches the legacy `core::*WithIds` mutators, which stamp
 // `GenerateUniqueGid(package, id)` on the terminology package/category/term and
-// the association's ArtifactReference/AssertedContext. Fresh ids are unique, so
-// the base `gid-<id>` never collides and the legacy disambiguation suffix
-// (`-2`, `-3`, ...) is unreachable here -- the replayed forced ids are exactly
-// the ids the live path generated, whose gids were this same base form.
-sacm::commands::MutationResult assign_legacy_gid(sacm::model::Document& doc, const sacm::model::ElementId& id) {
-    return doc.apply(sacm::commands::SetGid{.element = id, .gid = "gid-" + id.value()});
+// the association's ArtifactReference/AssertedContext.
+//
+// `requested` is the caller's gid -- the one a live flipped command planned with
+// the legacy generator, or the one an audit payload recorded. Empty falls back to
+// the base `gid-<id>` form, which is what `GenerateUniqueGid` yields whenever
+// that base is free. It is NOT always free: gid space is independent of id
+// space, so a document can already carry `gid-TP1` on an unrelated element while
+// `TP1` is a perfectly fresh id, and the legacy generator then disambiguates to
+// `gid-TP1-2`. Reconstructing the gid from the id alone would silently diverge
+// there, which is why the callers that know the real gid pass it.
+sacm::commands::MutationResult
+assign_legacy_gid(sacm::model::Document& doc, const sacm::model::ElementId& id, const std::string& requested = {}) {
+    return doc.apply(sacm::commands::SetGid{.element = id, .gid = requested.empty() ? "gid-" + id.value() : requested});
 }
 
 // Reproduces core's TermContextLabel for the ArtifactReference/AssertedContext
@@ -1156,7 +1184,8 @@ bool is_visible_context_target(const sacm::model::SACMElement* element) {
 TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& document,
                                                           const std::string& name,
                                                           const std::string& description,
-                                                          const std::string& package_id) {
+                                                          const std::string& package_id,
+                                                          const std::string& package_gid) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::AssuranceCasePackage* root = root_case_package(doc);
     if (root == nullptr) {
@@ -1171,7 +1200,7 @@ TerminologyCreateOutcome apply_create_terminology_package(LibraryDocument& docum
     const sacm::model::ElementId new_id = created.created_ids().front();
     // Legacy CreateTerminologyPackageWithIds stamps GenerateUniqueGid on the
     // package; mint the same gid so the projection and canonical hash match.
-    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id); !gid.applied) {
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id, package_gid); !gid.applied) {
         rollback_element(doc, new_id);
         return failed_terminology_create(gid);
     }
@@ -1192,7 +1221,8 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
                                                            const std::string& package_id,
                                                            const std::string& name,
                                                            const std::string& description,
-                                                           const std::string& category_id) {
+                                                           const std::string& category_id,
+                                                           const std::string& category_gid) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     // Legacy ApplyCategoryDraft trims the name/description.
     const sacm::commands::MutationResult created =
@@ -1204,7 +1234,7 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
     }
     const sacm::model::ElementId new_id = created.created_ids().front();
     // Legacy CreateTerminologyCategoryWithIds stamps GenerateUniqueGid.
-    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id); !gid.applied) {
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id, category_gid); !gid.applied) {
         rollback_element(doc, new_id);
         return failed_terminology_create(gid);
     }
@@ -1225,7 +1255,8 @@ TerminologyCreateOutcome apply_create_terminology_category(LibraryDocument& docu
 TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document,
                                                        const std::string& package_id,
                                                        const TerminologyTermFields& fields,
-                                                       const std::string& term_id) {
+                                                       const std::string& term_id,
+                                                       const std::string& term_gid) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     // Legacy ApplyTermDraft trims value/name/externalReference/origin and
     // normalizes the category refs; reproduce that so the projection matches.
@@ -1242,7 +1273,7 @@ TerminologyCreateOutcome apply_create_terminology_term(LibraryDocument& document
     }
     const sacm::model::ElementId new_id = created.created_ids().front();
     // Legacy CreateTerminologyTermWithIds stamps GenerateUniqueGid.
-    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id); !gid.applied) {
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, new_id, term_gid); !gid.applied) {
         rollback_element(doc, new_id);
         return failed_terminology_create(gid);
     }
@@ -1384,23 +1415,166 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
     return TerminologyEditOutcome{.applied = true};
 }
 
-TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document, const std::string& element_id) {
-    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
-    const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
-        .target = sacm::model::ElementId(element_id),
-        .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+namespace {
+
+// The elements a CASCADING terminology delete removes, in application order:
+// every ArtifactReference that exists solely to point at `element_id`, then
+// `element_id` itself.
+//
+// The library's own cross-package cascade
+// (CrossPackageReferencePolicy::DeleteExternalReferencingRelationships) is not
+// what a user is asking for here. It removes the *entry* -- the term is dropped
+// from the reference's referencedArtifact list -- and the ArtifactReference
+// survives, now pointing at nothing, with its AssertedContext still drawing a
+// context node on the canvas. That is a husk, not a removal: correct by SACM's
+// letter (no dangling id) and wrong by every reading of "also remove the things
+// that reference it".
+//
+// "Exists solely to point at it" is the conservative test: the reference names
+// this element and nothing else. A reference that also points elsewhere is left
+// alone and merely scrubbed, because deleting it would take a second artifact's
+// evidence with it -- the preview reports that as a modification rather than a
+// removal.
+// Clause 8.7 utility elements (Description/ImplementationConstraint/Note/
+// TaggedValue) are attachments carried ON their owner, deleted with it. The
+// preview leaves them out, so the recorded removal has to as well -- otherwise a
+// confirmation reading "also removes 2 elements" is followed by an audit entry
+// naming four, and the extra two are internal bookkeeping nobody can act on.
+bool is_utility_attachment(sacm::metadata::ElementKind kind) {
+    return kind == sacm::metadata::ElementKind::Description ||
+           kind == sacm::metadata::ElementKind::ImplementationConstraint || kind == sacm::metadata::ElementKind::Note ||
+           kind == sacm::metadata::ElementKind::TaggedValue;
+}
+
+void collect_removed_ids(std::vector<std::string>& out, const sacm::commands::MutationResult& result) {
+    for (const sacm::commands::ChangeRecord& change : result.changes) {
+        const bool deleted = change.change == sacm::commands::ChangeRecord::Change::Deleted ||
+                             change.change == sacm::commands::ChangeRecord::Change::RelationshipDeleted;
+        if (deleted && !is_utility_attachment(change.kind)) {
+            out.push_back(change.id.value());
+        }
+    }
+}
+
+// Scrub rather than DeleteReferencingRelationships, for the same reason
+// `apply_delete_element` uses it: a relationship that still has a surviving
+// source and target survives, scrubbed, instead of cascading further.
+constexpr sacm::commands::ReferenceDeletePolicy kTerminologyCascadeReferencePolicy =
+    sacm::commands::ReferenceDeletePolicy::ScrubReferences;
+
+// The plan deliberately SPARES an ArtifactReference that names the term and
+// something else, so by the time the term itself is deleted a cross-package
+// referrer can still exist. Rejecting there (the default) would abort the
+// sequence after its earlier deletes had already applied, reporting failure over
+// a half-mutated document -- found in review of #360. Reaching across instead
+// hands that referrer to the reference policy above, which SCRUBS it: the shared
+// reference survives, minus the deleted term, which is exactly the "modified,
+// not removed" outcome the confirmation already showed for it.
+constexpr sacm::commands::CrossPackageReferencePolicy kTerminologyCascadeCrossPackagePolicy =
+    sacm::commands::CrossPackageReferencePolicy::DeleteExternalReferencingRelationships;
+
+std::vector<std::string> plan_terminology_delete_cascade(const sacm::model::Document& doc,
+                                                         const std::string& element_id) {
+    const sacm::model::ElementId target(element_id);
+    std::vector<std::string> doomed;
+    doc.for_each_element([&](const sacm::model::SACMElement& element) {
+        const auto* reference = dynamic_cast<const sacm::model::ArtifactReference*>(&element);
+        if (reference == nullptr) {
+            return;
+        }
+        const std::vector<sacm::model::ElementId> referenced = reference->referenced_artifact_elements();
+        if (referenced.size() == 1 && referenced.front() == target) {
+            doomed.push_back(reference->id().value());
+        }
     });
+    doomed.push_back(element_id);
+    return doomed;
+}
+
+} // namespace
+
+TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
+                                                        const std::string& element_id,
+                                                        bool cascade_external_references) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     TerminologyEditOutcome outcome;
-    outcome.applied = result.applied;
-    fill_diagnostics(outcome.diagnostics, result);
+
+    if (!cascade_external_references) {
+        const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
+            .target = sacm::model::ElementId(element_id),
+            .reference_policy = sacm::commands::ReferenceDeletePolicy::DeleteReferencingRelationships,
+        });
+        outcome.applied = result.applied;
+        collect_removed_ids(outcome.removed_ids, result);
+        fill_diagnostics(outcome.diagnostics, result);
+        return outcome;
+    }
+
+    // The cascade is a SEQUENCE of ordinary deletes, applied in the same order
+    // and under the same policies `preview_delete_terminology_element` models on
+    // a scratch copy -- so what the confirmation showed and what happens here
+    // cannot come apart.
+    for (const std::string& id : plan_terminology_delete_cascade(doc, element_id)) {
+        const sacm::commands::MutationResult result = doc.apply(sacm::commands::DeleteElement{
+            .target = sacm::model::ElementId(id),
+            .reference_policy = kTerminologyCascadeReferencePolicy,
+            .cross_package_policy = kTerminologyCascadeCrossPackagePolicy,
+        });
+        fill_diagnostics(outcome.diagnostics, result);
+        if (!result.applied) {
+            // Partial: earlier deletes in the sequence stand. Report it rather
+            // than pretending the whole cascade went through -- the caller
+            // surfaces the diagnostics and `removed_ids` says how far it got.
+            outcome.applied = false;
+            return outcome;
+        }
+        collect_removed_ids(outcome.removed_ids, result);
+    }
+    outcome.applied = true;
     return outcome;
+}
+
+DeletePreview preview_delete_terminology_element(const LibraryDocument& document, const std::string& element_id) {
+    const sacm::model::Document& doc = LibraryDocumentAccess::document(document);
+
+    // Same plan, same order, same policies as the cascading apply above, run on a
+    // throwaway copy -- the preview IS the apply rather than a second description
+    // of it.
+    DeletePreview preview = preview_delete_sequence(document,
+                                                    plan_terminology_delete_cascade(doc, element_id),
+                                                    kTerminologyCascadeReferencePolicy,
+                                                    kTerminologyCascadeCrossPackagePolicy);
+
+    // The user asked to delete ONE thing. `preview_delete_elements` buckets by
+    // what the caller named, and the caller here named the whole doomed set, so
+    // re-bucket: only the term is "requested"; everything the plan added on the
+    // user's behalf is a consequence, which is the entire point of showing it.
+    std::vector<DeleteEffect> requested;
+    std::vector<DeleteEffect> consequential;
+    for (std::vector<DeleteEffect>* bucket : {&preview.requested, &preview.consequential}) {
+        for (DeleteEffect& effect : *bucket) {
+            (effect.element_id == element_id ? requested : consequential).push_back(std::move(effect));
+        }
+    }
+    preview.requested = std::move(requested);
+    preview.consequential = std::move(consequential);
+
+    // `can_apply` is STRICTER here than the sequence preview's "at least one
+    // delete applied". The caller's question is not "does anything happen" but
+    // "does the thing I asked for happen": a plan whose sub-deletes succeed while
+    // the term itself is rejected reports any-applied == true, which is exactly
+    // the reading that let a stranding cascade look previewable (review of #360).
+    // So: the target has to come back as deleted.
+    preview.can_apply = std::any_of(preview.requested.begin(), preview.requested.end(), [&](const DeleteEffect& e) {
+        return e.element_id == element_id && e.deleted;
+    });
+    return preview;
 }
 
 TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& document,
                                                            const std::string& target_element_id,
                                                            const std::string& term_id,
-                                                           const std::string& artifact_reference_id,
-                                                           const std::string& asserted_context_id) {
+                                                           const TerminologyContextIdentities& identities) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId term_ref(term_id);
     const auto* term = doc.find_as<sacm::model::Term>(term_ref);
@@ -1444,7 +1618,7 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
     if (reusable_reference == nullptr) {
         const sacm::commands::MutationResult created_reference =
             doc.apply(sacm::commands::CreateArtifactReference{.parent = package_id,
-                                                              .id = to_optional_id(artifact_reference_id),
+                                                              .id = to_optional_id(identities.artifact_reference_id),
                                                               .name = term_context_label(*term),
                                                               .referenced_artifact_elements = {term_ref}});
         if (!created_reference.applied || created_reference.created_ids().empty()) {
@@ -1455,7 +1629,8 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
         // Legacy AssociateTerminologyTermWithElementWithIds stamps
         // GenerateUniqueGid on a newly created reference (a reused one keeps its
         // gid); mint the same so replay converges on the raw hash.
-        if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, sacm::model::ElementId(reference_id));
+        if (const sacm::commands::MutationResult gid =
+                assign_legacy_gid(doc, sacm::model::ElementId(reference_id), identities.artifact_reference_gid);
             !gid.applied) {
             rollback_element(doc, sacm::model::ElementId(reference_id));
             return failed_terminology_context(gid);
@@ -1467,7 +1642,7 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
     const sacm::commands::MutationResult created_context =
         doc.apply(sacm::commands::CreateAssertedRelationship{.parent = package_id,
                                                              .kind = sacm::metadata::ElementKind::AssertedContext,
-                                                             .id = to_optional_id(asserted_context_id),
+                                                             .id = to_optional_id(identities.asserted_context_id),
                                                              .name = "Context: " + term_context_label(*term),
                                                              .sources = {sacm::model::ElementId(reference_id)},
                                                              .targets = {target}});
@@ -1479,7 +1654,8 @@ TerminologyContextOutcome apply_associate_terminology_term(LibraryDocument& docu
     }
     const sacm::model::ElementId context_id = created_context.created_ids().front();
     // The AssertedContext also carries a legacy GenerateUniqueGid.
-    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, context_id); !gid.applied) {
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, context_id, identities.asserted_context_gid);
+        !gid.applied) {
         rollback_element(doc, context_id);
         if (outcome.created_artifact_reference) {
             rollback_element(doc, sacm::model::ElementId(reference_id));
@@ -1582,8 +1758,7 @@ void remove_unreferenced_term_artifacts(sacm::model::Document& doc,
 TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument& document,
                                                                 const std::string& target_element_id,
                                                                 const std::string& term_id,
-                                                                const std::string& artifact_reference_id,
-                                                                const std::string& asserted_context_id) {
+                                                                const TerminologyContextIdentities& identities) {
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId term_ref(term_id);
     const auto* term = doc.find_as<sacm::model::Term>(term_ref);
@@ -1628,7 +1803,7 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
     // Create a fresh terminology reference and a visible context.
     const sacm::commands::MutationResult created_reference =
         doc.apply(sacm::commands::CreateArtifactReference{.parent = package_id,
-                                                          .id = to_optional_id(artifact_reference_id),
+                                                          .id = to_optional_id(identities.artifact_reference_id),
                                                           .name = term_context_label(*term),
                                                           .referenced_artifact_elements = {term_ref}});
     if (!created_reference.applied || created_reference.created_ids().empty()) {
@@ -1637,7 +1812,9 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
     const sacm::model::ElementId reference_id = created_reference.created_ids().front();
     // Legacy AddTerminologyTermAsVisibleContextWithIds stamps GenerateUniqueGid
     // on the created reference and context; mint the same for raw-hash parity.
-    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, reference_id); !gid.applied) {
+    if (const sacm::commands::MutationResult gid =
+            assign_legacy_gid(doc, reference_id, identities.artifact_reference_gid);
+        !gid.applied) {
         rollback_element(doc, reference_id);
         return failed_terminology_context(gid);
     }
@@ -1645,7 +1822,7 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
     const sacm::commands::MutationResult created_context =
         doc.apply(sacm::commands::CreateAssertedRelationship{.parent = package_id,
                                                              .kind = sacm::metadata::ElementKind::AssertedContext,
-                                                             .id = to_optional_id(asserted_context_id),
+                                                             .id = to_optional_id(identities.asserted_context_id),
                                                              .name = "Context: " + term_context_label(*term),
                                                              .sources = {reference_id},
                                                              .targets = {target}});
@@ -1654,7 +1831,8 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
         return failed_terminology_context(created_context);
     }
     const sacm::model::ElementId context_id = created_context.created_ids().front();
-    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, context_id); !gid.applied) {
+    if (const sacm::commands::MutationResult gid = assign_legacy_gid(doc, context_id, identities.asserted_context_gid);
+        !gid.applied) {
         rollback_element(doc, context_id);
         rollback_element(doc, reference_id);
         return failed_terminology_context(gid);

@@ -68,6 +68,10 @@ public:
     void LoadIgnoredSuggestions();
 
 private:
+    // Fills `pending_delete_term_references` from the SACM library's preview of
+    // the delete, so the confirmation can list what a cascade would remove.
+    void PreviewTermDeleteReferences(const core::TerminologyTermRef& term_ref);
+
     AppRuntimeState& state_;
 };
 

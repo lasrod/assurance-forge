@@ -420,6 +420,48 @@ void ModalHost::RenderQuickDefineTermModal() {
     }
 }
 
+// The destructive half of the term-delete confirmation, and a different question
+// from the usage count above it: that counts times the term's TEXT appears in the
+// argument (deleting the term does not change that text), while this lists the
+// elements that reference the term structurally and would be removed with it --
+// typically the ArtifactReference/AssertedContext pair behind a visible context
+// chip. Confirming the modal is the consent to remove them, so they have to be
+// named before the button is pressed, not summarised afterwards.
+//
+// Rendering follows RenderRemovalPreview: `kind` is a SACM class name and `name`
+// is the user's own text, so neither is translated -- only the sentence around
+// them is.
+void ModalHost::RenderTermDeleteReferences() {
+    // The library says the delete cannot go through. Say why here rather than
+    // only after the button is pressed -- and offer no cascade, because there is
+    // no delete for it to be part of.
+    if (!state_.terminology.pending_delete_term_blockers.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Reported by the SACM library:").c_str());
+        for (const std::string& blocker : state_.terminology.pending_delete_term_blockers) {
+            ImGui::Bullet();
+            ImGui::TextDisabled("%s", blocker.c_str());
+        }
+        return;
+    }
+    if (state_.terminology.pending_delete_term_references.empty())
+        return;
+
+    ImGui::Spacing();
+    ImGui::TextWrapped("%s",
+                       ui::i18n::trnf("Deleting it also removes {0} element that references it:",
+                                      "Deleting it also removes {0} elements that reference it:",
+                                      static_cast<int>(state_.terminology.pending_delete_term_references.size()),
+                                      static_cast<int>(state_.terminology.pending_delete_term_references.size()))
+                           .c_str());
+    for (const app::controllers::ElementEditController::RemovalEffect& effect :
+         state_.terminology.pending_delete_term_references) {
+        const std::string& display = effect.name.empty() ? effect.element_id : effect.name;
+        ImGui::Bullet();
+        ImGui::TextUnformatted(ui::i18n::trf("{0} ({1})", display, effect.kind).c_str());
+    }
+}
+
 void ModalHost::RenderDeleteTerminologyTermModal() {
     if (!state_.terminology.show_delete_term_modal)
         return;
@@ -436,6 +478,7 @@ void ModalHost::RenderDeleteTerminologyTermModal() {
                                               state_.terminology.pending_delete_term_usage_count)
                                    .c_str());
         }
+        RenderTermDeleteReferences();
         ImGui::Spacing();
         if (ImGui::Button(AF_TR("Delete").c_str(), ImVec2(100.0f, 0.0f))) {
             callbacks_.confirm_delete_terminology_term();

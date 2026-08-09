@@ -64,24 +64,6 @@ sacm_adapter::ChallengeSource ToAdapterChallengeSource(ChallengeSourceType type)
     return sacm_adapter::ChallengeSource::CounterArgument;
 }
 
-// Library diagnostics, surfaced verbatim (code/severity/message) so the
-// application never has to reinterpret why the library refused an edit.
-std::string FormatLibraryDiagnostics(const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
-    if (diagnostics.empty())
-        return "(no library diagnostics)";
-    std::string summary;
-    for (const sacm_adapter::LoadDiagnostic& diagnostic : diagnostics) {
-        if (!summary.empty())
-            summary += "; ";
-        summary += diagnostic.code + "/" + diagnostic.severity + ": " + diagnostic.message;
-    }
-    return summary;
-}
-
-std::string LibraryRejection(const std::string& seam, const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
-    return "The SACM library rejected " + seam + ": " + FormatLibraryDiagnostics(diagnostics);
-}
-
 } // namespace
 
 std::string NewElementKindToToken(NewElementKind kind) {

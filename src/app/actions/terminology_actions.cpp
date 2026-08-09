@@ -9,8 +9,10 @@
 #include "core/ignored_terminology_store.h"
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
+#include "sacm_adapter/document_edit.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -355,6 +357,55 @@ bool TerminologyActions::ConfirmTermEdit() {
     return true;
 }
 
+// Asks the SACM library what deleting `term_ref` would take with it. A glossary
+// term that has been added as a visible context is referenced by an
+// ArtifactReference/AssertedContext pair living in an ArgumentPackage, and
+// removing those is a cascade across a package boundary that the library will
+// not perform unless the caller opts in -- so the user has to be shown the list
+// and asked. An empty result means the plain delete is enough.
+void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTermRef& term_ref) {
+    state_.terminology.pending_delete_term_references.clear();
+    state_.terminology.pending_delete_term_blockers.clear();
+    state_.terminology.pending_delete_term_preview_available = false;
+    if (state_.app_state.library_document == nullptr || term_ref.id.empty())
+        return;
+    // Only offer the cascade where the delete can actually honour it. Without a
+    // command bus -- a SACM file opened outside a project -- the dispatch hands
+    // the command no library document (the tracked #347 exception), so it takes
+    // the legacy path, which has no cascade. Previewing anyway would ask the user
+    // to confirm removals and then refuse them.
+    if (state_.command_bus == nullptr)
+        return;
+
+    const sacm_adapter::DeletePreview preview =
+        sacm_adapter::preview_delete_terminology_element(*state_.app_state.library_document, term_ref.id);
+    if (!preview.supported)
+        return;
+
+    // `can_apply` here means the term itself would go. When it would not, the
+    // consequential list describes removals that lead to a refusal rather than to
+    // a delete, so offering it would collect consent for something that cannot
+    // happen. Show the library's reason instead and leave the plain delete to
+    // fail with the same one.
+    if (!preview.can_apply) {
+        for (const sacm_adapter::LoadDiagnostic& diagnostic : preview.diagnostics)
+            state_.terminology.pending_delete_term_blockers.push_back(diagnostic.code + ": " + diagnostic.message);
+        return;
+    }
+
+    state_.terminology.pending_delete_term_preview_available = true;
+    for (const sacm_adapter::DeleteEffect& effect : preview.consequential) {
+        state_.terminology.pending_delete_term_references.push_back(
+            app::controllers::ElementEditController::RemovalEffect{
+                .element_id = effect.element_id,
+                .kind = effect.kind,
+                .name = effect.name,
+                .is_relationship = effect.is_relationship,
+                .deleted = effect.deleted,
+            });
+    }
+}
+
 void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_ref) {
     if (!state_.app_state.has_projected_package())
         return;
@@ -367,6 +418,7 @@ void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_re
     state_.terminology.selected_term_ref = term_ref;
     state_.terminology.pending_delete_term_usage_count =
         core::CountTerminologyTermUsage(state_.app_state.projected_package(), *term);
+    PreviewTermDeleteReferences(term_ref);
     state_.terminology.show_delete_term_modal = true;
 }
 
@@ -374,20 +426,35 @@ bool TerminologyActions::ConfirmDeleteTerm() {
     if (!state_.app_state.has_projected_package())
         return false;
 
-    core::commands::DeleteTerminologyTermCommand command(state_.terminology.selected_package_ref,
-                                                         state_.terminology.selected_term_ref);
+    // Confirming the modal IS the consent to remove what the preview listed, so
+    // the cascade is opted into exactly when something was listed. With nothing
+    // listed the flag stays false and the command behaves as it always has.
+    const bool cascade_references = !state_.terminology.pending_delete_term_references.empty();
+    core::commands::DeleteTerminologyTermCommand command(
+        state_.terminology.selected_package_ref, state_.terminology.selected_term_ref, cascade_references);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
         SetStatus(state_, "Term delete failed: " + outcome.error);
         return false;
     }
+    const std::size_t also_removed = command.RemovedIds().size() > 1 ? command.RemovedIds().size() - 1 : 0;
 
     state_.terminology.selected_term_ref = core::TerminologyTermRef{};
+    state_.terminology.pending_delete_term_references.clear();
+    state_.terminology.pending_delete_term_blockers.clear();
+    state_.terminology.pending_delete_term_preview_available = false;
     state_.terminology.show_delete_term_modal = false;
     state_.events.Emit(DocumentDirtyEvent{});
     if (RefreshVisibleTerminologyContextProjection(state_.app_state))
         state_.events.Emit(TreeDirtyEvent{});
-    SetStatus(state_, "Deleted term.");
+    // Say what actually went. "Deleted term." after a cascade would understate
+    // it, and the count is the one thing a user cannot re-check afterwards.
+    SetStatus(state_,
+              also_removed == 0 ? std::string("Deleted term.")
+                                : ui::i18n::trnf("Deleted term and {0} element that referenced it.",
+                                                 "Deleted term and {0} elements that referenced it.",
+                                                 static_cast<int>(also_removed),
+                                                 static_cast<int>(also_removed)));
     return true;
 }
 
