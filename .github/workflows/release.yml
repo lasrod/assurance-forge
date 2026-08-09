@@ -51,7 +51,7 @@ jobs:
 
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -129,7 +129,7 @@ jobs:
 
       - name: Upload evidence package artifact (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: assurance-forge-${{ steps.version.outputs.version }}-evidence-package
           path: package/assurance-forge.${{ steps.version.outputs.version }}-evidence-package.zip
@@ -165,7 +165,7 @@ jobs:
           (cd package && zip -r -y "../$archive" "$stage_name")
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: assurance-forge-${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}
           path: package/assurance-forge.${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}.${{ matrix.archive_ext }}
