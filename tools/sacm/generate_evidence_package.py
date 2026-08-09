@@ -296,9 +296,15 @@ def build_package(out_dir, args):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     commit = git("rev-parse", "HEAD")
-    dirty_entries = [line for line in git("status", "--porcelain").splitlines() if line.strip()]
+    # Untracked files are excluded deliberately: "clean" here means no TRACKED
+    # content differs from the commit the manifest names, which is what makes
+    # the package reproducible from that commit. Build byproducts are untracked
+    # by definition -- the tag run's own `ctest --output-junit` drops its
+    # results file in the working tree, and counting that as dirt failed the
+    # first release that ever exercised this path.
+    dirty_entries = [line for line in git("status", "--porcelain", "--untracked-files=no").splitlines() if line.strip()]
     if args.require_clean and dirty_entries:
-        problems.append(f"checkout is not clean ({len(dirty_entries)} entries) and --require-clean is set")
+        problems.append(f"checkout is not clean ({len(dirty_entries)} tracked entries) and --require-clean is set")
 
     spec_entries, spec_problems, spec_notes = verify_spec_pins(args.check)
     problems += spec_problems
