@@ -1,8 +1,10 @@
 # Evidence index
 
-The reviewer's entry point: every class of evidence the
-[repository-quality assurance case](assurance-case.md) cites, what it supports,
-where it lives, and what keeps it honest. For readers who want the conclusion
+The reviewer's entry point to the evidence behind the
+[repository-quality assurance case](assurance-case.md): what each class of
+evidence supports, where it lives, and what keeps it honest. A few rows are
+not cited by the case directly but contextualize it; they are listed so the
+picture is complete. For readers who want the conclusion
 chain without walking the full case.
 
 Evidence is only listed here if it is **reproducible** — a command, a gate, or
@@ -13,9 +15,9 @@ not appear.
 |---|---|---|---|
 | Capability matrix | What the tool can do, per capability | [feature-matrix.md](../features/feature-matrix.md) | `feature_matrix_check`: `supported` requires a cited, existing test |
 | SACM conformance matrix | What the library implements of SACM 2.3 | [sacm-conformance-matrix.md](../sacm/sacm-conformance-matrix.md) | `sacm_matrix_check`: `verified` requires an ID-bearing test; cited paths must exist |
-| Compliance-point tests | The four claimed interchange points | [sacm-compliance-points.md](../sacm/sacm-compliance-points.md) | `SACM23_CP_001..004` strict-load root assertions |
+| Compliance-point tests | The four claimed interchange points | [sacm-compliance-points.md](../sacm/sacm-compliance-points.md) | `SACM23_CP_001..004` — the unit-of-interchange tests (strict-load root assertions) |
 | Matrix-completeness audit | That the matrix is missing nothing unexamined | [sacm-matrix-completeness-audit.md](../sacm/sacm-matrix-completeness-audit.md) | Findings tracked as issues [#333](https://github.com/lasrod/assurance-forge/issues/333)–[#337](https://github.com/lasrod/assurance-forge/issues/337); frozen into each evidence package |
-| Verification records | That `verified` meant a real, adversarial pass | [verification/](../sacm/verification/README.md) | `verification_index_check`; FAIL rounds committed (8 of 14) |
+| Verification records | That `verified` meant a real, adversarial pass | [verification/](../sacm/verification/README.md) | `verification_index_check`; FAIL rounds committed — the generated index is the count source, and FAIL verdicts outnumber passes |
 | Preservation record | That data loss was measured, fixed, and pinned | [sacm-integration-preservation.md](../sacm/sacm-integration-preservation.md) | Byte-pinned `SACM23_LIB_002` tests; mechanical known-lost-kinds sweep |
 | Layer gate + self-test | Dependency direction | `cmake/check_layer_gates.cmake` | `layer_gate_negative_check` feeds it violations it must reject |
 | Architecture record | Subsystem responsibilities and ownership | [layers-and-ownership.md](../architecture/layers-and-ownership.md) | `documentation_check`: must describe every gated subsystem |
