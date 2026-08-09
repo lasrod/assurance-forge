@@ -11,9 +11,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace sacm_adapter {
 
@@ -246,26 +249,61 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
 
 namespace {
 
+// The fingerprint below is `name=value;` pairs, so a value carrying one of those
+// delimiters would shift every field after it -- and the values here are user
+// data: a Term's externalReference is a URL, which routinely contains `=` in a
+// query string, and an Expression's value is free text. Percent-encoding the
+// three characters that matter (and `%` itself, so the encoding is reversible)
+// makes a delimiter in the payload impossible.
+//
+// Space is deliberately NOT encoded, even though reference lists are
+// space-joined: XMI itself separates idrefs by space, so an id containing one is
+// not representable in a conformant document, and encoding it would make the
+// common values unreadable in a failure message for no gain.
+std::string encode_field_value(std::string_view value) {
+    std::string out;
+    out.reserve(value.size());
+    for (const char c : value) {
+        switch (c) {
+        case '%':
+            out += "%25";
+            break;
+        case ';':
+            out += "%3B";
+            break;
+        case '=':
+            out += "%3D";
+            break;
+        default:
+            out += c;
+            break;
+        }
+    }
+    return out;
+}
+
+std::string scalar_field(std::string_view name, std::string_view value) {
+    return std::string(name) + "=" + encode_field_value(value) + ";";
+}
+
 // `name=a b c;` for a reference list, so the fingerprint stays diffable and its
 // order is the model's rather than a hash's.
 std::string reference_field(std::string_view name, const std::vector<sacm::model::ElementId>& ids) {
     if (ids.empty()) {
         return {};
     }
-    std::string out(name);
-    out += '=';
+    std::string joined;
     for (std::size_t i = 0; i < ids.size(); ++i) {
         if (i > 0) {
-            out += ' ';
+            joined += ' ';
         }
-        out += ids[i].value();
+        joined += encode_field_value(ids[i].value());
     }
-    out += ';';
-    return out;
+    return std::string(name) + "=" + joined + ";";
 }
 
 std::string reference_field(std::string_view name, const std::optional<sacm::model::ElementId>& id) {
-    return id.has_value() ? std::string(name) + "=" + id->value() + ";" : std::string{};
+    return id.has_value() ? scalar_field(name, id->value()) : std::string{};
 }
 
 // The SACM attributes and reference ends whose silent disappearance changes what
@@ -275,7 +313,7 @@ std::string reference_field(std::string_view name, const std::optional<sacm::mod
 std::string describe_attributes(const sacm::model::SACMElement& element) {
     std::string out;
     if (element.gid().has_value()) {
-        out += "gid=" + *element.gid() + ";";
+        out += scalar_field("gid", *element.gid());
     }
     if (element.is_citation()) {
         out += "isCitation=true;";
@@ -287,9 +325,8 @@ std::string describe_attributes(const sacm::model::SACMElement& element) {
     out += reference_field("abstractForm", element.abstract_form());
 
     if (const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element)) {
-        out += "assertionDeclaration=";
-        out += sacm::model::assertion_declaration_name(assertion->assertion_declaration());
-        out += ";";
+        out += scalar_field("assertionDeclaration",
+                            sacm::model::assertion_declaration_name(assertion->assertion_declaration()));
         out += reference_field("metaClaim", assertion->meta_claims());
     }
     if (const auto* relationship = dynamic_cast<const sacm::model::AssertedRelationship*>(&element)) {
@@ -313,12 +350,12 @@ std::string describe_attributes(const sacm::model::SACMElement& element) {
         out += reference_field("terminologyElement", group->terminology_elements());
     }
     if (const auto* expression = dynamic_cast<const sacm::model::ExpressionElement*>(&element)) {
-        out += "value=" + expression->value() + ";";
+        out += scalar_field("value", expression->value());
         out += reference_field("category", expression->categories());
     }
     if (const auto* term = dynamic_cast<const sacm::model::Term*>(&element)) {
         if (!term->external_reference().empty()) {
-            out += "externalReference=" + term->external_reference() + ";";
+            out += scalar_field("externalReference", term->external_reference());
         }
         out += reference_field("origin", term->origin());
     }
@@ -327,10 +364,10 @@ std::string describe_attributes(const sacm::model::SACMElement& element) {
     }
     if (const auto* artifact = dynamic_cast<const sacm::model::Artifact*>(&element)) {
         if (!artifact->version().empty()) {
-            out += "version=" + artifact->version() + ";";
+            out += scalar_field("version", artifact->version());
         }
         if (!artifact->date().empty()) {
-            out += "date=" + artifact->date() + ";";
+            out += scalar_field("date", artifact->date());
         }
     }
     return out;

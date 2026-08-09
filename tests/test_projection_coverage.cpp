@@ -28,6 +28,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <ios>
 #include <map>
 #include <set>
 #include <string>
@@ -382,6 +384,19 @@ TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripKeepsEveryAttributeOfASur
                     << "projection to carry it, or add it to the list AND to the SACM23-LIB-002 disclosure.";
                 lost_attributes.insert(key);
             }
+            // An attribute the round trip INVENTED. Never disclosable, for the
+            // same reason a changed value is not: `isCounter` is emitted only
+            // when true, so a false->true addition here is the original
+            // rebuttal-becomes-support defect running in reverse, and checking
+            // only the fields present beforehand would not see it.
+            for (const auto& [field, value] : is) {
+                if (was.count(field) > 0)
+                    continue;
+                ADD_FAILURE() << fixture.filename().string() << ": a bridged edit ADDS '" << element.kind << "."
+                              << field << "' = '" << value << "' to '" << element.id
+                              << "', which had no such attribute before. The projection round trip must not invent "
+                              << "an attribute: the element now asserts something the source document did not.";
+            }
         }
     }
 
@@ -402,4 +417,50 @@ TEST(ProjectionCoverage, SACM23_LIB_002_BridgeRoundTripKeepsEveryAttributeOfASur
         EXPECT_TRUE(attributes_seen.count(meaningful) > 0)
             << "no fixture carries '" << meaningful << "', so this sweep no longer measures it";
     }
+}
+
+// The sweep above is only as trustworthy as its `name=value;` encoding. The
+// values in it are user data -- a Term's externalReference is a URL, and a query
+// string routinely carries both `=` and `;` -- so an unescaped delimiter in a
+// payload would shift every field after it and make the sweep report losses that
+// did not happen, or miss ones that did.
+TEST(ProjectionCoverage, SACM23_LIB_002_AttributeFingerprintSurvivesDelimitersInValues) {
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / "af-fingerprint-delimiters.sacm.xmi";
+    {
+        std::ofstream out(path, std::ios::binary);
+        ASSERT_TRUE(out.is_open());
+        out << R"(<?xml version="1.0" encoding="UTF-8"?>)"
+               R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+               R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+               R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+               R"(<name content="Case"/>)"
+               R"(<terminologyPackage xmi:id="tp_1"><name content="Vocabulary"/>)"
+               R"(<terminologyElement xsi:type="sacm:Term" xmi:id="term_nasty" value="a=b;c=d" )"
+               R"(externalReference="https://example.org/s?id=68383;rev=2"><name content="Nasty"/>)"
+               R"(</terminologyElement></terminologyPackage></sacm:AssuranceCasePackage>)";
+    }
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    std::filesystem::remove(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    std::string fingerprint;
+    for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*loaded.document)) {
+        if (element.id == "term_nasty")
+            fingerprint = element.attributes;
+    }
+    ASSERT_FALSE(fingerprint.empty()) << "the fixture element was not found; this test measures nothing";
+
+    // Non-vacuity: the raw delimiters must be gone from the rendered value, or
+    // the encoder did nothing and the parse below succeeds by luck.
+    EXPECT_EQ(fingerprint.find("a=b;c=d"), std::string::npos) << fingerprint;
+
+    const std::map<std::string, std::string> fields = ParseFields(fingerprint);
+    // Two fields, not the five an unescaped `a=b;c=d` plus the URL would split
+    // into.
+    EXPECT_EQ(fields.size(), 2u) << fingerprint;
+    ASSERT_TRUE(fields.count("value") > 0) << fingerprint;
+    EXPECT_EQ(fields.at("value"), "a%3Db%3Bc%3Dd");
+    ASSERT_TRUE(fields.count("externalReference") > 0) << fingerprint;
+    EXPECT_EQ(fields.at("externalReference"), "https://example.org/s?id%3D68383%3Brev%3D2");
 }

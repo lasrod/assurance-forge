@@ -9,12 +9,17 @@
 
 #include <pugixml.hpp>
 
+#include <algorithm>
+#include <cctype>
+#include <cstddef>
 #include <format>
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace sacm::io {
 
