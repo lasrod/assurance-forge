@@ -93,4 +93,4 @@ this project does and does not claim.
 
 ## Platform support
 
-Releases are currently **Windows x64 only**, built with the `Visual Studio 17 2022` generator on GitHub-hosted `windows-latest` runners. Cross-platform release artifacts are tracked separately on the roadmap.
+Release binaries are built on GitHub-hosted runners (`windows-latest`, `ubuntu-latest`, `macos-latest`); the Windows build uses the newest Visual Studio installed on the runner rather than a pinned generator, matching CI. The evidence package is generated on the Windows job.
