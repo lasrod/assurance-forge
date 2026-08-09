@@ -139,4 +139,38 @@ TEST(Sacm23Artifact, SACM23_ART_001_RejectsRelationshipToNonAsset) {
     }));
 }
 
+// Clause 12.10 declares `location: Base::MultiLangString (composition)` -- the
+// path or URL of the resource, and the only payload a Resource has.
+// ptc/22-03-13 omits the attribute entirely, and the library followed the model,
+// so a text-conformant `<location>` fell into preserved content and strict save
+// then refused the document. Resolved toward the TEXT and recorded as a
+// divergence in docs/sacm/sacm-2.3-metamodel-inventory.md (#337).
+TEST(Sacm23Artifact, SACM23_ART_001_ResourceLocationRoundTrips) {
+    const LoadResult first =
+        sacm::io::load_xmi_file(fixture("artifact-full-valid.sacm.xmi"), LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(first.ok) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+
+    const auto* resource = first.document->find_as<sacm::model::Resource>(ElementId{"resource_lab"});
+    ASSERT_NE(resource, nullptr);
+    ASSERT_EQ(resource->location().values.size(), 2u) << "the resource's location was not read as a MultiLangString";
+    const std::string* english = resource->location().find("en");
+    ASSERT_NE(english, nullptr);
+    EXPECT_EQ(*english, "file:///srv/hil/lab-bench-3");
+    const std::string* japanese = resource->location().find("ja");
+    ASSERT_NE(japanese, nullptr);
+    EXPECT_EQ(*japanese, "file:///srv/hil/ラボベンチ3");
+
+    // Strict save must emit it rather than refuse the document for carrying
+    // preserved content -- which is what happened before the field existed.
+    const auto saved = sacm::io::save_xmi_string(*first.document);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    EXPECT_NE(saved.xml.find("file:///srv/hil/lab-bench-3"), std::string::npos)
+        << "strict save dropped the resource location:\n"
+        << saved.xml;
+
+    const LoadResult second = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(second.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(*first.document, *second.document).empty());
+}
+
 } // namespace

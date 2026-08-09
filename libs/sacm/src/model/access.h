@@ -178,6 +178,9 @@ struct Access {
     static std::vector<std::unique_ptr<model::Property>>& properties(model::ArtifactAsset& e) {
         return e.properties_;
     }
+    static model::MultiLangString& location(model::Resource& e) {
+        return e.location_;
+    }
     static std::string& version(model::Artifact& e) {
         return e.version_;
     }

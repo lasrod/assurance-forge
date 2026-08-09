@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <format>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -489,6 +492,97 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetDescriptionAtAddressesDescriptionSlots)
     const auto& reloaded_claim = *reloaded.document->find_as<sacm::model::ModelElement>(ElementId{"c_1"});
     ASSERT_EQ(reloaded_claim.descriptions().size(), 2u);
     EXPECT_EQ(*reloaded_claim.descriptions()[1]->content().find("en"), "A revised note.");
+}
+
+// Two claims whose attribute lists the caller supplies, so each clause-8.2
+// negative below differs only in the attribute under test.
+std::vector<sacm::validation::Diagnostic> validate_two_claims(std::string_view first_attrs,
+                                                              std::string_view second_attrs) {
+    const std::string xml =
+        std::string(R"(<?xml version="1.0" encoding="UTF-8"?>)"
+                    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+                    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+                    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+                    R"(<argumentPackage xmi:id="ap_1">)"
+                    R"(<argumentElement xsi:type="sacm:Claim" xmi:id="claim_a" )") +
+        std::string(first_attrs) + R"(><name content="A"/></argumentElement>)" +
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="claim_b" )" + std::string(second_attrs) +
+        R"(><name content="B"/></argumentElement>)" + R"(</argumentPackage></sacm:AssuranceCasePackage>)";
+    const LoadResult result = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    EXPECT_TRUE(result.document.has_value()) << (result.diagnostics.empty() ? "" : result.diagnostics.front().message);
+    if (!result.document.has_value()) {
+        return {};
+    }
+    return sacm::validation::validate(*result.document);
+}
+
+bool mentions(const std::vector<sacm::validation::Diagnostic>& diagnostics, std::string_view fragment) {
+    return std::ranges::any_of(diagnostics, [&](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.message.find(fragment) != std::string::npos;
+    });
+}
+
+// Clause 8.2: gid is "a unique identifier that is unique within the scope of
+// the model instance". The validator checked xmi:id only, so two elements
+// sharing the gid third-party tools key on validated clean.
+TEST(Sacm23BaseModel, SACM23_BASE_002_DuplicateGidIsDiagnosed) {
+    const auto duplicated = validate_two_claims(R"(gid="urn:af:claim-1")", R"(gid="urn:af:claim-1")");
+    EXPECT_TRUE(has_code(duplicated, sacm::validation::codes::kGidDuplicate));
+    EXPECT_TRUE(mentions(duplicated, "urn:af:claim-1"))
+        << (duplicated.empty() ? "no diagnostics at all" : duplicated.front().message);
+
+    const auto distinct = validate_two_claims(R"(gid="urn:af:claim-1")", R"(gid="urn:af:claim-2")");
+    EXPECT_TRUE(distinct.empty()) << (distinct.empty() ? "" : distinct.front().message);
+
+    // Absent on both is not a collision: clause 8.2 makes gid [0..1].
+    EXPECT_TRUE(validate_two_claims("", "").empty());
+}
+
+// Clause 8.2: "When +abstractForm is used to refer to another SACMElement,
+// +isAbstract of the SACMElement is false, and the +isAbstract of the referred
+// SACMElement should be true. The referred SACMElement should be of the same
+// type of the SACMElement." Severities follow the clause's own modal verbs --
+// the flat statement is an error, the two "should"s are warnings.
+TEST(Sacm23BaseModel, SACM23_BASE_002_AbstractFormConstraintsAreValidated) {
+    // Conformant: a concrete claim conforming to an abstract claim.
+    const auto conformant = validate_two_claims(R"(abstractForm="claim_b")", R"(isAbstract="true")");
+    EXPECT_TRUE(conformant.empty()) << (conformant.empty() ? "" : conformant.front().message);
+
+    // The citing element is itself abstract.
+    const auto citing_abstract =
+        validate_two_claims(R"(isAbstract="true" abstractForm="claim_b")", R"(isAbstract="true")");
+    EXPECT_TRUE(has_code(citing_abstract, sacm::validation::codes::kAbstractnessInvalid));
+    EXPECT_TRUE(std::ranges::any_of(citing_abstract, [](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.code == sacm::validation::codes::kAbstractnessInvalid &&
+               diagnostic.severity == sacm::validation::Severity::Error;
+    }));
+
+    // The referred element is not abstract -- a "should", so a warning.
+    const auto referred_concrete = validate_two_claims(R"(abstractForm="claim_b")", "");
+    ASSERT_TRUE(has_code(referred_concrete, sacm::validation::codes::kAbstractnessInvalid));
+    EXPECT_TRUE(std::ranges::all_of(referred_concrete, [](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.severity == sacm::validation::Severity::Warning;
+    }));
+}
+
+TEST(Sacm23BaseModel, SACM23_BASE_002_AbstractFormMustNameTheSameType) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="claim_a" abstractForm="reasoning_1">)"
+        R"(<name content="A"/></argumentElement>)"
+        R"(<argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="reasoning_1" isAbstract="true">)"
+        R"(<name content="R"/></argumentElement>)"
+        R"(</argumentPackage></sacm:AssuranceCasePackage>)";
+    const LoadResult result = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(result.document.has_value());
+    const auto diagnostics = sacm::validation::validate(*result.document);
+    EXPECT_TRUE(has_code(diagnostics, sacm::validation::codes::kAbstractnessInvalid));
+    EXPECT_TRUE(mentions(diagnostics, "same type"))
+        << (diagnostics.empty() ? "no diagnostics at all" : diagnostics.front().message);
 }
 
 } // namespace

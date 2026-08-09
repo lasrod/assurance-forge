@@ -1,0 +1,52 @@
+# Automated dependency review (#349).
+#
+# The repository assurance case's strand 8 claimed dependency risks were
+# "documented and evidenced" while nothing checked them: submodule pointers were
+# advanced by hand and no job looked for known-vulnerable revisions. That is the
+# shape of unevidenced claim the case avoids everywhere else, so it was raised as
+# a counter-claim against itself and this is the answer to it.
+#
+# Report mode, per docs/quality/code-quality-policy.md: Dependabot opens a pull
+# request, a human reads it, CI decides whether it merges. Nothing here updates
+# anything on its own, and no gate is claimed as enforced.
+version: 2
+updates:
+  # The six submodules in .gitmodules are the whole third-party C++ surface --
+  # pugixml, hello_imgui, nativefiledialog-extended, picosha2, the SCCG
+  # guidelines and the examples project. There is no package manifest to scan
+  # instead, so this is the only automated view of them there can be.
+  - package-ecosystem: gitsubmodule
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "area: build"
+    groups:
+      # One PR for the batch rather than six. A submodule bump has to be built
+      # on all three CI platforms to mean anything, and six parallel PRs each
+      # doing that buys no extra signal.
+      submodules:
+        patterns:
+          - "*"
+
+  # Workflow actions pin third-party code that runs with repository credentials
+  # and produces the release evidence package. An unreviewed action revision is
+  # a supply-chain surface, and it is the one this repository can actually see.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "area: build"
+    groups:
+      actions:
+        patterns:
+          - "*"

@@ -8,6 +8,9 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -270,6 +273,72 @@ TEST(Sacm23Terminology, SACM23_TERM_001_LegacyTerminologyShorthandIsRead) {
     // SACM 2.3.
     const LoadResult strict = sacm::io::load_xmi_string(kXml, LoadOptions{.mode = Mode::Strict});
     EXPECT_FALSE(strict.ok);
+}
+
+// A terminology package whose two ExpressionElements the caller attributes, so
+// each clause-10.10 case differs only in isAbstract.
+std::vector<sacm::validation::Diagnostic> validate_terminology(std::string_view term_attrs,
+                                                               std::string_view expression_attrs) {
+    const std::string xml =
+        std::string(R"(<?xml version="1.0" encoding="UTF-8"?>)"
+                    R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+                    R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+                    R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+                    R"(<terminologyPackage xmi:id="tp_1"><name content="Vocabulary"/>)"
+                    R"(<terminologyElement xsi:type="sacm:Term" xmi:id="term_1" value="hazard" )") +
+        std::string(term_attrs) + R"(><name content="Hazard"/></terminologyElement>)" +
+        R"(<terminologyElement xsi:type="sacm:Expression" xmi:id="expr_1" value="{hazard}" element="term_1" )" +
+        std::string(expression_attrs) + R"(><name content="Phrase"/></terminologyElement>)" +
+        R"(</terminologyPackage></sacm:AssuranceCasePackage>)";
+    const LoadResult result = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    EXPECT_TRUE(result.document.has_value()) << (result.diagnostics.empty() ? "" : result.diagnostics.front().message);
+    if (!result.document.has_value()) {
+        return {};
+    }
+    return sacm::validation::validate(*result.document);
+}
+
+// Clause 10.10 OCL:
+// self.isAbstract = false implies self.element->forall(expr|expr.isAbstract = false)
+TEST(Sacm23Terminology, SACM23_TERM_001_ConcreteExpressionCannotReferenceAbstractElements) {
+    const auto abstract_part = validate_terminology(R"(isAbstract="true")", "");
+    EXPECT_TRUE(std::ranges::any_of(abstract_part, [](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.code == sacm::validation::codes::kAbstractnessInvalid;
+    })) << (abstract_part.empty() ? "no diagnostics at all" : abstract_part.front().message);
+
+    // Both concrete: clean.
+    EXPECT_TRUE(validate_terminology("", "").empty());
+    // An abstract expression may reference abstract parts -- the OCL's
+    // antecedent is `isAbstract = false`.
+    EXPECT_TRUE(validate_terminology(R"(isAbstract="true")", R"(isAbstract="true")").empty());
+}
+
+// Clause 8.4: "If expression is not empty, then +content should be empty." A
+// "should", so a warning -- but a real one: the two carry the same meaning
+// twice and a reader has no rule for which wins.
+TEST(Sacm23Terminology, SACM23_BASE_001_ExpressionLangStringWithLiteralContentIsDiagnosed) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<terminologyPackage xmi:id="tp_1"><name content="Vocabulary"/>)"
+        R"(<terminologyElement xsi:type="sacm:Term" xmi:id="term_1" value="hazard"><name content="Hazard"/>)"
+        R"(</terminologyElement></terminologyPackage>)"
+        R"(<argumentPackage xmi:id="ap_1"><name content="Args"/>)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="claim_1"><name content="C"/>)"
+        R"(<description xmi:id="d_1"><content>)"
+        R"(<value xsi:type="sacm:ExpressionLangString" lang="en" expression="term_1" content="hazard"/>)"
+        R"(</content></description></argumentElement></argumentPackage></sacm:AssuranceCasePackage>)";
+    const LoadResult result = sacm::io::load_xmi_string(xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(result.document.has_value()) << (result.diagnostics.empty() ? "" : result.diagnostics.front().message);
+    const auto diagnostics = sacm::validation::validate(*result.document);
+    ASSERT_TRUE(std::ranges::any_of(diagnostics, [](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.code == sacm::validation::codes::kExpressionContentConflict;
+    })) << (diagnostics.empty() ? "no diagnostics at all" : diagnostics.front().message);
+    EXPECT_TRUE(std::ranges::all_of(diagnostics, [](const sacm::validation::Diagnostic& diagnostic) {
+        return diagnostic.severity == sacm::validation::Severity::Warning;
+    }));
 }
 
 } // namespace

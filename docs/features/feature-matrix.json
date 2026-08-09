@@ -1674,12 +1674,14 @@
       "status": "supported",
       "evidence": [
         "src/ui/i18n/localization.cpp",
-        "src/ui/i18n/mo_catalog.cpp"
+        "src/ui/i18n/mo_catalog.cpp",
+        "src/app/app_runtime_project.cpp",
+        "src/app/app_runtime_undo.cpp"
       ],
       "tests": [
         "tests/test_localization.cpp"
       ],
-      "notes": "Catalog consistency is gated by the `i18n_catalog_check` CTest."
+      "notes": "Catalog consistency is gated by the `i18n_catalog_check` CTest. The status bar was the one surface that bypassed the catalog entirely — 65 message sites in `src/app`, one of them localized, so a Japanese user saw a translated UI and an English status line. All of `src/app` now goes through `ui::i18n` ([#252](https://github.com/lasrod/assurance-forge/issues/252)). **Bounded:** the 27 file- and project-level messages set in `core::AppState` are still English. The layer rule keeps `ui/i18n` out of `core`, so converting them needs the msgid-plus-arguments mechanism rather than a call, and they are tracked on the same issue. Status text also bakes its language when set, so a message already on screen survives a language switch unchanged — a recorded decision, not an oversight; see the comment on `AppRuntime::SetStatus`."
     },
     {
       "id": "AF-PLAT-005",

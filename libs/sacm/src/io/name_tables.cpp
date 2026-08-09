@@ -82,6 +82,25 @@ std::optional<ElementKind> kind_from_class_name_ci(std::string_view name) {
     return std::nullopt;
 }
 
+bool is_abstract_sacm_class_name(std::string_view name) {
+    static constexpr std::string_view kAbstractClasses[] = {
+        "Element",
+        "SACMElement",
+        "ModelElement",
+        "UtilityElement",
+        "ArtifactElement",
+        "TerminologyElement",
+        "TerminologyAsset",
+        "ExpressionElement",
+        "ArgumentationElement",
+        "ArgumentAsset",
+        "Assertion",
+        "AssertedRelationship",
+        "ArtifactAsset",
+    };
+    return std::ranges::find(kAbstractClasses, name) != std::ranges::end(kAbstractClasses);
+}
+
 bool kind_is_argumentation_element(ElementKind kind) {
     switch (kind) {
     case ElementKind::ArgumentPackage:

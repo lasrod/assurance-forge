@@ -105,6 +105,15 @@ each generated `.toml` and fails if a `writes: none` agent's file does not carry
 the read-only sandbox. Asserting `writes: none` in the definition says what was
 intended; parsing the artifact says what the platform will actually load.
 
+Every role now targets both platforms. `feature-matrix-steward` was the last
+Claude-only one, and [#329](https://github.com/lasrod/assurance-forge/issues/329)
+decided it should not stay that way: `feature_matrix_check` covers the matrix's
+mechanics — ID form, status vocabulary, whether a `supported` row cites a test
+that exists — and cannot tell whether a `supported` row is *true*. The steward is
+the only thing that can, so a Codex user editing the matrix had the gate and not
+the auditor. It is also the role that benefits most from `sandbox_mode =
+"read-only"`, since the artifact it audits is the one it must not edit.
+
 > **This table said "no" for Codex when the package landed**, on the strength of
 > the hand-written `.toml` files carrying only `name`, `description` and
 > `developer_instructions`. That was a fact about what somebody had written, not
@@ -151,10 +160,6 @@ to close. #294 is closed on what it delivered; these are what it did not.
   modes and `sacm-implementer` two scopes, and under #294's own principle those
   are knowledge rather than authority. They are prompt sections because there is
   nowhere better yet.
-- **`feature-matrix-steward` is Claude-only** — [#329](https://github.com/lasrod/assurance-forge/issues/329).
-  It always was. Adding a Codex adapter is one word in `adapters:`, but that is
-  a roster change rather than a migration, so it is a decision to make rather
-  than a default to take.
 - **The runtime may grant more than the definitions declare** —
   [#326](https://github.com/lasrod/assurance-forge/issues/326). The Claude
   session roster has listed write-denied agents with `Write` and `Edit`,
