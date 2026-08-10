@@ -277,11 +277,15 @@ claimed away**: the projection still cannot carry `AssertedArtifactSupport` (11.
 `AssertedArtifactContext` (11.18), `ArgumentGroup` (11.2), `TerminologyGroup` (10.3),
 `Event` (12.9), `Artifact` (12.7), `Activity` (12.8), `Term` (10.7), `Category` (10.8)
 or a nested `ArgumentPackage` (11.4) -- but a bridged edit on a document carrying any of
-them is now REFUSED by the guard above rather than applied, and the NodeOnly removal
-that used to bypass the guard entirely (round-3 probe a: silent deletion from the
-tracked file AND the live document, reachable from the context menu) now routes through
-the same bridge, pinned by SaveFromLibrary.SACM23_LIB_002_UnflippedNodeOnlyRemovalRefuses
-RatherThanDeleteUnrepresentableElements. `ArgumentReasoning@structure` (11.12) and
+them is now REFUSED by the guard above rather than applied. The NodeOnly removal that
+used to bypass the guard entirely (round-3 probe a: silent deletion from the tracked file
+AND the live document, reachable from the context menu) was first routed through the same
+bridge, and since slice 3c of #350 applies through native seams instead -- so it neither
+bypasses nor needs the guard, pinned by
+SaveFromLibrary.SACM23_LIB_002_NodeOnlyRemovalRunsNativelyAndKeepsUnrepresentable
+Elements, which requires all four unrepresentable kinds to survive in the SAVED bytes and
+the ArgumentGroup to survive in the live document (a test asserting only success would
+re-admit probe a). `ArgumentReasoning@structure` (11.12) and
 `Assertion@metaClaim` (11.10) came OFF the lost list in round 4: the legacy POD carries
 both and the bridge round-trips them
 (SaveFromLibrary.SACM23_LIB_002_BridgedEditPreservesMetaClaimAndReasoningStructure,
@@ -362,6 +366,50 @@ sweep gates the known-lost list in both directions, and a *changed* attribute va
 outright — that has never been disclosed and never will be, because an element that keeps
 an attribute and changes what it says is the reinterpretation the project's own hard
 constraint forbids.
+
+**Slice 3c: the audit projection was not reloadable for any artifact-bearing document
+([#350](https://github.com/lasrod/assurance-forge/issues/350)).** Found while flipping the
+NodeOnly removal, and recorded here because it is a defect in this row's own machinery
+rather than in the command that exposed it.
+
+`core::project_library_package` -- the projection BOTH sides of a replay verification are
+hashed from -- rebuilds the argument package flat, from every element the POD projection
+lists. That list includes the Artifacts that live in an `ArtifactPackage`, so each came
+out twice: once as `<artifact>` in the artifact package, and again as an
+`<artifactReference>` in the argument package **reusing the artifact's own id**. The
+projected package therefore held two elements under one id, and
+`library_canonical_hash`, which serializes the projection and loads it back, could not
+reload it. `project_library_package_with_tags` never had the defect because it filters
+elements by argument-package shell membership instead.
+
+It survived because the three sides of a verification treat an unhashable projection
+differently: the snapshot side fell back via `value_or` to a *differently normalized*
+hash, the on-disk side only appends a diagnostic, and the replayed side fails hard. A
+project holding such a document would have reported divergence permanently, with the one
+diagnostic saying only "Failed to load replayed SACM through the library for
+normalization". Exposing it needed a test that both mutated such a document successfully
+and then verified -- which none did until the NodeOnly flip. Reproducible with **no
+mutation at all**: `SaveFromLibrary.AuditProjectionOfAnArtifactBearingCaseReloadsThrough`
+`TheLibrary`, which fails without the fix and names the colliding id rather than only
+reporting a missing hash.
+
+Fixed by dropping, from the rebuilt argument packages, any id the terminology or artifact
+package projections already carry. The filter runs AFTER the rebuild rather than on its
+input, because the rebuild reads terminology elements to classify which artifact
+references are terminology references, and pre-filtering would change that
+classification as a side effect. The snapshot-side fallback now records a diagnostic when
+it engages, so a recurrence says so instead of reporting divergence with nothing to read.
+
+**Slice 3c: both `RemoveElement` modes are native.** `NodeOnly` reparents -- a child's
+inference is RETARGETED onto the removed node's parent, and a strategy interposed as a
+reasoning has that reasoning cleared -- which no set of per-id deletes expresses. It now
+runs `core::ReparentChildrenToParent` (declared in `element_factory.h` for this caller)
+on a scratch projection, mirrors the endpoint rewrites through
+`apply_set_relationship_ends`, and only then applies the planned deletes, whose own
+`ScrubReferences` policy handles the scrub. The reparent must be mirrored ALONE: diffing
+after the whole of `core::RemoveElement` also picks up its scrub, and a context whose only
+target was the removed node then comes back with an empty target list, which no
+relationship may hold. Three commands still bridge.
 
 **Phase 1 of the retirement: eleven commands off the bridge ([#350](https://github.com/lasrod/assurance-forge/issues/350)).**
 The ten terminology commands and `RemoveArgumentPackage` now apply through the
@@ -677,14 +725,19 @@ nothing announced-as-surviving gone).
 
 **Scope: `NodeAndDescendants` only.** `RemoveMode::NodeOnly` REPARENTS the removed
 node's children -- `core::ReparentChildrenToParent` retargets a child's inference rather
-than deleting it -- and the library has no retarget operation, so a delete-modelled
-preview would announce that inference as removed when it survives. `BuildRemovalPreview`
-therefore declines to preview NodeOnly and the modal says the preview is unavailable,
-rather than showing a confident wrong answer
+than deleting it -- so a delete-modelled preview would announce that inference as removed
+when it survives. `BuildRemovalPreview` therefore declines to preview NodeOnly and the
+modal says the preview is unavailable, rather than showing a confident wrong answer
 (`..._NodeOnlyOffersNoPreviewRatherThanAWrongOne`, which also pins that the retargeted
-inference really does survive). A native retarget operation would let NodeOnly onto the
-seam, at which point preview and apply converge by construction; recorded in
-docs/sacm/sacm-gsn-metamodel-gaps.md. Utility elements (clause 8.7
+inference really does survive).
+
+**Still true after slice 3c of #350, and worth stating precisely because the apply side
+moved.** The library now HAS a retarget (`SetRelationshipEnds`), and the NodeOnly *apply*
+path uses it, so the reason for the gap is no longer "no operation exists". What remains
+is that `preview_delete_elements` answers a delete question: its vocabulary is
+`deleted` per element, with no way to say "this inference survives, pointing somewhere
+else". Teaching the preview to report retargets is the remaining work, now unblocked
+rather than done; recorded in docs/sacm/sacm-gsn-metamodel-gaps.md. Utility elements (clause 8.7
 Description/Note/TaggedValue) are filtered out: they are attachments deleted with an
 owner that is already listed, and listing them turned "this goal and its inference" into
 a dozen rows of bookkeeping. Assurance Claim Points are the exception and are re-added

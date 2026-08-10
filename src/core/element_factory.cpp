@@ -1042,11 +1042,10 @@ std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, con
     return result;
 }
 
-namespace {
-
 // Reparent the structural children of `node_id` to its structural parent.
-// Mutates both models so the subsequent scrub-then-drop pass leaves a coherent
-// tree. No-op if the node has no structural parent (root or orphan).
+// No-op if the node has no structural parent (root or orphan). Declared in the
+// header because a library-primary caller needs the reparent WITHOUT the
+// scrub-then-erase that follows it in RemoveElement -- see element_factory.h.
 void ReparentChildrenToParent(parser::AssuranceCase& ac, sacm::AssuranceCasePackage* pkg, const std::string& node_id) {
     std::string parent_id = FindStructuralParent(ac, node_id);
     if (parent_id.empty())
@@ -1096,8 +1095,6 @@ void ReparentChildrenToParent(parser::AssuranceCase& ac, sacm::AssuranceCasePack
         }
     }
 }
-
-} // namespace
 
 bool RemoveElement(parser::AssuranceCase& ac,
                    sacm::AssuranceCasePackage* pkg,

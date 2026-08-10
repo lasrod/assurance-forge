@@ -234,7 +234,7 @@
       "tests": [
         "tests/test_save_from_library.cpp"
       ],
-      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included, and NodeOnly removals route through it too. Attribute fidelity below element level is pinned per test, not swept."
+      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included. Both RemoveElement modes now apply through native seams instead, so the refusal no longer covers them. Attribute fidelity below element level is pinned per test, not swept."
     },
     {
       "id": "AF-STD-012",

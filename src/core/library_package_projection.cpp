@@ -7,8 +7,65 @@
 #include "sacm_adapter/library_load.h"
 
 #include <unordered_map>
+#include <unordered_set>
 
 namespace core {
+
+namespace {
+
+// Ids the terminology and artifact package projections have already emitted.
+void CollectPackagedIds(const sacm::AssuranceCasePackage& package, std::unordered_set<std::string>& out) {
+    for (const sacm::TerminologyPackage& tp : package.terminologyPackages) {
+        for (const sacm::Category& category : tp.categories)
+            out.insert(category.id);
+        for (const sacm::Expression& expression : tp.expressions)
+            out.insert(expression.id);
+        for (const sacm::Term& term : tp.terms)
+            out.insert(term.id);
+    }
+    for (const sacm::ArtifactPackage& ap : package.artifactPackages) {
+        for (const sacm::Artifact& artifact : ap.artifacts)
+            out.insert(artifact.id);
+    }
+}
+
+template <typename Element>
+void EraseClaimedIds(std::vector<Element>& elements, const std::unordered_set<std::string>& claimed) {
+    std::erase_if(elements, [&claimed](const Element& element) { return claimed.contains(element.id); });
+}
+
+// Drop from the argument packages anything the terminology or artifact packages
+// already carry under the same id.
+//
+// The argument rebuild below is FLAT: it converts every element the POD
+// projection lists, and that projection lists the whole document -- including the
+// Artifacts that live in an ArtifactPackage. Those came out a second time as an
+// `<artifactReference>` in the argument package, reusing the artifact's own id, so
+// the projected package held two elements with one id and the library refused to
+// load it back. `project_library_package_with_tags` never had the problem because
+// it filters by argument-package shell membership instead.
+//
+// This runs AFTER the rebuild rather than filtering its input, because the
+// rebuild reads terminology elements to classify which artifact references are
+// terminology references; removing them beforehand would change that
+// classification as a side effect of fixing the collision.
+void DropIdsClaimedByOtherPackages(sacm::AssuranceCasePackage& package) {
+    std::unordered_set<std::string> claimed;
+    CollectPackagedIds(package, claimed);
+    if (claimed.empty()) {
+        return;
+    }
+    for (sacm::ArgumentPackage& ap : package.argumentPackages) {
+        EraseClaimedIds(ap.claims, claimed);
+        EraseClaimedIds(ap.argumentReasonings, claimed);
+        EraseClaimedIds(ap.artifactReferences, claimed);
+        EraseClaimedIds(ap.assertedInferences, claimed);
+        EraseClaimedIds(ap.assertedContexts, claimed);
+        EraseClaimedIds(ap.assertedEvidences, claimed);
+    }
+}
+
+} // namespace
 
 sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDocument& document) {
     // The argument content comes from the same POD projection the application
@@ -27,6 +84,7 @@ sacm::AssuranceCasePackage project_library_package(const sacm_adapter::LibraryDo
     // and audit coverage is not reduced.
     package.terminologyPackages = sacm_adapter::project_terminology_packages(document);
     package.artifactPackages = sacm_adapter::project_artifact_packages(document);
+    DropIdsClaimedByOtherPackages(package);
     return package;
 }
 
