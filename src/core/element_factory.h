@@ -260,6 +260,25 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
 // when the element is unknown.
 std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::string& element_id);
 
+// The reparent half of a `RemoveMode::NodeOnly` removal, on its own.
+//
+// NodeOnly promotes the removed node's structural children onto its parent: a
+// child's inference is RETARGETED from the node to the parent, and a strategy
+// interposed as an inference's reasoning has that reasoning cleared so its
+// sub-goals become direct children of the inference's target. Contexts of the
+// node are deliberately not retargeted -- they go away with it.
+//
+// `RemoveElement` runs this and then scrubs and erases. It is split out because
+// the two halves need different library operations and must not be confused: the
+// reparent is a set of endpoint rewrites (`SetRelationshipEnds`), while the
+// scrub-and-erase is the delete seam's own `ScrubReferences` policy. A caller
+// that diffs the model after BOTH have run cannot tell them apart, and will try
+// to write endpoint sets the scrub produced -- including a context left with no
+// target at all, which is not a set any relationship may hold.
+//
+// `pkg` may be null, in which case only the parser model is updated.
+void ReparentChildrenToParent(parser::AssuranceCase& ac, sacm::AssuranceCasePackage* pkg, const std::string& node_id);
+
 // Set or clear the GSN undeveloped decorator (SACM `needsSupport`). Writes the
 // previous value so an audited command can record and reverse it.
 bool SetElementUndeveloped(parser::AssuranceCase& ac,

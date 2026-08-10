@@ -1215,12 +1215,36 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // reload), which recomputes the same PlanRemoval the live path recorded --
         // exactly as the legacy replay does.
         if (mode == core::RemoveMode::NodeOnly) {
-            const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-            const BridgeMutator mutate =
-                [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-                return core::RemoveElement(model, &package, element_id, core::RemoveMode::NodeOnly, err);
-            };
-            return BridgeViaLegacy(document, location, mutate, out_error);
+            // Phase 3c: seam-mapped, matching the live command exactly -- reparent
+            // ALONE, mirror its endpoint rewrites, then fall through to the
+            // recorded-id deletes both modes share. Diffing after the whole of
+            // RemoveElement would also pick up its scrub and try to write endpoint
+            // sets no relationship may hold.
+            parser::AssuranceCase before = sacm_adapter::project_case(document);
+            parser::AssuranceCase reparented = before;
+            core::ReparentChildrenToParent(reparented, nullptr, element_id);
+            for (const parser::SacmElement& updated : reparented.elements) {
+                if (!parser::IsRelationshipElement(updated))
+                    continue;
+                const parser::SacmElement* original = parser::FindElementById(before, updated.id);
+                if (original == nullptr)
+                    continue;
+                if (original->source_refs == updated.source_refs && original->target_refs == updated.target_refs &&
+                    original->reasoning_ref == updated.reasoning_ref) {
+                    continue;
+                }
+                const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
+                    document, updated.id, updated.source_refs, updated.target_refs, updated.reasoning_ref);
+                if (!ends.supported || !ends.applied) {
+                    out_error = FormatSeamFailure("apply_set_relationship_ends(reparent)",
+                                                  tx_seq,
+                                                  event,
+                                                  ends.supported,
+                                                  ends.applied,
+                                                  ends.diagnostics);
+                    return false;
+                }
+            }
         }
 
         // NodeAndDescendants removes a closed subtree with no reparenting, so the

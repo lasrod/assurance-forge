@@ -36,6 +36,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <unordered_map>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -818,16 +819,70 @@ RunOnBus(ProjectFixture& fixture, core::AppState& state, core::commands::IComman
 
 } // namespace
 
-// NodeOnly removal REPARENTS, which the scrub seam cannot express, so it is the
-// one element command that must go through the guarded bridge. It used to fall
-// through to the raw legacy mutator instead: the bus then autosaved lossy
-// projection bytes over the tracked file, silently deleting the ArgumentGroup,
-// both artifact relationships, the nested package, every metaClaim and every
-// structure reference -- from the tracked file AND the live document, reachable
-// from the element context menu, with zero diagnostics (round-3 verification,
-// probe a). The same event REPLAYED through the guarded bridge and would have
-// refused, so live and replay also disagreed.
-TEST(SaveFromLibrary, SACM23_LIB_002_UnflippedNodeOnlyRemovalRefusesRatherThanDeleteUnrepresentableElements) {
+// The audit projection must be loadable back through the library, because that
+// round trip IS how the replayed side is hashed (`library_canonical_hash`
+// serializes the projection and reloads it). It was not, for any document with an
+// ArtifactPackage: the flat argument rebuild emitted each Artifact a second time
+// as an `<artifactReference>` carrying the artifact's own id, so the package held
+// two elements with one id.
+//
+// Nothing failed visibly for as long as that was true. The snapshot side takes a
+// fallback when the hash cannot be computed, the on-disk side only notes it, and
+// the replayed side is the one that fails hard -- so the defect needed a project
+// that both mutates such a document successfully AND verifies, which no test did
+// until the NodeOnly flip below. Two sessions of the flip's replay divergence
+// were spent looking at the reparent; the cause was here, and reachable with no
+// mutation at all.
+TEST(SaveFromLibrary, AuditProjectionOfAnArtifactBearingCaseReloadsThroughTheLibrary) {
+    const std::string full_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                           "sacm23" / "argumentation-full-valid.sacm.xmi");
+    ASSERT_FALSE(full_case.empty());
+    ProjectFixture fixture = MakeProject("audit-projection-reload", full_case.c_str());
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const sacm::AssuranceCasePackage projected = core::project_library_package(*state.library_document);
+    // The fixture has to carry an ArtifactPackage for this to measure anything.
+    ASSERT_FALSE(projected.artifactPackages.empty()) << "fixture has no artifact package; this test measures nothing";
+
+    EXPECT_TRUE(core::library_canonical_hash(projected).has_value())
+        << "the audit projection cannot be reloaded, so every replay verification of a project holding this "
+           "document reports divergence with no usable diagnostic";
+
+    // Named, so a regression says which id collided rather than just "no hash".
+    std::unordered_map<std::string, int> seen;
+    for (const sacm::ArtifactPackage& ap : projected.artifactPackages) {
+        for (const sacm::Artifact& artifact : ap.artifacts)
+            ++seen[artifact.id];
+    }
+    for (const sacm::ArgumentPackage& ap : projected.argumentPackages) {
+        for (const sacm::ArtifactReference& reference : ap.artifactReferences)
+            ++seen[reference.id];
+        for (const sacm::Claim& claim : ap.claims)
+            ++seen[claim.id];
+    }
+    for (const std::pair<const std::string, int>& entry : seen) {
+        EXPECT_EQ(entry.second, 1) << "the projection emitted " << entry.first << " " << entry.second << " times";
+    }
+}
+
+// NodeOnly removal REPARENTS -- a child's inference is retargeted from the removed
+// node onto its parent, and a strategy interposed as a reasoning has that
+// reasoning cleared -- which no set of per-id deletes can express. It was the last
+// element command on the guarded bridge, and the history is why the bridge is
+// there: before it caught this path, the raw legacy mutator ran and the bus
+// autosaved lossy projection bytes over the tracked file, silently deleting the
+// ArgumentGroup, both artifact relationships, the nested package, every metaClaim
+// and every structure reference -- from the file AND the live document, from a
+// context-menu action, with zero diagnostics (round-3 verification, probe a).
+//
+// Phase 3c expresses the retarget with `SetRelationshipEnds`, so the removal now
+// applies natively and this test INVERTS: what used to be refused must succeed,
+// and every element the projection cannot represent must still be there. Both
+// halves matter -- succeeding while dropping them is the round-3 defect back
+// again, which is exactly what a test asserting only success would miss.
+TEST(SaveFromLibrary, SACM23_LIB_002_NodeOnlyRemovalRunsNativelyAndKeepsUnrepresentableElements) {
     const std::string full_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
                                            "sacm23" / "argumentation-full-valid.sacm.xmi");
     ASSERT_FALSE(full_case.empty());
@@ -837,90 +892,41 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnflippedNodeOnlyRemovalRefusesRatherThanDe
     ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
     ASSERT_NE(state.library_document, nullptr);
 
+    const std::vector<std::string> unrepresentable = {
+        "ArgumentGroup", "AssertedArtifactSupport", "AssertedArtifactContext", "argpkg_detail"};
     const std::string before = ReadFile(fixture.sacm_absolute);
-    ASSERT_TRUE(Contains(before, "ArgumentGroup"))
-        << "fixture carries no unrepresentable element; this test measures nothing";
+    for (const std::string& marker : unrepresentable) {
+        ASSERT_TRUE(Contains(before, marker))
+            << "fixture no longer carries " << marker << "; this test measures nothing";
+    }
 
-    std::string error;
-    std::unique_ptr<core::commands::CommandBus> bus =
-        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
-    ASSERT_TRUE(bus) << error;
+    // `claim_sub1` is an interior claim: it is a source of the main inference and
+    // the target of an evidence relationship, so removing it NodeOnly reparents.
+    bool library_primary = false;
     core::commands::RemoveElementCommand command("claim_sub1", core::RemoveMode::NodeOnly);
-    core::commands::CommandContext ctx{
-        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
-    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+    ASSERT_TRUE(result.success) << "the NodeOnly removal was refused, so it is still going through the bridge: "
+                                << result.error;
+    ASSERT_TRUE(library_primary) << "the removal did not reach the library at all";
 
-    EXPECT_FALSE(result.success) << "the NodeOnly removal was applied and deleted part of the case";
-    EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
-        << "the refusal does not say what would have been destroyed: " << result.error;
-    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused removal still rewrote the tracked file";
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    for (const std::string& marker : unrepresentable) {
+        EXPECT_TRUE(Contains(autosaved, marker))
+            << "the native NodeOnly removal deleted " << marker << " from the tracked file";
+    }
+    EXPECT_FALSE(Contains(autosaved, "claim_sub1")) << "the removal did not actually remove the node";
+    // The evidence that pointed AT the removed claim was reparented rather than
+    // dropped, which is the whole difference between NodeOnly and NodeAndDescendants.
+    EXPECT_TRUE(Contains(autosaved, "ev_fmea")) << "the reparent took the evidence with the node";
 
-    // The LIVE document is intact too -- the round-3 probe showed this path
-    // degrading both the file and the in-memory document, so byte-identity of
-    // the file alone would not prove the session is safe to keep working in.
+    // The LIVE document too -- the round-3 probe degraded both, so byte-identity
+    // of the file alone would not prove the session is safe to keep working in.
     bool group_alive = false;
     for (const sacm_adapter::DocumentElement& element : sacm_adapter::list_document_elements(*state.library_document)) {
         if (element.id == "group_core")
             group_alive = true;
     }
-    EXPECT_TRUE(group_alive) << "the refused removal still deleted the ArgumentGroup from the live document";
-}
-
-// Phase 3b: MoveStrategyToReasoning. Moving a strategy into an inference's
-// reasoning slot is one endpoint rewrite -- the strategy leaves `source` and
-// becomes `reasoning` -- which is exactly what `SetRelationshipEnds` does, so
-// this needed no new library capability beyond the one slice 3a added.
-//
-// Routing proof as ever: the fixture nests an ArgumentPackage the legacy POD
-// cannot express, so a bridged edit is refused and success means the seam ran.
-TEST(SaveFromLibrary, SACM23_LIB_002_FlippedMoveStrategyRunsOnACaseTheBridgeRefuses) {
-    constexpr const char* kStrategySacm = R"(<?xml version="1.0" encoding="UTF-8"?>
-<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
-    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample" acme:owner="alice">
-  <acme:vendorMetadata reviewCycle="Q3-2026"/>
-  <argumentPackage id="AP1" name="Args">
-    <claim id="G1" name="Top goal" description="The system is safe."/>
-    <claim id="G2" name="Sub goal"/>
-    <argumentReasoning id="S1" name="Strategy"/>
-    <assertedInference id="R1" source="G2 S1" target="G1"/>
-    <argumentPackage id="AP_nested" name="Nested"/>
-  </argumentPackage>
-</sacm:AssuranceCasePackage>
-)";
-    ProjectFixture fixture = MakeProject("phase3b-routing", kStrategySacm);
-
-    core::AppState state;
-    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
-    ASSERT_NE(state.library_document, nullptr);
-    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "AP_nested"))
-        << "fixture carries no nested package, so a bridged edit would pass too";
-
-    bool library_primary = false;
-    core::commands::MoveStrategyToReasoningCommand command("R1", "S1");
-    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
-    ASSERT_TRUE(result.success) << "the move was refused, so it is still going through the bridge: " << result.error;
-    ASSERT_TRUE(library_primary) << "the move did not reach the library at all";
-
-    // The strategy is the inference's reasoning now, and no longer one of its
-    // sources -- a Strategy in GSN hangs off the relationship rather than being
-    // one of the things it relates.
-    core::RebuildDerivedViewsFromLibrary(
-        *state.library_document, state.loaded_case.value(), state.sacm_package.value());
-    bool checked = false;
-    for (const sacm::ArgumentPackage& argument_package : state.sacm_package->argumentPackages) {
-        for (const sacm::AssertedInference& inference : argument_package.assertedInferences) {
-            if (inference.id != "R1")
-                continue;
-            checked = true;
-            EXPECT_EQ(inference.reasoning, "S1");
-            EXPECT_EQ(inference.sources, (std::vector<std::string>{"G2"}));
-        }
-    }
-    EXPECT_TRUE(checked) << "the inference disappeared";
-
-    const std::string autosaved = ReadFile(fixture.sacm_absolute);
-    EXPECT_TRUE(Contains(autosaved, "AP_nested")) << "the move deleted the nested package";
-    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << "the move dropped the vendor attribute";
+    EXPECT_TRUE(group_alive) << "the removal deleted the ArgumentGroup from the live document";
 
     const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
     EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());

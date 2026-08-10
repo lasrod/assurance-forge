@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 4 commands have no native seam yet (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 3 commands have no native seam yet (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -68,7 +68,7 @@ default `true`, assigned nowhere under `src/app/`).
 | CreateTopGoal | `apply_add_top_goal` | [`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp) `CreateTopGoalCommand::Apply` |
 | CreateChildElement | `apply_add_child` | `CreateChildElementCommand::Apply` |
 | CreateChallenge | `apply_challenge` | `CreateChallengeCommand::Apply` |
-| RemoveElement (`NodeAndDescendants` only) | `apply_delete_element` per planned id | `RemoveElementCommand::Apply` |
+| RemoveElement (`NodeAndDescendants`) | `apply_delete_element` per planned id | `RemoveElementCommand::Apply` |
 | RemoveRelationship | `apply_delete_element` | `RemoveRelationshipCommand::Apply` |
 | Undo | move-assigns the replayed document; deliberately ignores the kill switch | [`undo_command.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/undo_command.cpp) `UndoLastTransactionCommand::Apply` |
 | All ten terminology commands | `apply_create/update/delete_terminology_*`, `apply_associate_terminology_term`, `apply_add_terminology_visible_context` | [`terminology_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/terminology_commands.cpp) (phase 1) |
@@ -80,6 +80,7 @@ default `true`, assigned nowhere under `src/app/`).
 | AddAcp, RemoveAcp, UpsertAcp, CreateConfidenceArgumentTree | `apply_upsert_acp_tags`, `apply_remove_acp_tags`, `apply_set_meta_claims`, `apply_create_confidence_argument_package` | [`acp_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/acp_commands.cpp) (slice 2c) |
 | DropRelationshipReference | `apply_set_relationship_ends`, `apply_delete_element` | `element_commands.cpp` `DropRelationshipReferenceCommand::Apply` (slice 3a) |
 | MoveStrategyToReasoning | `apply_set_relationship_ends` | `element_commands.cpp` `MoveStrategyToReasoningCommand::Apply` (slice 3b) |
+| RemoveElement (`NodeOnly`) | `apply_set_relationship_ends` for the reparent, then `apply_delete_element` per planned id | `element_commands.cpp` `RemoveElementCommand::Apply` (slice 3c) |
 
 Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
 seam does not support (and for a ref that carries only a gid, which the seams
@@ -92,9 +93,7 @@ is present.
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
 - Tree: ReorderSiblings, MoveSubtree ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
-- RemoveElement `NodeOnly` (reparent — the library has no retarget operation,
-  see [GSN metamodel gaps](../sacm/sacm-gsn-metamodel-gaps.md)) and the
-  seam-unsupported create fallbacks (CreateTopGoal / CreateChildElement /
+- the seam-unsupported create fallbacks (CreateTopGoal / CreateChildElement /
   CreateChallenge on shapes the seams cannot express) — routed through the
   guarded bridge by the `SACM23-LIB-002` round-4/5 fixes, after the verifier's
   probes measured the earlier raw-mutator fallbacks silently degrading the
@@ -336,10 +335,9 @@ key string is how a projection quietly stops seeing what an editor writes.
   ([`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp),
   pinned by `StrategyMigration.SACM23_LIB_002_StrategyMigrationPreservesUnknownContent`)
   is the template. Silent reinterpretation is forbidden outright.
-- **ReorderSiblings / MoveSubtree / RemoveElement NodeOnly**: need library
-  relationship reorder and retarget operations. A native retarget also lets
-  NodeOnly onto the delete-preview seam (`SACM23-INT-002`'s declared gap). New
-  relationship operations must respect the family-typing caution in
+- **ReorderSiblings / MoveSubtree**: need library
+  relationship reorder operations; the retarget half already exists
+  (`SetRelationshipEnds`, slice 3a). New relationship operations must respect the family-typing caution in
   [#334](https://github.com/lasrod/assurance-forge/issues/334) and take any
   GSN mapping from [the mapping record](../sacm/sacm-gsn-mapping.md), never
   from code.
@@ -367,32 +365,50 @@ key string is how a projection quietly stops seeing what an editor writes.
   re-decided: the command runs the same `core::MoveStrategyToReasoning` on a
   scratch projection and mirrors the endpoints it produced.
 
-- **RemoveElement `NodeOnly`** — attempted twice and backed out twice. Findings so
-  far, so a third attempt starts ahead rather than repeating them:
+- **RemoveElement `NodeOnly`** — landed in slice 3c, on the third attempt. The two
+  backed-out attempts are worth recording, because the cause was not where all
+  the looking happened:
 
-    - `SetRelationshipEnds` **can** express the reparent's retarget. The obstacle
-      is not a missing operation.
+    - `SetRelationshipEnds` expressed the reparent's retarget with no new library
+      capability. The obstacle was never a missing operation.
     - The reparent must be run **alone** to be mirrored. Diffing the model after
       the whole of `core::RemoveElement` also picks up its scrub, and a context
       whose only target was the removed node then comes back with an empty target
-      list — a set no relationship may hold. Exposing
-      `core::ReparentChildrenToParent` on its own (the treatment
-      `ValidateGsnIdentifierChange` got in slice 2b) fixes this, and with it the
-      LIVE path works: the removal applies, the node goes, and all four
-      unrepresentable kinds survive in the saved bytes.
-    - The **replay** path still produces a document that will not reload
-      (`VerifyProject`: "Failed to load replayed SACM through the library for
-      normalization"), on `argumentation-full-valid.sacm.xmi` but not on the
-      simple fixture `LibraryReplayConvergence.RemoveNodeOnlyInteriorReparents-`
-      `AndConverges` uses. Ruled out: deriving the replay model with
-      `RebuildDerivedViewsFromLibrary` instead of a bare `project_case` does not
-      fix it, so the divergence is not the render passes.
-    - Next step is instrumentation rather than inspection — replay that log
-      directly and read the load diagnostics — not another hypothesis.
+      list — a set no relationship may hold. `core::ReparentChildrenToParent` is
+      now declared in [`element_factory.h`](https://github.com/lasrod/assurance-forge/blob/main/src/core/element_factory.h)
+      for exactly this caller (the treatment `ValidateGsnIdentifierChange` got in
+      slice 2b), and with it the live path worked.
+    - The replay failure that then blocked it twice — `VerifyProject`: "Failed to
+      load replayed SACM through the library for normalization" — **was not the
+      reparent, and not replay**. The audit projection of any document with an
+      ArtifactPackage was not reloadable at all: the flat argument rebuild in
+      `project_library_package` emitted each Artifact a second time as an
+      `<artifactReference>` reusing the artifact's own id, so the projected
+      package carried two elements under one id. Reproducible on the **unmutated**
+      fixture, with no command run
+      (`SaveFromLibrary.AuditProjectionOfAnArtifactBearingCaseReloadsThroughThe-`
+      `Library`, which fails without the fix).
+    - Why it had never surfaced: the three sides of a verification treat an
+      unhashable projection differently. The snapshot side took a silent
+      `value_or` fallback to a *differently normalized* hash, the on-disk side
+      only appends a diagnostic, and the replayed side is the one that fails hard.
+      Exposing it needed a project that both mutated such a document successfully
+      **and** verified — which no test did until this flip. The snapshot fallback
+      now records a diagnostic when it engages, so the next occurrence says so
+      instead of reporting divergence forever with nothing to read.
+    - Method note: two attempts were spent on hypotheses about the reparent, each
+      plausible and each wrong. The third dumped the unloadable XML and read it,
+      and the duplicate id was visible immediately. When a failure names a
+      *mechanism* ("cannot load"), instrument the mechanism before theorizing
+      about the change that revealed it.
 
-    Worth doing: it is the last blocker on `RemoveElement` having one code path,
-    and a native retarget also puts NodeOnly on the delete-preview seam, closing
-    `SACM23-INT-002`'s declared gap.
+    `RemoveElement` now has one code path for both modes. `SACM23-INT-002`'s
+    declared gap is **not** closed by this: only the apply path moved. The delete
+    *preview* still declines NodeOnly rather than show a wrong one
+    (`ElementEditControllerTest.SACM23_INT_002_NodeOnlyOffersNoPreviewRatherThan-`
+    `AWrongOne`), because `preview_delete_elements` reports deletions and a
+    reparent is a retarget. Closing it means teaching the preview to report
+    retargets — a separate change, now unblocked rather than done.
 
 - **ApplyProposal**: composes the native primitives once the rest exist.
 

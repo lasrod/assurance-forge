@@ -65,6 +65,45 @@ sacm_adapter::ChallengeSource ToAdapterChallengeSource(ChallengeSourceType type)
     return sacm_adapter::ChallengeSource::CounterArgument;
 }
 
+// One relationship whose endpoints a reparent rewrote, flattened for the seam.
+struct RetargetedRelationship {
+    std::string id;
+    std::vector<std::string> sources;
+    std::vector<std::string> targets;
+    std::string reasoning;
+};
+
+// The endpoint rewrites `core::ReparentChildrenToParent` performed, found by
+// diffing the model before against the model after.
+//
+// The reparent MUST be run alone for this to be right. Diffing after the whole of
+// `RemoveElement` also picks up its scrub, and a context whose only target was
+// the removed node then comes back with an empty target list -- a set no
+// relationship may hold and the seam rightly refuses. The scrub is not this
+// caller's job: `apply_delete_element` performs it, under the same
+// ScrubReferences policy the legacy pass used.
+std::vector<RetargetedRelationship> ReparentedRelationships(const parser::AssuranceCase& before,
+                                                            const parser::AssuranceCase& after) {
+    std::vector<RetargetedRelationship> changed;
+    for (const parser::SacmElement& updated : after.elements) {
+        if (!parser::IsRelationshipElement(updated))
+            continue;
+        const parser::SacmElement* original = parser::FindElementById(before, updated.id);
+        if (original == nullptr)
+            continue;
+        if (original->source_refs == updated.source_refs && original->target_refs == updated.target_refs &&
+            original->reasoning_ref == updated.reasoning_ref) {
+            continue;
+        }
+        changed.push_back(RetargetedRelationship{
+            .id = updated.id,
+            .sources = updated.source_refs,
+            .targets = updated.target_refs,
+            .reasoning = updated.reasoning_ref,
+        });
+    }
+    return changed;
+}
 } // namespace
 
 std::string NewElementKindToToken(NewElementKind kind) {
@@ -349,27 +388,63 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // sources (the inference survives, scrubbed to the rest, rather than cascading
     // away).
     //
-    // NodeOnly is the exception and cannot use the scrub seam: it REPARENTS the
-    // removed node's structural children onto its parent (core::ReparentChildren-
-    // ToParent RETARGETS a child's inference from the node to the parent, or clears
-    // a strategy's reasoning). A retarget is not expressible as a set of per-id
-    // deletes, so the seam cannot reproduce it -- it would leave the child inference
-    // target-less, drop it, and orphan the promoted node. NodeOnly therefore goes
-    // through the GUARDED bridge below (project -> mutate -> reload), exactly as
-    // `ApplyEventToLibrary` replays it. It previously fell through to the raw
-    // legacy mutator with library_primary false, which autosaved lossy
-    // projection bytes over the tracked file -- silently deleting every element
-    // kind the projection cannot hold, with no refusal, on a context-menu
-    // action (round-3 verification, probe a).
+    // Both modes reach the library natively now, which is phase 3's exit criterion
+    // of `RemoveElement` having one code path.
     //
-    // Phase 3b added `SetRelationshipEnds`, which CAN express the retarget, so the
-    // remaining obstacle is narrower than "no operation exists": the reparent has
-    // to be separated from the scrub that follows it. Diffing the fully-mutated
-    // projection picks up both, and a context whose only target was the removed
-    // node then comes back with an empty target list -- a set the seam rightly
-    // refuses. Exposing the reparent step on its own (the treatment
-    // `ValidateGsnIdentifierChange` got) is what unblocks it.
+    // NodeOnly was the last element command on the guarded bridge because it
+    // REPARENTS: a child's inference is retargeted from the removed node onto its
+    // parent, and a strategy interposed as a reasoning has that reasoning cleared.
+    // A retarget is not expressible as a set of per-id deletes. Before the bridge
+    // caught it, this path fell through to the raw legacy mutator and the bus
+    // autosaved lossy projection bytes over the tracked file -- silently deleting
+    // every element kind the projection cannot hold, from a context-menu action,
+    // with no diagnostic (round-3 verification, probe a).
+    //
+    // `SetRelationshipEnds` expresses the retarget. The ordering below is the part
+    // that took two attempts:
+    //
+    //   1. Run the reparent ALONE (`core::ReparentChildrenToParent`) on a scratch
+    //      and mirror the endpoint rewrites. Running the whole of
+    //      `core::RemoveElement` instead also applies its scrub, and diffing that
+    //      cannot tell the two apart -- a context whose only target was the
+    //      removed node comes back with an empty target list, which no
+    //      relationship may hold and the seam rightly refuses.
+    //   2. THEN delete the planned ids. `apply_delete_element` scrubs under the
+    //      same ScrubReferences policy the legacy pass used, so the scrub is not
+    //      reimplemented here -- and by now nothing points at the node except what
+    //      is meant to die with it.
     bool applied_to_library = false;
+    if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeOnly) {
+        parser::AssuranceCase reparented = ctx.model;
+        core::ReparentChildrenToParent(reparented, nullptr, element_id_);
+        for (const RetargetedRelationship& changed : ReparentedRelationships(ctx.model, reparented)) {
+            const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
+                *ctx.library_document, changed.id, changed.sources, changed.targets, changed.reasoning);
+            // `!supported` fails here rather than falling through, which is the
+            // opposite of how the seams elsewhere treat it. Falling through would
+            // skip the retarget and then apply the deletes anyway, so the child
+            // inference would be SCRUBBED instead of reparented -- a NodeOnly
+            // removal quietly behaving like NodeAndDescendants, which is the one
+            // outcome this command exists to avoid. The replay branch in
+            // `event_replayer.cpp` fails on it too, so the two cannot disagree.
+            // (The seam only reports unsupported for an empty relationship id,
+            // which a projected relationship cannot have; this is the guard being
+            // right rather than a reachable path.)
+            if (!ends.supported || !ends.applied) {
+                out_error = LibraryRejection("the reparent of " + changed.id, ends.diagnostics);
+                return false;
+            }
+        }
+        for (const std::string& id : deleted_ids) {
+            const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_element(*ctx.library_document, id);
+            if (!outcome.applied) {
+                out_error = LibraryRejection("the deletion of " + id, outcome.diagnostics);
+                return false;
+            }
+        }
+        ctx.library_primary = true;
+        applied_to_library = true;
+    }
     if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeAndDescendants) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
         // records, walked in the same sorted order `ApplyEventToLibrary` replays,
@@ -587,7 +662,11 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
                                                                                              repaired->source_refs,
                                                                                              repaired->target_refs,
                                                                                              repaired->reasoning_ref);
-            if (ends.supported && !ends.applied) {
+            // `!supported` is a failure, not a fall-through: see the NodeOnly
+            // reparent above. Continuing would set `library_primary` with the
+            // endpoints unwritten, reporting success for an edit the document
+            // never received.
+            if (!ends.supported || !ends.applied) {
                 out_error = LibraryRejection("the endpoints of " + relationship_id_, ends.diagnostics);
                 return false;
             }
@@ -647,10 +726,13 @@ bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx, audit::AuditEven
         }
         const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
             *ctx.library_document, relationship_id_, moved->source_refs, moved->target_refs, moved->reasoning_ref);
-        if (ends.supported && !ends.applied) {
-            // "the endpoints", not "the reasoning": the seam rewrites source,
-            // target and reasoning together, so it can also refuse for a
-            // multiplicity reason that has nothing to do with the reasoning slot.
+        // "the endpoints", not "the reasoning": the seam rewrites source, target
+        // and reasoning together, so it can also refuse for a multiplicity reason
+        // that has nothing to do with the reasoning slot. `!supported` fails for
+        // the reason given on the NodeOnly reparent above -- this command IS the
+        // endpoint rewrite, so continuing would report success for a document that
+        // was never touched.
+        if (!ends.supported || !ends.applied) {
             out_error = LibraryRejection("the endpoints of " + relationship_id_, ends.diagnostics);
             return false;
         }

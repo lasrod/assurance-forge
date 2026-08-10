@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <limits>
+#include <optional>
 
 namespace core::audit {
 
@@ -94,8 +95,21 @@ ReplayVerificationResult VerifyProject(const AssuranceProject& project) {
         return result;
     }
     const sacm::AssuranceCasePackage snapshot_package = core::project_library_package(*snapshot.document);
-    result.snapshot_canonical_hash =
-        core::library_canonical_hash(snapshot_package).value_or(CanonicalModelHash(snapshot_package));
+    // The fallback normalizes DIFFERENTLY from the replayed side below, which
+    // hashes through `library_canonical_hash` unconditionally, so a project whose
+    // projection cannot be reloaded would report divergence permanently with
+    // nothing saying why. It stays a fallback rather than a hard failure -- a
+    // verification that cannot hash the snapshot should still compare what it can
+    // -- but it no longer engages silently. A duplicate-id projection did exactly
+    // this: the snapshot took the fallback while the replayed side failed hard.
+    if (std::optional<std::string> snapshot_hash = core::library_canonical_hash(snapshot_package)) {
+        result.snapshot_canonical_hash = *snapshot_hash;
+    } else {
+        result.snapshot_canonical_hash = CanonicalModelHash(snapshot_package);
+        result.diagnostics.emplace_back(
+            "Snapshot projection could not be reloaded through the library; hashed without that normalization, "
+            "which does not match how the replayed side is hashed");
+    }
 
     std::unique_ptr<EventStore> store;
     {
