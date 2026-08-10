@@ -1047,6 +1047,34 @@ EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& 
         doc.apply(sacm::commands::SetAssertionDeclaration{.element = element, .declaration = target}));
 }
 
+EditOutcome apply_set_relationship_ends(LibraryDocument& document,
+                                        const std::string& relationship_id,
+                                        const std::vector<std::string>& sources,
+                                        const std::vector<std::string>& targets,
+                                        const std::string& reasoning) {
+    if (relationship_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const auto to_ids = [](const std::vector<std::string>& values) {
+        std::vector<sacm::model::ElementId> ids;
+        ids.reserve(values.size());
+        for (const std::string& value : values) {
+            if (!value.empty()) {
+                ids.emplace_back(value);
+            }
+        }
+        return ids;
+    };
+    return applied_outcome(doc.apply(sacm::commands::SetRelationshipEnds{
+        .relationship = sacm::model::ElementId(relationship_id),
+        .sources = to_ids(sources),
+        .targets = to_ids(targets),
+        .reasoning =
+            reasoning.empty() ? std::nullopt : std::optional<sacm::model::ElementId>(sacm::model::ElementId(reasoning)),
+    }));
+}
+
 // -------------------------------------------------------------- terminology
 
 namespace {

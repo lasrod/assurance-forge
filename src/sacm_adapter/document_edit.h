@@ -380,6 +380,25 @@ apply_set_gsn_identifier(LibraryDocument& document, const std::string& element_i
 // did nothing.
 EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& element_id, bool undeveloped);
 
+// Replace an AssertedRelationship's endpoints, mirroring the model write in
+// `core::DropRelationshipReference`. All three slots go together because SACM's
+// source[1..*] / target[1..*] multiplicity spans them (clause 11.13).
+//
+// This exists for the repair path: the quick fix for an `UnresolvedEndpoint`
+// finding drops one endpoint that resolves to nothing. The library operation
+// underneath accepts an unresolved id only where the relationship ALREADY
+// carried it, so a relationship with two broken endpoints can be fixed one at a
+// time while a new dangling reference still cannot be introduced.
+//
+// Emptying a slot is refused rather than silently deleting the relationship --
+// the caller decides that, because withdrawing a claim of support is a different
+// act from repairing a broken pointer.
+EditOutcome apply_set_relationship_ends(LibraryDocument& document,
+                                        const std::string& relationship_id,
+                                        const std::vector<std::string>& sources,
+                                        const std::vector<std::string>& targets,
+                                        const std::string& reasoning);
+
 // ---------------------------------------------------------------------------
 // Terminology edit seams (Phase 0 part 2).
 //

@@ -29,6 +29,7 @@ using sacm::commands::OperationPreview;
 using sacm::commands::ReferenceDeletePolicy;
 using sacm::commands::SetAssertionDeclaration;
 using sacm::commands::SetMetaClaims;
+using sacm::commands::SetRelationshipEnds;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
 using sacm::io::Mode;
@@ -349,6 +350,121 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_SetsAndClearsMetaClaims) {
     // Clear.
     ASSERT_TRUE(document.apply(SetMetaClaims{.element = ElementId{"inf_1"}, .meta_claims = {}}).applied);
     EXPECT_TRUE(meta_claims_of().empty());
+}
+
+// `AddRelationshipSource` could extend a relationship's endpoints and nothing
+// could withdraw one, so a tool repairing a document could not drop a broken
+// endpoint. `SetRelationshipEnds` replaces all three slots together, because the
+// clause-11.13 multiplicity spans them.
+//
+// The interesting half is the repair exception. The reader stores endpoint ids
+// verbatim and reports the unresolvable ones separately, so documents with
+// dangling endpoints exist and have to be fixable. A strict "every id must
+// resolve" check would make a relationship with TWO broken endpoints
+// unrepairable -- dropping either one still leaves the other in the list being
+// written. So an unresolved id is accepted where the relationship already
+// carried it, and rejected where it would be introduced.
+TEST(Sacm23Argumentation, SACM23_ARG_001_SetsRelationshipEndsAndToleratesOnlyInheritedDangles) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_two"}, .name = "Second"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .name = "Inference",
+                        .sources = {ElementId{"claim_sub"}, ElementId{"claim_two"}},
+                        .targets = {ElementId{"claim_top"}},
+                    })
+                    .applied);
+    const auto sources_of = [&document]() {
+        const auto* rel = document.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_1"});
+        std::vector<std::string> ids;
+        for (const ElementId& id : rel->sources())
+            ids.push_back(id.value());
+        return ids;
+    };
+
+    // Withdraw one source -- the direction that had no operation.
+    ASSERT_TRUE(document
+                    .apply(SetRelationshipEnds{.relationship = ElementId{"inf_1"},
+                                               .sources = {ElementId{"claim_two"}},
+                                               .targets = {ElementId{"claim_top"}}})
+                    .applied);
+    EXPECT_EQ(sources_of(), (std::vector<std::string>{"claim_two"}));
+
+    // Introducing an id that resolves to nothing is refused, and refusal leaves
+    // the endpoints alone.
+    const auto introduced =
+        document.apply(SetRelationshipEnds{.relationship = ElementId{"inf_1"},
+                                           .sources = {ElementId{"claim_two"}, ElementId{"claim_missing"}},
+                                           .targets = {ElementId{"claim_top"}}});
+    EXPECT_FALSE(introduced.applied);
+    EXPECT_FALSE(introduced.diagnostics.empty());
+    EXPECT_EQ(sources_of(), (std::vector<std::string>{"claim_two"}));
+
+    // Emptying a slot is refused too: clause 11.13 needs one of each, and a
+    // caller who wants the relationship gone should delete it.
+    const auto emptied = document.apply(
+        SetRelationshipEnds{.relationship = ElementId{"inf_1"}, .sources = {}, .targets = {ElementId{"claim_top"}}});
+    EXPECT_FALSE(emptied.applied);
+    EXPECT_EQ(sources_of(), (std::vector<std::string>{"claim_two"}));
+
+    // Now the repair case, built the way it actually arises: a document that
+    // ARRIVES with dangling endpoints. The reader stores endpoint ids verbatim,
+    // so this loads with two sources naming nothing.
+    //
+    // (Deleting an element to manufacture the dangle does not work -- the scrub
+    // takes it out of the relationship, and writing it back is then correctly
+    // refused as introducing one. That the operation refuses it is the point.)
+    constexpr const char* kDanglingXmi = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <argumentPackage xmi:id="argpkg_1">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_top"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_real"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="inf_broken" source="claim_real gone_a gone_b" target="claim_top"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    LoadResult broken = sacm::io::load_xmi_string(kDanglingXmi, LoadOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(broken.document.has_value());
+    Document& repaired = *broken.document;
+    const auto broken_sources = [&repaired]() {
+        const auto* rel = repaired.find_as<sacm::model::AssertedRelationship>(ElementId{"inf_broken"});
+        std::vector<std::string> ids;
+        for (const ElementId& id : rel->sources())
+            ids.push_back(id.value());
+        return ids;
+    };
+    ASSERT_EQ(broken_sources(), (std::vector<std::string>{"claim_real", "gone_a", "gone_b"}))
+        << "the reader did not keep the dangling endpoints, so this measures nothing";
+
+    // Drop ONE of the two dangles. The other is still in the list being written,
+    // and a strict check would refuse the whole repair because of it.
+    ASSERT_TRUE(repaired
+                    .apply(SetRelationshipEnds{.relationship = ElementId{"inf_broken"},
+                                               .sources = {ElementId{"claim_real"}, ElementId{"gone_b"}},
+                                               .targets = {ElementId{"claim_top"}}})
+                    .applied)
+        << "a two-fault relationship could not be repaired one endpoint at a time";
+    EXPECT_EQ(broken_sources(), (std::vector<std::string>{"claim_real", "gone_b"}));
+
+    // Drop the second, and the relationship is clean.
+    ASSERT_TRUE(repaired
+                    .apply(SetRelationshipEnds{.relationship = ElementId{"inf_broken"},
+                                               .sources = {ElementId{"claim_real"}},
+                                               .targets = {ElementId{"claim_top"}}})
+                    .applied);
+    EXPECT_EQ(broken_sources(), (std::vector<std::string>{"claim_real"}));
+
+    // A NEW dangle is still refused on the very document that carries them.
+    EXPECT_FALSE(repaired
+                     .apply(SetRelationshipEnds{.relationship = ElementId{"inf_broken"},
+                                                .sources = {ElementId{"claim_real"}, ElementId{"never_seen"}},
+                                                .targets = {ElementId{"claim_top"}}})
+                     .applied);
 }
 
 // A strategy's inference is materialized with its first sub-goal as source, then

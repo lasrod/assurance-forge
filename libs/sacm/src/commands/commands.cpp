@@ -717,6 +717,97 @@ void perform_set_meta_claims(model::Document& document, const SetMetaClaims& set
     Access::meta_claims(*assertion) = set.meta_claims;
 }
 
+// True when `id` is already one of `relationship`'s endpoints. The repair
+// exception below turns on this: an unresolved id the relationship inherited may
+// stay, an unresolved id being introduced may not.
+bool relationship_already_references(const model::AssertedRelationship& relationship, const ElementId& id) {
+    const auto contains = [&id](const std::vector<ElementId>& ids) {
+        return std::find(ids.begin(), ids.end(), id) != ids.end();
+    };
+    return contains(relationship.sources()) || contains(relationship.targets()) ||
+           (relationship.reasoning().has_value() && *relationship.reasoning() == id);
+}
+
+CheckOutcome
+check_set_relationship_ends(const model::Document& document, const SetRelationshipEnds& set, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* relationship = document.find_as<model::AssertedRelationship>(set.relationship);
+    if (relationship == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound,
+                       "SACM23-ARG-001",
+                       op,
+                       {set.relationship},
+                       std::format("'{}' is not an AssertedRelationship", set.relationship.value())));
+        return outcome;
+    }
+    // Clause 11.13 multiplicity. A caller emptying a relationship wants it
+    // deleted, which is a different operation with different consequences.
+    if (set.sources.empty() || set.targets.empty()) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdInvalidParent,
+                       "SACM23-ARG-001",
+                       op,
+                       {set.relationship},
+                       "an AssertedRelationship needs at least one source and one target; delete it instead"));
+        return outcome;
+    }
+
+    // The repair exception, documented on the operation: an id that resolves to
+    // nothing is allowed through only if this relationship already carried it.
+    const auto check_end = [&](const ElementId& id) {
+        if (document.find(id) != nullptr) {
+            return true;
+        }
+        if (relationship_already_references(*relationship, id)) {
+            return true;
+        }
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdTargetNotFound,
+            "SACM23-ARG-001",
+            op,
+            {set.relationship, id},
+            std::format("'{}' does not exist and is not already an endpoint of '{}', so setting it would introduce "
+                        "a dangling reference",
+                        id.value(),
+                        set.relationship.value())));
+        return false;
+    };
+    for (const ElementId& id : set.sources) {
+        if (!check_end(id)) {
+            outcome.effects.clear();
+            return outcome;
+        }
+    }
+    for (const ElementId& id : set.targets) {
+        if (!check_end(id)) {
+            outcome.effects.clear();
+            return outcome;
+        }
+    }
+    if (set.reasoning.has_value() && !check_end(*set.reasoning)) {
+        outcome.effects.clear();
+        return outcome;
+    }
+
+    outcome.effects.push_back(ChangeRecord{.id = set.relationship,
+                                           .kind = relationship->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "source/target/reasoning",
+                                           .before = std::nullopt,
+                                           .after = std::nullopt});
+    return outcome;
+}
+
+void perform_set_relationship_ends(model::Document& document, const SetRelationshipEnds& set) {
+    auto* relationship =
+        const_cast<model::AssertedRelationship*>(document.find_as<model::AssertedRelationship>(set.relationship));
+    Access::sources(*relationship) = set.sources;
+    Access::targets(*relationship) = set.targets;
+    Access::reasoning(*relationship) = set.reasoning;
+}
+
 CheckOutcome
 check_add_relationship_source(const model::Document& document, const AddRelationshipSource& add, const Operation& op) {
     CheckOutcome outcome;
@@ -1883,6 +1974,8 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_description_at(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetMetaClaims>) {
                 return check_set_meta_claims(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetRelationshipEnds>) {
+                return check_set_relationship_ends(document, op, operation);
             } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
                 return check_add_tagged_value(document, op, operation);
             } else {
@@ -1920,6 +2013,8 @@ void perform(model::Document& document, const Operation& operation, const std::v
                 perform_add_meta_claim(document, op);
             } else if constexpr (std::is_same_v<T, SetMetaClaims>) {
                 perform_set_meta_claims(document, op);
+            } else if constexpr (std::is_same_v<T, SetRelationshipEnds>) {
+                perform_set_relationship_ends(document, op);
             } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
                 perform_add_relationship_source(document, op);
             } else if constexpr (std::is_same_v<T, SetExpressionValue>) {

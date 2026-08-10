@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 6 commands have no native seam yet (26 before phase 1, 15 before 2a, 12 before 2b, 10 before 2c) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 5 commands have no native seam yet (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -78,6 +78,7 @@ default `true`, assigned nowhere under `src/app/`).
 | UpdateGsnIdentifier | `apply_set_gsn_identifier` | `element_commands.cpp` `UpdateGsnIdentifierCommand::Apply` (slice 2b) |
 | SetElementUndeveloped | `apply_set_undeveloped` | `element_commands.cpp` `SetElementUndevelopedCommand::Apply` (slice 2b) |
 | AddAcp, RemoveAcp, UpsertAcp, CreateConfidenceArgumentTree | `apply_upsert_acp_tags`, `apply_remove_acp_tags`, `apply_set_meta_claims`, `apply_create_confidence_argument_package` | [`acp_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/acp_commands.cpp) (slice 2c) |
+| DropRelationshipReference | `apply_set_relationship_ends`, `apply_delete_element` | `element_commands.cpp` `DropRelationshipReferenceCommand::Apply` (slice 3a) |
 
 Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
 seam does not support (and for a ref that carries only a gid, which the seams
@@ -86,8 +87,7 @@ is present.
 
 **Bridged** (`ApplyLibraryPrimaryOrLegacy` → `BridgeLegacyMutationToLibrary`):
 
-- Text and GSN state: UpdateElementText (all fields), DropRelationshipReference,
-  MoveStrategyToReasoning
+- Text and GSN state: UpdateElementText (all fields), MoveStrategyToReasoning
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
 - Tree: ReorderSiblings, MoveSubtree ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
@@ -342,8 +342,25 @@ key string is how a projection quietly stops seeing what an editor writes.
   [#334](https://github.com/lasrod/assurance-forge/issues/334) and take any
   GSN mapping from [the mapping record](../sacm/sacm-gsn-mapping.md), never
   from code.
-- **ApplyProposal, DropRelationshipReference**: compose the native primitives
-  once they exist; drop-one-reference needs a scrub-style library operation.
+- ~~**DropRelationshipReference**~~ — **done (slice 3a).** It is the quick fix
+  for an `UnresolvedEndpoint` finding, so the reference it drops resolves to
+  nothing and the delete seam cannot serve: there is nothing to delete. The
+  library gained `SetRelationshipEnds`, which replaces source/target/reasoning
+  together because the clause-11.13 multiplicity spans them.
+
+    Its contract is the part worth remembering. An unresolved id is accepted
+    **only where the relationship already carried it**. A strict "every id must
+    resolve" rule would have made a relationship with TWO broken endpoints
+    unrepairable — dropping either still leaves the other in the list being
+    written — while blanket tolerance would let a typo introduce a dangling
+    reference. So the operation can leave a document no worse than it found it
+    and cannot make it worse. The reader already admits such documents: it stores
+    endpoint ids verbatim (`append_idrefs`) and reports the unresolvable ones
+    separately. Pinned by
+    `Sacm23Argumentation.SACM23_ARG_001_SetsRelationshipEndsAndToleratesOnlyInheritedDangles`
+    and `LibraryPrimaryEditFlip.DropsOneBrokenEndpointAtATimeAndKeepsTheRest`.
+
+- **ApplyProposal**: composes the native primitives once the rest exist.
 
 *Exit criteria*: `BridgeViaLegacy` has no callers; the bridge's refusal
 message is unreachable; `RemoveElement` has one code path.

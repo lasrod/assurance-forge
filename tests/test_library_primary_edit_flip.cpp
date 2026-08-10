@@ -35,6 +35,7 @@
 #include "core/app_state.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
+#include "core/problems/gsn_wellformedness.h"
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "core/reviews/review_proposal.h"
@@ -1537,6 +1538,84 @@ TEST(LibraryPrimaryEditFlip, UndevelopedDecoratorSticksOnAGoalAndIsRefusedOnAnAs
     ASSERT_NE(cleared, nullptr);
     EXPECT_FALSE(cleared->undeveloped);
     EXPECT_EQ(cleared->assertion_declaration, "asserted");
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// Phase 3a. `DropRelationshipReference` is the quick fix for an
+// `UnresolvedEndpoint` finding, so the reference it drops names an element that
+// does not exist -- which is why the delete seam cannot serve: there is nothing
+// to delete. It needed a new library operation, `SetRelationshipEnds`.
+//
+// The fixture carries TWO dangling sources on one inference, which is the case
+// that decided the operation's contract: had it required every id to resolve,
+// dropping either would have been refused because the other was still in the
+// list being written, and a two-fault relationship would be unrepairable.
+TEST(LibraryPrimaryEditFlip, DropsOneBrokenEndpointAtATimeAndKeepsTheRest) {
+    constexpr const char* kTwoDanglesSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="G2" name="Sub goal"/>
+    <assertedInference id="R1" source="G2 gone_a gone_b" target="G1"/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    // The nested ArgumentPackage is the routing discriminator: the legacy POD has
+    // no field for it, so a BRIDGED edit on this case is refused outright. Both
+    // repairs below therefore only succeed if they reached the library directly.
+    std::unique_ptr<EditFixture> fixture = MakeFixture("drop_ref", /*library_backed=*/true, kTwoDanglesSacm);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    const parser::SacmElement* before = FindElement(fixture->model, "R1");
+    ASSERT_NE(before, nullptr);
+    ASSERT_EQ(before->source_refs, (std::vector<std::string>{"G2", "gone_a", "gone_b"}))
+        << "the fixture's dangling endpoints did not survive the load; this measures nothing";
+
+    core::commands::DropRelationshipReferenceCommand drop_first("R1", "gone_a");
+    ASSERT_TRUE(RunCommand(*fixture, drop_first, ctx).success);
+    const parser::SacmElement* after_first = FindElement(fixture->model, "R1");
+    ASSERT_NE(after_first, nullptr);
+    EXPECT_EQ(after_first->source_refs, (std::vector<std::string>{"G2", "gone_b"}))
+        << "the repair could not proceed with a second broken endpoint still present";
+
+    core::commands::DropRelationshipReferenceCommand drop_second("R1", "gone_b");
+    ASSERT_TRUE(RunCommand(*fixture, drop_second, ctx).success);
+    const parser::SacmElement* after_second = FindElement(fixture->model, "R1");
+    ASSERT_NE(after_second, nullptr);
+    EXPECT_EQ(after_second->source_refs, (std::vector<std::string>{"G2"}));
+    EXPECT_TRUE(core::CheckGsnWellFormedness(fixture->model).empty())
+        << "the repair did not clear the finding it exists to clear";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// Scrubbing the LAST endpoint leaves a relationship relating nothing, so it goes
+// -- and its surviving nodes do not. Withdrawing a claim of support is not a
+// decision to delete what it connected.
+TEST(LibraryPrimaryEditFlip, DroppingTheLastEndpointRemovesTheRelationshipNotItsNodes) {
+    constexpr const char* kSingleDangleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <assertedInference id="R1" source="gone_only" target="G1"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    std::unique_ptr<EditFixture> fixture = MakeFixture("drop_last", /*library_backed=*/true, kSingleDangleSacm);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+    ASSERT_NE(FindElement(fixture->model, "R1"), nullptr);
+
+    core::commands::DropRelationshipReferenceCommand drop("R1", "gone_only");
+    ASSERT_TRUE(RunCommand(*fixture, drop, ctx).success);
+
+    EXPECT_EQ(FindElement(fixture->model, "R1"), nullptr) << "the emptied relationship survived";
+    EXPECT_NE(FindElement(fixture->model, "G1"), nullptr) << "the repair took the goal with it";
 
     const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture->project);
     EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
