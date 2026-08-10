@@ -21,6 +21,7 @@
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/tree_commands.h"
 #include "core/commands/acp_commands.h"
 #include "core/commands/gid_commands.h"
 #include "core/commands/package_commands.h"
@@ -1317,6 +1318,57 @@ TEST(SaveFromLibrary, SACM23_LIB_002_FlippedGsnIdentifierRunsOnACaseTheBridgeRef
     EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << "the rename dropped the vendor attribute";
     EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << "the rename dropped the vendor element";
     EXPECT_TRUE(Contains(autosaved, "TOP1")) << "the identifier is not in the saved file";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// Slice 3d: MoveSubtree. Same routing proof -- a bridged edit is refused on this
+// fixture, so success means the seams ran. The move is the case that needs the new
+// `apply_add_relationship` seam: claim_sub2 leaves inf_1 (which keeps claim_sub1,
+// so it stays valid) and a NEW AssertedInference is created under claim_counter.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedMoveSubtreeRunsOnACaseTheBridgeRefuses) {
+    const std::string full_case = ReadFile(std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                           "sacm23" / "argumentation-full-valid.sacm.xmi");
+    ASSERT_FALSE(full_case.empty());
+    ProjectFixture fixture = MakeProject("phase3d-routing", full_case.c_str());
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::vector<std::string> unrepresentable = {
+        "ArgumentGroup", "AssertedArtifactSupport", "AssertedArtifactContext", "argpkg_detail"};
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    for (const std::string& marker : unrepresentable) {
+        ASSERT_TRUE(Contains(before, marker))
+            << "fixture no longer carries " << marker << "; this test measures nothing";
+    }
+
+    bool library_primary = false;
+    core::commands::MoveSubtreeCommand move("claim_sub2", "claim_counter");
+    const core::commands::CommandResult result = RunOnBus(fixture, state, move, library_primary);
+    ASSERT_TRUE(result.success) << "the move was refused, so it is still going through the bridge: " << result.error;
+    ASSERT_TRUE(library_primary) << "the move did not reach the library at all";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    for (const std::string& marker : unrepresentable) {
+        EXPECT_TRUE(Contains(autosaved, marker)) << "the native move deleted " << marker << " from the tracked file";
+    }
+    // The move really happened, and did not take the old inference with it: inf_1
+    // keeps claim_sub1, and claim_sub2 now hangs off claim_counter.
+    EXPECT_TRUE(Contains(autosaved, "inf_1")) << "the move deleted the inference it only had to shrink";
+    EXPECT_TRUE(Contains(autosaved, "claim_sub1")) << "the move took the remaining sub-goal with it";
+    EXPECT_TRUE(Contains(autosaved, "claim_sub2")) << "the moved element is gone from the file";
+    // A relationship was ADDED, not just rewired. This is what distinguishes the
+    // case that needs `apply_add_relationship` from the reasoning-retarget case,
+    // which `SetRelationshipEnds` alone covers -- without it the test would still
+    // pass if the move had merely retargeted inf_1 onto claim_counter and taken
+    // claim_sub1 along with it.
+    EXPECT_EQ(CountOccurrences(autosaved, "sacm:AssertedInference"),
+              CountOccurrences(before, "sacm:AssertedInference") + 1)
+        << "no new inference was created, so the move did not go through apply_add_relationship";
+    EXPECT_TRUE(Contains(autosaved, "claim_counter")) << "the new parent is gone from the file";
 
     const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
     EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());

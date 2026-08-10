@@ -1,5 +1,7 @@
 #include "core/tree_editing.h"
 
+#include "parser/model_utils.h"
+
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
@@ -663,6 +665,88 @@ bool ReorderSiblings(parser::AssuranceCase& model,
     ApplySacmSiblingOrder(package, model, parent->id, order);
     display_order.children_by_parent[parent->id] = order;
     return true;
+}
+
+namespace {
+
+MoveSubtreePlan::Relationship FlattenRelationship(const parser::SacmElement& element) {
+    return MoveSubtreePlan::Relationship{
+        .id = element.id,
+        .type = element.type,
+        .sources = element.source_refs,
+        .targets = element.target_refs,
+        .reasoning = element.reasoning_ref,
+    };
+}
+
+} // namespace
+
+MoveSubtreePlan PlanMoveSubtreeFromDiff(const parser::AssuranceCase& before, const parser::AssuranceCase& after) {
+    MoveSubtreePlan plan;
+
+    for (const parser::SacmElement& updated : after.elements) {
+        const parser::SacmElement* original = parser::FindElementById(before, updated.id);
+        if (!IsRelationshipType(updated.type)) {
+            // A move rewrites relationships only. Anything else differing means the
+            // mutator did something this plan does not model, and the caller must
+            // not pretend the plan is complete.
+            if (original == nullptr)
+                plan.touches_non_relationships = true;
+            continue;
+        }
+        if (original == nullptr) {
+            plan.created.push_back(FlattenRelationship(updated));
+            continue;
+        }
+        if (original->source_refs != updated.source_refs || original->target_refs != updated.target_refs ||
+            original->reasoning_ref != updated.reasoning_ref) {
+            plan.retargeted.push_back(FlattenRelationship(updated));
+        }
+    }
+    for (const parser::SacmElement& original : before.elements) {
+        if (parser::FindElementById(after, original.id) != nullptr)
+            continue;
+        if (!IsRelationshipType(original.type)) {
+            plan.touches_non_relationships = true;
+            continue;
+        }
+        plan.deleted_ids.push_back(original.id);
+    }
+
+    // SACM 11.13 multiplicity: an AssertedRelationship has source [1..*] and
+    // target [1]. The legacy parser model tolerates neither bound, so the mutator
+    // can produce two shapes the library will not accept, and BOTH have to be found
+    // here rather than halfway through applying the plan:
+    //
+    //   - a created inference carrying only a `reasoning` and no source, which is
+    //     what a bare-placed Strategy moved to a new parent produces;
+    //   - a surviving relationship the move emptied -- move the only source of an
+    //     inference that has a `reasoning`, and the inference is not "dangling" by
+    //     the legacy test (the reasoning still points somewhere) so it stays, with
+    //     no source at all.
+    //
+    // The second one is why this check is not just about `created`. It cost a test:
+    // the obvious routing fixture has exactly one source on its main inference, so
+    // moving that source hits this shape rather than the seam path.
+    const auto multiplicity_problem = [](const MoveSubtreePlan::Relationship& relationship) -> std::string {
+        if (relationship.sources.empty())
+            return "no source, which SACM 11.13 does not allow (source [1..*])";
+        if (relationship.targets.empty())
+            return "no target, which SACM 11.13 does not allow (target [1])";
+        return {};
+    };
+    for (const MoveSubtreePlan::Relationship& created : plan.created) {
+        const std::string problem = multiplicity_problem(created);
+        if (!problem.empty())
+            plan.unrepresentable_reason = "the move creates " + created.type + " '" + created.id + "' with " + problem;
+    }
+    for (const MoveSubtreePlan::Relationship& retargeted : plan.retargeted) {
+        const std::string problem = multiplicity_problem(retargeted);
+        if (!problem.empty())
+            plan.unrepresentable_reason =
+                "the move leaves " + retargeted.type + " '" + retargeted.id + "' with " + problem;
+    }
+    return plan;
 }
 
 bool MoveSubtree(parser::AssuranceCase& model,

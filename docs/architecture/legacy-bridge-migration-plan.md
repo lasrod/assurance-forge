@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 3 commands have no native seam yet (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 2 commands have no native seam yet, plus two MoveSubtree shapes (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c, 3 before 3d) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -81,6 +81,7 @@ default `true`, assigned nowhere under `src/app/`).
 | DropRelationshipReference | `apply_set_relationship_ends`, `apply_delete_element` | `element_commands.cpp` `DropRelationshipReferenceCommand::Apply` (slice 3a) |
 | MoveStrategyToReasoning | `apply_set_relationship_ends` | `element_commands.cpp` `MoveStrategyToReasoningCommand::Apply` (slice 3b) |
 | RemoveElement (`NodeOnly`) | `apply_set_relationship_ends` for the reparent, then `apply_delete_element` per planned id | `element_commands.cpp` `RemoveElementCommand::Apply` (slice 3c) |
+| MoveSubtree | `apply_add_relationship`, `apply_set_relationship_ends`, `apply_delete_element`, from a diffed `MoveSubtreePlan` | [`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp) `MoveSubtreeCommand::Apply` (slice 3d) |
 
 Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
 seam does not support (and for a ref that carries only a gid, which the seams
@@ -91,7 +92,9 @@ is present.
 
 - Text: UpdateElementText (all fields)
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
-- Tree: ReorderSiblings, MoveSubtree ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
+- Tree: ReorderSiblings ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
+- MoveSubtree, for the two shapes the seams cannot express -- see slice 3d below.
+  The command applies natively otherwise
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
 - the seam-unsupported create fallbacks (CreateTopGoal / CreateChildElement /
   CreateChallenge on shapes the seams cannot express) — routed through the
@@ -335,9 +338,16 @@ key string is how a projection quietly stops seeing what an editor writes.
   ([`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp),
   pinned by `StrategyMigration.SACM23_LIB_002_StrategyMigrationPreservesUnknownContent`)
   is the template. Silent reinterpretation is forbidden outright.
-- **ReorderSiblings / MoveSubtree**: need library
-  relationship reorder operations; the retarget half already exists
-  (`SetRelationshipEnds`, slice 3a). New relationship operations must respect the family-typing caution in
+- **ReorderSiblings**: the only remaining command that needs a NEW library
+  operation. Order in this model is two things, and only one of them is
+  expressible today: the order of a relationship's `source` refs (which
+  `SetRelationshipEnds` already writes, in order) and the order of the
+  relationship ELEMENTS within their package (which no operation addresses).
+  `ApplyParserSiblingOrder` does both -- it stable-sorts the element list -- so a
+  half-flip would change the display order without changing the serialization,
+  and `LibraryReplayConvergence.TreeReorderSiblingsConvergesAndChangesSerialization`
+  says in its name why that diverges. A new operation must respect the
+  family-typing caution in
   [#334](https://github.com/lasrod/assurance-forge/issues/334) and take any
   GSN mapping from [the mapping record](../sacm/sacm-gsn-mapping.md), never
   from code.
@@ -409,6 +419,41 @@ key string is how a projection quietly stops seeing what an editor writes.
     `AWrongOne`), because `preview_delete_elements` reports deletions and a
     reparent is a retarget. Closing it means teaching the preview to report
     retargets — a separate change, now unblocked rather than done.
+
+- **MoveSubtree** — landed in slice 3d, needing one new seam and no new library
+  operation. `apply_add_relationship` creates an AssertedRelationship between
+  elements that already exist (`apply_add_child` only creates one together with a
+  new element); the rest is `SetRelationshipEnds` and `apply_delete_element`.
+
+    The command uses the scratch-compute pattern: run the same
+    `core::MoveSubtree` on a scratch projection, diff what it decided
+    (`core::PlanMoveSubtreeFromDiff`), write that through the seams. The mutator
+    stays the single authority on what a move means -- which relationship kind
+    connects the two elements, whether the old one dies -- so the flip cannot
+    re-decide the GSN reading behind its back.
+
+    The plan is computed in full before anything is written, which is the part
+    worth keeping. The library refuses two shapes the legacy parser model
+    tolerates, both SACM 11.13 multiplicity (source [1..*], target [1]):
+
+    - a created AssertedInference carrying only a `reasoning` and no source, which
+      is what a bare-placed Strategy moved to a new parent produces;
+    - a SURVIVING relationship the move emptied. An inference with a `reasoning`
+      is not "dangling" by `IsParserRelationshipDangling`, so moving its only
+      sub-goal leaves it in the model with no source at all.
+
+    Both are reported by the plan up front, so the command falls back to the
+    guarded bridge with the document untouched. Discovering either halfway through
+    would leave a half-moved argument and no way back — which is also why the
+    apply order (create, retarget, delete) and the "a refusal after the first
+    write is a hard failure, not a fallback" rule live in ONE function,
+    `ApplyMoveSubtreePlanToLibrary`, shared by the command and the replayer.
+
+    The audit event now records `new_relationship_id`. `core::MoveSubtree` derives
+    it from the model, so replay lands on the same value today, but the recorded id
+    is what the document actually got and a log has to keep replaying if that
+    derivation changes. Events written before the field existed carry no id and
+    replay by re-deriving it, exactly as they always did.
 
 - **ApplyProposal**: composes the native primitives once the rest exist.
 

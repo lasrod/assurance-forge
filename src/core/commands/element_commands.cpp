@@ -415,6 +415,13 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     //      is meant to die with it.
     bool applied_to_library = false;
     if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeOnly) {
+        // Before the first write: this is several writes, and a failure between them
+        // leaves the document changed. The bus re-derives the live views on its
+        // failure path only when `library_primary` says the flip engaged, so setting
+        // this afterwards would leave the UI rendering a part-removed document. Safe
+        // because nothing below falls back -- an unsupported endpoint rewrite is a
+        // hard failure here, for the reason given on the refusal check.
+        ctx.library_primary = true;
         parser::AssuranceCase reparented = ctx.model;
         core::ReparentChildrenToParent(reparented, nullptr, element_id_);
         for (const RetargetedRelationship& changed : ReparentedRelationships(ctx.model, reparented)) {
@@ -442,7 +449,6 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
                 return false;
             }
         }
-        ctx.library_primary = true;
         applied_to_library = true;
     }
     if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeAndDescendants) {
@@ -637,6 +643,11 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
     if (CanApplyLibraryPrimary(ctx)) {
         // Model only, for the reason given on the strategy move below: the
         // package copy this used to make was never read.
+        // Before the first write, for the reason given on the NodeOnly removal
+        // above: this branch can both delete a relationship and rewrite another
+        // relationship's endpoints, and a failure between the two must still
+        // trigger the re-derive.
+        ctx.library_primary = true;
         parser::AssuranceCase scratch_model = ctx.model;
         if (!core::DropRelationshipReference(
                 scratch_model, nullptr, relationship_id_, reference_, removed_relationship_, out_error))
@@ -671,7 +682,6 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
                 return false;
             }
         }
-        ctx.library_primary = true;
         applied_to_library = true;
     }
     if (!applied_to_library) {

@@ -1361,7 +1361,41 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             }
             return true;
         };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+
+        // Seam-mapped, mirroring `MoveSubtreeCommand::Apply` step for step: run the
+        // same mutator on a projection, diff what it decided, write that through the
+        // seams -- and fall back to the bridge on exactly the two shapes the live
+        // path falls back on, before anything is written.
+        parser::AssuranceCase before = sacm_adapter::project_case(document);
+        parser::AssuranceCase after = before;
+        const core::AssuranceTree tree = core::AssuranceTree::Build(after, "");
+        std::string move_error;
+        if (!core::MoveSubtree(after, nullptr, tree, core::MoveSubtreeCommand{dragged_id, new_parent_id}, move_error) &&
+            !move_error.empty()) {
+            out_error = "MoveSubtree failed at " + location + ": " + move_error;
+            return false;
+        }
+        core::MoveSubtreePlan plan = core::PlanMoveSubtreeFromDiff(before, after);
+        if (plan.touches_non_relationships || !plan.unrepresentable_reason.empty()) {
+            return BridgeViaLegacy(document, location, mutate, out_error);
+        }
+        // Prefer the RECORDED relationship id over the one this replay's mutator
+        // just minted. They agree today -- `GenerateRelationshipId` derives from the
+        // model -- but the recorded id is what the document actually got, and an
+        // audit log has to keep replaying if that derivation ever changes. Events
+        // written before the field existed carry no id, and for those the minted one
+        // is exactly what they were always replayed with.
+        std::string recorded_relationship_id;
+        if (event.payload.contains("new_relationship_id") && event.payload["new_relationship_id"].is_string())
+            recorded_relationship_id = event.payload["new_relationship_id"].get<std::string>();
+        if (!recorded_relationship_id.empty() && plan.created.size() == 1)
+            plan.created.front().id = recorded_relationship_id;
+
+        if (!commands::ApplyMoveSubtreePlanToLibrary(document, plan, out_error)) {
+            out_error = "MoveSubtree failed at " + location + ": " + out_error;
+            return false;
+        }
+        return true;
     }
 
     if (type == "UpdateElementText") {

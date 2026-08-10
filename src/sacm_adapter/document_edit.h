@@ -399,6 +399,35 @@ EditOutcome apply_set_relationship_ends(LibraryDocument& document,
                                         const std::vector<std::string>& targets,
                                         const std::string& reasoning);
 
+// Which AssertedRelationship to create. SACM's own vocabulary rather than GSN's:
+// `AssertedInference` is what GSN draws as SupportedBy and `AssertedContext` what
+// it draws as InContextOf, in the opposite direction (see
+// docs/sacm/sacm-gsn-mapping.md). The seam takes the SACM kind so the direction
+// swap stays in the caller that owns the GSN reading.
+enum class RelationshipKind { AssertedInference, AssertedContext, AssertedEvidence };
+
+// Create an AssertedRelationship between elements that ALREADY exist (clause
+// 11.13), in the argument package that owns `target`.
+//
+// `apply_add_child` also creates a relationship, but only together with a new
+// element; moving an existing subtree to a new parent needs the relationship
+// alone. `relationship_id` is required rather than minted here, because the
+// caller has to record it in the audit event for replay to reproduce the same
+// document -- a seam that minted its own would put the two out of step.
+//
+// Refuses rather than creates a structurally invalid relationship. In particular
+// an AssertedInference whose only end is `reasoning` violates source [1..*], the
+// shape a bare-placed Strategy would produce; `apply_add_child` handles that case
+// for a NEW strategy by deferring the inference behind a vendor tag, and this seam
+// deliberately does not reproduce that -- it reports the refusal so the caller can
+// decline the move instead of writing an argument the library would not load.
+EditOutcome apply_add_relationship(LibraryDocument& document,
+                                   const std::string& relationship_id,
+                                   RelationshipKind kind,
+                                   const std::vector<std::string>& sources,
+                                   const std::vector<std::string>& targets,
+                                   const std::string& reasoning);
+
 // ---------------------------------------------------------------------------
 // Terminology edit seams (Phase 0 part 2).
 //
