@@ -126,8 +126,8 @@ struct SetMetaClaims {
 };
 
 // Replace an AssertedRelationship's endpoints wholesale (clause 11.13):
-// source[1..*], target[1..*], and the optional reasoning an AssertedInference
-// may carry. `AddRelationshipSource` could only extend, so an endpoint could be
+// source[1..*], target[1] -- exactly one -- and the optional reasoning an
+// AssertedInference may carry. `AddRelationshipSource` could only extend, so an endpoint could be
 // attached and never withdrawn; all three slots are replaced together because
 // the multiplicity invariant spans them and writing one at a time would have to
 // pass through states SACM forbids.

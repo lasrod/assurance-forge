@@ -7,6 +7,8 @@
 #include "sacm/validation/validate.h"
 
 #include <cassert>
+#include <string>
+#include <unordered_set>
 #include <format>
 #include <utility>
 
@@ -70,6 +72,38 @@ commands::MutationResult Document::apply(const commands::Operation& operation,
         return result;
     }
 
+#ifndef NDEBUG
+    // SACM23-VAL-002, stated as "introduces no structural error" rather than
+    // "leaves the document structurally valid".
+    //
+    // The stronger form was wrong, and not subtly: a TOLERANT load accepts a
+    // document with a dangling reference (the reader keeps endpoint ids verbatim
+    // and reports the unresolvable ones), and `validate_structure` grades one as
+    // an Error. So the whole-document form made every mutation on such a
+    // document abort -- including edits with nothing to do with the broken
+    // reference, and including the repair that exists to fix it. Assurance
+    // Forge's `UnresolvedEndpoint` quick fix is exactly that repair. A debug
+    // build could therefore not edit a document the library had just accepted.
+    //
+    // What the contract is actually for is unchanged: a command must not corrupt
+    // the document. Comparing before against after says that, and says it about
+    // the mutation rather than about the file someone opened.
+    const std::vector<validation::Diagnostic> errors_before = validation::validate_structure(*this);
+    const auto signature = [](const validation::Diagnostic& diagnostic) {
+        std::string key = diagnostic.code + "|" + diagnostic.message;
+        for (const ElementId& id : diagnostic.affected) {
+            key += "|" + id.value();
+        }
+        return key;
+    };
+    std::unordered_set<std::string> before_signatures;
+    for (const validation::Diagnostic& diagnostic : errors_before) {
+        if (diagnostic.severity == validation::Severity::Error) {
+            before_signatures.insert(signature(diagnostic));
+        }
+    }
+#endif
+
     commands::detail::perform(*this, operation, outcome.effects);
     ++revision_;
     result.applied = true;
@@ -77,9 +111,13 @@ commands::MutationResult Document::apply(const commands::Operation& operation,
     result.document_revision = revision_;
 
 #ifndef NDEBUG
-    // The check/perform contract must leave the document structurally valid
-    // after every successful mutation (SACM23-VAL-002).
-    assert(!validation::has_errors(validation::validate_structure(*this)));
+    for (const validation::Diagnostic& diagnostic : validation::validate_structure(*this)) {
+        if (diagnostic.severity != validation::Severity::Error) {
+            continue;
+        }
+        assert(before_signatures.contains(signature(diagnostic)) &&
+               "a mutation introduced a structural error (SACM23-VAL-002)");
+    }
 #endif
     return result;
 }

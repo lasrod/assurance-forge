@@ -381,8 +381,8 @@ apply_set_gsn_identifier(LibraryDocument& document, const std::string& element_i
 EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& element_id, bool undeveloped);
 
 // Replace an AssertedRelationship's endpoints, mirroring the model write in
-// `core::DropRelationshipReference`. All three slots go together because SACM's
-// source[1..*] / target[1..*] multiplicity spans them (clause 11.13).
+// `core::DropRelationshipReference`. All three slots go together because the
+// clause-11.13 multiplicity spans them: source[1..*], target[1] -- exactly one.
 //
 // This exists for the repair path: the quick fix for an `UnresolvedEndpoint`
 // finding drops one endpoint that resolves to nothing. The library operation

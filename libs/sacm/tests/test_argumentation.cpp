@@ -29,6 +29,7 @@ using sacm::commands::OperationPreview;
 using sacm::commands::ReferenceDeletePolicy;
 using sacm::commands::SetAssertionDeclaration;
 using sacm::commands::SetMetaClaims;
+using sacm::commands::SetName;
 using sacm::commands::SetRelationshipEnds;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
@@ -766,3 +767,43 @@ TEST(Sacm23Argumentation, SACM23_ARG_002_NestingAPackageForbidsOtherContent) {
 }
 
 } // namespace
+
+// A TOLERANT load accepts a document with a dangling reference -- the reader
+// keeps endpoint ids verbatim and reports the unresolvable ones -- and
+// `validate_structure` grades one as an Error. `Document::apply` used to assert
+// the WHOLE document was error-free after every mutation, so a debug build could
+// not edit such a document at all: an unrelated rename aborted, and so did the
+// repair that exists to fix the dangle. Assurance Forge's `UnresolvedEndpoint`
+// quick fix is that repair.
+//
+// SACM23-VAL-002 is now "introduces no structural error", which is what the
+// contract was always for, said about the mutation rather than about the file
+// someone opened. This is the regression test: an ordinary edit on a document
+// that arrived broken must simply work.
+TEST(Sacm23Argumentation, SACM23_ARG_001_EditsADocumentThatArrivedWithADanglingReference) {
+    constexpr const char* kDangling = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <argumentPackage xmi:id="argpkg_1">
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_top"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="claim_real"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="inf_broken" source="claim_real gone_a" target="claim_top"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    LoadResult loaded = sacm::io::load_xmi_string(kDangling, LoadOptions{.mode = Mode::Tolerant});
+    ASSERT_TRUE(loaded.document.has_value());
+    // Non-vacuity: the document really is structurally invalid as loaded.
+    EXPECT_TRUE(sacm::validation::has_errors(sacm::validation::validate_structure(*loaded.document)));
+
+    EXPECT_TRUE(loaded.document->apply(SetName{.element = ElementId{"claim_real"}, .name = "Renamed"}).applied)
+        << "an edit unrelated to the broken reference was refused";
+
+    // And the repair itself, which is the case that found this.
+    EXPECT_TRUE(loaded.document
+                    ->apply(SetRelationshipEnds{.relationship = ElementId{"inf_broken"},
+                                                .sources = {ElementId{"claim_real"}},
+                                                .targets = {ElementId{"claim_top"}}})
+                    .applied);
+    EXPECT_FALSE(sacm::validation::has_errors(sacm::validation::validate_structure(*loaded.document)))
+        << "the repair did not actually clear the dangling reference";
+}

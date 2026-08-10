@@ -741,15 +741,29 @@ check_set_relationship_ends(const model::Document& document, const SetRelationsh
                        std::format("'{}' is not an AssertedRelationship", set.relationship.value())));
         return outcome;
     }
-    // Clause 11.13 multiplicity. A caller emptying a relationship wants it
-    // deleted, which is a different operation with different consequences.
-    if (set.sources.empty() || set.targets.empty()) {
+    // Clause 11.13 multiplicity: source[1..*] but target[1] -- exactly one, which
+    // `validate_structure` enforces at both bounds. Writing two targets would
+    // produce a document that fails validation the moment it is written, so it is
+    // refused here rather than left for the validator to find.
+    //
+    // A caller emptying a relationship wants it deleted, which is a different
+    // operation with different consequences, so that is refused too.
+    if (set.sources.empty()) {
+        outcome.diagnostics.push_back(make_error(validation::codes::kCmdInvalidParent,
+                                                 "SACM23-ARG-001",
+                                                 op,
+                                                 {set.relationship},
+                                                 "an AssertedRelationship needs at least one source (clause 11.13 "
+                                                 "source[1..*]); delete it instead"));
+        return outcome;
+    }
+    if (set.targets.size() != 1) {
         outcome.diagnostics.push_back(
             make_error(validation::codes::kCmdInvalidParent,
                        "SACM23-ARG-001",
                        op,
                        {set.relationship},
-                       "an AssertedRelationship needs at least one source and one target; delete it instead"));
+                       std::format("clause 11.13 declares target[1]; {} were given", set.targets.size())));
         return outcome;
     }
 
