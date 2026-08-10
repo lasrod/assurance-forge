@@ -125,6 +125,28 @@ struct SetMetaClaims {
     std::vector<model::ElementId> meta_claims;
 };
 
+// Replace an AssertedRelationship's endpoints wholesale (clause 11.13):
+// source[1..*], target[1] -- exactly one -- and the optional reasoning an
+// AssertedInference may carry. `AddRelationshipSource` could only extend, so an endpoint could be
+// attached and never withdrawn; all three slots are replaced together because
+// the multiplicity invariant spans them and writing one at a time would have to
+// pass through states SACM forbids.
+//
+// UNRESOLVED IDS: a reference that resolves to nothing is accepted ONLY where
+// the relationship already carried it. The reader admits such documents (it
+// stores endpoint ids verbatim and reports the dangling ones separately), and a
+// tool that repairs them has to be able to drop one broken endpoint while
+// leaving another -- a strict check would make a two-fault relationship
+// unrepairable. What stays forbidden is INTRODUCING one: an id that neither
+// resolves nor was already there is rejected. So this operation can leave a
+// document no worse than it found it, and cannot make it worse.
+struct SetRelationshipEnds {
+    model::ElementId relationship;
+    std::vector<model::ElementId> sources;
+    std::vector<model::ElementId> targets;
+    std::optional<model::ElementId> reasoning;
+};
+
 // Attach a meta-claim (a Claim about an Assertion, clause 11.6).
 struct AddMetaClaim {
     model::ElementId element;
@@ -286,6 +308,7 @@ using Operation = std::variant<CreateAssuranceCasePackage,
                                AddMetaClaim,
                                SetMetaClaims,
                                AddRelationshipSource,
+                               SetRelationshipEnds,
                                SetExpressionValue,
                                SetTermExternalReference,
                                SetTermOrigin,

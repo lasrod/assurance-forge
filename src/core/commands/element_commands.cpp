@@ -537,16 +537,65 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
         return false;
     }
 
-    // Bridged rather than routed to a native seam: the library has no operation
-    // for "drop one reference", and its delete seam would remove the referenced
-    // element -- which here does not exist, that being the whole defect.
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-            return core::DropRelationshipReference(
-                model, &package, relationship_id_, reference_, removed_relationship_, error);
-        };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+    // Phase 3a of the legacy-bridge retirement. This is the quick fix for an
+    // `UnresolvedEndpoint` finding: the reference being dropped names an element
+    // that does not exist, which is why the delete seam is no use here -- there
+    // is nothing to delete. `SetRelationshipEnds` was added to the library for
+    // it, and accepts an unresolved id only where the relationship already
+    // carried one, so a two-fault relationship is repairable one endpoint at a
+    // time while a new dangling reference still cannot be introduced.
+    //
+    // The scratch pattern the ACP tranche established: run the SAME
+    // `core::DropRelationshipReference` on a projected copy to decide what the
+    // result should be -- which references survive, and whether the relationship
+    // is left structurally empty and must go -- then write that decision through
+    // the seams. The scratch is read and discarded; the document is edited in
+    // place, so nothing outside this relationship is touched.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx)) {
+        parser::AssuranceCase scratch_model = ctx.model;
+        sacm::AssuranceCasePackage scratch_package = ctx.package;
+        if (!core::DropRelationshipReference(
+                scratch_model, &scratch_package, relationship_id_, reference_, removed_relationship_, out_error))
+            return false;
+
+        if (removed_relationship_) {
+            // Scrubbing the last endpoint leaves nothing that relates anything,
+            // so the relationship goes -- a delete, not an ends rewrite.
+            const sacm_adapter::DeleteOutcome deleted =
+                sacm_adapter::apply_delete_element(*ctx.library_document, relationship_id_);
+            if (deleted.supported && !deleted.applied) {
+                out_error = LibraryRejection("the removal of relationship " + relationship_id_, deleted.diagnostics);
+                return false;
+            }
+        } else {
+            const parser::SacmElement* repaired = parser::FindElementById(scratch_model, relationship_id_);
+            if (repaired == nullptr) {
+                out_error = "Relationship " + relationship_id_ + " disappeared while dropping " + reference_ + ".";
+                return false;
+            }
+            const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(*ctx.library_document,
+                                                                                             relationship_id_,
+                                                                                             repaired->source_refs,
+                                                                                             repaired->target_refs,
+                                                                                             repaired->reasoning_ref);
+            if (ends.supported && !ends.applied) {
+                out_error = LibraryRejection("the endpoints of " + relationship_id_, ends.diagnostics);
+                return false;
+            }
+        }
+        ctx.library_primary = true;
+        applied_to_library = true;
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                return core::DropRelationshipReference(
+                    model, &package, relationship_id_, reference_, removed_relationship_, error);
+            };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "DropRelationshipReference";
     out_event.payload = nlohmann::ordered_json::object();

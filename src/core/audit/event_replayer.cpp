@@ -21,6 +21,7 @@
 #include "core/terminology_context_projection.h"
 #include "core/terminology_package_service.h"
 #include "legacy_sacm/sacm_serializer.h"
+#include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
@@ -1473,18 +1474,47 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("reference", reference))
             return false;
+        // Phase 3a: the same scratch-then-seams route the live command takes, so
+        // a repair and its own replay are one code path. The reference being
+        // dropped resolves to nothing -- that is the defect being repaired -- so
+        // the delete seam is no use; `apply_set_relationship_ends` rewrites the
+        // endpoints, or the relationship goes when scrubbing empties it.
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-                bool removed_relationship_unused = false;
-                if (!core::DropRelationshipReference(
-                        model, &package, relationship_id, reference, removed_relationship_unused, error)) {
-                    error = "DropRelationshipReference (bridge) failed at " + location + ": " + error;
-                    return false;
-                }
-                return true;
-            };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        parser::AssuranceCase model = sacm_adapter::project_case(document);
+        sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
+        bool removed_relationship = false;
+        std::string drop_error;
+        if (!core::DropRelationshipReference(
+                model, &package, relationship_id, reference, removed_relationship, drop_error)) {
+            out_error = "DropRelationshipReference failed at " + location + ": " + drop_error;
+            return false;
+        }
+        if (removed_relationship) {
+            const sacm_adapter::DeleteOutcome deleted = sacm_adapter::apply_delete_element(document, relationship_id);
+            if (!deleted.supported || !deleted.applied) {
+                out_error = FormatSeamFailure("apply_delete_element(emptied relationship)",
+                                              tx_seq,
+                                              event,
+                                              deleted.supported,
+                                              deleted.applied,
+                                              deleted.diagnostics);
+                return false;
+            }
+            return true;
+        }
+        const parser::SacmElement* repaired = parser::FindElementById(model, relationship_id);
+        if (repaired == nullptr) {
+            out_error = "Relationship " + relationship_id + " disappeared while replaying at " + location;
+            return false;
+        }
+        const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
+            document, relationship_id, repaired->source_refs, repaired->target_refs, repaired->reasoning_ref);
+        if (!ends.supported || !ends.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_relationship_ends", tx_seq, event, ends.supported, ends.applied, ends.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "MoveStrategyToReasoning") {

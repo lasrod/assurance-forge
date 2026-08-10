@@ -32,6 +32,8 @@ std::string_view operation_name(const Operation& operation) {
                 return "AddMetaClaim";
             } else if constexpr (std::is_same_v<T, SetMetaClaims>) {
                 return "SetMetaClaims";
+            } else if constexpr (std::is_same_v<T, SetRelationshipEnds>) {
+                return "SetRelationshipEnds";
             } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
                 return "AddRelationshipSource";
             } else if constexpr (std::is_same_v<T, SetExpressionValue>) {
