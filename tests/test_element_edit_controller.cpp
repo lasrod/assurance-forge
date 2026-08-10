@@ -538,3 +538,76 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
               reprojected.acps.end())
         << "ACP1 belongs to a surviving element and must not have been destroyed";
 }
+
+// The undeveloped decorator, from the controller the inspector calls down to the
+// bytes on disk and back.
+//
+// This is the coverage whose absence let a user-visible bug survive: the model
+// layer was tested, the command was tested, and the inspector checkbox called
+// NEITHER -- it assigned the projection's own `undeveloped` field and synced it
+// to the legacy package, which reaches neither the library document (what gets
+// saved) nor the audit log. The decorator showed on the canvas until the next
+// load and was then gone, which is exactly how it was reported.
+//
+// So this asserts the round trip rather than the in-memory flag: mark, save,
+// reload from disk, and expect it back.
+TEST(ElementEditControllerTest, SetElementUndevelopedSurvivesSaveAndReload) {
+    const std::filesystem::path root =
+        std::filesystem::temp_directory_path() /
+        ("af_undeveloped_roundtrip_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    const std::filesystem::path sacm_absolute = root / "argument.sacm";
+    {
+        std::ofstream out(sacm_absolute, std::ios::binary);
+        out << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    }
+
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(sacm_absolute.string())) << state.app_state.status_message;
+    ASSERT_NE(state.app_state.library_document, nullptr);
+
+    core::AssuranceProject project;
+    project.id = "p";
+    project.name = "Project";
+    project.rootPath = root;
+    core::ProjectFileEntry entry;
+    entry.id = "f1";
+    entry.relativePath = "argument.sacm";
+    entry.role = core::ProjectFileRole::SacmArgument;
+    project.files.push_back(entry);
+    core::audit::EnsureAuditStoreResult ensure;
+    std::string error;
+    ASSERT_TRUE(core::audit::EnsureAuditStore(project, entry.relativePath, ensure, error)) << error;
+    state.app_state.current_project = project;
+    state.command_bus = core::commands::CommandBus::Open(project, sacm_absolute, error);
+    ASSERT_NE(state.command_bus, nullptr) << error;
+
+    ASSERT_TRUE(state.element_edit_controller->SetElementUndeveloped(state, "G1", true));
+
+    // Reload from the file the bus autosaved. An edit that only reached the
+    // projection would be absent here, and present in `state` -- which is what
+    // made the bug look like it had worked.
+    app::AppRuntimeState reopened;
+    ASSERT_TRUE(reopened.app_state.load_file(sacm_absolute.string())) << reopened.app_state.status_message;
+    const parser::SacmElement* reloaded = parser::FindElementById(reopened.app_state.loaded_case.value(), "G1");
+    ASSERT_NE(reloaded, nullptr);
+    EXPECT_TRUE(reloaded->undeveloped) << "the undeveloped decorator did not survive save and reload";
+
+    // ...and clearing it survives too, so the round trip is not one-way.
+    ASSERT_TRUE(state.element_edit_controller->SetElementUndeveloped(state, "G1", false));
+    app::AppRuntimeState cleared;
+    ASSERT_TRUE(cleared.app_state.load_file(sacm_absolute.string())) << cleared.app_state.status_message;
+    const parser::SacmElement* after_clear = parser::FindElementById(cleared.app_state.loaded_case.value(), "G1");
+    ASSERT_NE(after_clear, nullptr);
+    EXPECT_FALSE(after_clear->undeveloped);
+
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+}

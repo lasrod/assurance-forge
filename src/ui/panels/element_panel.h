@@ -41,12 +41,23 @@ struct ElementConfidenceAssistCallbacks {
     std::function<bool()> backup_invalid_and_reset;
 };
 
-// Audited text-edit dispatch. Called once when a text field loses focus
-// after the user changed its value (i.e., the end of a typing session, not
-// per keystroke). The runtime translates each call into one
-// UpdateElementTextCommand transaction. `original_value` is the value the
-// field held immediately before the edit began and is forwarded as the
-// audit event's `old_value`.
+// Audited element-edit dispatch. Every field in this panel that changes the
+// model must go through one of these: the panel edits a PROJECTION, so a write
+// it makes directly reaches neither the library document nor the audit log, and
+// is lost at the next save. That is not hypothetical -- the undeveloped checkbox
+// used to do exactly that, and the decorator vanished on reload.
+//
+// `commit_text_edit` is called once when a text field loses focus after the user
+// changed its value (the end of a typing session, not per keystroke). The
+// runtime translates each call into one UpdateElementTextCommand transaction.
+// `original_value` is the value the field held immediately before the edit began
+// and is forwarded as the audit event's `old_value`.
+//
+// `set_undeveloped` toggles the GSN undeveloped decorator, one
+// SetElementUndevelopedCommand per call. The runtime may REFUSE it (the
+// decorator lives in SACM's single `assertionDeclaration`, so it cannot coexist
+// with `assumed`/`axiomatic`); the panel only offers the control where it can be
+// honoured and lets the runtime report any refusal.
 struct ElementTextEditCallbacks {
     std::function<void(const std::string& element_id,
                        const std::string& field_token,
@@ -54,6 +65,7 @@ struct ElementTextEditCallbacks {
                        const std::string& original_value,
                        const std::string& new_value)>
         commit_text_edit;
+    std::function<void(const std::string& element_id, bool undeveloped)> set_undeveloped;
 };
 
 // Per-element history summary surfaced in the Element Properties panel.
