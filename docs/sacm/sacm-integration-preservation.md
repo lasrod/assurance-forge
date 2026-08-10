@@ -367,6 +367,33 @@ outright — that has never been disclosed and never will be, because an element
 an attribute and changes what it says is the reinterpretation the project's own hard
 constraint forbids.
 
+**Slice 3d: the subtree move is native, with two disclosed fallbacks
+([#350](https://github.com/lasrod/assurance-forge/issues/350)).** `MoveSubtree` runs the
+same `core::MoveSubtree` on a scratch projection, diffs what it decided
+(`core::PlanMoveSubtreeFromDiff`) and writes that through the seams -- a new
+`apply_add_relationship` for the relationship it creates, `apply_set_relationship_ends`
+for the one it rewires, `apply_delete_element` for what it emptied. The mutator remains
+the only thing that decides what a move means, so the flip does not re-decide the GSN
+reading.
+
+**Two shapes still bridge, and the reason is SACM 11.13 multiplicity rather than a
+missing operation.** An AssertedRelationship has source [1..*] and target [1]; the legacy
+parser model enforces neither, so the mutator can produce (a) a created inference carrying
+only a `reasoning` and no source -- a bare-placed Strategy moved to a new parent -- and
+(b) a surviving relationship the move emptied, because an inference with a `reasoning` is
+not "dangling" by `IsParserRelationshipDangling` and so is not deleted when its only
+sub-goal leaves. Both are reported by the plan BEFORE any seam runs, so the fallback sees
+an untouched document; a refusal discovered after the first write is a hard failure
+instead, because by then the argument is half-moved. That ordering rule and the apply
+order live in one shared function (`commands::ApplyMoveSubtreePlanToLibrary`) used by both
+the live command and the replayer, so live/replay cannot drift into disagreeing about it.
+Pinned by TreeEditingCommand.MoveSubtreePlanRefusesAMoveThatEmptiesTheOldInference, which
+asserts the fixture really produces the shape before checking that the plan refuses it.
+
+The audit event records `new_relationship_id` so replay reuses the id the document
+actually got rather than re-deriving one; events written before the field existed replay
+by re-deriving, as they always did.
+
 **Slice 3c: the audit projection was not reloadable for any artifact-bearing document
 ([#350](https://github.com/lasrod/assurance-forge/issues/350)).** Found while flipping the
 NodeOnly removal, and recorded here because it is a defect in this row's own machinery

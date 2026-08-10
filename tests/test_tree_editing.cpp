@@ -429,6 +429,74 @@ TEST(TreeEditingCommand, MoveStrategyRetargetsItsInferenceAndPreservesSubtree) {
     EXPECT_EQ(relationship->source_refs, std::vector<std::string>({"G2"}));
 }
 
+// `PlanMoveSubtreeFromDiff` is what lets the command write a move through the
+// library seams instead of the bridge. It must report the whole change -- and
+// report up front the shapes a seam cannot express, because the caller can only
+// fall back to the bridge BEFORE it has written anything.
+TEST(TreeEditingCommand, MoveSubtreePlanReportsCreatedRetargetedAndDeleted) {
+    MiniCase mini_case;
+    AddClaim(mini_case, "G1");
+    AddClaim(mini_case, "G2");
+    AddClaim(mini_case, "G3");
+    AddClaim(mini_case, "G4");
+    // R1 has two sources, so moving one leaves it valid rather than empty.
+    AddInference(mini_case, "R1", "G1", {"G2", "G3"});
+    AddInference(mini_case, "R2", "G1", {"G4"});
+    const parser::AssuranceCase before = mini_case.model;
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+    std::string error;
+    ASSERT_TRUE(
+        core::MoveSubtree(mini_case.model, &mini_case.package, tree, core::MoveSubtreeCommand{"G3", "G4"}, error))
+        << error;
+
+    const core::MoveSubtreePlan plan = core::PlanMoveSubtreeFromDiff(before, mini_case.model);
+    EXPECT_TRUE(plan.unrepresentable_reason.empty()) << plan.unrepresentable_reason;
+    EXPECT_FALSE(plan.touches_non_relationships);
+    ASSERT_EQ(plan.created.size(), 1u);
+    EXPECT_EQ(plan.created.front().type, "assertedinference");
+    EXPECT_EQ(plan.created.front().sources, std::vector<std::string>({"G3"}));
+    EXPECT_EQ(plan.created.front().targets, std::vector<std::string>({"G4"}));
+    ASSERT_EQ(plan.retargeted.size(), 1u);
+    EXPECT_EQ(plan.retargeted.front().id, "R1");
+    EXPECT_EQ(plan.retargeted.front().sources, std::vector<std::string>({"G2"}))
+        << "the plan did not notice that R1 lost a source";
+    EXPECT_TRUE(plan.deleted_ids.empty()) << "nothing had to be deleted; R1 still has a source";
+}
+
+// The shape that must NOT be written through the seams. An AssertedInference with
+// a `reasoning` is not "dangling" by the legacy test even with no sources
+// (`IsParserRelationshipDangling`), so moving its only sub-goal leaves it in the
+// model with nothing supporting it -- and SACM 11.13 gives source [1..*], so the
+// library refuses. Caught in the plan, before a single seam has run, because the
+// alternative is a half-moved argument with no way back.
+TEST(TreeEditingCommand, MoveSubtreePlanRefusesAMoveThatEmptiesTheOldInference) {
+    MiniCase mini_case;
+    AddClaim(mini_case, "G1");
+    AddClaim(mini_case, "G2");
+    AddClaim(mini_case, "G3");
+    AddStrategy(mini_case, "S1");
+    // R1's only source is G2, and its reasoning keeps it alive when G2 leaves.
+    AddInference(mini_case, "R1", "G1", {"G2"}, "S1");
+    AddInference(mini_case, "R2", "G1", {"G3"});
+    const parser::AssuranceCase before = mini_case.model;
+
+    core::AssuranceTree tree = core::AssuranceTree::Build(mini_case.model);
+    std::string error;
+    ASSERT_TRUE(
+        core::MoveSubtree(mini_case.model, &mini_case.package, tree, core::MoveSubtreeCommand{"G2", "G3"}, error))
+        << error;
+    const parser::SacmElement* emptied = FindElement(mini_case.model, "R1");
+    ASSERT_NE(emptied, nullptr) << "R1 was deleted, so this test no longer measures the surviving-empty case";
+    ASSERT_TRUE(emptied->source_refs.empty()) << "R1 kept a source; the fixture no longer produces the shape";
+
+    const core::MoveSubtreePlan plan = core::PlanMoveSubtreeFromDiff(before, mini_case.model);
+    EXPECT_FALSE(plan.unrepresentable_reason.empty())
+        << "the plan would have written an inference with no source through the seams";
+    EXPECT_NE(plan.unrepresentable_reason.find("R1"), std::string::npos)
+        << "the reason does not say which relationship: " << plan.unrepresentable_reason;
+}
+
 TEST(TreeEditingCommand, MoveSolutionUnderGoalCreatesEvidenceRelationship) {
     MiniCase mini_case;
     AddClaim(mini_case, "G1");

@@ -652,6 +652,69 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditReproducesLegacyForNonClaim)
 // (predating the gsn.role encoding) projects as the app's "justification" role:
 // the library normalizes it to axiomatic + a reserved compat tag on import, and
 // the projection honours that tag so old Justifications survive the migration.
+// `apply_add_relationship` (slice 3d) creates an AssertedRelationship between
+// elements that already exist, which is what a subtree move needs and what
+// `apply_add_child` -- the only other relationship-creating seam -- cannot do
+// alone. Two claims about it are worth measuring rather than asserting in a
+// comment, because `MoveSubtreeCommand` decides whether to fall back to the bridge
+// on the strength of the second one.
+TEST(SacmLibraryEdit, SACM23_LIB_002_AddRelationshipLinksExistingElements) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top"/></argumentElement>)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="G2"><name content="Sub"/></argumentElement>)"
+        R"(</argumentPackage></sacm:AssuranceCasePackage>)";
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, xml));
+
+    const sacm_adapter::EditOutcome added = sacm_adapter::apply_add_relationship(
+        document, "R_new", sacm_adapter::RelationshipKind::AssertedInference, {"G2"}, {"G1"}, "");
+    ASSERT_TRUE(added.supported);
+    ASSERT_TRUE(added.applied) << (added.diagnostics.empty() ? std::string{} : added.diagnostics.front().message);
+
+    const core::AssuranceCase projected = sacm_adapter::project_case(document);
+    const core::SacmElement* relationship = find_element(projected, "R_new");
+    ASSERT_NE(relationship, nullptr) << "the relationship was reported applied but is not in the document";
+    EXPECT_EQ(relationship->type, "assertedinference");
+    EXPECT_EQ(relationship->source_refs, std::vector<std::string>({"G2"}));
+    EXPECT_EQ(relationship->target_refs, std::vector<std::string>({"G1"}));
+}
+
+// SACM 11.13 gives AssertedRelationship source [1..*]. An inference whose only end
+// is `reasoning` has none -- the shape a bare-placed Strategy moved to a new parent
+// produces -- and the seam must refuse it rather than write an argument the library
+// would not load back. `MoveSubtreePlan` reports that case up front SO THAT the
+// command can fall back before writing anything; if this refusal ever softened, the
+// plan's caution would be pointless and the fallback would look like dead code.
+TEST(SacmLibraryEdit, SACM23_LIB_002_AddRelationshipRefusesAnInferenceWithNoSource) {
+    const std::string xml =
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" )"
+        R"(xmlns:xmi="http://www.omg.org/spec/XMI/20131001" )"
+        R"(xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">)"
+        R"(<argumentPackage xmi:id="ap_1">)"
+        R"(<argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top"/></argumentElement>)"
+        R"(<argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S1"><name content="Strat"/></argumentElement>)"
+        R"(</argumentPackage></sacm:AssuranceCasePackage>)";
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, xml));
+
+    const sacm_adapter::EditOutcome added = sacm_adapter::apply_add_relationship(
+        document, "R_bad", sacm_adapter::RelationshipKind::AssertedInference, {}, {"G1"}, "S1");
+    // `supported` stays TRUE: the seam could address this edit perfectly well, and
+    // it is the LIBRARY that refuses on multiplicity. Asserting only
+    // `!(supported && applied)` would also pass if the seam had merely failed to
+    // find the package, which is a different thing and would not protect anything.
+    EXPECT_TRUE(added.supported) << "the seam could not address the edit, so this test proves nothing about 11.13";
+    EXPECT_FALSE(added.applied) << "a sourceless AssertedInference was created, which SACM 11.13 does not allow";
+    EXPECT_EQ(sacm_adapter::project_case(document).elements.size(), 2u)
+        << "the refused creation still left something in the document";
+}
+
 TEST(SacmLibraryEdit, SACM23_INT_001_LegacyJustificationProjectsAsJustification) {
     const std::string xml =
         R"(<?xml version="1.0" encoding="UTF-8"?>)"

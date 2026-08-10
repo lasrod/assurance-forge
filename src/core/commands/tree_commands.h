@@ -33,6 +33,22 @@ bool TreeDropModeFromToken(const std::string& token, core::TreeDropMode& out);
 
 // Reorder a dragged element above/below a target sibling (same parent, same tree
 // group -- enforced by the underlying `core::ReorderSiblings` validation).
+// Write a planned subtree move to the library document.
+//
+// Shared by `MoveSubtreeCommand::Apply` and the audit replayer's MoveSubtree
+// branch so the live edit and its replay cannot drift: the ORDER matters (create,
+// then retarget, then delete) and so does treating a mid-plan refusal as a hard
+// failure rather than a fallback, because by then the document is part-moved.
+// Two copies of that reasoning would eventually disagree, and the disagreement
+// would show up as an audit divergence rather than as a compile error.
+//
+// The caller must have handled `plan.unrepresentable_reason` and
+// `plan.touches_non_relationships` first -- this function assumes the plan is
+// writable and reports a refusal as a failure.
+bool ApplyMoveSubtreePlanToLibrary(sacm_adapter::LibraryDocument& document,
+                                   const core::MoveSubtreePlan& plan,
+                                   std::string& out_error);
+
 class ReorderSiblingsCommand final : public ICommand {
 public:
     ReorderSiblingsCommand(std::string dragged_id, std::string target_id, core::TreeDropMode drop_mode)

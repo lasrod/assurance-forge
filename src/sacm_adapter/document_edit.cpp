@@ -1047,6 +1047,61 @@ EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& 
         doc.apply(sacm::commands::SetAssertionDeclaration{.element = element, .declaration = target}));
 }
 
+namespace {
+
+sacm::metadata::ElementKind to_element_kind(RelationshipKind kind) {
+    switch (kind) {
+    case RelationshipKind::AssertedInference:
+        return sacm::metadata::ElementKind::AssertedInference;
+    case RelationshipKind::AssertedContext:
+        return sacm::metadata::ElementKind::AssertedContext;
+    case RelationshipKind::AssertedEvidence:
+        return sacm::metadata::ElementKind::AssertedEvidence;
+    }
+    return sacm::metadata::ElementKind::AssertedInference;
+}
+
+} // namespace
+
+EditOutcome apply_add_relationship(LibraryDocument& document,
+                                   const std::string& relationship_id,
+                                   RelationshipKind kind,
+                                   const std::vector<std::string>& sources,
+                                   const std::vector<std::string>& targets,
+                                   const std::string& reasoning) {
+    if (relationship_id.empty() || targets.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    // The package that owns the TARGET, matching `apply_add_child`: a relationship
+    // lives with the parent it points at, so a move across packages does not leave
+    // it behind in the old one.
+    const sacm::model::ArgumentPackage* package =
+        owning_argument_package(doc.find(sacm::model::ElementId(targets.front())));
+    if (package == nullptr) {
+        return EditOutcome{.supported = false};
+    }
+    const auto to_ids = [](const std::vector<std::string>& values) {
+        std::vector<sacm::model::ElementId> ids;
+        ids.reserve(values.size());
+        for (const std::string& value : values) {
+            if (!value.empty()) {
+                ids.emplace_back(value);
+            }
+        }
+        return ids;
+    };
+    return applied_outcome(doc.apply(sacm::commands::CreateAssertedRelationship{
+        .parent = package->id(),
+        .kind = to_element_kind(kind),
+        .id = to_optional_id(relationship_id),
+        .sources = to_ids(sources),
+        .targets = to_ids(targets),
+        .reasoning =
+            reasoning.empty() ? std::nullopt : std::optional<sacm::model::ElementId>(sacm::model::ElementId(reasoning)),
+    }));
+}
+
 EditOutcome apply_set_relationship_ends(LibraryDocument& document,
                                         const std::string& relationship_id,
                                         const std::vector<std::string>& sources,

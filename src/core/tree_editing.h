@@ -92,6 +92,39 @@ bool ReorderSiblings(parser::AssuranceCase& model,
                      const ReorderSiblingsCommand& command,
                      std::string& out_error);
 
+// The structural change a `MoveSubtree` makes, found by running the mutator on a
+// scratch model and diffing it -- one relationship created, one relationship's
+// endpoints rewritten, and any relationship the move left structurally empty.
+//
+// It is a PLAN rather than an application: nothing is written until the caller has
+// seen the whole of it. That ordering is the point. The library can refuse the
+// creation (an AssertedInference whose only end is `reasoning` violates source
+// [1..*] -- the shape a bare-placed Strategy produces), and a caller that had
+// already applied the deletion would be left with a half-moved argument and no
+// way back. `unrepresentable_reason` reports that up front so the caller can
+// decline before touching the document.
+struct MoveSubtreePlan {
+    struct Relationship {
+        std::string id;
+        std::string type; // parser token: assertedinference / assertedcontext / assertedevidence
+        std::vector<std::string> sources;
+        std::vector<std::string> targets;
+        std::string reasoning;
+    };
+
+    std::vector<Relationship> created;
+    std::vector<Relationship> retargeted;
+    std::vector<std::string> deleted_ids;
+    std::string unrepresentable_reason; // non-empty when a seam cannot express this move
+    bool touches_non_relationships = false;
+};
+
+// Diffs `before` against `after` (the same model with `core::MoveSubtree` applied)
+// and reports the relationship-level change. `after` must come from the mutator,
+// not be hand-built: the point is to mirror what the mutator decided, never to
+// re-decide it.
+MoveSubtreePlan PlanMoveSubtreeFromDiff(const parser::AssuranceCase& before, const parser::AssuranceCase& after);
+
 bool MoveSubtree(parser::AssuranceCase& model,
                  sacm::AssuranceCasePackage* package,
                  const AssuranceTree& tree,
