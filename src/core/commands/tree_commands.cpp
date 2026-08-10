@@ -1,13 +1,13 @@
 #include "core/commands/tree_commands.h"
 
 #include "core/assurance_tree.h"
+#include "core/commands/library_bridge.h"
 #include "core/tree_editing.h"
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/case_projection.h"
 #include "parser/model_utils.h"
 
 #include <unordered_set>
-#include "core/commands/library_bridge.h"
 
 namespace core::commands {
 
@@ -39,6 +39,20 @@ std::vector<RetargetedEnds> ReorderedSources(const parser::AssuranceCase& before
                                          .reasoning = updated.reasoning_ref});
     }
     return changed;
+}
+
+// The same elements `order` names, in the order the package holds them NOW. Equal
+// to `order` exactly when this package needs no reorder.
+std::vector<std::string> NamedSubsetInCurrentOrder(const std::vector<std::string>& current_ids,
+                                                   const std::vector<std::string>& order) {
+    const std::unordered_set<std::string> named(order.begin(), order.end());
+    std::vector<std::string> current;
+    current.reserve(order.size());
+    for (const std::string& id : current_ids) {
+        if (named.contains(id))
+            current.push_back(id);
+    }
+    return current;
 }
 
 // The order `model` puts this package's elements in, restricted to the ones the
@@ -135,6 +149,13 @@ bool ApplySiblingReorderToLibrary(sacm_adapter::LibraryDocument& document,
         // Fewer than two named elements cannot be in the wrong order, and the seam
         // refuses an empty list rather than treating it as "nothing to do".
         if (order.size() < 2)
+            continue;
+        // A reorder touches ONE package's siblings; every other package in the
+        // document would otherwise be rewritten to the order it already had. That
+        // costs a library operation and a change record per package for no effect,
+        // which is misleading as much as it is wasteful -- an audit reader should not
+        // see a reorder claim to have touched packages it did not.
+        if (order == NamedSubsetInCurrentOrder(shell.element_ids, order))
             continue;
         const sacm_adapter::EditOutcome written =
             sacm_adapter::apply_reorder_package_elements(document, shell.identity.id, order);

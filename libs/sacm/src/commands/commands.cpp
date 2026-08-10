@@ -881,16 +881,23 @@ void perform_reorder_package_elements(model::Document& document, const ReorderPa
     // new sequence back into exactly these slots is what leaves every unnamed
     // element -- a nested package, a group, a claim the caller never mentioned --
     // where it was.
+    // One pass over the package with the named ids in a set, rather than a scan of
+    // `ordered` per element: a package holding hundreds of elements is ordinary in a
+    // real case, and the nested form was quadratic in it.
+    std::unordered_set<std::string> named;
+    named.reserve(reorder.ordered.size());
+    for (const model::ElementId& id : reorder.ordered) {
+        named.insert(id.value());
+    }
     std::unordered_map<std::string, std::size_t> position_of;
     std::vector<std::size_t> slots;
+    position_of.reserve(reorder.ordered.size());
+    slots.reserve(reorder.ordered.size());
     for (std::size_t index = 0; index < elements.size(); ++index) {
         const std::string id = elements[index]->id().value();
-        for (const model::ElementId& named : reorder.ordered) {
-            if (named.value() == id) {
-                position_of[id] = index;
-                slots.push_back(index);
-                break;
-            }
+        if (named.contains(id)) {
+            position_of[id] = index;
+            slots.push_back(index);
         }
     }
     std::vector<std::unique_ptr<model::ArgumentationElement>> taken;
