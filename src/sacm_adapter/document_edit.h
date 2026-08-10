@@ -305,6 +305,27 @@ EditOutcome apply_set_gid(LibraryDocument& document, const std::string& element_
 EditOutcome
 apply_set_gsn_identifier(LibraryDocument& document, const std::string& element_id, const std::string& identifier);
 
+// Sets or clears the GSN undeveloped decorator, mirroring
+// `core::SetElementUndeveloped`. GSN's `undeveloped` is SACM
+// `assertionDeclaration = needsSupport` (docs/sacm/sacm-gsn-mapping.md), so this
+// is one `SetAssertionDeclaration` and no vendor tag.
+//
+// REFUSES on an element whose declaration is anything other than `asserted` or
+// `needsSupport`. SACM has a single `assertionDeclaration`, so `needsSupport`
+// cannot coexist with `assumed`, `axiomatic`, `defeated` or `asCited` -- writing
+// it would silently turn a GSN Assumption into an undeveloped Goal. That is not
+// a limitation being worked around: the decorator means "requires support that
+// has not yet been provided", and GSN reaches Assumptions and Justifications by
+// `InContextOf`, never by `SupportedBy`, so there is no support for them to be
+// missing. The refusal names the declaration in the way.
+//
+// The legacy path this replaces kept `undeveloped` as a POD boolean independent
+// of the declaration, wrote both, and then lost the boolean on reload, because
+// the reader honours the shorthand only when the declaration is still
+// `asserted`. Marking an Assumption undeveloped therefore reported success and
+// did nothing.
+EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& element_id, bool undeveloped);
+
 // ---------------------------------------------------------------------------
 // Terminology edit seams (Phase 0 part 2).
 //

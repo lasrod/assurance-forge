@@ -2,6 +2,7 @@
 
 #include "core/commands/library_bridge.h"
 #include "core/relationship_editing.h"
+#include "parser/model_utils.h"
 #include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
@@ -581,12 +582,44 @@ bool SetElementUndevelopedCommand::Apply(CommandContext& ctx, audit::AuditEvent&
         return false;
     }
 
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-            return core::SetElementUndeveloped(model, &package, element_id_, undeveloped_, old_value_, error);
-        };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+    // Slice 2b of the legacy-bridge retirement, and a defect fix. GSN's
+    // `undeveloped` is SACM `assertionDeclaration = needsSupport`, one enum --
+    // whereas the legacy POD carried `undeveloped` as a boolean beside the
+    // declaration, wrote both, and lost the boolean on reload, because the reader
+    // honours that shorthand only when the declaration is still `asserted`.
+    // Marking a GSN Assumption undeveloped therefore reported success and did
+    // nothing, in memory and on disk.
+    //
+    // The seam writes the declaration, so the value sticks -- and refuses when
+    // the declaration is already saying something else, rather than overwriting
+    // it. See apply_set_undeveloped.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx)) {
+        const parser::SacmElement* element = parser::FindElementById(ctx.model, element_id_);
+        if (element == nullptr) {
+            out_error = "Element not found in model: " + element_id_ + ".";
+            return false;
+        }
+        old_value_ = element->undeveloped;
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_undeveloped(*ctx.library_document, element_id_, undeveloped_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = LibraryRejection("the undeveloped decorator on " + element_id_, outcome.diagnostics);
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                return core::SetElementUndeveloped(model, &package, element_id_, undeveloped_, old_value_, error);
+            };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     was_no_op_ = old_value_ == undeveloped_;
     out_event.event_type = "SetElementUndeveloped";

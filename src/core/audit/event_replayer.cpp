@@ -1365,18 +1365,18 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        const bool undeveloped = new_value->get<bool>();
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-                bool old_value_unused = false;
-                if (!core::SetElementUndeveloped(model, &package, element_id, undeveloped, old_value_unused, error)) {
-                    error = "SetElementUndeveloped (bridge) failed at " + location + ": " + error;
-                    return false;
-                }
-                return true;
-            };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        // Slice 2b: seam-mapped, matching the live command. The seam refuses an
+        // element whose declaration is already saying something else, which the
+        // live command refused too -- so an event that exists was applicable when
+        // it was recorded and stays applicable here.
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_undeveloped(document, element_id, new_value->get<bool>());
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_undeveloped", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     // The three package removals, all seam-mapped. `package_gid` is read and not

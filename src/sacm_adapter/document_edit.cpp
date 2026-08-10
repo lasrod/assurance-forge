@@ -1002,6 +1002,51 @@ apply_set_gsn_identifier(LibraryDocument& document, const std::string& element_i
     return applied_outcome(doc.apply(add));
 }
 
+EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& element_id, bool undeveloped) {
+    if (element_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId element(element_id);
+    const auto* assertion = doc.find_as<sacm::model::Assertion>(element);
+    if (assertion == nullptr) {
+        EditOutcome outcome;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "SACM-CMD-002",
+            .severity = "error",
+            .message = "'" + element_id + "' is not an element that can be marked undeveloped",
+        });
+        return outcome;
+    }
+
+    // The declaration slot has to be free. `asserted` is the ordinary case and
+    // `needsSupport` is the decorator already being set, so both are ours to
+    // write; anything else is a different GSN element wearing the same SACM
+    // class, and overwriting it would change what the argument says.
+    const sacm::model::AssertionDeclaration current = assertion->assertion_declaration();
+    if (current != sacm::model::AssertionDeclaration::Asserted &&
+        current != sacm::model::AssertionDeclaration::NeedsSupport) {
+        EditOutcome outcome;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "SACM-CMD-002",
+            .severity = "error",
+            .message = "'" + element_id + "' is declared '" +
+                       std::string(sacm::model::assertion_declaration_name(current)) +
+                       "', and SACM carries the undeveloped decorator in that same assertionDeclaration, so the "
+                       "two cannot both be recorded",
+        });
+        return outcome;
+    }
+
+    const sacm::model::AssertionDeclaration target =
+        undeveloped ? sacm::model::AssertionDeclaration::NeedsSupport : sacm::model::AssertionDeclaration::Asserted;
+    if (current == target) {
+        return EditOutcome{.supported = true, .applied = true};
+    }
+    return applied_outcome(
+        doc.apply(sacm::commands::SetAssertionDeclaration{.element = element, .declaration = target}));
+}
+
 // -------------------------------------------------------------- terminology
 
 namespace {

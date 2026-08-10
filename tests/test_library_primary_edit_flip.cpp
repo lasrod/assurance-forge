@@ -32,6 +32,7 @@
 #include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/commands/tree_commands.h"
+#include "core/app_state.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
 #include "core/library_package_projection.h"
@@ -1468,4 +1469,75 @@ TEST(LibraryPrimaryEditFlip, GsnIdentifierEditKeepsTheLegacyEditingRules) {
     const parser::SacmElement* target = FindElement(fixture->model, "G1");
     ASSERT_NE(target, nullptr);
     EXPECT_NE(target->gsn_identifier, taken);
+}
+
+// Slice 2b. The undeveloped decorator, and the defect behind it.
+//
+// GSN `undeveloped` is SACM `assertionDeclaration = needsSupport` -- ONE enum.
+// The legacy path kept `undeveloped` as a POD boolean beside the declaration and
+// wrote both; the reader honours that shorthand only when the declaration is
+// still `asserted`, so on a GSN Assumption the write reported success and was
+// silently lost on reload. Measured before the fix: in-memory undeveloped=0,
+// on-disk undeveloped=0, command success=1, status bar "Marked A1 undeveloped."
+//
+// Now the decorator is written where SACM actually keeps it, so it sticks; and
+// where the declaration is already saying something else the edit is REFUSED
+// rather than either overwriting it (turning an Assumption into an undeveloped
+// Goal) or pretending.
+TEST(LibraryPrimaryEditFlip, UndevelopedDecoratorSticksOnAGoalAndIsRefusedOnAnAssumption) {
+    constexpr const char* kMixedDeclarationSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="A1" name="Assumed thing" assertionDeclaration="assumed"/>
+    <claim id="J1" name="Justified thing" assertionDeclaration="axiomatic"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    std::unique_ptr<EditFixture> fixture = MakeFixture("undeveloped", /*library_backed=*/true, kMixedDeclarationSacm);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    // (1) An ordinary Goal: the decorator is set, and it is in the saved file as
+    // the SACM declaration rather than as a boolean the reader will discard.
+    core::commands::SetElementUndevelopedCommand mark("G1", true);
+    ASSERT_TRUE(RunCommand(*fixture, mark, ctx).success);
+    const parser::SacmElement* goal = FindElement(fixture->model, "G1");
+    ASSERT_NE(goal, nullptr);
+    EXPECT_TRUE(goal->undeveloped) << "the decorator did not survive the frame-boundary rebuild";
+    EXPECT_EQ(goal->assertion_declaration, "needsSupport");
+
+    core::AppState reopened;
+    ASSERT_TRUE(reopened.load_file(fixture->sacm_abs.string())) << reopened.status_message;
+    bool on_disk_undeveloped = false;
+    for (const parser::SacmElement& element : reopened.loaded_case->elements)
+        if (element.id == "G1")
+            on_disk_undeveloped = element.undeveloped;
+    EXPECT_TRUE(on_disk_undeveloped) << "the decorator was lost on reload -- the defect this fixes";
+
+    // (2) An Assumption and a Justification: refused, saying why, and unchanged.
+    for (const char* id : {"A1", "J1"}) {
+        SCOPED_TRACE(id);
+        core::commands::SetElementUndevelopedCommand refused(id, true);
+        const core::commands::CommandResult result = RunCommand(*fixture, refused, ctx);
+        EXPECT_FALSE(result.success) << "marking a non-asserted claim undeveloped was accepted";
+        EXPECT_NE(result.error.find("assertionDeclaration"), std::string::npos)
+            << "the refusal does not explain the collision: " << result.error;
+        const parser::SacmElement* element = FindElement(fixture->model, id);
+        ASSERT_NE(element, nullptr);
+        EXPECT_FALSE(element->undeveloped);
+        EXPECT_NE(element->assertion_declaration, "needsSupport")
+            << "the refused edit overwrote the declaration anyway";
+    }
+
+    // (3) Clearing it returns the goal to plain asserted, and replays.
+    core::commands::SetElementUndevelopedCommand clear("G1", false);
+    ASSERT_TRUE(RunCommand(*fixture, clear, ctx).success);
+    const parser::SacmElement* cleared = FindElement(fixture->model, "G1");
+    ASSERT_NE(cleared, nullptr);
+    EXPECT_FALSE(cleared->undeveloped);
+    EXPECT_EQ(cleared->assertion_declaration, "asserted");
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
 }

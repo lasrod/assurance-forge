@@ -143,6 +143,39 @@ you lose them.**
 | `isPublic` | TaggedValue |
 | `isMany`, `isOptional` | *no SACM feature* |
 
+### `undeveloped` occupies the declaration, so it is confined to Goal and Strategy
+
+The row above is a *substitution*, not an addition: SACM has one
+`assertionDeclaration`, so `needsSupport` and `assumed` / `axiomatic` /
+`defeated` / `asCited` are mutually exclusive. Inside a GSN model that never
+bites, because v2.2's OCL pins the declaration to `asserted` and GSN keeps
+`undeveloped` in its own boolean. In a SACM-native store — which is what
+Assurance Forge keeps — the two land in the same slot.
+
+**Decision: the editor sets the decorator only where the declaration is
+`asserted` or `needsSupport`, and refuses otherwise.** This is not a workaround
+for the collision; it is what the notation already says. Undeveloped means "requires
+support that has not yet been provided", and GSN reaches an Assumption or a
+Justification through `InContextOf`, never `SupportedBy` — there is no support
+for them to be missing. An element that would collide is, by construction, an
+element the decorator does not apply to.
+
+So this is **not** a gap worth reporting: no GSN v3 construct needs
+"assumed *and* undeveloped", and inventing an encoding for it would create a
+combination the notation cannot draw. (Contrast the genuine gaps in
+`sacm-gsn-metamodel-gaps.md`, which are all cases where v3 *requires* something
+SACM cannot hold.)
+
+Getting here cost a real defect, recorded so the reasoning is not re-derived from
+scratch. Assurance Forge used to keep `undeveloped` as a boolean beside the
+declaration, write both on save, and read the shorthand back only when the
+declaration was still `asserted` (`xmi_reader.cpp`, deliberate and correct).
+Marking a GSN Assumption undeveloped therefore reported success and changed
+nothing, in memory or on disk, while the status bar said it had worked. The
+editor now writes the declaration itself, and the inspector offers the control
+only where it can be honoured. Tests:
+`LibraryPrimaryEditFlip.UndevelopedDecoratorSticksOnAGoalAndIsRefusedOnAnAssumption`.
+
 ## Recording the original GSN type
 
 Resolving a GSN type to its SACM supertype is lossy — `Goal`, `Assumption` and
