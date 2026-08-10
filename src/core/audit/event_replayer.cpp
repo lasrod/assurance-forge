@@ -1271,18 +1271,19 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("new_identifier", new_identifier))
             return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate = [&](parser::AssuranceCase& model,
-                                         sacm::AssuranceCasePackage& package,
-                                         std::string& error) {
-            std::string old_identifier_unused;
-            if (!core::SetGsnIdentifier(model, &package, element_id, new_identifier, old_identifier_unused, error)) {
-                error = "SetGsnIdentifier (bridge) failed at " + location + ": " + error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        // Slice 2b: seam-mapped, matching the live command. The app's editing
+        // rules (non-empty, no surrounding whitespace, unique among the nodes)
+        // are NOT re-checked -- they gated whether the event was recorded, and
+        // re-applying them here would refuse to reproduce history the user
+        // legitimately made. The recorded identifier is written as recorded.
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_gsn_identifier(document, element_id, new_identifier);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_gsn_identifier", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     // The GSN repair events. Bridged rather than routed to a native seam for the
@@ -1296,16 +1297,24 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         std::string relationship_id;
         if (!require_string("relationship_id", relationship_id))
             return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-                if (!core::RemoveRelationship(model, &package, relationship_id, error)) {
-                    error = "RemoveRelationship (bridge) failed at " + location + ": " + error;
-                    return false;
-                }
-                return true;
-            };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        // Slice 2b: seam-mapped, closing an asymmetry that predates the retirement
+        // work. `RemoveRelationshipCommand` has applied `apply_delete_element`
+        // natively since the Phase 2 slice 2b-1 element flip, while this branch
+        // went on bridging -- so a relationship removal and its own replay ran
+        // different code, and only agreed because the seam's scrub-then-drop
+        // happens to reproduce `core::RemoveRelationship`. That agreement is now
+        // structural rather than coincidental.
+        const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_element(document, relationship_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_delete_element(relationship)",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "DropRelationshipReference") {

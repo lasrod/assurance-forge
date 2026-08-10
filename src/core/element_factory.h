@@ -225,10 +225,29 @@ bool SetElementTextField(parser::AssuranceCase& ac,
 // elements fall back to their SACM storage id until explicitly renumbered.
 std::string GsnIdentifierFor(const parser::SacmElement& element);
 
+// `SetGsnIdentifier`'s editing rules, without the write: the identifier must be
+// non-empty, free of surrounding whitespace, and unique among the case's
+// non-relationship elements, and the target must exist and be a node.
+//
+// Split out because these are Assurance Forge's rules rather than SACM's -- SACM
+// has no notion of a diagram label -- so the library seam
+// (`sacm_adapter::apply_set_gsn_identifier`) does not and should not enforce
+// them. The library-primary command runs this first, over the same model the
+// legacy mutator would have run it over, so both routes refuse the same edits
+// with the same messages. On success `out_normalized_identifier` is the trimmed
+// value to store and `out_old_identifier` is what the element answers to now;
+// equal values mean the edit is a no-op.
+bool ValidateGsnIdentifierChange(const parser::AssuranceCase& ac,
+                                 const std::string& element_id,
+                                 const std::string& new_identifier,
+                                 std::string& out_normalized_identifier,
+                                 std::string& out_old_identifier,
+                                 std::string& out_error);
+
 // Renumber one GSN node without changing its SACM storage identity or any
-// relationship references. The identifier must be non-empty and unique among
-// the case's non-relationship elements. The independent value is mirrored to
-// the SACM package as a vendor TaggedValue for lossless save/reload.
+// relationship references. Validates through `ValidateGsnIdentifierChange`, then
+// mirrors the value to the SACM package as a vendor TaggedValue for lossless
+// save/reload.
 bool SetGsnIdentifier(parser::AssuranceCase& ac,
                       sacm::AssuranceCasePackage* pkg,
                       const std::string& element_id,

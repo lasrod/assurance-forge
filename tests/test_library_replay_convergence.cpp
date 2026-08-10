@@ -906,3 +906,49 @@ TEST(LibraryReplayConvergence, RemoveArtifactPackageConverges) {
     EXPECT_TRUE(core::project_library_package(*library_doc).artifactPackages.empty())
         << "the replay did not remove the artifact package at all";
 }
+
+// Slice 2b: RemoveRelationship's replay branch moved onto the seam the LIVE
+// command has used since the Phase 2 slice 2b-1 element flip. The two agreed
+// before only because `apply_delete_element`'s scrub-then-drop happens to
+// reproduce `core::RemoveRelationship`; this pins that they still agree now that
+// the replay side is the seam, which is what makes the agreement structural.
+//
+// The relationship removed here is a strategy's inference with two sources, the
+// shape where scrub-then-drop and cascade differ most.
+TEST(LibraryReplayConvergence, RemoveRelationshipConverges) {
+    auto f = MakeFixture("remove_relationship");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::commands::CreateChildElementCommand add_strategy("G1", core::NewElementKind::Strategy);
+    ASSERT_TRUE(bus->Execute(add_strategy, ctx, "tester").success);
+    core::commands::CreateChildElementCommand add_sub_one(add_strategy.GeneratedId(), core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub_one, ctx, "tester").success);
+    core::commands::CreateChildElementCommand add_sub_two(add_strategy.GeneratedId(), core::NewElementKind::Goal);
+    ASSERT_TRUE(bus->Execute(add_sub_two, ctx, "tester").success);
+
+    std::string inference_id;
+    for (const sacm::ArgumentPackage& argument_package : f.package.argumentPackages)
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences)
+            if (inference.reasoning == add_strategy.GeneratedId())
+                inference_id = inference.id;
+    ASSERT_FALSE(inference_id.empty()) << "no strategy inference to remove; this test measures nothing";
+
+    core::commands::RemoveRelationshipCommand remove(inference_id);
+    ASSERT_TRUE(bus->Execute(remove, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}

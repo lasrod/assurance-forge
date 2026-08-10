@@ -1399,3 +1399,73 @@ TEST(LibraryPrimaryEditFlip, RemoveTerminologyPackageStillRefusesANonEmptyPackag
     EXPECT_TRUE(RunCommand(*fixture, remove_again, ctx).success);
     EXPECT_EQ(core::FindTerminologyPackage(fixture->package, create_pkg.GeneratedRef()), nullptr);
 }
+
+// Slice 2b. The GSN identifier is a vendor TaggedValue, and the library has
+// `AddTaggedValue` but no update, so the seam composes drop-then-add. Two things
+// that composition can get wrong, both asserted here: the element must end with
+// exactly ONE identifier tag (an additive write would leave two, and the
+// projection reads the first), and a rename must be reversible.
+TEST(LibraryPrimaryEditFlip, GsnIdentifierEditsMatchLegacyCanonicalHash) {
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::UpdateGsnIdentifierCommand rename("G1", "TOP1");
+        EXPECT_TRUE(RunCommand(fixture, rename, ctx).success);
+        core::commands::UpdateGsnIdentifierCommand rename_again("G1", "TOP2");
+        EXPECT_TRUE(RunCommand(fixture, rename_again, ctx).success);
+        core::commands::UpdateGsnIdentifierCommand back("G1", "TOP1");
+        EXPECT_TRUE(RunCommand(fixture, back, ctx).success);
+    };
+    std::unique_ptr<EditFixture> library_side = MakeFixture("gsn_id_library", /*library_backed=*/true);
+    std::unique_ptr<EditFixture> legacy_side = MakeFixture("gsn_id_legacy", /*library_backed=*/false);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+    run(*library_side);
+    run(*legacy_side);
+
+    const parser::SacmElement* flipped = FindElement(library_side->model, "G1");
+    ASSERT_NE(flipped, nullptr);
+    EXPECT_EQ(flipped->gsn_identifier, "TOP1");
+    EXPECT_EQ(CanonicalHash(*library_side), CanonicalHash(*legacy_side));
+
+    // Exactly one tag survives three writes.
+    std::size_t identifier_tags = 0;
+    for (const sacm::ArgumentPackage& argument_package : library_side->package.argumentPackages)
+        for (const sacm::Claim& claim : argument_package.claims)
+            if (claim.id == "G1")
+                for (const sacm::TaggedValue& tag : claim.taggedValues)
+                    if (tag.key == core::kGsnIdentifierTagKey)
+                        ++identifier_tags;
+    EXPECT_EQ(identifier_tags, 1u) << "drop-then-add left the element carrying more than one identifier";
+}
+
+// The editing rules are Assurance Forge's, not SACM's, so the seam does not
+// enforce them and the flipped command has to. Each of these was refused before
+// the flip and must still be, with the same message.
+TEST(LibraryPrimaryEditFlip, GsnIdentifierEditKeepsTheLegacyEditingRules) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("gsn_id_rules", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    core::commands::CreateChildElementCommand add_sub("G1", core::NewElementKind::Goal);
+    ASSERT_TRUE(RunCommand(*fixture, add_sub, ctx).success);
+    const parser::SacmElement* sibling = FindElement(fixture->model, add_sub.GeneratedId());
+    ASSERT_NE(sibling, nullptr);
+    const std::string taken = sibling->gsn_identifier;
+    ASSERT_FALSE(taken.empty());
+
+    const auto refuses = [&](const std::string& identifier, const char* fragment) {
+        core::commands::UpdateGsnIdentifierCommand rename("G1", identifier);
+        const core::commands::CommandResult result = RunCommand(*fixture, rename, ctx);
+        EXPECT_FALSE(result.success) << "accepted '" << identifier << "'";
+        EXPECT_NE(result.error.find(fragment), std::string::npos) << result.error;
+    };
+    refuses("", "non-empty");
+    refuses("  ", "non-empty");
+    refuses(" G9 ", "whitespace");
+    refuses(taken, "already used");
+
+    // ...and the element is untouched by any of them.
+    const parser::SacmElement* target = FindElement(fixture->model, "G1");
+    ASSERT_NE(target, nullptr);
+    EXPECT_NE(target->gsn_identifier, taken);
+}

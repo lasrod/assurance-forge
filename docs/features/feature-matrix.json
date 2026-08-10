@@ -437,7 +437,7 @@
       "tests": [
         "tests/test_assurance_tree.cpp"
       ],
-      "notes": ""
+      "notes": "Rendering and authoring both work on an ordinary Goal or Strategy. **Authoring it on an Assumption or a Justification silently does nothing**: GSN `undeveloped` is SACM `assertionDeclaration = needsSupport`, one enum that cannot also hold `assumed` or `axiomatic`, and the reader honours the legacy `undeveloped` attribute only when the declaration is still `asserted`. The inspector offers the toggle on every claim regardless, and reports success. Deciding between refusing the edit (GSN v3 makes undeveloped a Goal/Strategy decorator, so an Assumption should not offer it) and encoding both is an open mapping question, recorded in docs/architecture/legacy-bridge-migration-plan.md under phase 2b."
     },
     {
       "id": "AF-GSN-012",

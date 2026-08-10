@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 12 commands have no native seam yet (26 before phase 1, 15 before slice 2a) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 11 commands have no native seam yet (26 before phase 1, 15 before 2a, 12 before 2b) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -75,6 +75,7 @@ default `true`, assigned nowhere under `src/app/`).
 | RemoveArgumentPackage | `apply_delete_package` | [`package_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/package_commands.cpp) `RemoveArgumentPackageCommand::Apply` (phase 1) |
 | RemoveTerminologyPackage, RemoveArtifactPackage | `apply_delete_package` | `package_commands.cpp` (slice 2a) |
 | SetElementGid | `apply_set_gid` | [`gid_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/gid_commands.cpp) `EnsureElementGidCommand::Apply` (slice 2a) |
+| UpdateGsnIdentifier | `apply_set_gsn_identifier` | `element_commands.cpp` `UpdateGsnIdentifierCommand::Apply` (slice 2b) |
 
 Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
 seam does not support (and for a ref that carries only a gid, which the seams
@@ -83,8 +84,8 @@ is present.
 
 **Bridged** (`ApplyLibraryPrimaryOrLegacy` → `BridgeLegacyMutationToLibrary`):
 
-- Text and GSN state: UpdateElementText (all fields), UpdateGsnIdentifier,
-  SetElementUndeveloped, DropRelationshipReference, MoveStrategyToReasoning
+- Text and GSN state: UpdateElementText (all fields), SetElementUndeveloped,
+  DropRelationshipReference, MoveStrategyToReasoning
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
 - Tree: ReorderSiblings, MoveSubtree ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
 - ACP: AddAcp, RemoveAcp, UpsertAcp, CreateConfidenceArgumentTree
@@ -211,12 +212,15 @@ commands and refuse exactly what they refused before.
 
 ### Phase 2 — Seam the small remaining state edits
 
-Sliced, because these nine commands are not one size. **Slice 2a is done**:
-SetElementGid and the two remaining package removals — the ones whose seam either
-already existed or was a single library operation away. Slice 2b is the vendor-
-TaggedValue state edits (UpdateGsnIdentifier, SetElementUndeveloped); slice 2c is
-the four ACP commands, the largest, because `CreateConfidenceArgumentTree` is a
-compound operation that mints a package and a goal.
+Sliced, because these nine commands are not one size. **Slices 2a and 2b are
+done**: SetElementGid and the two remaining package removals, then
+UpdateGsnIdentifier. Slice 2c is the four ACP commands, the largest, because
+`CreateConfidenceArgumentTree` is a compound operation that mints a package and a
+goal.
+
+**SetElementUndeveloped is not flipped, and must not be flipped as it stands** —
+see the phase 2b note below. It has a live defect that a mechanical flip would
+convert from a silent no-op into silent data loss.
 
 *Slice 2a, as landed.* `apply_set_gid` is new and trivial (the app decides the
 value, the seam stores it); `apply_delete_package` already covered all three
@@ -259,6 +263,58 @@ thin `sacm_adapter` seams plus replay-branch parity.
 *Exit criteria*: each command sets `library_primary` without the bridge; the
 matching `BridgeViaLegacy` replay branch is replaced by a seam call; per-event
 convergence tests extend `LibraryReplayConvergence`.
+
+*Slice 2b, as landed.* `UpdateGsnIdentifier` writes the reserved
+`assuranceForge.gsn.identifier` TaggedValue, which the library carries natively.
+The library has `AddTaggedValue` and **no update operation**, so the seam
+composes an upsert: preview the add, drop the existing tag for the key, then add.
+Previewing first means a rejected add cannot leave the element with no identifier
+at all, and a test asserts exactly one tag survives three renames — an additive
+write would leave three, and the projection reads the first.
+
+`SetGsnIdentifier`'s front half was split out as
+`core::ValidateGsnIdentifierChange` rather than reimplemented, so both routes
+refuse the same edits with the same messages. Those rules — non-empty, no
+surrounding whitespace, unique among the nodes — are Assurance Forge's; SACM has
+no notion of a diagram label, so the seam neither knows nor enforces them.
+
+`RemoveRelationship`'s replay branch was seam-mapped in the same slice. It is not
+part of phase 2's list: the LIVE command has applied `apply_delete_element`
+natively since the Phase 2 slice 2b-1 element flip while the replay branch went on
+bridging, so a relationship removal and its own replay ran different code and
+agreed only because the seam's scrub-then-drop happens to reproduce
+`core::RemoveRelationship`. Now structural rather than coincidental
+(`LibraryReplayConvergence.RemoveRelationshipConverges`, over a strategy inference
+with two sources — the shape where scrub and cascade differ most).
+
+**SetElementUndeveloped: blocked on a mapping decision, and broken today.**
+GSN `undeveloped` maps to `assertionDeclaration = needsSupport`
+([mapping](../sacm/sacm-gsn-mapping.md)). SACM has ONE `assertionDeclaration`
+enum, so `needsSupport` and `assumed`/`axiomatic` are mutually exclusive — while
+the legacy POD carries `undeveloped` and `assertionDeclaration` as two
+independent fields. That is the same two-slots-collapse-to-one impedance as the
+phase 3 claim-text problem, and it is already causing a live defect:
+
+- The inspector offers the undeveloped toggle on **any** claim
+  (`supports_undeveloped = has_content`), including a GSN Assumption
+  (`assumed`) or Justification (`axiomatic`).
+- The bridged write sets the POD's `undeveloped` bool while leaving
+  `assertionDeclaration` alone; the serializer emits both; the reader honours
+  `undeveloped="true"` **only when the declaration is still `asserted`**
+  (`xmi_reader.cpp`, deliberate and documented in the mapping).
+- So marking an Assumption undeveloped **reports success, and does nothing** —
+  measured: the flag is absent from the in-memory model after the frame-boundary
+  rebuild and from the saved file, while the status bar says "Marked A1
+  undeveloped."
+
+Flipping the command onto `SetAssertionDeclaration` without deciding this would
+make it *worse*: the write would land, silently converting an Assumption into an
+undeveloped Goal — the reinterpretation the project's hard constraint forbids.
+The options are a refusal plus inspector gating (undeveloped is a Goal/Strategy
+decorator in GSN v3, so an Assumption should never offer it), or an encoding that
+carries both, which needs a mapping row and probably a
+[gap report](../sacm/sacm-gsn-metamodel-gaps.md) row. Not a migration decision;
+raised rather than guessed, per the mapping rule.
 
 ### Phase 3 — The hard residue
 

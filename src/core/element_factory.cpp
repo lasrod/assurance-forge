@@ -1456,12 +1456,13 @@ std::string GsnIdentifierFor(const parser::SacmElement& element) {
     return element.id;
 }
 
-bool SetGsnIdentifier(parser::AssuranceCase& ac,
-                      sacm::AssuranceCasePackage* pkg,
-                      const std::string& element_id,
-                      const std::string& new_identifier,
-                      std::string& out_old_identifier,
-                      std::string& out_error) {
+bool ValidateGsnIdentifierChange(const parser::AssuranceCase& ac,
+                                 const std::string& element_id,
+                                 const std::string& new_identifier,
+                                 std::string& out_normalized_identifier,
+                                 std::string& out_old_identifier,
+                                 std::string& out_error) {
+    out_normalized_identifier.clear();
     out_old_identifier.clear();
     out_error.clear();
 
@@ -1480,8 +1481,8 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
         return false;
     }
 
-    parser::SacmElement* target = nullptr;
-    for (parser::SacmElement& element : ac.elements) {
+    const parser::SacmElement* target = nullptr;
+    for (const parser::SacmElement& element : ac.elements) {
         if (element.id == element_id) {
             target = &element;
             break;
@@ -1505,7 +1506,21 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
         }
     }
 
+    out_normalized_identifier = normalized_identifier;
     out_old_identifier = GsnIdentifierFor(*target);
+    return true;
+}
+
+bool SetGsnIdentifier(parser::AssuranceCase& ac,
+                      sacm::AssuranceCasePackage* pkg,
+                      const std::string& element_id,
+                      const std::string& new_identifier,
+                      std::string& out_old_identifier,
+                      std::string& out_error) {
+    std::string normalized_identifier;
+    if (!ValidateGsnIdentifierChange(
+            ac, element_id, new_identifier, normalized_identifier, out_old_identifier, out_error))
+        return false;
     if (out_old_identifier == normalized_identifier)
         return true;
 
@@ -1513,7 +1528,12 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
         out_error = "SACM element not found for GSN identifier update: " + element_id;
         return false;
     }
-    target->gsn_identifier = normalized_identifier;
+    for (parser::SacmElement& element : ac.elements) {
+        if (element.id == element_id) {
+            element.gsn_identifier = normalized_identifier;
+            break;
+        }
+    }
     return true;
 }
 

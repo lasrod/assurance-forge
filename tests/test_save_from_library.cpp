@@ -1212,6 +1212,43 @@ TEST(SaveFromLibrary, SACM23_LIB_002_FlippedPackageAndGidCommandsRunOnACaseTheBr
     EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
 }
 
+// Slice 2b: the GSN identifier. Same routing proof -- a bridged edit is refused
+// on this fixture, so success means the seam ran.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedGsnIdentifierRunsOnACaseTheBridgeRefuses) {
+    constexpr const char* kNestedVendorSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample" acme:owner="alice">
+  <acme:vendorMetadata reviewCycle="Q3-2026"/>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase2b-routing", kNestedVendorSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "AP_nested"))
+        << "fixture carries no nested package, so a bridged edit would pass too";
+
+    bool library_primary = false;
+    core::commands::UpdateGsnIdentifierCommand rename("G1", "TOP1");
+    const core::commands::CommandResult result = RunOnBus(fixture, state, rename, library_primary);
+    ASSERT_TRUE(result.success) << "the rename was refused, so it is still going through the bridge: " << result.error;
+    ASSERT_TRUE(library_primary) << "the rename did not reach the library at all";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "AP_nested")) << "the rename deleted the nested package";
+    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << "the rename dropped the vendor attribute";
+    EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << "the rename dropped the vendor element";
+    EXPECT_TRUE(Contains(autosaved, "TOP1")) << "the identifier is not in the saved file";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
     const std::string acp_case =
         ReadFile(std::filesystem::path(AF_REPO_ROOT) / "tests" / "data" / "fixture_acp_parity.sacm.xml");

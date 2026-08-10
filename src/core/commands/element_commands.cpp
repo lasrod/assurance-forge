@@ -448,12 +448,45 @@ bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx, audit::AuditEvent& o
         return false;
     }
 
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-            return core::SetGsnIdentifier(model, &package, element_id_, new_identifier_, old_identifier_, error);
-        };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+    // Slice 2b of the legacy-bridge retirement. The GSN identifier is a vendor
+    // TaggedValue, which the library can carry natively, so this needs no
+    // projection round trip.
+    //
+    // `core::ValidateGsnIdentifierChange` is the legacy mutator's own front half,
+    // split out rather than reimplemented: non-empty, no surrounding whitespace,
+    // the target exists and is a node, and the identifier is not already taken.
+    // Those are Assurance Forge's editing rules -- SACM has no notion of a
+    // diagram label at all -- so the seam does not enforce them and a flip that
+    // just called it would have dropped every one. Running them first also means
+    // the no-op case (same identifier) never reaches the library.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx)) {
+        std::string normalized;
+        if (!core::ValidateGsnIdentifierChange(
+                ctx.model, element_id_, new_identifier_, normalized, old_identifier_, out_error))
+            return false;
+        if (old_identifier_ != normalized) {
+            const sacm_adapter::EditOutcome outcome =
+                sacm_adapter::apply_set_gsn_identifier(*ctx.library_document, element_id_, normalized);
+            if (outcome.supported && !outcome.applied) {
+                out_error = LibraryRejection("the GSN identifier for " + element_id_, outcome.diagnostics);
+                return false;
+            }
+            if (outcome.applied)
+                ctx.library_primary = true;
+        }
+        // A no-op still counts as handled: the legacy mutator returns success
+        // without touching anything, and so must this.
+        applied_to_library = true;
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                return core::SetGsnIdentifier(model, &package, element_id_, new_identifier_, old_identifier_, error);
+            };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     was_no_op_ = old_identifier_ == new_identifier_;
     out_event.event_type = "UpdateGsnIdentifier";

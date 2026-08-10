@@ -949,6 +949,59 @@ EditOutcome apply_set_gid(LibraryDocument& document, const std::string& element_
     return applied_outcome(result);
 }
 
+EditOutcome
+apply_set_gsn_identifier(LibraryDocument& document, const std::string& element_id, const std::string& identifier) {
+    if (element_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId element(element_id);
+    const auto* model_element = doc.find_as<sacm::model::ModelElement>(element);
+    if (model_element == nullptr) {
+        // Not a tag-carrying element. Reported as a rejection rather than as
+        // unsupported: the caller named something specific and it was wrong.
+        EditOutcome outcome;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "SACM-CMD-002",
+            .severity = "error",
+            .message = "'" + element_id + "' is not an element that can carry a GSN identifier",
+        });
+        return outcome;
+    }
+
+    // The tag this replaces, if the element already carries one.
+    std::optional<sacm::model::ElementId> existing;
+    for (const auto& tag : model_element->tagged_values()) {
+        if (tag->key().primary() == core::kGsnIdentifierTagKey) {
+            existing = tag->id();
+            break;
+        }
+    }
+
+    const sacm::commands::AddTaggedValue add{
+        .element = element, .key = core::kGsnIdentifierTagKey, .value = identifier};
+    // Previewed before the old tag goes, so a rejected add cannot leave the
+    // element with no identifier at all.
+    if (const sacm::commands::OperationPreview preview = doc.preview(add); !preview.can_apply) {
+        EditOutcome outcome;
+        for (const sacm::validation::Diagnostic& diagnostic : preview.diagnostics) {
+            outcome.diagnostics.push_back(LoadDiagnostic{
+                .code = diagnostic.code,
+                .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
+                .message = diagnostic.message,
+            });
+        }
+        return outcome;
+    }
+    if (existing.has_value()) {
+        const sacm::commands::MutationResult removed = doc.apply(sacm::commands::DeleteElement{.target = *existing});
+        if (!removed.applied) {
+            return applied_outcome(removed);
+        }
+    }
+    return applied_outcome(doc.apply(add));
+}
+
 // -------------------------------------------------------------- terminology
 
 namespace {
