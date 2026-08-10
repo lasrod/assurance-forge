@@ -394,6 +394,18 @@ The audit event records `new_relationship_id` so replay reuses the id the docume
 actually got rather than re-deriving one; events written before the field existed replay
 by re-deriving, as they always did.
 
+**`library_primary` is claimed before the first write, not after the last one** -- in
+MoveSubtree, the NodeOnly removal, the broken-endpoint repair and the ACP writes, all of
+which perform several library writes per command. The bus deliberately does not rebuild
+the live models on its failure path (that would free containers the canvas is still
+rendering from the current frame); the caller re-derives them at the next frame boundary,
+and only when `ctx.library_primary` says the flip engaged. Set after the last write, a
+command that failed part-way would leave the document changed and the UI rendering a model
+it no longer matches -- an inconsistency the user could keep editing from. Setting it
+early is safe only where the fallback decision is already made: a command that can still
+route to the bridge must not claim the flip, or the bridge would run with the flag set.
+Found in review of slice 3d and fixed at every multi-write site.
+
 **Slice 3c: the audit projection was not reloadable for any artifact-bearing document
 ([#350](https://github.com/lasrod/assurance-forge/issues/350)).** Found while flipping the
 NodeOnly removal, and recorded here because it is a defect in this row's own machinery

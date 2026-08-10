@@ -76,6 +76,21 @@ bool WriteAcpToDocument(CommandContext& ctx,
                         const AcpScratch& scratch,
                         const parser::AcpRecord& record,
                         std::string& out_error) {
+    // `library_primary` is set BEFORE the first write, not by the callers after the
+    // last one. This function performs TWO writes for a relationship target -- the
+    // ACP tags, then the meta-claims -- and a failure between them leaves the
+    // document changed. The bus deliberately does not rebuild the live models on its
+    // failure path (that would free containers the canvas is still rendering from
+    // this frame); the caller re-derives them at the next frame boundary, but only
+    // when this flag says the flip engaged. Set afterwards, a half-written ACP would
+    // leave the UI rendering a model the document no longer matches.
+    //
+    // Safe for every caller: each treats a failure here as terminal and returns,
+    // rather than falling back to the bridge, so the flag can never be set with the
+    // bridge about to run as well. A caller that writes something of its own BEFORE
+    // this (the confidence-tree command creates a package first) sets it earlier
+    // still, for the same reason.
+    ctx.library_primary = true;
     const sacm_adapter::EditOutcome tagged =
         sacm_adapter::apply_upsert_acp_tags(*ctx.library_document, record.target_id, ToTagFields(record));
     if (!tagged.supported || !tagged.applied) {
@@ -157,7 +172,6 @@ bool AddAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std
         }
         if (!WriteAcpToDocument(ctx, scratch, *record, out_error))
             return false;
-        ctx.library_primary = true;
         applied_to_library = true;
     }
     if (!applied_to_library) {
@@ -295,7 +309,6 @@ bool UpsertAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, 
         }
         if (!WriteAcpToDocument(ctx, scratch, *record, out_error))
             return false;
-        ctx.library_primary = true;
         applied_to_library = true;
     }
     if (!applied_to_library) {
@@ -349,6 +362,12 @@ bool CreateConfidenceArgumentTreeForAcpCommand::Apply(CommandContext& ctx,
         // Create the package and its goal, then point the ACP at them. In that
         // order: an ACP naming a package that does not exist yet is a dangling
         // reference for as long as the two writes are apart.
+        //
+        // Which is why `library_primary` is claimed here rather than left to
+        // `WriteAcpToDocument` below: that intermediate state is exactly what a
+        // failure of the second write leaves behind, and the re-derive on the bus's
+        // failure path only happens when this flag is set.
+        ctx.library_primary = true;
         const sacm_adapter::AcpOutcome created =
             sacm_adapter::apply_create_confidence_argument_package(*ctx.library_document,
                                                                    result.argument_package_id,
@@ -362,7 +381,6 @@ bool CreateConfidenceArgumentTreeForAcpCommand::Apply(CommandContext& ctx,
         }
         if (!WriteAcpToDocument(ctx, scratch, *record, out_error))
             return false;
-        ctx.library_primary = true;
         applied_to_library = true;
     }
     if (!applied_to_library) {

@@ -178,9 +178,24 @@ bool MoveSubtreeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event
 
         if (!plan.created.empty())
             planned_relationship_id = plan.created.front().id;
+        // Set BEFORE the first write, not after the last one. A plan is several
+        // writes, and a failure between them leaves the document changed. The bus
+        // does not rebuild the live models on its failure path -- that would free
+        // containers the canvas is still rendering from this frame -- so the caller
+        // re-derives them at the next frame boundary, and only when `library_primary`
+        // says the flip engaged (see the failure path in `CommandBus::Execute`). Set
+        // afterwards, a part-applied move would leave the UI rendering a model the
+        // document no longer matches.
+        //
+        // Safe here precisely because the fallback decision is already made: the two
+        // shapes that bridge were reported by the plan above and returned early. A
+        // command that could still fall back must NOT claim the flip -- the bridge
+        // would then run with the flag already set. If the very first write fails
+        // nothing was mutated, and the flag costs one redundant re-derive from an
+        // unchanged document.
+        ctx.library_primary = true;
         if (!ApplyMoveSubtreePlanToLibrary(*ctx.library_document, plan, out_error))
             return false;
-        ctx.library_primary = true;
         applied_to_library = true;
     }
     if (!applied_to_library && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
