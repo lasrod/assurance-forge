@@ -1480,12 +1480,12 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // the delete seam is no use; `apply_set_relationship_ends` rewrites the
         // endpoints, or the relationship goes when scrubbing empties it.
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        // Model only, as above.
         parser::AssuranceCase model = sacm_adapter::project_case(document);
-        sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
         bool removed_relationship = false;
         std::string drop_error;
         if (!core::DropRelationshipReference(
-                model, &package, relationship_id, reference, removed_relationship, drop_error)) {
+                model, nullptr, relationship_id, reference, removed_relationship, drop_error)) {
             out_error = "DropRelationshipReference failed at " + location + ": " + drop_error;
             return false;
         }
@@ -1526,10 +1526,11 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // Phase 3b: the same scratch-then-seam route the live command takes, so
         // the move and its own replay are one code path.
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+        // Model only: nothing below reads a legacy package, and projecting one per
+        // event is the expensive half of this branch.
         parser::AssuranceCase model = sacm_adapter::project_case(document);
-        sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
         std::string move_error;
-        if (!core::MoveStrategyToReasoning(model, &package, relationship_id, strategy_id, move_error)) {
+        if (!core::MoveStrategyToReasoning(model, nullptr, relationship_id, strategy_id, move_error)) {
             out_error = "MoveStrategyToReasoning failed at " + location + ": " + move_error;
             return false;
         }

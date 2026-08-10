@@ -793,12 +793,18 @@ namespace {
 // which ROUTE the command took, not what it edited.
 core::commands::CommandResult
 RunOnBus(ProjectFixture& fixture, core::AppState& state, core::commands::ICommand& command, bool& out_library_primary) {
+    // Written before anything can fail: a caller that reads it after an aborted
+    // run would otherwise be told the flip engaged when nothing ran at all.
+    out_library_primary = false;
     std::string error;
     std::unique_ptr<core::commands::CommandBus> bus =
         core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
-    EXPECT_TRUE(bus) << error;
-    if (!bus)
+    if (!bus) {
+        // Hard failure rather than EXPECT: every assertion after this one would
+        // fail as well, and the noise buries the one line that says why.
+        ADD_FAILURE() << "could not open a command bus over the fixture: " << error;
         return core::commands::CommandResult{};
+    }
     core::commands::CommandContext ctx{
         state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");

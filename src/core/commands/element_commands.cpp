@@ -560,10 +560,11 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
     // place, so nothing outside this relationship is touched.
     bool applied_to_library = false;
     if (CanApplyLibraryPrimary(ctx)) {
+        // Model only, for the reason given on the strategy move below: the
+        // package copy this used to make was never read.
         parser::AssuranceCase scratch_model = ctx.model;
-        sacm::AssuranceCasePackage scratch_package = ctx.package;
         if (!core::DropRelationshipReference(
-                scratch_model, &scratch_package, relationship_id_, reference_, removed_relationship_, out_error))
+                scratch_model, nullptr, relationship_id_, reference_, removed_relationship_, out_error))
             return false;
 
         if (removed_relationship_) {
@@ -632,9 +633,12 @@ bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx, audit::AuditEven
     // recorded in docs/sacm/sacm-gsn-mapping.md is the only one in play.
     bool applied_to_library = false;
     if (CanApplyLibraryPrimary(ctx)) {
+        // Model only. The mutator syncs a legacy package when given one, and
+        // nothing here reads it -- the endpoints come off `scratch_model` below --
+        // so passing nullptr skips a deep copy of the whole package and the sync
+        // loop inside the mutator.
         parser::AssuranceCase scratch_model = ctx.model;
-        sacm::AssuranceCasePackage scratch_package = ctx.package;
-        if (!core::MoveStrategyToReasoning(scratch_model, &scratch_package, relationship_id_, strategy_id_, out_error))
+        if (!core::MoveStrategyToReasoning(scratch_model, nullptr, relationship_id_, strategy_id_, out_error))
             return false;
         const parser::SacmElement* moved = parser::FindElementById(scratch_model, relationship_id_);
         if (moved == nullptr) {
@@ -644,7 +648,10 @@ bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx, audit::AuditEven
         const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
             *ctx.library_document, relationship_id_, moved->source_refs, moved->target_refs, moved->reasoning_ref);
         if (ends.supported && !ends.applied) {
-            out_error = LibraryRejection("the reasoning of " + relationship_id_, ends.diagnostics);
+            // "the endpoints", not "the reasoning": the seam rewrites source,
+            // target and reasoning together, so it can also refuse for a
+            // multiplicity reason that has nothing to do with the reasoning slot.
+            out_error = LibraryRejection("the endpoints of " + relationship_id_, ends.diagnostics);
             return false;
         }
         if (ends.applied) {
