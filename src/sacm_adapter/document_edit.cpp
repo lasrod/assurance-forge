@@ -1973,4 +1973,194 @@ TerminologyContextOutcome apply_add_terminology_visible_context(LibraryDocument&
     return outcome;
 }
 
+namespace {
+
+// Every tag key belonging to one ACP: the marker (whose VALUE is the id) and the
+// `assuranceForge.acp.<id>.` field family. Mirrors core::acp::IsAcpTagForId.
+bool is_acp_tag_for(const sacm::model::TaggedValue& tag, const std::string& acp_id) {
+    const std::string key = tag.key().primary();
+    if (key == core::kAcpMarkerTagKey) {
+        return tag.content().primary() == acp_id;
+    }
+    return key.rfind(std::string(core::kAcpFieldTagPrefix) + acp_id + ".", 0) == 0;
+}
+
+// Ids of the tags on `element` belonging to `acp_id`, captured before any delete
+// (the list being iterated is about to be mutated).
+std::vector<sacm::model::ElementId> acp_tag_ids(const sacm::model::ModelElement& element, const std::string& acp_id) {
+    std::vector<sacm::model::ElementId> ids;
+    for (const auto& tag : element.tagged_values()) {
+        if (is_acp_tag_for(*tag, acp_id)) {
+            ids.push_back(tag->id());
+        }
+    }
+    return ids;
+}
+
+EditOutcome acp_tag_target_error(const std::string& element_id) {
+    EditOutcome outcome;
+    outcome.diagnostics.push_back(LoadDiagnostic{
+        .code = "SACM-CMD-002",
+        .severity = "error",
+        .message = "'" + element_id + "' is not an element that can carry an Assurance Claim Point",
+    });
+    return outcome;
+}
+
+} // namespace
+
+EditOutcome
+apply_upsert_acp_tags(LibraryDocument& document, const std::string& element_id, const AcpTagFields& fields) {
+    if (element_id.empty() || fields.id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId element(element_id);
+    const auto* model_element = doc.find_as<sacm::model::ModelElement>(element);
+    if (model_element == nullptr) {
+        return acp_tag_target_error(element_id);
+    }
+
+    // The set to write, in the order core::acp::UpsertAcpTags writes it and with
+    // the same omissions -- an empty optional field produces no tag at all, so
+    // the projection reads back exactly what the legacy path would have left.
+    std::vector<std::pair<std::string, std::string>> tags;
+    tags.emplace_back(core::kAcpMarkerTagKey, fields.id);
+    const std::string field_prefix = std::string(core::kAcpFieldTagPrefix) + fields.id;
+    if (!fields.name.empty()) {
+        tags.emplace_back(field_prefix + ".name", fields.name);
+    }
+    tags.emplace_back(field_prefix + ".resolutionKind", fields.resolution_kind);
+    if (!fields.text.empty()) {
+        tags.emplace_back(field_prefix + ".text", fields.text);
+    }
+    if (fields.resolution_kind == "text") {
+        if (!fields.confidence_claim_id.empty()) {
+            tags.emplace_back(field_prefix + ".confidenceClaimId", fields.confidence_claim_id);
+        }
+    } else if (fields.resolution_kind == "topGoalReference") {
+        tags.emplace_back(field_prefix + ".argumentPackageId", fields.argument_package_id);
+        tags.emplace_back(field_prefix + ".topGoalId", fields.top_goal_id);
+    }
+
+    for (const sacm::model::ElementId& id : acp_tag_ids(*model_element, fields.id)) {
+        const sacm::commands::MutationResult removed = doc.apply(sacm::commands::DeleteElement{.target = id});
+        if (!removed.applied) {
+            return applied_outcome(removed);
+        }
+    }
+    EditOutcome outcome;
+    outcome.applied = true;
+    for (const auto& [key, value] : tags) {
+        const sacm::commands::MutationResult added =
+            doc.apply(sacm::commands::AddTaggedValue{.element = element, .key = key, .value = value});
+        fill_diagnostics(outcome.diagnostics, added);
+        if (!added.applied) {
+            outcome.applied = false;
+            return outcome;
+        }
+    }
+    return outcome;
+}
+
+EditOutcome apply_remove_acp_tags(LibraryDocument& document, const std::string& element_id, const std::string& acp_id) {
+    if (element_id.empty() || acp_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const auto* model_element = doc.find_as<sacm::model::ModelElement>(sacm::model::ElementId(element_id));
+    if (model_element == nullptr) {
+        return acp_tag_target_error(element_id);
+    }
+    EditOutcome outcome;
+    for (const sacm::model::ElementId& id : acp_tag_ids(*model_element, acp_id)) {
+        const sacm::commands::MutationResult removed = doc.apply(sacm::commands::DeleteElement{.target = id});
+        fill_diagnostics(outcome.diagnostics, removed);
+        if (!removed.applied) {
+            outcome.applied = false;
+            return outcome;
+        }
+        outcome.applied = true;
+    }
+    return outcome;
+}
+
+EditOutcome apply_set_meta_claims(LibraryDocument& document,
+                                  const std::string& element_id,
+                                  const std::vector<std::string>& meta_claim_ids) {
+    if (element_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    std::vector<sacm::model::ElementId> ids;
+    ids.reserve(meta_claim_ids.size());
+    for (const std::string& id : meta_claim_ids) {
+        ids.emplace_back(id);
+    }
+    return applied_outcome(doc.apply(
+        sacm::commands::SetMetaClaims{.element = sacm::model::ElementId(element_id), .meta_claims = std::move(ids)}));
+}
+
+AcpOutcome apply_create_confidence_argument_package(LibraryDocument& document,
+                                                    const std::string& package_id,
+                                                    const std::string& package_name,
+                                                    const std::string& top_goal_id,
+                                                    const std::string& top_goal_name,
+                                                    const std::string& top_goal_content) {
+    if (package_id.empty() || top_goal_id.empty()) {
+        return AcpOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::AssuranceCasePackage* root = root_case_package(doc);
+    if (root == nullptr) {
+        return AcpOutcome{.supported = false};
+    }
+
+    const auto failed = [](const sacm::commands::MutationResult& result) {
+        AcpOutcome outcome;
+        fill_diagnostics(outcome.diagnostics, result);
+        return outcome;
+    };
+
+    const sacm::commands::MutationResult created_package = doc.apply(sacm::commands::CreateArgumentPackage{
+        .parent = root->id(), .id = sacm::model::ElementId(package_id), .name = package_name});
+    if (!created_package.applied) {
+        return failed(created_package);
+    }
+    const sacm::model::ElementId package(package_id);
+    // The purpose tag is what makes this a CONFIDENCE package; without it the
+    // tree is indistinguishable from an ordinary argument package.
+    const sacm::commands::MutationResult purpose =
+        doc.apply(sacm::commands::AddTaggedValue{.element = package,
+                                                 .key = core::kArgumentPackagePurposeTagKey,
+                                                 .value = core::kArgumentPackagePurposeConfidence});
+    if (!purpose.applied) {
+        rollback_element(doc, package);
+        return failed(purpose);
+    }
+
+    const sacm::commands::MutationResult created_goal = doc.apply(sacm::commands::CreateClaim{
+        .parent = package, .id = sacm::model::ElementId(top_goal_id), .name = top_goal_name});
+    if (!created_goal.applied) {
+        rollback_element(doc, package);
+        return failed(created_goal);
+    }
+    const sacm::model::ElementId goal(top_goal_id);
+    if (!top_goal_content.empty()) {
+        const sacm::commands::MutationResult described = set_terminology_description(doc, goal, top_goal_content);
+        if (!described.applied) {
+            rollback_element(doc, package);
+            return failed(described);
+        }
+    }
+    if (const sacm::commands::MutationResult tagged = add_gsn_identifier_tag(doc, goal); !tagged.applied) {
+        rollback_element(doc, package);
+        return failed(tagged);
+    }
+
+    AcpOutcome outcome;
+    outcome.applied = true;
+    return outcome;
+}
+
 } // namespace sacm_adapter

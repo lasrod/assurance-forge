@@ -1,5 +1,7 @@
 #include "core/acp/assurance_claim_point.h"
 
+#include "core/sacm_model.h"
+
 #include <algorithm>
 #include <cctype>
 #include <unordered_set>
@@ -7,16 +9,18 @@
 namespace core::acp {
 namespace {
 
-constexpr const char* kAcpMarkerKey = "assuranceForge.acp";
-constexpr const char* kAcpFieldPrefix = "assuranceForge.acp.";
+// The key vocabulary is shared with the library seam (core/sacm_model.h): the
+// seam must write exactly what this file's readers look for.
+constexpr const char* kAcpMarkerKey = core::kAcpMarkerTagKey;
+constexpr const char* kAcpFieldPrefix = core::kAcpFieldTagPrefix;
 constexpr const char* kNameField = ".name";
 constexpr const char* kResolutionKindField = ".resolutionKind";
 constexpr const char* kTextField = ".text";
 constexpr const char* kConfidenceClaimIdField = ".confidenceClaimId";
 constexpr const char* kArgumentPackageIdField = ".argumentPackageId";
 constexpr const char* kTopGoalIdField = ".topGoalId";
-constexpr const char* kPackagePurposeKey = "assuranceForge.argumentPackage.purpose";
-constexpr const char* kPackagePurposeConfidence = "confidence";
+constexpr const char* kPackagePurposeKey = core::kArgumentPackagePurposeTagKey;
+constexpr const char* kPackagePurposeConfidence = core::kArgumentPackagePurposeConfidence;
 
 std::string ToLower(std::string value) {
     std::transform(

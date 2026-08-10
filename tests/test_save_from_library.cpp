@@ -21,6 +21,7 @@
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/acp_commands.h"
 #include "core/commands/gid_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/terminology_commands.h"
@@ -1569,4 +1570,77 @@ TEST(SaveFromLibrary, SACM23_INT_001_LoadSurfacesNonConformanceWarningToTheUser)
         std::none_of(ordinary.load_warnings.begin(), ordinary.load_warnings.end(), [](const std::string& warning) {
             return warning.find("SACM-XMI-009") != std::string::npos;
         }));
+}
+
+// Slice 2c: the four ACP commands. Same routing proof -- a bridged edit is
+// refused on this fixture, so success means the seams ran.
+//
+// An ACP is a set of vendor TaggedValues, and a relationship ACP additionally
+// holds a clause-11.6 metaClaim, so this also checks the tags survive in the
+// saved bytes rather than only that the command reported success.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedAcpCommandsRunOnACaseTheBridgeRefuses) {
+    constexpr const char* kNestedVendorSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample" acme:owner="alice">
+  <acme:vendorMetadata reviewCycle="Q3-2026"/>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <artifactReference id="Sn1" name="Test report"/>
+    <assertedEvidence id="E1" source="Sn1" target="G1"/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase2c-routing", kNestedVendorSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "AP_nested"))
+        << "fixture carries no nested package, so a bridged edit would pass too";
+
+    const auto run = [&](core::commands::ICommand& command, const char* what) {
+        bool library_primary = false;
+        const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+        EXPECT_TRUE(result.success) << what
+                                    << " was refused, so it is still going through the bridge: " << result.error;
+        EXPECT_TRUE(library_primary) << what << " did not reach the library at all";
+        const std::string autosaved = ReadFile(fixture.sacm_absolute);
+        EXPECT_TRUE(Contains(autosaved, "AP_nested")) << what << " deleted the nested package";
+        EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << what << " dropped the vendor attribute";
+    };
+
+    core::commands::AddAcpCommand add("element", "Sn1");
+    run(add, "AddAcp");
+    const std::string acp_id = add.GeneratedAcpId();
+    ASSERT_FALSE(acp_id.empty());
+    EXPECT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "assuranceForge.acp"))
+        << "the ACP tags are not in the saved file";
+
+    parser::AcpRecord edited;
+    edited.id = acp_id;
+    edited.name = "Confidence in the test report";
+    edited.target_kind = "element";
+    edited.target_id = "Sn1";
+    edited.resolution_kind = "none";
+    core::commands::UpsertAcpCommand upsert(edited);
+    run(upsert, "UpsertAcp");
+    EXPECT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "Confidence in the test report"))
+        << "the edited ACP name is not in the saved file";
+
+    core::commands::CreateConfidenceArgumentTreeForAcpCommand create_tree(acp_id);
+    run(create_tree, "CreateConfidenceArgumentTree");
+    const std::string with_tree = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(with_tree, "assuranceForge.argumentPackage.purpose"))
+        << "the confidence package carries no purpose tag, so it is an ordinary package:\n"
+        << with_tree;
+    EXPECT_TRUE(Contains(with_tree, create_tree.GeneratedTopGoalId())) << "the confidence top goal is not in the file";
+
+    core::commands::RemoveAcpCommand remove(acp_id);
+    run(remove, "RemoveAcp");
+    EXPECT_FALSE(Contains(ReadFile(fixture.sacm_absolute), "assuranceForge.acp"))
+        << "the ACP tags survived the removal";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
 }

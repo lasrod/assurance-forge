@@ -19,6 +19,20 @@ namespace core {
 // vendor TaggedValue while keeping all graph references on the SACM id.
 inline constexpr char kGsnIdentifierTagKey[] = "assuranceForge.gsn.identifier";
 
+// Assurance Claim Points are a GSN v3 concept SACM 2.3 has no class for, so an
+// ACP is stored as a set of vendor TaggedValues on the element or relationship it
+// annotates: a marker tag whose value is the ACP id, plus one
+// `assuranceForge.acp.<id>.<field>` tag per populated field. A confidence
+// argument tree is an ordinary ArgumentPackage wearing a purpose tag.
+//
+// They live here rather than inside `core::acp` because the library seam has to
+// write exactly the keys the projection reads, and two copies of a key string is
+// how a projection quietly stops seeing what an editor writes.
+inline constexpr char kAcpMarkerTagKey[] = "assuranceForge.acp";
+inline constexpr char kAcpFieldTagPrefix[] = "assuranceForge.acp.";
+inline constexpr char kArgumentPackagePurposeTagKey[] = "assuranceForge.argumentPackage.purpose";
+inline constexpr char kArgumentPackagePurposeConfidence[] = "confidence";
+
 // Represents a SACM element (claim, strategy, evidence, etc.)
 struct SacmElement {
     std::string id;
