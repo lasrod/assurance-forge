@@ -153,6 +153,156 @@ bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document,
     return core::commands::BridgeLegacyMutationToLibrary(document, mutate, out_error, location);
 }
 
+// Slice 2c: the ACP replay path. Like BridgeViaLegacy it projects the document
+// and runs the SAME `core::acp` mutator the live command runs -- those rules
+// about resolution kinds and meta-claims live in one place and are not worth a
+// second copy. UNLIKE it, the projection is read and thrown away: the result is
+// written back through the seams as targeted tag and meta-claim edits, so the
+// document is never rebuilt from the projection and nothing outside the ACP is
+// touched. Mirrors `core::commands`' ACP flip exactly, which is the point -- a
+// live edit and its own replay must be the same code path.
+using AcpReplayMutator = std::function<core::acp::AcpEditResult(parser::AssuranceCase&, sacm::AssuranceCasePackage&)>;
+
+std::vector<std::string> ReplayMetaClaimsOf(const sacm::AssuranceCasePackage& package,
+                                            const std::string& relationship_id) {
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::AssertedInference& r : argument_package.assertedInferences)
+            if (r.id == relationship_id)
+                return r.metaClaims;
+        for (const sacm::AssertedContext& r : argument_package.assertedContexts)
+            if (r.id == relationship_id)
+                return r.metaClaims;
+        for (const sacm::AssertedEvidence& r : argument_package.assertedEvidences)
+            if (r.id == relationship_id)
+                return r.metaClaims;
+    }
+    return {};
+}
+
+sacm_adapter::AcpTagFields ReplayTagFields(const parser::AcpRecord& acp) {
+    sacm_adapter::AcpTagFields fields;
+    fields.id = acp.id;
+    fields.name = acp.name;
+    fields.resolution_kind = acp.resolution_kind;
+    fields.text = acp.text;
+    fields.confidence_claim_id = acp.confidence_claim_id;
+    fields.argument_package_id = acp.argument_package_id;
+    fields.top_goal_id = acp.top_goal_id;
+    return fields;
+}
+
+// Runs `mutate` on a scratch projection and mirrors the resulting ACP onto the
+// document. `expect_removed` inverts it: the ACP is expected to be gone, so its
+// tags are dropped and a relationship target's meta-claims rewritten.
+bool ApplyAcpViaSeams(sacm_adapter::LibraryDocument& document,
+                      const std::string& location,
+                      const std::string& acp_id,
+                      bool expect_removed,
+                      const AcpReplayMutator& mutate,
+                      std::string& out_error) {
+    parser::AssuranceCase model = sacm_adapter::project_case(document);
+    sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
+
+    const parser::AcpRecord* before = core::acp::FindAcp(model, acp_id);
+    const std::string previous_target = before != nullptr ? before->target_id : std::string{};
+    const bool previous_was_relationship = before != nullptr && before->target_kind == "relationship";
+
+    const core::acp::AcpEditResult result = mutate(model, package);
+    if (!result.error.empty()) {
+        out_error = "ACP replay failed at " + location + ": " + result.error;
+        return false;
+    }
+    if (!result.changed) {
+        out_error = "ACP replay applied nothing at " + location;
+        return false;
+    }
+
+    const auto rejected = [&](const char* what, const std::vector<sacm_adapter::LoadDiagnostic>& diagnostics) {
+        out_error = std::string("ACP replay could not write ") + what + " at " + location + ": " +
+                    SummarizeDiagnostics(diagnostics);
+    };
+
+    if (expect_removed) {
+        if (!previous_target.empty()) {
+            const sacm_adapter::EditOutcome removed =
+                sacm_adapter::apply_remove_acp_tags(document, previous_target, acp_id);
+            if (removed.supported && !removed.applied && !removed.diagnostics.empty()) {
+                rejected("the ACP removal", removed.diagnostics);
+                return false;
+            }
+            if (previous_was_relationship) {
+                const sacm_adapter::EditOutcome meta = sacm_adapter::apply_set_meta_claims(
+                    document, previous_target, ReplayMetaClaimsOf(package, previous_target));
+                if (!meta.supported || !meta.applied) {
+                    rejected("the meta-claims", meta.diagnostics);
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    const parser::AcpRecord* after = core::acp::FindAcp(model, acp_id);
+    if (after == nullptr) {
+        out_error = "ACP replay lost the ACP at " + location;
+        return false;
+    }
+
+    // A confidence tree materializes a package and a goal before the ACP can
+    // point at them.
+    if (!result.argument_package_id.empty() && !result.top_goal_id.empty()) {
+        const parser::SacmElement* goal = nullptr;
+        for (const parser::SacmElement& element : model.elements) {
+            if (element.id == result.top_goal_id)
+                goal = &element;
+        }
+        if (goal == nullptr) {
+            out_error = "ACP replay lost the confidence top goal at " + location;
+            return false;
+        }
+        const sacm_adapter::AcpOutcome created = sacm_adapter::apply_create_confidence_argument_package(
+            document, result.argument_package_id, goal->name, result.top_goal_id, goal->name, goal->content);
+        if (!created.supported || !created.applied) {
+            rejected("the confidence argument tree", created.diagnostics);
+            return false;
+        }
+    }
+
+    // Re-pointed at a different target: clear the one it left.
+    if (!previous_target.empty() && previous_target != after->target_id) {
+        const sacm_adapter::EditOutcome cleared =
+            sacm_adapter::apply_remove_acp_tags(document, previous_target, acp_id);
+        if (cleared.supported && !cleared.applied && !cleared.diagnostics.empty()) {
+            rejected("the ACP move", cleared.diagnostics);
+            return false;
+        }
+        if (previous_was_relationship) {
+            const sacm_adapter::EditOutcome meta = sacm_adapter::apply_set_meta_claims(
+                document, previous_target, ReplayMetaClaimsOf(package, previous_target));
+            if (!meta.supported || !meta.applied) {
+                rejected("the meta-claims", meta.diagnostics);
+                return false;
+            }
+        }
+    }
+
+    const sacm_adapter::EditOutcome tagged =
+        sacm_adapter::apply_upsert_acp_tags(document, after->target_id, ReplayTagFields(*after));
+    if (!tagged.supported || !tagged.applied) {
+        rejected("the ACP tags", tagged.diagnostics);
+        return false;
+    }
+    if (after->target_kind == "relationship") {
+        const sacm_adapter::EditOutcome meta = sacm_adapter::apply_set_meta_claims(
+            document, after->target_id, ReplayMetaClaimsOf(package, after->target_id));
+        if (!meta.supported || !meta.applied) {
+            rejected("the meta-claims", meta.diagnostics);
+            return false;
+        }
+    }
+    return true;
+}
+
 bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& event, std::string& out_error) {
     const std::string& type = event.event_type;
     const auto& payload = event.payload;
@@ -1855,17 +2005,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("generated_acp_id", generated_acp_id))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::acp::AcpEditResult result =
-                core::acp::AddAcpWithId(model, &package, target_kind, target_id, generated_acp_id);
-            if (!result.error.empty()) {
-                err = "AddAcpWithId (bridge) failed at " + location + ": " + result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        return ApplyAcpViaSeams(
+            document,
+            location,
+            generated_acp_id,
+            /*expect_removed=*/false,
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
+                return core::acp::AddAcpWithId(model, &package, target_kind, target_id, generated_acp_id);
+            },
+            out_error);
     }
 
     if (type == "RemoveAcp") {
@@ -1873,16 +2021,15 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("acp_id", acp_id))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::acp::AcpEditResult result = core::acp::RemoveAcp(model, &package, acp_id);
-            if (!result.error.empty()) {
-                err = "RemoveAcp (bridge) failed at " + location + ": " + result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        return ApplyAcpViaSeams(
+            document,
+            location,
+            acp_id,
+            /*expect_removed=*/true,
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
+                return core::acp::RemoveAcp(model, &package, acp_id);
+            },
+            out_error);
     }
 
     if (type == "UpsertAcp") {
@@ -1894,21 +2041,20 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         parser::AcpRecord record;
         std::string parse_error;
         if (!commands::DeserializeAcpRecord(*acp_it, record, parse_error)) {
-            out_error = "Failed to deserialize ACP record at " + FormatLocation(tx_seq, event.event_sequence, type) +
-                        ": " + parse_error;
+            out_error =
+                "Invalid ACP record at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + parse_error;
             return false;
         }
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::acp::AcpEditResult result = core::acp::UpsertAcp(model, &package, record);
-            if (!result.error.empty()) {
-                err = "UpsertAcp (bridge) failed at " + location + ": " + result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        return ApplyAcpViaSeams(
+            document,
+            location,
+            record.id,
+            /*expect_removed=*/false,
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
+                return core::acp::UpsertAcp(model, &package, record);
+            },
+            out_error);
     }
 
     if (type == "CreateConfidenceArgumentTree") {
@@ -1920,17 +2066,16 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("top_goal_id", top_goal_id))
             return false;
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::acp::AcpEditResult result = core::acp::CreateConfidenceArgumentTreeForAcpWithIds(
-                model, &package, acp_id, argument_package_id, top_goal_id);
-            if (!result.error.empty()) {
-                err = "CreateConfidenceArgumentTreeForAcpWithIds (bridge) failed at " + location + ": " + result.error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        return ApplyAcpViaSeams(
+            document,
+            location,
+            acp_id,
+            /*expect_removed=*/false,
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package) {
+                return core::acp::CreateConfidenceArgumentTreeForAcpWithIds(
+                    model, &package, acp_id, argument_package_id, top_goal_id);
+            },
+            out_error);
     }
 
     if (type == "Undo" || type == "SacmRestoredFromAudit") {

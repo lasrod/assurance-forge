@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 10 commands have no native seam yet (26 before phase 1, 15 before 2a, 12 before 2b) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 6 commands have no native seam yet (26 before phase 1, 15 before 2a, 12 before 2b, 10 before 2c) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -77,6 +77,7 @@ default `true`, assigned nowhere under `src/app/`).
 | SetElementGid | `apply_set_gid` | [`gid_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/gid_commands.cpp) `EnsureElementGidCommand::Apply` (slice 2a) |
 | UpdateGsnIdentifier | `apply_set_gsn_identifier` | `element_commands.cpp` `UpdateGsnIdentifierCommand::Apply` (slice 2b) |
 | SetElementUndeveloped | `apply_set_undeveloped` | `element_commands.cpp` `SetElementUndevelopedCommand::Apply` (slice 2b) |
+| AddAcp, RemoveAcp, UpsertAcp, CreateConfidenceArgumentTree | `apply_upsert_acp_tags`, `apply_remove_acp_tags`, `apply_set_meta_claims`, `apply_create_confidence_argument_package` | [`acp_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/acp_commands.cpp) (slice 2c) |
 
 Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
 seam does not support (and for a ref that carries only a gid, which the seams
@@ -89,8 +90,6 @@ is present.
   MoveStrategyToReasoning
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
 - Tree: ReorderSiblings, MoveSubtree ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
-- ACP: AddAcp, RemoveAcp, UpsertAcp, CreateConfidenceArgumentTree
-  ([`acp_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/acp_commands.cpp))
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
 - RemoveElement `NodeOnly` (reparent — the library has no retarget operation,
   see [GSN metamodel gaps](../sacm/sacm-gsn-metamodel-gaps.md)) and the
@@ -213,11 +212,9 @@ commands and refuse exactly what they refused before.
 
 ### Phase 2 — Seam the small remaining state edits
 
-Sliced, because these nine commands are not one size. **Slices 2a and 2b are
-done**: SetElementGid and the two remaining package removals, then
-UpdateGsnIdentifier and SetElementUndeveloped. Slice 2c is the four ACP commands, the largest, because
-`CreateConfidenceArgumentTree` is a compound operation that mints a package and a
-goal.
+Sliced, because these nine commands are not one size. **Phase 2 is done.** 2a:
+SetElementGid and the two remaining package removals. 2b: UpdateGsnIdentifier and
+SetElementUndeveloped. 2c: the four ACP commands.
 
 SetElementUndeveloped came with a live defect and a mapping decision; both are
 resolved below.
@@ -306,6 +303,28 @@ provided", and GSN reaches an Assumption or Justification by `InContextOf`, neve
 `SupportedBy`, so there is no support for them to be missing. The inspector now
 offers the control only where it can be honoured, and no gap report is warranted:
 no GSN v3 construct needs "assumed *and* undeveloped".
+
+*Slice 2c, as landed.* The ACP tranche needed a library change first: an ACP on
+a RELATIONSHIP is carried partly by SACM's own clause-11.6 `metaClaim`, and
+`AddMetaClaim` could attach one while nothing could detach it. `SetMetaClaims`
+(replace-the-list, mirroring `SetExpressionCategories`) closes that, and landed on
+its own because it is the reusable library's public API rather than Assurance
+Forge's.
+
+The flip uses a pattern worth naming, because it resembles the bridge and is not
+it. `core::acp` holds several hundred lines of rules — which targets are
+eligible, what each resolution kind writes, which meta-claim a relationship ACP
+implies — and a second copy beside the seams would drift. So each command runs the
+SAME `core::acp` mutator on a **scratch** projection to work out the result, then
+writes that result through the seams as targeted tag and meta-claim edits. The
+bridge projects, mutates, and then *rebuilds the live document by reloading the
+projection*, which is why it loses whatever the POD cannot carry; here the scratch
+is read and discarded, and nothing outside the ACP is touched. The replay branches
+use the same helper, so a live ACP edit and its own replay are one code path.
+
+The ACP tag vocabulary moved to `core/sacm_model.h` beside `kGsnIdentifierTagKey`:
+the seam has to write exactly the keys the projection reads, and two copies of a
+key string is how a projection quietly stops seeing what an editor writes.
 
 ### Phase 3 — The hard residue
 

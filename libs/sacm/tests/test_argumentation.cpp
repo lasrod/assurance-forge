@@ -28,6 +28,7 @@ using sacm::commands::DeleteElement;
 using sacm::commands::OperationPreview;
 using sacm::commands::ReferenceDeletePolicy;
 using sacm::commands::SetAssertionDeclaration;
+using sacm::commands::SetMetaClaims;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
 using sacm::io::Mode;
@@ -279,6 +280,75 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_CreatesRelationshipsWithCommands) {
     const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(reloaded.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+}
+
+// `AddMetaClaim` could attach a meta-claim (clause 11.6) and nothing could
+// detach one, so the association was one-way: a client retracting a meta-claim --
+// an Assurance Claim Point whose resolution changes or is deleted -- had no
+// operation for it. `SetMetaClaims` replaces the list, the way
+// `SetExpressionCategories` replaces an ExpressionElement's categories.
+//
+// Asserts all three directions (replace, extend, clear), that a non-Claim id is
+// rejected with the document unchanged, and that the result round-trips.
+TEST(Sacm23Argumentation, SACM23_ARG_001_SetsAndClearsMetaClaims) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(document
+                    .apply(CreateAssertedRelationship{
+                        .parent = ElementId{"argpkg_1"},
+                        .kind = ElementKind::AssertedInference,
+                        .id = ElementId{"inf_1"},
+                        .name = "Inference",
+                        .sources = {ElementId{"claim_sub"}},
+                        .targets = {ElementId{"claim_top"}},
+                    })
+                    .applied);
+    for (const char* id : {"claim_meta_a", "claim_meta_b"}) {
+        ASSERT_TRUE(
+            document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{id}, .name = "Meta"}).applied);
+    }
+    const auto meta_claims_of = [&document]() {
+        const auto* assertion = document.find_as<sacm::model::Assertion>(ElementId{"inf_1"});
+        std::vector<std::string> ids;
+        for (const ElementId& id : assertion->meta_claims())
+            ids.push_back(id.value());
+        return ids;
+    };
+
+    ASSERT_TRUE(
+        document.apply(AddMetaClaim{.element = ElementId{"inf_1"}, .meta_claim = ElementId{"claim_meta_a"}}).applied);
+    EXPECT_EQ(meta_claims_of(), (std::vector<std::string>{"claim_meta_a"}));
+
+    // Replace: the one that was there goes, the new one arrives. This is the
+    // direction that had no operation at all.
+    ASSERT_TRUE(document.apply(SetMetaClaims{.element = ElementId{"inf_1"}, .meta_claims = {ElementId{"claim_meta_b"}}})
+                    .applied);
+    EXPECT_EQ(meta_claims_of(), (std::vector<std::string>{"claim_meta_b"}));
+
+    // Extend, preserving order.
+    ASSERT_TRUE(document
+                    .apply(SetMetaClaims{.element = ElementId{"inf_1"},
+                                         .meta_claims = {ElementId{"claim_meta_b"}, ElementId{"claim_meta_a"}}})
+                    .applied);
+    EXPECT_EQ(meta_claims_of(), (std::vector<std::string>{"claim_meta_b", "claim_meta_a"}));
+
+    // A target that is not a Claim is rejected, and rejection leaves the list
+    // alone rather than half-applied.
+    const auto rejected = document.apply(SetMetaClaims{
+        .element = ElementId{"inf_1"}, .meta_claims = {ElementId{"claim_meta_b"}, ElementId{"argpkg_1"}}});
+    EXPECT_FALSE(rejected.applied);
+    EXPECT_FALSE(rejected.diagnostics.empty());
+    EXPECT_EQ(meta_claims_of(), (std::vector<std::string>{"claim_meta_b", "claim_meta_a"}));
+
+    EXPECT_TRUE(sacm::validation::validate(document).empty());
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+
+    // Clear.
+    ASSERT_TRUE(document.apply(SetMetaClaims{.element = ElementId{"inf_1"}, .meta_claims = {}}).applied);
+    EXPECT_TRUE(meta_claims_of().empty());
 }
 
 // A strategy's inference is materialized with its first sub-goal as source, then

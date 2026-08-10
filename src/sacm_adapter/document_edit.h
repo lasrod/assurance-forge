@@ -185,6 +185,60 @@ struct AcpOutcome {
 AcpOutcome
 apply_add_acp(LibraryDocument& document, const std::string& target_id, const std::string& requested_acp_id = {});
 
+// One Assurance Claim Point, as the tag set it is stored as. Mirrors the fields
+// `core::acp::UpsertAcpTags` writes; empty fields are omitted exactly as it omits
+// them, so the projection reads back what it wrote.
+struct AcpTagFields {
+    std::string id;
+    std::string name;
+    std::string resolution_kind; // "none" | "text" | "topGoalReference"
+    std::string text;
+    std::string confidence_claim_id;
+    std::string argument_package_id;
+    std::string top_goal_id;
+};
+
+// Replace the tag set for `fields.id` on `element_id`, mirroring
+// `core::acp::UpsertAcpTags`: every `assuranceForge.acp` tag belonging to this
+// ACP is dropped, then the new set is written. An ACP is a vendor extension
+// (clause 8.12), not a SACM concept, so this is tags all the way down -- and
+// because the library has `AddTaggedValue` and no update operation, "replace" is
+// composed here the same way `apply_set_gsn_identifier` composes it.
+//
+// Knows nothing about which targets may carry an ACP. `core::acp`'s eligibility
+// rules are Assurance Forge's, not SACM's, and stay with the command.
+EditOutcome apply_upsert_acp_tags(LibraryDocument& document, const std::string& element_id, const AcpTagFields& fields);
+
+// Drop every tag belonging to `acp_id` from `element_id`, mirroring
+// `core::acp::RemoveAcpTags`. Reports `applied == false` with no diagnostics when
+// the element carries none -- nothing to do is not a failure.
+EditOutcome apply_remove_acp_tags(LibraryDocument& document, const std::string& element_id, const std::string& acp_id);
+
+// Replace an Assertion's clause-11.6 meta-claims. An ACP on a RELATIONSHIP is
+// carried partly by `metaClaim` and not only by vendor tags, so retracting or
+// re-resolving one has to rewrite this list; `SetMetaClaims` is the library
+// operation added for it. Every id must resolve to a Claim.
+EditOutcome apply_set_meta_claims(LibraryDocument& document,
+                                  const std::string& element_id,
+                                  const std::vector<std::string>& meta_claim_ids);
+
+// Create the ArgumentPackage and top goal a confidence argument tree consists
+// of, mirroring the compound half of
+// `core::acp::CreateConfidenceArgumentTreeForAcpWithIds`: a package carrying the
+// `assuranceForge.argumentPackage.purpose = confidence` tag, holding one Claim
+// with the given name and content. The caller then points the ACP at it with
+// `apply_upsert_acp_tags`.
+//
+// Both ids are supplied rather than generated -- they are the compound
+// operation's only non-deterministic outputs, and the audit payload records
+// them, so the command plans them with the same generators the legacy path used.
+AcpOutcome apply_create_confidence_argument_package(LibraryDocument& document,
+                                                    const std::string& package_id,
+                                                    const std::string& package_name,
+                                                    const std::string& top_goal_id,
+                                                    const std::string& top_goal_name,
+                                                    const std::string& top_goal_content);
+
 // Result of deleting an element.
 struct DeleteOutcome {
     bool supported = true;

@@ -684,6 +684,39 @@ void perform_add_meta_claim(model::Document& document, const AddMetaClaim& add) 
     Access::meta_claims(*assertion).push_back(add.meta_claim);
 }
 
+CheckOutcome check_set_meta_claims(const model::Document& document, const SetMetaClaims& set, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* assertion = document.find_as<model::Assertion>(set.element);
+    if (assertion == nullptr) {
+        outcome.diagnostics.push_back(make_error(validation::codes::kCmdTargetNotFound,
+                                                 "SACM23-ARG-001",
+                                                 op,
+                                                 {set.element},
+                                                 std::format("'{}' is not an Assertion", set.element.value())));
+        return outcome;
+    }
+    const auto is_claim = [](const SACMElement& element) { return element.kind() == model::ElementKind::Claim; };
+    for (const ElementId& meta_claim : set.meta_claims) {
+        if (!require_target(document, meta_claim, "metaClaim", is_claim, op, outcome)) {
+            outcome.effects.clear();
+            return outcome;
+        }
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = assertion->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "metaClaim",
+                                           .before = std::nullopt,
+                                           .after = std::nullopt});
+    return outcome;
+}
+
+void perform_set_meta_claims(model::Document& document, const SetMetaClaims& set) {
+    auto* assertion = const_cast<model::Assertion*>(document.find_as<model::Assertion>(set.element));
+    Access::meta_claims(*assertion) = set.meta_claims;
+}
+
 CheckOutcome
 check_add_relationship_source(const model::Document& document, const AddRelationshipSource& add, const Operation& op) {
     CheckOutcome outcome;
@@ -1848,6 +1881,8 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_description(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetDescriptionAt>) {
                 return check_set_description_at(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetMetaClaims>) {
+                return check_set_meta_claims(document, op, operation);
             } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
                 return check_add_tagged_value(document, op, operation);
             } else {
@@ -1883,6 +1918,8 @@ void perform(model::Document& document, const Operation& operation, const std::v
                 perform_set_assertion_declaration(document, op);
             } else if constexpr (std::is_same_v<T, AddMetaClaim>) {
                 perform_add_meta_claim(document, op);
+            } else if constexpr (std::is_same_v<T, SetMetaClaims>) {
+                perform_set_meta_claims(document, op);
             } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
                 perform_add_relationship_source(document, op);
             } else if constexpr (std::is_same_v<T, SetExpressionValue>) {
