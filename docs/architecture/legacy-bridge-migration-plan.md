@@ -367,16 +367,32 @@ key string is how a projection quietly stops seeing what an editor writes.
   re-decided: the command runs the same `core::MoveStrategyToReasoning` on a
   scratch projection and mirrors the endpoints it produced.
 
-- **RemoveElement `NodeOnly`** — attempted in slice 3b and backed out, with the
-  obstacle now narrower than "no operation exists". `SetRelationshipEnds` *can*
-  express the reparent's retarget; what it cannot do is tell the reparent apart
-  from the scrub that follows it. Diffing the fully-mutated projection picks up
-  both, and a context whose only target was the removed node then comes back with
-  an empty target list — a set the seam rightly refuses, and the replayed document
-  fails to reload. Exposing the reparent step on its own (the treatment
-  `ValidateGsnIdentifierChange` got in slice 2b) is what unblocks it, and that
-  also puts NodeOnly on the delete-preview seam, closing `SACM23-INT-002`'s
-  declared gap and giving `RemoveElement` one code path.
+- **RemoveElement `NodeOnly`** — attempted twice and backed out twice. Findings so
+  far, so a third attempt starts ahead rather than repeating them:
+
+    - `SetRelationshipEnds` **can** express the reparent's retarget. The obstacle
+      is not a missing operation.
+    - The reparent must be run **alone** to be mirrored. Diffing the model after
+      the whole of `core::RemoveElement` also picks up its scrub, and a context
+      whose only target was the removed node then comes back with an empty target
+      list — a set no relationship may hold. Exposing
+      `core::ReparentChildrenToParent` on its own (the treatment
+      `ValidateGsnIdentifierChange` got in slice 2b) fixes this, and with it the
+      LIVE path works: the removal applies, the node goes, and all four
+      unrepresentable kinds survive in the saved bytes.
+    - The **replay** path still produces a document that will not reload
+      (`VerifyProject`: "Failed to load replayed SACM through the library for
+      normalization"), on `argumentation-full-valid.sacm.xmi` but not on the
+      simple fixture `LibraryReplayConvergence.RemoveNodeOnlyInteriorReparents-`
+      `AndConverges` uses. Ruled out: deriving the replay model with
+      `RebuildDerivedViewsFromLibrary` instead of a bare `project_case` does not
+      fix it, so the divergence is not the render passes.
+    - Next step is instrumentation rather than inspection — replay that log
+      directly and read the load diagnostics — not another hypothesis.
+
+    Worth doing: it is the last blocker on `RemoveElement` having one code path,
+    and a native retarget also puts NodeOnly on the delete-preview seam, closing
+    `SACM23-INT-002`'s declared gap.
 
 - **ApplyProposal**: composes the native primitives once the rest exist.
 
