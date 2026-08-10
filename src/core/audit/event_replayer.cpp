@@ -1320,26 +1320,35 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         }
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::AssuranceTree tree = core::AssuranceTree::Build(model, "");
-            core::TreeDisplayOrder scratch_order;
-            std::string reorder_error;
-            // Non-empty `reorder_error` is a real failure; a false-with-empty is an
-            // idempotent no-op (mirrors the legacy replay branch).
-            if (!core::ReorderSiblings(model,
-                                       &package,
-                                       tree,
-                                       scratch_order,
-                                       core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
-                                       reorder_error) &&
-                !reorder_error.empty()) {
-                err = "ReorderSiblings (bridge) failed at " + location + ": " + reorder_error;
+
+        // Seam-mapped in the same change as the live command, which is not optional:
+        // the live path now applies natively on documents the bridge REFUSES, so a
+        // bridged replay of the same event would refuse what the live edit accepted
+        // and the log would stop replaying.
+        parser::AssuranceCase before = sacm_adapter::project_case(document);
+        parser::AssuranceCase after = before;
+        const core::AssuranceTree tree = core::AssuranceTree::Build(after, "");
+        core::TreeDisplayOrder replayed_order;
+        std::string reorder_error;
+        if (!core::ReorderSiblings(after,
+                                   nullptr,
+                                   tree,
+                                   replayed_order,
+                                   core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
+                                   reorder_error)) {
+            // False with an empty error is the mutator's no-op, not a failure --
+            // the same distinction the live command relies on.
+            if (!reorder_error.empty()) {
+                out_error = "ReorderSiblings failed at " + location + ": " + reorder_error;
                 return false;
             }
             return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        }
+        if (!commands::ApplySiblingReorderToLibrary(document, before, after, out_error)) {
+            out_error = "ReorderSiblings failed at " + location + ": " + out_error;
+            return false;
+        }
+        return true;
     }
 
     if (type == "MoveSubtree") {

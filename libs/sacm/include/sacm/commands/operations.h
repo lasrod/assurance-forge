@@ -158,6 +158,30 @@ struct AddMetaClaim {
 // first sub-goal is added, and this extends that inference's sources for each
 // later sub-goal. The source must be an ArgumentAsset (same typing as
 // CreateAssertedRelationship); adding one already present is rejected.
+// Reorder the elements an ArgumentPackage contains (clause 11.4 `argumentElement`,
+// which this library holds in document order -- see model::ArgumentPackage).
+//
+// `ordered` names a SUBSET of the package's elements. They are written back into
+// the positions those same elements occupy now, in the order given; every element
+// not named keeps its position. The set of occupied positions is therefore
+// unchanged, and so is the content of the package -- this operation moves nothing
+// in or out, and creates and deletes nothing.
+//
+// A subset rather than a full permutation because a client that reasons about a
+// projection of the package cannot see all of it: nested packages and groups are
+// contained elements too, and a client reordering the relationships of a package
+// should not have to enumerate them to do it.
+//
+// SACM does not attach meaning to the order of contained elements, and neither
+// does this operation: it changes serialization order only. It exists because
+// document order is the only thing an interchange file can carry a client's own
+// ordering in, and a client that must not lose one (a display order the user
+// arranged) would otherwise have to rewrite the file itself.
+struct ReorderPackageElements {
+    model::ElementId package;
+    std::vector<model::ElementId> ordered;
+};
+
 struct AddRelationshipSource {
     model::ElementId relationship;
     model::ElementId source;
@@ -309,6 +333,7 @@ using Operation = std::variant<CreateAssuranceCasePackage,
                                SetMetaClaims,
                                AddRelationshipSource,
                                SetRelationshipEnds,
+                               ReorderPackageElements,
                                SetExpressionValue,
                                SetTermExternalReference,
                                SetTermOrigin,

@@ -1063,6 +1063,26 @@ sacm::metadata::ElementKind to_element_kind(RelationshipKind kind) {
 
 } // namespace
 
+EditOutcome apply_reorder_package_elements(LibraryDocument& document,
+                                           const std::string& package_id,
+                                           const std::vector<std::string>& ordered_ids) {
+    if (package_id.empty() || ordered_ids.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    std::vector<sacm::model::ElementId> ordered;
+    ordered.reserve(ordered_ids.size());
+    for (const std::string& id : ordered_ids) {
+        if (!id.empty()) {
+            ordered.emplace_back(id);
+        }
+    }
+    return applied_outcome(doc.apply(sacm::commands::ReorderPackageElements{
+        .package = sacm::model::ElementId(package_id),
+        .ordered = std::move(ordered),
+    }));
+}
+
 EditOutcome apply_add_relationship(LibraryDocument& document,
                                    const std::string& relationship_id,
                                    RelationshipKind kind,

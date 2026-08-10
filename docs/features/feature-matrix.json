@@ -234,7 +234,7 @@
       "tests": [
         "tests/test_save_from_library.cpp"
       ],
-      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included. Both RemoveElement modes now apply through native seams instead, so the refusal no longer covers them. Attribute fidelity below element level is pinned per test, not swept."
+      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included. What it still covers is shrinking as #350 proceeds, so the accurate statement is which edits remain on that path rather than which have left: UpdateElementText, ApplyProposal, the seam-unsupported create fallbacks, and two SACM 11.13 multiplicity shapes a subtree move can produce. Everything else — including both RemoveElement modes, the subtree move and the sibling reorder — applies through native seams and now succeeds on cases that used to be refused. Attribute fidelity below element level is pinned per test, not swept."
     },
     {
       "id": "AF-STD-012",
