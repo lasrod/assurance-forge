@@ -508,6 +508,15 @@ void AppRuntime::RenderFrame(bool& done) {
         },
         [this](const std::string& element_id) { return IsTranslationReviewPending(element_id); },
         [this](const std::string& element_id) { AcceptTranslationReview(element_id); },
+        [this](const std::string& element_id, bool undeveloped) {
+            // Through the audited command, like every other model edit in this
+            // panel. The checkbox used to assign the projection's own field and
+            // sync it to the legacy package, which reached neither the library
+            // document nor the audit log -- so the decorator was gone at the next
+            // save. SetElementUndeveloped reports its own refusals.
+            if (SetElementUndeveloped(element_id, undeveloped))
+                impl_->events.Emit(TreeDirtyEvent{});
+        },
     };
     {
         core::perf::ScopedTimer s("app.area.inspector");

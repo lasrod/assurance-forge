@@ -432,12 +432,15 @@
       "status": "supported",
       "evidence": [
         "src/ui/gsn/gsn_model.h",
-        "src/ui/gsn/gsn_shapes.cpp"
+        "src/ui/gsn/gsn_shapes.cpp",
+        "src/ui/panels/element_panel.cpp",
+        "src/sacm_adapter/document_edit.cpp"
       ],
       "tests": [
-        "tests/test_assurance_tree.cpp"
+        "tests/test_assurance_tree.cpp",
+        "tests/test_library_primary_edit_flip.cpp"
       ],
-      "notes": ""
+      "notes": "Authoring is offered on Goals and Strategies. It is not offered on an Assumption or a Justification, and is refused if requested: SACM records the decorator in the same single `assertionDeclaration` that carries `assumed`/`axiomatic`, and GSN reaches those elements by `InContextOf` rather than `SupportedBy`, so they have no missing support to declare. Until this was fixed the inspector offered the toggle on every claim and reported success while the edit was discarded on reload, because the reader honours the legacy `undeveloped` attribute only when the declaration is still `asserted`. Reasoning and evidence: docs/sacm/sacm-gsn-mapping.md."
     },
     {
       "id": "AF-GSN-012",

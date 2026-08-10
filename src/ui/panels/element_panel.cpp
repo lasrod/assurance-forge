@@ -686,7 +686,16 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
 
     // Content (editable, for claims and argument reasonings)
     bool has_content = (elem->type == "claim" || elem->type == "argumentreasoning");
-    bool supports_undeveloped = has_content;
+    // The undeveloped decorator means "requires support that has not yet been
+    // provided". GSN reaches an Assumption or a Justification by `InContextOf`,
+    // never by `SupportedBy`, so there is no support for them to be missing --
+    // and SACM records the decorator in the same single `assertionDeclaration`
+    // that already says `assumed` or `axiomatic`, so the two cannot both be
+    // stored. The control used to be offered on every claim, and the edit then
+    // reported success and did nothing. Offer it only where it means something.
+    const bool declaration_is_free = elem->assertion_declaration.empty() || elem->assertion_declaration == "asserted" ||
+                                     elem->assertion_declaration == "needsSupport";
+    bool supports_undeveloped = has_content && declaration_is_free;
     if (has_content) {
         InspectorFieldLabel(AF_TR("Content"));
         {
@@ -715,8 +724,13 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
     if (supports_undeveloped) {
         bool undeveloped = elem->undeveloped;
         if (ImGui::Checkbox(AF_TR("Undeveloped").c_str(), &undeveloped)) {
-            elem->undeveloped = undeveloped;
-            modified = true;
+            // Dispatched, not written here. This panel edits a projection, so
+            // assigning `elem->undeveloped` and syncing to the legacy package --
+            // which is what this did -- reached neither the library document nor
+            // the audit log, and the decorator was gone at the next save. The
+            // runtime owns the write, and the projection refreshes from it.
+            if (text_edit_callbacks != nullptr && text_edit_callbacks->set_undeveloped)
+                text_edit_callbacks->set_undeveloped(elem->id, undeveloped);
         }
         ImGui::Spacing();
     }

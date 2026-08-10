@@ -45,6 +45,12 @@ struct InspectorAreaCallbacks {
     std::function<void(const std::string& element_id)> open_element_history;
     std::function<bool(const std::string& element_id)> is_translation_review_pending;
     std::function<void(const std::string& element_id)> accept_translation_review;
+    // Toggle the GSN undeveloped decorator through the audited command. Appended
+    // rather than placed next to `commit_element_text_edit` because this struct
+    // is aggregate-initialized POSITIONALLY in app_runtime_frame.cpp, and several
+    // members share a `std::function` signature -- inserting in the middle would
+    // silently rebind its neighbours rather than fail to compile.
+    std::function<void(const std::string& element_id, bool undeveloped)> set_element_undeveloped;
 };
 
 void RenderInspectorArea(AppRuntimeState& state,

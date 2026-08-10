@@ -207,6 +207,7 @@ void RenderInspectorArea(AppRuntimeState& state,
         };
         ui::panels::ElementTextEditCallbacks text_edit_callbacks;
         text_edit_callbacks.commit_text_edit = callbacks.commit_element_text_edit;
+        text_edit_callbacks.set_undeveloped = callbacks.set_element_undeveloped;
 
         ui::panels::ElementTranslationReviewCallbacks translation_review_callbacks;
         translation_review_callbacks.is_pending = callbacks.is_translation_review_pending;
