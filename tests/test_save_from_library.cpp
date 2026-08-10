@@ -778,6 +778,46 @@ TEST(SaveFromLibrary, SACM23_LIB_002_ChildUnderReasoningFallbackFailsWithFileUnt
     EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the failed command still rewrote the tracked file";
 }
 
+// --- Phase 1 of the bridge retirement: the terminology tranche goes native ----
+//
+// The ten terminology commands and RemoveArgumentPackage no longer project the
+// document into the legacy POD; they call the `sacm_adapter` seams the audit
+// replayer has always used. Two things have to be measured on the SAVED BYTES,
+// because the canonical hash is computed through the same projection on both
+// sides of every comparison and is blind to exactly what these assert.
+
+namespace {
+
+// Runs one command through a real bus over `fixture`, reporting whether the flip
+// engaged. Unlike RunBridgedRename this takes any command, because the point is
+// which ROUTE the command took, not what it edited.
+core::commands::CommandResult
+RunOnBus(ProjectFixture& fixture, core::AppState& state, core::commands::ICommand& command, bool& out_library_primary) {
+    // Written before anything can fail: a caller that reads it after an aborted
+    // run would otherwise be told the flip engaged when nothing ran at all.
+    out_library_primary = false;
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    if (!bus) {
+        // Hard failure rather than EXPECT: every assertion after this one would
+        // fail as well, and the noise buries the one line that says why.
+        ADD_FAILURE() << "could not open a command bus over the fixture: " << error;
+        return core::commands::CommandResult{};
+    }
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    out_library_primary = ctx.library_primary;
+    if (ctx.library_primary && state.library_document != nullptr) {
+        core::RebuildDerivedViewsFromLibrary(
+            *state.library_document, state.loaded_case.value(), state.sacm_package.value());
+    }
+    return result;
+}
+
+} // namespace
+
 // NodeOnly removal REPARENTS, which the scrub seam cannot express, so it is the
 // one element command that must go through the guarded bridge. It used to fall
 // through to the raw legacy mutator instead: the bus then autosaved lossy
@@ -826,39 +866,65 @@ TEST(SaveFromLibrary, SACM23_LIB_002_UnflippedNodeOnlyRemovalRefusesRatherThanDe
     EXPECT_TRUE(group_alive) << "the refused removal still deleted the ArgumentGroup from the live document";
 }
 
-// --- Phase 1 of the bridge retirement: the terminology tranche goes native ----
+// Phase 3b: MoveStrategyToReasoning. Moving a strategy into an inference's
+// reasoning slot is one endpoint rewrite -- the strategy leaves `source` and
+// becomes `reasoning` -- which is exactly what `SetRelationshipEnds` does, so
+// this needed no new library capability beyond the one slice 3a added.
 //
-// The ten terminology commands and RemoveArgumentPackage no longer project the
-// document into the legacy POD; they call the `sacm_adapter` seams the audit
-// replayer has always used. Two things have to be measured on the SAVED BYTES,
-// because the canonical hash is computed through the same projection on both
-// sides of every comparison and is blind to exactly what these assert.
+// Routing proof as ever: the fixture nests an ArgumentPackage the legacy POD
+// cannot express, so a bridged edit is refused and success means the seam ran.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedMoveStrategyRunsOnACaseTheBridgeRefuses) {
+    constexpr const char* kStrategySacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample" acme:owner="alice">
+  <acme:vendorMetadata reviewCycle="Q3-2026"/>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="G2" name="Sub goal"/>
+    <argumentReasoning id="S1" name="Strategy"/>
+    <assertedInference id="R1" source="G2 S1" target="G1"/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase3b-routing", kStrategySacm);
 
-namespace {
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "AP_nested"))
+        << "fixture carries no nested package, so a bridged edit would pass too";
 
-// Runs one command through a real bus over `fixture`, reporting whether the flip
-// engaged. Unlike RunBridgedRename this takes any command, because the point is
-// which ROUTE the command took, not what it edited.
-core::commands::CommandResult
-RunOnBus(ProjectFixture& fixture, core::AppState& state, core::commands::ICommand& command, bool& out_library_primary) {
-    std::string error;
-    std::unique_ptr<core::commands::CommandBus> bus =
-        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
-    EXPECT_TRUE(bus) << error;
-    if (!bus)
-        return core::commands::CommandResult{};
-    core::commands::CommandContext ctx{
-        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
-    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
-    out_library_primary = ctx.library_primary;
-    if (ctx.library_primary && state.library_document != nullptr) {
-        core::RebuildDerivedViewsFromLibrary(
-            *state.library_document, state.loaded_case.value(), state.sacm_package.value());
+    bool library_primary = false;
+    core::commands::MoveStrategyToReasoningCommand command("R1", "S1");
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+    ASSERT_TRUE(result.success) << "the move was refused, so it is still going through the bridge: " << result.error;
+    ASSERT_TRUE(library_primary) << "the move did not reach the library at all";
+
+    // The strategy is the inference's reasoning now, and no longer one of its
+    // sources -- a Strategy in GSN hangs off the relationship rather than being
+    // one of the things it relates.
+    core::RebuildDerivedViewsFromLibrary(
+        *state.library_document, state.loaded_case.value(), state.sacm_package.value());
+    bool checked = false;
+    for (const sacm::ArgumentPackage& argument_package : state.sacm_package->argumentPackages) {
+        for (const sacm::AssertedInference& inference : argument_package.assertedInferences) {
+            if (inference.id != "R1")
+                continue;
+            checked = true;
+            EXPECT_EQ(inference.reasoning, "S1");
+            EXPECT_EQ(inference.sources, (std::vector<std::string>{"G2"}));
+        }
     }
-    return result;
-}
+    EXPECT_TRUE(checked) << "the inference disappeared";
 
-} // namespace
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "AP_nested")) << "the move deleted the nested package";
+    EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << "the move dropped the vendor attribute";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
 
 // (1) The refusal shrinks, and this is the test that PROVES the flip -- the only
 // observable that separates a native seam call from the bridge, since both set
