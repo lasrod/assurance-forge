@@ -112,6 +112,19 @@ struct SetAssertionDeclaration {
     model::AssertionDeclaration declaration = model::AssertionDeclaration::Asserted;
 };
 
+// Replace an Assertion's meta-claims wholesale (clause 11.6), the way
+// SetExpressionCategories replaces an ExpressionElement's categories.
+//
+// `AddMetaClaim` alone left the association one-way: a meta-claim could be
+// attached and never detached, so a client that had to retract one -- an
+// Assurance Claim Point whose resolution changes or is removed -- had no
+// operation for it and would have had to reach past the API. Every id must
+// resolve to a Claim; an empty list clears them.
+struct SetMetaClaims {
+    model::ElementId element;
+    std::vector<model::ElementId> meta_claims;
+};
+
 // Attach a meta-claim (a Claim about an Assertion, clause 11.6).
 struct AddMetaClaim {
     model::ElementId element;
@@ -271,6 +284,7 @@ using Operation = std::variant<CreateAssuranceCasePackage,
                                SetDescriptionAt,
                                SetAssertionDeclaration,
                                AddMetaClaim,
+                               SetMetaClaims,
                                AddRelationshipSource,
                                SetExpressionValue,
                                SetTermExternalReference,
