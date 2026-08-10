@@ -1523,16 +1523,29 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("strategy_id", strategy_id))
             return false;
+        // Phase 3b: the same scratch-then-seam route the live command takes, so
+        // the move and its own replay are one code path.
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-                if (!core::MoveStrategyToReasoning(model, &package, relationship_id, strategy_id, error)) {
-                    error = "MoveStrategyToReasoning (bridge) failed at " + location + ": " + error;
-                    return false;
-                }
-                return true;
-            };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        parser::AssuranceCase model = sacm_adapter::project_case(document);
+        sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
+        std::string move_error;
+        if (!core::MoveStrategyToReasoning(model, &package, relationship_id, strategy_id, move_error)) {
+            out_error = "MoveStrategyToReasoning failed at " + location + ": " + move_error;
+            return false;
+        }
+        const parser::SacmElement* moved = parser::FindElementById(model, relationship_id);
+        if (moved == nullptr) {
+            out_error = "Inference " + relationship_id + " disappeared while replaying at " + location;
+            return false;
+        }
+        const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
+            document, relationship_id, moved->source_refs, moved->target_refs, moved->reasoning_ref);
+        if (!ends.supported || !ends.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_relationship_ends", tx_seq, event, ends.supported, ends.applied, ends.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     if (type == "SetElementUndeveloped") {

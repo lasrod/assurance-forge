@@ -360,8 +360,15 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // legacy mutator with library_primary false, which autosaved lossy
     // projection bytes over the tracked file -- silently deleting every element
     // kind the projection cannot hold, with no refusal, on a context-menu
-    // action (round-3 verification, probe a). A native retarget op would let
-    // the scrub seam take NodeOnly too.
+    // action (round-3 verification, probe a).
+    //
+    // Phase 3b added `SetRelationshipEnds`, which CAN express the retarget, so the
+    // remaining obstacle is narrower than "no operation exists": the reparent has
+    // to be separated from the scrub that follows it. Diffing the fully-mutated
+    // projection picks up both, and a context whose only target was the removed
+    // node then comes back with an empty target list -- a set the seam rightly
+    // refuses. Exposing the reparent step on its own (the treatment
+    // `ValidateGsnIdentifierChange` got) is what unblocks it.
     bool applied_to_library = false;
     if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeAndDescendants) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
@@ -611,12 +618,48 @@ bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx, audit::AuditEven
         return false;
     }
 
-    const LibraryBridgeMutator mutate =
-        [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
-            return core::MoveStrategyToReasoning(model, &package, relationship_id_, strategy_id_, error);
-        };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
-        return false;
+    // Phase 3b of the legacy-bridge retirement. Moving a strategy into an
+    // inference's reasoning slot is one endpoint rewrite: the strategy leaves
+    // `source` and becomes `reasoning`, which is precisely what
+    // `SetRelationshipEnds` (added in slice 3a) does. No new library capability
+    // was needed -- the retarget operation the tree work called for turned out to
+    // cover this too.
+    //
+    // The GSN mapping is not re-decided here. A Strategy is an ArgumentReasoning
+    // that hangs off a relationship rather than connecting elements, and the
+    // legacy mutator already encodes that; this runs the SAME mutator on a
+    // scratch projection and mirrors the endpoints it produced, so the mapping
+    // recorded in docs/sacm/sacm-gsn-mapping.md is the only one in play.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx)) {
+        parser::AssuranceCase scratch_model = ctx.model;
+        sacm::AssuranceCasePackage scratch_package = ctx.package;
+        if (!core::MoveStrategyToReasoning(scratch_model, &scratch_package, relationship_id_, strategy_id_, out_error))
+            return false;
+        const parser::SacmElement* moved = parser::FindElementById(scratch_model, relationship_id_);
+        if (moved == nullptr) {
+            out_error = "Inference " + relationship_id_ + " disappeared while moving " + strategy_id_ + ".";
+            return false;
+        }
+        const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
+            *ctx.library_document, relationship_id_, moved->source_refs, moved->target_refs, moved->reasoning_ref);
+        if (ends.supported && !ends.applied) {
+            out_error = LibraryRejection("the reasoning of " + relationship_id_, ends.diagnostics);
+            return false;
+        }
+        if (ends.applied) {
+            ctx.library_primary = true;
+            applied_to_library = true;
+        }
+    }
+    if (!applied_to_library) {
+        const LibraryBridgeMutator mutate =
+            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
+                return core::MoveStrategyToReasoning(model, &package, relationship_id_, strategy_id_, error);
+            };
+        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            return false;
+    }
 
     out_event.event_type = "MoveStrategyToReasoning";
     out_event.payload = nlohmann::ordered_json::object();
