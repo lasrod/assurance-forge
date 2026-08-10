@@ -1304,3 +1304,98 @@ TEST(LibraryPrimaryEditFlip, TerminologyDeletePreviewReportsWhetherTheTargetItse
     EXPECT_FALSE(absent.can_apply) << "a delete with no target to remove reported itself applicable";
     EXPECT_TRUE(absent.consequential.empty());
 }
+
+// Phase 2a. Removing an artifact package is where the seam is CLEANER than the
+// legacy mutator rather than more destructive:
+//
+//   legacy -- erases the package and leaves every ArtifactReference that named
+//             one of its artifacts pointing at an id that no longer resolves.
+//   seam   -- drops the reference to the deleted artifact, so nothing dangles.
+//
+// Same shape as phase 1's term-delete disclosure, opposite sign: no consent is
+// needed because nothing the user can see is being removed, only a broken
+// pointer. Asserted on both sides so the difference is measured, not assumed.
+TEST(LibraryPrimaryEditFlip, RemoveArtifactPackageScrubsTheReferenceTheLegacyMutatorLeftDangling) {
+    constexpr const char* kCitedArtifactSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <artifactPackage id="ARTP1" name="Evidence">
+    <artifact id="A1" name="Brake test report"/>
+  </artifactPackage>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <artifactReference id="EV1" name="Test report" referencedArtifact="A1"/>
+    <assertedEvidence id="E1" source="EV1" target="G1"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    const auto run = [](EditFixture& fixture) {
+        core::commands::CommandContext ctx = MakeContext(fixture);
+        core::commands::RemoveArtifactPackageCommand remove("ARTP1", "");
+        EXPECT_TRUE(RunCommand(fixture, remove, ctx).success);
+        std::string reference_target = "<missing>";
+        for (const sacm::ArgumentPackage& argument_package : fixture.package.argumentPackages)
+            for (const sacm::ArtifactReference& reference : argument_package.artifactReferences)
+                if (reference.id == "EV1")
+                    reference_target = reference.referencedArtifact;
+        return reference_target;
+    };
+
+    std::unique_ptr<EditFixture> library_side =
+        MakeFixture("remove_artp_library", /*library_backed=*/true, kCitedArtifactSacm);
+    std::unique_ptr<EditFixture> legacy_side =
+        MakeFixture("remove_artp_legacy", /*library_backed=*/false, kCitedArtifactSacm);
+    ASSERT_NE(library_side->document, nullptr);
+    ASSERT_EQ(legacy_side->document, nullptr);
+
+    const std::string flipped_target = run(*library_side);
+    const std::string legacy_target = run(*legacy_side);
+
+    EXPECT_EQ(legacy_target, "A1") << "the legacy mutator no longer leaves the reference dangling; fixture is stale";
+    EXPECT_TRUE(flipped_target.empty()) << "the flipped removal left the reference naming a deleted artifact: "
+                                        << flipped_target;
+    // The reference itself survives either way -- it is a drawn Solution node, and
+    // removing evidence from the argument is not what "delete this artifact
+    // package" asked for.
+    EXPECT_NE(flipped_target, "<missing>") << "the removal deleted the ArtifactReference too, which overshoots";
+
+    // The requirement that actually matters in production is not agreement with
+    // the legacy mutator -- nothing replays through it any more -- but that the
+    // live edit and its own replay agree. VerifyProject replays the log through
+    // the seams and compares hashes, so this is that check.
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(library_side->project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
+}
+
+// Phase 2a. `core::DeleteTerminologyPackage` refuses a package that still holds
+// terms; `apply_delete_package` deletes recursively. That guard is an Assurance
+// Forge editing rule rather than a SACM invariant, so the seam has no opinion
+// about it and the flip had to re-state it -- otherwise "empty this first" would
+// have become "the glossary is gone" on the same click.
+TEST(LibraryPrimaryEditFlip, RemoveTerminologyPackageStillRefusesANonEmptyPackage) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("remove_tp_nonempty", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    core::commands::CommandContext ctx = MakeContext(*fixture);
+
+    core::commands::CreateTerminologyPackageCommand create_pkg("Terms", "");
+    ASSERT_TRUE(RunCommand(*fixture, create_pkg, ctx).success);
+    core::TerminologyTermDraft draft;
+    draft.value = "ODD";
+    core::commands::CreateTerminologyTermCommand create_term(create_pkg.GeneratedRef(), draft);
+    ASSERT_TRUE(RunCommand(*fixture, create_term, ctx).success);
+
+    core::commands::RemoveTerminologyPackageCommand remove(create_pkg.GeneratedRef().id, create_pkg.GeneratedRef().gid);
+    const core::commands::CommandResult result = RunCommand(*fixture, remove, ctx);
+    EXPECT_FALSE(result.success) << "the flipped removal deleted a non-empty glossary recursively";
+    EXPECT_NE(result.error.find("contains terms"), std::string::npos)
+        << "the refusal is not the legacy guard's: " << result.error;
+    EXPECT_NE(core::FindTerminologyPackage(fixture->package, create_pkg.GeneratedRef()), nullptr)
+        << "the refused removal deleted the package anyway";
+
+    // Emptied, it goes.
+    core::commands::DeleteTerminologyTermCommand delete_term(create_pkg.GeneratedRef(), create_term.GeneratedRef());
+    ASSERT_TRUE(RunCommand(*fixture, delete_term, ctx).success);
+    core::commands::RemoveTerminologyPackageCommand remove_again(create_pkg.GeneratedRef().id,
+                                                                 create_pkg.GeneratedRef().gid);
+    EXPECT_TRUE(RunCommand(*fixture, remove_again, ctx).success);
+    EXPECT_EQ(core::FindTerminologyPackage(fixture->package, create_pkg.GeneratedRef()), nullptr);
+}

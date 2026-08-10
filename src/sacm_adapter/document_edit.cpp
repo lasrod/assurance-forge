@@ -939,6 +939,16 @@ DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string&
     return outcome;
 }
 
+EditOutcome apply_set_gid(LibraryDocument& document, const std::string& element_id, const std::string& gid) {
+    if (element_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::commands::MutationResult result =
+        doc.apply(sacm::commands::SetGid{.element = sacm::model::ElementId(element_id), .gid = gid});
+    return applied_outcome(result);
+}
+
 // -------------------------------------------------------------- terminology
 
 namespace {

@@ -444,6 +444,43 @@ Two behaviours changed, disclosed rather than absorbed:
   independently of this phase. `LibraryPrimaryEditFlip.TerminologyCreateKeepsTheLegacyGidWhenTheBaseFormIsTaken`
   pins it, and fails when the seam ignores the requested gid.
 
+**Slice 2a of phase 2: the package removals and the gid.** `SetElementGid` and the two
+remaining package removals (`RemoveTerminologyPackage`, `RemoveArtifactPackage`) now apply
+through the seams, taking the bridged count from fifteen to twelve, with all three replay
+branches moved off `BridgeViaLegacy` in the same change so live and replay run one code
+path. `apply_set_gid` is new and is a single library operation — the app decides the value
+and the seam stores it, so there is nothing for a bridge to reproduce. Routing is proven
+the phase-1 way, by running the three on a nested-ArgumentPackage fixture a bridged edit is
+refused on
+(`SaveFromLibrary.SACM23_LIB_002_FlippedPackageAndGidCommandsRunOnACaseTheBridgeRefuses`).
+
+Two disclosures, pointing opposite ways:
+
+- **RemoveTerminologyPackage keeps its guard.** `core::DeleteTerminologyPackage` refuses a
+  package that still holds categories, terms or expressions; `apply_delete_package` deletes
+  recursively. Flipping without re-stating the guard would have converted "empty this
+  first" into "the glossary is gone" on the same click, so it moved into the command,
+  checked against the same projection the legacy mutator ran on. The REPLAY branch
+  deliberately does not re-check it: the guard gated whether the event was ever recorded,
+  and re-applying it during replay would refuse to reproduce history a user legitimately
+  made. Pinned by
+  `LibraryPrimaryEditFlip.RemoveTerminologyPackageStillRefusesANonEmptyPackage`.
+- **RemoveArtifactPackage stops stranding references.** `core::DeleteArtifactPackage`
+  erased the package and left every ArtifactReference citing its artifacts pointing at an
+  id that no longer resolved; the seam scrubs the reference instead. The ArtifactReference
+  itself survives either way — it is a drawn Solution node, and removing evidence from the
+  argument is not what "delete this artifact package" asked for. Measured on both sides by
+  `LibraryPrimaryEditFlip.RemoveArtifactPackageScrubsTheReferenceTheLegacyMutatorLeftDangling`.
+
+That second one changes what the legacy replay oracle can certify, and the change is worth
+naming. With `RemoveArtifactPackage` seam-mapped on both live and replay sides, the two
+agree; the LEGACY replay now diverges for a cited package, because it still runs the
+mutator that leaves the dangling reference. `LibraryReplayConvergence.RemoveArtifactPackageConverges`
+therefore uses an empty package, and the cited case is verified where the requirement
+actually lives — live against its own replay, via `VerifyProject`. The legacy oracle has no
+production caller; treating its agreement as the goal, rather than live/replay agreement,
+would have meant preserving a defect to keep a test green.
+
 The app-level guards the legacy mutators carried — a required package name, a required
 term value, a category still assigned to terms — are Assurance Forge editing rules, not
 SACM invariants, so the seams do not enforce them. They moved into the commands, checked

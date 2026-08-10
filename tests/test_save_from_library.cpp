@@ -21,6 +21,7 @@
 #include "core/audit/replay_verifier.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
+#include "core/commands/gid_commands.h"
 #include "core/commands/package_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/derived_views.h"
@@ -1147,6 +1148,68 @@ TEST(SaveFromLibrary, SACM23_LIB_002_NativeArgumentPackageRemovalPreservesUnknow
     EXPECT_FALSE(Contains(autosaved, "Spare goal")) << "the removed package is still in the file:\n" << autosaved;
     EXPECT_TRUE(Contains(autosaved, "Top goal")) << "the removal took the wrong package:\n" << autosaved;
     EXPECT_EQ(state.sacm_package->argumentPackages.size(), 1u);
+}
+
+// Phase 2a of the bridge retirement: the two remaining package removals and the
+// gid assignment. Same routing proof as phase 1 -- run them on a case a BRIDGED
+// edit is refused on, where success means the seam ran -- because nothing else
+// distinguishes the two routes.
+//
+// The fixture nests an empty ArgumentPackage, which the legacy POD cannot express
+// (SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNestedArgumentPackage pins
+// that on the same shape), and carries vendor content that has to survive each
+// edit.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedPackageAndGidCommandsRunOnACaseTheBridgeRefuses) {
+    constexpr const char* kNestedVendorSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation"
+    xmlns:acme="http://acme.example/toolchain" id="AC1" name="Sample" acme:owner="alice">
+  <acme:vendorMetadata reviewCycle="Q3-2026"/>
+  <terminologyPackage id="TP_empty" name="Unused terms"/>
+  <artifactPackage id="ARTP1" name="Evidence">
+    <artifact id="A1" name="Brake test report"/>
+  </artifactPackage>
+  <argumentPackage id="AP1" name="Args">
+    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <argumentPackage id="AP_nested" name="Nested"/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase2a-routing", kNestedVendorSacm);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "AP_nested"))
+        << "fixture carries no nested package, so a bridged edit would pass too";
+
+    const auto run = [&](core::commands::ICommand& command, const char* what) {
+        bool library_primary = false;
+        const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+        EXPECT_TRUE(result.success) << what
+                                    << " was refused, so it is still going through the bridge: " << result.error;
+        EXPECT_TRUE(library_primary) << what << " did not reach the library at all";
+        const std::string autosaved = ReadFile(fixture.sacm_absolute);
+        EXPECT_TRUE(Contains(autosaved, "AP_nested")) << what << " deleted the nested package";
+        EXPECT_TRUE(Contains(autosaved, kVendorAttributeMarker)) << what << " dropped the vendor attribute";
+        EXPECT_TRUE(Contains(autosaved, kVendorElementMarker)) << what << " dropped the vendor element";
+    };
+
+    core::commands::EnsureElementGidCommand assign_gid("G1");
+    run(assign_gid, "SetElementGid");
+
+    core::commands::RemoveTerminologyPackageCommand remove_terminology("TP_empty", "");
+    run(remove_terminology, "RemoveTerminologyPackage");
+
+    core::commands::RemoveArtifactPackageCommand remove_artifacts("ARTP1", "");
+    run(remove_artifacts, "RemoveArtifactPackage");
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_FALSE(Contains(autosaved, "TP_empty")) << "the terminology package is still in the file";
+    EXPECT_FALSE(Contains(autosaved, "Brake test report")) << "the artifact package is still in the file";
+    EXPECT_TRUE(Contains(autosaved, "Top goal")) << "the removals overshot";
+
+    const core::audit::ReplayVerificationResult verified = core::audit::VerifyProject(fixture.project);
+    EXPECT_TRUE(verified.success) << (verified.diagnostics.empty() ? std::string{} : verified.diagnostics.front());
 }
 
 TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {

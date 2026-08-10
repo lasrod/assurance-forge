@@ -1111,22 +1111,16 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         if (!require_string("gid", gid))
             return false;
-        // No parity library seam mints the legacy RANDOM gid (the terminology seams
-        // mint a deterministic `gid-<id>`, but an element gid is a UUID captured in
-        // the payload). Bridge: run the same legacy core::SetElementGid onto a
-        // projected package -- forcing the recorded gid -- then re-derive the
-        // library, so this converges with the legacy replay by construction.
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            std::string set_error;
-            if (!core::SetElementGid(model, &package, element_id, gid, set_error)) {
-                err = "SetElementGid (bridge) failed at " + location + ": " + set_error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        // Phase 2a: seam-mapped. The gid is not generated here -- the live command
+        // minted it and the payload carries it -- so there is nothing for a bridge
+        // to reproduce, only a value to store.
+        const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_set_gid(document, element_id, gid);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_gid", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
     }
 
     // The tree drop mutators (reorder siblings / move a subtree) have no parity
@@ -1376,6 +1370,10 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         return BridgeViaLegacy(document, location, mutate, out_error);
     }
 
+    // The three package removals, all seam-mapped. `package_gid` is read and not
+    // used: the payload contract requires it, and a replay must reject a malformed
+    // event rather than quietly accept one missing a field its own writer promised.
+    // The seam addresses the package by id.
     if (type == "RemoveArgumentPackage") {
         std::string id, gid;
         if (!require_string("package_id", id))
@@ -1389,6 +1387,50 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure(
                 "apply_delete_package", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "RemoveArtifactPackage") {
+        std::string id, gid;
+        if (!require_string("package_id", id))
+            return false;
+        if (!require_string("package_gid", gid))
+            return false;
+        // Phase 2a: seam-mapped, matching the live command.
+        const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(document, id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_delete_package(artifact)",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "RemoveTerminologyPackage") {
+        std::string id, gid;
+        if (!require_string("package_id", id))
+            return false;
+        if (!require_string("package_gid", gid))
+            return false;
+        // Phase 2a: seam-mapped. The live command's "the package must be empty"
+        // guard is deliberately NOT re-checked here. It is an editing rule that
+        // gated whether the event was ever recorded; re-applying it on replay would
+        // refuse to reproduce history the user legitimately made -- and the seam
+        // deletes recursively, which is what the recorded event means.
+        const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_package(document, id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure("apply_delete_package(terminology)",
+                                          tx_seq,
+                                          event,
+                                          outcome.supported,
+                                          outcome.applied,
+                                          outcome.diagnostics);
             return false;
         }
         return true;
@@ -1747,44 +1789,6 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
     // projected FROM the library, then re-derive the library from the serialized
     // package (BridgeViaLegacy). This keeps library-primary replay converged
     // with the legacy live path for these events.
-
-    if (type == "RemoveArtifactPackage") {
-        std::string id, gid;
-        if (!require_string("package_id", id))
-            return false;
-        if (!require_string("package_gid", gid))
-            return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& /*model*/, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            std::string delete_error;
-            if (!core::DeleteArtifactPackage(package, id, gid, delete_error)) {
-                err = "DeleteArtifactPackage (bridge) failed at " + location + ": " + delete_error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
-    }
-
-    if (type == "RemoveTerminologyPackage") {
-        std::string id, gid;
-        if (!require_string("package_id", id))
-            return false;
-        if (!require_string("package_gid", gid))
-            return false;
-        const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& /*model*/, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            std::string delete_error;
-            if (!core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id, gid}, delete_error)) {
-                err = "DeleteTerminologyPackage (bridge) failed at " + location + ": " + delete_error;
-                return false;
-            }
-            return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
-    }
 
     if (type == "ApplyProposal") {
         std::string proposal_json;
