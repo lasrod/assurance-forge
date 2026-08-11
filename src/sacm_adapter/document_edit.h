@@ -154,6 +154,13 @@ struct CreateElementFields {
     std::string name;
     std::string text;     // the Claim's Description (clause 8.9); ignored by kinds with none
     std::string language; // language tag for name/text; may be empty
+    // For an ArgumentReasoning only: the id of the element this strategy will
+    // support once it has a sub-goal. Recorded as the `strategyTarget` vendor tag
+    // instead of an AssertedInference, because a bare strategy's inference would
+    // have no source and SACM's source [1..*] forbids that (clause 11.13). This is
+    // the same deferral `apply_add_child` performs for a new Strategy; the
+    // inference materializes when the first sub-goal gives it a source.
+    std::string strategy_target;
 };
 
 // Creates ONE element inside `package_id`, with no relationship, mirroring what

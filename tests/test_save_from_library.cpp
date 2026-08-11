@@ -1440,6 +1440,68 @@ TEST(SaveFromLibrary, SACM23_LIB_002_FlippedApplyProposalRunsOnACaseTheBridgeRef
     EXPECT_TRUE(Contains(autosaved, "The new sub-claim holds.")) << "the proposal's claim text never reached disk";
 }
 
+// A proposal that creates a strategy and attaches it applies NATIVELY, on a case
+// the bridge refuses. It used to decline: the patch service produces an
+// AssertedInference whose only end is `reasoning`, which clause 11.13 forbids
+// (source [1..*]) and the seam rightly refuses.
+//
+// The fix is deferral, not a new relationship shape -- the same one
+// `apply_add_child` has always used for a new Strategy. The strategy records the
+// goal it will support in a vendor tag, and the inference materializes when the
+// first sub-goal gives it a source. This was the LAST functional dependency on
+// the bridge outside multi-language names.
+TEST(SaveFromLibrary, SACM23_LIB_002_NativeProposalDefersABareStrategysInference) {
+    constexpr const char* kGroupedCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Bare strategy"/>
+  <argumentPackage xmi:id="ap_1">
+    <name content="Main"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top"/></argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentGroup" xmi:id="grp_1" argumentElement="G1">
+      <name content="Grouped"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase4-bare-strategy", kGroupedCase);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+    ASSERT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "ArgumentGroup"))
+        << "fixture lost the unrepresentable element, so a bridged apply would pass too";
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "phase4-bare-strategy";
+    proposal.anchor_element_id = "G1";
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateStrategy;
+    create.create_ref = "$new_strategy_1";
+    create.text = "Argument over the identified hazards.";
+    proposal.operations.push_back(create);
+    core::reviews::PatchOperation attach;
+    attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+    attach.source = core::reviews::ElementRef{std::nullopt, "$new_strategy_1"};
+    attach.target = core::reviews::ElementRef{"G1", std::nullopt};
+    proposal.operations.push_back(attach);
+
+    bool library_primary = false;
+    core::commands::ApplyProposalCommand command(proposal);
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+    ASSERT_TRUE(result.success) << "the proposal declined and the bridge refused the case: " << result.error;
+    ASSERT_TRUE(library_primary) << "the proposal did not reach the library at all";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "ArgumentGroup")) << "the native apply deleted the ArgumentGroup";
+    EXPECT_TRUE(Contains(autosaved, "assuranceForge.gsn.strategyTarget"))
+        << "the strategy's pending attachment was not recorded, so it will not materialize";
+    // And NOT as a relationship: a sourceless AssertedInference is what the
+    // library refuses, and writing one would make the file unloadable.
+    EXPECT_FALSE(Contains(autosaved, "AssertedInference")) << "a bare inference reached the file after all";
+}
+
 // Review of #373: a proposed Strategy's text reached the seam and was dropped.
 // `CreateArgumentReasoning` takes no description, and an ArgumentReasoning's
 // statement IS its Description -- so it had to be written after the create or not
