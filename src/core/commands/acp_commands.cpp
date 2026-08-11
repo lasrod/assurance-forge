@@ -186,7 +186,7 @@ bool AddAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std
                 return false;
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
     generated_acp_id_ = result.acp_id;
@@ -256,7 +256,7 @@ bool RemoveAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, 
                 return false;
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -323,7 +323,7 @@ bool UpsertAcpCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, 
                 return false;
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -395,7 +395,7 @@ bool CreateConfidenceArgumentTreeForAcpCommand::Apply(CommandContext& ctx,
                 return false;
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
     argument_package_id_ = result.argument_package_id;

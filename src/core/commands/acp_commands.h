@@ -10,7 +10,7 @@
 // Audited commands that mutate ACP (Assurance Claim Point) records. ACP editing
 // previously bypassed the command bus (unaudited, writing the legacy package
 // directly); these commands route it through the same library-primary bridge
-// chokepoint every other audited mutation uses (`ApplyLibraryPrimaryOrLegacy`),
+// chokepoint every other audited mutation uses (`ApplyLegacyOrRefuse`),
 // so an ACP add/remove/upsert becomes a recorded, replayable transaction.
 //
 // Determinism: AddAcp generates a deterministic ACP<n> id on first apply, which

@@ -12,7 +12,7 @@
 // non-destructive recovery, data loss. The inspector's confidence-save flow used
 // to call `core::EnsureElementGid` directly on the loaded case; this routes that
 // mutation through the same library-primary bridge chokepoint
-// (`ApplyLibraryPrimaryOrLegacy`) every other audited mutation uses, so the gid
+// (`ApplyLegacyOrRefuse`) every other audited mutation uses, so the gid
 // assignment becomes a recorded, replayable transaction.
 //
 // Determinism: the gid is RANDOM (`GenerateUniqueElementGid`), so it is generated

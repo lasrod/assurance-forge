@@ -30,7 +30,7 @@
 //   * LEGACY (no library document): the reconstructed `model`/`package` are
 //     assigned over the live ones, and the bus serializes a projection.
 //
-// Undo is the one command that does NOT consult `CommandContext::allow_library_primary`.
+// Undo applies whenever a document is present, like every other command.
 // That switch exists to stop a command replacing the live views wholesale
 // mid-dispatch, and for undo the two routings are inverted: the library-primary
 // path leaves the views for the frame-boundary re-derive, while the legacy path

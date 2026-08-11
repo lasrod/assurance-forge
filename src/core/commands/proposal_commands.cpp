@@ -120,7 +120,7 @@ bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
             applied_natively = true;
         }
     }
-    if (!applied_natively && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error)) {
+    if (!applied_natively && !ApplyLegacyOrRefuse(ctx, mutate, out_error)) {
         if (!decline_reason.empty()) {
             out_error = "The SACM library could not express this proposal (" + decline_reason +
                         "), and the compatibility path failed too: " + out_error;

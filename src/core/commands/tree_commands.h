@@ -17,7 +17,7 @@
 // audited.
 //
 // These commands route the SAME `core::*` tree mutators through the library-
-// primary bridge chokepoint (`ApplyLibraryPrimaryOrLegacy`), so a drop becomes a
+// primary bridge chokepoint (`ApplyLegacyOrRefuse`), so a drop becomes a
 // recorded, replayable, library-synced transaction.
 //
 // Determinism: `MoveSubtree` mints a new relationship id via

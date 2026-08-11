@@ -220,7 +220,7 @@ bool ArgumentTargetKindFromToken(const std::string& token, ArgumentTarget::Kind&
 
 bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+    if (ctx.library_document != nullptr) {
         const std::string planned_id = core::PlanTopGoalId(ctx.model);
         const sacm_adapter::AddChildOutcome outcome =
             sacm_adapter::apply_add_top_goal(*ctx.library_document, planned_id);
@@ -241,14 +241,14 @@ bool CreateTopGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // projection cannot fully represent. Round-4 verification measured the raw
     // fallback on artifact-full-valid.sacm.xmi (no ArgumentPackage, so the seam
     // reports unsupported): success reported, 8 of 9 clause-12 elements deleted
-    // from the tracked file. Without a document, ApplyLibraryPrimaryOrLegacy
+    // from the tracked file. Without a document, ApplyLegacyOrRefuse
     // runs the legacy mutator directly -- the pre-flip behavior.
     if (!applied_to_library) {
         const LibraryBridgeMutator mutate =
             [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::AddTopGoal(model, &package, generated_id_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -265,7 +265,7 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     }
 
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+    if (ctx.library_document != nullptr) {
         std::string planned_element_id;
         std::string planned_relationship_id;
         if (!core::PlanChildElementIds(
@@ -296,7 +296,7 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
             return core::AddChildElement(
                 model, &package, parent_id_, kind_, generated_id_, generated_relationship_id_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -316,7 +316,7 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
     }
 
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+    if (ctx.library_document != nullptr) {
         std::string planned_element_id;
         std::string planned_relationship_id;
         if (!core::PlanChallengeIds(
@@ -350,7 +350,7 @@ bool CreateChallengeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
             return core::AddChallenge(
                 model, &package, target_, source_type_, generated_id_, generated_relationship_id_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -414,7 +414,7 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     //      reimplemented here -- and by now nothing points at the node except what
     //      is meant to die with it.
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeOnly) {
+    if (ctx.library_document != nullptr && mode_ == RemoveMode::NodeOnly) {
         // Before the first write: this is several writes, and a failure between them
         // leaves the document changed. The bus re-derives the live views on its
         // failure path only when `library_primary` says the flip engaged, so setting
@@ -451,7 +451,7 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
         }
         applied_to_library = true;
     }
-    if (ctx.library_document != nullptr && ctx.allow_library_primary && mode_ == RemoveMode::NodeAndDescendants) {
+    if (ctx.library_document != nullptr && mode_ == RemoveMode::NodeAndDescendants) {
         // Exactly the ids `PlanRemoval` produced -- the same set the audit event
         // records, walked in the same sorted order `ApplyEventToLibrary` replays,
         // so the live document and the replayed document agree by construction.
@@ -475,7 +475,7 @@ bool RemoveElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
                 [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
                 return core::RemoveElement(model, &package, element_id_, RemoveMode::NodeOnly, err);
             };
-            if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
                 return false;
         } else if (!core::RemoveElement(ctx.model, &ctx.package, element_id_, mode_, out_error)) {
             return false;
@@ -540,8 +540,7 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
     // `supported && !applied`, and routing that to the bridge would reinstate the
     // very edit the seam rejected.
     bool applied_natively = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary &&
-        (field_ == ElementTextField::Name || field_ == ElementTextField::Content)) {
+    if (ctx.library_document != nullptr && (field_ == ElementTextField::Name || field_ == ElementTextField::Content)) {
         const parser::SacmElement* before = parser::FindElementById(ctx.model, element_id_);
         // The same reading the legacy mutator makes, so both routes record the same
         // audit `old_value` for the same edit.
@@ -566,7 +565,7 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
         [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_, old_value_, err);
     };
-    if (!applied_natively && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+    if (!applied_natively && !ApplyLegacyOrRefuse(ctx, mutate, out_error))
         return false;
 
     was_no_op_ = (old_value_ == new_value_);
@@ -623,7 +622,7 @@ bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx, audit::AuditEvent& o
             [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
                 return core::SetGsnIdentifier(model, &package, element_id_, new_identifier_, old_identifier_, error);
             };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -646,7 +645,7 @@ bool RemoveRelationshipCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     // out of whatever still references it, so a relationship needs no special
     // case there -- unlike the app's node-shaped removal plan.
     bool applied_to_library = false;
-    if (ctx.library_document != nullptr && ctx.allow_library_primary) {
+    if (ctx.library_document != nullptr) {
         const sacm_adapter::DeleteOutcome outcome =
             sacm_adapter::apply_delete_element(*ctx.library_document, relationship_id_);
         if (outcome.supported && !outcome.applied) {
@@ -740,7 +739,7 @@ bool DropRelationshipReferenceCommand::Apply(CommandContext& ctx,
                 return core::DropRelationshipReference(
                     model, &package, relationship_id_, reference_, removed_relationship_, error);
             };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -806,7 +805,7 @@ bool MoveStrategyToReasoningCommand::Apply(CommandContext& ctx, audit::AuditEven
             [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
                 return core::MoveStrategyToReasoning(model, &package, relationship_id_, strategy_id_, error);
             };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -858,7 +857,7 @@ bool SetElementUndevelopedCommand::Apply(CommandContext& ctx, audit::AuditEvent&
             [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& error) {
                 return core::SetElementUndeveloped(model, &package, element_id_, undeveloped_, old_value_, error);
             };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 

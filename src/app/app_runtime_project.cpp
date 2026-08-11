@@ -20,7 +20,6 @@
 #include "core/acp/assurance_claim_point.h"
 #include "core/audit/replay_verifier.h"
 #include "core/audit/audit_store.h"
-#include "core/audit/strategy_migration.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/proposal_commands.h"
 #include "core/commands/package_commands.h"
@@ -286,19 +285,6 @@ void AppRuntime::OpenProjectFile(const core::ProjectFileEntry& entry) {
 }
 
 void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
-    // Migrate a legacy GSN-strategy encoding on disk BEFORE loading, so the
-    // loaded state and the promoted trusted baseline both reflect the standard
-    // single-inference form and open-verify converges. No-op for non-audited or
-    // already-migrated files. (Phase 9 Stage 7, slice 3.)
-    core::audit::StrategyMigrationResult strategy_migration;
-    if (entry.role == core::ProjectFileRole::SacmArgument && impl_->app_state.current_project.has_value()) {
-        std::string migration_error;
-        if (!core::audit::MigrateStrategyEncodingIfNeeded(
-                impl_->app_state.current_project.value(), entry.relativePath, strategy_migration, migration_error)) {
-            SetStatus(ui::i18n::trf("Strategy encoding migration failed: {0}", migration_error));
-        }
-    }
-
     if (!impl_->app_state.open_project_file(entry))
         return;
 
@@ -350,10 +336,6 @@ void AppRuntime::PerformOpenProjectFile(const core::ProjectFileEntry& entry) {
                 for (const auto& d : verification.diagnostics)
                     msg += "\n  - " + d;
                 SetStatus(msg);
-            } else if (strategy_migration.migrated) {
-                // Verify passed after a migration: surface the one-time note as
-                // the final status so the on-disk rewrite is visible, not silent.
-                SetStatus(strategy_migration.note);
             }
             impl_->last_audit_verification = std::move(verification);
         }

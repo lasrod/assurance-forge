@@ -168,7 +168,7 @@ bool RemoveTerminologyPackageCommand::Apply(CommandContext& ctx, audit::AuditEve
             [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::DeleteTerminologyPackage(package, core::TerminologyPackageRef{id_, gid_}, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -211,7 +211,7 @@ bool RemoveArgumentPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent&
             [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::DeleteArgumentPackage(package, model, id_, gid_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -252,7 +252,7 @@ bool RemoveArtifactPackageCommand::Apply(CommandContext& ctx, audit::AuditEvent&
             [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::DeleteArtifactPackage(package, id_, gid_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
