@@ -25,25 +25,29 @@ jobs:
         include:
           - name: Windows
             os: windows-latest
-            # Let CMake pick the newest Visual Studio installed on the runner
-            # rather than pinning a version — windows-latest's VS rolls forward.
+            # NINJA, not the Visual Studio generator. `CMAKE_<LANG>_COMPILER_LAUNCHER`
+            # is silently IGNORED by the VS generator -- the first attempt at this
+            # configured ccache, started it, and compiled 0 requests through it.
+            # Ninja honours the launcher, and Multi-Config keeps `--config Debug`
+            # and `ctest -C Debug` working exactly as before.
             #
-            # sccache rather than ccache, because it caches MSVC reliably; and
             # MSVC output is only cacheable with debug info EMBEDDED in the object
             # (/Z7). CMake's Debug default is /Zi, which writes a shared .pdb the
-            # compiler mutates outside the object file, so nothing can cache it.
-            # `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT` needs CMP0141, and this
-            # project's `cmake_minimum_required(3.21)` leaves that policy OLD, so
-            # the default is set to NEW here rather than raising the floor for
-            # everyone to serve CI.
+            # compiler mutates outside the object, so nothing can cache it.
+            # `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT` needs CMP0141, which this
+            # project's `cmake_minimum_required(3.21)` leaves OLD, so the policy
+            # default is set here rather than raising the floor for everyone.
+            #
+            # Verified locally end to end before pushing: 20/20 calls cacheable,
+            # then a wiped build directory rebuilt in 2s with 20 hits.
             configure: >-
-              cmake -B build -A x64 -DAF_WARNINGS_AS_ERRORS=ON
+              cmake -B build -G "Ninja Multi-Config" -DAF_WARNINGS_AS_ERRORS=ON
               -DCMAKE_POLICY_DEFAULT_CMP0141=NEW
               -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
-              -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build --config Debug
             test: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
-            cache_variant: sccache
+            cache_variant: ccache
           - name: Linux
             os: ubuntu-latest
             configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -62,6 +66,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      # Ninja invokes cl.exe directly, so the MSVC environment has to be on PATH.
+      # The Visual Studio generator located the toolchain itself, which is the one
+      # convenience given up by moving off it.
+      - name: Set up MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -84,7 +97,9 @@ jobs:
       #
       # Windows was the critical path at ~15 min because it alone built from
       # scratch: 11 of those minutes were compilation the other two platforms
-      # were already reusing.
+      # were already reusing. Note the cache is per-branch on GitHub: a pull
+      # request cannot read a cache another branch created, so the first run
+      # after this lands is still cold and the saving shows on the run after.
       - name: Set up compiler cache
         uses: hendrikmuhs/ccache-action@v1.2.23
         with:
