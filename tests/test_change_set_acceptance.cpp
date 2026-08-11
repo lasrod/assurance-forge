@@ -258,7 +258,7 @@ TEST(ChangeSetAcceptance, RefusesAChangeSetTheArgumentHasMovedUnder) {
     const nlohmann::json operations =
         nlohmann::json::array({nlohmann::json{{"type", "UpdateElementText"},
                                               {"element", {{"id", "G1"}}},
-                                              {"field", "description"},
+                                              {"field", "content"},
                                               {"old_value", "The system is safe."},
                                               {"new_value", "The system is acceptably safe."}}});
     std::vector<core::reviews::PatchOperation> parsed;

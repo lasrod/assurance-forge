@@ -502,14 +502,29 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
         return false;
     }
 
-    // Phase 2 slice 2b-2 -- the LIVE edit flip for text edits, via a BRIDGE rather
-    // than the apply_text_edit seam. The seam makes a claim's Content/Description
-    // "more correct" (a lone Description is the statement, clause 8.9), which would
-    // DIVERGE from the audit replay -- which stays bridged to preserve the legacy
-    // two-slot content/description semantics for existing on-disk data (see the long
-    // comment in event_replayer.cpp's UpdateElementText branch). Bridging the SAME
-    // legacy mutator onto the library reproduces the legacy result exactly, so the
-    // recorded hash and the replayed hash converge by construction with no migration.
+    // ADR 0012: a claim-like element carries ONE clause-8.9 Description and that
+    // Description is its statement, which the POD holds in `content`. It has no
+    // note slot, so this edit has nowhere to land.
+    //
+    // Refused rather than run. The bridge would write the legacy `description`
+    // field quite happily, the next projection would drop it, and the command
+    // would have reported success -- and written an audit event -- for an edit
+    // that vanished. A recorded event nobody can replay to a visible result is
+    // worse than a refusal.
+    if (field_ == ElementTextField::Description) {
+        const parser::SacmElement* element = parser::FindElementById(ctx.model, element_id_);
+        if (element != nullptr && core::ClaimLikeCarriesStatementAsDescription(*element)) {
+            out_error = "Element " + element_id_ + " is a " + element->type +
+                        ", which carries one description and that description is its statement. "
+                        "Edit the content field instead.";
+            return false;
+        }
+    }
+
+    // Content still goes through the BRIDGE rather than the apply_text_edit seam.
+    // ADR 0012 removed the model difference that made the seam diverge from replay,
+    // so the native flip is now unblocked -- but flipping it is its own slice, with
+    // its own convergence evidence, and it is not done here.
     // `old_value_` is captured whether the bridge runs it on the scratch projection
     // (the library's last committed value) or the legacy fallback runs it in place.
     const LibraryBridgeMutator mutate =

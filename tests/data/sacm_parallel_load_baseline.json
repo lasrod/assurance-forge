@@ -2,9 +2,6 @@
   "tests/data/fixture_roundtrip_core_argument.sacm.xml": {
     "field": 11
   },
-  "tests/data/fixture_roundtrip_sample.sacm.xml": {
-    "field": 8
-  },
   "tests/data/fixture_roundtrip_sanitized_strict.sacm.xml": {
     "field": 358
   }

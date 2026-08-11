@@ -55,6 +55,19 @@ EditOutcome unsupported_outcome() {
     return EditOutcome{.supported = false, .applied = false, .diagnostics = {}};
 }
 
+// An edit the seam UNDERSTANDS and REFUSES, as distinct from one it has no
+// mapping for. The difference is load-bearing: `supported == false` tells the
+// caller to keep the legacy edit authoritative, so refusing that way would route
+// the very edit we are rejecting straight back into the legacy path. This says
+// "the document is unchanged, and here is why" instead.
+EditOutcome refused_outcome(std::string code, std::string message) {
+    return EditOutcome{
+        .supported = true,
+        .applied = false,
+        .diagnostics = {LoadDiagnostic{.code = std::move(code), .severity = "error", .message = std::move(message)}},
+    };
+}
+
 // The app's `content` is a claim-like element's primary Description (clause
 // 8.9). Other kinds carry their text elsewhere (Term/Expression `value`), where
 // SetDescription would be wrong, so Content is only mapped for these kinds.
@@ -133,23 +146,20 @@ EditOutcome apply_text_edit(LibraryDocument& document,
             return unsupported_outcome();
         }
         if (content_maps_to_description(element->kind())) {
-            // For a claim-like element the POD `description` is the SECOND
-            // Description (a note); the first is the statement (content). Target
-            // slot 1 via SetDescriptionAt, creating it when absent. A claim with
-            // no statement yet (no slot 0) has no anchor for a note -- slot 1
-            // would be a gap the library rejects -- so report it unsupported
-            // rather than write something the projection could not read back.
-            if (element->descriptions().empty()) {
-                return unsupported_outcome();
-            }
-            const std::string target_language =
-                language == kPrimaryLanguage ? description_slot_language(*element, 1) : language;
-            return applied_outcome(doc.apply(sacm::commands::SetDescriptionAt{
-                .element = id,
-                .index = 1,
-                .text = value,
-                .language = target_language,
-            }));
+            // A claim-like element has exactly ONE Description -- its statement,
+            // reached through TextField::Content (ADR 0012). It has no note slot,
+            // so there is nothing for this field to write. Writing slot 1 here is
+            // what produced the redundant second Description that clause 8.9 does
+            // not sanction.
+            //
+            // REFUSED, not unsupported. `supported == false` means "no mapping
+            // yet, keep the legacy edit authoritative", which would hand this edit
+            // back to the legacy path and reinstate the silent drop this change
+            // exists to remove. The diagnostic names the field to use, because the
+            // caller may be an agent with no other way to find out.
+            return refused_outcome("AF-EDIT-CLAIM-HAS-NO-NOTE",
+                                   "A Claim or ArgumentReasoning carries one description and that description is "
+                                   "its statement; edit the content field instead.");
         }
         // For every other element the POD `description` IS the front Description,
         // so it maps directly (same language handling as Content).
