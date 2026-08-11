@@ -252,7 +252,10 @@ TEST(LibraryPrimaryEditFlip, ProposalPreflightIsIsolatedAndMatchesTheLiveLibrary
     core::reviews::ElementRef element;
     element.existing_id = "G1";
     update.element = element;
-    update.field = "description";
+    // `content`, not `description`: G1 is a claim, and a claim's one Description
+    // IS its statement (ADR 0012). The rehearsal below reads it back from the
+    // POD's `content`, which is where that Description projects.
+    update.field = "content";
     update.new_value = "The system remains acceptably safe.";
     proposal.operations.push_back(update);
 
@@ -265,7 +268,7 @@ TEST(LibraryPrimaryEditFlip, ProposalPreflightIsIsolatedAndMatchesTheLiveLibrary
         << error;
     const parser::SacmElement* rehearsed_goal = FindElement(rehearsed, "G1");
     ASSERT_NE(rehearsed_goal, nullptr);
-    EXPECT_EQ(rehearsed_goal->description, update.new_value);
+    EXPECT_EQ(rehearsed_goal->content, update.new_value);
 
     const sacm_adapter::SaveOutcome after_preflight = sacm_adapter::save_document(*fixture->document);
     ASSERT_TRUE(after_preflight.ok);
@@ -277,6 +280,34 @@ TEST(LibraryPrimaryEditFlip, ProposalPreflightIsIsolatedAndMatchesTheLiveLibrary
     ASSERT_TRUE(committed.success) << committed.error;
     EXPECT_EQ(core::reviews::ComputeModelSemanticHash(fixture->model),
               core::reviews::ComputeModelSemanticHash(rehearsed));
+}
+
+// A proposal operation naming `description` on a claim is REFUSED, not ignored.
+// A claim has one Description and it is its statement (ADR 0012), so there is no
+// slot for this operation to write. Applying it as a silent no-op would let a
+// proposal report success while changing nothing the reviewer approved -- and a
+// reviewer approving a change to a safety argument has to get the change they
+// approved or an error, never a quiet nothing. The message names the field to
+// use, because the caller may be an agent with no other way to find out.
+TEST(LibraryPrimaryEditFlip, ProposalDescriptionEditOnAClaimIsRefusedRatherThanSilentlyDropped) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("proposal_description_refusal", true);
+    ASSERT_NE(fixture->document, nullptr);
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "draft-note-on-a-claim";
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    core::reviews::ElementRef element;
+    element.existing_id = "G1";
+    update.element = element;
+    update.field = "description";
+    update.new_value = "A note the model has nowhere to put.";
+    proposal.operations.push_back(update);
+
+    parser::AssuranceCase rehearsed;
+    std::string error;
+    EXPECT_FALSE(core::commands::PreflightProposalAgainstLibrary(*fixture->document, proposal, {}, rehearsed, error));
+    EXPECT_NE(error.find("content"), std::string::npos) << "the refusal must name the field to use instead: " << error;
 }
 
 TEST(LibraryPrimaryEditFlip, CreateSequenceMatchesLegacyIdsAndCanonicalHash) {

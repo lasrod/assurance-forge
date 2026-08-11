@@ -732,14 +732,16 @@ TEST(SacmLibraryEdit, SACM23_INT_001_LegacyJustificationProjectsAsJustification)
     EXPECT_EQ(j1->assertion_declaration, "justification");
 }
 
-// The Description field on a claim-like element is its NOTE: the SECOND
-// Description (clause 8.9 lists Description[0..*]; slot 0 is the statement that
-// surfaces as content). Phase 2 slice 2a routes it through the library's
-// SetDescriptionAt at slot 1, so it now applies natively -- writing the note
-// without disturbing the statement, and matching the legacy `description` edit
-// on the edited field. (G1 carries its statement in a `content=` attribute, so
-// slot 0 exists to anchor the note.)
-TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditWritesClaimNoteToSecondDescription) {
+// A claim-like element carries ONE clause-8.9 Description and that Description
+// is its statement, reached through TextField::Content (ADR 0012). It has no
+// note slot, so the seam reports a Description edit unsupported and leaves the
+// statement exactly where it was.
+//
+// This replaces SACM23_INT_001_DescriptionEditWritesClaimNoteToSecondDescription,
+// which pinned the removed behaviour: that edit wrote slot 1 via
+// SetDescriptionAt, and the redundant second Description it produced is what
+// clause 8.9 does not sanction.
+TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedOnAClaimWhoseDescriptionIsItsStatement) {
     const std::string kNote = "Reviewed by the safety board.";
     sacm_adapter::LoadOutcome loaded = load_fixture();
     ASSERT_NE(loaded.document, nullptr);
@@ -747,32 +749,27 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditWritesClaimNoteToSecondDescr
     const core::AssuranceCase before = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* before_g1 = find_element(before, "G1");
     ASSERT_NE(before_g1, nullptr);
-    ASSERT_EQ(before_g1->content, "The system is acceptably safe."); // statement, slot 0
-    ASSERT_NE(before_g1->description, kNote);                        // vacuity guard
+    ASSERT_EQ(before_g1->content, "The system is acceptably safe."); // the one Description
+    // The statement does NOT also surface as a note -- the mirror is gone.
+    EXPECT_TRUE(before_g1->description.empty());
 
     const sacm_adapter::EditOutcome edit =
         sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Description, "en", kNote);
-    ASSERT_TRUE(edit.supported);
-    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+    EXPECT_FALSE(edit.supported);
+    EXPECT_FALSE(edit.applied);
 
+    // Refused, not partially applied: the statement is untouched and no second
+    // Description appeared for a later load to read back.
     const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
     const core::SacmElement* after_g1 = find_element(after, "G1");
     ASSERT_NE(after_g1, nullptr);
-    // The statement (slot 0 / content) is untouched; the note lands in description.
     EXPECT_EQ(after_g1->content, "The system is acceptably safe.");
-    EXPECT_EQ(after_g1->description, kNote);
-    ASSERT_TRUE(after_g1->description_langs.contains("en"));
-    EXPECT_EQ(after_g1->description_langs.at("en"), kNote);
-
-    const core::AssuranceCase legacy = legacy_edit("G1", core::ElementTextField::Description, "en", kNote);
-    const core::SacmElement* legacy_g1 = find_element(legacy, "G1");
-    ASSERT_NE(legacy_g1, nullptr);
-    EXPECT_EQ(after_g1->description, legacy_g1->description);
+    EXPECT_TRUE(after_g1->description.empty());
+    EXPECT_FALSE(after_g1->description_langs.contains("en"));
 }
 
-// A claim with no statement yet (no slot 0 Description) has no anchor for a
-// note, so the seam reports the note edit unsupported rather than writing a
-// slot-1 gap the library would reject -- the caller keeps the legacy edit.
+// The same refusal for a claim that has no Description at all -- there is no
+// statement to be a note against, and there was never a slot to write.
 TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForStatementlessClaim) {
     const std::string xml =
         R"(<?xml version="1.0" encoding="UTF-8"?>)"
@@ -785,6 +782,26 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForStatementlessC
         sacm_adapter::apply_text_edit(document, "G9", sacm_adapter::TextField::Description, "en", "a note");
     EXPECT_FALSE(edit.supported);
     EXPECT_FALSE(edit.applied);
+}
+
+// A relationship keeps its note: its single `<description>` genuinely IS a note
+// (it has no statement), so the seam still writes it. ADR 0012 narrowed the
+// Description field to claim-like elements only, and this is the other side of
+// that line -- without it the change would read as "descriptions are gone".
+TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditStillWritesTheNoteOnANonClaimElement) {
+    const std::string kNote = "Recorded by the reviewer.";
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::EditOutcome edit =
+        sacm_adapter::apply_text_edit(*loaded.document, "R1", sacm_adapter::TextField::Description, "en", kNote);
+    ASSERT_TRUE(edit.supported);
+    ASSERT_TRUE(edit.applied) << (edit.diagnostics.empty() ? "" : edit.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* after_r1 = find_element(after, "R1");
+    ASSERT_NE(after_r1, nullptr);
+    EXPECT_EQ(after_r1->description, kNote);
 }
 
 // The ACP id is a TaggedValue value, not an element id. Adding an ACP must not

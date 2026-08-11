@@ -338,6 +338,17 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
         } else if (operation.field == "content" || operation.field.empty()) {
             WriteField(element->content, element->content_langs, primary, operation.translations);
         } else if (operation.field == "description") {
+            // Refused rather than ignored. Before ADR 0012 this landed in a
+            // second Description slot that no longer exists; applying it as a
+            // silent no-op would let a proposal report success while changing
+            // nothing the reviewer approved -- the worst outcome for an operation
+            // that edits a safety argument. An agent gets told which field to use.
+            if (core::ClaimLikeCarriesStatementAsDescription(*element)) {
+                error = "Element " + element_id + " is a " + element->type +
+                        ", which carries one description and that description is its statement. "
+                        "Update the 'content' field instead.";
+                return false;
+            }
             WriteField(element->description, element->description_langs, primary, operation.translations);
         } else {
             error = "Unsupported UpdateElementText field: " + operation.field;
