@@ -395,6 +395,36 @@ TEST(McpServer, PublishesTheSccgCatalogAsAResource) {
     // Real guideline text, not a placeholder: an agent that reads this is
     // reading what reviews actually apply.
     EXPECT_NE(text.find("CL.1"), std::string::npos) << text.substr(0, 400);
+    // The dist loader carries no document metadata, so without a fallback the
+    // resource opened "# \n\n" -- an empty heading on the text that exists to
+    // establish authority.
+    EXPECT_EQ(text.rfind("# ", 0), 0u) << text.substr(0, 80);
+    EXPECT_NE(text.find("Safety Case Core Guidelines"), std::string::npos) << text.substr(0, 80);
+}
+
+// The per-guideline uri was readable long before it was discoverable: nothing
+// listed it, and MCP's discovery surface for parameterized uris is the resource
+// template list.
+TEST(McpServer, ListsThePerGuidelineResourceTemplateAndServesIt) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const std::optional<nlohmann::json> listed = server.HandleMessage(Request("resources/templates/list", nullptr, 2));
+    ASSERT_TRUE(listed.has_value());
+    ASSERT_TRUE(listed->contains("result")) << listed->dump();
+    const nlohmann::json& templates = (*listed)["result"]["resourceTemplates"];
+    ASSERT_FALSE(templates.empty());
+    EXPECT_EQ(templates[0]["uriTemplate"], "sccg://guideline/{id}");
+
+    // And the uri the template describes actually serves one guideline.
+    const std::optional<nlohmann::json> read =
+        server.HandleMessage(Request("resources/read", {{"uri", "sccg://guideline/CL.1"}}, 3));
+    ASSERT_TRUE(read.has_value());
+    ASSERT_TRUE(read->contains("result")) << read->dump();
+    const std::string text = (*read)["result"]["contents"][0]["text"].get<std::string>();
+    EXPECT_NE(text.find("CL.1"), std::string::npos) << text.substr(0, 200);
 }
 
 TEST(McpServer, ReportsAnUnknownResourceRatherThanEmptyContent) {
@@ -458,6 +488,9 @@ TEST(McpServer, TheTranslatePromptSaysWhatTranslatingAClaimMustPreserve) {
     EXPECT_NE(text.find("qualifier"), std::string::npos) << text;
     // And it must not rewrite the argument it is translating.
     EXPECT_NE(text.find("Do not change the English"), std::string::npos) << text;
+    // The qualifier rule itself rides along, quoted from the catalog: the
+    // prompt's informal paragraph and the review must apply the same text.
+    EXPECT_NE(text.find("CL.5"), std::string::npos) << text;
 }
 
 TEST(McpServer, ReportsAnUnknownPrompt) {

@@ -60,14 +60,14 @@ file(READ "${_stdout_file}" _stdout)
 file(READ "${_stdout_file}" _stdout_hex HEX)
 
 # --- Framing ---
-# Three requests and one notification go in; a notification must draw no reply,
-# so exactly three lines must come back. This is the assertion that catches
+# Five requests and one notification go in; a notification must draw no reply,
+# so exactly five lines must come back. This is the assertion that catches
 # stdout pollution: anything else written to the stream changes the line count.
 string(REGEX MATCHALL "\n" _newlines "${_stdout}")
 list(LENGTH _newlines _line_count)
-if(NOT _line_count EQUAL 3)
+if(NOT _line_count EQUAL 5)
     message(FATAL_ERROR
-        "Expected exactly 3 response lines (a notification must not be answered), got ${_line_count}.\n"
+        "Expected exactly 5 response lines (a notification must not be answered), got ${_line_count}.\n"
         "This usually means something wrote to stdout that is not the protocol.\n"
         "stdout:\n${_stdout}")
 endif()
@@ -99,6 +99,23 @@ foreach(_needle "\"protocolVersion\":\"2025-06-18\"" "\"name\":\"assurance-forge
     string(FIND "${_stdout}" "${_needle}" _found)
     if(_found EQUAL -1)
         message(FATAL_ERROR "Response did not contain ${_needle}\nstdout:\n${_stdout}")
+    endif()
+endforeach()
+
+# --- SCCG resources and prompts, through the real process ---
+# The unit tests read the catalog through __FILE__-relative paths; only this
+# process proves the *shipped* binary finds its own data/sccg/dist copy. These
+# run in both consent modes deliberately: SCCG is the public guideline corpus,
+# not case content, and an agent should be able to read the house rules before
+# the user has flipped the sharing switch.
+#   - The heading pins the dist-path metadata fallback (the dist files carry no
+#     document title, so an empty heading here was the observable defect).
+#   - CL.1 proves real guideline text came back, not a placeholder.
+#   - CL.5 proves the translate prompt carries the qualifier rule it cites.
+foreach(_needle "# Safety Case Core Guidelines" "CL.1" "CL.5")
+    string(FIND "${_stdout}" "${_needle}" _found)
+    if(_found EQUAL -1)
+        message(FATAL_ERROR "SCCG surface did not contain ${_needle}\nstdout:\n${_stdout}")
     endif()
 endforeach()
 

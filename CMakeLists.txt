@@ -348,6 +348,11 @@ target_link_libraries(assurance-forge-mcp PRIVATE
 if(WIN32)
     target_link_libraries(assurance-forge-mcp PRIVATE bcrypt advapi32)
 endif()
+# The MCP server serves the SCCG catalog (resources, prompts) and must find it
+# in its own runtime directory. Until this line it found the copy only because
+# the GUI target happened to share the output directory -- built or shipped
+# alone, the catalog silently vanished from every prompt.
+af_copy_sccg_data(assurance-forge-mcp)
 
 # --- Localization catalogs (optional regeneration) ---
 # The Japanese .mo is committed and bundled as an asset, so normal builds need
