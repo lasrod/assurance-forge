@@ -23,6 +23,15 @@ inline constexpr const char* kGsnRoleJustification = "Justification";
 inline constexpr const char* kImportAssertionDeclarationKey = "sacm.import.assertionDeclaration";
 inline constexpr const char* kImportAssertionDeclarationJustification = "justification";
 
+// Reserved compat TaggedValue holding an element's names in every language BUT
+// the primary. SACM gives an element one name LangString (clause 8.6), so the
+// library's reader parks the surplus here on import
+// (libs/sacm/src/io/xmi_reader.cpp) and the projection merges it back into
+// `name_langs`. The edit seam now WRITES it too, through `SetTaggedValue`, so a
+// translated name goes where the reader will find it. The key string must stay
+// in sync with the reader; the translated-name round-trip test guards it.
+inline constexpr const char* kImportNameOverflowTagKey = "sacm.import.name";
+
 // A GSN Strategy is added under a goal before it has any sub-goals, but SACM's
 // AssertedInference requires source [1..*] (clause 11.13), so a bare strategy
 // inference is invalid. The strategy is created as a standalone ArgumentReasoning
