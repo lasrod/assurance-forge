@@ -107,7 +107,16 @@ bool KindCanHoldText(sacm_adapter::NewElementKind kind) {
            kind == sacm_adapter::NewElementKind::ArgumentReasoning;
 }
 
-void CollectTextWrites(const SacmElement& before, const SacmElement& after, std::vector<ProposalPlan::TextWrite>& out) {
+// Collects the per-language writes that turn `before`'s text into `after`'s.
+//
+// Returns a decline reason rather than emitting a write the seam would reject.
+// SACM's name is ONE LangString (clause 8.6), so `apply_text_edit` declines a
+// non-primary-language name; planning one anyway would pass the representability
+// check and then hard-fail mid-apply, with elements already written and no way
+// back -- the exact failure planning first exists to prevent.
+std::string
+CollectTextWrites(const SacmElement& before, const SacmElement& after, std::vector<ProposalPlan::TextWrite>& out) {
+    std::string decline_reason;
     const auto collect = [&](ElementTextField field,
                              const std::string& before_scalar,
                              const std::string& after_scalar,
@@ -125,6 +134,13 @@ void CollectTextWrites(const SacmElement& before, const SacmElement& after, std:
                 continue; // already covered by the scalar
             const auto found = before_langs.find(language);
             if (found == before_langs.end() || found->second != value) {
+                if (field == ElementTextField::Name) {
+                    if (decline_reason.empty()) {
+                        decline_reason = "element " + after.id + " changes its name in '" + language +
+                                         "', and a SACM name is one LangString";
+                    }
+                    continue;
+                }
                 out.push_back(ProposalPlan::TextWrite{
                     .element_id = after.id, .field = field, .language = language, .value = value});
             }
@@ -137,6 +153,7 @@ void CollectTextWrites(const SacmElement& before, const SacmElement& after, std:
             after.description,
             before.description_langs,
             after.description_langs);
+    return decline_reason;
 }
 
 // Fields no seam in this plan can write. Reported rather than silently skipped:
@@ -167,7 +184,7 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
     ProposalPlan plan;
 
     const auto decline = [&plan](std::string reason) {
-        if (plan.unrepresentable_reason.empty())
+        if (!reason.empty() && plan.unrepresentable_reason.empty())
             plan.unrepresentable_reason = std::move(reason);
     };
 
@@ -233,7 +250,7 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
             SacmElement created_so_far = empty;
             created_so_far.name = updated.name;
             created_so_far.content = updated.content;
-            CollectTextWrites(created_so_far, updated, plan.text_writes);
+            decline(CollectTextWrites(created_so_far, updated, plan.text_writes));
             continue;
         }
 
@@ -253,7 +270,7 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
             decline(unsupported);
             continue;
         }
-        CollectTextWrites(*original, updated, plan.text_writes);
+        decline(CollectTextWrites(*original, updated, plan.text_writes));
         if (original->undeveloped != updated.undeveloped) {
             plan.flag_writes.push_back(
                 ProposalPlan::FlagWrite{.element_id = updated.id, .undeveloped = updated.undeveloped});

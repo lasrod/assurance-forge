@@ -1440,6 +1440,94 @@ TEST(SaveFromLibrary, SACM23_LIB_002_FlippedApplyProposalRunsOnACaseTheBridgeRef
     EXPECT_TRUE(Contains(autosaved, "The new sub-claim holds.")) << "the proposal's claim text never reached disk";
 }
 
+// Review of #373: a proposed Strategy's text reached the seam and was dropped.
+// `CreateArgumentReasoning` takes no description, and an ArgumentReasoning's
+// statement IS its Description -- so it had to be written after the create or not
+// at all. The native path silently lost it while the bridge kept it.
+//
+// Asserted on the SAVED BYTES, because the failure was invisible in the command
+// result: the apply succeeded, and the text was simply gone.
+TEST(SaveFromLibrary, SACM23_LIB_002_NativeProposalKeepsACreatedStrategysText) {
+    ProjectFixture fixture = MakeProject("phase3g-strategy-text");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "phase3g-strategy-text";
+    proposal.anchor_element_id = "G1";
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateStrategy;
+    create.create_ref = "$new_strategy_1";
+    create.text = "Argument over the identified hazards.";
+    proposal.operations.push_back(create);
+
+    bool library_primary = false;
+    core::commands::ApplyProposalCommand command(proposal);
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_TRUE(library_primary) << "the proposal did not reach the library at all";
+
+    EXPECT_TRUE(Contains(ReadFile(fixture.sacm_absolute), "Argument over the identified hazards."))
+        << "the created strategy's statement never reached disk";
+}
+
+// Review of #373: a translated NAME edit planned as representable and then
+// hard-failed mid-apply. SACM's name is one LangString (clause 8.6), so the seam
+// declines a non-primary language -- and a decline discovered at write time comes
+// after elements are already in the document, with no way back.
+//
+// Measured the same way as the other fallback test: the bridge refuses this
+// fixture, so a clean decline shows up as a refusal with the file untouched,
+// whereas a mid-apply failure would have left the document changed.
+TEST(SaveFromLibrary, SACM23_LIB_002_ProposalWithATranslatedNameDeclinesBeforeWriting) {
+    constexpr const char* kGroupedCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Translated name"/>
+  <argumentPackage xmi:id="ap_1">
+    <name content="Main"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top"/></argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentGroup" xmi:id="grp_1" argumentElement="G1">
+      <name content="Grouped"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase3g-translated-name", kGroupedCase);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "phase3g-translated-name";
+    proposal.anchor_element_id = "G1";
+    core::reviews::PatchOperation rename;
+    rename.type = core::reviews::PatchOperationType::UpdateElementName;
+    rename.element = core::reviews::ElementRef{"G1", std::nullopt};
+    rename.translations["ja"] = "トップ";
+    proposal.operations.push_back(rename);
+
+    bool library_primary = false;
+    core::commands::ApplyProposalCommand command(proposal);
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+
+    // Both a plan-time decline and a mid-apply failure make the command fail, so
+    // failure alone proves nothing. WHICH failure is the point: a decline routes to
+    // the guarded bridge, whose refusal names the element it would have destroyed.
+    // A mid-apply failure reports the seam call instead -- and by then the plan is
+    // part-written.
+    EXPECT_FALSE(result.success) << "a translated name reached the seams, which decline it";
+    EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
+        << "this failed inside the seams rather than declining to the bridge: " << result.error;
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the declined proposal still rewrote the tracked file";
+}
+
 // The other half of slice 3g's routing claim: a proposal the planner CANNOT
 // express falls back to the guarded bridge rather than applying a near-miss.
 //

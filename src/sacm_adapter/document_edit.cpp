@@ -643,9 +643,30 @@ AddChildOutcome apply_create_element(LibraryDocument& document,
             return failed_child(tagged);
         }
     }
-    // An ArgumentReasoning or ArtifactReference carries no Description, so text
-    // given for one is dropped rather than written somewhere it would not project
-    // back. The planner refuses that case before reaching here.
+    // An ArgumentReasoning's statement is its Description, exactly as a Claim's is
+    // (`content_maps_to_description` covers both), but `CreateArgumentReasoning`
+    // takes no description -- so it is written here or not at all. Dropping it
+    // silently lost a proposed strategy's text on the native path while the bridge
+    // kept it, which is the shape of bug this whole migration exists to avoid.
+    //
+    // An ArtifactReference genuinely has no statement: its POD `description` is a
+    // note, and the planner routes that as an ordinary Description write instead.
+    // An ArgumentReasoning's statement is its Description, exactly as a Claim's is
+    // (`content_maps_to_description` covers both), but `CreateArgumentReasoning`
+    // takes no description -- so it is written here or not at all. Dropping it
+    // silently lost a proposed strategy's text on the native path while the bridge
+    // kept it, which is the shape of bug this whole migration exists to avoid.
+    //
+    // An ArtifactReference genuinely has no statement: its POD `description` is a
+    // note, and the planner routes that as an ordinary Description write instead.
+    if (kind == NewElementKind::ArgumentReasoning && !fields.text.empty()) {
+        const sacm::commands::MutationResult described = doc.apply(
+            sacm::commands::SetDescription{.element = created_id, .text = fields.text, .language = fields.language});
+        if (!described.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(described);
+        }
+    }
 
     AddChildOutcome outcome;
     outcome.supported = true;
