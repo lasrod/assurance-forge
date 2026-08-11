@@ -11,6 +11,7 @@
 #include "core/project_model.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "legacy_sacm/sacm_parser.h"
 #include "ui/text_edit_session.h"
 
@@ -396,6 +397,44 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveConfirmDisclosesLibraryCons
     EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm());
     EXPECT_TRUE(state.element_edit_controller->PendingRemoveConsequences().empty());
     EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
+}
+
+// An edit made with NO command bus -- a SACM file opened outside a project --
+// must not lose content the legacy projection cannot represent.
+//
+// It used to. Without a bus the command took the pure legacy path, mutated the
+// package in place, and `sync_library_document()` then re-derived the
+// library-owned document FROM that projection: the wrong direction, unguarded,
+// and with the reload result ignored. Anything the POD cannot hold was gone from
+// the source of truth, with no refusal in the way and nothing reported. It was
+// the last such path (#347); the audited path has refused this since
+// SACM23-LIB-002.
+//
+// The document is now passed into the no-bus context, so the command applies to
+// it natively and the views are re-derived from it instead.
+TEST(ElementEditControllerTest, SACM23_LIB_002_NoBusEditKeepsUnrepresentableContent) {
+    const std::filesystem::path fixture = std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                          "sacm23" / "argumentation-full-valid.sacm.xmi";
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(fixture.string())) << state.app_state.status_message;
+    ASSERT_EQ(state.command_bus, nullptr) << "this test is about the NO-BUS path; a bus makes it measure nothing";
+    ASSERT_NE(state.app_state.library_document, nullptr);
+
+    // Non-vacuity: the case carries a kind the legacy projection cannot hold.
+    const sacm_adapter::SaveOutcome before = sacm_adapter::save_document(*state.app_state.library_document);
+    ASSERT_TRUE(before.ok);
+    ASSERT_NE(before.xml.find("ArgumentGroup"), std::string::npos)
+        << "fixture carries no unrepresentable element; this test measures nothing";
+
+    ASSERT_TRUE(state.element_edit_controller->CommitElementTextEdit(
+        state, "claim_top", "name", "en", "Top claim", "Renamed outside a project"));
+
+    const sacm_adapter::SaveOutcome after = sacm_adapter::save_document(*state.app_state.library_document);
+    ASSERT_TRUE(after.ok);
+    EXPECT_NE(after.xml.find("ArgumentGroup"), std::string::npos)
+        << "a no-bus edit dropped the unrepresentable element from the source of truth";
+    EXPECT_NE(after.xml.find("Renamed outside a project"), std::string::npos)
+        << "the no-bus edit never reached the document";
 }
 
 // The counterpart: a delete that really does reach nothing else still goes

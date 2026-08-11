@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "core/audit/audit_event.h"
+#include "core/derived_views.h"
 #include "parser/xml_parser.h"
 
 namespace app::commands {
@@ -50,19 +51,30 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
         parser::AssuranceCase scratch_model;
         parser::AssuranceCase& model_ref =
             state.app_state.loaded_case.has_value() ? state.app_state.loaded_case.value() : scratch_model;
-        core::commands::CommandContext ctx{model_ref, state.app_state.sacm_package.value()};
+        core::commands::CommandContext ctx{
+            model_ref, state.app_state.sacm_package.value(), state.app_state.library_document.get()};
         core::audit::AuditEvent unused_event;
         std::string apply_error;
         if (!command.Apply(ctx, unused_event, apply_error)) {
             return {false, apply_error};
         }
-        // No bus, so `ctx` carried no library document and the command took the
-        // legacy in-place path, mutating `sacm_package` but not the library-owned
-        // document. Re-derive the library from the package so it stays the source
-        // of truth even outside a project/audit context (the bus's Stage-5 net does
-        // this on the audited path; the ACP controller used to do it itself before
-        // its edits were routed through the bus).
-        state.app_state.sync_library_document();
+        // The document IS in scope here, so the command applies to it natively
+        // exactly as it does on the audited path. What is missing without a bus is
+        // the re-derivation, so do it here: `RebuildDerivedViewsFromLibrary` is
+        // what `CommandBus::Execute` runs when the flip engages.
+        //
+        // This replaced a `sync_library_document()` that re-derived the document
+        // FROM the legacy package -- the wrong direction. Outside a project the
+        // command took the pure legacy path, mutated the package, and the lossy
+        // projection then became the document, unguarded and with the reload result
+        // ignored. That was the last place a projection could overwrite the source
+        // of truth without a refusal in the way (#347).
+        if (ctx.library_primary && state.app_state.library_document != nullptr) {
+            core::RebuildDerivedViewsFromLibrary(
+                *state.app_state.library_document, model_ref, state.app_state.sacm_package.value());
+        } else {
+            state.app_state.sync_library_document();
+        }
         // The model has been mutated in-place but we have no bus to drive
         // the autosave path. Set the dirty flag directly (matching how
         // helpers like `EnsureQuickDefineTargetPackage` mark state) so

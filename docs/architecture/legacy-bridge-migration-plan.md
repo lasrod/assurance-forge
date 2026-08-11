@@ -11,9 +11,9 @@ Where the migration stands: the library-owned document is authoritative for
 load, and every bus-dispatched edit reaches disk through it — natively or via
 the guarded bridge (`SACM23-LIB-002` in the
 [conformance matrix](../sacm/sacm-conformance-matrix.md)); the legacy parser
-load fallback is gone, and the one save path outside the bus (the no-bus
-dispatch for a file opened without a project) is a disclosed, tracked
-exception ([#347](https://github.com/lasrod/assurance-forge/issues/347)).
+load fallback is gone, and the no-bus dispatch (a file opened without a project)
+no longer re-derives the document from a projection -- it carries the document
+and applies natively, like every audited path.
 Edits are split: some commands mutate the library
 natively, the rest go through a bridge that projects the document into the
 legacy model, mutates that, and re-derives the document. The bridge is lossy
