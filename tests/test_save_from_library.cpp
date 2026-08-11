@@ -507,18 +507,26 @@ core::commands::CommandResult RunNativeRename(ProjectFixture& fixture,
     return result;
 }
 
-// A genuinely BRIDGED edit. ApplyProposal is one of the commands still routed
-// through ApplyLibraryPrimaryOrLegacy, so it is what exercises the refusal guard
-// now that text edits go native.
+// A genuinely BRIDGED edit, which is getting harder to come by: the flip has
+// taken every routine command native, so the guard now rides on a shape the seam
+// DECLINES rather than a command that never flipped.
 //
-// This helper has to be re-pointed at whatever is still bridged whenever another
-// command flips, and it retires WITH the bridge in phase 4 -- the refusal guard
-// must outlive every bridged command, not the bridge itself.
-core::commands::CommandResult RunBridgedProposalRename(ProjectFixture& fixture,
-                                                       core::AppState& state,
-                                                       const std::string& element_id,
-                                                       const std::string& new_name,
-                                                       bool& out_library_primary) {
+// A name edit in a non-primary language is that shape. SACM's name is one
+// LangString (clause 8.6), so `apply_text_edit` reports it unsupported rather
+// than dropping the primary name, and the command falls through to the guarded
+// bridge exactly as an unflipped command used to.
+//
+// This has been re-pointed twice (rename -> ApplyProposal -> translated rename)
+// and will need it again as the remaining fallbacks go. That is the intended
+// maintenance: the refusal guard must outlive every bridged path and retire WITH
+// the bridge in phase 4, never before it. If nothing bridges any more, this test
+// should be deleted in the same change that deletes the bridge -- not quietly
+// left passing for the wrong reason.
+core::commands::CommandResult RunBridgedTranslatedRename(ProjectFixture& fixture,
+                                                         core::AppState& state,
+                                                         const std::string& element_id,
+                                                         const std::string& new_name,
+                                                         bool& out_library_primary) {
     std::string error;
     std::unique_ptr<core::commands::CommandBus> bus =
         core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
@@ -526,15 +534,7 @@ core::commands::CommandResult RunBridgedProposalRename(ProjectFixture& fixture,
     if (!bus) {
         return core::commands::CommandResult{};
     }
-    core::reviews::ReviewProposal proposal;
-    proposal.id = "bridged-refusal-probe";
-    core::reviews::PatchOperation update;
-    update.type = core::reviews::PatchOperationType::UpdateElementName;
-    update.element = core::reviews::ElementRef{element_id, std::nullopt};
-    update.new_value = new_name;
-    proposal.operations.push_back(update);
-
-    core::commands::ApplyProposalCommand command(proposal);
+    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Name, "ja", new_name);
     core::commands::CommandContext ctx{
         state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
@@ -679,7 +679,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNested
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedProposalRename(fixture, state, "G1", "Renamed top goal", library_primary);
+        RunBridgedTranslatedRename(fixture, state, "G1", "Renamed top goal", library_primary);
 
     EXPECT_FALSE(result.success) << "the bridged edit was applied and dropped the nested ArgumentPackage";
     EXPECT_TRUE(Contains(result.error, "ArgumentPackage"))
@@ -716,7 +716,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnreprese
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedProposalRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
+        RunBridgedTranslatedRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
 
     EXPECT_FALSE(result.success) << "the bridged edit was applied and deleted part of the case";
     EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
@@ -1377,6 +1377,127 @@ TEST(SaveFromLibrary, SACM23_LIB_002_FlippedGsnIdentifierRunsOnACaseTheBridgeRef
 // have meant writing a fixture that contradicts clause 11.4 (a package that nests
 // packages contains nothing else). The negative check caught it: the test passed with
 // the native path disabled.
+// Slice 3g routing: a proposal applies through the seams on a case whose
+// ArgumentGroup the bridge's projection cannot represent, so the bridge refuses
+// it outright. Success here means the flip engaged; the group surviving in the
+// SAVED BYTES means it engaged without going through the lossy round trip.
+//
+// The unrepresentable element is the whole instrument. Without it a bridged
+// apply would pass this test too, and the routing claim would rest on nothing.
+TEST(SaveFromLibrary, SACM23_LIB_002_FlippedApplyProposalRunsOnACaseTheBridgeRefuses) {
+    constexpr const char* kGroupedCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Proposal routing"/>
+  <argumentPackage xmi:id="ap_1">
+    <name content="Main"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top"/></argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2"><name content="Sub A"/></argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R1" source="G2" target="G1"/>
+    <argumentElement xsi:type="sacm:ArgumentGroup" xmi:id="grp_1" argumentElement="G2">
+      <name content="Grouped sub-goals"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase3g-routing", kGroupedCase);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "ArgumentGroup"))
+        << "fixture lost the unrepresentable element, so a bridged apply would pass too";
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "phase3g";
+    proposal.anchor_element_id = "G1";
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateClaim;
+    create.create_ref = "$new_claim_1";
+    create.text = "The new sub-claim holds.";
+    proposal.operations.push_back(create);
+    core::reviews::PatchOperation attach;
+    attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+    // GSN's SupportedBy points parent -> child; SACM's AssertedInference runs the
+    // other way, premise to conclusion. The patch service owns that swap, so the
+    // operation names the new claim as the SOURCE and the top goal as the TARGET.
+    attach.source = core::reviews::ElementRef{std::nullopt, "$new_claim_1"};
+    attach.target = core::reviews::ElementRef{"G1", std::nullopt};
+    proposal.operations.push_back(attach);
+
+    bool library_primary = false;
+    core::commands::ApplyProposalCommand command(proposal);
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+    ASSERT_TRUE(result.success) << "the proposal was refused, so it is still going through the bridge: "
+                                << result.error;
+    ASSERT_TRUE(library_primary) << "the proposal did not reach the library at all";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "ArgumentGroup")) << "the native apply deleted the ArgumentGroup";
+    EXPECT_TRUE(Contains(autosaved, "The new sub-claim holds.")) << "the proposal's claim text never reached disk";
+}
+
+// The other half of slice 3g's routing claim: a proposal the planner CANNOT
+// express falls back to the guarded bridge rather than applying a near-miss.
+//
+// The shape here is a NodeOnly removal, which reparents the removed element's
+// children onto its parent. That is a RETARGET -- an existing relationship's
+// endpoints change -- and the plan has no operation for it, because the proposal
+// vocabulary has no move (#261) and a retarget arriving through a diff means
+// something the planner was not built to mirror.
+//
+// Measured by the bridge REFUSING: the fixture carries an ArgumentGroup the
+// projection cannot represent, so a bridged apply fails outright while a native
+// one would have succeeded. The failure IS the evidence of which path ran, and
+// the tracked file must be untouched either way.
+TEST(SaveFromLibrary, SACM23_LIB_002_ProposalThePlannerCannotExpressFallsBackToTheBridge) {
+    constexpr const char* kGroupedCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="acp_1">
+  <name content="Proposal fallback"/>
+  <argumentPackage xmi:id="ap_1">
+    <name content="Main"/>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top"/></argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2"><name content="Middle"/></argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G3"><name content="Leaf"/></argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R1" source="G2" target="G1"/>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R2" source="G3" target="G2"/>
+    <argumentElement xsi:type="sacm:ArgumentGroup" xmi:id="grp_1" argumentElement="G2">
+      <name content="Grouped"/>
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+    ProjectFixture fixture = MakeProject("phase3g-fallback", kGroupedCase);
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    const std::string before = ReadFile(fixture.sacm_absolute);
+    ASSERT_TRUE(Contains(before, "ArgumentGroup")) << "fixture lost the unrepresentable element";
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "phase3g-fallback";
+    proposal.anchor_element_id = "G1";
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    remove.element = core::reviews::ElementRef{"G2", std::nullopt};
+    remove.field = core::reviews::kReviewProposalRemoveModeNodeOnly;
+    proposal.operations.push_back(remove);
+
+    bool library_primary = false;
+    core::commands::ApplyProposalCommand command(proposal);
+    const core::commands::CommandResult result = RunOnBus(fixture, state, command, library_primary);
+
+    EXPECT_FALSE(result.success) << "a reparent reached the seams, which have no retarget in this plan";
+    EXPECT_EQ(ReadFile(fixture.sacm_absolute), before) << "the refused proposal still rewrote the tracked file";
+}
+
 TEST(SaveFromLibrary, SACM23_LIB_002_FlippedReorderSiblingsRunsOnACaseTheBridgeRefuses) {
     constexpr const char* kReorderCase = R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301"
