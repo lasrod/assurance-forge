@@ -1341,13 +1341,24 @@ CheckOutcome check_set_tagged_value(const model::Document& document, const SetTa
         });
         return outcome;
     }
+    // `before` is the entry for the language BEING EDITED, not the tag's primary.
+    // They differ as soon as the tag carries more than one language, which is the
+    // case this operation exists for -- and a ChangeRecord naming an unrelated
+    // language would misreport the edit to every audit and undo consumer.
+    std::string previous;
+    for (const model::LangString& entry : existing->content().values) {
+        if (entry.lang == set.language) {
+            previous = entry.content;
+            break;
+        }
+    }
     outcome.effects.push_back(ChangeRecord{
         .id = existing->id(),
         .kind = model::ElementKind::TaggedValue,
         .change = ChangeRecord::Change::Modified,
         .parent = set.element,
         .property = "content",
-        .before = existing->content().primary().empty() ? std::nullopt : std::optional(existing->content().primary()),
+        .before = previous.empty() ? std::nullopt : std::optional(previous),
         .after = set.value.empty() ? std::nullopt : std::optional(set.value),
     });
     return outcome;
@@ -1386,7 +1397,7 @@ void perform_set_tagged_value(model::Document& document,
         std::erase_if(Access::content(*tagged).values,
                       [](const model::LangString& entry) { return entry.content.empty(); });
         if (Access::content(*tagged).values.empty()) {
-            std::erase_if(Access::index(document), [&](const auto& entry) { return entry.first == tagged->id(); });
+            Access::index(document).erase(tagged->id());
             std::erase_if(Access::tagged_values(*element),
                           [&](const std::unique_ptr<model::TaggedValue>& owned) { return owned.get() == tagged; });
         }

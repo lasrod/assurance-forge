@@ -490,6 +490,48 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetTaggedValueMergesByKeyAndDropsAnEmptied
     EXPECT_EQ(tagged_values_with_key("x.name"), 0u) << "an emptied tag lingered";
 }
 
+// Review of #376: the ChangeRecord must describe the LANGUAGE being edited.
+//
+// `before` was read from the tag's primary entry, which is whichever language
+// happens to sit first -- unrelated to the one the operation touches, and
+// different from it as soon as the tag carries more than one. That is exactly the
+// case this operation exists for, so every audit or undo consumer reading the
+// record would have been told about the wrong language.
+TEST(Sacm23BaseModel, SACM23_BASE_001_SetTaggedValueReportsTheEditedLanguageInItsChangeRecord) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"ap_1"}, .name = "Args"})
+            .applied);
+    ASSERT_TRUE(document.apply(CreateClaim{.parent = ElementId{"ap_1"}, .id = ElementId{"c_1"}, .name = "G"}).applied);
+    const ElementId claim{"c_1"};
+
+    // Two languages, "fr" first so it is the tag's primary.
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Nom", .language = "fr"}).applied);
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Namae", .language = "ja"}).applied);
+
+    // Revising "ja" must report "ja"'s old value, not "fr"'s.
+    const sacm::commands::MutationResult revised =
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Atarashii", .language = "ja"});
+    ASSERT_TRUE(revised.applied);
+    ASSERT_EQ(revised.changes.size(), 1u);
+    ASSERT_TRUE(revised.changes.front().before.has_value());
+    EXPECT_EQ(*revised.changes.front().before, "Namae")
+        << "the change record reported a different language's value than the one edited";
+    ASSERT_TRUE(revised.changes.front().after.has_value());
+    EXPECT_EQ(*revised.changes.front().after, "Atarashii");
+
+    // A language with no prior entry reports no `before` at all, rather than
+    // borrowing the primary's.
+    const sacm::commands::MutationResult added =
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Nombre", .language = "es"});
+    ASSERT_TRUE(added.applied);
+    ASSERT_EQ(added.changes.size(), 1u);
+    EXPECT_FALSE(added.changes.front().before.has_value()) << "a language that had no entry reported one anyway";
+}
+
 // SetDescriptionAt addresses a ModelElement's Description list by ordinal slot
 // (clause 8.9 Description[0..*]): slot 0 is the statement, slot 1 a second note.
 // Appending at the count grows the list; an in-range index edits in place; a gap

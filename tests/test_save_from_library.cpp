@@ -1474,6 +1474,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_NativeTranslatedNameSurvivesSaveAndReload) 
     core::commands::UpdateElementTextCommand second("G1", core::ElementTextField::Name, "ja", "二回目");
     bool second_primary = false;
     ASSERT_TRUE(RunOnBus(fixture, state, second, second_primary).success);
+    ASSERT_TRUE(second_primary) << "the second translated edit fell back to the bridge";
 
     const std::string autosaved = ReadFile(fixture.sacm_absolute);
     EXPECT_TRUE(Contains(autosaved, "sacm.import.name"))
