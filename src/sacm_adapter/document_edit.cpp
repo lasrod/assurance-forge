@@ -558,6 +558,123 @@ AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string&
     return outcome; // a top goal has no parent, so no relationship
 }
 
+std::string resolve_argument_package_id(const LibraryDocument& document, const std::string& element_id) {
+    const sacm::model::Document& doc = LibraryDocumentAccess::document(document);
+    if (!element_id.empty()) {
+        if (const sacm::model::ArgumentPackage* owner =
+                owning_argument_package(doc.find(sacm::model::ElementId(element_id)))) {
+            return owner->id().value();
+        }
+    }
+    if (const sacm::model::ArgumentPackage* first = first_argument_package(doc)) {
+        return first->id().value();
+    }
+    return {};
+}
+
+AddChildOutcome apply_create_element(LibraryDocument& document,
+                                     const std::string& package_id,
+                                     NewElementKind kind,
+                                     const CreateElementFields& fields) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId package(package_id);
+    const auto* argument_package = dynamic_cast<const sacm::model::ArgumentPackage*>(doc.find(package));
+    if (argument_package == nullptr) {
+        return unsupported_child();
+    }
+
+    const std::optional<sacm::model::ElementId> id = to_optional_id(fields.element_id);
+    sacm::commands::Operation create = sacm::commands::CreateClaim{
+        .parent = package,
+        .id = id,
+        .name = fields.name,
+        .description = fields.text,
+        .language = fields.language,
+    };
+    std::optional<sacm::model::AssertionDeclaration> assertion;
+    std::optional<std::string> gsn_role;
+    switch (kind) {
+    case NewElementKind::Claim:
+        break;
+    case NewElementKind::Assumption:
+        assertion = sacm::model::AssertionDeclaration::Assumed;
+        break;
+    case NewElementKind::Justification:
+        // Axiomatic plus the vendor role tag, the same mapping `plan_child` uses:
+        // SACM cannot tell a Justification from an axiomatically-asserted Goal, so
+        // the GSN role rides in a TaggedValue the projection reads back.
+        assertion = sacm::model::AssertionDeclaration::Axiomatic;
+        gsn_role = std::string(kGsnRoleJustification);
+        break;
+    case NewElementKind::ArgumentReasoning:
+        create = sacm::commands::CreateArgumentReasoning{.parent = package, .id = id, .name = fields.name};
+        break;
+    case NewElementKind::ArtifactReference:
+        create = sacm::commands::CreateArtifactReference{.parent = package, .id = id, .name = fields.name};
+        break;
+    }
+
+    const sacm::commands::MutationResult created = doc.apply(create);
+    if (!created.applied || created.created_ids().empty()) {
+        return failed_child(created);
+    }
+    const sacm::model::ElementId created_id = created.created_ids().front();
+
+    // Everything past the create rolls the element back on failure, so a partial
+    // create leaves no half-formed element for the projection to render.
+    const sacm::commands::MutationResult identifier_tagged = add_gsn_identifier_tag(doc, created_id);
+    if (!identifier_tagged.applied) {
+        rollback_element(doc, created_id);
+        return failed_child(identifier_tagged);
+    }
+    if (assertion.has_value()) {
+        const sacm::commands::MutationResult declared =
+            doc.apply(sacm::commands::SetAssertionDeclaration{.element = created_id, .declaration = *assertion});
+        if (!declared.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(declared);
+        }
+    }
+    if (gsn_role.has_value()) {
+        const sacm::commands::MutationResult tagged =
+            doc.apply(sacm::commands::AddTaggedValue{.element = created_id, .key = kGsnRoleTagKey, .value = *gsn_role});
+        if (!tagged.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(tagged);
+        }
+    }
+    // An ArgumentReasoning's statement is its Description, exactly as a Claim's is
+    // (`content_maps_to_description` covers both), but `CreateArgumentReasoning`
+    // takes no description -- so it is written here or not at all. Dropping it
+    // silently lost a proposed strategy's text on the native path while the bridge
+    // kept it, which is the shape of bug this whole migration exists to avoid.
+    //
+    // An ArtifactReference genuinely has no statement: its POD `description` is a
+    // note, and the planner routes that as an ordinary Description write instead.
+    // An ArgumentReasoning's statement is its Description, exactly as a Claim's is
+    // (`content_maps_to_description` covers both), but `CreateArgumentReasoning`
+    // takes no description -- so it is written here or not at all. Dropping it
+    // silently lost a proposed strategy's text on the native path while the bridge
+    // kept it, which is the shape of bug this whole migration exists to avoid.
+    //
+    // An ArtifactReference genuinely has no statement: its POD `description` is a
+    // note, and the planner routes that as an ordinary Description write instead.
+    if (kind == NewElementKind::ArgumentReasoning && !fields.text.empty()) {
+        const sacm::commands::MutationResult described = doc.apply(
+            sacm::commands::SetDescription{.element = created_id, .text = fields.text, .language = fields.language});
+        if (!described.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(described);
+        }
+    }
+
+    AddChildOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.new_element_id = created_id.value();
+    return outcome; // no relationship: a proposal attaches separately
+}
+
 AddChildOutcome apply_challenge(LibraryDocument& document,
                                 const std::string& target_id,
                                 ChallengeSource source,

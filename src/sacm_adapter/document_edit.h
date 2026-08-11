@@ -136,6 +136,50 @@ AddChildOutcome apply_add_child(LibraryDocument& document,
 // it. Reports `supported == false` only if the document has no ArgumentPackage.
 AddChildOutcome apply_add_top_goal(LibraryDocument& document, const std::string& element_id = {});
 
+// The shapes a bare element create can take. A proposal builds an element FIRST
+// and attaches it in a separate operation, so unlike `apply_add_child` this
+// creates no relationship. Solution and Context are both ArtifactReference --
+// they differ only in the relationship that later attaches them, which is a
+// separate operation and therefore not this seam's business.
+enum class NewElementKind {
+    Claim,             // Claim
+    Assumption,        // Claim, assertionDeclaration = assumed
+    Justification,     // Claim, axiomatic + the gsn.role vendor tag
+    ArgumentReasoning, // ArgumentReasoning (a GSN Strategy)
+    ArtifactReference, // ArtifactReference (a GSN Solution or Context)
+};
+
+struct CreateElementFields {
+    std::string element_id; // used verbatim when non-empty; empty lets the library generate
+    std::string name;
+    std::string text;     // the Claim's Description (clause 8.9); ignored by kinds with none
+    std::string language; // language tag for name/text; may be empty
+};
+
+// Creates ONE element inside `package_id`, with no relationship, mirroring what
+// `ReviewProposalPatchService` puts in the model for a Create* operation. The
+// assertion declaration and the GSN role tag follow the same mapping
+// `apply_add_child` uses, so an element created either way projects identically.
+//
+// `package_id` must name an ArgumentPackage; the caller chooses it, because a
+// flat POD model does not record which package an element belongs to and
+// guessing would put a proposed claim in the wrong package of a multi-package
+// case. Reports `supported == false` when it does not resolve.
+AddChildOutcome apply_create_element(LibraryDocument& document,
+                                     const std::string& package_id,
+                                     NewElementKind kind,
+                                     const CreateElementFields& fields);
+
+// The id of the ArgumentPackage that owns `element_id`, or of the document's
+// first ArgumentPackage when `element_id` is empty or does not resolve. Empty
+// when the document has no ArgumentPackage at all.
+//
+// A read rather than an edit, exposed because the flat POD model records no
+// package: a caller mirroring POD changes into the document has no other way to
+// say WHERE a new element goes, and picking the first package unconditionally
+// would put a proposed claim in the wrong package of a multi-package case.
+std::string resolve_argument_package_id(const LibraryDocument& document, const std::string& element_id);
+
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
     CounterArgument, // Claim             <- AssertedInference (isCounter)

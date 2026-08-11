@@ -28,6 +28,7 @@
 #include "core/commands/element_commands.h"
 #include "core/commands/gid_commands.h"
 #include "core/commands/package_commands.h"
+#include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/commands/tree_commands.h"
 #include "core/element_factory.h"
@@ -435,6 +436,52 @@ TEST(LibraryReplayConvergence, ContentEditOnDescriptionOnlyClaimConverges) {
 // marker) carrying legacy-minted gids the library seam could not assign. Slice
 // 3b-1 bridges it, so create-package + create-term + add-as-visible-context
 // converges on the raw canonical hash.
+// Slice 3g: a proposal applied through the seams replays to the same canonical
+// hash the legacy replay produces. This is the pin that matters for the flip --
+// the live edit and the recorded history have to describe the same argument, or
+// the audit stops being evidence of anything.
+//
+// A create plus its attachment, because that is the shape the AI review and MCP
+// paths actually produce, and it exercises the two halves the plan mirrors
+// separately: a bare element, then the relationship that attaches it.
+TEST(LibraryReplayConvergence, ApplyProposalCreateAndAttachConverges) {
+    auto f = MakeFixture("apply_proposal_converge");
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+    core::commands::CommandContext ctx{f.model, f.package};
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "converge-1";
+    proposal.anchor_element_id = "G1";
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateClaim;
+    create.create_ref = "$new_claim_1";
+    create.text = "The subsystem is acceptably safe.";
+    proposal.operations.push_back(create);
+    core::reviews::PatchOperation attach;
+    attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+    attach.source = core::reviews::ElementRef{std::nullopt, "$new_claim_1"};
+    attach.target = core::reviews::ElementRef{"G1", std::nullopt};
+    proposal.operations.push_back(attach);
+
+    core::commands::ApplyProposalCommand command(proposal);
+    ASSERT_TRUE(bus->Execute(command, ctx, "tester").success);
+
+    const std::vector<core::audit::AuditTransaction> txns = bus->Store().Transactions();
+    const core::audit::ReplayState legacy = LegacyReplay(f, txns);
+    const std::unique_ptr<sacm_adapter::LibraryDocument> library_doc = LibraryReplay(f, txns);
+    ASSERT_NE(library_doc, nullptr);
+
+    const std::optional<std::string> library_hash =
+        core::library_canonical_hash(core::project_library_package(*library_doc));
+    const std::optional<std::string> legacy_hash = core::library_canonical_hash(legacy.package);
+    ASSERT_TRUE(library_hash.has_value());
+    ASSERT_TRUE(legacy_hash.has_value());
+    EXPECT_EQ(*library_hash, *legacy_hash);
+}
+
 TEST(LibraryReplayConvergence, AddTerminologyVisibleContextBridgeConverges) {
     auto f = MakeFixture("terminology_visible_context");
 
