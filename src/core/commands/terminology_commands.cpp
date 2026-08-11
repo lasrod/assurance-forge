@@ -212,7 +212,7 @@ bool CreateTerminologyPackageCommand::Apply(CommandContext& ctx, audit::AuditEve
             }
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
         generated_ref_ = result.package_ref;
     }
@@ -248,7 +248,7 @@ bool UpdateTerminologyPackageCommand::Apply(CommandContext& ctx, audit::AuditEve
             [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::UpdateTerminologyPackage(package, package_ref_, name_, description_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -293,7 +293,7 @@ bool CreateTerminologyCategoryCommand::Apply(CommandContext& ctx,
             }
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
         generated_ref_ = result.category_ref;
     }
@@ -333,7 +333,7 @@ bool UpdateTerminologyCategoryCommand::Apply(CommandContext& ctx,
             [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::UpdateTerminologyCategory(package, package_ref_, category_ref_, draft_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -371,7 +371,7 @@ bool DeleteTerminologyCategoryCommand::Apply(CommandContext& ctx,
             [&](parser::AssuranceCase&, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::DeleteTerminologyCategory(package, package_ref_, category_ref_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -414,7 +414,7 @@ bool CreateTerminologyTermCommand::Apply(CommandContext& ctx, audit::AuditEvent&
             }
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
         generated_ref_ = result.term_ref;
     }
@@ -458,7 +458,7 @@ bool UpdateTerminologyTermCommand::Apply(CommandContext& ctx, audit::AuditEvent&
             core::RefreshVisibleTerminologyContextProjection(model, package);
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -507,7 +507,7 @@ bool DeleteTerminologyTermCommand::Apply(CommandContext& ctx, audit::AuditEvent&
             core::RefreshVisibleTerminologyContextProjection(model, package);
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
         removed_ids_.push_back(term_ref_.id);
     }
@@ -564,7 +564,7 @@ bool AssociateTerminologyTermWithElementCommand::Apply(CommandContext& ctx,
             }
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
@@ -609,7 +609,7 @@ bool AddTerminologyTermAsVisibleContextCommand::Apply(CommandContext& ctx,
             core::SyncVisibleTerminologyContextToParser(model, package, result_);
             return true;
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 

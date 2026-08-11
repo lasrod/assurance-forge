@@ -335,8 +335,7 @@
         "src/ui/gsn/gsn_shapes.cpp"
       ],
       "tests": [
-        "tests/test_element_factory.cpp",
-        "tests/test_strategy_migration.cpp"
+        "tests/test_element_factory.cpp"
       ],
       "notes": "Maps to SACM `ArgumentReasoning`; see docs/sacm/sacm-gsn-mapping.md."
     },

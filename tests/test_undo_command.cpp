@@ -319,32 +319,6 @@ TEST(UndoCommand, SACM23_LIB_002_LibraryPrimaryUndoPreservesUnknownVendorContent
         << "undo wrote a projection and erased the preserved vendor content";
 }
 
-// Undo is exempt from the `allow_library_primary` kill switch, and deliberately
-// so: for undo the two routings are inverted (see undo_command.h), so honouring
-// the switch would take the path that BOTH replaces the live views mid-dispatch
-// -- the hazard the switch exists to prevent -- and restores the wrong preserved
-// content, since the Stage-5 net adopts the compatibility content of the
-// outgoing document rather than of the state being restored.
-TEST(UndoCommand, SACM23_LIB_002_UndoStaysLibraryPrimaryUnderTheKillSwitch) {
-    auto f = MakeLibraryBackedFixture("kill_switch", kVendorExtendedSacm);
-    ASSERT_NE(f.document, nullptr);
-
-    std::string error;
-    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
-    ASSERT_TRUE(bus) << error;
-    core::commands::CommandContext ctx{f.model, f.package, f.document.get()};
-    ctx.allow_library_primary = false;
-
-    core::commands::CreateChildElementCommand add_goal("G1", core::NewElementKind::Goal);
-    RunCommand(f, *bus, add_goal, ctx);
-    ASSERT_FALSE(ctx.library_primary) << "the kill switch did not force the EDIT onto the legacy path";
-
-    ASSERT_TRUE(DoUndo(f, *bus, ctx, error)) << error;
-    EXPECT_TRUE(ctx.library_primary) << "undo honoured the kill switch and took the lossy path";
-    EXPECT_NE(ReadFile(f.sacm_abs).find(kVendorElementMarker), std::string::npos)
-        << "undo under the kill switch erased the preserved vendor content";
-}
-
 TEST(UndoBoundary, ImplicitInitialSnapshotIsAlwaysTheFloor) {
     // Empty snapshot/baseline lists still pin the wall at sequence 0.
     EXPECT_EQ(core::audit::FindUndoBoundary({}, {}, /*current_sequence=*/5), 0u);

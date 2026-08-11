@@ -11,9 +11,9 @@ Where the migration stands: the library-owned document is authoritative for
 load, and every bus-dispatched edit reaches disk through it — natively or via
 the guarded bridge (`SACM23-LIB-002` in the
 [conformance matrix](../sacm/sacm-conformance-matrix.md)); the legacy parser
-load fallback is gone, and the one save path outside the bus (the no-bus
-dispatch for a file opened without a project) is a disclosed, tracked
-exception ([#347](https://github.com/lasrod/assurance-forge/issues/347)).
+load fallback is gone, and the no-bus dispatch (a file opened without a project)
+no longer re-derives the document from a projection -- it carries the document
+and applies natively, like every audited path.
 Edits are split: some commands mutate the library
 natively, the rest go through a bridge that projects the document into the
 legacy model, mutates that, and re-derives the document. The bridge is lossy
@@ -537,22 +537,38 @@ key string is how a projection quietly stops seeing what an editor writes.
 *Exit criteria*: `BridgeViaLegacy` has no callers; the bridge's refusal
 message is unreachable; `RemoveElement` has one code path.
 
-### Phase 4 — Delete the bridge and the flip plumbing
+### Phase 4 — Delete the bridge and the flip plumbing — **done**
 
-Delete `library_bridge.cpp/.h`, `project_library_package_with_tags`,
-`reload_document_keeping_compatibility_content`, the Stage-5 net, and the
-`allow_library_primary` kill switch; audit whether any dispatch can still
-carry a null `library_document`, and retire the routine
-`library_xmi_from_package` autosave path with it.
+`library_bridge.cpp`'s `BridgeLegacyMutationToLibrary` and the replayer's
+`BridgeViaLegacy` are gone, along with the `allow_library_primary` kill switch.
+What survives at that seam is `ApplyLegacyOrRefuse`: with a document present it
+REFUSES and leaves the document untouched; with no document it runs the legacy
+mutator, which is how the convergence tests still build their legacy baseline.
 
-*Exit criteria*: the files are gone;
-`SaveFromLibrary.SACM23_LIB_002_AutosaveAndExplicitSaveProduceIdenticalBytes`
-holds for **every** command, not only flipped ones; the "unflipped autosave"
-remaining-work note on `SACM23-LIB-002` is deleted;
-`ProjectionCoverage.SACM23_LIB_002_BridgeRoundTripLosesOnlyTheKnownKinds` and
-the refusal test are retired *in the same change* as the bridge, with the
-matrix note rewritten — they must outlive every bridged command, and not the
-bridge itself.
+*Exit criteria, as met.* `BridgeViaLegacy` has no callers because it no longer
+exists; the bridge's refusal message is unreachable for the same reason. No
+command routes through a projection rebuild any more, so the "unflipped autosave"
+note is gone from `SACM23-LIB-002`.
+
+Four things this phase established that the plan did not anticipate:
+
+- **The refusal guards were deleted, not re-pointed.** They had moved four times
+  as fallbacks went native (rename → ApplyProposal → translated rename →
+  attaching an existing strategy). The plan always said they must retire WITH the
+  bridge rather than be kept alive for their own sake, and that is what happened.
+- **The strategy-encoding migration went too.** It existed to convert a legacy
+  bare-inference encoding on open, and it was the last caller of the bridge
+  outside the command path. With no released version to migrate from, converting
+  is support for a format nobody has.
+- **The bridge was not the last silent-loss path.** The no-bus dispatch was: it
+  built a context with no document, mutated the legacy package, and re-derived the
+  document FROM that projection. The bridge at least refused what it could not
+  represent; that path did not. It now carries the document like every other.
+- **The tag-carrying projection stays.** The plan expected
+  `project_library_package_with_tags` to fall out with the bridge. It does not:
+  `RebuildDerivedViewsFromLibrary` is built on it, and that is the target
+  architecture rather than migration scaffolding.
+
 
 ### Phase 5 — Retire the legacy model as a hash and serialization substrate
 

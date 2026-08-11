@@ -269,7 +269,7 @@ bool ReorderSiblingsCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
     // the empty error string is what distinguishes a no-op from a real failure for
     // the caller. (In practice `ValidateTreeDrop` gates invalid drops before dispatch,
     // so a no-op does not reach here.)
-    if (!applied_to_library && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+    if (!applied_to_library && !ApplyLegacyOrRefuse(ctx, mutate, out_error))
         return false;
 
     out_event.event_type = "ReorderSiblings";
@@ -309,7 +309,7 @@ bool MoveSubtreeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event
         // refusal is a hard failure instead -- the same rule the cascading delete
         // in `RemoveElementCommand` follows.
         if (plan.touches_non_relationships || !plan.unrepresentable_reason.empty()) {
-            if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+            if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
                 return false;
             RecordMoveSubtreeEvent(out_event, dragged_id_, new_parent_id_, {});
             return true;
@@ -337,7 +337,7 @@ bool MoveSubtreeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event
             return false;
         applied_to_library = true;
     }
-    if (!applied_to_library && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+    if (!applied_to_library && !ApplyLegacyOrRefuse(ctx, mutate, out_error))
         return false;
 
     RecordMoveSubtreeEvent(out_event, dragged_id_, new_parent_id_, planned_relationship_id);

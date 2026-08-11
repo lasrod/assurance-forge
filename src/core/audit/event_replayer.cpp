@@ -139,20 +139,13 @@ std::string FormatSeamFailure(const std::string& seam,
 // back into `document` in place.
 using BridgeMutator = std::function<bool(parser::AssuranceCase&, sacm::AssuranceCasePackage&, std::string&)>;
 
-bool BridgeViaLegacy(sacm_adapter::LibraryDocument& document,
-                     const std::string& location,
-                     const BridgeMutator& mutate,
-                     std::string& out_error) {
-    // Delegates rather than duplicating. This WAS a second copy of
-    // `core::commands::BridgeLegacyMutationToLibrary`, and the copy is what made
-    // fixing the live path insufficient: the live bridge stopped dropping vendor
-    // content while this one carried the defect onto the RESTORE path, where a
-    // recovery rebuilt the document through the tag-less audit projection and
-    // silently destroyed every Assurance Claim Point -- reporting no degradation,
-    // because the canonical hash drops the same tags on both sides and cannot see
-    // it. Restore-from-audit losing data is precisely what the audit subsystem
-    // exists to prevent. One implementation now, so the two cannot drift again.
-    return core::commands::BridgeLegacyMutationToLibrary(document, mutate, out_error, location);
+// Replay refuses a shape no seam expresses, rather than rebuilding the document
+// from a projection. The live command that recorded such an event refused too, so
+// a log carrying one describes an edit that never landed.
+bool RefuseUnrepresentableReplay(const std::string& location, std::string& out_error) {
+    out_error = "Replaying " + location +
+                " needs the legacy compatibility path, which has been removed; the document is unchanged.";
+    return false;
 }
 
 // Slice 2c: the ACP replay path. Like BridgeViaLegacy it projects the document
@@ -1387,7 +1380,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         }
         core::MoveSubtreePlan plan = core::PlanMoveSubtreeFromDiff(before, after);
         if (plan.touches_non_relationships || !plan.unrepresentable_reason.empty()) {
-            return BridgeViaLegacy(document, location, mutate, out_error);
+            return RefuseUnrepresentableReplay(location, out_error);
         }
         // Prefer the RECORDED relationship id over the one this replay's mutator
         // just minted. They agree today -- `GenerateRelationshipId` derives from the
@@ -1468,7 +1461,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             }
             return true;
         };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        return RefuseUnrepresentableReplay(location, out_error);
     }
 
     if (type == "UpdateGsnIdentifier") {
@@ -2110,7 +2103,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             core::RebuildSacmArgumentPackageFromParser(model, package);
             return true;
         };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        return RefuseUnrepresentableReplay(location, out_error);
     }
 
     // ACP events have no parity library seam (ACPs are legacy vendor TaggedValues,

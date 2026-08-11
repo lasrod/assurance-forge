@@ -51,7 +51,7 @@ bool EnsureElementGidCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_
             [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
             return core::SetElementGid(model, &package, element_id_, generated_gid_, err);
         };
-        if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+        if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 

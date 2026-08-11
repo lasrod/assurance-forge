@@ -1,3 +1,4 @@
+#include "app/commands/dispatch.h"
 #include "app/app_runtime.h"
 
 #include "app/actions/element_actions.h"
@@ -894,15 +895,7 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     // the frame before any panel renders -- the same deferred-to-next-frame remedy
     // `pending_reconcile_audit_store` uses for the same class of hazard. This runs
     // even when the proposal canvas is active (the edit is committed regardless).
-    if (impl_->rederive_views_from_library) {
-        impl_->rederive_views_from_library = false;
-        if (impl_->app_state.library_document && impl_->app_state.loaded_case.has_value() &&
-            impl_->app_state.sacm_package.has_value()) {
-            core::RebuildDerivedViewsFromLibrary(*impl_->app_state.library_document,
-                                                 impl_->app_state.loaded_case.value(),
-                                                 impl_->app_state.sacm_package.value());
-        }
-    }
+    app::commands::ApplyPendingLibraryRederive(*impl_);
 
     if (impl_->IsProposalCanvasActive()) {
         return;

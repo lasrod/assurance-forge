@@ -33,7 +33,6 @@ add_library(af_core OBJECT
     audit/history_highlights.cpp
     audit/history_reconstruction.cpp
     audit/replay_verifier.cpp
-    audit/strategy_migration.cpp
     audit/timeline_model_builder.cpp
     audit/undo_boundary.cpp
     audit/undo_resolver.cpp

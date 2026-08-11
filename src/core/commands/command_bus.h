@@ -67,23 +67,6 @@ struct CommandContext {
     // Kill switch for the library-primary live edit flip. When false, flipped
     // commands take the legacy-mutator path regardless of `library_document`, so
     // the derived views are mutated in place rather than rebuilt wholesale.
-    //
-    // The flip is LIVE in the interactive app. This used to say the app set it
-    // false to dodge a GUI re-entrancy (a wholesale mid-frame rebuild of
-    // `model`/`package` invalidating a panel iterating them); that re-entrancy
-    // was fixed and the flip re-enabled, but the comment stayed, which made the
-    // whole live edit path read as legacy-only to anyone reasoning from here.
-    // Nothing under `src/` assigns this now -- see the note in
-    // `app::commands::DispatchAuditedCommand`. It is therefore TEST-ONLY in
-    // practice: the only `false` assignments are in `tests/`, which use it to
-    // exercise the legacy-mutator path that production no longer reaches.
-    //
-    // Kept rather than deleted because it is the kill switch for an incomplete
-    // migration -- setting it false is how a regression in the flipped path gets
-    // contained without a revert. Recorded here as a bounded claim rather than
-    // left to look like a live production branch, because the SACM23-LIB-002
-    // round-5 argument leans on which branches production can reach (#347).
-    bool allow_library_primary = true;
 };
 
 struct CommandResult {

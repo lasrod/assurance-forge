@@ -1,5 +1,6 @@
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "app/controllers/element_edit_controller.h"
 
 #include "core/audit/audit_paths.h"
@@ -11,6 +12,7 @@
 #include "core/project_model.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "legacy_sacm/sacm_parser.h"
 #include "ui/text_edit_session.h"
 
@@ -398,6 +400,44 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveConfirmDisclosesLibraryCons
     EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
 }
 
+// An edit made with NO command bus -- a SACM file opened outside a project --
+// must not lose content the legacy projection cannot represent.
+//
+// It used to. Without a bus the command took the pure legacy path, mutated the
+// package in place, and `sync_library_document()` then re-derived the
+// library-owned document FROM that projection: the wrong direction, unguarded,
+// and with the reload result ignored. Anything the POD cannot hold was gone from
+// the source of truth, with no refusal in the way and nothing reported. It was
+// the last such path (#347); the audited path has refused this since
+// SACM23-LIB-002.
+//
+// The document is now passed into the no-bus context, so the command applies to
+// it natively and the views are re-derived from it instead.
+TEST(ElementEditControllerTest, SACM23_LIB_002_NoBusEditKeepsUnrepresentableContent) {
+    const std::filesystem::path fixture = std::filesystem::path(AF_REPO_ROOT) / "libs" / "sacm" / "tests" / "data" /
+                                          "sacm23" / "argumentation-full-valid.sacm.xmi";
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(fixture.string())) << state.app_state.status_message;
+    ASSERT_EQ(state.command_bus, nullptr) << "this test is about the NO-BUS path; a bus makes it measure nothing";
+    ASSERT_NE(state.app_state.library_document, nullptr);
+
+    // Non-vacuity: the case carries a kind the legacy projection cannot hold.
+    const sacm_adapter::SaveOutcome before = sacm_adapter::save_document(*state.app_state.library_document);
+    ASSERT_TRUE(before.ok);
+    ASSERT_NE(before.xml.find("ArgumentGroup"), std::string::npos)
+        << "fixture carries no unrepresentable element; this test measures nothing";
+
+    ASSERT_TRUE(state.element_edit_controller->CommitElementTextEdit(
+        state, "claim_top", "name", "en", "Top claim", "Renamed outside a project"));
+
+    const sacm_adapter::SaveOutcome after = sacm_adapter::save_document(*state.app_state.library_document);
+    ASSERT_TRUE(after.ok);
+    EXPECT_NE(after.xml.find("ArgumentGroup"), std::string::npos)
+        << "a no-bus edit dropped the unrepresentable element from the source of truth";
+    EXPECT_NE(after.xml.find("Renamed outside a project"), std::string::npos)
+        << "the no-bus edit never reached the document";
+}
+
 // The counterpart: a delete that really does reach nothing else still goes
 // through without a dialog. A confirmation on every delete is a confirmation
 // on none -- users learn to click past it, and then it protects nothing when
@@ -414,11 +454,18 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveWithoutConsequencesStillDel
     // post-removal state rather than a stale one.
     ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "R1", core::RemoveMode::NodeAndDescendants));
     ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+    // The edit is library-primary, so the derived views refresh at the next frame
+    // rather than in the dispatch -- rebuilding there frees containers a panel may
+    // still be rendering from. Stand in for that frame.
+    app::commands::ApplyPendingLibraryRederive(state);
     ASSERT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "R1"), nullptr);
 
     ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeAndDescendants));
     EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm())
         << "a delete with no consequences should not interrupt the user";
+    // Library-primary: the derived views refresh at the next frame, not in the
+    // dispatch. Stand in for that frame before reading the model.
+    app::commands::ApplyPendingLibraryRederive(state);
     EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
 }
 
@@ -460,6 +507,9 @@ TEST(ElementEditControllerTest, SACM23_INT_002_NodeOnlyOffersNoPreviewRatherThan
     // the removal already happened — the same behaviour as before this feature,
     // which is the point: NodeOnly gains no wrong dialog.
     EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm());
+    // Library-primary: the derived views refresh at the next frame, not in the
+    // dispatch. Stand in for that frame before reading the model.
+    app::commands::ApplyPendingLibraryRederive(state);
     EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
 
     // And here is why previewing it as a set of deletes would have lied: R2 and
@@ -507,6 +557,9 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
         before.push_back(element.id);
 
     ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+    // Library-primary: the derived views refresh at the next frame, not in the
+    // dispatch. Stand in for that frame before reading the model.
+    app::commands::ApplyPendingLibraryRederive(state);
 
     std::vector<std::string> actually_gone;
     for (const std::string& id : before) {

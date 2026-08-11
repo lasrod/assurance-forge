@@ -105,7 +105,7 @@ partial — say so in Notes rather than downgrading the row.
 | ID | Capability | Status | Evidence | Tests | Notes |
 |---|---|---|---|---|---|
 | AF-GSN-001 | Goal | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp | tests/test_element_factory.cpp | |
-| AF-GSN-002 | Strategy | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp | tests/test_element_factory.cpp, tests/test_strategy_migration.cpp | Maps to SACM `ArgumentReasoning`; see docs/sacm/sacm-gsn-mapping.md. |
+| AF-GSN-002 | Strategy | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp | tests/test_element_factory.cpp | Maps to SACM `ArgumentReasoning`; see docs/sacm/sacm-gsn-mapping.md. |
 | AF-GSN-003 | Solution | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp | tests/test_element_factory.cpp | |
 | AF-GSN-004 | Context | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp | tests/test_element_factory.cpp | Claim-versus-ArtifactReference typing is preserved and diagnosed, not guessed. |
 | AF-GSN-005 | Assumption | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp | tests/test_element_factory.cpp | |

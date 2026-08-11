@@ -13,7 +13,7 @@ bool UndoLastTransactionCommand::Apply(CommandContext& ctx, audit::AuditEvent& o
     // to generate an inverse event-set. Instead, the audit log carries an
     // explicit `Undo` marker, and the replayer (event_replayer.cpp) is
     // aware of these markers and skips the transactions they cancel.
-    // Deliberately NOT gated on `ctx.allow_library_primary`, unlike every other
+    // Gated only on a document being present, like every other
     // flipped command. That kill switch exists to stop a command replacing the
     // live views wholesale mid-dispatch; for undo the routings are INVERTED --
     // the library-primary path leaves the views alone and the legacy path is the
