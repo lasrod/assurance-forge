@@ -188,6 +188,11 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
             plan.unrepresentable_reason = std::move(reason);
     };
 
+    // Strategy id -> the element it will support, for the bare-strategy shape
+    // below. Collected while walking, applied to the created elements afterwards,
+    // because the relationship can appear before the strategy it names.
+    std::map<std::string, std::string> deferred_strategy_targets;
+
     for (const SacmElement& updated : after.elements) {
         const SacmElement* original = Find(before, updated.id);
 
@@ -214,6 +219,22 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
                 // is the whole point of planning first: by then the elements are
                 // already in the document and the refusal is a hard failure with
                 // no way back, instead of a clean fall-through to the bridge.
+                // A strategy attached before it has any sub-goal produces an
+                // AssertedInference whose only end is `reasoning`, which clause
+                // 11.13 forbids. It is DEFERRED rather than declined: the strategy
+                // records the goal it will support in a vendor tag, and the
+                // inference materializes when the first sub-goal gives it a source
+                // -- exactly what `apply_add_child` does for a new Strategy.
+                // A strategy attached before it has any sub-goal produces an
+                // AssertedInference whose only end is `reasoning`, which clause
+                // 11.13 forbids. It is DEFERRED rather than declined: the strategy
+                // records the goal it will support in a vendor tag, and the
+                // inference materializes when the first sub-goal gives it a source
+                // -- exactly what `apply_add_child` does for a new Strategy.
+                if (updated.source_refs.empty() && !updated.reasoning_ref.empty() && updated.target_refs.size() == 1) {
+                    deferred_strategy_targets[updated.reasoning_ref] = updated.target_refs.front();
+                    continue;
+                }
                 if (updated.source_refs.empty() || updated.target_refs.empty()) {
                     decline("relationship " + updated.id + " has no source or no target");
                     continue;
@@ -282,6 +303,23 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
             plan.deleted_ids.push_back(original.id);
     }
 
+    for (ProposalPlan::CreatedElement& created : plan.created) {
+        const auto deferred = deferred_strategy_targets.find(created.id);
+        if (deferred == deferred_strategy_targets.end())
+            continue;
+        if (created.kind != sacm_adapter::NewElementKind::ArgumentReasoning) {
+            decline("element " + created.id + " is the reasoning of an inference with no source");
+            continue;
+        }
+        created.strategy_target = deferred->second;
+        deferred_strategy_targets.erase(deferred);
+    }
+    // A deferral naming a strategy this proposal did not create would tag an
+    // element the plan never touched, so it is declined rather than guessed at.
+    for (const auto& [strategy_id, target] : deferred_strategy_targets) {
+        decline("sourceless inference names existing reasoning " + strategy_id);
+    }
+
     return plan;
 }
 
@@ -295,8 +333,11 @@ bool ApplyProposalPlanToLibrary(sacm_adapter::LibraryDocument& document,
             document,
             created.package_id,
             created.kind,
-            sacm_adapter::CreateElementFields{
-                .element_id = created.id, .name = created.name, .text = created.text, .language = created.language});
+            sacm_adapter::CreateElementFields{.element_id = created.id,
+                                              .name = created.name,
+                                              .text = created.text,
+                                              .language = created.language,
+                                              .strategy_target = created.strategy_target});
         if (!outcome.supported || !outcome.applied) {
             out_error = "creating " + created.id + " failed" +
                         (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);

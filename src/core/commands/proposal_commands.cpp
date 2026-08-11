@@ -74,6 +74,10 @@ bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
     // creates, how a `create_ref` resolves, what a removal cascades to -- so the
     // flip cannot re-decide any of it. This is NOT the bridge: the scratch is read
     // and discarded, and the document is never rebuilt from it.
+    // Why the seams could not take this proposal, when they could not. A decline
+    // used to be silent: the command fell back and nothing recorded what the
+    // library would not express, so diagnosing one meant patching a probe in.
+    std::string decline_reason;
     bool applied_natively = false;
     if (CanApplyLibraryPrimary(ctx)) {
         // The BEFORE state is projected from the document, not taken from
@@ -102,6 +106,7 @@ bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
             sacm_adapter::resolve_argument_package_id(*ctx.library_document, proposal_.anchor_element_id);
         const reviews::ProposalPlan plan = reviews::PlanProposalFromDiff(before, scratch, package_id);
 
+        decline_reason = plan.unrepresentable_reason;
         if (plan.unrepresentable_reason.empty()) {
             generated_ids_ = result.generated_ids;
             // Set BEFORE the first write, for the reason MoveSubtreeCommand records:
@@ -115,8 +120,13 @@ bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
             applied_natively = true;
         }
     }
-    if (!applied_natively && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+    if (!applied_natively && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error)) {
+        if (!decline_reason.empty()) {
+            out_error = "The SACM library could not express this proposal (" + decline_reason +
+                        "), and the compatibility path failed too: " + out_error;
+        }
         return false;
+    }
 
     out_event.event_type = "ApplyProposal";
     out_event.payload = nlohmann::ordered_json::object();

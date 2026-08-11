@@ -36,6 +36,10 @@ struct ProposalPlan {
         std::string name;
         std::string text;
         std::string language;
+        // Set only for a strategy attached before it has a sub-goal: the element
+        // it will support, deferred to a vendor tag rather than an inference the
+        // library would refuse. See `CreateElementFields::strategy_target`.
+        std::string strategy_target;
     };
 
     struct Relationship {

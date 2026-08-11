@@ -643,6 +643,23 @@ AddChildOutcome apply_create_element(LibraryDocument& document,
             return failed_child(tagged);
         }
     }
+    // The deferred strategy attachment, mirroring `apply_add_child`'s Strategy
+    // branch: the goal this strategy will support is recorded as a vendor tag, not
+    // as a relationship, because the AssertedInference cannot exist until a
+    // sub-goal gives it a source (clause 11.13).
+    if (!fields.strategy_target.empty()) {
+        if (kind != NewElementKind::ArgumentReasoning) {
+            rollback_element(doc, created_id);
+            return unsupported_child();
+        }
+        const sacm::commands::MutationResult tagged = doc.apply(sacm::commands::AddTaggedValue{
+            .element = created_id, .key = kGsnStrategyTargetTagKey, .value = fields.strategy_target});
+        if (!tagged.applied) {
+            rollback_element(doc, created_id);
+            return failed_child(tagged);
+        }
+    }
+
     // An ArgumentReasoning's statement is its Description, exactly as a Claim's is
     // (`content_maps_to_description` covers both), but `CreateArgumentReasoning`
     // takes no description -- so it is written here or not at all. Dropping it
