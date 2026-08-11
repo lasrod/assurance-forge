@@ -111,6 +111,22 @@ nlohmann::json Server::HandleInitialize(const jsonrpc::Request& request) {
     // successful initialize as sufficient.
     session_.mark_initialized();
 
+    // The mode is re-evaluated per call, so this is a statement of *now*, not a
+    // promise -- but a client that never calls get_connection_status should
+    // still learn from the handshake what kind of session it got and that a
+    // missing application heals without restarting anything.
+    const std::string instructions =
+        session_.connected()
+            ? "Connected to a running Assurance Forge" +
+                  (session_.application_version().empty() ? std::string() : " " + session_.application_version()) +
+                  ". Reads answer from the live integrated working draft; staged changes appear on the user's "
+                  "canvas and are promoted only by the user, in the application. If the connection is ever "
+                  "lost, this session reconnects automatically on the next call."
+            : "Assurance Forge is not running with this project open, so this session serves read-only from "
+              "the last accepted version on disk and draft tools are unavailable. The session connects "
+              "automatically once the application has the project open -- call get_connection_status to "
+              "check, and simply retry after the user starts Assurance Forge.";
+
     return jsonrpc::MakeResult(request.id,
                                nlohmann::json{
                                    {"protocolVersion", kProtocolVersion},
@@ -122,6 +138,7 @@ nlohmann::json Server::HandleInitialize(const jsonrpc::Request& request) {
                                      {"resources", {{"subscribe", false}, {"listChanged", false}}},
                                      {"prompts", {{"listChanged", false}}}}},
                                    {"serverInfo", {{"name", kServerName}, {"version", kServerVersion}}},
+                                   {"instructions", instructions},
                                });
 }
 

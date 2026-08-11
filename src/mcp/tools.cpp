@@ -19,6 +19,10 @@ ToolResult Run(Session& session, const char* op, const nlohmann::json& arguments
     return ToolResult{result.payload, result.is_error};
 }
 
+ToolResult GetConnectionStatus(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "get_connection_status", arguments);
+}
+
 ToolResult GetCaseOverview(Session& session, const nlohmann::json& arguments) {
     return Run(session, "get_case_overview", arguments);
 }
@@ -198,6 +202,21 @@ nlohmann::json ExpectedRevisionSchema() {
 
 std::vector<ToolDefinition> BuildTools() {
     std::vector<ToolDefinition> tools;
+
+    tools.push_back(ToolDefinition{
+        "get_connection_status",
+        "Report whether this session is talking to a running Assurance Forge (live working "
+        "draft, draft tools available) or serving read-only from a copy on disk, and whether "
+        "MCP sharing consent is enabled. Returns no case content. Call it when another tool "
+        "reports a connection or consent problem.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        // Mode, application version and the consent flag are about this
+        // process, not the argument, so the consent gate does not apply --
+        // which is the point: it must work while consent is still off, so the
+        // model can tell the user which switch to flip.
+        false,
+        &GetConnectionStatus,
+    });
 
     tools.push_back(ToolDefinition{
         "get_case_overview",

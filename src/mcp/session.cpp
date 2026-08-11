@@ -7,6 +7,8 @@
 #include <nlohmann/json.hpp>
 
 #include <cctype>
+#include <chrono>
+#include <thread>
 
 namespace mcp {
 namespace {
@@ -171,6 +173,7 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     session->project_path_ = config.project_path;
     session->settings_path_ = config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
     session->session_id_ = bridge::GenerateToken();
+    session->never_connect_ = config.never_connect;
 
     // The running application first. It has the argument the user is looking at,
     // including edits that have not reached disk, so any copy this process could
@@ -185,7 +188,71 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     if (!session->OpenOffline(error)) {
         return nullptr;
     }
+    session->offline_loaded_ = true;
     return session;
+}
+
+bool Session::EnsureConnected() {
+    if (connection_ != nullptr) {
+        return true;
+    }
+    if (never_connect_) {
+        return false;
+    }
+
+    // Up to three attempts, ~50ms apart, but only while an endpoint record
+    // exists: an application that is mid-restart, or rebuilding its listener
+    // after a project switch, is reachable again within a breath, and one
+    // refused connect should not cost the caller a whole conversational turn.
+    // No record at all fails immediately -- "not running" is the ordinary case
+    // and it must stay free, or every offline call pays the backoff.
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        if (attempt > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        bridge::EndpointRecord record;
+        std::string error;
+        if (!bridge::ReadEndpointRecord(project_path_, record, error)) {
+            break;
+        }
+        if (ConnectToApplication(error)) {
+            mode_ = Mode::Connected;
+            return true;
+        }
+    }
+    mode_ = Mode::Offline;
+    return false;
+}
+
+Session::OperationResult Session::DescribeConnection() {
+    OperationResult result;
+    result.payload = nlohmann::json{
+        {"project_path", project_path_.string()},
+        {"consent_granted", consent_granted()},
+    };
+    if (connection_ != nullptr) {
+        result.payload["mode"] = "connected";
+        result.payload["application_version"] = application_version_;
+        result.payload["detail"] = "Connected to a running Assurance Forge. Reads answer from the integrated "
+                                   "working draft the user is looking at; draft tools are available.";
+    } else if (offline_loaded_) {
+        result.payload["mode"] = "offline_read_only";
+        result.payload["detail"] = "No running Assurance Forge is reachable, so reads serve the accepted case "
+                                   "this process loaded from disk and draft tools are refused. The session "
+                                   "connects automatically on the next call once the application has the "
+                                   "project open.";
+    } else {
+        result.payload["mode"] = "unreachable";
+        result.payload["detail"] = "The connection to Assurance Forge was lost and this session holds no "
+                                   "offline copy. Start Assurance Forge and open the project; the session "
+                                   "reconnects automatically on the next call.";
+    }
+    if (!consent_granted()) {
+        result.payload["consent_detail"] =
+            "MCP sharing is disabled, so tools that return case content will be refused. Enable \"Allow AI "
+            "clients to read and propose changes\" in Assurance Forge's Preferences, under MCP Server.";
+    }
+    return result;
 }
 
 Session::OperationResult Session::RunOverBridge(const std::string& op, const nlohmann::json& args) {
@@ -199,10 +266,11 @@ Session::OperationResult Session::RunOverBridge(const std::string& op, const nlo
 
     std::string reply;
     if (!connection_->WriteMessage(bridge::EncodeRequest(request)) || !connection_->ReadMessage(reply)) {
+        // The peer is gone. Drop the dead connection so the caller's reconnect
+        // path starts clean; Run decides what to tell the client.
+        connection_.reset();
         result.is_error = true;
-        result.payload = nlohmann::json{{"error",
-                                         "Lost the connection to Assurance Forge. It may have closed the project or "
-                                         "exited. Reconnect this AI client to continue."}};
+        result.connection_lost = true;
         return result;
     }
 
@@ -241,7 +309,7 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
                                          "application is the sole owner of the integrated draft, shows every staged "
                                          "change to the user, and enforces revision checks between contributors. A "
                                          "headless copy cannot safely do that. Open the project in Assurance Forge and "
-                                         "reconnect."}};
+                                         "retry; the session connects automatically on the next call."}};
         return result;
     }
 
@@ -311,7 +379,66 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
 }
 
 Session::OperationResult Session::Run(const std::string& op, const nlohmann::json& args) {
-    return connected() ? RunOverBridge(op, args) : RunOffline(op, args);
+    if (op == "get_connection_status") {
+        // Probe first so the status is what the next tool call will actually
+        // get, not what the last one got.
+        EnsureConnected();
+        return DescribeConnection();
+    }
+
+    EnsureConnected();
+
+    if (connection_ != nullptr) {
+        OperationResult result = RunOverBridge(op, args);
+        if (!result.connection_lost) {
+            return result;
+        }
+
+        // The application went away mid-call. Reads are answered by whatever
+        // the application holds now, so retrying one after a successful
+        // reconnect is safe and invisible. A mutation is never retried: the
+        // application may have applied it before the connection broke, and a
+        // second submission is exactly the kind of silent duplicate this
+        // surface exists to prevent.
+        const bool restored = EnsureConnected();
+        if (restored && IsOfflineOperation(op)) {
+            OperationResult retried = RunOverBridge(op, args);
+            if (!retried.connection_lost) {
+                return retried;
+            }
+        }
+
+        OperationResult failure;
+        failure.is_error = true;
+        failure.needs_application = true;
+        if (restored) {
+            failure.payload = nlohmann::json{
+                {"error",
+                 "The connection to Assurance Forge was interrupted and has been restored. This operation was "
+                 "not completed -- the application may or may not have applied it before the interruption. "
+                 "Check the current state (get_draft_status or describe_working_draft) before retrying."}};
+        } else {
+            failure.payload = nlohmann::json{
+                {"error",
+                 "Assurance Forge is not reachable. It may have exited, or switched to a different project. "
+                 "Start Assurance Forge and open this project; the session reconnects automatically on the "
+                 "next call -- there is no need to restart this AI client."}};
+        }
+        return failure;
+    }
+
+    if (offline_loaded_) {
+        return RunOffline(op, args);
+    }
+
+    OperationResult result;
+    result.is_error = true;
+    result.needs_application = true;
+    result.payload = nlohmann::json{
+        {"error",
+         "Assurance Forge is not reachable, and this session holds no offline copy to read from. Start "
+         "Assurance Forge and open this project; the session reconnects automatically on the next call."}};
+    return result;
 }
 
 } // namespace mcp

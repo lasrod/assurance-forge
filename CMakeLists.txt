@@ -492,6 +492,7 @@ add_executable(tests
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
     tests/test_mcp_modes.cpp
+    tests/test_mcp_reconnect.cpp
     tests/test_mcp_client_config.cpp
     tests/test_user_settings_path.cpp
 )
