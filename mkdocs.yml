@@ -64,6 +64,7 @@ nav:
   - Roadmap:
     - Product Roadmap: roadmap/public.md
     - Workflow: roadmap/workflow.md
+    - Demo Plan (2026-08): roadmap/demo-2026-08.md
   - Standards:
     - Overview: sacm/index.md
     - GSN v3 Conformance: gsn/gsn-v3-conformance-matrix.md
