@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 2 commands have no native seam yet, plus two MoveSubtree shapes (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c, 3 before 3d) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 1 command has no native seam yet (ApplyProposal), plus two MoveSubtree shapes and UpdateElementText's Description field (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c, 3 before 3d, 3 before 3e, 2 before 3f -- the "2" recorded for 3d was an undercount, since ReorderSiblings was still bridged then) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -82,6 +82,7 @@ default `true`, assigned nowhere under `src/app/`).
 | MoveStrategyToReasoning | `apply_set_relationship_ends` | `element_commands.cpp` `MoveStrategyToReasoningCommand::Apply` (slice 3b) |
 | RemoveElement (`NodeOnly`) | `apply_set_relationship_ends` for the reparent, then `apply_delete_element` per planned id | `element_commands.cpp` `RemoveElementCommand::Apply` (slice 3c) |
 | MoveSubtree | `apply_add_relationship`, `apply_set_relationship_ends`, `apply_delete_element`, from a diffed `MoveSubtreePlan` | [`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp) `MoveSubtreeCommand::Apply` (slice 3d) |
+| ReorderSiblings | `apply_set_relationship_ends` for source order, `apply_reorder_package_elements` for document order | `tree_commands.cpp` `ReorderSiblingsCommand::Apply` (slice 3e) |
 
 Every one of these keeps the guarded bridge as its *fallback*, for the shapes the
 seam does not support (and for a ref that carries only a gid, which the seams
@@ -90,9 +91,10 @@ is present.
 
 **Bridged** (`ApplyLibraryPrimaryOrLegacy` → `BridgeLegacyMutationToLibrary`):
 
-- Text: UpdateElementText (all fields)
+- Text: UpdateElementText **Description only** -- Name and Content went native in
+  slice 3f. Description stays bridged for the kinds that genuinely carry a note;
+  on a claim-like element the seam refuses it outright (ADR 0012)
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
-- Tree: ReorderSiblings ([`tree_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/tree_commands.cpp))
 - MoveSubtree, for the two shapes the seams cannot express -- see slice 3d below.
   The command applies natively otherwise
 - ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
@@ -331,26 +333,43 @@ key string is how a projection quietly stops seeing what an editor writes.
 
 ### Phase 3 — The hard residue
 
-- **UpdateElementText Content/Description**: requires deciding the claim
-  text model (two legacy slots vs clause-8.9 Description list) and, if the
-  library semantics win, a *recorded, announced* on-open migration of existing
-  data — the strategy-encoding migration
+- ~~**UpdateElementText Content/Description**~~ — **done (slice 3f).** It required
+  deciding the claim text model (two legacy slots vs clause-8.9 Description list),
+  and the decision is [ADR 0012](decisions/0012-a-claim-carries-one-description.md):
+  a claim carries ONE Description and that Description is its statement.
+
+    What settled it was measuring rather than arguing. Across 14 files and 139
+    claim-like elements, **120 carried two Descriptions holding identical text and
+    not one carried a genuine note** -- the second slot was the projection's mirror
+    written back through the bridge, not a note anybody had authored. Removing the
+    mirror removed the model difference, and with no second slot for the two routes
+    to disagree about, Name and Content now replay through the same seam the live
+    command uses. No migration was announced: the tool is pre-production, and the
+    accepted consequences are recorded in the ADR.
+
+    Two things this changed that are worth keeping:
+
+    - **A refusal is not a decline.** `apply_text_edit` reports "no mapping, keep
+      the legacy edit" as `supported = false`, which the command falls through to
+      the bridge. A refusal must NOT fall through, or the bridge reinstates the
+      edit the seam just rejected; it is reported as `supported && !applied` with a
+      diagnostic naming `content`, and the command fails on it.
+    - **The refusal guard had to move.** Both
+      `SACM23_LIB_002_BridgedEditRefuses*` tests used a rename as their bridged
+      vehicle, so flipping text edits made them measure nothing -- they failed,
+      which is how the flip proved they were load-bearing. They now run through
+      `ApplyProposal`, and must be re-pointed at whatever is still bridged each
+      time a command flips. They retire WITH the bridge in phase 4, not before it.
+
+  The announced-migration machinery this item was expected to need -- the
+  strategy-encoding migration
   ([`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp),
   pinned by `StrategyMigration.SACM23_LIB_002_StrategyMigrationPreservesUnknownContent`)
-  is the template. Silent reinterpretation is forbidden outright.
-- **ReorderSiblings**: the only remaining command that needs a NEW library
-  operation. Order in this model is two things, and only one of them is
-  expressible today: the order of a relationship's `source` refs (which
-  `SetRelationshipEnds` already writes, in order) and the order of the
-  relationship ELEMENTS within their package (which no operation addresses).
-  `ApplyParserSiblingOrder` does both -- it stable-sorts the element list -- so a
-  half-flip would change the display order without changing the serialization,
-  and `LibraryReplayConvergence.TreeReorderSiblingsConvergesAndChangesSerialization`
-  says in its name why that diverges. A new operation must respect the
-  family-typing caution in
-  [#334](https://github.com/lasrod/assurance-forge/issues/334) and take any
-  GSN mapping from [the mapping record](../sacm/sacm-gsn-mapping.md), never
-  from code.
+  -- was not used, because the measurement showed there was nothing to reinterpret:
+  the second slot held a copy, not a note. It remains the template if a future
+  change does have to reinterpret data, where silent reinterpretation stays
+  forbidden outright.
+- ~~**ReorderSiblings**~~ — **done (slice 3e).** See below.
 - ~~**DropRelationshipReference**~~ — **done (slice 3a).** It is the quick fix
   for an `UnresolvedEndpoint` finding, so the reference it drops resolves to
   nothing and the delete seam cannot serve: there is nothing to delete. The
@@ -454,6 +473,33 @@ key string is how a projection quietly stops seeing what an editor writes.
     is what the document actually got and a log has to keep replaying if that
     derivation changes. Events written before the field existed carry no id and
     replay by re-deriving it, exactly as they always did.
+
+- **ReorderSiblings** — landed in slice 3e, the only slice that needed a new
+  library operation.
+
+    Order in this model is TWO things. `ApplyParserSiblingOrder` rewrites the order
+    of each relationship's `source` refs -- which `SetRelationshipEnds` already
+    wrote -- and it stable-sorts the element list itself, which is the order the
+    package serializes in. Nothing addressed the second until
+    `sacm::commands::ReorderPackageElements`. Writing only the first half would have
+    moved the tree on screen and saved a file in the old order, which is what
+    `LibraryReplayConvergence.TreeReorderSiblingsConvergesAndChangesSerialization`
+    says in its name.
+
+    The operation reorders a NAMED SUBSET of a package's elements through the
+    positions those elements already occupy, leaving everything unnamed where it
+    was. A subset because the caller works from a projection, which does not list
+    nested packages, groups it cannot see, or clause-8.7 attachments -- requiring a
+    full permutation would have made the operation unusable by its only client. It
+    refuses an id the package does not contain, and an id named twice, rather than
+    ignoring either: the caller relies on the resulting order.
+
+    No GSN mapping was invented and none was needed. SACM attaches no meaning to
+    containment order and neither does the operation -- it changes serialization
+    order only. What makes it worth having is that document order is the only place
+    an interchange file can carry a client's own ordering, so a client that must not
+    lose one (a display order the user arranged) would otherwise have to rewrite the
+    file behind the library's back.
 
 - **ApplyProposal**: composes the native primitives once the rest exist.
 

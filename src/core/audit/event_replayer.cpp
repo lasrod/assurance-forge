@@ -1320,26 +1320,35 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         }
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
-        const BridgeMutator mutate =
-            [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            const core::AssuranceTree tree = core::AssuranceTree::Build(model, "");
-            core::TreeDisplayOrder scratch_order;
-            std::string reorder_error;
-            // Non-empty `reorder_error` is a real failure; a false-with-empty is an
-            // idempotent no-op (mirrors the legacy replay branch).
-            if (!core::ReorderSiblings(model,
-                                       &package,
-                                       tree,
-                                       scratch_order,
-                                       core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
-                                       reorder_error) &&
-                !reorder_error.empty()) {
-                err = "ReorderSiblings (bridge) failed at " + location + ": " + reorder_error;
+
+        // Seam-mapped in the same change as the live command, which is not optional:
+        // the live path now applies natively on documents the bridge REFUSES, so a
+        // bridged replay of the same event would refuse what the live edit accepted
+        // and the log would stop replaying.
+        parser::AssuranceCase before = sacm_adapter::project_case(document);
+        parser::AssuranceCase after = before;
+        const core::AssuranceTree tree = core::AssuranceTree::Build(after, "");
+        core::TreeDisplayOrder replayed_order;
+        std::string reorder_error;
+        if (!core::ReorderSiblings(after,
+                                   nullptr,
+                                   tree,
+                                   replayed_order,
+                                   core::ReorderSiblingsCommand{dragged_id, target_id, drop_mode},
+                                   reorder_error)) {
+            // False with an empty error is the mutator's no-op, not a failure --
+            // the same distinction the live command relies on.
+            if (!reorder_error.empty()) {
+                out_error = "ReorderSiblings failed at " + location + ": " + reorder_error;
                 return false;
             }
             return true;
-        };
-        return BridgeViaLegacy(document, location, mutate, out_error);
+        }
+        if (!commands::ApplySiblingReorderToLibrary(document, before, after, out_error)) {
+            out_error = "ReorderSiblings failed at " + location + ": " + out_error;
+            return false;
+        }
+        return true;
     }
 
     if (type == "MoveSubtree") {
@@ -1414,42 +1423,29 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                         FormatLocation(tx_seq, event.event_sequence, type);
             return false;
         }
-        // `Name` maps cleanly onto the library seam (SetName). `Content` and
-        // `Description` on a CLAIM stay BRIDGED -- and this is not a missing op
-        // (Phase 2 slice 2a added SetDescriptionAt so the seam can address both
-        // Description slots) but an IRRECONCILABLE data-model difference, proven
-        // by measuring the replay:
+        // Name and Content replay through the library seam, matching the live
+        // command (phase 3f). They used to bridge, and the reason is worth keeping
+        // because it was a MODEL difference, not a missing operation:
         //
-        //   The app models a claim with two text slots (content = statement,
-        //   description = note). The legacy POD keeps them as two independent
-        //   fields whose values depend on how the claim was LOADED: a `content=`
-        //   attribute fills `content`, a `description=` attribute fills
-        //   `description`. The library instead stores clause-8.9 Description[0..*]
-        //   as an ordered list, and a claim with a single Description is
-        //   indistinguishable whether that text arrived as content or as a note.
-        //
-        //   So a claim loaded from `description="X"` (no content) has, in the
-        //   library, one Description at slot 0 = the app's content. Editing
-        //   Content overwrites it (correct for the library-primary model), which
-        //   DESTROYS "X". The legacy mutator instead sets a separate `content`
-        //   field and KEEPS `description="X"` as the note. Measured:
+        //   The app modelled two claim text slots. The legacy POD kept them as two
+        //   independent fields whose values depended on how the claim was LOADED --
+        //   a `content=` attribute filled one, a `description=` attribute the other
+        //   -- while the library stores clause-8.9 Description[0..*], where a claim
+        //   with a single Description is indistinguishable whichever way its text
+        //   arrived. Two legacy states collapsed to one library state, so no seam
+        //   could reproduce both, and the replay oracle compared against the legacy
+        //   mutator. Measured at the time:
         //     library: content="fully safe", description="fully safe"
         //     legacy:  content="fully safe", description="The system is safe."
-        //   No seam or projection can recover "The system is safe." -- the
-        //   overwrite already dropped it -- and preserving the old slot 0 as a
-        //   note would instead break a content-only claim (whose legacy
-        //   description is empty). The two legacy states collapse to one library
-        //   state, so the seam cannot reproduce both.
         //
-        //   This divergence is the migration being MORE correct (a lone
-        //   Description is the statement, clause 8.9), but the replay oracle
-        //   compares against the legacy mutator, so Content/Description stay
-        //   bridged: run the SAME legacy `SetElementTextField` onto a projected
-        //   package and re-derive the library, reproducing the legacy fields
-        //   exactly. The seam's SetDescriptionAt slot mapping still powers the
-        //   LIVE library-primary edit path (apply_text_edit), where the
-        //   description-only claim's text is correctly a statement.
-        if (field == core::ElementTextField::Name) {
+        // ADR 0012 removed the difference rather than working around it: a claim
+        // carries ONE Description and that Description is its statement. There is
+        // no second slot for the two routes to disagree about, so live and replay
+        // now run the same seam and agree by construction.
+        //
+        // Description still bridges. It remains meaningful for every kind that
+        // genuinely has a note, and on a claim-like element the seam refuses it.
+        if (field == core::ElementTextField::Name || field == core::ElementTextField::Content) {
             const sacm_adapter::EditOutcome outcome =
                 sacm_adapter::apply_text_edit(document, element_id, ToAdapterTextField(field), language, new_value);
             if (!outcome.supported || !outcome.applied) {

@@ -221,7 +221,7 @@
         "tests/test_sacm_library_edit.cpp",
         "tests/test_library_primary_edit_flip.cpp"
       ],
-      "notes": "SACM23-CMD-001..006."
+      "notes": "SACM23-CMD-001..006. **A claim carries one text, not two** (ADR 0012): a Claim or ArgumentReasoning has exactly one clause-8.9 Description and that Description is its statement, edited as `content`. The separate note field these kinds used to offer is gone — the inspector no longer shows it, and an edit naming `description` on one is refused with a message naming `content`, by the command, by the proposal patch service, and by the edit seam. Refused rather than ignored: the note used to land in a second Description that the projection then dropped, so the edit reported success and vanished. Every other kind keeps its `description`, which genuinely is a note. Files written before this carry a redundant second Description; it is read past, and dropped when the file is next saved. No migration is provided — see the ADR's accepted consequences."
     },
     {
       "id": "AF-STD-011",
@@ -234,7 +234,7 @@
       "tests": [
         "tests/test_save_from_library.cpp"
       ],
-      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included. Both RemoveElement modes now apply through native seams instead, so the refusal no longer covers them. Attribute fidelity below element level is pinned per test, not swept."
+      "notes": "SACM23-LIB-002. An edit through the legacy bridge on a document its projection cannot fully represent is refused with the file byte-unchanged; the guard sweeps the whole document inventory, packages included. What it still covers is shrinking as #350 proceeds, so the accurate statement is which edits remain on that path rather than which have left: UpdateElementText, ApplyProposal, the seam-unsupported create fallbacks, and two SACM 11.13 multiplicity shapes a subtree move can produce. Everything else — including both RemoveElement modes, the subtree move and the sibling reorder — applies through native seams and now succeeds on cases that used to be refused. Attribute fidelity below element level is pinned per test, not swept."
     },
     {
       "id": "AF-STD-012",

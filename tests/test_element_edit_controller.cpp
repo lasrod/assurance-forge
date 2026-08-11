@@ -145,7 +145,7 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     constexpr const char* kSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
   <argumentPackage id="AP1" name="Args">
-    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="G1" name="Top goal" content="The system is safe."/>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
 )";
@@ -187,7 +187,8 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     state.app_state.sacm_package = std::move(pkg.value());
     state.command_bus = std::move(bus);
 
-    // Locate the element and snapshot its original description.
+    // Locate the element and snapshot its original statement. G1 is a claim, so
+    // its text lives in `content` -- a claim has no note field (ADR 0012).
     parser::AssuranceCase& model = state.app_state.loaded_case.value();
     parser::SacmElement* elem = nullptr;
     for (auto& e : model.elements) {
@@ -197,25 +198,25 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
         }
     }
     ASSERT_NE(elem, nullptr);
-    const std::string original_value = elem->description;
+    const std::string original_value = elem->content;
     ASSERT_EQ(original_value, "The system is safe.");
 
     // Simulate ImGui's per-keystroke binding: the InputText writes the
     // new value straight into elem->description before the deactivation
     // callback fires.
-    elem->description = "Edited by the user.";
-    elem->description_langs["en"] = elem->description;
+    elem->content = "Edited by the user.";
+    elem->content_langs["en"] = elem->content;
 
     // Call the controller exactly the way the runtime does: `new_value` is
     // a reference to elem->description itself. This is the aliasing
     // scenario that produced the no-op bug.
     const bool committed = state.element_edit_controller->CommitElementTextEdit(
-        state, "G1", "description", "en", original_value, elem->description);
+        state, "G1", "content", "en", original_value, elem->content);
     EXPECT_TRUE(committed);
 
     // The edit must persist in the live model.
-    EXPECT_EQ(elem->description, "Edited by the user.");
-    EXPECT_EQ(elem->description_langs.at("en"), "Edited by the user.");
+    EXPECT_EQ(elem->content, "Edited by the user.");
+    EXPECT_EQ(elem->content_langs.at("en"), "Edited by the user.");
 
     // The audit log must contain one UpdateElementText event with the
     // correct old/new values — not a no-op.
@@ -226,7 +227,7 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
     const auto& ev = tx.events.back();
     EXPECT_EQ(ev.event_type, "UpdateElementText");
     EXPECT_EQ(ev.payload.at("element_id").get<std::string>(), "G1");
-    EXPECT_EQ(ev.payload.at("field").get<std::string>(), "description");
+    EXPECT_EQ(ev.payload.at("field").get<std::string>(), "content");
     EXPECT_EQ(ev.payload.at("language").get<std::string>(), "en");
     EXPECT_EQ(ev.payload.at("old_value").get<std::string>(), "The system is safe.");
     EXPECT_EQ(ev.payload.at("new_value").get<std::string>(), "Edited by the user.");
@@ -298,17 +299,17 @@ TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWitho
         }
     }
     ASSERT_NE(elem, nullptr);
-    const std::string original_value = elem->description;
+    const std::string original_value = elem->content;
 
     // Simulate the live, uncommitted keystroke edit: ImGui's per-keystroke
     // binding wrote the new value into the model, but the deactivation commit
     // never fired (no audit transaction yet).
-    elem->description = "Edited but never deactivated.";
-    elem->description_langs["en"] = elem->description;
+    elem->content = "Edited but never deactivated.";
+    elem->content_langs["en"] = elem->content;
 
     // The forced-flush path hands the controller the still-open edit.
     std::vector<ui::PendingTextEdit> pending;
-    pending.push_back(ui::PendingTextEdit{"G1", "description", "en", original_value, elem->description});
+    pending.push_back(ui::PendingTextEdit{"G1", "content", "en", original_value, elem->content});
     const int committed = state.element_edit_controller->FlushPendingTextEdits(state, pending);
     EXPECT_EQ(committed, 1);
 

@@ -27,6 +27,7 @@ using sacm::commands::CreateClaim;
 using sacm::commands::DeleteElement;
 using sacm::commands::OperationPreview;
 using sacm::commands::ReferenceDeletePolicy;
+using sacm::commands::ReorderPackageElements;
 using sacm::commands::SetAssertionDeclaration;
 using sacm::commands::SetMetaClaims;
 using sacm::commands::SetName;
@@ -472,6 +473,103 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_SetsRelationshipEndsAndToleratesOnlyInh
 // extended with a second source when the next sub-goal is added -- the GSN
 // incremental-construction workflow. AddRelationshipSource must append the source
 // and the result must round-trip.
+namespace {
+
+// The ids a package contains, in document order (clause 11.4 `argumentElement`).
+std::vector<std::string> package_order(const Document& document, const char* package_id) {
+    std::vector<std::string> ids;
+    const auto* package = document.find_as<sacm::model::ArgumentPackage>(ElementId{package_id});
+    if (package == nullptr) {
+        return ids;
+    }
+    for (const std::unique_ptr<sacm::model::ArgumentationElement>& element : package->argument_elements()) {
+        ids.push_back(element->id().value());
+    }
+    return ids;
+}
+
+} // namespace
+
+// `ReorderPackageElements` permutes the NAMED elements through the positions they
+// already occupy, so everything unnamed stays where it was. A client reordering the
+// relationships of a package must not have to enumerate its claims, its groups or
+// its nested packages -- it usually cannot see all of them.
+TEST(Sacm23Argumentation, SACM23_ARG_001_ReordersNamedPackageElementsAndLeavesTheRestInPlace) {
+    Document document = build_argument_case();
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_a"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_b"}, .name = "B"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateClaim{.parent = ElementId{"argpkg_1"}, .id = ElementId{"claim_c"}, .name = "C"}).applied);
+
+    const std::vector<std::string> before = package_order(document, "argpkg_1");
+    const std::size_t count = before.size();
+    ASSERT_GE(count, 5u) << "the fixture must hold elements this test does not name";
+
+    // Reverse claim_a/claim_b/claim_c, naming nothing else.
+    const auto reordered = document.apply(ReorderPackageElements{
+        .package = ElementId{"argpkg_1"},
+        .ordered = {ElementId{"claim_c"}, ElementId{"claim_a"}, ElementId{"claim_b"}},
+    });
+    ASSERT_TRUE(reordered.applied) << (reordered.diagnostics.empty() ? "" : reordered.diagnostics.front().message);
+
+    const std::vector<std::string> after = package_order(document, "argpkg_1");
+    ASSERT_EQ(after.size(), count) << "the reorder added or dropped an element";
+    // Same content, so nothing was created or destroyed.
+    std::vector<std::string> sorted_before = before;
+    std::vector<std::string> sorted_after = after;
+    std::sort(sorted_before.begin(), sorted_before.end());
+    std::sort(sorted_after.begin(), sorted_after.end());
+    EXPECT_EQ(sorted_before, sorted_after);
+
+    // The three named elements occupy the same three slots, in the new order.
+    std::vector<std::size_t> named_slots;
+    for (std::size_t index = 0; index < before.size(); ++index) {
+        if (before[index] == "claim_a" || before[index] == "claim_b" || before[index] == "claim_c")
+            named_slots.push_back(index);
+    }
+    ASSERT_EQ(named_slots.size(), 3u);
+    EXPECT_EQ(after[named_slots[0]], "claim_c");
+    EXPECT_EQ(after[named_slots[1]], "claim_a");
+    EXPECT_EQ(after[named_slots[2]], "claim_b");
+
+    // Everything the caller did not name is untouched, which is the property that
+    // lets a projection-driven client use this at all.
+    for (std::size_t index = 0; index < before.size(); ++index) {
+        const bool named = before[index] == "claim_a" || before[index] == "claim_b" || before[index] == "claim_c";
+        if (!named) {
+            EXPECT_EQ(after[index], before[index]) << "unnamed element at " << index << " moved";
+        }
+    }
+}
+
+// Reordering something the package does not contain is refused rather than
+// ignored. A caller relies on the resulting order; silently skipping an id would
+// let it believe an order was applied that was not.
+TEST(Sacm23Argumentation, SACM23_ARG_001_ReorderRefusesAnElementThePackageDoesNotContain) {
+    Document document = build_argument_case();
+    const std::vector<std::string> before = package_order(document, "argpkg_1");
+    ASSERT_FALSE(before.empty());
+
+    const auto refused = document.apply(ReorderPackageElements{
+        .package = ElementId{"argpkg_1"},
+        .ordered = {ElementId{before.front()}, ElementId{"no_such_element"}},
+    });
+    EXPECT_FALSE(refused.applied);
+    EXPECT_FALSE(refused.diagnostics.empty()) << "refused with no diagnostic";
+    EXPECT_EQ(package_order(document, "argpkg_1"), before) << "the refused reorder still moved something";
+
+    // The same for an id named twice: an order that mentions one element in two
+    // places does not say where it goes.
+    const auto ambiguous = document.apply(ReorderPackageElements{
+        .package = ElementId{"argpkg_1"},
+        .ordered = {ElementId{before.front()}, ElementId{before.front()}},
+    });
+    EXPECT_FALSE(ambiguous.applied);
+    EXPECT_EQ(package_order(document, "argpkg_1"), before);
+}
+
 TEST(Sacm23Argumentation, SACM23_ARG_001_AddsSourceToExistingRelationship) {
     Document document = build_argument_case();
     ASSERT_TRUE(document

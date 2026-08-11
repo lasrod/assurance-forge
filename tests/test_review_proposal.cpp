@@ -36,7 +36,9 @@ parser::AssuranceCase MakeCase() {
     root.type = "claim";
     root.name = "Mixed claim";
     root.content = "System is safe and secure.";
-    root.description = "Original description";
+    // A claim's one Description is its statement, which the POD carries in
+    // `content` (ADR 0012); a claim has no note field.
+    root.description.clear();
     model.elements.push_back(root);
     return model;
 }
@@ -57,8 +59,8 @@ core::reviews::ReviewProposal MakeProposal(const parser::AssuranceCase& model) {
     core::reviews::PatchOperation update;
     update.type = core::reviews::PatchOperationType::UpdateElementText;
     update.element = core::reviews::ElementRef{"G12", std::nullopt};
-    update.field = "description";
-    update.old_value = "Original description";
+    update.field = "content";
+    update.old_value = "System is safe and secure.";
     update.new_value = "System dependability is adequately addressed.";
     proposal.operations.push_back(update);
 

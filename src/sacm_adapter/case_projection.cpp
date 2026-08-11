@@ -159,35 +159,34 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         }
     }
 
-    // Statement = Description (clause 8.9). Only claim-like elements carry a
-    // statement; the POD's `content` field holds it (the GSN node's fallback
-    // label and the inspector's statement view). Artifacts, references and
-    // relationships legitimately have a `<description>` that is a note, not a
-    // statement, so they must keep `content` empty as the legacy parser does.
+    // Statement = the one Description (clause 8.9, ADR 0012). Only claim-like
+    // elements carry a statement; the POD's `content` field holds it (the GSN
+    // node's fallback label and the inspector's statement view). Artifacts,
+    // references and relationships legitimately have a `<description>` that is a
+    // note, not a statement, so they must keep `content` empty as the legacy
+    // parser does.
+    //
+    // The converse also holds, and is the half ADR 0012 changed: a claim has no
+    // note, so its POD `description` projects EMPTY. It used to mirror the
+    // statement whenever there was no second Description, and that mirror is what
+    // wrote a redundant slot-1 copy back to disk on every bridged save.
     if (element.kind() == sacm::metadata::ElementKind::Claim ||
         element.kind() == sacm::metadata::ElementKind::ArgumentReasoning) {
         const auto* model_element = static_cast<const sacm::model::ModelElement*>(&element);
         const auto& descriptions = model_element->descriptions();
+        // The generic ModelElement branch above filled `description` from the
+        // primary Description. For a claim that Description IS the statement, so
+        // leaving it there would show the same text in two fields and, through the
+        // bridge, write it back as a second Description.
+        projected.description.clear();
+        projected.description_langs.clear();
         if (!descriptions.empty()) {
-            // content = the FIRST Description (clause 8.9 statement, slot 0).
+            // content = the one Description (clause 8.9 statement, slot 0). A
+            // surplus slot 1 on a file written before ADR 0012 is read past, not
+            // surfaced: the app has no field to show it in.
             const sacm::model::MultiLangString& statement = descriptions.front()->content();
             projected.content = statement.primary();
             fill_lang_map(projected.content_langs, statement);
-            // note (the POD `description`) = the SECOND Description (slot 1) when
-            // present; otherwise it mirrors the statement. The mirror is
-            // deliberate and load-bearing: a claim whose text lives in a single
-            // Description (whether authored as `content=` or a lone
-            // `description=`) has no distinct note, and the app's `description`
-            // field has historically shown that statement. It also keeps the
-            // audit's legacy-bridge convergent -- the bridge round-trips a
-            // description-only claim through this projection, and mirroring the
-            // statement is what reproduces the legacy parser's `description`
-            // field for such a claim. A genuine note (a real second Description,
-            // e.g. written by the Description edit seam) is read from slot 1.
-            const sacm::model::MultiLangString& note = descriptions.size() > 1 ? descriptions[1]->content() : statement;
-            projected.description = note.primary();
-            projected.description_langs.clear();
-            fill_lang_map(projected.description_langs, note);
         }
     }
 

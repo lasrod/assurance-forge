@@ -83,6 +83,18 @@ struct AssuranceCase {
     std::vector<AcpRecord> acps;
 };
 
+// True for the element kinds whose single clause-8.9 Description IS their
+// statement, which this POD carries in `content` (ADR 0012). Such an element has
+// no note, so its `description` is always empty and nothing may write one.
+//
+// It lives here, beside the type, because the same question is asked from three
+// layers -- the projection that fills these fields, the diff that compares them,
+// and the patch service that refuses to write them -- and three copies of the
+// kind list is how they drift apart.
+inline bool ClaimLikeCarriesStatementAsDescription(const SacmElement& element) {
+    return element.type == "claim" || element.type == "argumentreasoning";
+}
+
 } // namespace core
 
 // Transitional aliases: the SACM POD types historically lived in

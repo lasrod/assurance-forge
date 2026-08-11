@@ -33,6 +33,19 @@ bool TreeDropModeFromToken(const std::string& token, core::TreeDropMode& out);
 
 // Reorder a dragged element above/below a target sibling (same parent, same tree
 // group -- enforced by the underlying `core::ReorderSiblings` validation).
+// Write a sibling reorder to the library document, given the model before the
+// reorder and the model `core::ReorderSiblings` produced from it.
+//
+// Shared by `ReorderSiblingsCommand::Apply` and the audit replayer so the live edit
+// and its replay cannot drift. A reorder is TWO writes per affected package -- the
+// `source` order of each relationship whose sub-goals moved, and the document order
+// of the package's own elements -- and getting only one of them would move the tree
+// on screen while saving the old order, or the reverse.
+bool ApplySiblingReorderToLibrary(sacm_adapter::LibraryDocument& document,
+                                  const parser::AssuranceCase& before,
+                                  const parser::AssuranceCase& after,
+                                  std::string& out_error);
+
 // Write a planned subtree move to the library document.
 //
 // Shared by `MoveSubtreeCommand::Apply` and the audit replayer's MoveSubtree

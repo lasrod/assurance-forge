@@ -27,7 +27,7 @@ namespace {
 constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
   <argumentPackage id="AP1" name="Args">
-    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="G1" name="Top goal" content="The system is safe."/>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
 )";
@@ -391,7 +391,8 @@ TEST(EventReplayer, ReplaysUpdateElementTextToMatchLiveState) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CommandContext ctx{f.model, f.package};
-    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Description, "en", "Updated by test.");
+    // Content: G1 is a claim, whose one Description IS its statement (ADR 0012).
+    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Content, "en", "Updated by test.");
     const auto live_result = bus->Execute(edit, ctx, "tester");
     ASSERT_TRUE(live_result.success) << live_result.error;
     EXPECT_EQ(edit.OldValue(), "The system is safe.");
@@ -406,7 +407,7 @@ TEST(EventReplayer, ReplaysUpdateElementTextToMatchLiveState) {
     bool found = false;
     for (const auto& e : replayed->model.elements) {
         if (e.id == "G1") {
-            EXPECT_EQ(e.description, "Updated by test.");
+            EXPECT_EQ(e.content, "Updated by test.");
             found = true;
             break;
         }
@@ -475,8 +476,7 @@ TEST(UpdateElementTextCommand, NoOpWhenValueUnchangedStillAppendsAuditEvent) {
     ASSERT_TRUE(bus) << error;
 
     core::commands::CommandContext ctx{f.model, f.package};
-    core::commands::UpdateElementTextCommand edit(
-        "G1", core::ElementTextField::Description, "en", "The system is safe.");
+    core::commands::UpdateElementTextCommand edit("G1", core::ElementTextField::Content, "en", "The system is safe.");
     const auto result = bus->Execute(edit, ctx, "tester");
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_TRUE(edit.WasNoOp());

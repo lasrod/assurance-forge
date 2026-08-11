@@ -822,6 +822,94 @@ void perform_set_relationship_ends(model::Document& document, const SetRelations
     Access::reasoning(*relationship) = set.reasoning;
 }
 
+CheckOutcome check_reorder_package_elements(const model::Document& document,
+                                            const ReorderPackageElements& reorder,
+                                            const Operation& op) {
+    CheckOutcome outcome;
+    const auto* package = document.find_as<model::ArgumentPackage>(reorder.package);
+    if (package == nullptr) {
+        outcome.diagnostics.push_back(
+            make_error(validation::codes::kCmdTargetNotFound,
+                       "SACM23-ARG-001",
+                       op,
+                       {reorder.package},
+                       std::format("'{}' is not an ArgumentPackage", reorder.package.value())));
+        return outcome;
+    }
+    if (reorder.ordered.empty()) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-ARG-001", op, {reorder.package}, "no elements to reorder"));
+        return outcome;
+    }
+    // Every named element must be a DIRECT child of this package. Reordering
+    // something the package does not contain has no meaning, and silently ignoring
+    // it would let a caller believe an order was applied that was not: the whole
+    // point of the operation is that the caller can rely on the resulting order.
+    std::unordered_set<std::string> children;
+    for (const std::unique_ptr<model::ArgumentationElement>& child : package->argument_elements()) {
+        children.insert(child->id().value());
+    }
+    std::unordered_set<std::string> seen;
+    for (const model::ElementId& id : reorder.ordered) {
+        if (!children.contains(id.value())) {
+            outcome.diagnostics.push_back(make_error(
+                validation::codes::kCmdTargetNotFound,
+                "SACM23-ARG-001",
+                op,
+                {id},
+                std::format("'{}' is not contained by ArgumentPackage '{}'", id.value(), reorder.package.value())));
+            return outcome;
+        }
+        if (!seen.insert(id.value()).second) {
+            outcome.diagnostics.push_back(
+                make_error(validation::codes::kCmdInvalidParent,
+                           "SACM23-ARG-001",
+                           op,
+                           {id},
+                           std::format("'{}' is named twice; an order must be unambiguous", id.value())));
+            return outcome;
+        }
+    }
+    return outcome;
+}
+
+void perform_reorder_package_elements(model::Document& document, const ReorderPackageElements& reorder) {
+    auto* package = const_cast<model::ArgumentPackage*>(document.find_as<model::ArgumentPackage>(reorder.package));
+    std::vector<std::unique_ptr<model::ArgumentationElement>>& elements = Access::argument_elements(*package);
+
+    // The positions the named elements occupy now, in ascending order. Writing the
+    // new sequence back into exactly these slots is what leaves every unnamed
+    // element -- a nested package, a group, a claim the caller never mentioned --
+    // where it was.
+    // One pass over the package with the named ids in a set, rather than a scan of
+    // `ordered` per element: a package holding hundreds of elements is ordinary in a
+    // real case, and the nested form was quadratic in it.
+    std::unordered_set<std::string> named;
+    named.reserve(reorder.ordered.size());
+    for (const model::ElementId& id : reorder.ordered) {
+        named.insert(id.value());
+    }
+    std::unordered_map<std::string, std::size_t> position_of;
+    std::vector<std::size_t> slots;
+    position_of.reserve(reorder.ordered.size());
+    slots.reserve(reorder.ordered.size());
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        const std::string id = elements[index]->id().value();
+        if (named.contains(id)) {
+            position_of[id] = index;
+            slots.push_back(index);
+        }
+    }
+    std::vector<std::unique_ptr<model::ArgumentationElement>> taken;
+    taken.reserve(reorder.ordered.size());
+    for (const model::ElementId& named : reorder.ordered) {
+        taken.push_back(std::move(elements[position_of[named.value()]]));
+    }
+    for (std::size_t index = 0; index < slots.size(); ++index) {
+        elements[slots[index]] = std::move(taken[index]);
+    }
+}
+
 CheckOutcome
 check_add_relationship_source(const model::Document& document, const AddRelationshipSource& add, const Operation& op) {
     CheckOutcome outcome;
@@ -1990,6 +2078,8 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_meta_claims(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetRelationshipEnds>) {
                 return check_set_relationship_ends(document, op, operation);
+            } else if constexpr (std::is_same_v<T, ReorderPackageElements>) {
+                return check_reorder_package_elements(document, op, operation);
             } else if constexpr (std::is_same_v<T, AddTaggedValue>) {
                 return check_add_tagged_value(document, op, operation);
             } else {
@@ -2029,6 +2119,8 @@ void perform(model::Document& document, const Operation& operation, const std::v
                 perform_set_meta_claims(document, op);
             } else if constexpr (std::is_same_v<T, SetRelationshipEnds>) {
                 perform_set_relationship_ends(document, op);
+            } else if constexpr (std::is_same_v<T, ReorderPackageElements>) {
+                perform_reorder_package_elements(document, op);
             } else if constexpr (std::is_same_v<T, AddRelationshipSource>) {
                 perform_add_relationship_source(document, op);
             } else if constexpr (std::is_same_v<T, SetExpressionValue>) {

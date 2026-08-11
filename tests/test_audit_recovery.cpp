@@ -152,7 +152,10 @@ TEST(AuditRecovery, RestoreSacmFromAuditPreservesPriorTransactionsOnReplay) {
         ASSERT_TRUE(model);
         core::commands::CommandContext ctx{*model, *pkg};
 
-        core::commands::UpdateElementTextCommand cmd{"G1", core::ElementTextField::Description, "en", "Audited edit."};
+        // Content, not Description: G1 is a claim, and a claim's one Description is
+        // its statement (ADR 0012). This test is about audit restore, not about
+        // which field carries the text.
+        core::commands::UpdateElementTextCommand cmd{"G1", core::ElementTextField::Content, "en", "Audited edit."};
         auto res = bus->Execute(cmd, ctx, "alice");
         ASSERT_TRUE(res.success) << res.error;
     }
@@ -175,7 +178,7 @@ TEST(AuditRecovery, RestoreSacmFromAuditPreservesPriorTransactionsOnReplay) {
     for (const auto& ap : restored.argumentPackages) {
         for (const auto& claim : ap.claims) {
             if (claim.id == "G1") {
-                EXPECT_EQ(claim.description, "Audited edit.");
+                EXPECT_EQ(claim.content, "Audited edit.");
                 found = true;
             }
         }

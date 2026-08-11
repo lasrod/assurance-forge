@@ -1,13 +1,78 @@
 #include "core/commands/tree_commands.h"
 
 #include "core/assurance_tree.h"
+#include "core/commands/library_bridge.h"
 #include "core/tree_editing.h"
 #include "sacm_adapter/document_edit.h"
-#include "core/commands/library_bridge.h"
+#include "sacm_adapter/case_projection.h"
+#include "parser/model_utils.h"
+
+#include <unordered_set>
 
 namespace core::commands {
 
 namespace {
+
+// One relationship's endpoints, flattened for `apply_set_relationship_ends`.
+struct RetargetedEnds {
+    std::string id;
+    std::vector<std::string> sources;
+    std::vector<std::string> targets;
+    std::string reasoning;
+};
+
+// Relationships whose SOURCE ORDER the reorder changed. A sibling reorder is two
+// changes, not one: the order of a relationship's sources (GSN sub-goals of one
+// inference) and the order of the relationship elements themselves within their
+// package. `SetRelationshipEnds` writes the first, in order.
+std::vector<RetargetedEnds> ReorderedSources(const parser::AssuranceCase& before, const parser::AssuranceCase& after) {
+    std::vector<RetargetedEnds> changed;
+    for (const parser::SacmElement& updated : after.elements) {
+        if (!parser::IsRelationshipElement(updated))
+            continue;
+        const parser::SacmElement* original = parser::FindElementById(before, updated.id);
+        if (original == nullptr || original->source_refs == updated.source_refs)
+            continue;
+        changed.push_back(RetargetedEnds{.id = updated.id,
+                                         .sources = updated.source_refs,
+                                         .targets = updated.target_refs,
+                                         .reasoning = updated.reasoning_ref});
+    }
+    return changed;
+}
+
+// The same elements `order` names, in the order the package holds them NOW. Equal
+// to `order` exactly when this package needs no reorder.
+std::vector<std::string> NamedSubsetInCurrentOrder(const std::vector<std::string>& current_ids,
+                                                   const std::vector<std::string>& order) {
+    const std::unordered_set<std::string> named(order.begin(), order.end());
+    std::vector<std::string> current;
+    current.reserve(order.size());
+    for (const std::string& id : current_ids) {
+        if (named.contains(id))
+            current.push_back(id);
+    }
+    return current;
+}
+
+// The order `model` puts this package's elements in, restricted to the ones the
+// package actually holds and the projection can see.
+//
+// Restricted deliberately: `current_ids` is the package's whole contents, which
+// includes nested packages and groups the parser model does not carry, and naming
+// an id the model does not have would be naming nothing. The seam reorders the
+// named subset through its own positions and leaves the rest, so the result is the
+// model's order for what it knows about and no change at all for what it does not.
+std::vector<std::string> ProjectedPackageOrder(const parser::AssuranceCase& model,
+                                               const std::vector<std::string>& current_ids) {
+    std::unordered_set<std::string> in_package(current_ids.begin(), current_ids.end());
+    std::vector<std::string> order;
+    for (const parser::SacmElement& element : model.elements) {
+        if (in_package.contains(element.id))
+            order.push_back(element.id);
+    }
+    return order;
+}
 
 // The parser's relationship token as the seam's SACM kind. The tokens come from
 // `core::MoveSubtree`, which is the only thing that decides them.
@@ -67,6 +132,41 @@ bool TreeDropModeFromToken(const std::string& token, core::TreeDropMode& out) {
     return false;
 }
 
+bool ApplySiblingReorderToLibrary(sacm_adapter::LibraryDocument& document,
+                                  const parser::AssuranceCase& before,
+                                  const parser::AssuranceCase& after,
+                                  std::string& out_error) {
+    for (const RetargetedEnds& ends : ReorderedSources(before, after)) {
+        const sacm_adapter::EditOutcome written =
+            sacm_adapter::apply_set_relationship_ends(document, ends.id, ends.sources, ends.targets, ends.reasoning);
+        if (!written.supported || !written.applied) {
+            out_error = LibraryRejection("the source order of " + ends.id, written.diagnostics);
+            return false;
+        }
+    }
+    for (const sacm_adapter::ArgumentPackageShell& shell : sacm_adapter::project_argument_package_shells(document)) {
+        const std::vector<std::string> order = ProjectedPackageOrder(after, shell.element_ids);
+        // Fewer than two named elements cannot be in the wrong order, and the seam
+        // refuses an empty list rather than treating it as "nothing to do".
+        if (order.size() < 2)
+            continue;
+        // A reorder touches ONE package's siblings; every other package in the
+        // document would otherwise be rewritten to the order it already had. That
+        // costs a library operation and a change record per package for no effect,
+        // which is misleading as much as it is wasteful -- an audit reader should not
+        // see a reorder claim to have touched packages it did not.
+        if (order == NamedSubsetInCurrentOrder(shell.element_ids, order))
+            continue;
+        const sacm_adapter::EditOutcome written =
+            sacm_adapter::apply_reorder_package_elements(document, shell.identity.id, order);
+        if (!written.supported || !written.applied) {
+            out_error = LibraryRejection("the element order of package " + shell.identity.id, written.diagnostics);
+            return false;
+        }
+    }
+    return true;
+}
+
 bool ApplyMoveSubtreePlanToLibrary(sacm_adapter::LibraryDocument& document,
                                    const core::MoveSubtreePlan& plan,
                                    std::string& out_error) {
@@ -123,6 +223,45 @@ bool ReorderSiblingsCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
         reordered_ = scratch_order;
         return true;
     };
+    // Library-primary, by the same scratch-compute pattern as the subtree move: run
+    // the SAME `core::ReorderSiblings` on a scratch, then write what it decided.
+    //
+    // What it decides is TWO things, and the second is why this command needed a new
+    // library operation. `ApplyParserSiblingOrder` rewrites the order of each
+    // relationship's `source` refs -- which `SetRelationshipEnds` already writes --
+    // and it stable-sorts the element list itself, which is the order the package
+    // serializes in. Nothing addressed that until
+    // `sacm::commands::ReorderPackageElements`. Writing only the first half would
+    // have moved the tree on screen and saved a file in the old order, and
+    // `LibraryReplayConvergence.TreeReorderSiblingsConvergesAndChangesSerialization`
+    // says in its name why that diverges.
+    bool applied_to_library = false;
+    if (CanApplyLibraryPrimary(ctx)) {
+        parser::AssuranceCase scratch = ctx.model;
+        const core::AssuranceTree scratch_tree = core::AssuranceTree::Build(scratch, "");
+        core::TreeDisplayOrder scratch_order;
+        // Runs BEFORE anything is written, so the no-op contract below still holds:
+        // a false-with-empty-error leaves the document untouched and records no
+        // transaction, exactly as the bridged path did.
+        if (!core::ReorderSiblings(scratch,
+                                   nullptr,
+                                   scratch_tree,
+                                   scratch_order,
+                                   core::ReorderSiblingsCommand{dragged_id_, target_id_, drop_mode_},
+                                   out_error)) {
+            return false;
+        }
+
+        // Claimed before the first write: a reorder is several writes and a failure
+        // between them leaves the document changed, which the bus only re-derives
+        // from when this says the flip engaged. Safe because nothing below falls
+        // back -- see the same note on `MoveSubtreeCommand::Apply`.
+        ctx.library_primary = true;
+        if (!ApplySiblingReorderToLibrary(*ctx.library_document, ctx.model, scratch, out_error))
+            return false;
+        reordered_ = scratch_order;
+        applied_to_library = true;
+    }
     // `core::ReorderSiblings` returns false BOTH on a genuine no-op (nothing to
     // reorder) and on a real failure, distinguished only by whether `err` is set. A
     // false-with-empty-error propagates here so `Apply` returns false with an empty
@@ -130,7 +269,7 @@ bool ReorderSiblingsCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_e
     // the empty error string is what distinguishes a no-op from a real failure for
     // the caller. (In practice `ValidateTreeDrop` gates invalid drops before dispatch,
     // so a no-op does not reach here.)
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+    if (!applied_to_library && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
     out_event.event_type = "ReorderSiblings";

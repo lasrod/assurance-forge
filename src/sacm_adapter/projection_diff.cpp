@@ -182,7 +182,18 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy, 
         compare_field(differences, id, "type", legacy_element->type, other.type);
         compare_field(differences, id, "name", legacy_element->name, other.name);
         compare_field(differences, id, "content", legacy_element->content, other.content);
-        compare_field(differences, id, "description", legacy_element->description, other.description);
+        // `description` on a claim-like element is EXCLUDED, not compared and
+        // budgeted. The two models deliberately disagree there since ADR 0012: a
+        // claim carries one clause-8.9 Description and that Description is its
+        // statement, so the projection leaves the POD note empty while the legacy
+        // parser mirrors the statement into it. Counting that as a fidelity
+        // difference would inflate the recorded budget on every claim in every
+        // fixture, and a budget that large stops being able to catch the drift it
+        // exists to catch. Every other kind still compares -- their `<description>`
+        // genuinely is a note, and a divergence there is still a defect.
+        if (!core::ClaimLikeCarriesStatementAsDescription(*legacy_element)) {
+            compare_field(differences, id, "description", legacy_element->description, other.description);
+        }
         compare_field(differences, id, "gid", legacy_element->gid, other.gid);
         // The legacy parser leaves assertionDeclaration empty when the attribute
         // is absent; the library makes the clause-11.10 default ("asserted")
@@ -200,8 +211,14 @@ std::vector<ProjectionDifference> diff_cases(const core::AssuranceCase& legacy, 
         compare_refs(differences, id, "target_refs", legacy_element->target_refs, other.target_refs);
         compare_refs(differences, id, "meta_claim_refs", legacy_element->meta_claim_refs, other.meta_claim_refs);
         compare_lang_map(differences, id, "name_langs", legacy_element->name_langs, other.name_langs);
-        compare_lang_map(
-            differences, id, "description_langs", legacy_element->description_langs, other.description_langs);
+        // Excluded for the same reason, and it has to be the same predicate: the
+        // language map is the per-language half of the field above, so comparing
+        // it while skipping the field would report the identical divergence under
+        // a different category.
+        if (!core::ClaimLikeCarriesStatementAsDescription(*legacy_element)) {
+            compare_lang_map(
+                differences, id, "description_langs", legacy_element->description_langs, other.description_langs);
+        }
         compare_lang_map(differences, id, "content_langs", legacy_element->content_langs, other.content_langs);
         if (legacy_element->is_counter != other.is_counter) {
             differences.push_back(ProjectionDifference{

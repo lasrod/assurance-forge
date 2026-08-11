@@ -51,3 +51,5 @@ to point at the replacement. This keeps the decision history intact.
 | [0008](0008-one-owner-for-the-open-project.md) | One owner for the open project | Accepted (superseded in part by 0009, 0010) |
 | [0009](0009-one-integrated-working-draft-per-argument.md) | One integrated working draft per argument file | Accepted |
 | [0010](0010-draft-provenance-persistence-and-human-promotion.md) | Draft provenance, persistence, and human-controlled promotion | Accepted |
+| [0011](0011-panels-own-their-view-types.md) | Panels own their view types | Accepted |
+| [0012](0012-a-claim-carries-one-description.md) | A claim carries one Description | Accepted |

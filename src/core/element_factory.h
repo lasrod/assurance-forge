@@ -205,6 +205,12 @@ enum class ElementTextField {
 const char* ElementTextFieldToToken(ElementTextField field);
 bool ElementTextFieldFromToken(const std::string& token, ElementTextField& out);
 
+// Current value of `field` in `language` on `elem`, with the same fallback the
+// legacy mutator uses (a missing language falls back to the scalar only for
+// "en"). Shared so a native text edit records the same audit `old_value` a
+// bridged one would.
+std::string ReadParserField(const parser::SacmElement& elem, ElementTextField field, const std::string& language);
+
 // Update one localized text field on the element with id `element_id`. The
 // language code is typically "en" (the primary editor language) but the
 // helper handles secondary languages too by writing only the corresponding

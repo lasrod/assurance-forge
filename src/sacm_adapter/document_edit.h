@@ -399,6 +399,21 @@ EditOutcome apply_set_relationship_ends(LibraryDocument& document,
                                         const std::vector<std::string>& targets,
                                         const std::string& reasoning);
 
+// Set the document order of elements inside one argument package.
+//
+// `ordered_ids` names a subset; those elements take the positions they already
+// occupy, in the order given, and everything unnamed stays put (see
+// `sacm::commands::ReorderPackageElements`). That subset behaviour is what makes
+// the seam usable from a projection: the projection does not list packages or
+// clause-8.7 attachments, so a caller cannot enumerate a package's full contents.
+//
+// Order carries no SACM meaning and this seam claims none. It exists because the
+// application's tree order is persisted as document order, and a sibling reorder
+// that could not write it would be lost on save.
+EditOutcome apply_reorder_package_elements(LibraryDocument& document,
+                                           const std::string& package_id,
+                                           const std::vector<std::string>& ordered_ids);
+
 // Which AssertedRelationship to create. SACM's own vocabulary rather than GSN's:
 // `AssertedInference` is what GSN draws as SupportedBy and `AssertedContext` what
 // it draws as InContextOf, in the opposite direction (see

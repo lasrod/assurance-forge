@@ -502,21 +502,71 @@ bool UpdateElementTextCommand::Apply(CommandContext& ctx, audit::AuditEvent& out
         return false;
     }
 
-    // Phase 2 slice 2b-2 -- the LIVE edit flip for text edits, via a BRIDGE rather
-    // than the apply_text_edit seam. The seam makes a claim's Content/Description
-    // "more correct" (a lone Description is the statement, clause 8.9), which would
-    // DIVERGE from the audit replay -- which stays bridged to preserve the legacy
-    // two-slot content/description semantics for existing on-disk data (see the long
-    // comment in event_replayer.cpp's UpdateElementText branch). Bridging the SAME
-    // legacy mutator onto the library reproduces the legacy result exactly, so the
-    // recorded hash and the replayed hash converge by construction with no migration.
+    // ADR 0012: a claim-like element carries ONE clause-8.9 Description and that
+    // Description is its statement, which the POD holds in `content`. It has no
+    // note slot, so this edit has nowhere to land.
+    //
+    // Refused rather than run. The bridge would write the legacy `description`
+    // field quite happily, the next projection would drop it, and the command
+    // would have reported success -- and written an audit event -- for an edit
+    // that vanished. A recorded event nobody can replay to a visible result is
+    // worse than a refusal.
+    if (field_ == ElementTextField::Description) {
+        const parser::SacmElement* element = parser::FindElementById(ctx.model, element_id_);
+        if (element != nullptr && core::ClaimLikeCarriesStatementAsDescription(*element)) {
+            out_error = "Element " + element_id_ + " is a " + element->type +
+                        ", which carries one description and that description is its statement. "
+                        "Edit the content field instead.";
+            return false;
+        }
+    }
+
+    // Content still goes through the BRIDGE rather than the apply_text_edit seam.
+    // ADR 0012 removed the model difference that made the seam diverge from replay,
+    // so the native flip is now unblocked -- but flipping it is its own slice, with
+    // its own convergence evidence, and it is not done here.
     // `old_value_` is captured whether the bridge runs it on the scratch projection
     // (the library's last committed value) or the legacy fallback runs it in place.
+    // Phase 3f: Name and Content apply through the `apply_text_edit` seam. ADR 0012
+    // removed what kept them bridged -- a claim's lone Description used to mean one
+    // thing to the seam and another to the legacy mutator, so the replay oracle
+    // could not agree with the live edit. With one Description that is the
+    // statement, both routes write the same thing.
+    //
+    // The seam is not universal: it declines shapes it cannot express (a name in a
+    // non-primary language, Content on a kind that carries its text elsewhere), and
+    // those still fall through to the guarded bridge below. A REFUSAL is different
+    // from a decline and must not fall through -- `apply_text_edit` reports one as
+    // `supported && !applied`, and routing that to the bridge would reinstate the
+    // very edit the seam rejected.
+    bool applied_natively = false;
+    if (ctx.library_document != nullptr && ctx.allow_library_primary &&
+        (field_ == ElementTextField::Name || field_ == ElementTextField::Content)) {
+        const parser::SacmElement* before = parser::FindElementById(ctx.model, element_id_);
+        // The same reading the legacy mutator makes, so both routes record the same
+        // audit `old_value` for the same edit.
+        old_value_ = before == nullptr ? std::string() : core::ReadParserField(*before, field_, language_);
+        const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_text_edit(
+            *ctx.library_document,
+            element_id_,
+            field_ == ElementTextField::Name ? sacm_adapter::TextField::Name : sacm_adapter::TextField::Content,
+            language_,
+            new_value_);
+        if (outcome.supported && !outcome.applied) {
+            out_error = outcome.diagnostics.empty() ? "The library refused the text edit on " + element_id_ + "."
+                                                    : outcome.diagnostics.front().message;
+            return false;
+        }
+        if (outcome.applied) {
+            ctx.library_primary = true;
+            applied_natively = true;
+        }
+    }
     const LibraryBridgeMutator mutate =
         [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
         return core::SetElementTextField(model, &package, element_id_, field_, language_, new_value_, old_value_, err);
     };
-    if (!ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
+    if (!applied_natively && !ApplyLibraryPrimaryOrLegacy(ctx, mutate, out_error))
         return false;
 
     was_no_op_ = (old_value_ == new_value_);

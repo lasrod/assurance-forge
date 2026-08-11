@@ -735,28 +735,32 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         ImGui::Spacing();
     }
 
-    // Description (editable)
-    InspectorFieldLabel(AF_TR("Description"));
-    {
-        ImGuiID widget_id = 0;
-        if (EditableTextField("description", elem->description, -1.0f, &widget_id)) {
-            elem->description_langs["en"] = elem->description;
-            modified = true;
+    // Description (editable) -- a note, shown only for the kinds that have one.
+    // A claim-like element carries exactly one Description and that Description is
+    // its statement, edited as Content above (ADR 0012). There is no second slot,
+    // so offering this field on a claim edited a note the model cannot hold.
+    if (!has_content) {
+        InspectorFieldLabel(AF_TR("Description"));
+        {
+            ImGuiID widget_id = 0;
+            if (EditableTextField("description", elem->description, -1.0f, &widget_id)) {
+                elem->description_langs["en"] = elem->description;
+                modified = true;
+            }
+            commit_if_finished(widget_id, elem->description, "description", "en");
         }
-        commit_if_finished(widget_id, elem->description, "description", "en");
-    }
-    if (!has_content)
         RenderTerminologySuggestions(sacm_pkg, elem->id, elem->description, terminology_callbacks);
-    // Secondary language description (only show if this field has the secondary language)
-    if (elem->description_langs.count(sec_lang)) {
-        InspectorFieldLabel(ui::i18n::trf("Description ({0})", sec_lang));
-        std::string sec_desc = elem->description_langs.at(sec_lang);
-        ImGuiID widget_id = 0;
-        if (EditableTextField("description_sec", sec_desc, -1.0f, &widget_id)) {
-            elem->description_langs[sec_lang] = sec_desc;
-            modified = true;
+        // Secondary language description (only show if this field has the secondary language)
+        if (elem->description_langs.count(sec_lang)) {
+            InspectorFieldLabel(ui::i18n::trf("Description ({0})", sec_lang));
+            std::string sec_desc = elem->description_langs.at(sec_lang);
+            ImGuiID widget_id = 0;
+            if (EditableTextField("description_sec", sec_desc, -1.0f, &widget_id)) {
+                elem->description_langs[sec_lang] = sec_desc;
+                modified = true;
+            }
+            commit_if_finished(widget_id, sec_desc, "description", sec_lang);
         }
-        commit_if_finished(widget_id, sec_desc, "description", sec_lang);
     }
 
     // Translation controls: checkbox + language dropdown
@@ -789,11 +793,15 @@ bool ShowElementPanel(parser::AssuranceCase* ac,
         bool has_trans = element_has_secondary(*elem, mut_state.active_secondary_lang);
         if (ImGui::Checkbox(AF_TR("Add Translation").c_str(), &has_trans)) {
             if (has_trans) {
-                // Enable: insert empty entries so the fields appear
+                // Enable: insert empty entries so the fields appear. A claim-like
+                // element has no Description field to translate (ADR 0012), so
+                // seeding one there would show a translation box for a slot the
+                // model cannot hold.
                 elem->name_langs[mut_state.active_secondary_lang] = "";
-                elem->description_langs[mut_state.active_secondary_lang] = "";
                 if (has_content) {
                     elem->content_langs[mut_state.active_secondary_lang] = "";
+                } else {
+                    elem->description_langs[mut_state.active_secondary_lang] = "";
                 }
             } else {
                 // Disable: remove the language entries

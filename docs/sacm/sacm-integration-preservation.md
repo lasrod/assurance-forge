@@ -367,6 +367,36 @@ outright — that has never been disclosed and never will be, because an element
 an attribute and changes what it says is the reinterpretation the project's own hard
 constraint forbids.
 
+**Slice 3e: the sibling reorder is native, and needed a new library operation
+([#350](https://github.com/lasrod/assurance-forge/issues/350)).** A reorder is two
+changes, not one: the order of a relationship's `source` refs -- GSN sub-goals of one
+inference, which `SetRelationshipEnds` already wrote -- and the order of the elements
+within their own package, which is what the file serializes in and which no operation
+addressed. `sacm::commands::ReorderPackageElements` addresses it: a named SUBSET of a
+package's elements takes the positions those same elements already occupy, in the order
+given, and everything unnamed stays put.
+
+The subset behaviour is what makes it usable from a projection, which cannot see a
+package's full contents (nested packages, groups, clause-8.7 attachments). The operation
+refuses an id the package does not contain, and an id named twice, rather than skipping
+either -- the caller relies on the resulting order, so silently ignoring an id would let
+it believe an order was applied that was not.
+
+**No SACM meaning is claimed for containment order, and none is invented.** The operation
+changes serialization order only. It exists because document order is the only place an
+interchange file can carry a client's own ordering, and the application persists the tree
+order the user arranged there; a client that could not write it would have to rewrite the
+file behind the library's back. Pinned by
+Sacm23Argumentation.SACM23_ARG_001_ReordersNamedPackageElementsAndLeavesTheRestInPlace
+and ...ReorderRefusesAnElementThePackageDoesNotContain.
+
+Both halves are written by one function shared with the replayer
+(`commands::ApplySiblingReorderToLibrary`), because writing one without the other is the
+failure mode: the tree moves on screen and the file keeps the old order, or the reverse.
+The replay branch was seam-mapped in the same change, which is not optional here -- the
+live path now applies on documents the bridge REFUSES, so a bridged replay of the same
+event would refuse what the live edit accepted and the log would stop replaying.
+
 **Slice 3d: the subtree move is native, with two disclosed fallbacks
 ([#350](https://github.com/lasrod/assurance-forge/issues/350)).** `MoveSubtree` runs the
 same `core::MoveSubtree` on a scratch projection, diffs what it decided
