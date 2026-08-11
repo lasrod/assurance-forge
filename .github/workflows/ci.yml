@@ -27,24 +27,35 @@ jobs:
             os: windows-latest
             # Let CMake pick the newest Visual Studio installed on the runner
             # rather than pinning a version — windows-latest's VS rolls forward.
-            # No ccache: MSVC caching needs embedded debug info (/Z7) and is
-            # fragile to set up blind; left for a follow-up.
-            configure: cmake -B build -A x64 -DAF_WARNINGS_AS_ERRORS=ON
+            #
+            # sccache rather than ccache, because it caches MSVC reliably; and
+            # MSVC output is only cacheable with debug info EMBEDDED in the object
+            # (/Z7). CMake's Debug default is /Zi, which writes a shared .pdb the
+            # compiler mutates outside the object file, so nothing can cache it.
+            # `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT` needs CMP0141, and this
+            # project's `cmake_minimum_required(3.21)` leaves that policy OLD, so
+            # the default is set to NEW here rather than raising the floor for
+            # everyone to serve CI.
+            configure: >-
+              cmake -B build -A x64 -DAF_WARNINGS_AS_ERRORS=ON
+              -DCMAKE_POLICY_DEFAULT_CMP0141=NEW
+              -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+              -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
             build: cmake --build build --config Debug
             test: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
-            use_ccache: false
+            cache_variant: sccache
           - name: Linux
             os: ubuntu-latest
             configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build
             test: ctest --test-dir build --output-on-failure --no-tests=error
-            use_ccache: true
+            cache_variant: ccache
           - name: macOS
             os: macos-latest
             configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
             build: cmake --build build
             test: ctest --test-dir build --output-on-failure --no-tests=error
-            use_ccache: true
+            cache_variant: ccache
 
     steps:
       - name: Checkout (with submodules)
@@ -68,12 +79,16 @@ jobs:
 
       # Caches compiled objects across runs, including the FetchContent
       # dependencies (curl, hello_imgui, yaml-cpp, googletest) which are pinned
-      # and rarely change — that rebuild is most of the build time. AppleClang
-      # and GCC cache reliably; the cache is keyed per OS by the action.
-      - name: Set up ccache
-        if: matrix.use_ccache
+      # and rarely change — that rebuild is most of the build time. The cache is
+      # keyed per OS by the action.
+      #
+      # Windows was the critical path at ~15 min because it alone built from
+      # scratch: 11 of those minutes were compilation the other two platforms
+      # were already reusing.
+      - name: Set up compiler cache
         uses: hendrikmuhs/ccache-action@v1.2.23
         with:
+          variant: ${{ matrix.cache_variant }}
           key: ${{ matrix.name }}
           max-size: 500M
 
@@ -128,6 +143,53 @@ jobs:
             echo '::error::the round trip did not RUN - the keyring did not come up, so libsecret is still untested'
             exit 1
           fi
+
+  # The repository gates are Python scripts that read the tree. They are ALSO
+  # registered as ctest tests, which is what makes them run against the same
+  # checkout the build used — but reaching them that way costs a full configure,
+  # build and test run first. A mistyped documentation link or an over-length
+  # matrix notes cell then failed after ~15 minutes.
+  #
+  # This job runs the same scripts directly and fails in under a minute. It does
+  # NOT replace the ctest registration: that stays the authoritative run, and it
+  # is what `ctest_label_check` proves is complete. This is an early warning that
+  # happens to catch the errors most often made.
+  gates:
+    name: Repository gates (fast)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # Every gate runs even after one fails, because being told about one
+      # broken link at a time is how a five-minute fix becomes five round trips.
+      - name: Run the gates
+        shell: bash
+        run: |
+          status=0
+          run() {
+            echo "::group::$1"
+            if ! python "$@"; then
+              echo "::error::$1 failed"
+              status=1
+            fi
+            echo "::endgroup::"
+          }
+          run tools/i18n/check_catalog.py
+          run tools/sacm/check_conformance_matrix.py
+          run tools/gsn/check_conformance_matrix.py
+          run tools/features/check_feature_matrix.py
+          run tools/repo/check_no_committed_artifacts.py
+          run tools/docs/check_documentation.py
+          run tools/docs/generate_verification_index.py --check
+          run tools/sacm/generate_evidence_package.py --check
+          exit $status
 
   # Static analysis runs as its own job rather than inside the build matrix.
   # It needs no test run, and its result is a ratchet against a committed
