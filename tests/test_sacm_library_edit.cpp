@@ -755,8 +755,14 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedOnAClaimWhoseDesc
 
     const sacm_adapter::EditOutcome edit =
         sacm_adapter::apply_text_edit(*loaded.document, "G1", sacm_adapter::TextField::Description, "en", kNote);
-    EXPECT_FALSE(edit.supported);
+    // REFUSED, not unsupported: `supported == false` is this seam's "no mapping
+    // yet, keep the legacy edit authoritative" signal, and routing this edit back
+    // to the legacy path is exactly the silent drop ADR 0012 removes.
+    EXPECT_TRUE(edit.supported);
     EXPECT_FALSE(edit.applied);
+    ASSERT_FALSE(edit.diagnostics.empty()) << "a refusal must say why";
+    EXPECT_NE(edit.diagnostics.front().message.find("content"), std::string::npos)
+        << "the refusal must name the field to use instead: " << edit.diagnostics.front().message;
 
     // Refused, not partially applied: the statement is untouched and no second
     // Description appeared for a later load to read back.
@@ -780,8 +786,9 @@ TEST(SacmLibraryEdit, SACM23_INT_001_DescriptionEditUnsupportedForStatementlessC
     ASSERT_TRUE(sacm_adapter::reload_document(document, xml));
     const sacm_adapter::EditOutcome edit =
         sacm_adapter::apply_text_edit(document, "G9", sacm_adapter::TextField::Description, "en", "a note");
-    EXPECT_FALSE(edit.supported);
+    EXPECT_TRUE(edit.supported);
     EXPECT_FALSE(edit.applied);
+    ASSERT_FALSE(edit.diagnostics.empty()) << "a refusal must say why";
 }
 
 // A relationship keeps its note: its single `<description>` genuinely IS a note
