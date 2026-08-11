@@ -16,6 +16,7 @@
 #include "core/relationship_editing.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_patch_service.h"
+#include "core/reviews/review_proposal_plan.h"
 #include "core/sacm_argument_sync.h"
 #include "core/sacm_identity.h"
 #include "core/terminology_context_projection.h"
@@ -2074,13 +2075,36 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             predetermined_ids[it.key()] = it->get<std::string>();
         }
         const std::string location = FormatLocation(tx_seq, event.event_sequence, type);
+
+        // Same scratch-compute the live command runs, for the same reason it must
+        // be the same: the recorded ids come from the event payload, so both sides
+        // give the patch service identical input and mirror an identical plan.
+        // Replaying through the bridge while the live edit went native would make
+        // the two agree only as far as the projection happened to be faithful.
+        const parser::AssuranceCase before = sacm_adapter::project_case(document);
+        parser::AssuranceCase scratch = before;
+        reviews::ReviewProposalPatchService patch_service;
+        const reviews::ApplyProposalResult result =
+            patch_service.ApplyProposalWithIds(proposal, scratch, predetermined_ids);
+        if (!result.success) {
+            out_error = "ApplyProposalWithIds failed at " + location + ": " + result.error;
+            return false;
+        }
+        const std::string package_id = sacm_adapter::resolve_argument_package_id(document, proposal.anchor_element_id);
+        const reviews::ProposalPlan plan = reviews::PlanProposalFromDiff(before, scratch, package_id);
+        if (plan.unrepresentable_reason.empty()) {
+            return reviews::ApplyProposalPlanToLibrary(document, plan, out_error);
+        }
+
+        // The plan declined, so this proposal was recorded by a live edit that
+        // also declined -- replay it the way it was written.
         const BridgeMutator mutate =
             [&](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            reviews::ReviewProposalPatchService patch_service;
-            reviews::ApplyProposalResult result =
-                patch_service.ApplyProposalWithIds(proposal, model, predetermined_ids);
-            if (!result.success) {
-                err = "ApplyProposalWithIds (bridge) failed at " + location + ": " + result.error;
+            reviews::ReviewProposalPatchService bridge_patch_service;
+            reviews::ApplyProposalResult bridge_result =
+                bridge_patch_service.ApplyProposalWithIds(proposal, model, predetermined_ids);
+            if (!bridge_result.success) {
+                err = "ApplyProposalWithIds (bridge) failed at " + location + ": " + bridge_result.error;
                 return false;
             }
             core::RebuildSacmArgumentPackageFromParser(model, package);

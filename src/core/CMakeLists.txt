@@ -73,6 +73,7 @@ add_library(af_core OBJECT
     translation_review_store.cpp
     reviews/review_proposal_manager.cpp
     reviews/review_proposal_patch_service.cpp
+    reviews/review_proposal_plan.cpp
     reviews/review_text_utils.cpp
     sacm_argument_sync.cpp
     sacm_identity.cpp

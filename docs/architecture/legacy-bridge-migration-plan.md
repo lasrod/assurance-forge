@@ -37,7 +37,7 @@ Two ground rules, inherited from that history:
 
 | Component | What it does | Why it still exists | Depended on by |
 |---|---|---|---|
-| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | 1 command has no native seam yet (ApplyProposal), plus two MoveSubtree shapes and UpdateElementText's Description field (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c, 3 before 3d, 3 before 3e, 2 before 3f -- the "2" recorded for 3d was an undercount, since ReorderSiblings was still bridged then) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
+| [`library_bridge.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/library_bridge.cpp) — `BridgeLegacyMutationToLibrary`, `ApplyLibraryPrimaryOrLegacy` | Projects the document to legacy models, runs a legacy mutator, re-derives the document; refuses when the projection cannot represent the case | No command routes here as its primary path. What remains are FALLBACKS: the shapes each flipped command's seam cannot express -- two MoveSubtree multiplicity shapes, a non-primary-language name, a proposal the planner declines (26 before phase 1, 15 before 2a, 10 before 2c, 6 before 3a, 5 before 3b, 4 before 3c, 3 before 3d, 3 before 3e, 2 before 3f, 1 before 3g -- the "2" recorded for 3d was an undercount, since ReorderSiblings was still bridged then) | Every bridged command below; the audit replayer; [`strategy_migration.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/strategy_migration.cpp) |
 | [`event_replayer.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/audit/event_replayer.cpp) — `BridgeViaLegacy` + bridged replay branches | Library-primary replay for events with no seam parity; delegates to the one bridge implementation | Recorded history must replay convergently with how it was recorded | Audit verification, restore-from-audit, undo, history view |
 | [`sacm_argument_sync.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/sacm_argument_sync.cpp) — `RebuildSacmArgumentPackageFromParser` | Rebuilds a legacy `sacm::ArgumentPackage` from the POD model (six element kinds, clears lists first) | The bridge and the audit-hash projection are built on it | `library_bridge.cpp`, `library_package_projection.cpp` |
 | [`library_package_projection.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/library_package_projection.cpp) — `project_library_package[_with_tags]`, `library_canonical_hash*`, `library_xmi_from_package` | Document → legacy package, for canonical hashing (tagless) and for the bridge (tag-carrying); projection-bytes fallback serializer | The canonical hash is *defined* over the legacy package; unflipped commands still autosave projection bytes | Command bus, audit verifier, replay, guarded save fallbacks |
@@ -97,7 +97,8 @@ is present.
   ([`element_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/element_commands.cpp))
 - MoveSubtree, for the two shapes the seams cannot express -- see slice 3d below.
   The command applies natively otherwise
-- ApplyProposal ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
+- ApplyProposal, only for a proposal the planner declines -- see slice 3g
+  ([`proposal_commands.cpp`](https://github.com/lasrod/assurance-forge/blob/main/src/core/commands/proposal_commands.cpp))
 - the seam-unsupported create fallbacks (CreateTopGoal / CreateChildElement /
   CreateChallenge on shapes the seams cannot express) — routed through the
   guarded bridge by the `SACM23-LIB-002` round-4/5 fixes, after the verifier's
@@ -501,7 +502,37 @@ key string is how a projection quietly stops seeing what an editor writes.
     lose one (a display order the user arranged) would otherwise have to rewrite the
     file behind the library's back.
 
-- **ApplyProposal**: composes the native primitives once the rest exist.
+- ~~**ApplyProposal**~~ — **done (slice 3g).** It composes the native primitives,
+  as predicted, but needed one new seam and one new idea.
+
+    The seam is `apply_create_element`: the patch service builds a BARE element and
+    attaches it in a separate operation, so `apply_add_child` -- which always makes
+    a relationship too -- could not serve. The new seam creates one element in a
+    named ArgumentPackage with the same kind, assertion-declaration and GSN-role
+    mapping `apply_add_child` uses, so an element created either way projects
+    identically.
+
+    The idea is that the POD model records no package, so `resolve_argument_package_id`
+    resolves it from the DOCUMENT (the package owning the proposal's anchor,
+    falling back to the first). Guessing would file a proposed claim in the wrong
+    package of a multi-package case.
+
+    Three things worth keeping:
+
+    - **The before-state is projected from the document, not read from
+      `ctx.model`.** They are the same on the ordinary command path and NOT in
+      `PreflightProposalAgainstLibrary`, which deliberately passes an empty model
+      and lets the applied path derive one. Reading `ctx.model` there diffed
+      against nothing, and every preflight failed with "missing existing element".
+    - **A sourceless inference is declined at plan time, not discovered at write
+      time.** A strategy attached before it has a sub-goal produces an
+      AssertedInference whose only end is `reasoning`, which clause 11.13 forbids
+      and the seam refuses. By the time the write fails the created elements are
+      already in the document and the refusal is a hard failure with no way back --
+      which is exactly what planning first exists to prevent.
+    - **A retarget still declines.** A NodeOnly removal reparents children, and the
+      plan has no operation for an endpoint change; the proposal vocabulary has no
+      move either (#261). It falls back with the document untouched.
 
 *Exit criteria*: `BridgeViaLegacy` has no callers; the bridge's refusal
 message is unreachable; `RemoveElement` has one code path.
