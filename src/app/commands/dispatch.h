@@ -13,6 +13,17 @@
 // use of the bus but is callable from non-controller action classes.
 namespace app::commands {
 
+// Applies a pending library-primary re-derive, if one is due, and clears the
+// flag. Call it at a FRAME BOUNDARY, never mid-dispatch.
+//
+// `RebuildDerivedViewsFromLibrary` replaces `loaded_case` and `sacm_package`
+// wholesale, which frees containers a panel may still be rendering from -- the
+// create-a-Claim crash. Dispatch therefore only ever RAISES the flag; the
+// runtime drains it at the top of the next frame, before any panel renders.
+// Tests that need the derived views refreshed call this to stand in for that
+// frame.
+void ApplyPendingLibraryRederive(AppRuntimeState& state);
+
 struct DispatchOutcome {
     bool success = false;
     std::string error;

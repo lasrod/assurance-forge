@@ -59,9 +59,7 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
             return {false, apply_error};
         }
         // The document IS in scope here, so the command applies to it natively
-        // exactly as it does on the audited path. What is missing without a bus is
-        // the re-derivation, so do it here: `RebuildDerivedViewsFromLibrary` is
-        // what `CommandBus::Execute` runs when the flip engages.
+        // exactly as it does on the audited path.
         //
         // This replaced a `sync_library_document()` that re-derived the document
         // FROM the legacy package -- the wrong direction. Outside a project the
@@ -69,9 +67,14 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
         // projection then became the document, unguarded and with the reload result
         // ignored. That was the last place a projection could overwrite the source
         // of truth without a refusal in the way (#347).
-        if (ctx.library_primary && state.app_state.library_document != nullptr) {
-            core::RebuildDerivedViewsFromLibrary(
-                *state.app_state.library_document, model_ref, state.app_state.sacm_package.value());
+        //
+        // The re-derive is DEFERRED, exactly as the bus path defers it below.
+        // Rebuilding here would free containers a panel may still be rendering
+        // from -- this dispatch runs mid-frame from a context menu like any other.
+        // Raise the flag; the runtime drains it at the top of the next frame.
+        if (ctx.library_primary) {
+            state.rederive_views_from_library = true;
+            state.tree_needs_rebuild = true;
         } else {
             state.app_state.sync_library_document();
         }
@@ -129,6 +132,19 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
         state.autosave_persisted_pending_edit = true;
     }
     return {true, {}, result.sacm_written, result.transaction_sequence};
+}
+
+void ApplyPendingLibraryRederive(AppRuntimeState& state) {
+    if (!state.rederive_views_from_library) {
+        return;
+    }
+    state.rederive_views_from_library = false;
+    if (state.app_state.library_document && state.app_state.loaded_case.has_value() &&
+        state.app_state.sacm_package.has_value()) {
+        core::RebuildDerivedViewsFromLibrary(*state.app_state.library_document,
+                                             state.app_state.loaded_case.value(),
+                                             state.app_state.sacm_package.value());
+    }
 }
 
 } // namespace app::commands

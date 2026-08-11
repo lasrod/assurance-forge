@@ -1,5 +1,6 @@
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "app/controllers/element_edit_controller.h"
 
 #include "core/audit/audit_paths.h"
@@ -453,11 +454,18 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemoveWithoutConsequencesStillDel
     // post-removal state rather than a stale one.
     ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "R1", core::RemoveMode::NodeAndDescendants));
     ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+    // The edit is library-primary, so the derived views refresh at the next frame
+    // rather than in the dispatch -- rebuilding there frees containers a panel may
+    // still be rendering from. Stand in for that frame.
+    app::commands::ApplyPendingLibraryRederive(state);
     ASSERT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "R1"), nullptr);
 
     ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G2", core::RemoveMode::NodeAndDescendants));
     EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm())
         << "a delete with no consequences should not interrupt the user";
+    // Library-primary: the derived views refresh at the next frame, not in the
+    // dispatch. Stand in for that frame before reading the model.
+    app::commands::ApplyPendingLibraryRederive(state);
     EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
 }
 
@@ -499,6 +507,9 @@ TEST(ElementEditControllerTest, SACM23_INT_002_NodeOnlyOffersNoPreviewRatherThan
     // the removal already happened — the same behaviour as before this feature,
     // which is the point: NodeOnly gains no wrong dialog.
     EXPECT_FALSE(state.element_edit_controller->ShouldShowRemoveConfirm());
+    // Library-primary: the derived views refresh at the next frame, not in the
+    // dispatch. Stand in for that frame before reading the model.
+    app::commands::ApplyPendingLibraryRederive(state);
     EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "G2"), nullptr);
 
     // And here is why previewing it as a set of deletes would have lied: R2 and
@@ -546,6 +557,9 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
         before.push_back(element.id);
 
     ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+    // Library-primary: the derived views refresh at the next frame, not in the
+    // dispatch. Stand in for that frame before reading the model.
+    app::commands::ApplyPendingLibraryRederive(state);
 
     std::vector<std::string> actually_gone;
     for (const std::string& id : before) {
