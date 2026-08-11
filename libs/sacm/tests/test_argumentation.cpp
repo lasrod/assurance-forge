@@ -538,8 +538,9 @@ TEST(Sacm23Argumentation, SACM23_ARG_001_ReordersNamedPackageElementsAndLeavesTh
     // lets a projection-driven client use this at all.
     for (std::size_t index = 0; index < before.size(); ++index) {
         const bool named = before[index] == "claim_a" || before[index] == "claim_b" || before[index] == "claim_c";
-        if (!named)
+        if (!named) {
             EXPECT_EQ(after[index], before[index]) << "unnamed element at " << index << " moved";
+        }
     }
 }
 
