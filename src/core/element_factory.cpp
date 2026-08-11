@@ -1203,9 +1203,13 @@ bool ElementTextFieldFromToken(const std::string& token, ElementTextField& out) 
     return false;
 }
 
-namespace {
-
 // Read the current value of `field`/`language` on the parser element.
+//
+// Exported because `UpdateElementTextCommand` needs the SAME reading when it
+// applies natively as this file's legacy mutator does when it bridges: the value
+// it captures becomes the audit payload's `old_value`, and a native edit that
+// recorded a different old value than a bridged one would make the two routes
+// disagree in the log rather than only in the code.
 std::string ReadParserField(const parser::SacmElement& elem, ElementTextField field, const std::string& language) {
     auto from_map = [&](const std::map<std::string, std::string>& m, const std::string& scalar) {
         auto it = m.find(language);
@@ -1223,6 +1227,8 @@ std::string ReadParserField(const parser::SacmElement& elem, ElementTextField fi
     }
     return {};
 }
+
+namespace {
 
 // Write `new_value` to `field`/`language` on the parser element. Updates the
 // canonical scalar too when language == "en".

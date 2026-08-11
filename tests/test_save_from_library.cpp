@@ -25,6 +25,7 @@
 #include "core/commands/acp_commands.h"
 #include "core/commands/gid_commands.h"
 #include "core/commands/package_commands.h"
+#include "core/commands/proposal_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/derived_views.h"
 #include "core/element_factory.h"
@@ -482,13 +483,15 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RepeatedSavesAreByteStableForRepositoryCase
 
 namespace {
 
-// A bridged edit: `UpdateElementTextCommand` goes through
-// ApplyLibraryPrimaryOrLegacy, not through a native library operation.
-core::commands::CommandResult RunBridgedRename(ProjectFixture& fixture,
-                                               core::AppState& state,
-                                               const std::string& element_id,
-                                               const std::string& new_name,
-                                               bool& out_library_primary) {
+// A NATIVE rename. `UpdateElementTextCommand` routes Name and Content through
+// the `apply_text_edit` seam since the phase 3f flip; it falls back to the bridge
+// only for shapes the seam cannot express. Tests that need the vendor-content
+// guarantee use this; tests that need the BRIDGE use RunBridgedProposalRename.
+core::commands::CommandResult RunNativeRename(ProjectFixture& fixture,
+                                              core::AppState& state,
+                                              const std::string& element_id,
+                                              const std::string& new_name,
+                                              bool& out_library_primary) {
     std::string error;
     std::unique_ptr<core::commands::CommandBus> bus =
         core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
@@ -497,6 +500,41 @@ core::commands::CommandResult RunBridgedRename(ProjectFixture& fixture,
         return core::commands::CommandResult{};
     }
     core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Name, "en", new_name);
+    core::commands::CommandContext ctx{
+        state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
+    out_library_primary = ctx.library_primary;
+    return result;
+}
+
+// A genuinely BRIDGED edit. ApplyProposal is one of the commands still routed
+// through ApplyLibraryPrimaryOrLegacy, so it is what exercises the refusal guard
+// now that text edits go native.
+//
+// This helper has to be re-pointed at whatever is still bridged whenever another
+// command flips, and it retires WITH the bridge in phase 4 -- the refusal guard
+// must outlive every bridged command, not the bridge itself.
+core::commands::CommandResult RunBridgedProposalRename(ProjectFixture& fixture,
+                                                       core::AppState& state,
+                                                       const std::string& element_id,
+                                                       const std::string& new_name,
+                                                       bool& out_library_primary) {
+    std::string error;
+    std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
+    EXPECT_TRUE(bus) << error;
+    if (!bus) {
+        return core::commands::CommandResult{};
+    }
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "bridged-refusal-probe";
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementName;
+    update.element = core::reviews::ElementRef{element_id, std::nullopt};
+    update.new_value = new_name;
+    proposal.operations.push_back(update);
+
+    core::commands::ApplyProposalCommand command(proposal);
     core::commands::CommandContext ctx{
         state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
@@ -514,8 +552,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesUnknownContent) {
     ASSERT_NE(state.library_document, nullptr);
 
     bool library_primary = false;
-    const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "G1", "Renamed goal", library_primary);
+    const core::commands::CommandResult result = RunNativeRename(fixture, state, "G1", "Renamed goal", library_primary);
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_TRUE(library_primary)
         << "the rename did not take the bridged library-primary path; this test measures nothing";
@@ -555,7 +592,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesCounterRelationships) {
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "G1", "Renamed top claim", library_primary);
+        RunNativeRename(fixture, state, "G1", "Renamed top claim", library_primary);
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_TRUE(library_primary)
         << "the rename did not take the bridged library-primary path; this test measures nothing";
@@ -601,7 +638,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesMetaClaimAndReasoningSt
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+        RunNativeRename(fixture, state, "G1", "Renamed top goal", library_primary);
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_TRUE(library_primary)
         << "the rename did not take the bridged library-primary path; this test measures nothing";
@@ -642,7 +679,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNested
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+        RunBridgedProposalRename(fixture, state, "G1", "Renamed top goal", library_primary);
 
     EXPECT_FALSE(result.success) << "the bridged edit was applied and dropped the nested ArgumentPackage";
     EXPECT_TRUE(Contains(result.error, "ArgumentPackage"))
@@ -679,7 +716,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnreprese
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
+        RunBridgedProposalRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
 
     EXPECT_FALSE(result.success) << "the bridged edit was applied and deleted part of the case";
     EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
@@ -1458,7 +1495,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditPreservesAcpTaggedValues) {
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+        RunNativeRename(fixture, state, "G1", "Renamed top goal", library_primary);
     ASSERT_TRUE(result.success) << result.error;
     ASSERT_TRUE(library_primary);
 
@@ -1498,8 +1535,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditSucceedsOnMultiArgumentPackageCa
     ASSERT_FALSE(target_id.empty());
 
     bool library_primary = false;
-    const core::commands::CommandResult result =
-        RunBridgedRename(fixture, state, target_id, "Renamed", library_primary);
+    const core::commands::CommandResult result = RunNativeRename(fixture, state, target_id, "Renamed", library_primary);
     ASSERT_TRUE(result.success) << "a bridged edit failed on a multi-argument-package case: " << result.error;
     ASSERT_TRUE(library_primary);
 
