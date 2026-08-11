@@ -23,6 +23,7 @@ using sacm::commands::SetDescription;
 using sacm::commands::SetDescriptionAt;
 using sacm::commands::SetGid;
 using sacm::commands::SetName;
+using sacm::commands::SetTaggedValue;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
 using sacm::io::Mode;
@@ -412,6 +413,123 @@ TEST(Sacm23BaseModel, SACM23_BASE_001_SetGidAssignsElementGid) {
     // A missing target fails, unchanged.
     const sacm::commands::MutationResult missing = document.apply(SetGid{.element = ElementId{"nope"}, .gid = "gid-x"});
     EXPECT_FALSE(missing.applied);
+}
+
+// SetTaggedValue revises the TaggedValue carrying a key (clause 8.12) rather
+// than appending another one under the same key. The distinction is the whole
+// point: a client keeping per-language content under one key -- the reserved
+// "sacm.import.name" overflow is ours -- has to be able to change an entry it
+// already wrote. AddTaggedValue always creates, so a second write left two tags
+// under one key and a reader had to guess which won.
+TEST(Sacm23BaseModel, SACM23_BASE_001_SetTaggedValueMergesByKeyAndDropsAnEmptiedTag) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"ap_1"}, .name = "Args"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateClaim{.parent = ElementId{"ap_1"},
+                                       .id = ElementId{"c_1"},
+                                       .name = "G",
+                                       .description = "The statement.",
+                                       .language = "en"})
+                    .applied);
+    const ElementId claim{"c_1"};
+
+    const auto tagged_values_with_key = [&](const std::string& key) {
+        std::size_t count = 0;
+        const auto* element = document.find_as<sacm::model::ModelElement>(claim);
+        for (const auto& tagged : element->tagged_values()) {
+            if (tagged->key().primary() == key)
+                ++count;
+        }
+        return count;
+    };
+    const auto content_for = [&](const std::string& key, const std::string& language) {
+        const auto* element = document.find_as<sacm::model::ModelElement>(claim);
+        for (const auto& tagged : element->tagged_values()) {
+            if (tagged->key().primary() != key)
+                continue;
+            for (const sacm::model::LangString& entry : tagged->content().values) {
+                if (entry.lang == language)
+                    return entry.content;
+            }
+        }
+        return std::string{};
+    };
+
+    // First write creates the tag.
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Nom", .language = "fr"}).applied);
+    EXPECT_EQ(tagged_values_with_key("x.name"), 1u);
+    EXPECT_EQ(content_for("x.name", "fr"), "Nom");
+
+    // A second LANGUAGE merges into the same tag rather than adding one.
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "名前", .language = "ja"}).applied);
+    EXPECT_EQ(tagged_values_with_key("x.name"), 1u) << "a second language appended a second tag under the same key";
+    EXPECT_EQ(content_for("x.name", "fr"), "Nom");
+
+    // Re-writing a language REVISES it. This is what AddTaggedValue could not do,
+    // and the case where appending silently lost the newer value on read.
+    ASSERT_TRUE(document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Nouveau", .language = "fr"})
+                    .applied);
+    EXPECT_EQ(tagged_values_with_key("x.name"), 1u);
+    EXPECT_EQ(content_for("x.name", "fr"), "Nouveau");
+
+    // Empty clears one language and leaves the rest.
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "", .language = "fr"}).applied);
+    EXPECT_EQ(content_for("x.name", "fr"), "");
+    EXPECT_EQ(tagged_values_with_key("x.name"), 1u) << "clearing one language removed the whole tag";
+
+    // Clearing the LAST language removes the tag, so an empty key does not
+    // survive as an element the writer would still emit.
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "", .language = "ja"}).applied);
+    EXPECT_EQ(tagged_values_with_key("x.name"), 0u) << "an emptied tag lingered";
+}
+
+// Review of #376: the ChangeRecord must describe the LANGUAGE being edited.
+//
+// `before` was read from the tag's primary entry, which is whichever language
+// happens to sit first -- unrelated to the one the operation touches, and
+// different from it as soon as the tag carries more than one. That is exactly the
+// case this operation exists for, so every audit or undo consumer reading the
+// record would have been told about the wrong language.
+TEST(Sacm23BaseModel, SACM23_BASE_001_SetTaggedValueReportsTheEditedLanguageInItsChangeRecord) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "A"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"ap_1"}, .name = "Args"})
+            .applied);
+    ASSERT_TRUE(document.apply(CreateClaim{.parent = ElementId{"ap_1"}, .id = ElementId{"c_1"}, .name = "G"}).applied);
+    const ElementId claim{"c_1"};
+
+    // Two languages, "fr" first so it is the tag's primary.
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Nom", .language = "fr"}).applied);
+    ASSERT_TRUE(
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Namae", .language = "ja"}).applied);
+
+    // Revising "ja" must report "ja"'s old value, not "fr"'s.
+    const sacm::commands::MutationResult revised =
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Atarashii", .language = "ja"});
+    ASSERT_TRUE(revised.applied);
+    ASSERT_EQ(revised.changes.size(), 1u);
+    ASSERT_TRUE(revised.changes.front().before.has_value());
+    EXPECT_EQ(*revised.changes.front().before, "Namae")
+        << "the change record reported a different language's value than the one edited";
+    ASSERT_TRUE(revised.changes.front().after.has_value());
+    EXPECT_EQ(*revised.changes.front().after, "Atarashii");
+
+    // A language with no prior entry reports no `before` at all, rather than
+    // borrowing the primary's.
+    const sacm::commands::MutationResult added =
+        document.apply(SetTaggedValue{.element = claim, .key = "x.name", .value = "Nombre", .language = "es"});
+    ASSERT_TRUE(added.applied);
+    ASSERT_EQ(added.changes.size(), 1u);
+    EXPECT_FALSE(added.changes.front().before.has_value()) << "a language that had no entry reported one anyway";
 }
 
 // SetDescriptionAt addresses a ModelElement's Description list by ordinal slot

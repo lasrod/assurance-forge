@@ -147,7 +147,7 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         // TaggedValue. Reconstruct the full language map from both, or the
         // language toggle would lose every translated name.
         for (const auto& tagged_value : model_element->tagged_values()) {
-            if (tagged_value->key().primary() == "sacm.import.name") {
+            if (tagged_value->key().primary() == kImportNameOverflowTagKey) {
                 merge_overflow_langs(projected.name_langs, tagged_value->content());
             }
         }

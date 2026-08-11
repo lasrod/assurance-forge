@@ -1292,6 +1292,118 @@ void perform_set_gid(model::Document& document, const SetGid& set) {
     }
 }
 
+// The TaggedValue on `element` carrying `key`, or nullptr. The first one wins;
+// see the note on SetTaggedValue about why several are not merged.
+const model::TaggedValue* find_tagged_value(const model::ModelElement& element, const std::string& key) {
+    for (const auto& tagged : element.tagged_values()) {
+        if (tagged->key().primary() == key)
+            return tagged.get();
+    }
+    return nullptr;
+}
+
+CheckOutcome check_set_tagged_value(const model::Document& document, const SetTaggedValue& set, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* element = document.find_as<model::ModelElement>(set.element);
+    if (element == nullptr) {
+        outcome.diagnostics.push_back(make_error(validation::codes::kCmdTargetNotFound,
+                                                 "SACM23-BASE-001",
+                                                 op,
+                                                 {set.element},
+                                                 std::format("model element '{}' not found", set.element.value())));
+        return outcome;
+    }
+    if (set.key.empty()) {
+        outcome.diagnostics.push_back(make_error(
+            validation::codes::kCmdInvalidParent, "SACM23-BASE-001", op, {set.element}, "a tagged value needs a key"));
+        return outcome;
+    }
+    const model::TaggedValue* existing = find_tagged_value(*element, set.key);
+    if (existing == nullptr) {
+        if (set.value.empty()) {
+            // Removing an entry from a tag that does not exist is a no-op, not an
+            // error: the requested end state already holds.
+            return outcome;
+        }
+        std::unordered_set<ElementId> claimed;
+        const ElementId id = plan_id(document, std::nullopt, model::ElementKind::TaggedValue, op, claimed, outcome);
+        if (!outcome.ok()) {
+            return outcome;
+        }
+        outcome.effects.push_back(ChangeRecord{
+            .id = id,
+            .kind = model::ElementKind::TaggedValue,
+            .change = ChangeRecord::Change::Created,
+            .parent = set.element,
+            .property = std::nullopt,
+            .before = std::nullopt,
+            .after = set.value,
+        });
+        return outcome;
+    }
+    // `before` is the entry for the language BEING EDITED, not the tag's primary.
+    // They differ as soon as the tag carries more than one language, which is the
+    // case this operation exists for -- and a ChangeRecord naming an unrelated
+    // language would misreport the edit to every audit and undo consumer.
+    std::string previous;
+    for (const model::LangString& entry : existing->content().values) {
+        if (entry.lang == set.language) {
+            previous = entry.content;
+            break;
+        }
+    }
+    outcome.effects.push_back(ChangeRecord{
+        .id = existing->id(),
+        .kind = model::ElementKind::TaggedValue,
+        .change = ChangeRecord::Change::Modified,
+        .parent = set.element,
+        .property = "content",
+        .before = previous.empty() ? std::nullopt : std::optional(previous),
+        .after = set.value.empty() ? std::nullopt : std::optional(set.value),
+    });
+    return outcome;
+}
+
+void perform_set_tagged_value(model::Document& document,
+                              const SetTaggedValue& set,
+                              const std::vector<ChangeRecord>& effects) {
+    if (effects.empty()) {
+        return; // the no-op remove above
+    }
+    auto* element = const_cast<model::ModelElement*>(document.find_as<model::ModelElement>(set.element));
+    const ChangeRecord& record = effects.front();
+
+    if (record.change == ChangeRecord::Change::Created) {
+        auto tagged = std::make_unique<model::TaggedValue>(record.id);
+        Access::key(*tagged).set("", set.key);
+        Access::content(*tagged).set(set.language, set.value);
+        Access::set_parent(*tagged, element);
+        advance_id_counter(document, model::ElementKind::TaggedValue, record.id);
+        model::TaggedValue* raw = tagged.get();
+        Access::tagged_values(*element).push_back(std::move(tagged));
+        Access::index(document)[raw->id()] = raw;
+        return;
+    }
+
+    auto* tagged = const_cast<model::TaggedValue*>(document.find_as<model::TaggedValue>(record.id));
+    if (tagged == nullptr) {
+        return;
+    }
+    Access::content(*tagged).set(set.language, set.value);
+    if (set.value.empty()) {
+        // `set` with empty text clears that language; drop the tag once nothing
+        // is left, so a key whose content is gone does not linger as an empty
+        // element the writer would still emit.
+        std::erase_if(Access::content(*tagged).values,
+                      [](const model::LangString& entry) { return entry.content.empty(); });
+        if (Access::content(*tagged).values.empty()) {
+            Access::index(document).erase(tagged->id());
+            std::erase_if(Access::tagged_values(*element),
+                          [&](const std::unique_ptr<model::TaggedValue>& owned) { return owned.get() == tagged; });
+        }
+    }
+}
+
 // Shared check for setters targeting a ModelElement.
 CheckOutcome check_model_element_target(const model::Document& document,
                                         const model::ElementId& target,
@@ -2068,6 +2180,8 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_citation(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetGid>) {
                 return check_set_gid(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetTaggedValue>) {
+                return check_set_tagged_value(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetName>) {
                 return check_set_name(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetDescription>) {
@@ -2143,6 +2257,8 @@ void perform(model::Document& document, const Operation& operation, const std::v
                 perform_set_citation(document, op);
             } else if constexpr (std::is_same_v<T, SetGid>) {
                 perform_set_gid(document, op);
+            } else if constexpr (std::is_same_v<T, SetTaggedValue>) {
+                perform_set_tagged_value(document, op, effects);
             } else if constexpr (std::is_same_v<T, SetName>) {
                 perform_set_name(document, op);
             } else if constexpr (std::is_same_v<T, SetDescription>) {

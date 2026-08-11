@@ -58,6 +58,8 @@ std::string_view operation_name(const Operation& operation) {
                 return "SetCitation";
             } else if constexpr (std::is_same_v<T, SetGid>) {
                 return "SetGid";
+            } else if constexpr (std::is_same_v<T, SetTaggedValue>) {
+                return "SetTaggedValue";
             } else if constexpr (std::is_same_v<T, SetName>) {
                 return "SetName";
             } else if constexpr (std::is_same_v<T, SetDescription>) {

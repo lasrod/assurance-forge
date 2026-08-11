@@ -507,26 +507,24 @@ core::commands::CommandResult RunNativeRename(ProjectFixture& fixture,
     return result;
 }
 
-// A genuinely BRIDGED edit, which is getting harder to come by: the flip has
-// taken every routine command native, so the guard now rides on a shape the seam
-// DECLINES rather than a command that never flipped.
+// A genuinely BRIDGED edit, which keeps getting harder to come by: every routine
+// command is native now, so the guard rides on a shape the seams DECLINE.
 //
-// A name edit in a non-primary language is that shape. SACM's name is one
-// LangString (clause 8.6), so `apply_text_edit` reports it unsupported rather
-// than dropping the primary name, and the command falls through to the guarded
-// bridge exactly as an unflipped command used to.
+// This one attaches an ALREADY-EXISTING strategy to a goal. The patch service
+// produces an AssertedInference whose only end is `reasoning`, and the planner
+// defers that shape only when it created the strategy itself -- tagging an
+// element the plan never touched would be guessing. So it declines, and the
+// bridge is what runs.
 //
-// This has been re-pointed twice (rename -> ApplyProposal -> translated rename)
-// and will need it again as the remaining fallbacks go. That is the intended
-// maintenance: the refusal guard must outlive every bridged path and retire WITH
-// the bridge in phase 4, never before it. If nothing bridges any more, this test
-// should be deleted in the same change that deletes the bridge -- not quietly
-// left passing for the wrong reason.
-core::commands::CommandResult RunBridgedTranslatedRename(ProjectFixture& fixture,
-                                                         core::AppState& state,
-                                                         const std::string& element_id,
-                                                         const std::string& new_name,
-                                                         bool& out_library_primary) {
+// Re-pointed four times now (rename -> ApplyProposal -> translated rename ->
+// this), each time a fallback went native. That is the intended maintenance: the
+// refusal guard must outlive every bridged path and be DELETED in the same change
+// as the bridge, never left passing for the wrong reason.
+core::commands::CommandResult RunBridgedStrategyAttach(ProjectFixture& fixture,
+                                                       core::AppState& state,
+                                                       const std::string& strategy_id,
+                                                       const std::string& target_id,
+                                                       bool& out_library_primary) {
     std::string error;
     std::unique_ptr<core::commands::CommandBus> bus =
         core::commands::CommandBus::Open(fixture.project, fixture.sacm_absolute, error);
@@ -534,7 +532,16 @@ core::commands::CommandResult RunBridgedTranslatedRename(ProjectFixture& fixture
     if (!bus) {
         return core::commands::CommandResult{};
     }
-    core::commands::UpdateElementTextCommand command(element_id, core::ElementTextField::Name, "ja", new_name);
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "bridged-refusal-probe";
+    proposal.anchor_element_id = target_id;
+    core::reviews::PatchOperation attach;
+    attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+    attach.source = core::reviews::ElementRef{strategy_id, std::nullopt};
+    attach.target = core::reviews::ElementRef{target_id, std::nullopt};
+    proposal.operations.push_back(attach);
+
+    core::commands::ApplyProposalCommand command(proposal);
     core::commands::CommandContext ctx{
         state.loaded_case.value(), state.sacm_package.value(), state.library_document.get()};
     const core::commands::CommandResult result = bus->Execute(command, ctx, "tester");
@@ -663,7 +670,8 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNested
     constexpr const char* kNestedPackageSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
   <argumentPackage id="AP1" name="Args">
-    <claim id="G1" name="Top goal" description="The system is safe."/>
+    <claim id="G1" name="Top goal" content="The system is safe."/>
+    <argumentReasoning id="S1" name="Strategy"/>
     <argumentPackage id="AP_nested" name="Nested"/>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
@@ -678,8 +686,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDropEmptyNested
     ASSERT_TRUE(Contains(before, "AP_nested")) << "fixture carries no nested package; this test measures nothing";
 
     bool library_primary = false;
-    const core::commands::CommandResult result =
-        RunBridgedTranslatedRename(fixture, state, "G1", "Renamed top goal", library_primary);
+    const core::commands::CommandResult result = RunBridgedStrategyAttach(fixture, state, "S1", "G1", library_primary);
 
     EXPECT_FALSE(result.success) << "the bridged edit was applied and dropped the nested ArgumentPackage";
     EXPECT_TRUE(Contains(result.error, "ArgumentPackage"))
@@ -716,7 +723,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_BridgedEditRefusesRatherThanDeleteUnreprese
 
     bool library_primary = false;
     const core::commands::CommandResult result =
-        RunBridgedTranslatedRename(fixture, state, "claim_top", "Renamed top claim", library_primary);
+        RunBridgedStrategyAttach(fixture, state, "ar_decompose", "claim_top", library_primary);
 
     EXPECT_FALSE(result.success) << "the bridged edit was applied and deleted part of the case";
     EXPECT_TRUE(Contains(result.error, "ArgumentGroup"))
@@ -1438,6 +1445,57 @@ TEST(SaveFromLibrary, SACM23_LIB_002_FlippedApplyProposalRunsOnACaseTheBridgeRef
     const std::string autosaved = ReadFile(fixture.sacm_absolute);
     EXPECT_TRUE(Contains(autosaved, "ArgumentGroup")) << "the native apply deleted the ArgumentGroup";
     EXPECT_TRUE(Contains(autosaved, "The new sub-claim holds.")) << "the proposal's claim text never reached disk";
+}
+
+// A non-primary-language NAME edit applies through the seams and SURVIVES a save
+// and reload. This was the last functional dependency on the bridge: SACM gives
+// an element one name LangString (clause 8.6), so the seam used to decline and
+// the bridge carried translated names.
+//
+// The round trip is the assertion that matters. Writing the tag is easy; writing
+// it under the key the reader merges back into `name_langs` is the point, and a
+// write that landed anywhere else would look fine in memory and vanish on load.
+//
+// Edited TWICE in the same language, because that is where `AddTaggedValue` would
+// have failed: it always creates, so a second edit left two tags under one key
+// and the reader kept the FIRST -- the newer name silently lost.
+TEST(SaveFromLibrary, SACM23_LIB_002_NativeTranslatedNameSurvivesSaveAndReload) {
+    ProjectFixture fixture = MakeProject("translated-name");
+
+    core::AppState state;
+    ASSERT_TRUE(state.load_file(fixture.sacm_absolute.string())) << state.status_message;
+    ASSERT_NE(state.library_document, nullptr);
+
+    bool library_primary = false;
+    core::commands::UpdateElementTextCommand first("G1", core::ElementTextField::Name, "ja", "初回");
+    ASSERT_TRUE(RunOnBus(fixture, state, first, library_primary).success);
+    ASSERT_TRUE(library_primary) << "the translated name did not reach the library at all";
+
+    core::commands::UpdateElementTextCommand second("G1", core::ElementTextField::Name, "ja", "二回目");
+    bool second_primary = false;
+    ASSERT_TRUE(RunOnBus(fixture, state, second, second_primary).success);
+    ASSERT_TRUE(second_primary) << "the second translated edit fell back to the bridge";
+
+    const std::string autosaved = ReadFile(fixture.sacm_absolute);
+    EXPECT_TRUE(Contains(autosaved, "sacm.import.name"))
+        << "the translated name was not written where the reader looks for it";
+
+    // Reload through the library and project: the SECOND edit must be what comes
+    // back, and the primary name must be untouched.
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(fixture.sacm_absolute);
+    ASSERT_TRUE(reloaded.ok);
+    ASSERT_NE(reloaded.document, nullptr);
+    const core::AssuranceCase projected = sacm_adapter::project_case(*reloaded.document);
+    const core::SacmElement* goal = nullptr;
+    for (const core::SacmElement& element : projected.elements) {
+        if (element.id == "G1")
+            goal = &element;
+    }
+    ASSERT_NE(goal, nullptr);
+    ASSERT_TRUE(goal->name_langs.contains("ja")) << "the translated name did not survive the reload";
+    EXPECT_EQ(goal->name_langs.at("ja"), "二回目")
+        << "the reload returned the FIRST translated name; the second edit was lost";
+    EXPECT_EQ(goal->name, "Top goal") << "the translated edit overwrote the primary name";
 }
 
 // A proposal that creates a strategy and attaches it applies NATIVELY, on a case

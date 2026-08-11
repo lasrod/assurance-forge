@@ -108,12 +108,26 @@ EditOutcome apply_text_edit(LibraryDocument& document,
 
     switch (field) {
     case TextField::Name: {
-        // SetName replaces the element's single name LangString (clause 8.6).
-        // Under a non-primary language that would drop the primary name, so
-        // multi-language name edits wait for the slice that handles the
-        // reserved "sacm.import.name" TaggedValue.
+        // SACM gives an element ONE name LangString (clause 8.6), so a
+        // non-primary language cannot go there without dropping the primary. It
+        // goes where import already puts the overflow: the reserved
+        // "sacm.import.name" TaggedValue, which `case_projection` merges back into
+        // `name_langs`. Write and read now use the same convention, so a
+        // translated name survives a save/load round trip.
+        //
+        // `SetTaggedValue` rather than `AddTaggedValue`: the latter always creates,
+        // so editing the same language twice left two tags under one key and the
+        // reader kept the FIRST -- the second edit silently disappeared on load.
         if (language != kPrimaryLanguage) {
-            return unsupported_outcome();
+            if (doc.find_as<sacm::model::ModelElement>(id) == nullptr) {
+                return unsupported_outcome();
+            }
+            return applied_outcome(doc.apply(sacm::commands::SetTaggedValue{
+                .element = id,
+                .key = kImportNameOverflowTagKey,
+                .value = value,
+                .language = language,
+            }));
         }
         const sacm::commands::Operation operation = sacm::commands::SetName{
             .element = id,

@@ -301,6 +301,29 @@ struct AddTaggedValue {
     std::string language; // may be empty
 };
 
+// Set one language's entry inside the TaggedValue on `element` whose key is
+// `key`, creating that TaggedValue when the element has none (clause 8.12).
+//
+// Distinct from AddTaggedValue, which always CREATES: a client maintaining
+// per-language content under one key needs to revise an existing entry, and
+// appending a second TaggedValue with the same key instead leaves a reader to
+// guess which one wins. This finds by key and merges.
+//
+// Empty `value` removes that language's entry, and removes the TaggedValue
+// itself once its last entry goes -- so a key that carries nothing does not
+// survive as an empty tag.
+//
+// Where a document already carries several TaggedValues under `key` (an import
+// may), the FIRST is the one revised; the operation does not merge them, because
+// collapsing content a reader may distinguish is not a decision this operation
+// can make safely.
+struct SetTaggedValue {
+    model::ElementId element;
+    std::string key;
+    std::string value;
+    std::string language; // may be empty
+};
+
 // Delete any element by ID. Destructive consequences are governed by the
 // explicit policies; defaults reject rather than cascade.
 struct DeleteElement {
@@ -325,6 +348,7 @@ using Operation = std::variant<CreateAssuranceCasePackage,
                                CreateArtifactAssetRelationship,
                                SetCitation,
                                SetGid,
+                               SetTaggedValue,
                                SetName,
                                SetDescription,
                                SetDescriptionAt,
