@@ -145,6 +145,24 @@ TEST(AgentAcpReads, GetElementDoesNotAttachOtherElementsClaimPoints) {
     EXPECT_EQ(FindById(points, "ACP1"), nullptr);
 }
 
+// Attachment matches on kind as well as id: a record can never ride the wrong
+// kind of target, even if an element and a relationship were to share an id.
+TEST(AgentAcpReads, RelationshipBorneAttachmentRequiresTheRelationshipKind) {
+    Fixture fixture;
+    parser::AcpRecord decoy;
+    decoy.id = "ACP3";
+    decoy.target_kind = "element";
+    decoy.target_id = "R1"; // an element-kind record naming the relationship's id
+    decoy.resolution_kind = "none";
+    fixture.state.loaded_case->acps.push_back(decoy);
+
+    const agent::Result result = agent::GetElement(fixture.Context(), nlohmann::json{{"id", "G1"}});
+    ASSERT_FALSE(result.is_error) << result.payload.dump();
+    const nlohmann::json& points = result.payload["assurance_claim_points"];
+    EXPECT_EQ(FindById(points, "ACP3"), nullptr) << "an element-kind record must not ride a relationship";
+    EXPECT_NE(FindById(points, "ACP2"), nullptr);
+}
+
 TEST(AgentAcpReads, ElementWithoutClaimPointsOmitsTheField) {
     Fixture fixture;
     fixture.state.loaded_case->acps.clear();

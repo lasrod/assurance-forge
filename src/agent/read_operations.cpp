@@ -1,5 +1,6 @@
 #include "agent/operations.h"
 
+#include "core/acp/assurance_claim_point.h"
 #include "core/assurance_tree.h"
 #include "core/reviews/review_proposal.h"
 #include "parser/model_utils.h"
@@ -10,6 +11,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace agent {
@@ -162,6 +164,17 @@ nlohmann::json ElementDetail(const parser::SacmElement& element) {
     return detail;
 }
 
+// `instantiated` is core::acp::IsInstantiated's answer, computed through the
+// same function rather than re-derived here, so this surface and the ACP panel
+// cannot drift apart. The panel's further warnings -- a top-goal reference with
+// no confidence package behind it, for instance -- are problem diagnostics
+// layered on top of instantiation, not part of it.
+bool RecordIsInstantiated(const parser::AcpRecord& record) {
+    core::acp::Acp acp;
+    acp.resolution.kind = core::acp::AcpResolutionKindFromString(record.resolution_kind);
+    return core::acp::IsInstantiated(acp);
+}
+
 // One assurance claim point, in the vocabulary the ACP panel uses. Empty
 // resolution fields are omitted rather than sent as "", so an agent reads
 // "this ACP has no confidence argument yet" from absence, the same way a
@@ -174,7 +187,7 @@ nlohmann::json AcpJson(const parser::AcpRecord& record) {
         {"resolution_kind", record.resolution_kind},
         // GSN v3 requires an ACP to be developed somewhere; one without a
         // resolution is the uninstantiated state the ACP panel warns about.
-        {"instantiated", record.resolution_kind != "none"},
+        {"instantiated", RecordIsInstantiated(record)},
     };
     if (!record.name.empty()) {
         serialized["name"] = record.name;
@@ -405,7 +418,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
     // assembled by scanning them rather than by following pointers.
     nlohmann::json incoming = nlohmann::json::array();
     nlohmann::json outgoing = nlohmann::json::array();
-    std::vector<std::string> touching_relationship_ids;
+    std::unordered_set<std::string> touching_relationship_ids;
     for (const parser::SacmElement& candidate : model.elements) {
         if (!IsRelationship(candidate)) {
             continue;
@@ -421,7 +434,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
             incoming.push_back(ElementDetail(candidate));
         }
         if (is_source || is_target) {
-            touching_relationship_ids.push_back(candidate.id);
+            touching_relationship_ids.insert(candidate.id);
         }
     }
     result["relationships_from_here"] = std::move(outgoing);
@@ -430,15 +443,16 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
     // Assurance claim points on this element, and on the relationships that
     // touch it. An agent asked "is this claim's support assured?" needs the
     // ACP on the SupportedBy as much as one on the element itself; a
-    // relationship-borne entry names the relationship it rides on.
+    // relationship-borne entry names the relationship it rides on. The kind is
+    // checked alongside the id, so a record can never attach through the wrong
+    // kind of target even if an element and a relationship shared an id.
     nlohmann::json claim_points = nlohmann::json::array();
     for (const parser::AcpRecord& record : model.acps) {
-        if (record.target_id == id) {
+        if (record.target_kind == "element" && record.target_id == id) {
             claim_points.push_back(AcpJson(record));
             continue;
         }
-        if (std::find(touching_relationship_ids.begin(), touching_relationship_ids.end(), record.target_id) !=
-            touching_relationship_ids.end()) {
+        if (record.target_kind == "relationship" && touching_relationship_ids.count(record.target_id) > 0) {
             nlohmann::json entry = AcpJson(record);
             entry["via_relationship_id"] = record.target_id;
             claim_points.push_back(std::move(entry));
