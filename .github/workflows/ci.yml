@@ -27,9 +27,9 @@ jobs:
             os: windows-latest
             # NINJA, not the Visual Studio generator. `CMAKE_<LANG>_COMPILER_LAUNCHER`
             # is silently IGNORED by the VS generator -- the first attempt at this
-            # configured ccache, started it, and compiled 0 requests through it.
-            # Ninja honours the launcher, and Multi-Config keeps `--config Debug`
-            # and `ctest -C Debug` working exactly as before.
+            # (#378) configured sccache, started it, and compiled 0 requests
+            # through it. Ninja honours the launcher, and Multi-Config keeps
+            # `--config Debug` and `ctest -C Debug` working exactly as before.
             #
             # MSVC output is only cacheable with debug info EMBEDDED in the object
             # (/Z7). CMake's Debug default is /Zi, which writes a shared .pdb the
@@ -40,6 +40,13 @@ jobs:
             #
             # Verified locally end to end before pushing: 20/20 calls cacheable,
             # then a wiped build directory rebuilt in 2s with 20 hits.
+            #
+            # ccache rather than #378's sccache, deliberately, despite ccache's
+            # MSVC support carrying an "experimental" label: this exact ccache
+            # configuration is the one measured working above, while sccache is
+            # the tool that was never actually exercised here. What guards
+            # against either tool going silently dead again is not the tool
+            # choice but the assertion step after Build.
             configure: >-
               cmake -B build -G "Ninja Multi-Config" -DAF_WARNINGS_AS_ERRORS=ON
               -DCMAKE_POLICY_DEFAULT_CMP0141=NEW
@@ -110,8 +117,31 @@ jobs:
       - name: Configure CMake
         run: ${{ matrix.configure }}
 
+      # Statistics live inside the cache directory and survive the cache
+      # restore, so without an explicit reset a run can inherit nonzero
+      # numbers from an earlier run and the assertion below would prove
+      # nothing about THIS build.
+      - name: Reset compiler-cache statistics
+        shell: bash
+        run: ccache --zero-stats
+
       - name: Build
         run: ${{ matrix.build }}
+
+      # The failure #378 shipped: a launcher the generator silently ignored, a
+      # cache that processed zero calls, and a green run -- a cache that does
+      # nothing breaks nothing. This step makes it break the build instead, on
+      # every platform, whichever cache tool is in front of the compiler.
+      - name: Assert the compiler cache saw the build
+        shell: bash
+        run: |
+          ccache --show-stats
+          total=$(ccache --print-stats | awk -F'\t' '$1=="direct_cache_hit" || $1=="preprocessed_cache_hit" || $1=="cache_miss" {sum+=$2} END {print sum+0}')
+          echo "cacheable compile calls this run: $total"
+          if [ "$total" -eq 0 ]; then
+            echo "::error::The compiler cache processed zero compile calls; the launcher is not engaged."
+            exit 1
+          fi
 
       - name: Run tests
         run: ${{ matrix.test }}
