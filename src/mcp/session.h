@@ -8,15 +8,26 @@
 // is the mode that matters: the agent and the user see one thing, and draft
 // changes are serialized through the application's revisioned workspace.
 //
-// **Offline.** No application is running, so the session loads the project
+// **Offline.** No application is reachable, so the session loads the project
 // itself and answers reads from accepted SACM. It is **read-only**. A headless
 // process cannot own the user's integrated draft or present unaccepted changes,
 // and a second project writer is exactly the fault this design removes.
 //
-// The mode is decided once, at open. A session does not promote itself when the
-// application starts later: the client has already been told what this
-// connection can do, and quietly changing that mid-conversation is worse than
-// asking the user to reconnect.
+// The mode is re-evaluated on every call. MCP clients launch this process at
+// *client* startup, so "the application is not running yet" and "the
+// application restarted" are ordinary situations, not faults: before each
+// operation the session tries to reach the application, an offline session
+// promotes itself when the application appears, and a lost connection is
+// retried on the next call. An earlier design decided the mode once, at open,
+// on the argument that quietly changing capability mid-conversation is worse
+// than asking the user to reconnect -- experience showed the permanent dead
+// session was the worse trap, so the change is announced instead of quiet:
+// every transition is visible in the response envelope (`view`, revisions),
+// the connection errors say the session will reconnect by itself, and
+// `get_connection_status` reports the current mode on demand.
+//
+// The session id is generated once at open and survives reconnects, so draft
+// groups this session authored remain its own across an application restart.
 
 #include "core/app_state.h"
 
@@ -34,7 +45,8 @@ public:
     enum class Mode {
         // Answering from a running Assurance Forge over the bridge.
         Connected,
-        // Answering from a copy this process loaded. Reads only.
+        // No application reachable right now. Reads come from a copy this
+        // process loaded, when it loaded one; every call retries the bridge.
         Offline,
     };
 
@@ -71,9 +83,13 @@ public:
     struct OperationResult {
         nlohmann::json payload = nlohmann::json::object();
         bool is_error = false;
-        // True when the operation failed because this session is offline, so a
-        // caller can say so rather than reporting a generic failure.
+        // True when the operation failed because no application is reachable,
+        // so a caller can say so rather than reporting a generic failure.
         bool needs_application = false;
+        // True when a bridge round trip failed mid-call. Internal to Run's
+        // reconnect handling; by the time a result leaves Run the flag has been
+        // folded into the error text.
+        bool connection_lost = false;
     };
     OperationResult Run(const std::string& op, const nlohmann::json& args);
 
@@ -117,6 +133,12 @@ private:
 
     bool ConnectToApplication(std::string& error);
     bool OpenOffline(std::string& error);
+    // Re-establishes the bridge connection when there is none. Cheap when
+    // already connected, and cheap when the application is absent -- one
+    // endpoint-record read that usually finds no file. Never called when the
+    // session was opened with `never_connect`.
+    bool EnsureConnected();
+    OperationResult DescribeConnection();
     OperationResult RunOverBridge(const std::string& op, const nlohmann::json& args);
     OperationResult RunOffline(const std::string& op, const nlohmann::json& args);
 
@@ -131,6 +153,13 @@ private:
     // Resolved once at open so every consent read hits the same file.
     std::filesystem::path settings_path_;
     bool initialized_ = false;
+    bool never_connect_ = false;
+    // True when OpenOffline loaded a copy this session can serve reads from. A
+    // session that opened connected has no such copy, and does not load one
+    // when the connection drops: the disk may be behind what the user was
+    // looking at, and a silently stale answer is worse than an error that says
+    // to start the application.
+    bool offline_loaded_ = false;
     std::string client_label_;
     std::string session_id_;
 };

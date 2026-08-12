@@ -39,7 +39,7 @@ same answers whether or not a window is open.
 
 | | Connected | Offline |
 |---|---|---|
-| When | Assurance Forge has the project open | No application running |
+| When | Assurance Forge has the project open | No application reachable |
 | Reads | The complete integrated working draft the user is looking at, including MCP, SCCG and human draft groups | Accepted SACM from a copy the adapter loaded |
 | Changes | Revision-checked groups in the application's persisted draft workspace | **Refused** |
 
@@ -48,9 +48,23 @@ workspace, presents every unaccepted change to the user, and serializes edits
 from all contributors through one revision. A headless copy cannot safely do
 that. The refusal says so and says what to do.
 
-The mode is fixed at connection time. A session does not promote itself when the
-application starts later: the client has been told what this connection can do,
-and changing that mid-conversation is worse than asking for a reconnect.
+The mode is re-evaluated on every call. MCP clients launch this process when
+the *client* starts, so the application being absent, appearing later, or
+restarting are ordinary events in a session's life, not faults: an offline
+session promotes itself when the application appears, and a lost connection
+reconnects on the next call — the user never has to restart their AI client.
+An earlier design fixed the mode at connection time, reasoning that changing a
+session's capability mid-conversation is worse than asking for a reconnect;
+the permanently dead session turned out to be the worse trap. The change is
+announced rather than quiet: every case-content result names its `view`, the
+connection errors say the session heals by itself, `initialize` states the
+mode in its `instructions`, and `get_connection_status` reports it on demand
+(without returning case content, so it also works before consent is granted).
+An interrupted read is retried once after a successful reconnect; an
+interrupted change is reported but **never replayed** — the application may
+have applied it before the connection broke, and a silent duplicate is exactly
+what this surface exists to prevent. The session id survives reconnects, so
+draft-group ownership persists across an application restart.
 
 ## Reading
 
