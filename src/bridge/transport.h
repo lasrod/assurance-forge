@@ -37,6 +37,9 @@ public:
     bool ReadMessage(std::string& out_message);
     bool WriteMessage(const std::string& message);
 
+    // Safe to call from another thread while ReadMessage or WriteMessage is
+    // blocked: both unblock and return false. The descriptor is reclaimed on
+    // destruction, not here, so no blocked thread can race a reused handle.
     void Close();
 
 private:

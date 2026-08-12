@@ -225,10 +225,12 @@ bool Session::EnsureConnected() {
 }
 
 Session::OperationResult Session::DescribeConnection() {
+    // One consent read serves both fields; the flag is re-read per call anyway.
+    const bool consent = consent_granted();
     OperationResult result;
     result.payload = nlohmann::json{
         {"project_path", project_path_.string()},
-        {"consent_granted", consent_granted()},
+        {"consent_granted", consent},
     };
     if (connection_ != nullptr) {
         result.payload["mode"] = "connected";
@@ -247,7 +249,7 @@ Session::OperationResult Session::DescribeConnection() {
                                    "offline copy. Start Assurance Forge and open the project; the session "
                                    "reconnects automatically on the next call.";
     }
-    if (!consent_granted()) {
+    if (!consent) {
         result.payload["consent_detail"] =
             "MCP sharing is disabled, so tools that return case content will be refused. Enable \"Allow AI "
             "clients to read and propose changes\" in Assurance Forge's Preferences, under MCP Server.";
@@ -400,18 +402,36 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
         // application may have applied it before the connection broke, and a
         // second submission is exactly the kind of silent duplicate this
         // surface exists to prevent.
-        const bool restored = EnsureConnected();
-        if (restored && IsOfflineOperation(op)) {
+        if (EnsureConnected() && IsOfflineOperation(op)) {
             OperationResult retried = RunOverBridge(op, args);
             if (!retried.connection_lost) {
                 return retried;
             }
         }
 
+        // Probed here, not carried from before the retry: a retry that also
+        // broke consumed the restored connection, and telling the client the
+        // connection "has been restored" while it is down again would send the
+        // next call into the same wall with the wrong expectation.
+        const bool restored = EnsureConnected();
+        const bool is_read = IsOfflineOperation(op);
+
         OperationResult failure;
         failure.is_error = true;
         failure.needs_application = true;
-        if (restored) {
+        if (is_read) {
+            // A read has no application-side effect, so "applied" language
+            // would be misleading; the only fact that matters is whether the
+            // next attempt can succeed.
+            failure.payload = nlohmann::json{
+                {"error",
+                 restored ? "The connection to Assurance Forge was interrupted while answering this read, and "
+                            "again during the automatic retry. The connection has been restored -- retry the "
+                            "call."
+                          : "Assurance Forge is not reachable. It may have exited, or switched to a different "
+                            "project. Start Assurance Forge and open this project; the session reconnects "
+                            "automatically on the next call -- there is no need to restart this AI client."}};
+        } else if (restored) {
             failure.payload = nlohmann::json{
                 {"error",
                  "The connection to Assurance Forge was interrupted and has been restored. This operation was "
@@ -421,8 +441,10 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
             failure.payload = nlohmann::json{
                 {"error",
                  "Assurance Forge is not reachable. It may have exited, or switched to a different project. "
-                 "Start Assurance Forge and open this project; the session reconnects automatically on the "
-                 "next call -- there is no need to restart this AI client."}};
+                 "The interrupted operation may or may not have been applied before the connection broke -- "
+                 "check get_draft_status once the application is back. Start Assurance Forge and open this "
+                 "project; the session reconnects automatically on the next call -- there is no need to "
+                 "restart this AI client."}};
         }
         return failure;
     }

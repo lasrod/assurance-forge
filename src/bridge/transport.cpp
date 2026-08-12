@@ -361,6 +361,30 @@ std::string ErrnoText(const char* what) {
     return std::string(what) + " failed: " + std::strerror(errno);
 }
 
+// The peer going away is an ordinary event for this transport -- the
+// application exits, the adapter's client is closed -- but a write to a
+// half-closed socket raises SIGPIPE, whose default action kills the whole
+// process. That turned "the app closed" into "the MCP server silently died"
+// on Linux and macOS. Suppressed per-socket (SO_NOSIGPIPE) or per-send
+// (MSG_NOSIGNAL) rather than by a process-wide signal disposition, which is
+// not this library's to change.
+void SuppressSigpipe(int fd) {
+#ifdef SO_NOSIGPIPE
+    const int one = 1;
+    ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#else
+    (void)fd;
+#endif
+}
+
+ssize_t SendBytes(int fd, const char* data, std::size_t size) {
+#ifdef MSG_NOSIGNAL
+    return ::send(fd, data, size, MSG_NOSIGNAL);
+#else
+    return ::send(fd, data, size, 0);
+#endif
+}
+
 } // namespace
 
 struct Connection::Impl {
@@ -415,6 +439,7 @@ std::unique_ptr<Connection> Connection::Connect(const std::string& address, std:
         error = "No Assurance Forge is listening on " + address + ".";
         return nullptr;
     }
+    SuppressSigpipe(fd);
 
     std::unique_ptr<Impl> impl = std::make_unique<Impl>();
     impl->fd = fd;
@@ -513,6 +538,7 @@ std::unique_ptr<Connection> Listener::Accept(std::string& error) {
             error = ErrnoText("accept");
             return nullptr;
         }
+        SuppressSigpipe(accepted);
 
         std::unique_ptr<Connection::Impl> impl = std::make_unique<Connection::Impl>();
         impl->fd = accepted;
@@ -573,7 +599,7 @@ bool Connection::WriteMessage(const std::string& message) {
 
     std::size_t offset = 0;
     while (offset < framed.size()) {
-        const ssize_t written = ::write(impl_->fd, framed.data() + offset, framed.size() - offset);
+        const ssize_t written = SendBytes(impl_->fd, framed.data() + offset, framed.size() - offset);
         if (written < 0) {
             if (errno == EINTR) {
                 continue;
@@ -586,9 +612,14 @@ bool Connection::WriteMessage(const std::string& message) {
 }
 
 void Connection::Close() {
+    // `shutdown`, not `close`. Close is documented as safe to call from another
+    // thread while a reader is blocked, and on Linux `close` does not wake a
+    // thread blocked in `read` on the same descriptor -- the reader sleeps
+    // forever and its `join` hangs with it. `shutdown` wakes every blocked
+    // reader and writer with EOF/EPIPE at once; the descriptor itself is
+    // reclaimed by the destructor, so no thread can race a reused fd number.
     if (impl_->fd >= 0) {
-        ::close(impl_->fd);
-        impl_->fd = -1;
+        ::shutdown(impl_->fd, SHUT_RDWR);
     }
 }
 

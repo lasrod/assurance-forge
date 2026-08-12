@@ -111,10 +111,11 @@ public:
         listener_.reset();
     }
 
-    // Close the connection when the next domain operation arrives, before
-    // answering it. From the adapter's side that is an interruption mid-call.
-    void DropNextOperation() {
-        drop_next_operation_ = true;
+    // Close the connection when the next `count` domain operations arrive,
+    // before answering them. From the adapter's side each is an interruption
+    // mid-call; two in a row defeats the automatic read retry.
+    void DropNextOperation(int count = 1) {
+        drops_remaining_ = count;
     }
 
     int hello_count() const {
@@ -168,7 +169,8 @@ private:
                     bridge::EncodeResponse(bridge::MakeResult(request.id, nlohmann::json::object())));
                 continue;
             }
-            if (drop_next_operation_.exchange(false)) {
+            if (drops_remaining_.load() > 0) {
+                --drops_remaining_;
                 connection.Close();
                 return;
             }
@@ -183,7 +185,7 @@ private:
     std::unique_ptr<bridge::Listener> listener_;
     std::thread thread_;
     std::atomic<bool> running_{false};
-    std::atomic<bool> drop_next_operation_{false};
+    std::atomic<int> drops_remaining_{0};
     std::atomic<int> hello_count_{0};
     std::atomic<int> operation_count_{0};
     std::mutex connection_mutex_;
@@ -306,6 +308,37 @@ TEST(McpReconnect, ReadIsRetriedTransparentlyAfterAnInterruption) {
     EXPECT_EQ(result.payload.value("answered_by", std::string()), "fake-application");
     EXPECT_EQ(application.hello_count(), 2) << "the retry must reconnect, not reuse the dead connection";
     EXPECT_EQ(application.operation_count(), 1);
+}
+
+// A read interrupted twice -- the original call and its automatic retry --
+// reports connectivity, not application: a read has no application-side
+// effect, so "may have been applied" language on this path would send the
+// agent chasing a phantom draft change.
+TEST(McpReconnect, ReadInterruptedTwiceReportsWithoutClaimingApplication) {
+    std::unique_ptr<Fixture> fixture = MakeProject("retry_read_twice");
+    ASSERT_NE(fixture, nullptr);
+
+    FakeApplication application(fixture->project_root);
+    ASSERT_TRUE(application.Start());
+
+    std::unique_ptr<mcp::Session> session = OpenSession(*fixture);
+    ASSERT_NE(session, nullptr);
+    ASSERT_TRUE(session->connected());
+
+    application.DropNextOperation(2);
+
+    const mcp::Session::OperationResult result = session->Run("get_case_overview", nlohmann::json::object());
+    EXPECT_TRUE(result.is_error);
+    EXPECT_NE(ErrorText(result).find("interrupted"), std::string::npos) << ErrorText(result);
+    EXPECT_EQ(ErrorText(result).find("applied"), std::string::npos)
+        << "a read error must not speak of the operation being applied: " << ErrorText(result);
+    EXPECT_NE(ErrorText(result).find("restored"), std::string::npos)
+        << "the error-path probe reconnected, and the message must say so: " << ErrorText(result);
+    EXPECT_EQ(application.operation_count(), 0);
+
+    const mcp::Session::OperationResult next = session->Run("get_case_overview", nlohmann::json::object());
+    ASSERT_FALSE(next.is_error) << next.payload.dump();
+    EXPECT_EQ(next.payload.value("answered_by", std::string()), "fake-application");
 }
 
 // A mutation interrupted mid-call may already have been applied -- the
