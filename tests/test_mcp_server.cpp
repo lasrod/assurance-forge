@@ -416,7 +416,14 @@ TEST(McpServer, ListsThePerGuidelineResourceTemplateAndServesIt) {
     ASSERT_TRUE(listed->contains("result")) << listed->dump();
     const nlohmann::json& templates = (*listed)["result"]["resourceTemplates"];
     ASSERT_FALSE(templates.empty());
-    EXPECT_EQ(templates[0]["uriTemplate"], "sccg://guideline/{id}");
+    // Presence, not position: the list may grow and reorder without this
+    // template becoming any less published.
+    bool guideline_template_listed = false;
+    for (const nlohmann::json& entry : templates) {
+        guideline_template_listed =
+            guideline_template_listed || entry.value("uriTemplate", "") == "sccg://guideline/{id}";
+    }
+    EXPECT_TRUE(guideline_template_listed) << templates.dump();
 
     // And the uri the template describes actually serves one guideline.
     const std::optional<nlohmann::json> read =
