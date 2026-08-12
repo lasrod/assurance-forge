@@ -145,9 +145,30 @@ bool UsesContentText(const parser::SacmElement& element) {
     return element.type == "claim" || element.type == "argumentreasoning";
 }
 
-std::string TextFor(const parser::SacmElement& element) {
-    return UsesContentText(element) ? (!element.content.empty() ? element.content : element.description)
-                                    : (!element.description.empty() ? element.description : element.content);
+// The requested language's text for one field, or the primary when that field
+// has no such translation. Per field, matching the canvas: a half-translated
+// element exports its translated fields in the requested language and the rest
+// in the primary, rather than dropping text that exists.
+std::string LanguageOrPrimary(const std::map<std::string, std::string>& translations,
+                              const std::string& language,
+                              const std::string& primary) {
+    if (language.empty())
+        return primary;
+    const std::map<std::string, std::string>::const_iterator found = translations.find(language);
+    if (found != translations.end() && !found->second.empty())
+        return found->second;
+    return primary;
+}
+
+std::string TextFor(const parser::SacmElement& element, const std::string& language) {
+    // Which field carries the body text is decided on the primary content, so a
+    // translation can never move a node's text between fields.
+    if (UsesContentText(element)) {
+        return !element.content.empty() ? LanguageOrPrimary(element.content_langs, language, element.content)
+                                        : LanguageOrPrimary(element.description_langs, language, element.description);
+    }
+    return !element.description.empty() ? LanguageOrPrimary(element.description_langs, language, element.description)
+                                        : LanguageOrPrimary(element.content_langs, language, element.content);
 }
 
 void AddReference(std::unordered_map<std::string, size_t>& node_by_ref,
@@ -361,7 +382,7 @@ void ApplyContextKind(GsnNode& node) {
 
 } // namespace
 
-GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
+GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const std::string& secondary_language) {
     GsnProjectionResult result;
     std::unordered_map<std::string, size_t> node_by_ref;
     std::unordered_map<std::string, int> node_id_counts;
@@ -446,8 +467,8 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         node.display_id = is_visible_terminology_context ? source_id : core::GsnIdentifierFor(element);
         node.source_gid = element.gid;
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
-        node.title = element.name;
-        node.text = TextFor(element);
+        node.title = LanguageOrPrimary(element.name_langs, secondary_language, element.name);
+        node.text = TextFor(element, secondary_language);
         node.undeveloped = element.undeveloped;
         node.uninstantiated = element.is_abstract;
         AttachAcpLabels(node.acp_labels, element_acp_labels, element.id, element.gid);
