@@ -1108,12 +1108,13 @@
       "status": "supported",
       "evidence": [
         "src/export/gsn_svg_exporter.cpp",
-        "src/export/svg_writer.cpp"
+        "src/export/svg_writer.cpp",
+        "src/export/gsn_projection.cpp"
       ],
       "tests": [
         "tests/test_gsn_svg_exporter.cpp"
       ],
-      "notes": "Core GSN nodes, SupportedBy/InContextOf/Challenges edges, and decorators (AF-ENG-015). Nodes and edges carry `gsn-*` CSS classes for restyling."
+      "notes": "Core GSN nodes, SupportedBy/InContextOf/Challenges edges, and decorators (AF-ENG-015). Nodes and edges carry `gsn-*` CSS classes for restyling. Exports in the language the canvas is showing (AF-ENG-012): a secondary-language export takes each field's translation with a per-field fallback to the primary, and the language code lands in the file name so a Japanese export cannot silently overwrite the English one."
     },
     {
       "id": "AF-ENG-006",

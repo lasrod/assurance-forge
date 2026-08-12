@@ -6,6 +6,7 @@
 #include "export/gsn_svg_exporter.h"
 #include "ui/i18n/localization.h"
 #include "ui/text_edit_session.h"
+#include "ui/ui_state.h"
 
 #include <filesystem>
 #include <string>
@@ -119,8 +120,20 @@ void AppRuntime::ExportGsnSvg() {
     if (source_stem.empty())
         source_stem = impl_->app_state.loaded_case->name;
 
-    export_gsn::GsnSvgExportResult export_result = export_gsn::ExportCurrentSafetyCaseToGsnSvg(
-        impl_->app_state.loaded_case.value(), impl_->app_state.current_project->rootPath, source_stem);
+    // Export the language the canvas is showing, so the file says what the
+    // screen says. The language lands in the file name too: a Japanese export
+    // must not silently overwrite the English one, or vice versa.
+    const ui::UiState& ui_state = ui::GetUiState();
+    const std::string secondary_language =
+        ui_state.show_secondary_language ? ui_state.active_secondary_lang : std::string();
+    if (!secondary_language.empty())
+        source_stem += "_" + secondary_language;
+
+    export_gsn::GsnSvgExportResult export_result =
+        export_gsn::ExportCurrentSafetyCaseToGsnSvg(impl_->app_state.loaded_case.value(),
+                                                    impl_->app_state.current_project->rootPath,
+                                                    source_stem,
+                                                    secondary_language);
     if (!export_result.success) {
         SetStatus(ui::i18n::trf("GSN SVG export failed: {0}", export_result.error_message));
         return;

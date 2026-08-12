@@ -273,6 +273,69 @@ TEST(GsnSvgExporterTest, SvgRendersElementNameAndContent) {
     EXPECT_NE(svg.find("Actual safety claim content."), std::string::npos);
 }
 
+// The canvas has shown secondary-language labels since AF-ENG-012; until this,
+// the export silently dropped them -- a bilingual case exported from a Japanese
+// view produced an English diagram. The selection is per field, matching the
+// canvas: a field with no translation keeps its primary text rather than
+// vanishing.
+TEST(GsnSvgExporterTest, SecondaryLanguageProjectionTranslatesPerFieldWithFallback) {
+    parser::AssuranceCase model;
+    parser::SacmElement goal = Element("G1", "claim", "Braking goal", "");
+    goal.content = "The braking subsystem meets its stated targets.";
+    goal.content_langs["en"] = goal.content;
+    goal.content_langs["ja"] = "制動サブシステムは規定の目標を満たす。";
+    // Deliberately no Japanese name: the title must fall back to the primary.
+    model.elements = {goal};
+
+    const export_gsn::GsnProjectionResult primary = export_gsn::BuildGsnProjection(model);
+    const export_gsn::GsnNode* primary_node = FindNode(primary.diagram, "G1");
+    ASSERT_NE(primary_node, nullptr);
+    EXPECT_EQ(primary_node->text, "The braking subsystem meets its stated targets.");
+    EXPECT_EQ(primary_node->title, "Braking goal");
+
+    const export_gsn::GsnProjectionResult japanese = export_gsn::BuildGsnProjection(model, "ja");
+    const export_gsn::GsnNode* japanese_node = FindNode(japanese.diagram, "G1");
+    ASSERT_NE(japanese_node, nullptr);
+    EXPECT_EQ(japanese_node->text, "制動サブシステムは規定の目標を満たす。");
+    EXPECT_EQ(japanese_node->title, "Braking goal");
+}
+
+// The canvas falls back from content_langs to description_langs for content
+// elements; a case whose translations live in description_langs shows Japanese
+// on screen, so it must export Japanese too. Mirrors
+// core/assurance_tree.cpp's secondary-label chain.
+TEST(GsnSvgExporterTest, SecondaryLanguageFallsBackToDescriptionTranslationsLikeTheCanvas) {
+    parser::AssuranceCase model;
+    parser::SacmElement goal = Element("G1", "claim", "Braking goal", "");
+    goal.content = "The braking subsystem meets its stated targets.";
+    // The translation lives in description_langs; content_langs has none.
+    goal.description_langs["ja"] = "制動サブシステムは規定の目標を満たす。";
+    model.elements = {goal};
+
+    const export_gsn::GsnProjectionResult japanese = export_gsn::BuildGsnProjection(model, "ja");
+    const export_gsn::GsnNode* node = FindNode(japanese.diagram, "G1");
+    ASSERT_NE(node, nullptr);
+    EXPECT_EQ(node->text, "制動サブシステムは規定の目標を満たす。");
+}
+
+TEST(GsnSvgExporterTest, SecondaryLanguageTextReachesTheSvgOutput) {
+    parser::AssuranceCase model;
+    parser::SacmElement goal = Element("G1", "claim", "Braking goal", "");
+    goal.content = "The braking subsystem meets its stated targets.";
+    goal.content_langs["ja"] = "制動サブシステムは規定の目標を満たす。";
+    model.elements = {goal};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model, "ja");
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    // A short needle, so line wrapping inside the node cannot split the match.
+    EXPECT_NE(svg.find("制動"), std::string::npos) << "the Japanese text did not survive into the SVG";
+    EXPECT_EQ(svg.find("The braking subsystem"), std::string::npos)
+        << "the primary text leaked into a secondary-language export";
+}
+
 TEST(GsnSvgExporterTest, MissingRelationshipEndpointProducesWarning) {
     parser::AssuranceCase model;
     model.elements = {Element("G1", "claim", "Goal"), Relationship("inf1", "assertedinference", {"missing"}, {"G1"})};

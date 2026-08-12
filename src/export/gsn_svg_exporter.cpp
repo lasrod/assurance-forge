@@ -90,7 +90,8 @@ std::filesystem::path MakeGsnSvgExportPath(const std::filesystem::path& exports_
 
 GsnSvgExportResult ExportCurrentSafetyCaseToGsnSvg(const parser::AssuranceCase& model,
                                                    const std::filesystem::path& project_root,
-                                                   const std::string& source_file_stem) {
+                                                   const std::string& source_file_stem,
+                                                   const std::string& secondary_language) {
     GsnSvgExportResult result;
 
     std::string error;
@@ -100,7 +101,7 @@ GsnSvgExportResult ExportCurrentSafetyCaseToGsnSvg(const parser::AssuranceCase& 
         return result;
     }
 
-    GsnProjectionResult projection = BuildGsnProjection(model);
+    GsnProjectionResult projection = BuildGsnProjection(model, secondary_language);
     AppendWarnings(result.warnings, projection.warnings);
     if (projection.diagram.nodes.empty()) {
         result.error_message = "No exportable GSN elements were found.";

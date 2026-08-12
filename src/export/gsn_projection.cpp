@@ -145,9 +145,44 @@ bool UsesContentText(const parser::SacmElement& element) {
     return element.type == "claim" || element.type == "argumentreasoning";
 }
 
-std::string TextFor(const parser::SacmElement& element) {
-    return UsesContentText(element) ? (!element.content.empty() ? element.content : element.description)
-                                    : (!element.description.empty() ? element.description : element.content);
+// The requested language's text for one field, or the primary when that field
+// has no such translation. Per field, matching the canvas: a half-translated
+// element exports its translated fields in the requested language and the rest
+// in the primary, rather than dropping text that exists.
+std::string LanguageOrPrimary(const std::map<std::string, std::string>& translations,
+                              const std::string& language,
+                              const std::string& primary) {
+    if (language.empty())
+        return primary;
+    const std::map<std::string, std::string>::const_iterator found = translations.find(language);
+    if (found != translations.end() && !found->second.empty())
+        return found->second;
+    return primary;
+}
+
+std::string TextFor(const parser::SacmElement& element, const std::string& language) {
+    // Not const: a const local cannot be moved from on return
+    // (performance-no-automatic-move).
+    std::string primary = UsesContentText(element)
+                              ? (!element.content.empty() ? element.content : element.description)
+                              : (!element.description.empty() ? element.description : element.content);
+    if (language.empty())
+        return primary;
+
+    // The same chain the canvas walks (core/assurance_tree.cpp, the secondary
+    // label block): content elements try content_langs and then fall back to
+    // description_langs, others try description_langs only, and the primary
+    // text stands in when the language is absent. Mirrored exactly so a case
+    // that shows Japanese on screen can never export English here.
+    if (UsesContentText(element)) {
+        const std::map<std::string, std::string>::const_iterator in_content = element.content_langs.find(language);
+        if (in_content != element.content_langs.end() && !in_content->second.empty())
+            return in_content->second;
+    }
+    const std::map<std::string, std::string>::const_iterator in_description = element.description_langs.find(language);
+    if (in_description != element.description_langs.end() && !in_description->second.empty())
+        return in_description->second;
+    return primary;
 }
 
 void AddReference(std::unordered_map<std::string, size_t>& node_by_ref,
@@ -361,7 +396,7 @@ void ApplyContextKind(GsnNode& node) {
 
 } // namespace
 
-GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
+GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const std::string& secondary_language) {
     GsnProjectionResult result;
     std::unordered_map<std::string, size_t> node_by_ref;
     std::unordered_map<std::string, int> node_id_counts;
@@ -446,8 +481,8 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model) {
         node.display_id = is_visible_terminology_context ? source_id : core::GsnIdentifierFor(element);
         node.source_gid = element.gid;
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
-        node.title = element.name;
-        node.text = TextFor(element);
+        node.title = LanguageOrPrimary(element.name_langs, secondary_language, element.name);
+        node.text = TextFor(element, secondary_language);
         node.undeveloped = element.undeveloped;
         node.uninstantiated = element.is_abstract;
         AttachAcpLabels(node.acp_labels, element_acp_labels, element.id, element.gid);
