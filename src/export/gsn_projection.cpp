@@ -161,9 +161,11 @@ std::string LanguageOrPrimary(const std::map<std::string, std::string>& translat
 }
 
 std::string TextFor(const parser::SacmElement& element, const std::string& language) {
-    const std::string primary = UsesContentText(element)
-                                    ? (!element.content.empty() ? element.content : element.description)
-                                    : (!element.description.empty() ? element.description : element.content);
+    // Not const: a const local cannot be moved from on return
+    // (performance-no-automatic-move).
+    std::string primary = UsesContentText(element)
+                              ? (!element.content.empty() ? element.content : element.description)
+                              : (!element.description.empty() ? element.description : element.content);
     if (language.empty())
         return primary;
 
