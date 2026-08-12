@@ -1,5 +1,6 @@
 #include "agent/operations.h"
 
+#include "core/acp/assurance_claim_point.h"
 #include "core/assurance_tree.h"
 #include "core/reviews/review_proposal.h"
 #include "parser/model_utils.h"
@@ -10,6 +11,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace agent {
@@ -160,6 +162,49 @@ nlohmann::json ElementDetail(const parser::SacmElement& element) {
         detail["translations"] = std::move(translations);
     }
     return detail;
+}
+
+// `instantiated` is core::acp::IsInstantiated's answer, computed through the
+// same function rather than re-derived here, so this surface and the ACP panel
+// cannot drift apart. The panel's further warnings -- a top-goal reference with
+// no confidence package behind it, for instance -- are problem diagnostics
+// layered on top of instantiation, not part of it.
+bool RecordIsInstantiated(const parser::AcpRecord& record) {
+    core::acp::Acp acp;
+    acp.resolution.kind = core::acp::AcpResolutionKindFromString(record.resolution_kind);
+    return core::acp::IsInstantiated(acp);
+}
+
+// One assurance claim point, in the vocabulary the ACP panel uses. Empty
+// resolution fields are omitted rather than sent as "", so an agent reads
+// "this ACP has no confidence argument yet" from absence, the same way a
+// human reads the panel.
+nlohmann::json AcpJson(const parser::AcpRecord& record) {
+    nlohmann::json serialized{
+        {"id", record.id},
+        {"target_kind", record.target_kind},
+        {"target_id", record.target_id},
+        {"resolution_kind", record.resolution_kind},
+        // GSN v3 requires an ACP to be developed somewhere; one without a
+        // resolution is the uninstantiated state the ACP panel warns about.
+        {"instantiated", RecordIsInstantiated(record)},
+    };
+    if (!record.name.empty()) {
+        serialized["name"] = record.name;
+    }
+    if (!record.text.empty()) {
+        serialized["text"] = record.text;
+    }
+    if (!record.confidence_claim_id.empty()) {
+        serialized["confidence_claim_id"] = record.confidence_claim_id;
+    }
+    if (!record.argument_package_id.empty()) {
+        serialized["confidence_argument_package_id"] = record.argument_package_id;
+    }
+    if (!record.top_goal_id.empty()) {
+        serialized["confidence_top_goal_id"] = record.top_goal_id;
+    }
+    return serialized;
 }
 
 nlohmann::json TreeNodeJson(const core::TreeNode& node, int remaining_depth) {
@@ -333,6 +378,24 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
                       });
 }
 
+Result ListAssuranceClaimPoints(const ReadContext& context) {
+    if (!HasCase(context)) {
+        return NoCase();
+    }
+    const parser::AssuranceCase& model = *context.argument();
+
+    nlohmann::json points = nlohmann::json::array();
+    for (const parser::AcpRecord& record : model.acps) {
+        points.push_back(AcpJson(record));
+    }
+    const int count = static_cast<int>(points.size());
+    return ReadResult(context,
+                      nlohmann::json{
+                          {"assurance_claim_points", std::move(points)},
+                          {"count", count},
+                      });
+}
+
 Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
     if (!HasCase(context)) {
         return NoCase();
@@ -355,6 +418,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
     // assembled by scanning them rather than by following pointers.
     nlohmann::json incoming = nlohmann::json::array();
     nlohmann::json outgoing = nlohmann::json::array();
+    std::unordered_set<std::string> touching_relationship_ids;
     for (const parser::SacmElement& candidate : model.elements) {
         if (!IsRelationship(candidate)) {
             continue;
@@ -369,9 +433,34 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
         if (is_target) {
             incoming.push_back(ElementDetail(candidate));
         }
+        if (is_source || is_target) {
+            touching_relationship_ids.insert(candidate.id);
+        }
     }
     result["relationships_from_here"] = std::move(outgoing);
     result["relationships_to_here"] = std::move(incoming);
+
+    // Assurance claim points on this element, and on the relationships that
+    // touch it. An agent asked "is this claim's support assured?" needs the
+    // ACP on the SupportedBy as much as one on the element itself; a
+    // relationship-borne entry names the relationship it rides on. The kind is
+    // checked alongside the id, so a record can never attach through the wrong
+    // kind of target even if an element and a relationship shared an id.
+    nlohmann::json claim_points = nlohmann::json::array();
+    for (const parser::AcpRecord& record : model.acps) {
+        if (record.target_kind == "element" && record.target_id == id) {
+            claim_points.push_back(AcpJson(record));
+            continue;
+        }
+        if (record.target_kind == "relationship" && touching_relationship_ids.count(record.target_id) > 0) {
+            nlohmann::json entry = AcpJson(record);
+            entry["via_relationship_id"] = record.target_id;
+            claim_points.push_back(std::move(entry));
+        }
+    }
+    if (!claim_points.empty()) {
+        result["assurance_claim_points"] = std::move(claim_points);
+    }
 
     const core::AssuranceTree tree = core::AssuranceTree::Build(model);
     if (const core::TreeNode* node = core::FindTreeNode(tree, id)) {

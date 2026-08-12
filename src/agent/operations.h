@@ -71,6 +71,10 @@ Result ReadResult(const ReadContext& context, nlohmann::json payload);
 Result GetCaseOverview(const ReadContext& context);
 Result FindElements(const ReadContext& context, const nlohmann::json& arguments);
 Result GetElement(const ReadContext& context, const nlohmann::json& arguments);
+// Every assurance claim point in the case: id, name, what it annotates, and how
+// it is resolved (inline text or a confidence argument). Read-only: the patch
+// vocabulary has no ACP operation, and extending it is an ADR 0009 decision.
+Result ListAssuranceClaimPoints(const ReadContext& context);
 Result GetArgumentTree(const ReadContext& context, const nlohmann::json& arguments);
 Result ListCaseFiles(const ReadContext& context);
 

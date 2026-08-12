@@ -74,6 +74,9 @@ bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentR
     if (request.op == "get_element") {
         return FromAgentResult(request.id, agent::GetElement(read, request.args));
     }
+    if (request.op == "list_assurance_claim_points") {
+        return FromAgentResult(request.id, agent::ListAssuranceClaimPoints(read));
+    }
     if (request.op == "get_argument_tree") {
         return FromAgentResult(request.id, agent::GetArgumentTree(read, request.args));
     }

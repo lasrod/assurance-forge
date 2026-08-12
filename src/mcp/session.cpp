@@ -48,7 +48,8 @@ bool LooksLikeAssuranceCaseFile(const std::filesystem::path& path) {
 // contributors through the workspace revision.
 bool IsOfflineOperation(const std::string& op) {
     return op == "get_case_overview" || op == "find_elements" || op == "get_element" || op == "get_argument_tree" ||
-           op == "list_case_files" || op == "open_case_file" || op == "suggest_placement";
+           op == "list_case_files" || op == "open_case_file" || op == "suggest_placement" ||
+           op == "list_assurance_claim_points";
 }
 
 } // namespace
@@ -327,6 +328,10 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
     }
     if (op == "get_element") {
         const agent::Result value = agent::GetElement(context, args);
+        return OperationResult{value.payload, value.is_error, false};
+    }
+    if (op == "list_assurance_claim_points") {
+        const agent::Result value = agent::ListAssuranceClaimPoints(context);
         return OperationResult{value.payload, value.is_error, false};
     }
     if (op == "get_argument_tree") {

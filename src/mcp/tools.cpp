@@ -35,6 +35,10 @@ ToolResult GetElement(Session& session, const nlohmann::json& arguments) {
     return Run(session, "get_element", arguments);
 }
 
+ToolResult ListAssuranceClaimPoints(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "list_assurance_claim_points", arguments);
+}
+
 ToolResult GetArgumentTree(Session& session, const nlohmann::json& arguments) {
     return Run(session, "get_argument_tree", arguments);
 }
@@ -249,12 +253,26 @@ std::vector<ToolDefinition> BuildTools() {
     tools.push_back(ToolDefinition{
         "get_element",
         "Fetch one element by id with its full fields, its incoming and outgoing SACM "
-        "relationships, and its GSN role and immediate neighbours.",
+        "relationships, its GSN role and immediate neighbours, and any assurance claim "
+        "points on it or on the relationships that touch it.",
         nlohmann::json{{"type", "object"},
                        {"properties", {{"id", {{"type", "string"}, {"description", "Element id."}}}}},
                        {"required", nlohmann::json::array({"id"})}},
         true,
         &GetElement,
+    });
+
+    tools.push_back(ToolDefinition{
+        "list_assurance_claim_points",
+        "List the case's assurance claim points (GSN ACPs): what each one annotates -- an "
+        "element such as a Solution, or a SupportedBy/InContextOf relationship -- and how it "
+        "is resolved: inline text, or a link to a confidence argument (claim, package and top "
+        "goal ids you can follow with get_element). An ACP marks where the argument's own "
+        "assurance is questioned, so read them before proposing changes near one. Read-only: "
+        "ACPs are created and edited in Assurance Forge, not over MCP.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &ListAssuranceClaimPoints,
     });
 
     tools.push_back(ToolDefinition{

@@ -77,6 +77,15 @@ with the path from the top goal, the sub-claims already there and the context in
 scope. The agent still decides; without it, an agent guesses and attaches at the
 root.
 
+`list_assurance_claim_points` returns the case's GSN assurance claim points —
+what each one annotates and how it is resolved, with the confidence argument's
+claim, package and top-goal ids as links `get_element` can follow. An ACP marks
+where the argument's own assurance is questioned, which is exactly what an
+agent should read before proposing changes nearby; `get_element` also carries
+the ACPs on the element and on the relationships touching it. Read-only: the
+patch vocabulary has no ACP operation, and adding one is an ADR 0009 decision
+with its own GSN review, so ACP authoring stays in the application.
+
 Hard limits on `find_elements` and `get_argument_tree` are a correctness
 requirement, not a nicety — an unbounded call on a real case spends the whole
 conversation.
