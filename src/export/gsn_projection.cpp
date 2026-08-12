@@ -161,14 +161,26 @@ std::string LanguageOrPrimary(const std::map<std::string, std::string>& translat
 }
 
 std::string TextFor(const parser::SacmElement& element, const std::string& language) {
-    // Which field carries the body text is decided on the primary content, so a
-    // translation can never move a node's text between fields.
+    const std::string primary = UsesContentText(element)
+                                    ? (!element.content.empty() ? element.content : element.description)
+                                    : (!element.description.empty() ? element.description : element.content);
+    if (language.empty())
+        return primary;
+
+    // The same chain the canvas walks (core/assurance_tree.cpp, the secondary
+    // label block): content elements try content_langs and then fall back to
+    // description_langs, others try description_langs only, and the primary
+    // text stands in when the language is absent. Mirrored exactly so a case
+    // that shows Japanese on screen can never export English here.
     if (UsesContentText(element)) {
-        return !element.content.empty() ? LanguageOrPrimary(element.content_langs, language, element.content)
-                                        : LanguageOrPrimary(element.description_langs, language, element.description);
+        const std::map<std::string, std::string>::const_iterator in_content = element.content_langs.find(language);
+        if (in_content != element.content_langs.end() && !in_content->second.empty())
+            return in_content->second;
     }
-    return !element.description.empty() ? LanguageOrPrimary(element.description_langs, language, element.description)
-                                        : LanguageOrPrimary(element.content_langs, language, element.content);
+    const std::map<std::string, std::string>::const_iterator in_description = element.description_langs.find(language);
+    if (in_description != element.description_langs.end() && !in_description->second.empty())
+        return in_description->second;
+    return primary;
 }
 
 void AddReference(std::unordered_map<std::string, size_t>& node_by_ref,

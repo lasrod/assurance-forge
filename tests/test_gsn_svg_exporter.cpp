@@ -300,6 +300,24 @@ TEST(GsnSvgExporterTest, SecondaryLanguageProjectionTranslatesPerFieldWithFallba
     EXPECT_EQ(japanese_node->title, "Braking goal");
 }
 
+// The canvas falls back from content_langs to description_langs for content
+// elements; a case whose translations live in description_langs shows Japanese
+// on screen, so it must export Japanese too. Mirrors
+// core/assurance_tree.cpp's secondary-label chain.
+TEST(GsnSvgExporterTest, SecondaryLanguageFallsBackToDescriptionTranslationsLikeTheCanvas) {
+    parser::AssuranceCase model;
+    parser::SacmElement goal = Element("G1", "claim", "Braking goal", "");
+    goal.content = "The braking subsystem meets its stated targets.";
+    // The translation lives in description_langs; content_langs has none.
+    goal.description_langs["ja"] = "制動サブシステムは規定の目標を満たす。";
+    model.elements = {goal};
+
+    const export_gsn::GsnProjectionResult japanese = export_gsn::BuildGsnProjection(model, "ja");
+    const export_gsn::GsnNode* node = FindNode(japanese.diagram, "G1");
+    ASSERT_NE(node, nullptr);
+    EXPECT_EQ(node->text, "制動サブシステムは規定の目標を満たす。");
+}
+
 TEST(GsnSvgExporterTest, SecondaryLanguageTextReachesTheSvgOutput) {
     parser::AssuranceCase model;
     parser::SacmElement goal = Element("G1", "claim", "Braking goal", "");
