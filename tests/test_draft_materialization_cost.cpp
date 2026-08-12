@@ -6,6 +6,8 @@
 
 #include <chrono>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -105,6 +107,15 @@ core::reviews::PatchOperation SupportOp(const std::string& child_ref, const std:
     return operation;
 }
 
+core::reviews::PatchOperation SetUndevelopedOp(const std::string& create_ref) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::SetUndeveloped;
+    core::reviews::ElementRef element;
+    element.create_ref = create_ref;
+    operation.element = element;
+    return operation;
+}
+
 double MedianMilliseconds(std::vector<double> samples) {
     std::sort(samples.begin(), samples.end());
     return samples[samples.size() / 2];
@@ -146,6 +157,11 @@ CostReport MeasureAt(int claim_count, int group_count, int claims_per_group, int
             operations.push_back(
                 CreateClaimOp(ref, "Draft claim " + std::to_string(created) + " states one further obligation."));
             operations.push_back(SupportOp(ref, parent));
+            // Undeveloped, as the MCP prompts instruct agents to leave new
+            // leaves. Without this every draft claim trips EV.1 and the
+            // measurement skews toward findings assembly on a draft no
+            // guided agent would produce.
+            operations.push_back(SetUndevelopedOp(ref));
         }
         EXPECT_TRUE(store.StageOperations(group_id, operations, accepted, error)) << error;
     }
@@ -166,14 +182,21 @@ CostReport MeasureAt(int claim_count, int group_count, int claims_per_group, int
     }
 
     // Cached: the per-frame path -- the revision keys match, nothing recomputes.
-    std::vector<double> cached;
-    for (int run = 0; run < runs; ++run) {
-        const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    // Timed as one batch and divided, because a single cache lookup is far
+    // below the clock's noise floor and one thread preemption on a contended
+    // CI machine could push an individual sample over any sane budget.
+    constexpr int kCachedBatch = 1000;
+    const std::chrono::steady_clock::time_point cached_begin = std::chrono::steady_clock::now();
+    for (int call = 0; call < kCachedBatch; ++call) {
         const core::drafts::DraftMaterializationResult& result = store.Materialize(accepted, kAcceptedRevision);
-        const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        EXPECT_TRUE(result.success);
-        cached.push_back(std::chrono::duration<double, std::milli>(end - begin).count());
+        if (!result.success) {
+            ADD_FAILURE() << result.error;
+            break;
+        }
     }
+    const std::chrono::steady_clock::time_point cached_end = std::chrono::steady_clock::now();
+    const double cached_per_call_ms =
+        std::chrono::duration<double, std::milli>(cached_end - cached_begin).count() / kCachedBatch;
 
     // One further staging call: what an MCP client waits for per stage_operations.
     request.title = "Timing probe group";
@@ -189,7 +212,7 @@ CostReport MeasureAt(int claim_count, int group_count, int claims_per_group, int
     CostReport report;
     report.accepted_elements = static_cast<int>(accepted.elements.size());
     report.cold_ms = MedianMilliseconds(cold);
-    report.cached_ms = MedianMilliseconds(cached);
+    report.cached_ms = cached_per_call_ms;
     report.stage_ms = std::chrono::duration<double, std::milli>(stage_end - stage_begin).count();
     return report;
 }
@@ -200,18 +223,15 @@ TEST(DraftMaterializationCost, MeasuredOnLargeArguments) {
     const int kGroups = 10;
     const int kClaimsPerGroup = 10;
 
-#ifdef NDEBUG
-    // The recorded baseline (see #283) comes from Release runs of these sizes.
-    const std::vector<int> kSizes{250, 1000, 2500};
-    const int kRuns = 5;
-#else
-    // CI builds Debug on every platform, where a cold materialization is
-    // several times slower; the full sweep would add minutes to every run for
-    // numbers nobody records. One small size keeps the harness itself from
-    // rotting unnoticed.
-    const std::vector<int> kSizes{250};
-    const int kRuns = 3;
-#endif
+    // The full sweep runs only on request: it costs the better part of a
+    // minute in Release and several in Debug, and its numbers matter when
+    // someone is deliberately re-measuring, not on every `ctest`. The default
+    // keeps one small size on every platform and configuration, so the harness
+    // itself cannot rot unnoticed. The recorded baseline in #283 comes from a
+    // Release run with the variable set.
+    const bool full_sweep = std::getenv("AF_MEASURE_MATERIALIZATION_COST") != nullptr;
+    const std::vector<int> kSizes = full_sweep ? std::vector<int>{250, 1000, 2500} : std::vector<int>{250};
+    const int kRuns = full_sweep ? 5 : 3;
 
     for (const int claim_count : kSizes) {
         const CostReport report = MeasureAt(claim_count, kGroups, kClaimsPerGroup, kRuns);
