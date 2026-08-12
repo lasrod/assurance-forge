@@ -33,6 +33,17 @@ struct ResourceDefinition {
     std::string mime_type;
 };
 
+// A parameterized resource, published through `resources/templates/list`. The
+// per-guideline uri was readable long before it was listed, which made it
+// undiscoverable: no client could learn the `sccg://guideline/<id>` form
+// without reading this codebase.
+struct ResourceTemplateDefinition {
+    std::string uri_template;
+    std::string name;
+    std::string description;
+    std::string mime_type;
+};
+
 struct PromptArgument {
     std::string name;
     std::string description;
@@ -46,6 +57,7 @@ struct PromptDefinition {
 };
 
 const std::vector<ResourceDefinition>& BuiltinResources();
+const std::vector<ResourceTemplateDefinition>& BuiltinResourceTemplates();
 const std::vector<PromptDefinition>& BuiltinPrompts();
 
 // Reads one resource. `found` distinguishes "no such uri" from "the catalog

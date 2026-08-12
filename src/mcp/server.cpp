@@ -87,6 +87,9 @@ nlohmann::json Server::Dispatch(const jsonrpc::Request& request) {
     if (request.method == "resources/list") {
         return HandleResourcesList(request);
     }
+    if (request.method == "resources/templates/list") {
+        return HandleResourcesTemplatesList(request);
+    }
     if (request.method == "resources/read") {
         return HandleResourcesRead(request);
     }
@@ -160,6 +163,17 @@ nlohmann::json Server::HandleResourcesList(const jsonrpc::Request& request) {
                                            {"mimeType", resource.mime_type}});
     }
     return jsonrpc::MakeResult(request.id, nlohmann::json{{"resources", std::move(resources)}});
+}
+
+nlohmann::json Server::HandleResourcesTemplatesList(const jsonrpc::Request& request) {
+    nlohmann::json templates = nlohmann::json::array();
+    for (const ResourceTemplateDefinition& definition : BuiltinResourceTemplates()) {
+        templates.push_back(nlohmann::json{{"uriTemplate", definition.uri_template},
+                                           {"name", definition.name},
+                                           {"description", definition.description},
+                                           {"mimeType", definition.mime_type}});
+    }
+    return jsonrpc::MakeResult(request.id, nlohmann::json{{"resourceTemplates", std::move(templates)}});
 }
 
 nlohmann::json Server::HandleResourcesRead(const jsonrpc::Request& request) {

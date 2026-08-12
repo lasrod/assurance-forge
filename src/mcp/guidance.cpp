@@ -124,10 +124,23 @@ const std::vector<ResourceDefinition>& BuiltinResources() {
                            "Safety Case Core Guidelines",
                            "The full SCCG catalog: the claim, argument, evidence, sufficiency and "
                            "fallacy rules this project's reviews are held to. Read this before "
-                           "proposing argument structure.",
+                           "proposing argument structure. One guideline at a time is available as "
+                           "sccg://guideline/<id>, e.g. sccg://guideline/CL.1.",
                            "text/markdown"},
     };
     return resources;
+}
+
+const std::vector<ResourceTemplateDefinition>& BuiltinResourceTemplates() {
+    static const std::vector<ResourceTemplateDefinition> templates{
+        ResourceTemplateDefinition{"sccg://guideline/{id}",
+                                   "One SCCG guideline",
+                                   "A single guideline by id (e.g. CL.1, AR.2, EV.1): its statement, "
+                                   "rationale, examples and review prompts. Cheaper to re-read while "
+                                   "working than the whole catalog.",
+                                   "text/markdown"},
+    };
+    return templates;
 }
 
 const std::vector<PromptDefinition>& BuiltinPrompts() {
@@ -164,9 +177,18 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
             error = load_error;
             return {};
         }
+        // The dist loader -- the path every real build takes -- carries no
+        // document metadata; only the YAML fallback does. Without these
+        // fallbacks the resource opened with an empty heading and a blank
+        // line, which is a poor first impression for the text that exists to
+        // establish authority.
+        const std::string& title = catalog->document.metadata.title;
+        const std::string& purpose = catalog->document.metadata.purpose;
         std::ostringstream out;
-        out << "# " << catalog->document.metadata.title << "\n\n";
-        out << catalog->document.metadata.purpose << "\n\n";
+        out << "# " << (title.empty() ? "Safety Case Core Guidelines (SCCG)" : title) << "\n\n";
+        if (!purpose.empty()) {
+            out << purpose << "\n\n";
+        }
         for (const parser::Guideline& guideline : catalog->document.guidelines) {
             AppendGuideline(out, guideline);
         }
@@ -270,7 +292,15 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "and say which ones you replaced.\n\n"
             << "Leave anything you are unsure of untranslated and list it. An untranslated claim is "
                "a visible gap; a confidently wrong translation of a safety claim is not.\n\n"
-            << kWorkflow << kLanguages;
+            << kWorkflow << kLanguages
+            << "\n"
+            // CL.5 is the qualifier rule the paragraph above states informally;
+            // quoting it makes the prompt and the review apply the same text.
+            // The other guidelines govern writing argument, and a translation
+            // that needs them has stopped being a translation.
+            << "The review this case is held to applies this guideline to every claim, translated "
+               "text included:\n\n"
+            << GuidelinesFor({"CL.5"});
         return out.str();
     }
 
