@@ -146,6 +146,11 @@ std::vector<AccessRequest> AgentBridgeController::PendingAccessRequests() const 
     return pending_access_;
 }
 
+std::uint64_t AgentBridgeController::context_generation() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return context_generation_;
+}
+
 void AgentBridgeController::GrantAccess(const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
     if (active_project_key_.empty()) {
@@ -154,6 +159,7 @@ void AgentBridgeController::GrantAccess(const std::string& session_id) {
     granted_access_.insert(AccessKey(session_id, active_project_key_));
     denied_access_.erase(AccessKey(session_id, active_project_key_));
     std::erase_if(pending_access_, [&](const AccessRequest& request) { return request.session_id == session_id; });
+    ++context_generation_;
 }
 
 void AgentBridgeController::DenyAccess(const std::string& session_id) {
@@ -168,6 +174,7 @@ void AgentBridgeController::RevokeAccess(const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
     std::erase_if(granted_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
     std::erase_if(denied_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
+    ++context_generation_;
 }
 
 void AgentBridgeController::RevokeAllAccess() {
@@ -175,6 +182,7 @@ void AgentBridgeController::RevokeAllAccess() {
     granted_access_.clear();
     denied_access_.clear();
     pending_access_.clear();
+    ++context_generation_;
 }
 
 void AgentBridgeController::SetActiveProject(const std::filesystem::path& project_root) {
@@ -194,6 +202,7 @@ void AgentBridgeController::SetActiveProject(const std::filesystem::path& projec
         pending_access_.clear();
         granted_access_.clear();
         denied_access_.clear();
+        ++context_generation_;
 
         // Anything queued was staged against the previous project. Refusing it
         // here is what keeps a request from executing against a model it was

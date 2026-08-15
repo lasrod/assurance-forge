@@ -2013,6 +2013,11 @@ revokes everything today).
 
 ### Phase B4 — Context binding and generation safety
 
+**Status: implemented** — tracked in
+[#397](https://github.com/lasrod/assurance-forge/issues/397). The generation
+bumps on project switch/close, grant, and revocation; document replacement
+outside the ordinary edit path joins when such a path exists.
+
 #### Tasks
 
 - [ ] Add the project-scoped binding (16.5).

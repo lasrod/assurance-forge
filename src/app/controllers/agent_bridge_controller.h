@@ -139,6 +139,13 @@ public:
     // calls this when the master gate closes.
     void RevokeAllAccess();
 
+    // Monotonic context generation (ADR 0014): changes whenever the shared
+    // context changes identity -- project switch or close, a grant, a
+    // revocation. Carried on every content response; every draft mutation
+    // names the value it read, so a result computed against one context can
+    // never land in another.
+    std::uint64_t context_generation() const;
+
 private:
     struct PendingRequest;
 
@@ -189,6 +196,7 @@ private:
     std::vector<AccessRequest> pending_access_;
     std::set<std::string> granted_access_;
     std::set<std::string> denied_access_;
+    std::uint64_t context_generation_ = 1;
     std::condition_variable queued_;
     std::deque<std::shared_ptr<PendingRequest>> pending_;
     // Every connection ever served this session, including finished ones whose

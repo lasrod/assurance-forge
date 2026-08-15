@@ -596,6 +596,31 @@ std::vector<ToolDefinition> BuildTools() {
         &ListChangeSets,
     });
 
+    // Every mutation that names the working revision it read also names the
+    // context generation it read (ADR 0014): the revision says the draft
+    // moved, the generation says the ground under the whole session moved --
+    // a project switch, a fresh grant, a revocation. One loop rather than
+    // thirteen edits, so a new mutating tool cannot forget the field.
+    const nlohmann::json generation_schema{
+        {"type", "integer"},
+        {"minimum", 0},
+        {"description", "The context_generation returned by the draft or case-content read this change is based on."}};
+    for (ToolDefinition& tool : tools) {
+        if (!tool.input_schema.contains("required")) {
+            continue;
+        }
+        nlohmann::json& required = tool.input_schema["required"];
+        bool wants_revision = false;
+        for (const nlohmann::json& field : required) {
+            wants_revision = wants_revision || field == "expected_working_revision";
+        }
+        if (!wants_revision) {
+            continue;
+        }
+        tool.input_schema["properties"]["expected_context_generation"] = generation_schema;
+        required.push_back("expected_context_generation");
+    }
+
     return tools;
 }
 
