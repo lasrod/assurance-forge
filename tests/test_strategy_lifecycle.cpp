@@ -241,8 +241,9 @@ TEST(StrategyLifecycle, NewSubgoalCanBeAddedAfterRemovingTheOnlyOne) {
             continue;
         found_inference = true;
         EXPECT_EQ(element.source_refs.size(), 1u);
-        if (!element.source_refs.empty())
+        if (!element.source_refs.empty()) {
             EXPECT_EQ(element.source_refs.front(), replacement);
+        }
         ASSERT_EQ(element.target_refs.size(), 1u);
         EXPECT_EQ(element.target_refs.front(), ids.goal);
     }
