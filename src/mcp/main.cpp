@@ -30,10 +30,19 @@ constexpr int kExitUsage = 2;
 void PrintUsage() {
     std::cerr << "assurance-forge-mcp — Model Context Protocol server for Assurance Forge\n\n"
                  "Usage:\n"
+                 "  assurance-forge-mcp [--settings <path>]\n"
                  "  assurance-forge-mcp --project <path> [--settings <path>]\n"
+                 "  assurance-forge-mcp --offline-project <path> [--settings <path>]\n"
                  "  assurance-forge-mcp --version\n\n"
-                 "  --project   Project directory, project manifest, or a SACM file.\n"
-                 "  --settings  Override the settings file used for the consent gate.\n\n"
+                 "  With no project argument the server discovers a running Assurance\n"
+                 "  Forge by itself. It initializes even when none is running, and a\n"
+                 "  session stays unbound -- receiving no project content -- until it is\n"
+                 "  bound to a project.\n\n"
+                 "  --project          Bind to this project: a directory, a project\n"
+                 "                     manifest, or a SACM file.\n"
+                 "  --offline-project  Read this path's accepted SACM without any running\n"
+                 "                     application. Read-only; never connects.\n"
+                 "  --settings         Override the settings file used for the consent gate.\n\n"
                  "The server speaks JSON-RPC 2.0 over stdin/stdout and is meant to be\n"
                  "launched by an MCP client, not run interactively.\n";
 }
@@ -51,6 +60,7 @@ int main(int argc, char** argv) {
     const std::vector<std::string> args(argv + 1, argv + argc);
 
     mcp::Session::Config config;
+    bool saw_project = false;
     for (std::size_t index = 0; index < args.size(); ++index) {
         const std::string& argument = args[index];
         if (argument == "--help" || argument == "-h") {
@@ -63,6 +73,12 @@ int main(int argc, char** argv) {
         }
         if (argument == "--project" && index + 1 < args.size()) {
             config.project_path = args[++index];
+            saw_project = true;
+            continue;
+        }
+        if (argument == "--offline-project" && index + 1 < args.size()) {
+            config.project_path = args[++index];
+            config.offline_only = true;
             continue;
         }
         if (argument == "--settings" && index + 1 < args.size()) {
@@ -74,7 +90,13 @@ int main(int argc, char** argv) {
         return kExitUsage;
     }
 
-    if (config.project_path.empty()) {
+    if (saw_project && config.offline_only) {
+        std::cerr << "--project and --offline-project are two different modes; pass one of them.\n\n";
+        PrintUsage();
+        return kExitUsage;
+    }
+
+    if (config.project_path.empty() && !config.offline_only) {
         if (const char* from_environment = std::getenv("AF_MCP_PROJECT")) {
             config.project_path = from_environment;
         }

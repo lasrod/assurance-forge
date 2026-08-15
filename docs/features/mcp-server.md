@@ -48,6 +48,25 @@ workspace, presents every unaccepted change to the user, and serializes edits
 from all contributors through one revision. A headless copy cannot safely do
 that. The refusal says so and says what to do.
 
+### Dynamic sessions and explicit offline mode
+
+Launched with **no project argument**, the adapter is a *dynamic session*
+([ADR 0014](../architecture/decisions/0014-projectless-mcp-discovery-with-runtime-case-binding.md)):
+it initializes even when no application is running, discovers the running
+instance at call time, and connects **unbound**. An unbound session can report
+status — including the coarse fact that a project is open, never which one —
+and receives no project content: every project operation is refused with
+`project_access_required`. This is the fail-closed interim until the
+access-grant flow exists; the master `mcp.enabled` flag alone never discloses
+whatever project the user has open. With more than one instance running, a
+dynamic session refuses to choose — picking the newest would be picking a
+safety case by timestamp.
+
+`--offline-project <path>` is the offline mode above chosen deliberately:
+accepted SACM from the named path, read-only, and it never connects — even
+while an application with that project open is right there. `--project`
+remains the project-bound mode described in the rest of this page.
+
 The mode is re-evaluated on every call. MCP clients launch this process when
 the *client* starts, so the application being absent, appearing later, or
 restarting are ordinary events in a session's life, not faults: an offline

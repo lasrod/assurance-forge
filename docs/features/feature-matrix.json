@@ -1652,6 +1652,21 @@
       "notes": "`list_assurance_claim_points` serializes the projected ACP records: what each one annotates — an element such as a Solution, or a SupportedBy/InContextOf relationship — and how it is resolved: inline text, or a confidence argument whose claim, package and top-goal ids are followable with `get_element`; an ACP with no resolution reports `instantiated: false`, the state the ACP panel warns about. `get_element` carries the ACPs on the element and on the relationships touching it, relationship-borne entries naming the relationship they ride. Available connected (working-draft view) and offline. **Read-only, deliberately**: the patch vocabulary has no ACP operation, and extending it is an ADR 0009 vocabulary decision with its own GSN review — authoring stays in the application (AF-ACP-001..008). ACPs seen through the working draft come from the accepted baseline, since no draft operation can create one."
     },
     {
+      "id": "AF-AI-021",
+      "area": "AI",
+      "name": "Projectless MCP sessions with runtime project binding",
+      "status": "in-development",
+      "evidence": [
+        "src/mcp/session.cpp",
+        "src/mcp/main.cpp",
+        "src/app/controllers/agent_bridge_controller.cpp"
+      ],
+      "tests": [
+        "tests/test_mcp_dynamic.cpp"
+      ],
+      "notes": "Launched with no project argument, the adapter initializes without a running application, discovers the single running instance at call time, and connects unbound (ADR 0014). **Fail-closed interim**: an unbound session can report status but receives no project content — every project operation is refused with `project_access_required` — until the per-session access-grant flow lands. Multiple running instances are never auto-selected. `--offline-project <path>` is the deliberate read-only escape hatch that never connects. Not usable end to end until grants and explicit rebinding ship; `--project` remains the working mode."
+    },
+    {
       "id": "AF-PLAT-001",
       "area": "PLAT",
       "name": "Project model, load and save",

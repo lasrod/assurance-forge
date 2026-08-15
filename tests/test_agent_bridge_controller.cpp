@@ -291,9 +291,42 @@ TEST_F(AgentBridgeControllerTest, RefusesHelloUntilAStableSessionIdIsProvided) {
     EXPECT_EQ(controller.connections()[0].session_id, "stable-session-3");
 }
 
-// The hello names the project the session was launched for; binding happens
-// there and never silently again.
-TEST_F(AgentBridgeControllerTest, RefusesHelloWithoutAProjectKey) {
+// A dynamic session's hello names no project. The connection is accepted --
+// the session can report status -- but it is unbound: no project content, not
+// even the project's name, until an access grant binds it (ADR 0014 gate 2).
+TEST_F(AgentBridgeControllerTest, UnboundHelloConnectsButReceivesNoProjectContent) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+
+    std::atomic<bool> stop{false};
+    std::thread frames([&] { DriveFrames(controller, stop); });
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+
+    bridge::Request hello = Hello(token, 1, "stable-session-4");
+    hello.args.erase("projectKey");
+    const bridge::Response greeting = Exchange(*client, hello);
+    ASSERT_TRUE(greeting.ok) << greeting.error_message;
+    // The coarse fact that a project is open is served; which project is not.
+    EXPECT_EQ(greeting.result["projectOpen"], true);
+    EXPECT_FALSE(greeting.result.contains("projectRoot"));
+
+    const bridge::Response refused = Exchange(*client, Say("get_case_overview", token, 2));
+    EXPECT_FALSE(refused.ok);
+    EXPECT_EQ(refused.error_code, bridge::error_code::kProjectAccessRequired);
+
+    stop.store(true);
+    frames.join();
+}
+
+// Present-but-malformed is a client bug, not a request for an unbound
+// connection: silently downgrading it would hide the bug and blur the
+// handshake contract.
+TEST_F(AgentBridgeControllerTest, RefusesAMalformedProjectKeyRatherThanDowngrading) {
     app::controllers::AgentBridgeController controller;
     std::string error;
     ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
@@ -303,12 +336,17 @@ TEST_F(AgentBridgeControllerTest, RefusesHelloWithoutAProjectKey) {
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
-    bridge::Request hello = Hello(token, 1, "stable-session-4");
-    hello.args.erase("projectKey");
-    const bridge::Response refused = Exchange(*client, hello);
-    EXPECT_FALSE(refused.ok);
-    EXPECT_EQ(refused.error_code, bridge::error_code::kBadRequest);
-    EXPECT_NE(refused.error_message.find("projectKey"), std::string::npos);
+    bridge::Request empty_key = Hello(token, 1, "stable-session-6");
+    empty_key.args["projectKey"] = "";
+    const bridge::Response refused_empty = Exchange(*client, empty_key);
+    EXPECT_FALSE(refused_empty.ok);
+    EXPECT_EQ(refused_empty.error_code, bridge::error_code::kBadRequest);
+
+    bridge::Request wrong_type = Hello(token, 2, "stable-session-6");
+    wrong_type.args["projectKey"] = 42;
+    const bridge::Response refused_type = Exchange(*client, wrong_type);
+    EXPECT_FALSE(refused_type.ok);
+    EXPECT_EQ(refused_type.error_code, bridge::error_code::kBadRequest);
 }
 
 // The token lives in the user's own runtime directory. A local process that did

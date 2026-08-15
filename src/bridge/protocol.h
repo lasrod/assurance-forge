@@ -34,7 +34,11 @@ namespace bridge {
 //    for, and operations against a project that is no longer active are
 //    refused with `project_not_active` instead of the connection being torn
 //    down on every project switch.
-inline constexpr int kProtocolVersion = 2;
+// 3: dynamic sessions. `hello` may omit the project fingerprint; such a
+//    connection is unbound and receives no project content -- every project
+//    operation is refused with `project_access_required` until an access
+//    grant binds it (the grant flow is the next phase of ADR 0014).
+inline constexpr int kProtocolVersion = 3;
 
 // Stable string codes rather than numbers. These reach an AI client, and
 // occasionally a user, through the adapter's error text -- `unauthorized` is
@@ -51,6 +55,10 @@ inline constexpr const char* kNoProject = "no_project";
 // say precisely why content stopped, and recoverable without reconnecting: the
 // same connection serves again when the user reopens the project.
 inline constexpr const char* kProjectNotActive = "project_not_active";
+// The connection is unbound: its hello named no project, and no access grant
+// exists. Project content is never served to an unbound connection (ADR 0014
+// gate 2) -- the master consent flag alone does not disclose a project.
+inline constexpr const char* kProjectAccessRequired = "project_access_required";
 inline constexpr const char* kNoCase = "no_case";
 inline constexpr const char* kConsentWithheld = "consent_withheld";
 inline constexpr const char* kInternal = "internal";
