@@ -1,6 +1,6 @@
 #include "app/controllers/agent_bridge_controller.h"
 
-#include "bridge/endpoint.h"
+#include "bridge/instance_registry.h"
 #include "bridge/protocol.h"
 #include "bridge/transport.h"
 
@@ -15,7 +15,7 @@
 #include <string>
 #include <thread>
 
-// The online path end to end: a client finds the endpoint record, connects over
+// The online path end to end: a client finds the instance record, connects over
 // a real pipe, shakes hands, and gets an answer produced on the thread that owns
 // the model.
 //
@@ -53,7 +53,7 @@ protected:
         std::filesystem::remove_all(root_);
         std::filesystem::create_directories(root_);
 
-        // Keeps the endpoint record out of the developer's real runtime
+        // Keeps the instance record out of the developer's real runtime
         // directory, where it would collide with an actually-running app.
         Remember("LOCALAPPDATA");
         Remember("XDG_RUNTIME_DIR");
@@ -91,14 +91,14 @@ protected:
     }
 
     std::unique_ptr<bridge::Connection> ConnectToController(std::string& token) {
-        bridge::EndpointRecord record;
-        std::string error;
-        if (!bridge::ReadEndpointRecord(project_, record, error)) {
-            ADD_FAILURE() << "no endpoint record was published: " << error;
+        const std::vector<bridge::InstanceRecord> records = bridge::EnumerateInstanceRecords();
+        if (records.size() != 1u) {
+            ADD_FAILURE() << "expected exactly one instance record, found " << records.size();
             return nullptr;
         }
-        token = record.token;
-        std::unique_ptr<bridge::Connection> connection = bridge::Connection::Connect(record.address, error);
+        token = records[0].token;
+        std::string error;
+        std::unique_ptr<bridge::Connection> connection = bridge::Connection::Connect(records[0].address, error);
         if (connection == nullptr) {
             ADD_FAILURE() << "could not connect: " << error;
         }
@@ -129,6 +129,13 @@ protected:
         return request;
     }
 
+    bridge::Request Hello(const std::string& token, std::uint64_t id, const std::string& session) const {
+        bridge::Request request = Say(bridge::kHelloOperation, token, id);
+        request.args = nlohmann::json{
+            {"client", "assurance-forge-mcp"}, {"session", session}, {"projectKey", bridge::ProjectKey(project_)}};
+        return request;
+    }
+
     std::filesystem::path root_;
     std::filesystem::path project_;
 
@@ -149,38 +156,64 @@ private:
     std::map<std::string, std::string> saved_;
 };
 
-TEST_F(AgentBridgeControllerTest, PublishesAnEndpointRecordAClientCanFind) {
+TEST_F(AgentBridgeControllerTest, PublishesAnInstanceRecordAClientCanFind) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
     EXPECT_TRUE(controller.listening());
+    controller.SetActiveProject(project_);
 
-    bridge::EndpointRecord record;
-    ASSERT_TRUE(bridge::ReadEndpointRecord(project_, record, error)) << error;
+    bridge::InstanceRecord record;
+    ASSERT_TRUE(bridge::FindInstanceForProject(project_, record, error)) << error;
     EXPECT_EQ(record.protocol, bridge::kProtocolVersion);
     EXPECT_EQ(record.app_version, "0.1.0");
+    EXPECT_EQ(record.instance_id, controller.instance_id());
+    EXPECT_EQ(record.state, bridge::instance_state::kProjectOpen);
     EXPECT_FALSE(record.token.empty());
     EXPECT_GT(record.pid, 0);
 }
 
-// A record outliving its process sends the next adapter to a pipe nobody is
-// listening on, which presents as a hang rather than as "no app running".
-TEST_F(AgentBridgeControllerTest, RemovesTheEndpointRecordOnStop) {
+// The listener exists independently of the current project (ADR 0014): it may
+// run with no project open, publishing a record that says exactly that.
+TEST_F(AgentBridgeControllerTest, ListensWithNoProjectOpen) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
-    ASSERT_TRUE(std::filesystem::exists(bridge::EndpointRecordPath(project_)));
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    EXPECT_TRUE(controller.listening());
+
+    const std::vector<bridge::InstanceRecord> records = bridge::EnumerateInstanceRecords();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].state, bridge::instance_state::kNoProject);
+    EXPECT_TRUE(records[0].project_key.empty());
+
+    // A session bound to a project gets a precise refusal, not content.
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+    const bridge::Response refused = Exchange(*client, Hello(token, 1, "stable-session-np"));
+    EXPECT_FALSE(refused.ok);
+    EXPECT_EQ(refused.error_code, bridge::error_code::kProjectNotActive);
+}
+
+// A record outliving its process sends the next adapter to a pipe nobody is
+// listening on, which presents as a hang rather than as "no app running".
+TEST_F(AgentBridgeControllerTest, RemovesTheInstanceRecordOnStop) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    ASSERT_EQ(bridge::EnumerateInstanceRecords().size(), 1u);
 
     controller.Stop();
 
     EXPECT_FALSE(controller.listening());
-    EXPECT_FALSE(std::filesystem::exists(bridge::EndpointRecordPath(project_)));
+    EXPECT_TRUE(bridge::EnumerateInstanceRecords().empty());
 }
 
 TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
 
     std::atomic<bool> stop{false};
     std::thread frames([&] { DriveFrames(controller, stop); });
@@ -189,9 +222,7 @@ TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
-    bridge::Request hello = Say(bridge::kHelloOperation, token, 1);
-    hello.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", "stable-session-1"}};
-    const bridge::Response greeting = Exchange(*client, hello);
+    const bridge::Response greeting = Exchange(*client, Hello(token, 1, "stable-session-1"));
     ASSERT_TRUE(greeting.ok) << greeting.error_message;
     EXPECT_EQ(greeting.result["appVersion"], "0.1.0");
 
@@ -214,51 +245,70 @@ TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
 TEST_F(AgentBridgeControllerTest, ShowsAConnectedClientToTheApplication) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
     EXPECT_TRUE(controller.connections().empty());
 
     std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
-    bridge::Request hello = Say(bridge::kHelloOperation, token, 1);
-    hello.args = nlohmann::json{{"client", "claude-ai 0.1.0"}, {"session", "stable-session-2"}};
+    bridge::Request hello = Hello(token, 1, "stable-session-2");
+    hello.args["client"] = "claude-ai 0.1.0";
     ASSERT_TRUE(Exchange(*client, hello).ok);
 
     const std::vector<app::controllers::AgentConnection> connected = controller.connections();
     ASSERT_EQ(connected.size(), 1u);
     EXPECT_EQ(connected[0].client_label, "claude-ai 0.1.0");
     EXPECT_EQ(connected[0].session_id, "stable-session-2");
+    EXPECT_EQ(connected[0].project_key, bridge::ProjectKey(project_));
     EXPECT_FALSE(connected[0].connected_utc.empty());
 }
 
 TEST_F(AgentBridgeControllerTest, RefusesHelloUntilAStableSessionIdIsProvided) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
 
     std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
 
-    bridge::Request missing = Say(bridge::kHelloOperation, token, 1);
-    missing.args = nlohmann::json{{"client", "assurance-forge-mcp"}};
+    bridge::Request missing = Hello(token, 1, "unused");
+    missing.args.erase("session");
     const bridge::Response missing_response = Exchange(*client, missing);
     EXPECT_FALSE(missing_response.ok);
     EXPECT_EQ(missing_response.error_code, bridge::error_code::kBadRequest);
     EXPECT_NE(missing_response.error_message.find("session"), std::string::npos);
 
-    bridge::Request empty = Say(bridge::kHelloOperation, token, 2);
-    empty.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", ""}};
-    const bridge::Response empty_response = Exchange(*client, empty);
+    const bridge::Response empty_response = Exchange(*client, Hello(token, 2, ""));
     EXPECT_FALSE(empty_response.ok);
     EXPECT_EQ(empty_response.error_code, bridge::error_code::kBadRequest);
 
-    bridge::Request valid = Say(bridge::kHelloOperation, token, 3);
-    valid.args = nlohmann::json{{"client", "assurance-forge-mcp"}, {"session", "stable-session-3"}};
-    EXPECT_TRUE(Exchange(*client, valid).ok);
+    EXPECT_TRUE(Exchange(*client, Hello(token, 3, "stable-session-3")).ok);
     ASSERT_EQ(controller.connections().size(), 1u);
     EXPECT_EQ(controller.connections()[0].session_id, "stable-session-3");
+}
+
+// The hello names the project the session was launched for; binding happens
+// there and never silently again.
+TEST_F(AgentBridgeControllerTest, RefusesHelloWithoutAProjectKey) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+
+    bridge::Request hello = Hello(token, 1, "stable-session-4");
+    hello.args.erase("projectKey");
+    const bridge::Response refused = Exchange(*client, hello);
+    EXPECT_FALSE(refused.ok);
+    EXPECT_EQ(refused.error_code, bridge::error_code::kBadRequest);
+    EXPECT_NE(refused.error_message.find("projectKey"), std::string::npos);
 }
 
 // The token lives in the user's own runtime directory. A local process that did
@@ -266,7 +316,8 @@ TEST_F(AgentBridgeControllerTest, RefusesHelloUntilAStableSessionIdIsProvided) {
 TEST_F(AgentBridgeControllerTest, RefusesAConnectionWithTheWrongToken) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
 
     std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
@@ -280,7 +331,8 @@ TEST_F(AgentBridgeControllerTest, RefusesAConnectionWithTheWrongToken) {
 TEST_F(AgentBridgeControllerTest, RefusesWorkBeforeTheHandshake) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
 
     std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
@@ -297,7 +349,8 @@ TEST_F(AgentBridgeControllerTest, RefusesWorkBeforeTheHandshake) {
 TEST_F(AgentBridgeControllerTest, RefusesAnUnsupportedProtocolByName) {
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
 
     std::string token;
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
@@ -312,20 +365,51 @@ TEST_F(AgentBridgeControllerTest, RefusesAnUnsupportedProtocolByName) {
     EXPECT_NE(refused.error_message.find(std::to_string(bridge::kProtocolVersion + 41)), std::string::npos);
 }
 
-// Switching projects must leave exactly one record. Two would send adapters to a
-// listener that is no longer serving the project they asked for.
-TEST_F(AgentBridgeControllerTest, MovesItsRecordWhenTheProjectChanges) {
+// The core of ADR 0014's no-silent-retargeting rule: a project switch does not
+// tear the listener down, and it does not let a session bound to the old
+// project read the new one. The same connection serves again, unchanged, when
+// the user returns to the session's project.
+TEST_F(AgentBridgeControllerTest, RefusesOperationsWhileTheBoundProjectIsInactive) {
     const std::filesystem::path second = root_ / "second-project";
     std::filesystem::create_directories(second);
 
     app::controllers::AgentBridgeController controller;
     std::string error;
-    ASSERT_TRUE(controller.Start(project_, "0.1.0", error)) << error;
-    ASSERT_TRUE(controller.Start(second, "0.1.0", error)) << error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+    const std::string instance_id = controller.instance_id();
 
-    EXPECT_FALSE(std::filesystem::exists(bridge::EndpointRecordPath(project_)));
-    EXPECT_TRUE(std::filesystem::exists(bridge::EndpointRecordPath(second)));
-    EXPECT_EQ(controller.project_root(), second);
+    std::atomic<bool> stop{false};
+    std::thread frames([&] { DriveFrames(controller, stop); });
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+    ASSERT_TRUE(Exchange(*client, Hello(token, 1, "stable-session-5")).ok);
+    ASSERT_TRUE(Exchange(*client, Say("get_case_overview", token, 2)).ok);
+
+    // The user switches projects. One instance, one listener, one record --
+    // whose fingerprint now names the other project.
+    controller.SetActiveProject(second);
+    EXPECT_TRUE(controller.listening());
+    EXPECT_EQ(controller.instance_id(), instance_id);
+    const std::vector<bridge::InstanceRecord> records = bridge::EnumerateInstanceRecords();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].project_key, bridge::ProjectKey(second));
+
+    // The bound session gets a refusal that names the situation, and no
+    // content from the newly opened project.
+    const bridge::Response refused = Exchange(*client, Say("get_case_overview", token, 3));
+    EXPECT_FALSE(refused.ok);
+    EXPECT_EQ(refused.error_code, bridge::error_code::kProjectNotActive);
+
+    // Switching back restores service on the very same connection.
+    controller.SetActiveProject(project_);
+    const bridge::Response restored = Exchange(*client, Say("get_case_overview", token, 4));
+    EXPECT_TRUE(restored.ok) << restored.error_message;
+
+    stop.store(true);
+    frames.join();
 }
 
 } // namespace

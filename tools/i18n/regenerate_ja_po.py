@@ -1066,8 +1066,12 @@ TRANSLATIONS = {
         "確信度評価を読み込めませんでした: {0}",
     "Register assessments could not be loaded: {0}":
         "登録簿評価を読み込めませんでした: {0}",
-    "AI clients cannot connect to this project: {0}":
-        "AI クライアントはこのプロジェクトに接続できません: {0}",
+    "AI clients cannot connect: {0}":
+        "AI クライアントは接続できません: {0}",
+    "This project appears to be open in another Assurance Forge instance (process {0}). "
+    "Two instances editing one project can corrupt its draft state.":
+        "このプロジェクトは別の Assurance Forge インスタンス（プロセス {0}）で開かれているようです。"
+        "2 つのインスタンスで同じプロジェクトを編集すると、ドラフト状態が破損するおそれがあります。",
     "Accepted, but undoing this will not bring the draft back: {0}":
         "受け入れましたが、これを元に戻してもドラフトは復元されません: {0}",
     "Accepted, but the draft could not be updated: {0}":

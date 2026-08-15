@@ -1,5 +1,5 @@
 add_library(af_bridge OBJECT
-    endpoint.cpp
+    instance_registry.cpp
     protocol.cpp
     transport.cpp
 )

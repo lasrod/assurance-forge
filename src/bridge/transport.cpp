@@ -14,6 +14,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <aclapi.h>
 #else
 #include <cerrno>
 #include <fcntl.h>
@@ -112,11 +113,86 @@ struct Listener::Impl {
 
 namespace {
 
-// Security: a NULL descriptor gives the pipe the creating token's default DACL,
-// which grants the creating user and SYSTEM and denies other interactive users.
-// That is the access control; the per-connection token in `bridge/protocol.h` is
-// the second gate, against another process running as the same user.
+// Security: an explicit DACL granting the creating user and SYSTEM, nothing
+// else (ADR 0014). The default DACL a NULL descriptor would borrow usually
+// says the same thing, but "usually" is inherited from token configuration
+// this code does not control; the pipe is the way into a safety-case tool, so
+// it states its own access control. The per-connection token in
+// `bridge/protocol.h` is the second gate, against another process running as
+// the same user.
+//
+// Built once per process: the owning user cannot change mid-run.
+class UserOnlyPipeSecurity {
+public:
+    UserOnlyPipeSecurity() {
+        HANDLE process_token = nullptr;
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &process_token)) {
+            return;
+        }
+        DWORD user_size = 0;
+        const BOOL got_user =
+            GetTokenInformation(process_token, TokenUser, user_buffer_, sizeof(user_buffer_), &user_size);
+        CloseHandle(process_token);
+        if (!got_user) {
+            return;
+        }
+
+        DWORD system_sid_size = sizeof(system_sid_buffer_);
+        if (!CreateWellKnownSid(WinLocalSystemSid, nullptr, system_sid_buffer_, &system_sid_size)) {
+            return;
+        }
+
+        EXPLICIT_ACCESS_W access[2] = {};
+        access[0].grfAccessPermissions = GENERIC_READ | GENERIC_WRITE;
+        access[0].grfAccessMode = SET_ACCESS;
+        access[0].grfInheritance = NO_INHERITANCE;
+        access[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        access[0].Trustee.TrusteeType = TRUSTEE_IS_USER;
+        access[0].Trustee.ptstrName = reinterpret_cast<LPWSTR>(reinterpret_cast<TOKEN_USER*>(user_buffer_)->User.Sid);
+        access[1] = access[0];
+        access[1].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+        access[1].Trustee.ptstrName = reinterpret_cast<LPWSTR>(system_sid_buffer_);
+
+        if (SetEntriesInAclW(2, access, nullptr, &acl_) != ERROR_SUCCESS) {
+            acl_ = nullptr;
+            return;
+        }
+        if (!InitializeSecurityDescriptor(&descriptor_, SECURITY_DESCRIPTOR_REVISION) ||
+            !SetSecurityDescriptorDacl(&descriptor_, TRUE, acl_, FALSE)) {
+            return;
+        }
+        attributes_.nLength = sizeof(attributes_);
+        attributes_.lpSecurityDescriptor = &descriptor_;
+        attributes_.bInheritHandle = FALSE;
+        ready_ = true;
+    }
+
+    ~UserOnlyPipeSecurity() {
+        if (acl_ != nullptr) {
+            LocalFree(acl_);
+        }
+    }
+
+    // Null when the descriptor could not be built, in which case the pipe
+    // falls back to the token's default DACL -- the pre-existing behaviour,
+    // not an exposure this class introduces.
+    SECURITY_ATTRIBUTES* attributes() {
+        return ready_ ? &attributes_ : nullptr;
+    }
+
+private:
+    // Aligned as the struct the API fills it with; a bare BYTE buffer is
+    // 1-aligned and the reinterpret_cast would be undefined behaviour.
+    alignas(TOKEN_USER) BYTE user_buffer_[sizeof(TOKEN_USER) + SECURITY_MAX_SID_SIZE] = {};
+    alignas(SID) BYTE system_sid_buffer_[SECURITY_MAX_SID_SIZE] = {};
+    PACL acl_ = nullptr;
+    SECURITY_DESCRIPTOR descriptor_{};
+    SECURITY_ATTRIBUTES attributes_{};
+    bool ready_ = false;
+};
+
 HANDLE CreatePipeInstance(const std::string& address) {
+    static UserOnlyPipeSecurity security;
     return CreateNamedPipeA(address.c_str(),
                             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
                             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
@@ -124,7 +200,7 @@ HANDLE CreatePipeInstance(const std::string& address) {
                             static_cast<DWORD>(kReadChunk),
                             static_cast<DWORD>(kReadChunk),
                             0,
-                            nullptr);
+                            security.attributes());
 }
 
 } // namespace

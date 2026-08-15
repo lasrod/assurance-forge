@@ -179,6 +179,7 @@ private:
     // Starts or stops serving connected AI clients to match the open project.
     // A project with no root -- a bare SACM file -- is not served: there is
     // nowhere to anchor an endpoint record, and nothing to propose against.
+    void EnsureAgentBridgeStarted();
     void UpdateAgentBridgeForProject();
     // Runs whatever a connected client asked for, on this thread, against the
     // model this frame is about to draw. Returns true when anything ran.

@@ -28,7 +28,13 @@ namespace bridge {
 // Bump when a change would make an older peer misread a message. Adding an
 // optional field to `args` or `result` is not such a change; renaming an
 // operation, or altering what an existing field means, is.
-inline constexpr int kProtocolVersion = 1;
+//
+// 2: instance-keyed discovery (ADR 0014). The listener outlives the open
+//    project, `hello` carries the project fingerprint the adapter was launched
+//    for, and operations against a project that is no longer active are
+//    refused with `project_not_active` instead of the connection being torn
+//    down on every project switch.
+inline constexpr int kProtocolVersion = 2;
 
 // Stable string codes rather than numbers. These reach an AI client, and
 // occasionally a user, through the adapter's error text -- `unauthorized` is
@@ -40,6 +46,11 @@ inline constexpr const char* kNotInitialized = "not_initialized";
 inline constexpr const char* kUnknownOperation = "unknown_operation";
 inline constexpr const char* kBadRequest = "bad_request";
 inline constexpr const char* kNoProject = "no_project";
+// The application is running but the project this session was launched for is
+// not the one the user has open. Distinct from `no_project` so the adapter can
+// say precisely why content stopped, and recoverable without reconnecting: the
+// same connection serves again when the user reopens the project.
+inline constexpr const char* kProjectNotActive = "project_not_active";
 inline constexpr const char* kNoCase = "no_case";
 inline constexpr const char* kConsentWithheld = "consent_withheld";
 inline constexpr const char* kInternal = "internal";

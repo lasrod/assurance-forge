@@ -106,8 +106,8 @@ msgstr "AI レビュー"
 msgid "AI client"
 msgstr "AI クライアント"
 
-msgid "AI clients cannot connect to this project: {0}"
-msgstr "AI クライアントはこのプロジェクトに接続できません: {0}"
+msgid "AI clients cannot connect: {0}"
+msgstr "AI クライアントは接続できません: {0}"
 
 msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
 msgstr "AI 機能は、選択した安全ケースの内容とプロンプトを構成された AI プロバイダーに送信することがあります。Assurance Forge はプロジェクトデータを自動的には送信しません。データは明示的に AI アクションを使用した場合のみ送信されます。"
@@ -2217,6 +2217,9 @@ msgstr "これはプレビューです。プロジェクトモデルは変更さ
 
 msgid "This node only ({0})"
 msgstr "このノードのみ ({0})"
+
+msgid "This project appears to be open in another Assurance Forge instance (process {0}). Two instances editing one project can corrupt its draft state."
+msgstr "このプロジェクトは別の Assurance Forge インスタンス（プロセス {0}）で開かれているようです。2 つのインスタンスで同じプロジェクトを編集すると、ドラフト状態が破損するおそれがあります。"
 
 msgid "This project does not have an audit store yet."
 msgstr "このプロジェクトにはまだ監査ストアがありません。"

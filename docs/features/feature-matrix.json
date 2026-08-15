@@ -1443,18 +1443,18 @@
       "evidence": [
         "src/bridge/protocol.cpp",
         "src/bridge/transport.cpp",
-        "src/bridge/endpoint.cpp",
+        "src/bridge/instance_registry.cpp",
         "src/app/controllers/agent_bridge_controller.cpp",
         "src/app/agent_request_handler.cpp"
       ],
       "tests": [
         "tests/test_bridge_protocol.cpp",
         "tests/test_bridge_transport.cpp",
-        "tests/test_bridge_endpoint.cpp",
+        "tests/test_instance_registry.cpp",
         "tests/test_agent_bridge_controller.cpp",
         "tests/test_agent_request_handler.cpp"
       ],
-      "notes": "A versioned, user-private, message-framed connection: Windows named pipe, POSIX AF_UNIX socket, no TCP. The application publishes one endpoint record per open project in the user's runtime directory — never in the project, which keeps `af.proj` under a single writer. Two gates: the operating system's access control on the pipe, and a 256-bit token from that record. **Requests execute on the frame thread**, so an operation sees exactly the model the user sees and needs no lock. Every frame carries a protocol version, and a mismatch between an old adapter and a newer application is reported as one message naming both versions. Both platform branches are compiled in CI; the Windows branch was additionally built with MinGW g++ and the POSIX branch with GCC 15.2."
+      "notes": "A versioned, user-private, message-framed connection: Windows named pipe, POSIX AF_UNIX socket, no TCP. The application publishes one instance record per running instance in the user's runtime directory (ADR 0014) — never in the project, which keeps `af.proj` under a single writer — carrying a fingerprint of the open project, not its path. The listener outlives project open/close/switch; a session bound to a project that is no longer active is refused with `project_not_active` rather than shown the new project, and a second instance opening an already-open project gets an advisory warning. Records are pruned by pid liveness. Two gates: the operating system's access control on the pipe (an explicit user-only DACL on Windows, 0600 on POSIX), and a 256-bit token from the record. **Requests execute on the frame thread**, so an operation sees exactly the model the user sees and needs no lock. Every frame carries a protocol version, and a mismatch between an old adapter and a newer application is reported as one message naming both versions. Both platform branches are compiled in CI; the Windows branch was additionally built with MinGW g++."
     },
     {
       "id": "AF-AI-009",
