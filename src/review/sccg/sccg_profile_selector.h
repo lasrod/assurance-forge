@@ -1,12 +1,24 @@
 #pragma once
 
-#include "core/assurance_tree.h"
-#include "core/guideline_catalog.h"
-#include "parser/guidelines_parser.h"
-#include "parser/xml_parser.h"
-
 #include <string>
 #include <vector>
+
+// Declarations only: this header is part of the controller's include surface,
+// so it names the types it touches instead of pulling in the parser and tree
+// headers behind them. `parser::SacmElement` is currently an alias into
+// `core` (see core/sacm_model.h); the alias is restated here identically,
+// which is legal and disappears with the parser-to-core rename.
+namespace core {
+struct GuidelineCatalog;
+struct SacmElement;
+struct TreeNode;
+} // namespace core
+
+namespace parser {
+struct Guideline;
+struct ReviewProfile;
+using SacmElement = core::SacmElement;
+} // namespace parser
 
 namespace review {
 

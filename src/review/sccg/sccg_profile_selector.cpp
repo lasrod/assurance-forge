@@ -1,5 +1,7 @@
 #include "review/sccg/sccg_profile_selector.h"
 
+#include "core/guideline_catalog.h"
+#include "parser/guidelines_parser.h"
 #include "review/sccg/sccg_review.h"
 
 namespace review {

@@ -542,9 +542,8 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
     if (selected_node) {
         nlohmann::json path_elements = nlohmann::json::array();
         nlohmann::json evidence_items = nlohmann::json::array();
-        std::vector<const core::TreeNode*> stack;
-        for (const core::TreeNode* child_node : selected_node->group1_children)
-            stack.push_back(child_node);
+        std::vector<const core::TreeNode*> stack(selected_node->group1_children.begin(),
+                                                 selected_node->group1_children.end());
         while (!stack.empty()) {
             const core::TreeNode* node = stack.back();
             stack.pop_back();
