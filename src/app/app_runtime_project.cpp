@@ -13,6 +13,7 @@
 #include "app/register_problem_sync.h"
 #include "app/structure_problem_sync.h"
 #include "app/translation_review_sync.h"
+#include "bridge/instance_registry.h"
 #include "core/translation_review_store.h"
 #include "core/drafts/draft_dependency_graph.h"
 #include "core/drafts/draft_promotion_service.h"
@@ -1160,30 +1161,66 @@ void AppRuntime::EnsureProjectSideStorage() {
     UpdateAgentBridgeForProject();
 }
 
+void AppRuntime::EnsureAgentBridgeStarted() {
+    if (impl_->agent_bridge == nullptr || impl_->agent_bridge->listening() || impl_->agent_bridge_start_attempted) {
+        return;
+    }
+    // One attempt per run: a transport that cannot listen now will not start
+    // being able to, and retrying every frame would repeat the status message
+    // forever.
+    impl_->agent_bridge_start_attempted = true;
+    std::string error;
+    if (!impl_->agent_bridge->Start(kAppVersion, error)) {
+        // Not fatal. The application is perfectly usable without an AI client
+        // attached, and failing startup over it would be a poor trade.
+        SetStatus(ui::i18n::trf("AI clients cannot connect: {0}", error));
+    }
+}
+
 void AppRuntime::UpdateAgentBridgeForProject() {
     if (impl_->agent_bridge == nullptr) {
         return;
     }
-    if (!impl_->app_state.current_project.has_value()) {
-        // Includes a bare SACM file opened outside a project: there is no root
-        // to key an endpoint record on, and no project-owned draft workspace to
-        // work against, so there is nothing useful to serve.
-        impl_->agent_bridge->Stop();
+    EnsureAgentBridgeStarted();
+    if (!impl_->agent_bridge->listening()) {
         return;
     }
 
-    std::string error;
-    if (!impl_->agent_bridge->Start(impl_->app_state.current_project->rootPath, kAppVersion, error)) {
-        // Not fatal. The application is perfectly usable without an AI client
-        // attached, and failing an project open over it would be a poor trade.
-        SetStatus(ui::i18n::trf("AI clients cannot connect to this project: {0}", error));
+    if (!impl_->app_state.current_project.has_value()) {
+        // Includes a bare SACM file opened outside a project: there is no
+        // project-owned draft workspace to work against. The listener stays up
+        // (ADR 0014); the record simply says no project is open, and sessions
+        // bound to the previous project get project_not_active until it
+        // returns.
+        impl_->agent_bridge->SetActiveProject({});
+        return;
     }
+
+    const std::filesystem::path& root = impl_->app_state.current_project->rootPath;
+
+    // Advisory single-owner check (ADR 0014): two instances writing one
+    // project's `.af/drafts` is a real corruption risk, but a crashed instance
+    // must never lock a user out of their own safety case -- so this warns and
+    // proceeds rather than refusing.
+    bridge::InstanceRecord other;
+    if (bridge::AnotherInstanceHasProjectOpen(root, impl_->agent_bridge->instance_id(), other)) {
+        SetStatus(ui::i18n::trf("This project appears to be open in another Assurance Forge instance (process {0}). "
+                                "Two instances editing one project can corrupt its draft state.",
+                                std::to_string(other.pid)));
+    }
+
+    impl_->agent_bridge->SetActiveProject(root);
 }
 
 bool AppRuntime::PollAgentBridge() {
-    if (impl_->agent_bridge == nullptr || !impl_->agent_bridge->listening()) {
+    if (impl_->agent_bridge == nullptr) {
         return false;
     }
+    EnsureAgentBridgeStarted();
+    if (!impl_->agent_bridge->listening()) {
+        return false;
+    }
+    impl_->agent_bridge->WriteHeartbeatIfDue();
 
     const std::string project_path = impl_->app_state.current_project.has_value()
                                          ? impl_->app_state.current_project->rootPath.generic_string()

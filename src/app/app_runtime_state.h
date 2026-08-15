@@ -221,6 +221,10 @@ struct AppRuntimeState {
     // thread by AppRuntime::PollAgentBridge, against the model the user is
     // looking at.
     std::unique_ptr<controllers::AgentBridgeController> agent_bridge;
+    // The listener is started at most once per run (ADR 0014: it outlives the
+    // open project). This records that the attempt happened, so a transport
+    // failure does not retry -- and re-announce itself -- every frame.
+    bool agent_bridge_start_attempted = false;
     // Changes connected clients are building. Held in memory and never written
     // into the project: a change set is a proposal in progress, not project
     // data, and a second writer in that directory is what this design removed.

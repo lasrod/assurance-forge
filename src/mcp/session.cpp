@@ -1,7 +1,7 @@
 #include "mcp/session.h"
 
 #include "agent/operations.h"
-#include "bridge/endpoint.h"
+#include "bridge/instance_registry.h"
 #include "core/user_settings.h"
 
 #include <nlohmann/json.hpp>
@@ -89,8 +89,12 @@ void Session::set_client_label(std::string label) {
 }
 
 bool Session::ConnectToApplication(std::string& error) {
-    bridge::EndpointRecord record;
-    if (!bridge::ReadEndpointRecord(project_path_, record, error)) {
+    // Discovery is by running instance, not by project (ADR 0014): every
+    // instance publishes one record, and this project-bound session picks the
+    // live instance whose project fingerprint matches the project it was
+    // launched for. Stale records are pruned on the way.
+    bridge::InstanceRecord record;
+    if (!bridge::FindInstanceForProject(project_path_, record, error)) {
         return false;
     }
     if (!bridge::IsSupportedProtocol(record.protocol)) {
@@ -112,7 +116,8 @@ bool Session::ConnectToApplication(std::string& error) {
     hello.op = bridge::kHelloOperation;
     hello.token = token_;
     hello.args = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp" : client_label_},
-                                {"session", session_id_}};
+                                {"session", session_id_},
+                                {"projectKey", bridge::ProjectKey(project_path_)}};
 
     std::string reply;
     if (!connection_->WriteMessage(bridge::EncodeRequest(hello)) || !connection_->ReadMessage(reply)) {
@@ -201,19 +206,19 @@ bool Session::EnsureConnected() {
         return false;
     }
 
-    // Up to three attempts, ~50ms apart, but only while an endpoint record
-    // exists: an application that is mid-restart, or rebuilding its listener
-    // after a project switch, is reachable again within a breath, and one
-    // refused connect should not cost the caller a whole conversational turn.
-    // No record at all fails immediately -- "not running" is the ordinary case
-    // and it must stay free, or every offline call pays the backoff.
+    // Up to three attempts, ~50ms apart, but only while a live instance has
+    // the project open: an application that is mid-restart is reachable again
+    // within a breath, and one refused connect should not cost the caller a
+    // whole conversational turn. No matching instance fails immediately --
+    // "not running" is the ordinary case and it must stay free, or every
+    // offline call pays the backoff.
     for (int attempt = 0; attempt < 3; ++attempt) {
         if (attempt > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
-        bridge::EndpointRecord record;
+        bridge::InstanceRecord record;
         std::string error;
-        if (!bridge::ReadEndpointRecord(project_path_, record, error)) {
+        if (!bridge::FindInstanceForProject(project_path_, record, error)) {
             break;
         }
         if (ConnectToApplication(error)) {

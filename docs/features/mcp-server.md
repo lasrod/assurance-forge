@@ -199,15 +199,37 @@ Connected clients are named on their draft groups. Something reading or
 contributing to a safety argument should never be invisible to the person
 responsible for it.
 
+## Discovery
+
+The application publishes **one instance record per running instance**
+([ADR 0014](../architecture/decisions/0014-projectless-mcp-discovery-with-runtime-case-binding.md)),
+keyed by a runtime instance id, under the user's runtime directory. The
+listener outlives the open project: opening, closing or switching projects
+updates the record's project fingerprint but never recreates the listener or
+rotates its token. Liveness is the recorded pid — a record whose process is
+gone is ignored and pruned by whichever side meets it first.
+
+The record carries a *fingerprint* of the open project root, never the path:
+discovery metadata must not disclose where a user keeps their safety cases.
+The project-bound adapter matches that fingerprint to find its application; a
+session whose project is not the active one is refused with
+`project_not_active` — a precise, recoverable refusal, not content from
+whatever the user switched to. Service resumes on the same connection when the
+project is reopened.
+
+Two instances that open the same project trip an **advisory warning** in the
+second instance: two writers on one `.af/drafts` is a real corruption risk,
+but a crashed instance must never lock a user out of their own safety case.
+
 ## Security of the bridge
 
-Two gates. The operating system's access control on the pipe or socket (the
-creating token's default DACL on Windows; mode 0600 in a user-private directory
-on POSIX), and a 256-bit token published in an endpoint record under the user's
-runtime directory. A local process that did not read that file is not the
+Two gates. The operating system's access control on the pipe or socket (an
+explicit user-only DACL on Windows for both the pipe and the record directory;
+mode 0600 in a user-private directory on POSIX), and a 256-bit token published
+in the instance record. A local process that did not read that file is not the
 adapter this application published for.
 
-The endpoint record is deliberately **not** in the project: a pipe name, a pid
+The instance record is deliberately **not** in the project: a pipe name, a pid
 and a token describe this machine at this moment, and in the project directory
 they would be hash-tracked by `af.proj` and would reach a colleague through
 version control.
@@ -237,10 +259,14 @@ version control.
 
 ## Verification
 
-- `tests/test_bridge_*.cpp` — wire contract, endpoint records, transport,
-  including a real loopback round trip and the shutdown path.
+- `tests/test_bridge_protocol.cpp`, `tests/test_bridge_transport.cpp`,
+  `tests/test_instance_registry.cpp` — wire contract, instance records and
+  discovery, stale-record pruning, transport, including a real loopback round
+  trip and the shutdown path.
 - `tests/test_agent_bridge_controller.cpp` — the online path end to end over a
-  real pipe: handshake, token refusal, protocol mismatch, frame-thread execution.
+  real pipe: handshake, token refusal, protocol mismatch, frame-thread
+  execution, the listener surviving a project switch, and the
+  `project_not_active` refusal.
 - `tests/test_agent_request_handler.cpp` — connected reads use the integrated
   working model; MCP groups persist, support multi-call editing, and refuse a
   stale revision after another contributor changes the draft.

@@ -484,7 +484,7 @@ add_executable(tests
     tests/test_dialectic_challenge.cpp
     tests/test_projection_coverage.cpp
     tests/test_bridge_protocol.cpp
-    tests/test_bridge_endpoint.cpp
+    tests/test_instance_registry.cpp
     tests/test_bridge_transport.cpp
     tests/test_agent_request_handler.cpp
     tests/test_agent_acp_reads.cpp

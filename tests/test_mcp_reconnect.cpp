@@ -3,7 +3,7 @@
 #include "mcp/session.h"
 #include "mcp/tools.h"
 
-#include "bridge/endpoint.h"
+#include "bridge/instance_registry.h"
 #include "bridge/protocol.h"
 #include "bridge/transport.h"
 #include "core/app_state.h"
@@ -18,6 +18,11 @@
 #include <optional>
 #include <string>
 #include <thread>
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 
 // The session lifecycle. MCP clients launch `assurance-forge-mcp` when the
 // *client* starts, so the application being absent, appearing later, restarting
@@ -54,10 +59,10 @@ std::filesystem::path WriteSettings(const std::filesystem::path& directory, bool
     return path;
 }
 
-// Enough of the application to answer the bridge: publishes an endpoint record,
+// Enough of the application to answer the bridge: publishes an instance record,
 // accepts connections, answers hello/identify, and answers every domain
 // operation with a payload naming itself, so a test can prove where an answer
-// came from. `Crash()` is a kill -9: the listener dies, the endpoint record
+// came from. `Crash()` is a kill -9: the listener dies, the instance record
 // stays behind, exactly what reconnect has to cope with.
 class FakeApplication {
 public:
@@ -65,33 +70,54 @@ public:
 
     ~FakeApplication() {
         Crash();
-        bridge::RemoveEndpointRecord(project_root_);
+        bridge::RemoveInstanceRecord(instance_id_);
     }
 
     bool Start() {
         token_ = bridge::GenerateToken();
+        // A restart is a new process with a new instance id; the crashed
+        // record disappears with it. In production pruning does this by pid
+        // liveness, but every record here carries the test runner's own live
+        // pid, so the fake sweeps its previous record explicitly.
+        if (!instance_id_.empty()) {
+            bridge::RemoveInstanceRecord(instance_id_);
+        }
+        instance_id_ = bridge::GenerateInstanceId();
         std::string error;
-        listener_ = bridge::Listener::Start(bridge::EndpointAddressFor(project_root_), error);
+        listener_ = bridge::Listener::Start(bridge::InstanceAddress(instance_id_), error);
         if (listener_ == nullptr) {
             ADD_FAILURE() << "fake application could not listen: " << error;
             return false;
         }
 
-        bridge::EndpointRecord record;
+        bridge::InstanceRecord record;
         record.protocol = bridge::kProtocolVersion;
-        record.pid = 4242;
+        record.instance_id = instance_id_;
+        // The test's own pid: discovery filters on liveness, and a record with
+        // an invented pid would be pruned as a crashed instance's leftover.
+        record.pid = OwnPid();
         record.address = listener_->address();
         record.token = token_;
-        record.project_root = project_root_.string();
         record.app_version = kFakeVersion;
-        if (!bridge::WriteEndpointRecord(record, error)) {
-            ADD_FAILURE() << "fake application could not publish its endpoint: " << error;
+        record.state = bridge::instance_state::kProjectOpen;
+        record.project_key = bridge::ProjectKey(project_root_);
+        record.last_heartbeat_utc = "2026-08-15T00:00:00Z";
+        if (!bridge::WriteInstanceRecord(record, error)) {
+            ADD_FAILURE() << "fake application could not publish its instance record: " << error;
             return false;
         }
 
         running_ = true;
         thread_ = std::thread([this] { Serve(); });
         return true;
+    }
+
+    static long long OwnPid() {
+#ifdef _WIN32
+        return static_cast<long long>(_getpid());
+#else
+        return static_cast<long long>(::getpid());
+#endif
     }
 
     void Crash() {
@@ -182,6 +208,7 @@ private:
 
     std::filesystem::path project_root_;
     std::string token_;
+    std::string instance_id_;
     std::unique_ptr<bridge::Listener> listener_;
     std::thread thread_;
     std::atomic<bool> running_{false};

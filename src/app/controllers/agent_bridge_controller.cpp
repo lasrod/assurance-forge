@@ -1,6 +1,6 @@
 #include "app/controllers/agent_bridge_controller.h"
 
-#include "bridge/endpoint.h"
+#include "bridge/instance_registry.h"
 #include "core/time_utils.h"
 
 #include <chrono>
@@ -25,6 +25,16 @@ namespace {
 // machine is a legitimate reason to be slow.
 constexpr std::chrono::seconds kFrameResponseTimeout{30};
 
+// How often the instance record's heartbeat is refreshed. Liveness is the pid,
+// not this timestamp -- the heartbeat exists so a human inspecting the record
+// can see the instance is not merely alive but attended.
+constexpr std::chrono::seconds kHeartbeatInterval{15};
+
+constexpr const char* kProjectNotActiveMessage =
+    "Assurance Forge no longer has this session's project open. Reads and draft "
+    "operations resume automatically when the user opens it again; nothing from "
+    "the newly opened project is shared with this session.";
+
 long long CurrentProcessId() {
 #ifdef _WIN32
     return static_cast<long long>(GetCurrentProcessId());
@@ -46,48 +56,107 @@ AgentBridgeController::~AgentBridgeController() {
     Stop();
 }
 
-bool AgentBridgeController::Start(const std::filesystem::path& project_root,
-                                  std::string app_version,
-                                  std::string& error) {
+bool AgentBridgeController::Start(std::string app_version, std::string& error) {
     error.clear();
-    if (project_root.empty()) {
-        error = "Cannot serve the bridge without an open project.";
-        return false;
-    }
-    if (listening_.load() && project_root_ == project_root) {
+    if (listening_.load()) {
         return true;
     }
-    // Switching projects: the old listener and its record must go first, or two
-    // records would claim this one application.
-    Stop();
 
-    const std::string address = bridge::EndpointAddressFor(project_root);
+    // A crashed instance leaves its record behind; whoever starts next sweeps
+    // it up so enumeration stays honest.
+    bridge::PruneStaleInstanceRecords();
+
+    instance_id_ = bridge::GenerateInstanceId();
+    const std::string address = bridge::InstanceAddress(instance_id_);
     listener_ = bridge::Listener::Start(address, error);
     if (listener_ == nullptr) {
+        instance_id_.clear();
         return false;
     }
 
-    project_root_ = project_root;
     app_version_ = std::move(app_version);
     token_ = bridge::GenerateToken();
 
-    bridge::EndpointRecord record;
-    record.protocol = bridge::kProtocolVersion;
-    record.pid = CurrentProcessId();
-    record.address = address;
-    record.token = token_;
-    record.project_root = project_root.generic_string();
-    record.app_version = app_version_;
-    if (!bridge::WriteEndpointRecord(record, error)) {
+    if (!PublishRecord(error)) {
         listener_.reset();
-        project_root_.clear();
+        instance_id_.clear();
         return false;
     }
+    last_heartbeat_ = std::chrono::steady_clock::now();
 
     stopping_.store(false);
     listening_.store(true);
     accept_thread_ = std::thread([this] { AcceptLoop(); });
     return true;
+}
+
+bool AgentBridgeController::PublishRecord(std::string& error) {
+    bridge::InstanceRecord record;
+    record.protocol = bridge::kProtocolVersion;
+    record.instance_id = instance_id_;
+    record.pid = CurrentProcessId();
+    record.address = listener_ != nullptr ? listener_->address() : bridge::InstanceAddress(instance_id_);
+    record.token = token_;
+    record.app_version = app_version_;
+    const std::string project_key = ActiveProjectKey();
+    record.state = project_key.empty() ? bridge::instance_state::kNoProject : bridge::instance_state::kProjectOpen;
+    record.project_key = project_key;
+    record.last_heartbeat_utc = core::NowUtcString();
+    return bridge::WriteInstanceRecord(record, error);
+}
+
+std::string AgentBridgeController::ActiveProjectKey() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return active_project_key_;
+}
+
+std::filesystem::path AgentBridgeController::active_project_root() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return active_project_root_;
+}
+
+void AgentBridgeController::SetActiveProject(const std::filesystem::path& project_root) {
+    const std::string new_key = project_root.empty() ? std::string() : bridge::ProjectKey(project_root);
+    {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        if (active_project_key_ == new_key) {
+            active_project_root_ = project_root;
+            return;
+        }
+        active_project_root_ = project_root;
+        active_project_key_ = new_key;
+
+        // Anything queued was staged against the previous project. Refusing it
+        // here is what keeps a request from executing against a model it was
+        // never aimed at.
+        for (const std::shared_ptr<PendingRequest>& pending : pending_) {
+            pending->response =
+                bridge::MakeError(pending->request.id, bridge::error_code::kProjectNotActive, kProjectNotActiveMessage);
+            pending->done = true;
+        }
+        pending_.clear();
+    }
+    queued_.notify_all();
+
+    if (listening_.load()) {
+        std::string error;
+        PublishRecord(error);
+        // A failed record update is not worth failing a project open over; the
+        // stale record corrects itself on the next heartbeat.
+    }
+}
+
+void AgentBridgeController::WriteHeartbeatIfDue() {
+    if (!listening_.load()) {
+        return;
+    }
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    if (now - last_heartbeat_ < kHeartbeatInterval) {
+        return;
+    }
+    last_heartbeat_ = now;
+    std::string error;
+    PublishRecord(error);
 }
 
 void AgentBridgeController::Stop() {
@@ -112,10 +181,12 @@ void AgentBridgeController::Stop() {
         // what lets their threads finish.
         for (const std::shared_ptr<PendingRequest>& pending : pending_) {
             pending->response = bridge::MakeError(
-                pending->request.id, bridge::error_code::kInternal, "Assurance Forge is closing this project.");
+                pending->request.id, bridge::error_code::kInternal, "Assurance Forge is shutting down.");
             pending->done = true;
         }
         pending_.clear();
+        active_project_root_.clear();
+        active_project_key_.clear();
     }
     queued_.notify_all();
 
@@ -135,11 +206,11 @@ void AgentBridgeController::Stop() {
         accept_thread_.join();
     }
 
-    if (!project_root_.empty()) {
-        bridge::RemoveEndpointRecord(project_root_);
+    if (!instance_id_.empty()) {
+        bridge::RemoveInstanceRecord(instance_id_);
     }
     listener_.reset();
-    project_root_.clear();
+    instance_id_.clear();
 }
 
 void AgentBridgeController::AcceptLoop() {
@@ -179,13 +250,13 @@ bool AgentBridgeController::CheckEnvelope(const bridge::Request& request,
         return false;
     }
     if (request.token != token_) {
-        // The endpoint record holding the token lives in the user's own runtime
+        // The instance record holding the token lives in the user's own runtime
         // directory. A caller without it did not read that file, so it is not
         // the adapter this application published for.
         refusal = bridge::MakeError(request.id,
                                     bridge::error_code::kUnauthorized,
                                     "This connection did not present the token Assurance Forge "
-                                    "published for the open project.");
+                                    "published for this instance.");
         return false;
     }
     if (!initialized && request.op != bridge::kHelloOperation) {
@@ -196,14 +267,11 @@ bool AgentBridgeController::CheckEnvelope(const bridge::Request& request,
     return true;
 }
 
-void AgentBridgeController::UpdateConnectionIdentity(std::uint64_t id,
-                                                     const std::string& client_label,
-                                                     const std::string& session_id) {
+void AgentBridgeController::UpdateConnectionIdentity(const AgentConnection& descriptor) {
     const std::lock_guard<std::mutex> lock(mutex_);
     for (const std::unique_ptr<ServedConnection>& entry : served_) {
-        if (entry->descriptor.id == id) {
-            entry->descriptor.client_label = client_label;
-            entry->descriptor.session_id = session_id;
+        if (entry->descriptor.id == descriptor.id) {
+            entry->descriptor = descriptor;
             return;
         }
     }
@@ -254,20 +322,42 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
                     request.id, bridge::error_code::kBadRequest, "Hello requires a non-empty session id.")));
                 continue;
             }
+            const nlohmann::json::const_iterator project_key = request.args.find("projectKey");
+            if (project_key == request.args.end() || !project_key->is_string() ||
+                project_key->get<std::string>().empty()) {
+                connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
+                    request.id, bridge::error_code::kBadRequest, "Hello requires a non-empty projectKey.")));
+                continue;
+            }
+
+            std::filesystem::path active_root;
+            {
+                const std::lock_guard<std::mutex> lock(mutex_);
+                if (project_key->get<std::string>() != active_project_key_) {
+                    // Bound at hello, never rebound: a session for project A
+                    // stays a session for project A (ADR 0014).
+                    connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
+                        request.id, bridge::error_code::kProjectNotActive, kProjectNotActiveMessage)));
+                    continue;
+                }
+                active_root = active_project_root_;
+            }
 
             const nlohmann::json::const_iterator client = request.args.find("client");
             if (client != request.args.end() && client->is_string()) {
                 descriptor.client_label = client->get<std::string>();
             }
             descriptor.session_id = session->get<std::string>();
-            UpdateConnectionIdentity(descriptor.id, descriptor.client_label, descriptor.session_id);
+            descriptor.project_key = project_key->get<std::string>();
+            UpdateConnectionIdentity(descriptor);
             initialized = true;
             connection->WriteMessage(
                 bridge::EncodeResponse(bridge::MakeResult(request.id,
                                                           nlohmann::json{
                                                               {"protocol", bridge::kProtocolVersion},
                                                               {"appVersion", app_version_},
-                                                              {"projectRoot", project_root_.generic_string()},
+                                                              {"instanceId", instance_id_},
+                                                              {"projectRoot", active_root.generic_string()},
                                                               {"connectionId", descriptor.id},
                                                           })));
             continue;
@@ -281,7 +371,7 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
                 continue;
             }
             descriptor.client_label = client->get<std::string>();
-            UpdateConnectionIdentity(descriptor.id, descriptor.client_label, descriptor.session_id);
+            UpdateConnectionIdentity(descriptor);
             connection->WriteMessage(bridge::EncodeResponse(
                 bridge::MakeResult(request.id, nlohmann::json{{"client", descriptor.client_label}})));
             continue;
@@ -316,10 +406,12 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
 
 int AgentBridgeController::PollPendingRequests(const OperationHandler& handler) {
     std::vector<std::shared_ptr<PendingRequest>> batch;
+    std::string active_key;
     {
         const std::lock_guard<std::mutex> lock(mutex_);
         batch.assign(pending_.begin(), pending_.end());
         pending_.clear();
+        active_key = active_project_key_;
     }
     if (batch.empty()) {
         return 0;
@@ -329,6 +421,15 @@ int AgentBridgeController::PollPendingRequests(const OperationHandler& handler) 
     // moment, and holding the queue lock across it would block every connection
     // thread from enqueuing.
     for (const std::shared_ptr<PendingRequest>& pending : batch) {
+        if (pending->connection.project_key != active_key) {
+            // Checked here, on the frame thread that owns the active project,
+            // so the decision and the execution cannot interleave with a
+            // project switch. The connection stays open: the refusal is
+            // recoverable the moment the user reopens the project.
+            pending->response =
+                bridge::MakeError(pending->request.id, bridge::error_code::kProjectNotActive, kProjectNotActiveMessage);
+            continue;
+        }
         pending->response = handler(pending->request, pending->connection);
     }
     {
