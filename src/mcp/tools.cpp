@@ -234,8 +234,11 @@ std::vector<ToolDefinition> BuildTools() {
         "stays open; a denial is also an answer. Call this when another tool reports "
         "project_access_pending, then retry after the user has had a moment to respond.",
         nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
-        // Reports the state of this session's own request; no case content.
-        false,
+        // The reply carries no case content, but the flag is what enforces the
+        // master gate (ADR 0007), and raising an approval prompt inside the
+        // application is exactly what a closed gate must prevent: with MCP
+        // disabled, no request reaches the user at all.
+        true,
         &RequestProjectAccess,
     });
 

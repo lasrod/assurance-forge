@@ -544,8 +544,8 @@ int AgentBridgeController::PollPendingRequests(const OperationHandler& handler) 
             if (access_state == "no_project") {
                 pending->response = bridge::MakeError(pending->request.id,
                                                       bridge::error_code::kNoProject,
-                                                      "No project is open to request access to. The request "
-                                                      "renews itself once the user opens one.");
+                                                      "No project is open to request access to. Ask again "
+                                                      "after the user has opened one.");
             } else {
                 pending->response = bridge::MakeResult(pending->request.id, nlohmann::json{{"status", access_state}});
             }
