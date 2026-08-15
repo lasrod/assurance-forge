@@ -12,7 +12,11 @@
   "change sets are held in memory" consequence below is replaced by draft
   recovery state under `.af/drafts/`. The single-owner rule, the IPC boundary,
   frame-thread execution, the ordinary command/validation/audit path and
-  offline read-only behaviour are unchanged.
+  offline read-only behaviour are unchanged; and
+  [ADR 0014](0014-projectless-mcp-discovery-with-runtime-case-binding.md) — the
+  project-keyed endpoint record becomes an instance-keyed record and the
+  listener outlives the project. The single-owner rule itself is unchanged and
+  gains an advisory project lock.
 
 ## Context
 

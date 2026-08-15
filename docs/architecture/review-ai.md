@@ -96,6 +96,13 @@ the complete materialized working model, including changes contributed by MCP,
 the user, and earlier SCCG review groups. The request preview explicitly says
 that it includes unaccepted draft content.
 
+The review method itself — profile selection, payload and data-package
+construction, prompt and result contracts, response parsing and validation —
+lives in `src/review` (`review::`), separated from the provider calls in
+`src/ai` by
+[ADR 0013](decisions/0013-review-methods-independent-of-inference-providers.md).
+`AiReviewController` composes the two.
+
 The UI exposes one `AI Review` action. The controller maps the selected GSN role
 to exactly one SCCG 0.6 profile and refuses to run if the catalog has no match or
 an ambiguous match. A no-findings result is persisted in the element review state

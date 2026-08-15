@@ -1,5 +1,4 @@
 add_library(af_ai OBJECT
-    ai_claim_review.cpp
     ai_service.cpp
     ai_settings.cpp
     ai_task_runner.cpp

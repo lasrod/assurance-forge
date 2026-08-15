@@ -9,6 +9,9 @@
   draft workspace. The consent gate, its fail-closed behaviour, the
   `returns_case_content` classification and the rule that the server never
   applies its own changes are unchanged and still govern the new tools.
+  [ADR 0014](0014-projectless-mcp-discovery-with-runtime-case-binding.md) — the
+  "per-machine and all-or-nothing" granularity consequence: a per-session,
+  per-project grant is layered on top of this gate, which itself is unchanged.
 
 ## Context
 

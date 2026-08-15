@@ -44,6 +44,11 @@ CASES = [
     ("agent must not include mcp", "agent", "ops.h", '#include "mcp/server.h"\n', True),
     ("mcp must not include ui", "mcp", "server.h", '#include "ui/theme.h"\n', True),
     ("export must not include ai", "export", "svg.h", '#include "ai/ai_types.h"\n', True),
+    # ADR 0013: review methods and inference are separated in both directions.
+    # `review` never calls a provider; `ai` never parses a review result.
+    ("review must not include ai", "review", "method.h", '#include "ai/ai_types.h"\n', True),
+    ("ai must not include review", "ai", "service.h", '#include "review/sccg/sccg_review.h"\n', True),
+    ("mcp must not include review", "mcp", "server.h", '#include "review/sccg/sccg_review.h"\n', True),
     # The gate must not fire on dependencies that are allowed, or it would be
     # useless in the other direction: a check that rejects everything teaches
     # people to bypass it.
@@ -51,6 +56,8 @@ CASES = [
     ("app may include ui", "app", "runtime.h", '#include "ui/theme.h"\n', False),
     ("core may include parser", "core", "service.h", '#include "parser/xml_parser.h"\n', False),
     ("mcp may include agent", "mcp", "server.h", '#include "agent/operations.h"\n', False),
+    ("review may include core", "review", "method.h", '#include "core/assurance_tree.h"\n', False),
+    ("agent may include review", "agent", "ops.h", '#include "review/sccg/sccg_review.h"\n', False),
 ]
 
 
@@ -58,7 +65,7 @@ def run_gate(source_dir):
     """Run the gate standalone against a fixture tree.
 
     Returns (passed, output). The output is captured rather than inherited so
-    that thirteen expected CMake errors do not bury the result, but it is kept
+    that the expected CMake errors do not bury the result, but it is kept
     and printed for any case that behaves unexpectedly -- a gate failure with no
     diagnostics is the hardest kind to debug from a CTest log.
     """

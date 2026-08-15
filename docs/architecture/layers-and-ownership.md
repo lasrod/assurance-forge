@@ -18,16 +18,17 @@ an aspiration.
 | Directory | Owns | Must not include |
 |---|---|---|
 | `libs/sacm` | The reusable SACM 2.3 library: model types, XMI import/export, validation, commands, semantic comparison. Independent of Assurance Forge — see [ADR 0006](decisions/0006-sacm-23-independent-library.md). | Any Assurance Forge header; ImGui; pugixml in public headers |
-| `src/legacy_sacm` | Legacy SACM model types, parsing and serialization, predating `libs/sacm`. | `ai/`, `export/`, `ui/`, `app/` |
-| `src/parser` | XML parsing into the flat POD model, SACM model building, and SCCG guideline-catalog loading. | `legacy_sacm/`, `sacm/`, `ai/`, `export/`, `ui/`, `app/` |
-| `src/sacm_adapter` | The seam between `libs/sacm` and the application: case projection, library-backed document edits, library load, GSN role tagging. | `ai/`, `export/`, `ui/`, `app/` |
-| `src/core` | UI-independent domain behaviour: tree building, add/remove logic, project model, problems, reviews, drafts, audit. | `ai/`, `export/`, `ui/`, `app/` |
-| `src/ai` | AI settings, prompt construction, provider calls, response parsing, background task execution, secret storage. | `export/`, `ui/`, `app/` |
-| `src/export` | SVG export of GSN diagrams: its own projection, layout and renderer, separate from the canvas. | `ai/`, `ui/`, `app/` |
-| `src/ui` | ImGui rendering, transient UI state, the GSN canvas, panels and widgets. | `ai/`, `export/`, `app/` |
-| `src/bridge` | Local transport between the MCP adapter and the running application: protocol, endpoint, transport. | `ai/`, `export/`, `ui/`, `agent/`, `mcp/`, `app/` |
-| `src/agent` | Operations an external agent can request — read, change, draft, placement — independent of transport. | `ai/`, `export/`, `ui/`, `mcp/`, `app/` |
-| `src/mcp` | The MCP server: JSON-RPC, session, tools, guidance. Its own executable entry point. | `ai/`, `export/`, `ui/`, `app/` |
+| `src/legacy_sacm` | Legacy SACM model types, parsing and serialization, predating `libs/sacm`. | `review/`, `ai/`, `export/`, `ui/`, `app/` |
+| `src/parser` | XML parsing into the flat POD model, SACM model building, and SCCG guideline-catalog loading. | `legacy_sacm/`, `sacm/`, `review/`, `ai/`, `export/`, `ui/`, `app/` |
+| `src/sacm_adapter` | The seam between `libs/sacm` and the application: case projection, library-backed document edits, library load, GSN role tagging. | `review/`, `ai/`, `export/`, `ui/`, `app/` |
+| `src/core` | UI-independent domain behaviour: tree building, add/remove logic, project model, problems, reviews, drafts, audit. | `review/`, `ai/`, `export/`, `ui/`, `app/` |
+| `src/review` | Review methods: what to review, SCCG profile selection, data packaging, prompt and result contracts, result parsing and validation — see [ADR 0013](decisions/0013-review-methods-independent-of-inference-providers.md). | `ai/`, `export/`, `ui/`, `bridge/`, `agent/`, `mcp/`, `app/` |
+| `src/ai` | AI settings, provider calls, normalized responses, background task execution, secret storage. Inference only — it never parses a review result. | `review/`, `export/`, `ui/`, `app/` |
+| `src/export` | SVG export of GSN diagrams: its own projection, layout and renderer, separate from the canvas. | `review/`, `ai/`, `ui/`, `app/` |
+| `src/ui` | ImGui rendering, transient UI state, the GSN canvas, panels and widgets. | `review/`, `ai/`, `export/`, `app/` |
+| `src/bridge` | Local transport between the MCP adapter and the running application: protocol, endpoint, transport. | `review/`, `ai/`, `export/`, `ui/`, `agent/`, `mcp/`, `app/` |
+| `src/agent` | Operations an external agent can request — read, change, draft, placement — independent of transport. May use `review/` so external clients get the same review method as the built-in path. | `ai/`, `export/`, `ui/`, `mcp/`, `app/` |
+| `src/mcp` | The MCP server: JSON-RPC, session, tools, guidance. Its own executable entry point. Reaches review behaviour only through `agent`. | `review/`, `ai/`, `export/`, `ui/`, `app/` |
 | `src/app` | Runtime orchestration, controllers, project workflow, modal state, command handling. May include anything. | — |
 
 `sacm/` now names exactly one thing: the reusable library under `libs/sacm`.
@@ -52,8 +53,12 @@ workflow simpler.
   depend on the UI shell.
 - **Keep `ui` render-only.** Panels receive state plus small action objects
   rather than reaching into application internals.
-- **Keep `ai` provider-neutral above the provider boundary.** Prompt assembly
-  and response validation must not depend on a specific service.
+- **Keep review methods and inference apart.** `review` owns what a review asks
+  and how its result is validated; `ai` owns talking to a provider. Neither
+  includes the other, and `app` composes them
+  ([ADR 0013](decisions/0013-review-methods-independent-of-inference-providers.md)).
+- **Keep `ai` provider-neutral above the provider boundary.** Request assembly
+  and response normalization must not depend on a specific service.
 - **Keep external data explicit.** A bundled runtime asset gets one discovery
   and copy path, with tests for the copies that matter.
 
@@ -93,9 +98,10 @@ Removing an exception means inverting the dependency, extracting an interface, o
 relocating the type, never rewording the rule. An entry that is genuinely
 unavoidable needs its own ADR and an issue to remove it.
 
-The gate is itself tested. `layer_gate_negative_check` feeds it nine forbidden
-dependencies it must reject and four allowed ones it must not — a gate that
-passes on a clean tree is indistinguishable from one that has stopped working.
+The gate is itself tested. `layer_gate_negative_check` feeds it thirteen
+forbidden dependencies it must reject and six allowed ones it must not — a gate
+that passes on a clean tree is indistinguishable from one that has stopped
+working.
 
 ### Third-party dependencies
 
@@ -108,6 +114,7 @@ what the build enforces.
 | `sacm` | — | pugixml |
 | `sacm_adapter` | `sacm::sacm` | — |
 | `core` | — | picosha2 |
+| `review` | — | — |
 | `ai` | — | libcurl |
 | `export` | — | — |
 | `ui` | Dear ImGui | hello_imgui |
@@ -118,7 +125,7 @@ what the build enforces.
 `bridge`, `agent` and `mcp`, so most of the tree meets it by inclusion rather
 than by convenience, and it stays on `af_common` with the `src/` include root.
 Header-only, so that is an include path rather than a link. **`af_common` is not
-a place to put the next dependency** — anything added there goes to eleven
+a place to put the next dependency** — anything added there goes to twelve
 targets to spare one of them a line.
 
 Until [#291](https://github.com/lasrod/assurance-forge/issues/291), `af_common`

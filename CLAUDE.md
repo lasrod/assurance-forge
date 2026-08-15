@@ -31,7 +31,8 @@ Assurance Forge is a C++23 ImGui desktop application for safety case engineering
 | `parser` | XML parsing, SACM model building, SCCG guideline catalog loading |
 | `sacm_adapter` | The seam between `libs/sacm` and the app: projection, library-backed edits, library load |
 | `core` | UI-independent domain behavior (tree building, add/remove logic, project model, drafts, audit) |
-| `ai` | AI settings, prompt construction, provider calls, response parsing, background task execution |
+| `review` | Review methods: SCCG profile selection, data packaging, prompt and result contracts, result validation. Never calls a provider |
+| `ai` | AI settings, provider calls, normalized responses, background task execution. Inference only — never parses a review result |
 | `export` | SVG export of GSN diagrams — its own projection and renderer, separate from the canvas |
 | `ui` | ImGui rendering, transient UI state, GSN canvas, panels, widgets |
 | `bridge` | Local transport between the MCP adapter and the running application |
