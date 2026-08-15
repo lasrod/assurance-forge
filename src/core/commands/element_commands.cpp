@@ -1,6 +1,7 @@
 #include "core/commands/element_commands.h"
 
 #include "core/commands/library_bridge.h"
+#include "core/derived_views.h"
 #include "core/relationship_editing.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/document_edit.h"
@@ -95,6 +96,24 @@ std::vector<RetargetedRelationship> ReparentedRelationships(const parser::Assura
             original->reasoning_ref == updated.reasoning_ref) {
             continue;
         }
+        // The render-only placeholder that places a bare strategy under its goal
+        // exists in ctx.model but has never existed in the library, so a rewrite
+        // of it can only be refused (SACM-CMD-001). Whatever the placeholder was
+        // doing is re-synthesized from the strategyTarget tag on the next
+        // rebuild.
+        if (core::IsBareStrategyPlacementPlaceholder(updated))
+            continue;
+        // A rewrite that leaves the relationship with nothing to relate is not
+        // written: it is the removal's own scrub showing through the reparent (a
+        // strategy's inference whose sources are already gone loses its last
+        // endpoint when the reasoning is cleared), and the library rightly
+        // refuses such an endpoint set (an AssertedInference needs a source,
+        // clause 11.13, SACM-CMD-005). The relationship dies with the deleted
+        // node instead -- `apply_delete_element`'s ScrubReferences drops it, the
+        // same scrub-then-drop the legacy RemoveElement applies with this same
+        // predicate.
+        if (core::IsParserRelationshipDangling(updated))
+            continue;
         changed.push_back(RetargetedRelationship{
             .id = updated.id,
             .sources = updated.source_refs,

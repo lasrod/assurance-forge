@@ -285,6 +285,19 @@ std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::st
 // `pkg` may be null, in which case only the parser model is updated.
 void ReparentChildrenToParent(parser::AssuranceCase& ac, sacm::AssuranceCasePackage* pkg, const std::string& node_id);
 
+// True if a relationship no longer relates anything: it has no targets, or it
+// has no sources and (for an inference) no reasoning either. This is the drop
+// policy `RemoveElement`'s scrub applies, exported so the library-primary
+// removal and the audit replayer can apply the SAME policy to the endpoint
+// rewrites `ReparentChildrenToParent` produces: a rewrite that leaves a
+// relationship structurally empty is not a rewrite the library accepts (an
+// AssertedRelationship needs a source, clause 11.13) -- the relationship dies
+// with the removed node via the delete seam's scrub instead. A strategy whose
+// single inference has no sources left (its last sub-goal was removed, or it
+// was never materialized and only the render placeholder exists) is the shape
+// that hits this.
+bool IsParserRelationshipDangling(const parser::SacmElement& rel);
+
 // Set or clear the GSN undeveloped decorator (SACM `needsSupport`). Writes the
 // previous value so an audited command can record and reverse it.
 bool SetElementUndeveloped(parser::AssuranceCase& ac,

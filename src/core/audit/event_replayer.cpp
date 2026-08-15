@@ -1227,6 +1227,16 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                     original->reasoning_ref == updated.reasoning_ref) {
                     continue;
                 }
+                // Mirror the live command (ReparentedRelationships in
+                // element_commands.cpp): a rewrite the reparent left structurally
+                // empty is the scrub showing through -- the library refuses it
+                // (clause 11.13 source[1..*]) and the relationship dies with the
+                // node via the delete scrub below instead. Same predicate as the
+                // legacy RemoveElement drop, so live, replayed and legacy agree.
+                // (This projection carries no render placeholders, so the live
+                // path's placeholder skip has nothing to skip here.)
+                if (core::IsParserRelationshipDangling(updated))
+                    continue;
                 const sacm_adapter::EditOutcome ends = sacm_adapter::apply_set_relationship_ends(
                     document, updated.id, updated.source_refs, updated.target_refs, updated.reasoning_ref);
                 if (!ends.supported || !ends.applied) {

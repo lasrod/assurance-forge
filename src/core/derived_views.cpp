@@ -190,6 +190,11 @@ void CollectPlaceholdersForArgumentPackage(const sacm::ArgumentPackage& argument
 
 } // namespace
 
+bool IsBareStrategyPlacementPlaceholder(const parser::SacmElement& element) {
+    return element.type == "assertedinference" && !element.reasoning_ref.empty() &&
+           element.id == element.reasoning_ref + "__pending_inference";
+}
+
 void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package) {
     const std::unordered_set<std::string> placed = CollectPlacedStrategies(model);
     std::vector<parser::SacmElement> placeholders;

@@ -57,6 +57,13 @@ void RefreshVisibleTerminologyContextDisplay(parser::AssuranceCase& model, const
 // (reasoning=strategy) exists, none is synthesized.
 void SynthesizeBareStrategyPlacements(parser::AssuranceCase& model, const sacm::AssuranceCasePackage& package);
 
+// True if `element` is the render-only placeholder inference synthesized above
+// (id = `<strategy>__pending_inference`, reasoning = the strategy). It exists
+// only in render models -- never in the library document, the saved package, or
+// the audit trail -- so anything that mirrors model edits into the library must
+// skip it: the library can only refuse an id it has never contained.
+bool IsBareStrategyPlacementPlaceholder(const parser::SacmElement& element);
+
 // Same pass scoped to ONE ArgumentPackage, for a render view that was projected
 // down to a single package (`core::BuildArgumentPackageProjection`, which feeds
 // the workbench's per-package canvas tabs). The placeholder is render-only and

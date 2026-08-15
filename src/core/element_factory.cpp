@@ -390,13 +390,19 @@ bool CanAddChildElement(const parser::SacmElement& parent, NewElementKind kind, 
         return false;
     }
     // Only a Goal or a Strategy takes children, whether by SupportedBy or by
-    // InContextOf. A Solution and a Context are leaves too.
+    // InContextOf. A Solution and a Context are leaves too. Spoken in GSN terms:
+    // this refusal reaches the user (status message, disabled-menu tooltip), and
+    // "artifactreference" names the SACM storage, not the thing on their canvas.
     if (!GsnCanBeSupported(parent_kind)) {
-        out_error = "Cannot add a child to a leaf element (" + parent.type + ").";
+        if (parent_kind == GsnElementKind::ArtifactBacked) {
+            out_error = "Cannot add a child to a Solution or Context; both are leaves in GSN.";
+        } else {
+            out_error = "Cannot add a child to this element (" + parent.type + ").";
+        }
         return false;
     }
     if (kind == NewElementKind::Strategy && parent_kind != GsnElementKind::Goal) {
-        out_error = "Strategy can only be added under a Claim.";
+        out_error = "A Strategy can only be added under a Goal.";
         return false;
     }
     return true;
@@ -1001,7 +1007,12 @@ void ScrubParserRelationshipRefs(parser::SacmElement& rel, const std::unordered_
     }
 }
 
-// True if a parser-side relationship has been emptied out by scrubbing.
+} // namespace
+
+// True if a parser-side relationship has been emptied out by scrubbing (or
+// never had anything to relate). Exported: the library-primary NodeOnly removal
+// and the audit replayer apply this same policy to reparent endpoint rewrites --
+// see element_factory.h.
 bool IsParserRelationshipDangling(const parser::SacmElement& rel) {
     if (rel.target_refs.empty())
         return true;
@@ -1010,8 +1021,6 @@ bool IsParserRelationshipDangling(const parser::SacmElement& rel) {
     }
     return rel.source_refs.empty();
 }
-
-} // namespace
 
 int CountDescendants(const parser::AssuranceCase& ac, const std::string& id) {
     if (id.empty())
