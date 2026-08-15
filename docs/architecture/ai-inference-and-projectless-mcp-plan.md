@@ -1980,6 +1980,12 @@ grant flow exists.
 
 ### Phase B3 — Runtime project access grants
 
+**Status: implemented** — tracked in
+[#395](https://github.com/lasrod/assurance-forge/issues/395). Grants apply to
+bound (`--project`) sessions too; a per-session revoke control in a dedicated
+connected-clients view follows with the B5/C2 UI work (the master toggle
+revokes everything today).
+
 #### Tasks
 
 - [ ] Add access-request protocol messages.

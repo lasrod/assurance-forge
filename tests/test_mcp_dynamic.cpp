@@ -184,9 +184,20 @@ TEST_F(McpDynamicTest, DiscoversTheApplicationAndStaysUnbound) {
     // The session's own configuration is empty; no project identity leaks in.
     EXPECT_EQ(status.payload.value("project_path", std::string()), "");
 
+    // The first read raises the access request and is refused while pending.
     const mcp::Session::OperationResult refused = session->Run("get_case_overview", nlohmann::json::object());
     EXPECT_TRUE(refused.is_error);
-    EXPECT_NE(ErrorText(refused).find("not bound to a project"), std::string::npos) << ErrorText(refused);
+    EXPECT_NE(ErrorText(refused).find("approve this session's access"), std::string::npos) << ErrorText(refused);
+
+    const mcp::Session::OperationResult asked = session->Run("request_project_access", nlohmann::json::object());
+    ASSERT_FALSE(asked.is_error) << asked.payload.dump();
+    EXPECT_EQ(asked.payload.value("status", std::string()), "pending");
+
+    // The user allows it, and the very same dynamic session reads.
+    controller.GrantAccess(session->session_id());
+    const mcp::Session::OperationResult granted = session->Run("get_case_overview", nlohmann::json::object());
+    ASSERT_FALSE(granted.is_error) << granted.payload.dump();
+    EXPECT_EQ(granted.payload.value("ranOperation", std::string()), "get_case_overview");
 
     stop.store(true);
     frames.join();

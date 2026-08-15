@@ -69,6 +69,53 @@ void ModalHost::Render() {
     RenderNotImplementedModal();
     RenderReviewerNamePromptModal();
     RenderDraftRejectionScopeModal();
+    RenderAccessRequestModal();
+}
+
+void ModalHost::RenderAccessRequestModal() {
+    if (state_.agent_bridge == nullptr)
+        return;
+    const std::vector<controllers::AccessRequest> requests = state_.agent_bridge->PendingAccessRequests();
+    if (requests.empty())
+        return;
+
+    // One request at a time, oldest first; answering it reveals the next.
+    const controllers::AccessRequest& request = requests.front();
+    const std::string project_name =
+        state_.app_state.current_project.has_value() ? state_.app_state.current_project->name : std::string();
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal((AF_TR("AI client access request") + "###mcp_access_request_modal").c_str(),
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        // The label is what the client claims to be -- attribution, not
+        // authentication. The token and pipe ACL are the security boundary.
+        ImGui::TextUnformatted(
+            ui::i18n::trf("\"{0}\" is asking to read the open project and propose draft changes.", request.client_label)
+                .c_str());
+        ImGui::TextUnformatted(ui::i18n::trf("Project: {0}", project_name).c_str());
+        ImGui::Spacing();
+        ImGui::TextUnformatted(AF_TR("Nothing is shared until you allow it. Access lasts while this "
+                                     "project stays open, and you can withdraw it at any time by "
+                                     "disabling MCP in Preferences.")
+                                   .c_str());
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        const float button_width = 160.0f;
+        if (ImGui::Button(AF_TR("Allow while open").c_str(), ImVec2(button_width, 0))) {
+            state_.agent_bridge->GrantAccess(request.session_id);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(AF_TR("Deny").c_str(), ImVec2(button_width, 0))) {
+            state_.agent_bridge->DenyAccess(request.session_id);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else {
+        ImGui::OpenPopup("###mcp_access_request_modal");
+    }
 }
 
 void ModalHost::RenderPreferencesWindow() {
@@ -205,6 +252,12 @@ void ModalHost::RenderPreferencesWindow() {
         // server will actually read, not what the user clicked.
         state_.mcp_settings = settings;
         state_.mcp_status.clear();
+        // Closing the master gate invalidates every per-session grant
+        // (ADR 0014): re-enabling later must start from explicit approvals,
+        // not resurrect old ones.
+        if (!enabled && state_.agent_bridge != nullptr) {
+            state_.agent_bridge->RevokeAllAccess();
+        }
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
     callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };

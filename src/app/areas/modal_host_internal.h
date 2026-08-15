@@ -43,6 +43,9 @@ private:
     void RenderTerminologyCategoryEditorModal();
     void RenderDeleteTerminologyCategoryModal();
     void RenderReviewerNamePromptModal();
+    // ADR 0014 gate 2: an MCP session asking for the open project. Shown as
+    // soon as a request is pending; nothing is shared until the user answers.
+    void RenderAccessRequestModal();
     // How far a draft rejection reaches: the changes built on top of the
     // rejected one go with it, or stay and wait for their author.
     void RenderDraftRejectionScopeModal();

@@ -209,7 +209,7 @@ TEST_F(AgentBridgeControllerTest, RemovesTheInstanceRecordOnStop) {
     EXPECT_TRUE(bridge::EnumerateInstanceRecords().empty());
 }
 
-TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
+TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAfterAGrant) {
     app::controllers::AgentBridgeController controller;
     std::string error;
     ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
@@ -230,13 +230,133 @@ TEST_F(AgentBridgeControllerTest, RunsAnOperationOnTheFrameThreadAndAnswers) {
     identify.args = nlohmann::json{{"client", "claude-ai 0.1.0"}};
     ASSERT_TRUE(Exchange(*client, identify).ok);
 
-    const bridge::Response answer = Exchange(*client, Say("get_case_overview", token, 3));
+    // ADR 0014 gate 2: bound at hello is not granted. The first operation
+    // raises the access request and is refused while it is pending.
+    const bridge::Response pending = Exchange(*client, Say("get_case_overview", token, 3));
+    EXPECT_FALSE(pending.ok);
+    EXPECT_EQ(pending.error_code, bridge::error_code::kProjectAccessPending);
+    const std::vector<app::controllers::AccessRequest> requests = controller.PendingAccessRequests();
+    ASSERT_EQ(requests.size(), 1u);
+    EXPECT_EQ(requests[0].session_id, "stable-session-1");
+    EXPECT_EQ(requests[0].client_label, "claude-ai 0.1.0");
+
+    controller.GrantAccess("stable-session-1");
+    EXPECT_TRUE(controller.PendingAccessRequests().empty());
+
+    const bridge::Response answer = Exchange(*client, Say("get_case_overview", token, 4));
     ASSERT_TRUE(answer.ok) << answer.error_message;
     EXPECT_EQ(answer.result["ranOperation"], "get_case_overview");
     // Attribution survives the hop, so anything a connection produces can be
     // traced to the client that asked for it rather than to "the AI".
     EXPECT_EQ(answer.result["client"], "claude-ai 0.1.0");
     EXPECT_EQ(answer.result["session"], "stable-session-1");
+
+    stop.store(true);
+    frames.join();
+}
+
+// The decision is the user's, and both answers are answers. A denial refuses
+// content without re-prompting; a revocation takes effect on the next call
+// and lets the session ask again.
+TEST_F(AgentBridgeControllerTest, DenyRefusesAndRevokeTakesEffectNextCall) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+
+    std::atomic<bool> stop{false};
+    std::thread frames([&] { DriveFrames(controller, stop); });
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+    ASSERT_TRUE(Exchange(*client, Hello(token, 1, "stable-session-7")).ok);
+
+    ASSERT_FALSE(Exchange(*client, Say("get_case_overview", token, 2)).ok);
+    controller.DenyAccess("stable-session-7");
+    const bridge::Response denied = Exchange(*client, Say("get_case_overview", token, 3));
+    EXPECT_FALSE(denied.ok);
+    EXPECT_EQ(denied.error_code, bridge::error_code::kProjectAccessDenied);
+    // A denial does not re-prompt: the user answered.
+    EXPECT_TRUE(controller.PendingAccessRequests().empty());
+
+    controller.GrantAccess("stable-session-7");
+    ASSERT_TRUE(Exchange(*client, Say("get_case_overview", token, 4)).ok);
+
+    controller.RevokeAccess("stable-session-7");
+    const bridge::Response revoked = Exchange(*client, Say("get_case_overview", token, 5));
+    EXPECT_FALSE(revoked.ok);
+    EXPECT_EQ(revoked.error_code, bridge::error_code::kProjectAccessPending);
+
+    stop.store(true);
+    frames.join();
+}
+
+// Grants are keyed by the adapter's session id: a second session presenting
+// the same token and project cannot ride on the first session's grant, and a
+// reconnect of the *same* session keeps its grant.
+TEST_F(AgentBridgeControllerTest, GrantsFollowTheSessionNotTheConnection) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+
+    std::atomic<bool> stop{false};
+    std::thread frames([&] { DriveFrames(controller, stop); });
+
+    std::string token;
+    {
+        const std::unique_ptr<bridge::Connection> first = ConnectToController(token);
+        ASSERT_NE(first, nullptr);
+        ASSERT_TRUE(Exchange(*first, Hello(token, 1, "stable-session-8")).ok);
+        ASSERT_FALSE(Exchange(*first, Say("get_case_overview", token, 2)).ok);
+        controller.GrantAccess("stable-session-8");
+        ASSERT_TRUE(Exchange(*first, Say("get_case_overview", token, 3)).ok);
+    }
+
+    // Another session: its own request, not the first session's grant.
+    const std::unique_ptr<bridge::Connection> other = ConnectToController(token);
+    ASSERT_NE(other, nullptr);
+    ASSERT_TRUE(Exchange(*other, Hello(token, 1, "stable-session-9")).ok);
+    const bridge::Response refused = Exchange(*other, Say("get_case_overview", token, 2));
+    EXPECT_FALSE(refused.ok);
+    EXPECT_EQ(refused.error_code, bridge::error_code::kProjectAccessPending);
+
+    // The first session reconnects -- an application or transport hiccup --
+    // and its grant is still standing.
+    const std::unique_ptr<bridge::Connection> again = ConnectToController(token);
+    ASSERT_NE(again, nullptr);
+    ASSERT_TRUE(Exchange(*again, Hello(token, 1, "stable-session-8")).ok);
+    EXPECT_TRUE(Exchange(*again, Say("get_case_overview", token, 2)).ok);
+
+    stop.store(true);
+    frames.join();
+}
+
+// request_project_access reports the request's state without ever returning
+// content, so a client can ask deliberately instead of probing with reads.
+TEST_F(AgentBridgeControllerTest, RequestProjectAccessReportsTheRequestState) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+
+    std::atomic<bool> stop{false};
+    std::thread frames([&] { DriveFrames(controller, stop); });
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+    ASSERT_TRUE(Exchange(*client, Hello(token, 1, "stable-session-10")).ok);
+
+    const bridge::Response pending = Exchange(*client, Say(bridge::kRequestProjectAccessOperation, token, 2));
+    ASSERT_TRUE(pending.ok) << pending.error_message;
+    EXPECT_EQ(pending.result["status"], "pending");
+
+    controller.GrantAccess("stable-session-10");
+    const bridge::Response granted = Exchange(*client, Say(bridge::kRequestProjectAccessOperation, token, 3));
+    ASSERT_TRUE(granted.ok) << granted.error_message;
+    EXPECT_EQ(granted.result["status"], "granted");
 
     stop.store(true);
     frames.join();
@@ -317,7 +437,9 @@ TEST_F(AgentBridgeControllerTest, UnboundHelloConnectsButReceivesNoProjectConten
 
     const bridge::Response refused = Exchange(*client, Say("get_case_overview", token, 2));
     EXPECT_FALSE(refused.ok);
-    EXPECT_EQ(refused.error_code, bridge::error_code::kProjectAccessRequired);
+    EXPECT_EQ(refused.error_code, bridge::error_code::kProjectAccessPending);
+    // The refusal raised the access request for the user to answer.
+    ASSERT_EQ(controller.PendingAccessRequests().size(), 1u);
 
     stop.store(true);
     frames.join();
@@ -424,6 +546,8 @@ TEST_F(AgentBridgeControllerTest, RefusesOperationsWhileTheBoundProjectIsInactiv
     const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
     ASSERT_NE(client, nullptr);
     ASSERT_TRUE(Exchange(*client, Hello(token, 1, "stable-session-5")).ok);
+    ASSERT_FALSE(Exchange(*client, Say("get_case_overview", token, 2)).ok);
+    controller.GrantAccess("stable-session-5");
     ASSERT_TRUE(Exchange(*client, Say("get_case_overview", token, 2)).ok);
 
     // The user switches projects. One instance, one listener, one record --
@@ -441,9 +565,15 @@ TEST_F(AgentBridgeControllerTest, RefusesOperationsWhileTheBoundProjectIsInactiv
     EXPECT_FALSE(refused.ok);
     EXPECT_EQ(refused.error_code, bridge::error_code::kProjectNotActive);
 
-    // Switching back restores service on the very same connection.
+    // Switching back restores the connection's route -- but not the grant.
+    // "Allow while open" ended when the project stopped being open, so the
+    // session asks again and the same connection serves once re-granted.
     controller.SetActiveProject(project_);
-    const bridge::Response restored = Exchange(*client, Say("get_case_overview", token, 4));
+    const bridge::Response ungranted = Exchange(*client, Say("get_case_overview", token, 4));
+    EXPECT_FALSE(ungranted.ok);
+    EXPECT_EQ(ungranted.error_code, bridge::error_code::kProjectAccessPending);
+    controller.GrantAccess("stable-session-5");
+    const bridge::Response restored = Exchange(*client, Say("get_case_overview", token, 5));
     EXPECT_TRUE(restored.ok) << restored.error_message;
 
     stop.store(true);

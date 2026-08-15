@@ -6,6 +6,7 @@
 #include "core/sccg/staged_checks.h"
 #include "core/problems/problem_utils.h"
 #include "core/time_utils.h"
+#include "ui/i18n/localization.h"
 #include "ui/panels/review_panel.h"
 #include "ui/ui_state.h"
 
@@ -148,7 +149,19 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
     // store and a model to diff against.
     if (state.agent_bridge != nullptr) {
         for (const controllers::AgentConnection& connection : state.agent_bridge->connections()) {
-            model.connected_agents.push_back(connection.client_label);
+            // The access state rides along so the person responsible for the
+            // argument can see not just that a client is attached, but
+            // whether it can currently read anything (ADR 0014).
+            if (connection.access_state == "granted") {
+                model.connected_agents.push_back(ui::i18n::trf("{0} — access granted", connection.client_label));
+            } else if (connection.access_state == "pending") {
+                model.connected_agents.push_back(
+                    ui::i18n::trf("{0} — awaiting your approval", connection.client_label));
+            } else if (connection.access_state == "denied") {
+                model.connected_agents.push_back(ui::i18n::trf("{0} — access denied", connection.client_label));
+            } else {
+                model.connected_agents.push_back(connection.client_label);
+            }
         }
     }
     for (const core::changesets::ChangeSet* change_set : state.agent_change_sets.Open()) {

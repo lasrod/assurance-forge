@@ -38,7 +38,12 @@ namespace bridge {
 //    connection is unbound and receives no project content -- every project
 //    operation is refused with `project_access_required` until an access
 //    grant binds it (the grant flow is the next phase of ADR 0014).
-inline constexpr int kProtocolVersion = 3;
+// 4: access grants (ADR 0014 gate 2). Every session -- bound at hello or
+//    unbound -- needs the user's per-session grant before project content
+//    flows; ungranted operations are refused with `project_access_pending`
+//    or `project_access_denied`, and `request_project_access` reports the
+//    request's state.
+inline constexpr int kProtocolVersion = 4;
 
 // Stable string codes rather than numbers. These reach an AI client, and
 // occasionally a user, through the adapter's error text -- `unauthorized` is
@@ -59,6 +64,10 @@ inline constexpr const char* kProjectNotActive = "project_not_active";
 // exists. Project content is never served to an unbound connection (ADR 0014
 // gate 2) -- the master consent flag alone does not disclose a project.
 inline constexpr const char* kProjectAccessRequired = "project_access_required";
+// An access request is in front of the user right now. Retry after approval.
+inline constexpr const char* kProjectAccessPending = "project_access_pending";
+// The user declined this session's access request.
+inline constexpr const char* kProjectAccessDenied = "project_access_denied";
 inline constexpr const char* kNoCase = "no_case";
 inline constexpr const char* kConsentWithheld = "consent_withheld";
 inline constexpr const char* kInternal = "internal";
@@ -70,6 +79,11 @@ inline constexpr const char* kHelloOperation = "hello";
 // Updates the client label after MCP initialize supplies the real client name
 // and version. Handled on the connection thread like hello, not by domain code.
 inline constexpr const char* kIdentifyOperation = "identify";
+// Asks the user to grant this session access to the open project (ADR 0014
+// gate 2). Answered immediately with the request's state -- pending, granted,
+// or denied -- never with content; the approval itself is a human decision in
+// the application, on the frame thread, at human speed.
+inline constexpr const char* kRequestProjectAccessOperation = "request_project_access";
 
 struct Request {
     int protocol = kProtocolVersion;
