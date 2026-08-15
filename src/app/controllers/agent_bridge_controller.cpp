@@ -156,10 +156,15 @@ void AgentBridgeController::GrantAccess(const std::string& session_id) {
     if (active_project_key_.empty()) {
         return;
     }
-    granted_access_.insert(AccessKey(session_id, active_project_key_));
-    denied_access_.erase(AccessKey(session_id, active_project_key_));
+    const bool newly_granted = granted_access_.insert(AccessKey(session_id, active_project_key_)).second;
+    const bool was_denied = denied_access_.erase(AccessKey(session_id, active_project_key_)) > 0;
     std::erase_if(pending_access_, [&](const AccessRequest& request) { return request.session_id == session_id; });
-    ++context_generation_;
+    // The generation says the context changed identity. A redundant grant
+    // changed nothing, and bumping for it would spuriously invalidate every
+    // other session's in-flight work.
+    if (newly_granted || was_denied) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::DenyAccess(const std::string& session_id) {
@@ -172,17 +177,24 @@ void AgentBridgeController::DenyAccess(const std::string& session_id) {
 
 void AgentBridgeController::RevokeAccess(const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
-    std::erase_if(granted_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
-    std::erase_if(denied_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
-    ++context_generation_;
+    const std::size_t removed =
+        std::erase_if(granted_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; }) +
+        std::erase_if(denied_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
+    // A revoke that revoked nothing changed nothing; see GrantAccess.
+    if (removed > 0) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::RevokeAllAccess() {
     const std::lock_guard<std::mutex> lock(mutex_);
+    const bool changed = !granted_access_.empty() || !denied_access_.empty() || !pending_access_.empty();
     granted_access_.clear();
     denied_access_.clear();
     pending_access_.clear();
-    ++context_generation_;
+    if (changed) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::SetActiveProject(const std::filesystem::path& project_root) {
