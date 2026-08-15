@@ -317,7 +317,7 @@ void DrawGsnNode(const GsnNode& node,
         ui_state.selected_acp_id.clear();
         ui_state.selected_relationship_id.clear();
         ui_state.selected_relationship_edge_key.clear();
-        RenderAddElementMenu(actions);
+        RenderAddElementMenu(active_case, ui_state.selected_element_id, actions);
         RenderRemoveSubmenu(active_case, ui_state.selected_element_id, actions);
         ImGui::Separator();
         RenderAiReviewMenu(actions);

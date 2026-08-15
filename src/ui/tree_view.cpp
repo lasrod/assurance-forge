@@ -253,7 +253,7 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
 
     if (popup_open) {
         state.selected_element_id = node->id;
-        RenderAddElementMenu(actions);
+        RenderAddElementMenu(active_case, state.selected_element_id, actions);
         RenderRemoveSubmenu(active_case, state.selected_element_id, actions);
         ImGui::Separator();
         RenderAiReviewMenu(actions);

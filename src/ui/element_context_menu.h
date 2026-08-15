@@ -46,7 +46,15 @@ struct ElementContextActions {
     std::function<void(const std::string& problem_id, const std::string& element_id)> focus_problem;
 };
 
-void RenderAddElementMenu(const ElementContextActions& actions);
+// Renders the Add submenu for the selected element. Kinds the selection cannot
+// take (per core::CanAddChildElement — e.g. any child under a Solution, a
+// Strategy under a Strategy) render disabled, with the refusal as a tooltip, so
+// an impossible edit is never offered instead of failing after the click.
+// `active_case`/`selected_id` may be null/empty; everything then stays enabled
+// and the command's own validation still has the last word.
+void RenderAddElementMenu(const parser::AssuranceCase* active_case,
+                          const std::string& selected_id,
+                          const ElementContextActions& actions);
 void RenderAiReviewMenu(const ElementContextActions& actions);
 
 void RenderRemoveSubmenu(const parser::AssuranceCase* active_case,

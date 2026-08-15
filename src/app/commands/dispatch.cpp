@@ -112,12 +112,18 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
         state.tree_needs_rebuild = true;
     }
 
-    // Mirror ElementEditController::EmitAutosaveStatus semantics: a non-empty
-    // error is always user-visible; a clean success clears any stale banner.
-    if (!result.error.empty()) {
+    // The autosave banner is for exactly one situation: the edit COMMITTED but
+    // persisting it failed -- `success` with a non-empty error (see
+    // CommandResult::sacm_written). A clean success clears any stale banner.
+    //
+    // A refusal (`success == false`) must NOT raise it: nothing was changed, so
+    // the file on disk is not at risk, and titling a validation message like
+    // "cannot add a child to a leaf element" with "Autosave write failed" told
+    // the user their file was in danger when the edit simply was not allowed.
+    // The caller owns surfacing the refusal (every controller reports
+    // "<action> failed: <reason>" from the returned outcome).
+    if (result.success) {
         state.events.Emit(AutosaveFailedEvent{result.error});
-    } else if (result.success) {
-        state.events.Emit(AutosaveFailedEvent{std::string{}});
     }
 
     if (!result.success) {

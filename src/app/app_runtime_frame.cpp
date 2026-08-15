@@ -180,6 +180,28 @@ void AppRuntime::RenderFrame(bool& done) {
     }
 
     {
+        // Commit any in-progress inspector text edit the moment the selection
+        // moves off the element being edited. The keystrokes are already in the
+        // projected model, but only the audited commit reaches the library --
+        // and the commit normally rides on ImGui's deactivated-after-edit
+        // transition, which is observed only when the SAME element's widget is
+        // submitted again. The workbench renders before the inspector and
+        // selection events are synchronous, so a single click that both leaves
+        // the field and selects another node swaps the inspector to the new
+        // element within one frame: the old widget is never submitted again,
+        // the transition is lost, and the un-committed text was silently erased
+        // by the next library-primary re-derive. Flushing here (before the
+        // re-derive below) turns that lost transition into a normal audited
+        // commit.
+        ui::UiState& ui_state = ui::GetUiState();
+        static std::string last_selected_element_id = ui_state.selected_element_id;
+        if (ui_state.selected_element_id != last_selected_element_id) {
+            last_selected_element_id = ui_state.selected_element_id;
+            FlushPendingTextEdits();
+        }
+    }
+
+    {
         core::perf::ScopedTimer s("app.derived_views");
         // Building the tree / GSN layout for a very large case can exhaust memory. Catch it here
         // so an allocation failure reports to the user and drops the case instead of escaping the

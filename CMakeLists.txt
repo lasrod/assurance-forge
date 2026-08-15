@@ -468,6 +468,7 @@ add_executable(tests
     tests/test_event_replayer.cpp
     tests/test_library_replay_convergence.cpp
     tests/test_library_primary_edit_flip.cpp
+    tests/test_strategy_lifecycle.cpp
     tests/test_audit_diff.cpp
     tests/test_event_scope.cpp
     tests/test_history_highlights.cpp

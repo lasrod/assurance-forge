@@ -377,9 +377,18 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state, const WorkbenchAreaCal
 void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
     if (state.last_autosave_error.empty())
         return;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(96, 16, 16, 255));
-    ImGui::BeginChild("##autosave_error_banner", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 3.5f), true);
-    ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.55f, 1.0f), "%s", AF_TR("Autosave write failed").c_str());
+    // Danger-tinted surface derived from the theme, not a hardcoded dark red:
+    // the banner body renders in the theme's default text color, and dark text
+    // on a fixed dark-red background made the message unreadable in the Light
+    // theme.
+    const ui::Theme& theme = ui::GetTheme();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ui::LerpColor(theme.surface_2, theme.danger, 0.22f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ui::WithAlpha(theme.danger, 0.80f));
+    // Auto-height: the error text wraps to an unknowable number of lines, and a
+    // fixed 3.5-line banner hid the Dismiss button behind an inner scrollbar.
+    ImGui::BeginChild(
+        "##autosave_error_banner", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+    ImGui::TextColored(ui::GetErrorColor(), "%s", AF_TR("Autosave write failed").c_str());
     ImGui::TextWrapped("%s", state.last_autosave_error.c_str());
     ImGui::TextWrapped("%s",
                        AF_TR("Your most recent change is recorded in the audit log but the on-disk SACM "
@@ -389,7 +398,7 @@ void RenderCanvasAutosaveErrorBanner(AppRuntimeState& state) {
     if (ImGui::Button((AF_TR("Dismiss") + "##autosave_error").c_str()))
         state.last_autosave_error.clear();
     ImGui::EndChild();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(2);
 }
 
 namespace {
