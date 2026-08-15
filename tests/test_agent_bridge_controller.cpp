@@ -333,6 +333,38 @@ TEST_F(AgentBridgeControllerTest, GrantsFollowTheSessionNotTheConnection) {
     frames.join();
 }
 
+// The context generation changes whenever the shared context changes
+// identity: project switch or close, a grant, a revocation. It never moves
+// backwards, so a value read before such a change can never match after it.
+TEST_F(AgentBridgeControllerTest, ContextGenerationChangesWithProjectAndAccessLifecycle) {
+    const std::filesystem::path second = root_ / "second-project";
+    std::filesystem::create_directories(second);
+
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+
+    const std::uint64_t at_start = controller.context_generation();
+    controller.SetActiveProject(project_);
+    const std::uint64_t at_open = controller.context_generation();
+    EXPECT_GT(at_open, at_start);
+
+    controller.GrantAccess("stable-session-gen");
+    const std::uint64_t at_grant = controller.context_generation();
+    EXPECT_GT(at_grant, at_open);
+
+    controller.RevokeAccess("stable-session-gen");
+    const std::uint64_t at_revoke = controller.context_generation();
+    EXPECT_GT(at_revoke, at_grant);
+
+    controller.SetActiveProject(second);
+    EXPECT_GT(controller.context_generation(), at_revoke);
+
+    // Re-opening the same project is a new context, not a resumed one.
+    controller.SetActiveProject(project_);
+    EXPECT_GT(controller.context_generation(), at_revoke + 1);
+}
+
 // request_project_access reports the request's state without ever returning
 // content, so a client can ask deliberately instead of probing with reads.
 TEST_F(AgentBridgeControllerTest, RequestProjectAccessReportsTheRequestState) {

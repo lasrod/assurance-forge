@@ -49,6 +49,11 @@ struct ReadContext {
     // when a bare SACM document was opened outside a project.
     std::string project_path;
 
+    // The application's context generation (ADR 0014): changes whenever the
+    // shared context changes identity -- project switch, grant, revocation.
+    // Zero when there is none to report, e.g. offline mode.
+    std::uint64_t context_generation = 0;
+
     // Connected mode supplies the immutable integrated working model that the
     // application is rendering. Offline mode leaves this null and therefore
     // reads only the accepted model loaded from SACM.
@@ -127,6 +132,11 @@ struct DraftContext {
     std::uint64_t connection_id = 0;
     std::string client_label;
     std::string session_id;
+    // See ReadContext::context_generation. Every mutation must name the value
+    // it read (`expected_context_generation`), checked next to the working
+    // revision: the revision says the draft moved, the generation says the
+    // ground under the whole session moved.
+    std::uint64_t context_generation = 0;
 };
 
 Result GetDraftStatus(const DraftContext& context);

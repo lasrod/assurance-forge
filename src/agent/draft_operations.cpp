@@ -47,6 +47,34 @@ bool CheckExpectedRevision(const DraftContext& context, const nlohmann::json& ar
     return true;
 }
 
+// The revision says the draft moved; the generation says the ground under the
+// whole session moved -- a project switch, a fresh grant, a revocation. A
+// mutation computed before such a change must not land after it (ADR 0014),
+// even when the workspace revision happens to match again.
+bool CheckExpectedContextGeneration(const DraftContext& context, const nlohmann::json& arguments, Result& refusal) {
+    if (context.context_generation == 0) {
+        // No generation to check against -- a caller outside the connected
+        // bridge, e.g. tests driving the handler directly. The revision check
+        // still stands.
+        return true;
+    }
+    const nlohmann::json::const_iterator supplied = arguments.find("expected_context_generation");
+    if (supplied == arguments.end() || !supplied->is_number_integer() || supplied->get<std::int64_t>() < 0) {
+        refusal = DraftError("Argument \"expected_context_generation\" is required. Read get_draft_status or any "
+                             "case-content result, then retry with the context_generation it reports.",
+                             context.store.revision());
+        return false;
+    }
+    if (supplied->get<std::uint64_t>() != context.context_generation) {
+        refusal = DraftError("The session's context changed after you read it -- the project was switched, or "
+                             "access was re-granted. Re-read the working draft before deciding whether this "
+                             "operation still applies.",
+                             context.store.revision());
+        return false;
+    }
+    return true;
+}
+
 std::string ArgumentFile(const DraftContext& context) {
     if (context.state.current_project.has_value()) {
         std::error_code error;
@@ -166,6 +194,8 @@ void AddWorkspaceEnvelope(const DraftContext& context, nlohmann::json& payload) 
     const core::drafts::DraftWorkspace* workspace = context.store.workspace();
     payload["argument_file"] = ArgumentFile(context);
     payload["working_revision"] = context.store.revision();
+    if (context.context_generation > 0)
+        payload["context_generation"] = context.context_generation;
     payload["view"] = workspace != nullptr && workspace->has_active_groups() ? "working_draft" : "accepted";
     if (workspace != nullptr) {
         payload["workspace_id"] = workspace->id;
@@ -245,6 +275,8 @@ Result BeginChangeGroup(const DraftContext& context, const nlohmann::json& argum
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
+    if (!CheckExpectedContextGeneration(context, arguments, refusal))
+        return refusal;
 
     const std::string title = StringArgument(arguments, "title");
     if (title.empty())
@@ -274,6 +306,8 @@ Result StageDraftOperations(const DraftContext& context, const nlohmann::json& a
         return Result::Error("No assurance case is loaded, so there is nothing to draft against.");
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
+        return refusal;
+    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
 
     const std::string group_id = GroupIdArgument(context, arguments);
@@ -311,6 +345,8 @@ Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arg
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
+    if (!CheckExpectedContextGeneration(context, arguments, refusal))
+        return refusal;
 
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -333,6 +369,8 @@ Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arg
 Result RemoveChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
+        return refusal;
+    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -362,6 +400,8 @@ Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& ar
 Result SubmitChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
+        return refusal;
+    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -426,6 +466,8 @@ Result UnstageDraftOperations(const DraftContext& context, const nlohmann::json&
         return Result::Error("No assurance case is loaded, so there is nothing to draft against.");
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
+        return refusal;
+    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())

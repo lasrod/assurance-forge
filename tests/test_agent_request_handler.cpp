@@ -76,6 +76,61 @@ TEST(AgentRequestHandler, AnswersAnOverviewFromTheLoadedModel) {
     EXPECT_GT(response.result["element_count"].get<int>(), 0);
 }
 
+// ADR 0014: the working revision says the draft moved; the context generation
+// says the ground under the whole session moved -- a project switch, a fresh
+// grant, a revocation. A mutation computed before such a change must not land
+// after it, and every read names the generation so a client can comply.
+TEST(AgentRequestHandler, MutationsNameTheContextGenerationTheyRead) {
+    TempDir workspace{UniqueTempPath("context-generation")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 43;
+    context.source_session_id = "stable-mcp-session-43";
+    context.context_generation = 7;
+
+    // Reads carry the generation the mutation must echo.
+    const bridge::Response read = app::HandleAgentRequest(MakeRequest("get_case_overview"), context);
+    ASSERT_FALSE(read.result.value("isError", true)) << read.result.dump();
+    EXPECT_EQ(read.result["context_generation"], 7);
+
+    // Missing: refused, and the refusal names the argument.
+    const bridge::Response missing = app::HandleAgentRequest(
+        MakeRequest("begin_change_group",
+                    {{"title", "Needs generation"}, {"rationale", "r"}, {"expected_working_revision", 0}}),
+        context);
+    ASSERT_TRUE(missing.result.value("isError", false)) << missing.result.dump();
+    EXPECT_NE(missing.result.value("error", std::string()).find("expected_context_generation"), std::string::npos);
+
+    // Stale: the context changed identity since the client read it.
+    const bridge::Response stale = app::HandleAgentRequest(MakeRequest("begin_change_group",
+                                                                       {{"title", "Stale generation"},
+                                                                        {"rationale", "r"},
+                                                                        {"expected_working_revision", 0},
+                                                                        {"expected_context_generation", 6}}),
+                                                           context);
+    ASSERT_TRUE(stale.result.value("isError", false)) << stale.result.dump();
+    EXPECT_NE(stale.result.value("error", std::string()).find("context changed"), std::string::npos);
+
+    // Current: proceeds, and the envelope names the generation back.
+    const bridge::Response begun = app::HandleAgentRequest(MakeRequest("begin_change_group",
+                                                                       {{"title", "Fresh generation"},
+                                                                        {"rationale", "r"},
+                                                                        {"expected_working_revision", 0},
+                                                                        {"expected_context_generation", 7}}),
+                                                           context);
+    ASSERT_TRUE(begun.ok);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+    EXPECT_EQ(begun.result["context_generation"], 7);
+}
+
 TEST(AgentRequestHandler, ConnectedReadsUseAndIdentifyTheIntegratedWorkingDraft) {
     TempDir workspace{UniqueTempPath("working-draft")};
     core::AppState state;

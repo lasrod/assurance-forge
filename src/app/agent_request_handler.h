@@ -56,6 +56,10 @@ struct AgentRequestContext {
     std::uint64_t connection_id = 0;
     std::string source_session_id;
 
+    // The bridge controller's context generation at dispatch time (ADR 0014).
+    // Zero when no bridge is serving, e.g. tests driving the handler directly.
+    std::uint64_t context_generation = 0;
+
     // The one integrated workspace for the argument currently open. Null for a
     // standalone SACM file, where MCP remains read-only.
     core::drafts::DraftWorkspaceStore* draft_workspace = nullptr;

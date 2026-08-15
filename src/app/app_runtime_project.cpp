@@ -1236,6 +1236,7 @@ bool AppRuntime::PollAgentBridge() {
                                               },
                                               connection.id,
                                               connection.session_id,
+                                              impl_->agent_bridge->context_generation(),
                                               &impl_->draft_workspace,
                                               [this] {
                                                   SyncDraftWorkspace();

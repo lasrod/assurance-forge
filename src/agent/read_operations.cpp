@@ -281,6 +281,8 @@ Result Result::Error(std::string message) {
 Result ReadResult(const ReadContext& context, nlohmann::json payload) {
     const core::drafts::DraftWorkspace* workspace = context.draft_workspace;
     payload["argument_file"] = ArgumentFile(context);
+    if (context.context_generation > 0)
+        payload["context_generation"] = context.context_generation;
     if (workspace != nullptr) {
         payload["view"] = context.is_working_draft ? "working_draft" : "accepted";
         payload["workspace_id"] = workspace->id;
