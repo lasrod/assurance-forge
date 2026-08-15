@@ -38,6 +38,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -49,7 +50,8 @@ namespace app::controllers {
 struct AgentConnection {
     std::uint64_t id = 0;
     // From the adapter's handshake, e.g. "claude-ai 0.1.0". Used for
-    // attribution on anything the connection produces.
+    // attribution on anything the connection produces -- display only, never
+    // authentication.
     std::string client_label;
     // Random identity minted by the adapter process. Unlike the application's
     // numeric connection id, it cannot collide with a persisted draft group
@@ -59,6 +61,19 @@ struct AgentConnection {
     // only while this is the active project's fingerprint.
     std::string project_key;
     std::string connected_utc;
+    // Derived when listed: this session's access state against the active
+    // project -- "granted", "pending", "denied", or "none".
+    std::string access_state;
+};
+
+// One session waiting for the user's decision (ADR 0014 gate 2).
+struct AccessRequest {
+    std::string session_id;
+    std::string client_label;
+    // The active project's fingerprint at request time. A request outlives
+    // neither the project it named nor the application run.
+    std::string project_key;
+    std::string requested_utc;
 };
 
 class AgentBridgeController {
@@ -109,6 +124,21 @@ public:
 
     std::vector<AgentConnection> connections() const;
 
+    // ADR 0014 gate 2: per-session, per-project grants held in application
+    // memory only. They survive a bridge reconnect to the same instance (the
+    // key is the adapter's stable session id) and end on revoke, deny,
+    // project close or switch, MCP disable, or application restart.
+    std::vector<AccessRequest> PendingAccessRequests() const;
+    // Grant or deny the pending request of `session_id` against the active
+    // project. A grant lasts while the project stays open.
+    void GrantAccess(const std::string& session_id);
+    void DenyAccess(const std::string& session_id);
+    // Removes a session's grants. The next operation raises a fresh request.
+    void RevokeAccess(const std::string& session_id);
+    // Every grant, denial and pending request. The Preferences MCP toggle
+    // calls this when the master gate closes.
+    void RevokeAllAccess();
+
 private:
     struct PendingRequest;
 
@@ -145,11 +175,20 @@ private:
     std::atomic<uint64_t> next_connection_id_{1};
     std::chrono::steady_clock::time_point last_heartbeat_{};
 
+    // Access bookkeeping, guarded by mutex_. Keys are session_id + "\n" +
+    // project_key -- both components are free of newlines by construction.
+    std::string AccessKey(const std::string& session_id, const std::string& project_key) const;
+    // Appends a request if the session has none pending. Caller holds mutex_.
+    void RegisterAccessRequestLocked(const AgentConnection& connection);
+
     mutable std::mutex mutex_;
     // Guarded by mutex_: written on the frame thread, read by connection
     // threads answering hello.
     std::filesystem::path active_project_root_;
     std::string active_project_key_;
+    std::vector<AccessRequest> pending_access_;
+    std::set<std::string> granted_access_;
+    std::set<std::string> denied_access_;
     std::condition_variable queued_;
     std::deque<std::shared_ptr<PendingRequest>> pending_;
     // Every connection ever served this session, including finished ones whose

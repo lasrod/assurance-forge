@@ -1068,6 +1068,26 @@ TRANSLATIONS = {
         "登録簿評価を読み込めませんでした: {0}",
     "AI clients cannot connect: {0}":
         "AI クライアントは接続できません: {0}",
+    "AI client access request":
+        "AI クライアントのアクセス要求",
+    "\"{0}\" is asking to read the open project and propose draft changes.":
+        "「{0}」が、開いているプロジェクトの読み取りとドラフト変更の提案を求めています。",
+    "Project: {0}":
+        "プロジェクト: {0}",
+    "Nothing is shared until you allow it. Access lasts while this project stays open, "
+    "and you can withdraw it at any time by disabling MCP in Preferences.":
+        "許可するまで何も共有されません。アクセスはこのプロジェクトが開いている間だけ有効で、"
+        "環境設定で MCP を無効にすればいつでも取り消せます。",
+    "Allow while open":
+        "開いている間許可",
+    "Deny":
+        "拒否",
+    "{0} — access granted":
+        "{0} — アクセス許可済み",
+    "{0} — awaiting your approval":
+        "{0} — 承認待ち",
+    "{0} — access denied":
+        "{0} — アクセス拒否",
     "This project appears to be open in another Assurance Forge instance (process {0}). "
     "Two instances editing one project can corrupt its draft state.":
         "このプロジェクトは別の Assurance Forge インスタンス（プロセス {0}）で開かれているようです。"

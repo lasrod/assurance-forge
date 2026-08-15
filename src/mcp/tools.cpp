@@ -23,6 +23,10 @@ ToolResult GetConnectionStatus(Session& session, const nlohmann::json& arguments
     return Run(session, "get_connection_status", arguments);
 }
 
+ToolResult RequestProjectAccess(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "request_project_access", arguments);
+}
+
 ToolResult GetCaseOverview(Session& session, const nlohmann::json& arguments) {
     return Run(session, "get_case_overview", arguments);
 }
@@ -220,6 +224,19 @@ std::vector<ToolDefinition> BuildTools() {
         // model can tell the user which switch to flip.
         false,
         &GetConnectionStatus,
+    });
+
+    tools.push_back(ToolDefinition{
+        "request_project_access",
+        "Ask the user, inside the running Assurance Forge, to grant this session access to the "
+        "project they have open (ADR 0014). Returns the request's state -- pending, granted, or "
+        "denied -- and never any case content. Access is per session and lasts while the project "
+        "stays open; a denial is also an answer. Call this when another tool reports "
+        "project_access_pending, then retry after the user has had a moment to respond.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        // Reports the state of this session's own request; no case content.
+        false,
+        &RequestProjectAccess,
     });
 
     tools.push_back(ToolDefinition{

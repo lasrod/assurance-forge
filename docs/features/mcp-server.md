@@ -208,15 +208,31 @@ agent self-corrects, and shown on the integrated draft for the reviewer.
 
 ## Consent
 
-`mcp.enabled` in the settings file, off by default, toggled in Preferences
-alongside a copyable client configuration. It fails closed on every failure path
-— missing file, malformed document, absent or non-boolean flag — and is re-read
-on every call, so revoking it takes effect immediately rather than when the
-client happens to restart.
+Two gates ([ADR 0007](../architecture/decisions/0007-mcp-server-consent.md) and
+[ADR 0014](../architecture/decisions/0014-projectless-mcp-discovery-with-runtime-case-binding.md)).
 
-Connected clients are named on their draft groups. Something reading or
-contributing to a safety argument should never be invisible to the person
-responsible for it.
+**Gate 1 — the master flag.** `mcp.enabled` in the settings file, off by
+default, toggled in Preferences alongside a copyable client configuration. It
+fails closed on every failure path — missing file, malformed document, absent
+or non-boolean flag — and is re-read on every call, so revoking it takes
+effect immediately rather than when the client happens to restart. Disabling
+it also revokes every session grant below.
+
+**Gate 2 — the per-session grant.** The master flag alone discloses nothing.
+Each session's first project operation (or an explicit
+`request_project_access` call) raises an access request inside the running
+application — client label, project name, *Allow while open* / *Deny* — and
+the operation is refused with `project_access_pending` until the user answers.
+Grants are keyed by session id and project, live only in application memory,
+survive a bridge reconnect to the same instance, and end on deny, revoke,
+project close or switch, MCP disable, or application restart. A re-granted
+session still owns the draft groups it authored earlier — they are keyed by
+the same session id. The client label is attribution, never authentication;
+the token and the pipe's ACL remain the security boundary.
+
+Connected clients are named on their draft groups and shown with their access
+state. Something reading or contributing to a safety argument should never be
+invisible to the person responsible for it.
 
 ## Discovery
 

@@ -22,6 +22,9 @@ msgstr " — ただし元のドラフトは復元されませんでした: {0}"
 msgid "\"{0}\" cannot be edited while a working draft is active."
 msgstr "作業ドラフトが有効な間は「{0}」を編集できません。"
 
+msgid "\"{0}\" is asking to read the open project and propose draft changes."
+msgstr "「{0}」が、開いているプロジェクトの読み取りとドラフト変更の提案を求めています。"
+
 msgid "% Frame"
 msgstr "% フレーム"
 
@@ -105,6 +108,9 @@ msgstr "AI レビュー"
 
 msgid "AI client"
 msgstr "AI クライアント"
+
+msgid "AI client access request"
+msgstr "AI クライアントのアクセス要求"
 
 msgid "AI clients cannot connect: {0}"
 msgstr "AI クライアントは接続できません: {0}"
@@ -255,6 +261,9 @@ msgstr "すべてのエビデンスがリンクされています"
 
 msgid "Allow AI clients to read and propose changes"
 msgstr "AI クライアントに読み取りと変更提案を許可する"
+
+msgid "Allow while open"
+msgstr "開いている間許可"
 
 msgid "An audit log is created automatically the first time a model-mutating command is recorded for a SACM file in this project."
 msgstr "このプロジェクトの SACM ファイルに対してモデル変更コマンドが初めて記録されたとき、監査ログが自動的に作成されます。"
@@ -726,6 +735,9 @@ msgstr "この用語を削除しますか?"
 
 msgid "Delete this terminology package?"
 msgstr "この用語パッケージを削除しますか?"
+
+msgid "Deny"
+msgstr "拒否"
 
 msgid "Depends on:"
 msgstr "前提とする変更:"
@@ -1372,6 +1384,9 @@ msgstr "未レビュー"
 msgid "Notes"
 msgstr "メモ"
 
+msgid "Nothing is shared until you allow it. Access lasts while this project stays open, and you can withdraw it at any time by disabling MCP in Preferences."
+msgstr "許可するまで何も共有されません。アクセスはこのプロジェクトが開いている間だけ有効で、環境設定で MCP を無効にすればいつでも取り消せます。"
+
 msgid "Nothing to undo."
 msgstr "元に戻す操作はありません。"
 
@@ -1593,6 +1608,9 @@ msgstr "プロジェクトを開きましたが、SACM ファイルを読み込�
 
 msgid "Project saved: {0}"
 msgstr "プロジェクトを保存しました: {0}"
+
+msgid "Project: {0}"
+msgstr "プロジェクト: {0}"
 
 msgid "Projected confidence"
 msgstr "投影信頼度"
@@ -2571,6 +2589,15 @@ msgstr "{0} 件の警告を確認する必要があります"
 
 msgid "{0} — accepted"
 msgstr "{0} — 受理済み"
+
+msgid "{0} — access denied"
+msgstr "{0} — アクセス拒否"
+
+msgid "{0} — access granted"
+msgstr "{0} — アクセス許可済み"
+
+msgid "{0} — awaiting your approval"
+msgstr "{0} — 承認待ち"
 
 msgid "{0} — working draft"
 msgstr "{0} — 作業ドラフト"
