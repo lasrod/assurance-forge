@@ -75,7 +75,14 @@ protected:
 
     void TearDown() override {
         for (const std::pair<const std::string, std::string>& entry : saved_) {
-            Set(entry.first, entry.second);
+            // A variable that was unset must be unset again, not set to "":
+            // the two differ on POSIX and the difference leaks into every
+            // later test in this process.
+            if (entry.second.empty()) {
+                Unset(entry.first);
+            } else {
+                Set(entry.first, entry.second);
+            }
         }
         std::error_code ec;
         std::filesystem::remove_all(root_, ec);
@@ -120,6 +127,14 @@ private:
         _putenv_s(name.c_str(), value.c_str());
 #else
         setenv(name.c_str(), value.c_str(), 1);
+#endif
+    }
+
+    static void Unset(const std::string& name) {
+#ifdef _WIN32
+        _putenv_s(name.c_str(), "");
+#else
+        unsetenv(name.c_str());
 #endif
     }
 
@@ -176,6 +191,38 @@ TEST_F(McpDynamicTest, DiscoversTheApplicationAndStaysUnbound) {
     stop.store(true);
     frames.join();
     controller.Stop();
+}
+
+// An instance was found but cannot be reached -- here, a future protocol.
+// "Start Assurance Forge" would be the wrong instruction, so the status must
+// surface the actual failure instead.
+TEST_F(McpDynamicTest, SurfacesWhyAFoundInstanceCannotBeReached) {
+    bridge::InstanceRecord future;
+    future.protocol = bridge::kProtocolVersion + 41;
+    future.instance_id = "af-futureprotocol";
+    future.pid = OwnPid();
+    future.address = bridge::InstanceAddress("af-futureprotocol");
+    future.token = bridge::GenerateToken();
+    future.app_version = "99.0";
+    future.state = bridge::instance_state::kNoProject;
+    future.last_heartbeat_utc = "2026-08-15T00:00:00Z";
+    std::string error;
+    ASSERT_TRUE(bridge::WriteInstanceRecord(future, error)) << error;
+
+    std::unique_ptr<mcp::Session> session = OpenDynamicSession();
+    ASSERT_NE(session, nullptr);
+
+    const mcp::Session::OperationResult status = session->Run("get_connection_status", nlohmann::json::object());
+    ASSERT_FALSE(status.is_error) << status.payload.dump();
+    EXPECT_EQ(status.payload.value("mode", std::string()), "application_unreachable");
+    EXPECT_NE(status.payload.value("detail", std::string()).find("protocol"), std::string::npos)
+        << status.payload.value("detail", std::string());
+
+    const mcp::Session::OperationResult read = session->Run("get_case_overview", nlohmann::json::object());
+    EXPECT_TRUE(read.is_error);
+    EXPECT_NE(ErrorText(read).find("protocol"), std::string::npos) << ErrorText(read);
+
+    bridge::RemoveInstanceRecord("af-futureprotocol");
 }
 
 // Two live instances: the session must refuse to choose. Picking the newest

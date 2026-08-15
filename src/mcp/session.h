@@ -174,6 +174,10 @@ private:
     // How many live instances the last dynamic discovery saw. Zero and one
     // explain themselves; more than one is reported rather than auto-picked.
     int last_discovery_count_ = 0;
+    // Why the last dynamic connect failed, when an instance was found but not
+    // reached -- a protocol mismatch reported as "start Assurance Forge"
+    // would send the user to fix the wrong thing.
+    std::string last_dynamic_error_;
 
     std::filesystem::path project_path_;
     // Resolved once at open so every consent read hits the same file.

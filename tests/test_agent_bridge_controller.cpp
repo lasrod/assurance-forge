@@ -323,6 +323,32 @@ TEST_F(AgentBridgeControllerTest, UnboundHelloConnectsButReceivesNoProjectConten
     frames.join();
 }
 
+// Present-but-malformed is a client bug, not a request for an unbound
+// connection: silently downgrading it would hide the bug and blur the
+// handshake contract.
+TEST_F(AgentBridgeControllerTest, RefusesAMalformedProjectKeyRatherThanDowngrading) {
+    app::controllers::AgentBridgeController controller;
+    std::string error;
+    ASSERT_TRUE(controller.Start("0.1.0", error)) << error;
+    controller.SetActiveProject(project_);
+
+    std::string token;
+    const std::unique_ptr<bridge::Connection> client = ConnectToController(token);
+    ASSERT_NE(client, nullptr);
+
+    bridge::Request empty_key = Hello(token, 1, "stable-session-6");
+    empty_key.args["projectKey"] = "";
+    const bridge::Response refused_empty = Exchange(*client, empty_key);
+    EXPECT_FALSE(refused_empty.ok);
+    EXPECT_EQ(refused_empty.error_code, bridge::error_code::kBadRequest);
+
+    bridge::Request wrong_type = Hello(token, 2, "stable-session-6");
+    wrong_type.args["projectKey"] = 42;
+    const bridge::Response refused_type = Exchange(*client, wrong_type);
+    EXPECT_FALSE(refused_type.ok);
+    EXPECT_EQ(refused_type.error_code, bridge::error_code::kBadRequest);
+}
+
 // The token lives in the user's own runtime directory. A local process that did
 // not read it is not the adapter this application published for.
 TEST_F(AgentBridgeControllerTest, RefusesAConnectionWithTheWrongToken) {

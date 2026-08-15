@@ -211,6 +211,7 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
         if (!config.never_connect && session->ConnectToApplication(connect_error)) {
             session->mode_ = Mode::Connected;
         } else {
+            session->last_dynamic_error_ = connect_error;
             session->mode_ = Mode::Offline;
         }
         return session;
@@ -262,9 +263,11 @@ bool Session::EnsureConnected() {
         // caller's next call.
         std::string error;
         if (ConnectToApplication(error)) {
+            last_dynamic_error_.clear();
             mode_ = Mode::Connected;
             return true;
         }
+        last_dynamic_error_ = error;
         mode_ = Mode::Offline;
         return false;
     }
@@ -315,6 +318,16 @@ Session::OperationResult Session::DescribeConnection() {
                 "More than one Assurance Forge is running, and this session never picks one by itself. "
                 "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
                 "the project directly.";
+        } else if (last_discovery_count_ == 1) {
+            // An instance was found but not reached -- a crashed process whose
+            // record lingers, or a protocol mismatch between builds. "Start
+            // Assurance Forge" would be the wrong instruction, so the actual
+            // failure is surfaced.
+            result.payload["mode"] = "application_unreachable";
+            result.payload["detail"] = last_dynamic_error_.empty()
+                                           ? "A running Assurance Forge was found but could not be reached. The "
+                                             "session retries automatically on the next call."
+                                           : last_dynamic_error_;
         } else {
             result.payload["mode"] = "application_unavailable";
             result.payload["detail"] =
@@ -558,13 +571,17 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
     result.is_error = true;
     result.needs_application = true;
     if (dynamic_) {
-        result.payload = nlohmann::json{
-            {"error",
-             last_discovery_count_ > 1
-                 ? "More than one Assurance Forge is running, and this session never picks one by itself. "
-                   "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
-                   "the project directly."
-                 : "Start Assurance Forge and open a project. This session will discover it automatically."}};
+        std::string message;
+        if (last_discovery_count_ > 1) {
+            message = "More than one Assurance Forge is running, and this session never picks one by itself. "
+                      "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
+                      "the project directly.";
+        } else if (last_discovery_count_ == 1 && !last_dynamic_error_.empty()) {
+            message = last_dynamic_error_;
+        } else {
+            message = "Start Assurance Forge and open a project. This session will discover it automatically.";
+        }
+        result.payload = nlohmann::json{{"error", message}};
         return result;
     }
     result.payload = nlohmann::json{

@@ -330,10 +330,18 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
             // The project fingerprint is optional: a dynamic session connects
             // unbound and receives no project content until a grant binds it.
             // When present it must name the active project -- bound at hello,
-            // never rebound (ADR 0014).
+            // never rebound (ADR 0014). Present-but-malformed is a client bug
+            // and is refused rather than silently downgraded to unbound.
             const nlohmann::json::const_iterator project_key = request.args.find("projectKey");
-            const bool wants_binding = project_key != request.args.end() && project_key->is_string() &&
-                                       !project_key->get<std::string>().empty();
+            const bool wants_binding = project_key != request.args.end();
+            if (wants_binding && (!project_key->is_string() || project_key->get<std::string>().empty())) {
+                connection->WriteMessage(bridge::EncodeResponse(
+                    bridge::MakeError(request.id,
+                                      bridge::error_code::kBadRequest,
+                                      "projectKey, when present, must be a non-empty string; omit it entirely "
+                                      "for an unbound connection.")));
+                continue;
+            }
 
             std::filesystem::path active_root;
             bool project_open = false;
