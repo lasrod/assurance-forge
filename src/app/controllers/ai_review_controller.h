@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ai/ai_claim_review.h"
 #include "ai/ai_service.h"
 #include "ai/ai_task_runner.h"
 #include "app/app_events.h"
@@ -9,6 +8,8 @@
 #include "core/assurance_tree.h"
 #include "core/problems/problems_manager.h"
 #include "parser/xml_parser.h"
+#include "review/sccg/sccg_profile_selector.h"
+#include "review/sccg/sccg_review.h"
 
 #include <chrono>
 #include <memory>
@@ -17,18 +18,6 @@
 #include <vector>
 
 namespace app::controllers {
-
-struct AiReviewGuidelineSelection {
-    const parser::ReviewProfile* review_profile = nullptr;
-    std::vector<const parser::Guideline*> guidelines;
-    std::string error_message;
-};
-
-AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCatalog& guideline_catalog,
-                                                         const std::string& review_profile_id);
-AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCatalog& guideline_catalog,
-                                                         const parser::SacmElement& element,
-                                                         const core::TreeNode* node = nullptr);
 
 class AiReviewController {
 public:
@@ -70,7 +59,7 @@ private:
     std::shared_ptr<ai::AiService> ai_service_;
 
     std::shared_ptr<ai::AiTaskHandle> review_task_;
-    ai::AiReviewRequestArtifacts pending_review_;
+    review::AiReviewRequestArtifacts pending_review_;
     std::string pending_review_element_id_;
     std::string pending_review_element_type_;
     std::string pending_review_profile_id_;

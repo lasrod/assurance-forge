@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace ai {
+namespace review {
 
 struct AiReviewElement {
     std::string role;
@@ -111,4 +111,4 @@ ParsedAiReviewResponse ParseAiReviewResponse(const std::string& response_text,
                                              const std::string& selected_element_id,
                                              const std::string& fallback_element_type);
 
-} // namespace ai
+} // namespace review

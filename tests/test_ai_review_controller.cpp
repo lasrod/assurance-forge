@@ -4,6 +4,7 @@
 #include "ai/secret_store.h"
 #include "app/review_problem_sync.h"
 #include "core/reviews/review_proposal.h"
+#include "review/sccg/sccg_profile_selector.h"
 
 #include <chrono>
 #include <gtest/gtest.h>
@@ -289,8 +290,7 @@ TEST(AiReviewControllerTest, SelectsExactlyOneReviewProfileForEverySupportedGsnE
         node.role = selection_case.role;
         node.is_counter_source = selection_case.counter;
 
-        app::controllers::AiReviewGuidelineSelection selection =
-            app::controllers::SelectReviewProfileForElement(catalog, element, &node);
+        review::AiReviewGuidelineSelection selection = review::SelectReviewProfileForElement(catalog, element, &node);
 
         ASSERT_NE(selection.review_profile, nullptr) << selection.error_message;
         EXPECT_EQ(selection.review_profile->id, selection_case.expected_profile_id);
@@ -316,8 +316,7 @@ TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnEle
         node.role = selection_case.role;
         node.is_counter_source = selection_case.counter;
 
-        app::controllers::AiReviewGuidelineSelection selection =
-            app::controllers::SelectReviewProfileForElement(catalog, element, &node);
+        review::AiReviewGuidelineSelection selection = review::SelectReviewProfileForElement(catalog, element, &node);
 
         ASSERT_NE(selection.review_profile, nullptr) << selection.error_message;
         EXPECT_EQ(selection.review_profile->id, selection_case.expected_profile_id);
@@ -335,8 +334,7 @@ TEST(AiReviewControllerTest, RefusesAmbiguousElementReviewProfiles) {
     node.id = element.id;
     node.role = core::NodeRole::Claim;
 
-    app::controllers::AiReviewGuidelineSelection selection =
-        app::controllers::SelectReviewProfileForElement(catalog, element, &node);
+    review::AiReviewGuidelineSelection selection = review::SelectReviewProfileForElement(catalog, element, &node);
 
     EXPECT_EQ(selection.review_profile, nullptr);
     EXPECT_NE(selection.error_message.find("More than one SCCG review profile"), std::string::npos);
@@ -352,8 +350,7 @@ TEST(AiReviewControllerTest, ReportsWhenElementHasNoReviewProfile) {
     node.id = element.id;
     node.role = core::NodeRole::Context;
 
-    app::controllers::AiReviewGuidelineSelection selection =
-        app::controllers::SelectReviewProfileForElement(catalog, element, &node);
+    review::AiReviewGuidelineSelection selection = review::SelectReviewProfileForElement(catalog, element, &node);
 
     EXPECT_EQ(selection.review_profile, nullptr);
     EXPECT_NE(selection.error_message.find("No SCCG review profile"), std::string::npos);

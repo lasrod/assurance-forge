@@ -10,13 +10,21 @@
 #   [parser]   parser/*           → may include model
 #   [legacy_sacm] legacy_sacm/*   → may include model, parser
 #   [core]     core/*             → may include model, parser, legacy_sacm
+#   [review]   review/*           → may include model, parser, legacy_sacm, core
 #   [ai]       ai/*               → may include model, parser, legacy_sacm, core
 #   [export]   export/*           → may include model, parser, legacy_sacm, core
 #   [ui]       ui/*               → may include model, parser, legacy_sacm, core
 #   [bridge]   bridge/*           → may include model, parser, legacy_sacm, core
-#   [agent]    agent/*            → may include model, parser, legacy_sacm, core, bridge
+#   [agent]    agent/*            → may include model, parser, legacy_sacm, core, review, bridge
 #   [mcp]      mcp/*              → may include model, parser, legacy_sacm, core, bridge, agent
 #   [app]      app/*              → may include everything
+#
+# `review` owns review methods — what to review, SCCG profile selection, data
+# packaging, prompt and result contracts, result validation (ADR 0013). `ai`
+# owns inference. Neither may include the other: `review` never calls a
+# provider, `ai` never parses a review result, and `app` composes the two.
+# `agent` may use `review` so an external client gets the same method and
+# validator as the built-in path; `mcp` still reaches it only through `agent`.
 #
 # `mcp` forbidding `ai/` is deliberate, not incidental: the MCP server and the
 # in-app AI review are two independent features that must not share an inference
@@ -48,16 +56,17 @@ endif()
 get_filename_component(AF_SOURCE_DIR "${AF_SOURCE_DIR}" ABSOLUTE)
 
 # Forbidden include prefixes per layer. Format: LAYER -> list of forbidden prefixes.
-set(_AF_FORBIDDEN_parser "legacy_sacm/;sacm/;ai/;export/;ui/;app/")
-set(_AF_FORBIDDEN_legacy_sacm "ai/;export/;ui/;app/")
-set(_AF_FORBIDDEN_sacm_adapter "ai/;export/;ui/;app/")
-set(_AF_FORBIDDEN_core   "ai/;export/;ui/;app/")
-set(_AF_FORBIDDEN_ai     "export/;ui/;app/")
-set(_AF_FORBIDDEN_export "ai/;ui/;app/")
-set(_AF_FORBIDDEN_ui     "ai/;export/;app/")
-set(_AF_FORBIDDEN_bridge "ai/;export/;ui/;agent/;mcp/;app/")
+set(_AF_FORBIDDEN_parser "legacy_sacm/;sacm/;review/;ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_legacy_sacm "review/;ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_sacm_adapter "review/;ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_core   "review/;ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_review "ai/;export/;ui/;bridge/;agent/;mcp/;app/")
+set(_AF_FORBIDDEN_ai     "review/;export/;ui/;app/")
+set(_AF_FORBIDDEN_export "review/;ai/;ui/;app/")
+set(_AF_FORBIDDEN_ui     "review/;ai/;export/;app/")
+set(_AF_FORBIDDEN_bridge "review/;ai/;export/;ui/;agent/;mcp/;app/")
 set(_AF_FORBIDDEN_agent  "ai/;export/;ui/;mcp/;app/")
-set(_AF_FORBIDDEN_mcp    "ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_mcp    "review/;ai/;export/;ui/;app/")
 # app may include anything.
 
 # Known cross-layer includes recorded as exceptions. Format:
@@ -76,7 +85,7 @@ set(_AF_FORBIDDEN_mcp    "ai/;export/;ui/;app/")
 set(_AF_ALLOWLIST
 )
 
-set(_AF_LAYERS parser legacy_sacm sacm_adapter core ai export ui bridge agent mcp)
+set(_AF_LAYERS parser legacy_sacm sacm_adapter core review ai export ui bridge agent mcp)
 set(_AF_VIOLATIONS "")
 
 foreach(layer IN LISTS _AF_LAYERS)

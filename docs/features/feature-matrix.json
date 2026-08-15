@@ -1397,7 +1397,8 @@
       "name": "SCCG-guided AI element review",
       "status": "supported",
       "evidence": [
-        "src/ai/ai_claim_review.cpp",
+        "src/review/sccg/sccg_review.cpp",
+        "src/review/sccg/sccg_profile_selector.cpp",
         "src/app/actions/ai_review_actions.cpp",
         "src/app/actions/proposal_actions.cpp",
         "src/app/controllers/ai_review_controller.cpp",

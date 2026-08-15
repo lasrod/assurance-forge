@@ -2,8 +2,8 @@
 # Assurance-Forge source tree
 #
 # Each top-level src/ subdirectory is a thin CMake OBJECT library:
-#   af_parser, af_legacy_sacm, af_sacm_adapter, af_core, af_ai, af_export, af_ui,
-#   af_bridge, af_agent, af_mcp, af_app
+#   af_parser, af_legacy_sacm, af_sacm_adapter, af_core, af_review, af_ai,
+#   af_export, af_ui, af_bridge, af_agent, af_mcp, af_app
 #
 # Each declares the third-party libraries it actually uses. The map is in
 # docs/architecture/layers-and-ownership.md; `af_sacm_adapter` was the pattern
@@ -23,7 +23,7 @@
 # include path rather than a link.
 #
 # It is not a place to put the next dependency. Adding one here gives it to
-# eleven targets to spare one of them a line.
+# twelve targets to spare one of them a line.
 add_library(af_common INTERFACE)
 target_include_directories(af_common INTERFACE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(af_common INTERFACE nlohmann_json::nlohmann_json)
@@ -39,6 +39,7 @@ add_subdirectory(parser)
 add_subdirectory(legacy_sacm)
 add_subdirectory(sacm_adapter)
 add_subdirectory(core)
+add_subdirectory(review)
 add_subdirectory(ai)
 add_subdirectory(export)
 add_subdirectory(ui)
@@ -50,7 +51,7 @@ add_subdirectory(app)
 # Listed explicitly rather than globbed: a new subsystem should have to say that
 # it builds warning-clean, not inherit the claim by being in the right folder.
 foreach(af_target
-    af_parser af_legacy_sacm af_sacm_adapter af_core af_ai af_export af_ui
+    af_parser af_legacy_sacm af_sacm_adapter af_core af_review af_ai af_export af_ui
     af_bridge af_agent af_mcp af_app)
     af_set_warning_level(${af_target})
 endforeach()

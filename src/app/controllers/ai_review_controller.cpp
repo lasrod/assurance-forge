@@ -100,18 +100,18 @@ void CollectElementIdsFromJson(const nlohmann::json& value, std::unordered_set<s
     }
 }
 
-std::unordered_set<std::string> BuildReviewScopeElementIds(const ai::AiReviewPayload& payload,
-                                                           const ai::AiReviewDataPackageBundle& data_packages) {
+std::unordered_set<std::string> BuildReviewScopeElementIds(const review::AiReviewPayload& payload,
+                                                           const review::AiReviewDataPackageBundle& data_packages) {
     std::unordered_set<std::string> element_ids;
     if (!payload.selected.id.empty())
         element_ids.insert(payload.selected.id);
     if (payload.parent.has_value() && !payload.parent->id.empty())
         element_ids.insert(payload.parent->id);
-    for (const ai::AiReviewElement& child : payload.children) {
+    for (const review::AiReviewElement& child : payload.children) {
         if (!child.id.empty())
             element_ids.insert(child.id);
     }
-    for (const ai::AiReviewDataPackage& data_package : data_packages.available) {
+    for (const review::AiReviewDataPackage& data_package : data_packages.available) {
         nlohmann::json parsed = nlohmann::json::parse(data_package.json, nullptr, false);
         if (!parsed.is_discarded())
             CollectElementIdsFromJson(parsed, element_ids);
@@ -155,45 +155,6 @@ void ReplaceAiReviewWithSingleItem(ReviewController& review_controller,
 }
 
 } // namespace
-
-AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCatalog& guideline_catalog,
-                                                         const std::string& review_profile_id) {
-    AiReviewGuidelineSelection selection;
-    selection.review_profile = guideline_catalog.document.FindReviewProfileById(review_profile_id);
-    if (!selection.review_profile) {
-        selection.error_message = "SCCG review profile was not found: " + review_profile_id;
-        return selection;
-    }
-
-    selection.guidelines = guideline_catalog.document.FindGuidelinesByReviewProfile(review_profile_id);
-    if (selection.guidelines.empty()) {
-        selection.error_message = "SCCG review profile '" + review_profile_id + "' references no valid guidelines.";
-    }
-    return selection;
-}
-
-AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCatalog& guideline_catalog,
-                                                         const parser::SacmElement& element,
-                                                         const core::TreeNode* node) {
-    const parser::ReviewProfile* match = nullptr;
-    for (const parser::ReviewProfile& profile : guideline_catalog.document.review_profiles) {
-        if (!ai::IsReviewProfileCompatibleWithElement(profile, element, node))
-            continue;
-        if (match != nullptr) {
-            AiReviewGuidelineSelection selection;
-            selection.error_message = "More than one SCCG review profile applies to the selected element type: '" +
-                                      match->display_name + "' and '" + profile.display_name + "'.";
-            return selection;
-        }
-        match = &profile;
-    }
-    if (match == nullptr) {
-        AiReviewGuidelineSelection selection;
-        selection.error_message = "No SCCG review profile applies to the selected element type.";
-        return selection;
-    }
-    return SelectReviewProfileGuidelines(guideline_catalog, match->id);
-}
 
 AiReviewController::AiReviewController(AppEvents& events,
                                        core::ProblemsManager& problems_manager,
@@ -241,7 +202,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    const parser::SacmElement* selected_element = ai::FindSacmElement(*assurance_case, selected_element_id);
+    const parser::SacmElement* selected_element = review::FindSacmElement(*assurance_case, selected_element_id);
     if (!selected_element) {
         problems_manager_.AddOrUpdateProblem(
             MakeAiReviewProblem("ai-review:" + selected_element_id + ":missing-element",
@@ -253,20 +214,20 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    if (!ai::IsSupportedAiReviewElement(*selected_element)) {
+    if (!review::IsSupportedAiReviewElement(*selected_element)) {
         problems_manager_.AddOrUpdateProblem(
             MakeAiReviewProblem("ai-review:" + selected_element_id + ":unsupported-type",
                                 core::ProblemSeverity::Info,
                                 selected_element_id,
-                                ai::AiReviewElementType(*selected_element),
+                                review::AiReviewElementType(*selected_element),
                                 "AI Review does not support the selected element type."));
         events_.Emit(StatusMessageEvent{"AI Review does not support the selected element type."});
         return;
     }
 
-    ai::AiReviewPayload payload;
+    review::AiReviewPayload payload;
     std::string payload_error;
-    if (!ai::BuildAiReviewPayload(*assurance_case, current_tree, selected_element_id, payload, payload_error)) {
+    if (!review::BuildAiReviewPayload(*assurance_case, current_tree, selected_element_id, payload, payload_error)) {
         ReplaceAiReviewWithSingleItem(review_controller_,
                                       selected_element_id,
                                       ReviewCommentPrefix(selected_element_id, review_profile_id),
@@ -319,9 +280,10 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     const core::TreeNode* selected_node = core::FindTreeNode(current_tree, selected_element_id);
-    AiReviewGuidelineSelection guideline_selection =
-        review_profile_id.empty() ? SelectReviewProfileForElement(guideline_catalog, *selected_element, selected_node)
-                                  : SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
+    review::AiReviewGuidelineSelection guideline_selection =
+        review_profile_id.empty()
+            ? review::SelectReviewProfileForElement(guideline_catalog, *selected_element, selected_node)
+            : review::SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
 
     if (!guideline_selection.error_message.empty()) {
         ReplaceAiReviewWithSingleItem(review_controller_,
@@ -351,7 +313,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     if (guideline_selection.review_profile &&
-        !ai::IsReviewProfileCompatibleWithElement(
+        !review::IsReviewProfileCompatibleWithElement(
             *guideline_selection.review_profile, *selected_element, selected_node)) {
         const std::string message = "SCCG review profile '" + guideline_selection.review_profile->display_name +
                                     "' does not apply to the selected element type.";
@@ -365,14 +327,14 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    ai::AiReviewDataPackageBundle data_packages;
+    review::AiReviewDataPackageBundle data_packages;
     std::string data_package_error;
-    if (!ai::CollectAiReviewDataPackages(*assurance_case,
-                                         current_tree,
-                                         selected_element_id,
-                                         guideline_selection.review_profile,
-                                         data_packages,
-                                         data_package_error)) {
+    if (!review::CollectAiReviewDataPackages(*assurance_case,
+                                             current_tree,
+                                             selected_element_id,
+                                             guideline_selection.review_profile,
+                                             data_packages,
+                                             data_package_error)) {
         ReplaceAiReviewWithSingleItem(
             review_controller_,
             selected_element_id,
@@ -402,7 +364,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    pending_review_ = ai::BuildAiReviewRequestArtifacts(
+    pending_review_ = review::BuildAiReviewRequestArtifacts(
         payload, guideline_selection.guidelines, guideline_selection.review_profile, &data_packages);
     pending_review_element_id_ = payload.selected.id;
     pending_review_element_type_ = payload.selected.type;
@@ -503,8 +465,8 @@ void AiReviewController::PollTask() {
     }
 
     last_raw_response_ = response.text.empty() ? response.rawJson : response.text;
-    ai::AiReviewParseResult parse_result =
-        ai::ParseAiReviewResponse(last_raw_response_, pending_review_element_id_, pending_guideline_ids_);
+    review::AiReviewParseResult parse_result =
+        review::ParseAiReviewResponse(last_raw_response_, pending_review_element_id_, pending_guideline_ids_);
     if (!parse_result.errorMessage.empty()) {
         last_parse_error_ = parse_result.errorMessage;
         std::string message = "AI response could not be parsed as the expected JSON format.";

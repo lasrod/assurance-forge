@@ -1,4 +1,4 @@
-#include "ai/ai_claim_review.h"
+#include "review/sccg/sccg_review.h"
 
 #include "core/string_utils.h"
 
@@ -7,7 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
-namespace ai {
+namespace review {
 namespace {
 
 const char* kAiReviewSystemInstruction =
@@ -817,4 +817,4 @@ ParsedAiReviewResponse ParseAiReviewResponse(const std::string& response_text,
     return result;
 }
 
-} // namespace ai
+} // namespace review

@@ -3,6 +3,8 @@
 #include "app/actions/ai_review_actions.h"
 #include "app/app_runtime_state.h"
 #include "core/guideline_catalog.h"
+#include "review/sccg/sccg_profile_selector.h"
+#include "review/sccg/sccg_review.h"
 #include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
 
@@ -53,16 +55,17 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
 
     const ui::UiState& ui_state = ui::GetUiState();
     const parser::AssuranceCase* loaded_case = GetLoadedCase();
-    const parser::SacmElement* selected_element = loaded_case && !ui_state.selected_element_id.empty()
-                                                      ? ai::FindSacmElement(*loaded_case, ui_state.selected_element_id)
-                                                      : nullptr;
+    const parser::SacmElement* selected_element =
+        loaded_case && !ui_state.selected_element_id.empty()
+            ? review::FindSacmElement(*loaded_case, ui_state.selected_element_id)
+            : nullptr;
     const core::TreeNode* selected_node = core::FindTreeNode(impl_->current_tree, ui_state.selected_element_id);
     const bool review_running = impl_->ai.review_controller->IsReviewRunning();
 
-    controllers::AiReviewGuidelineSelection profile_selection;
+    review::AiReviewGuidelineSelection profile_selection;
     if (impl_->guideline_catalog.has_value() && selected_element) {
         profile_selection =
-            controllers::SelectReviewProfileForElement(*impl_->guideline_catalog, *selected_element, selected_node);
+            review::SelectReviewProfileForElement(*impl_->guideline_catalog, *selected_element, selected_node);
     }
 
     const bool ai_review_enabled =
