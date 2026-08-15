@@ -90,12 +90,36 @@ void Session::set_client_label(std::string label) {
 
 bool Session::ConnectToApplication(std::string& error) {
     // Discovery is by running instance, not by project (ADR 0014): every
-    // instance publishes one record, and this project-bound session picks the
-    // live instance whose project fingerprint matches the project it was
-    // launched for. Stale records are pruned on the way.
+    // instance publishes one record. A project-bound session picks the live
+    // instance whose project fingerprint matches the project it was launched
+    // for; a dynamic session connects to the single running instance,
+    // unbound. Stale records are pruned on the way.
     bridge::InstanceRecord record;
-    if (!bridge::FindInstanceForProject(project_path_, record, error)) {
-        return false;
+    if (dynamic_) {
+        bridge::PruneStaleInstanceRecords();
+        std::vector<bridge::InstanceRecord> live;
+        for (bridge::InstanceRecord& candidate : bridge::EnumerateInstanceRecords()) {
+            if (bridge::IsProcessAlive(candidate.pid)) {
+                live.push_back(std::move(candidate));
+            }
+        }
+        last_discovery_count_ = static_cast<int>(live.size());
+        if (live.empty()) {
+            error = "No running Assurance Forge was found.";
+            return false;
+        }
+        if (live.size() > 1u) {
+            // Never auto-select. Choosing the newest is choosing a safety
+            // case by timestamp; the explicit selection flow arrives with the
+            // access grants.
+            error = "More than one Assurance Forge is running. This session never picks one by itself.";
+            return false;
+        }
+        record = std::move(live.front());
+    } else {
+        if (!bridge::FindInstanceForProject(project_path_, record, error)) {
+            return false;
+        }
     }
     if (!bridge::IsSupportedProtocol(record.protocol)) {
         error = bridge::UnsupportedProtocolMessage(record.protocol);
@@ -116,8 +140,10 @@ bool Session::ConnectToApplication(std::string& error) {
     hello.op = bridge::kHelloOperation;
     hello.token = token_;
     hello.args = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp" : client_label_},
-                                {"session", session_id_},
-                                {"projectKey", bridge::ProjectKey(project_path_)}};
+                                {"session", session_id_}};
+    if (!dynamic_) {
+        hello.args["projectKey"] = bridge::ProjectKey(project_path_);
+    }
 
     std::string reply;
     if (!connection_->WriteMessage(bridge::EncodeRequest(hello)) || !connection_->ReadMessage(reply)) {
@@ -164,9 +190,30 @@ bool Session::OpenOffline(std::string& error) {
 std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     error.clear();
 
-    if (config.project_path.empty()) {
-        error = "No project path was given. Pass --project <path>.";
+    if (config.offline_only && config.project_path.empty()) {
+        error = "Explicit offline mode needs a path. Pass --offline-project <path>.";
         return nullptr;
+    }
+
+    std::unique_ptr<Session> session(new Session());
+    session->project_path_ = config.project_path;
+    session->settings_path_ = config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
+    session->session_id_ = bridge::GenerateToken();
+    session->never_connect_ = config.never_connect || config.offline_only;
+    session->offline_only_ = config.offline_only;
+
+    // Dynamic mode: no configured project. The session must initialize even
+    // with no application running -- MCP clients launch this process at client
+    // startup -- so a failed first discovery is a state, not an error.
+    if (config.project_path.empty()) {
+        session->dynamic_ = true;
+        std::string connect_error;
+        if (!config.never_connect && session->ConnectToApplication(connect_error)) {
+            session->mode_ = Mode::Connected;
+        } else {
+            session->mode_ = Mode::Offline;
+        }
+        return session;
     }
 
     std::error_code ec;
@@ -175,11 +222,14 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
         return nullptr;
     }
 
-    std::unique_ptr<Session> session(new Session());
-    session->project_path_ = config.project_path;
-    session->settings_path_ = config.settings_path.empty() ? core::UserSettingsFilePath() : config.settings_path;
-    session->session_id_ = bridge::GenerateToken();
-    session->never_connect_ = config.never_connect;
+    if (config.offline_only) {
+        session->mode_ = Mode::Offline;
+        if (!session->OpenOffline(error)) {
+            return nullptr;
+        }
+        session->offline_loaded_ = true;
+        return session;
+    }
 
     // The running application first. It has the argument the user is looking at,
     // including edits that have not reached disk, so any copy this process could
@@ -203,6 +253,19 @@ bool Session::EnsureConnected() {
         return true;
     }
     if (never_connect_) {
+        return false;
+    }
+
+    if (dynamic_) {
+        // Discovery is one directory enumeration; no retry loop. Absent is
+        // the ordinary case and must stay free, and mid-restart heals on the
+        // caller's next call.
+        std::string error;
+        if (ConnectToApplication(error)) {
+            mode_ = Mode::Connected;
+            return true;
+        }
+        mode_ = Mode::Offline;
         return false;
     }
 
@@ -238,7 +301,31 @@ Session::OperationResult Session::DescribeConnection() {
         {"project_path", project_path_.string()},
         {"consent_granted", consent},
     };
-    if (connection_ != nullptr) {
+    if (dynamic_) {
+        if (connection_ != nullptr) {
+            result.payload["mode"] = "connected_unbound";
+            result.payload["application_version"] = application_version_;
+            result.payload["detail"] =
+                "Connected to a running Assurance Forge, but this session is not bound to a project, so "
+                "project content is refused with project_access_required. Until access grants are "
+                "available, launch assurance-forge-mcp with --project <path> to bind the session.";
+        } else if (last_discovery_count_ > 1) {
+            result.payload["mode"] = "multiple_applications";
+            result.payload["detail"] =
+                "More than one Assurance Forge is running, and this session never picks one by itself. "
+                "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
+                "the project directly.";
+        } else {
+            result.payload["mode"] = "application_unavailable";
+            result.payload["detail"] =
+                "Start Assurance Forge and open a project. This session will discover it automatically.";
+        }
+    } else if (offline_only_) {
+        result.payload["mode"] = "offline_read_only";
+        result.payload["detail"] = "Explicit offline mode (--offline-project). Reads serve the accepted case "
+                                   "this process loaded from disk; draft tools are refused, and the session "
+                                   "never connects to a running application.";
+    } else if (connection_ != nullptr) {
         result.payload["mode"] = "connected";
         result.payload["application_version"] = application_version_;
         result.payload["detail"] = "Connected to a running Assurance Forge. Reads answer from the integrated "
@@ -312,12 +399,16 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
     if (!IsOfflineOperation(op)) {
         result.is_error = true;
         result.needs_application = true;
-        result.payload = nlohmann::json{{"error",
-                                         "This needs Assurance Forge to be running with the project open. The running "
-                                         "application is the sole owner of the integrated draft, shows every staged "
-                                         "change to the user, and enforces revision checks between contributors. A "
-                                         "headless copy cannot safely do that. Open the project in Assurance Forge and "
-                                         "retry; the session connects automatically on the next call."}};
+        result.payload = nlohmann::json{
+            {"error",
+             offline_only_ ? "This needs Assurance Forge to be running with the project open, and this session was "
+                             "launched in explicit offline mode (--offline-project), which never connects. Restart "
+                             "the session without --offline-project to work against the running application."
+                           : "This needs Assurance Forge to be running with the project open. The running "
+                             "application is the sole owner of the integrated draft, shows every staged "
+                             "change to the user, and enforces revision checks between contributors. A "
+                             "headless copy cannot safely do that. Open the project in Assurance Forge and "
+                             "retry; the session connects automatically on the next call."}};
         return result;
     }
 
@@ -466,6 +557,16 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
     OperationResult result;
     result.is_error = true;
     result.needs_application = true;
+    if (dynamic_) {
+        result.payload = nlohmann::json{
+            {"error",
+             last_discovery_count_ > 1
+                 ? "More than one Assurance Forge is running, and this session never picks one by itself. "
+                   "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
+                   "the project directly."
+                 : "Start Assurance Forge and open a project. This session will discover it automatically."}};
+        return result;
+    }
     result.payload = nlohmann::json{
         {"error",
          "Assurance Forge is not reachable, and this session holds no offline copy to read from. Start "

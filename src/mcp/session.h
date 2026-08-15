@@ -1,6 +1,6 @@
 #pragma once
 
-// One MCP connection's view of an Assurance Forge project, in one of two modes.
+// One MCP connection's view of an Assurance Forge project.
 //
 // **Connected.** Assurance Forge has this project open. The session holds no
 // model of its own; every operation goes over the bridge and is answered by the
@@ -12,6 +12,19 @@
 // itself and answers reads from accepted SACM. It is **read-only**. A headless
 // process cannot own the user's integrated draft or present unaccepted changes,
 // and a second project writer is exactly the fault this design removes.
+//
+// **Dynamic** (no configured project, ADR 0014). The session initializes with
+// nothing -- no application, no project -- and discovers the running instance
+// at call time. It connects *unbound*: the application serves it no project
+// content, and every project operation is refused with
+// `project_access_required` until an access grant binds the session to the
+// open project. The grant flow is the next phase; until it exists a dynamic
+// session can report status and nothing else, which is the fail-closed
+// reading of ADR 0014's second gate.
+//
+// **Explicit offline** (`--offline-project`). The offline mode above, chosen
+// deliberately: reads accepted SACM from the named path, never connects, and
+// never promotes itself to a running application.
 //
 // The mode is re-evaluated on every call. MCP clients launch this process at
 // *client* startup, so "the application is not running yet" and "the
@@ -51,7 +64,9 @@ public:
     };
 
     struct Config {
-        // A project directory, a project manifest, or a bare SACM file.
+        // A project directory, a project manifest, or a bare SACM file. Empty
+        // means a dynamic session: discover the running application at call
+        // time and connect unbound.
         std::filesystem::path project_path;
         // Empty resolves to core::UserSettingsFilePath(). Tests point this at a
         // temporary file so a developer's real consent setting cannot make a
@@ -60,6 +75,9 @@ public:
         // Tests set this to keep a session offline even when the developer
         // happens to have the project open in Assurance Forge.
         bool never_connect = false;
+        // --offline-project: read the named path's accepted SACM, read-only,
+        // and never look for a running application. Requires project_path.
+        bool offline_only = false;
     };
 
     static std::unique_ptr<Session> Open(Config config, std::string& error);
@@ -148,6 +166,14 @@ private:
     std::string token_;
     std::string application_version_;
     std::uint64_t next_request_id_ = 1;
+
+    // No configured project: discover at call time, connect unbound.
+    bool dynamic_ = false;
+    // --offline-project: never discover, never connect, never promote.
+    bool offline_only_ = false;
+    // How many live instances the last dynamic discovery saw. Zero and one
+    // explain themselves; more than one is reported rather than auto-picked.
+    int last_discovery_count_ = 0;
 
     std::filesystem::path project_path_;
     // Resolved once at open so every consent read hits the same file.

@@ -1769,6 +1769,9 @@ flowchart LR
 
 ### Phase A1 — Extract the review layer
 
+**Status: complete** — merged in
+[#391](https://github.com/lasrod/assurance-forge/pull/391).
+
 #### Tasks
 
 - [ ] Add `src/review` and its CMake target.
@@ -1914,6 +1917,9 @@ flowchart LR
 
 ### Phase B1 — Application-level discovery
 
+**Status: complete** — merged in
+[#392](https://github.com/lasrod/assurance-forge/pull/392).
+
 #### Tasks
 
 - [ ] Replace project-keyed endpoint records with instance records.
@@ -1943,6 +1949,11 @@ flowchart LR
 ---
 
 ### Phase B2 — Dynamic MCP sessions
+
+**Status: implemented** — tracked in
+[#393](https://github.com/lasrod/assurance-forge/issues/393). Fail-closed
+interim: an unbound dynamic session receives no project content until the B3
+grant flow exists.
 
 #### Tasks
 

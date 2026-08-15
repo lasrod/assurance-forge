@@ -35,6 +35,11 @@ constexpr const char* kProjectNotActiveMessage =
     "operations resume automatically when the user opens it again; nothing from "
     "the newly opened project is shared with this session.";
 
+constexpr const char* kProjectAccessRequiredMessage =
+    "This session is not bound to a project and has no access grant, so project "
+    "content is not served to it. Until access grants are available, launch "
+    "assurance-forge-mcp with --project <path> to bind the session to a project.";
+
 long long CurrentProcessId() {
 #ifdef _WIN32
     return static_cast<long long>(GetCurrentProcessId());
@@ -322,25 +327,25 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
                     request.id, bridge::error_code::kBadRequest, "Hello requires a non-empty session id.")));
                 continue;
             }
+            // The project fingerprint is optional: a dynamic session connects
+            // unbound and receives no project content until a grant binds it.
+            // When present it must name the active project -- bound at hello,
+            // never rebound (ADR 0014).
             const nlohmann::json::const_iterator project_key = request.args.find("projectKey");
-            if (project_key == request.args.end() || !project_key->is_string() ||
-                project_key->get<std::string>().empty()) {
-                connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
-                    request.id, bridge::error_code::kBadRequest, "Hello requires a non-empty projectKey.")));
-                continue;
-            }
+            const bool wants_binding = project_key != request.args.end() && project_key->is_string() &&
+                                       !project_key->get<std::string>().empty();
 
             std::filesystem::path active_root;
+            bool project_open = false;
             {
                 const std::lock_guard<std::mutex> lock(mutex_);
-                if (project_key->get<std::string>() != active_project_key_) {
-                    // Bound at hello, never rebound: a session for project A
-                    // stays a session for project A (ADR 0014).
+                if (wants_binding && project_key->get<std::string>() != active_project_key_) {
                     connection->WriteMessage(bridge::EncodeResponse(bridge::MakeError(
                         request.id, bridge::error_code::kProjectNotActive, kProjectNotActiveMessage)));
                     continue;
                 }
                 active_root = active_project_root_;
+                project_open = !active_project_key_.empty();
             }
 
             const nlohmann::json::const_iterator client = request.args.find("client");
@@ -348,18 +353,25 @@ void AgentBridgeController::ServeConnection(std::shared_ptr<bridge::Connection> 
                 descriptor.client_label = client->get<std::string>();
             }
             descriptor.session_id = session->get<std::string>();
-            descriptor.project_key = project_key->get<std::string>();
+            descriptor.project_key = wants_binding ? project_key->get<std::string>() : std::string();
             UpdateConnectionIdentity(descriptor);
             initialized = true;
-            connection->WriteMessage(
-                bridge::EncodeResponse(bridge::MakeResult(request.id,
-                                                          nlohmann::json{
-                                                              {"protocol", bridge::kProtocolVersion},
-                                                              {"appVersion", app_version_},
-                                                              {"instanceId", instance_id_},
-                                                              {"projectRoot", active_root.generic_string()},
-                                                              {"connectionId", descriptor.id},
-                                                          })));
+            nlohmann::json greeting{
+                {"protocol", bridge::kProtocolVersion},
+                {"appVersion", app_version_},
+                {"instanceId", instance_id_},
+                {"connectionId", descriptor.id},
+            };
+            if (wants_binding) {
+                // The root is the bound session's own configuration echoed
+                // back. An unbound session gets only the coarse fact that a
+                // project is open -- which project stays undisclosed until a
+                // grant exists.
+                greeting["projectRoot"] = active_root.generic_string();
+            } else {
+                greeting["projectOpen"] = project_open;
+            }
+            connection->WriteMessage(bridge::EncodeResponse(bridge::MakeResult(request.id, greeting)));
             continue;
         }
 
@@ -421,6 +433,14 @@ int AgentBridgeController::PollPendingRequests(const OperationHandler& handler) 
     // moment, and holding the queue lock across it would block every connection
     // thread from enqueuing.
     for (const std::shared_ptr<PendingRequest>& pending : batch) {
+        if (pending->connection.project_key.empty()) {
+            // An unbound connection never reaches the handler, even when no
+            // project is open: the master consent flag alone must not
+            // disclose whatever the user opens next (ADR 0014 gate 2).
+            pending->response = bridge::MakeError(
+                pending->request.id, bridge::error_code::kProjectAccessRequired, kProjectAccessRequiredMessage);
+            continue;
+        }
         if (pending->connection.project_key != active_key) {
             // Checked here, on the frame thread that owns the active project,
             // so the decision and the execution cannot interleave with a
