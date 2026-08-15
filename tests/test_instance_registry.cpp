@@ -219,6 +219,35 @@ TEST_F(InstanceRegistryTest, EnumerationSkipsPartialAndCorruptRecords) {
     EXPECT_TRUE(bridge::EnumerateInstanceRecords().empty());
 }
 
+// Removal and pruning delete by id, so a record whose contents name a
+// different id than its filename would either survive pruning forever or
+// delete another instance's record. Such a file is not a record.
+TEST_F(InstanceRegistryTest, EnumerationSkipsARecordWhoseIdDoesNotMatchItsFilename) {
+    const bridge::InstanceRecord record = MakeRecord("af-original000000", OwnPid());
+    std::string error;
+    ASSERT_TRUE(bridge::WriteInstanceRecord(record, error)) << error;
+    std::filesystem::copy_file(bridge::InstancesDirectory() / "af-original000000.json",
+                               bridge::InstancesDirectory() / "af-copied00000000.json");
+
+    const std::vector<bridge::InstanceRecord> records = bridge::EnumerateInstanceRecords();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].instance_id, "af-original000000");
+}
+
+// The instance id becomes a filename. One that could name a path outside the
+// instances directory is refused before anything touches the filesystem.
+TEST_F(InstanceRegistryTest, RefusesAnInstanceIdThatCouldEscapeTheDirectory) {
+    std::string error;
+    for (const char* bad : {"", "../escape", "af/nested", "af\\nested", "c:evil", "AF-UPPER"}) {
+        bridge::InstanceRecord record = MakeRecord("af-placeholder000", OwnPid());
+        record.instance_id = bad;
+        EXPECT_FALSE(bridge::WriteInstanceRecord(record, error)) << "accepted: " << bad;
+        EXPECT_FALSE(error.empty());
+    }
+    // Removal with such an id must be a no-op rather than a path lookup.
+    bridge::RemoveInstanceRecord("../escape");
+}
+
 TEST_F(InstanceRegistryTest, RemovesTheRecordOnShutdown) {
     const bridge::InstanceRecord record = MakeRecord("af-removed0000000", OwnPid());
     std::string error;

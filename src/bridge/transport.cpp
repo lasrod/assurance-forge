@@ -181,8 +181,10 @@ public:
     }
 
 private:
-    BYTE user_buffer_[sizeof(TOKEN_USER) + SECURITY_MAX_SID_SIZE] = {};
-    BYTE system_sid_buffer_[SECURITY_MAX_SID_SIZE] = {};
+    // Aligned as the struct the API fills it with; a bare BYTE buffer is
+    // 1-aligned and the reinterpret_cast would be undefined behaviour.
+    alignas(TOKEN_USER) BYTE user_buffer_[sizeof(TOKEN_USER) + SECURITY_MAX_SID_SIZE] = {};
+    alignas(SID) BYTE system_sid_buffer_[SECURITY_MAX_SID_SIZE] = {};
     PACL acl_ = nullptr;
     SECURITY_DESCRIPTOR descriptor_{};
     SECURITY_ATTRIBUTES attributes_{};

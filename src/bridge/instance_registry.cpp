@@ -78,6 +78,14 @@ std::string RandomHex(int byte_count) {
     return hex.str();
 }
 
+// The instance id becomes a filename and a transport address. Restricting it
+// to this alphabet is what makes `RecordPathFor` unable to escape the
+// instances directory, whatever a future caller passes.
+bool IsSafeInstanceId(const std::string& instance_id) {
+    return !instance_id.empty() &&
+           instance_id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-") == std::string::npos;
+}
+
 std::filesystem::path RecordPathFor(const std::string& instance_id) {
     return InstancesDirectory() / (instance_id + ".json");
 }
@@ -95,7 +103,9 @@ void ApplyUserOnlyAclBestEffort(const std::filesystem::path& directory) {
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &process_token)) {
         return;
     }
-    BYTE user_buffer[sizeof(TOKEN_USER) + SECURITY_MAX_SID_SIZE] = {};
+    // Aligned as the struct the API fills it with; a bare BYTE buffer is
+    // 1-aligned and the reinterpret_cast would be undefined behaviour.
+    alignas(TOKEN_USER) BYTE user_buffer[sizeof(TOKEN_USER) + SECURITY_MAX_SID_SIZE] = {};
     DWORD user_size = 0;
     const BOOL got_user = GetTokenInformation(process_token, TokenUser, user_buffer, sizeof(user_buffer), &user_size);
     CloseHandle(process_token);
@@ -115,7 +125,7 @@ void ApplyUserOnlyAclBestEffort(const std::filesystem::path& directory) {
     access[0].Trustee.TrusteeType = TRUSTEE_IS_USER;
     access[0].Trustee.ptstrName = reinterpret_cast<LPWSTR>(user_sid);
 
-    BYTE system_sid_buffer[SECURITY_MAX_SID_SIZE] = {};
+    alignas(SID) BYTE system_sid_buffer[SECURITY_MAX_SID_SIZE] = {};
     DWORD system_sid_size = sizeof(system_sid_buffer);
     if (!CreateWellKnownSid(WinLocalSystemSid, nullptr, system_sid_buffer, &system_sid_size)) {
         return;
@@ -184,7 +194,12 @@ std::string InstanceAddress(const std::string& instance_id) {
 #ifdef _WIN32
     return "\\\\.\\pipe\\assurance-forge-" + instance_id;
 #else
-    return (InstancesDirectory() / (instance_id + ".sock")).string();
+    // The socket lives beside the instances directory, not inside it. The
+    // whole address must fit `sun_path` (104 bytes on macOS), and with a long
+    // home-directory fallback the extra "/instances" was measured to push a
+    // real address to 105. Records are enumerated, sockets are not, so only
+    // the records need the shared directory.
+    return (BridgeDirectory() / (instance_id + ".sock")).string();
 #endif
 }
 
@@ -194,8 +209,8 @@ std::string GenerateToken() {
 
 bool WriteInstanceRecord(const InstanceRecord& record, std::string& error) {
     error.clear();
-    if (record.instance_id.empty()) {
-        error = "An instance record needs an instance id.";
+    if (!IsSafeInstanceId(record.instance_id)) {
+        error = "An instance record needs an instance id of lowercase letters, digits and dashes.";
         return false;
     }
     const std::filesystem::path path = RecordPathFor(record.instance_id);
@@ -247,7 +262,7 @@ bool WriteInstanceRecord(const InstanceRecord& record, std::string& error) {
 }
 
 void RemoveInstanceRecord(const std::string& instance_id) {
-    if (instance_id.empty()) {
+    if (!IsSafeInstanceId(instance_id)) {
         return;
     }
     std::error_code ec;
@@ -259,7 +274,7 @@ bool IsProcessAlive(long long pid) {
         return false;
     }
 #ifdef _WIN32
-    const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
     if (process == nullptr) {
         // Access denied still proves existence -- it is some other user's
         // process, which cannot be one of ours, so treat it as not-alive for
@@ -290,9 +305,16 @@ std::vector<InstanceRecord> EnumerateInstanceRecords() {
             continue;
         }
         InstanceRecord record;
-        if (ParseRecordFile(entry.path(), record)) {
-            records.push_back(std::move(record));
+        if (!ParseRecordFile(entry.path(), record)) {
+            continue;
         }
+        // The id inside the file must be the id the file is named for.
+        // Removal and pruning delete by id, so a mismatched copy would either
+        // survive pruning forever or delete a different instance's record.
+        if (!IsSafeInstanceId(record.instance_id) || entry.path().stem().string() != record.instance_id) {
+            continue;
+        }
+        records.push_back(std::move(record));
     }
     return records;
 }
