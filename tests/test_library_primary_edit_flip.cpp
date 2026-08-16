@@ -310,6 +310,81 @@ TEST(LibraryPrimaryEditFlip, ProposalDescriptionEditOnAClaimIsRefusedRatherThanS
     EXPECT_NE(error.find("content"), std::string::npos) << "the refusal must name the field to use instead: " << error;
 }
 
+// A file can legitimately carry a relationship that is already structurally
+// broken -- this shape (an AssertedInference with a reasoning and a target but
+// no source) was produced by an earlier editing session and observed in the
+// wild. A cleanup proposal removes the orphaned strategy AND its dangling
+// relationship. The plan's deletion list is a before/after diff -- a set of
+// absences -- but deletes apply one at a time, and deleting the strategy scrubs
+// it out of the relationship, which (source already gone) drops the
+// relationship too. The plan's own delete of the relationship then finds
+// nothing. That must count as the absence it asked for, not a failure: refusing
+// made the draft that removes the broken pair impossible to accept in any
+// order.
+constexpr const char* kDanglingRelationshipSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="ACP1">
+  <name content="Broken relationship" />
+  <argumentPackage xmi:id="AP1">
+    <name content="Main" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <name lang="en" content="Top goal" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2">
+      <name lang="en" content="Sub goal" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S2">
+      <name lang="en" content="Orphaned strategy" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R1" source="G2" target="G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R2" reasoning="S2" target="G2">
+      <name />
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+
+TEST(LibraryPrimaryEditFlip, DeletingAStrategyAndItsDanglingRelationshipTogetherIsAccepted) {
+    std::unique_ptr<EditFixture> fixture = MakeFixture("dangling_rel_delete", true, kDanglingRelationshipSacm);
+    ASSERT_NE(fixture->document, nullptr);
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "remove-broken-branch";
+    const auto remove_op = [](const std::string& id) {
+        core::reviews::PatchOperation remove;
+        remove.type = core::reviews::PatchOperationType::RemoveElement;
+        core::reviews::ElementRef element;
+        element.existing_id = id;
+        remove.element = element;
+        return remove;
+    };
+    // Relationship first, strategy second -- the only order the parser-side
+    // rehearsal admits (removing the strategy first cascades the relationship
+    // there too, and the second operation no longer resolves). The library-side
+    // deletion list is a diff in MODEL order, which puts the strategy first
+    // regardless -- so a proposal that rehearses cleanly still hit the
+    // already-deleted refusal on the library.
+    proposal.operations.push_back(remove_op("R2"));
+    proposal.operations.push_back(remove_op("S2"));
+
+    parser::AssuranceCase rehearsed;
+    std::string error;
+    ASSERT_TRUE(core::commands::PreflightProposalAgainstLibrary(*fixture->document, proposal, {}, rehearsed, error))
+        << error;
+    EXPECT_EQ(FindElement(rehearsed, "S2"), nullptr);
+    EXPECT_EQ(FindElement(rehearsed, "R2"), nullptr);
+    EXPECT_NE(FindElement(rehearsed, "G2"), nullptr) << "only the broken pair goes";
+
+    // And the real commit takes the same path to the same result.
+    core::commands::ApplyProposalCommand command(proposal);
+    core::commands::CommandContext context = MakeContext(*fixture);
+    const core::commands::CommandResult committed = RunCommand(*fixture, command, context);
+    ASSERT_TRUE(committed.success) << committed.error;
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(fixture->model),
+              core::reviews::ComputeModelSemanticHash(rehearsed));
+}
+
 TEST(LibraryPrimaryEditFlip, CreateSequenceMatchesLegacyIdsAndCanonicalHash) {
     std::unique_ptr<EditFixture> library_side = MakeFixture("create_library", /*library_backed=*/true);
     std::unique_ptr<EditFixture> legacy_side = MakeFixture("create_legacy", /*library_backed=*/false);

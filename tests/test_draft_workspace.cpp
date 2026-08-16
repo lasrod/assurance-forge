@@ -1241,6 +1241,63 @@ TEST(DraftWorkspace, AcceptingADependentChangeTakesWhatItNeedsAndSaysSo) {
     EXPECT_EQ(promoted->content, "Identified hazards are mitigated to ALARP.");
 }
 
+TEST(DraftWorkspace, AnUnsubmittedGroupWithStagedWorkIsRefusedPromotion) {
+    Fixture fixture;
+    const std::string wording = fixture.BeginGroup("Clarify the top goal", "SCCG AI Review");
+    fixture.Stage(wording, {UpdateTextOp("G1", "Clarified.")});
+
+    // Not submitted. Accept cannot commit a change its author is still writing
+    // (ADR 0010), and the refusal has to happen in the plan -- before the
+    // accepted argument is touched.
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {wording}, "Jesper");
+    EXPECT_FALSE(plan.ok);
+    EXPECT_NE(plan.error.find("still being written"), std::string::npos) << plan.error;
+}
+
+TEST(DraftWorkspace, AnEmptyGroupNeitherBlocksAcceptanceNorSurvivesIt) {
+    Fixture fixture;
+    const std::string wording = fixture.BeginGroup("Clarify the top goal");
+    fixture.Stage(wording, {UpdateTextOp("G1", "Clarified.")});
+    fixture.Submit(wording);
+
+    // The shell a failed staging leaves behind: a group that was opened and
+    // never landed anything. The banner does not count it as an unaccepted
+    // change, so accepting everything the banner shows must not be refused
+    // because of it -- that refusal blocked every Accept All in a project until
+    // the user found and discarded a group no view was showing them.
+    std::string error;
+    const std::string shell = fixture.store.BeginGroup(
+        [] {
+            core::drafts::DraftGroupRequest request;
+            request.title = "My edits";
+            request.source = core::drafts::DraftSource::Human;
+            request.source_label = "Jesper";
+            return request;
+        }(),
+        fixture.accepted,
+        error);
+    ASSERT_FALSE(shell.empty()) << error;
+
+    const core::drafts::DraftPromotionPlan plan =
+        core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {wording, shell}, "Jesper");
+    ASSERT_TRUE(plan.ok) << plan.error;
+    const core::SacmElement* promoted_claim = FindElement(plan.promoted_model, "G1");
+    ASSERT_NE(promoted_claim, nullptr);
+    EXPECT_EQ(promoted_claim->content, "Clarified.");
+
+    // The shell contributed nothing, so its label is not an author of what was
+    // accepted.
+    EXPECT_EQ(core::drafts::DraftPromotionAuthor(*fixture.store.workspace(), plan.closure, "fallback"), "Claude Code");
+
+    // Riding along in the closure is what sweeps it: with the shell promoted
+    // away alongside the real work, nothing is left, and the workspace is
+    // consumed instead of lingering with a group no banner will ever count.
+    ASSERT_TRUE(fixture.store.BeginPromotion(plan.closure, plan.promoted_model, error)) << error;
+    ASSERT_TRUE(fixture.store.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) << error;
+    EXPECT_FALSE(fixture.store.has_workspace());
+}
+
 TEST(DraftWorkspace, PromotionIsRefusedWhenTheRemainderCannotBeRebased) {
     Fixture fixture;
     const std::string creator = fixture.BeginGroup("Add a sub-claim");

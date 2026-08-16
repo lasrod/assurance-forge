@@ -15,6 +15,7 @@
 #include "sacm/model/element_id.h"
 #include "sacm/model/lang_string.h"
 #include "sacm/model/terminology.h"
+#include "sacm/validation/codes.h"
 
 #include <algorithm>
 #include <cctype>
@@ -915,6 +916,8 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
     outcome.supported = true;
     outcome.applied = result.applied;
     for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        if (!result.applied && diagnostic.code == sacm::validation::codes::kCmdTargetNotFound)
+            outcome.target_missing = true;
         outcome.diagnostics.push_back(LoadDiagnostic{
             .code = diagnostic.code,
             .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),
@@ -1088,6 +1091,8 @@ DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string&
     outcome.supported = true;
     outcome.applied = result.applied;
     for (const sacm::validation::Diagnostic& diagnostic : result.diagnostics) {
+        if (!result.applied && diagnostic.code == sacm::validation::codes::kCmdTargetNotFound)
+            outcome.target_missing = true;
         outcome.diagnostics.push_back(LoadDiagnostic{
             .code = diagnostic.code,
             .severity = std::string(sacm::validation::severity_name(diagnostic.severity)),

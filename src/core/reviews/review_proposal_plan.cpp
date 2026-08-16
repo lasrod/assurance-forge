@@ -390,6 +390,15 @@ bool ApplyProposalPlanToLibrary(sacm_adapter::LibraryDocument& document,
     for (const std::string& id : plan.deleted_ids) {
         const sacm_adapter::DeleteOutcome outcome = sacm_adapter::apply_delete_element(document, id);
         if (!outcome.supported || !outcome.applied) {
+            // `deleted_ids` is a before/after diff -- a set of absences, not a
+            // sequence of independent commands. An earlier delete's reference
+            // scrub can take a listed relationship with it (deleting a strategy
+            // drops an inference the scrub leaves with no valid endpoints), and
+            // the absence this entry asks for already holds. Failing here made
+            // a draft that removed a strategy together with its dangling
+            // relationship impossible to accept in any order.
+            if (outcome.target_missing)
+                continue;
             out_error = "deleting " + id + " failed" +
                         (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
             return false;

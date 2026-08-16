@@ -294,6 +294,11 @@ AcpOutcome apply_create_confidence_argument_package(LibraryDocument& document,
 struct DeleteOutcome {
     bool supported = true;
     bool applied = false;
+    // The refusal was specifically "no element with that id". Distinguished
+    // because for some callers absence is the postcondition they were after: a
+    // proposal's deletion list is a before/after diff, and an earlier delete's
+    // reference scrub can legitimately have taken a listed relationship with it.
+    bool target_missing = false;
     std::vector<LoadDiagnostic> diagnostics;
 };
 

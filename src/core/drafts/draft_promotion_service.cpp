@@ -54,6 +54,10 @@ std::string DraftPromotionAuthor(const DraftWorkspace& workspace,
         const DraftChangeGroup* group = workspace.FindGroup(group_id);
         if (group == nullptr || group->source_label.empty())
             continue;
+        // An empty group contributes nothing to what is being accepted, so its
+        // label does not belong on the record of who wrote it.
+        if (group->operations.empty())
+            continue;
         if (std::find(labels.begin(), labels.end(), group->source_label) == labels.end())
             labels.push_back(group->source_label);
     }
@@ -205,6 +209,13 @@ DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
     for (const std::string& group_id : plan.closure) {
         for (const DraftChangeGroup& group : workspace.groups) {
             if (group.id != group_id || group.state != DraftGroupState::Building)
+                continue;
+            // A group with nothing staged has nothing "still being written".
+            // These shells exist -- a group whose first staging failed, or whose
+            // operations were all withdrawn -- and refusing the whole accept for
+            // one blocks real work behind an empty container. Compilation skips
+            // it; keeping it in the closure lets promotion sweep it away.
+            if (group.operations.empty())
                 continue;
             const std::string name = group.title.empty() ? group.id : group.title;
             plan.error = "\"" + name + "\" is still being written and has not been submitted by its author. " +

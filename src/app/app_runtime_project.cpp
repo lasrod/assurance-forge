@@ -1346,11 +1346,22 @@ bool AppRuntime::PromoteWorkingDraft(std::string& summary, std::string& error) {
     // say exactly what was left and why, instead of "accepted" over a banner
     // that still shows unaccepted changes.
     std::vector<std::string> selection;
+    int accepted = 0;
     int left_building = 0;
     for (const core::drafts::DraftChangeGroup* group : workspace->ActiveGroups()) {
         if (group->state == core::drafts::DraftGroupState::Ready || group->source == core::drafts::DraftSource::Human) {
+            // The user's own empty shell -- left behind when a staging failed or
+            // every edit was withdrawn -- holds nothing to accept, but it rides
+            // along so promotion sweeps it instead of leaving a workspace that
+            // no banner will ever show again. Only groups with content count in
+            // the outcome message; the banner never counted the shells.
             selection.push_back(group->id);
-        } else {
+            if (!group->operations.empty())
+                ++accepted;
+        } else if (!group->operations.empty()) {
+            // An empty group an agent has opened but not staged into is not an
+            // unaccepted change (the banner does not count it), so it is not
+            // "left for its author" either.
             ++left_building;
         }
     }
@@ -1360,7 +1371,7 @@ bool AppRuntime::PromoteWorkingDraft(std::string& summary, std::string& error) {
             ++needs_attention;
     }
 
-    if (selection.empty()) {
+    if (accepted == 0) {
         error = ui::i18n::trf("nothing is ready to accept -- {0} being written, {1} needing your attention",
                               std::to_string(left_building),
                               std::to_string(needs_attention));
@@ -1370,7 +1381,6 @@ bool AppRuntime::PromoteWorkingDraft(std::string& summary, std::string& error) {
     // Delegated rather than duplicated, so accept-all cannot skip the checks
     // accept-selected performs -- including the verification that the accepted
     // argument actually ended up holding the change.
-    const int accepted = static_cast<int>(selection.size());
     if (!PromoteDraftGroups(selection, error))
         return false;
 
@@ -1668,7 +1678,7 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     for (const std::string& group_id : group_ids) {
         for (const core::drafts::DraftChangeGroup& group : workspace->groups) {
             if (group.id == group_id && group.state == core::drafts::DraftGroupState::Building &&
-                group.source == core::drafts::DraftSource::Human) {
+                group.source == core::drafts::DraftSource::Human && !group.operations.empty()) {
                 std::string submit_error;
                 if (!impl_->draft_workspace.MarkGroupReady(group_id, submit_error)) {
                     // Continuing would hit the promotion plan's "still being
