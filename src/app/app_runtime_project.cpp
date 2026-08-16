@@ -1670,7 +1670,13 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
             if (group.id == group_id && group.state == core::drafts::DraftGroupState::Building &&
                 group.source == core::drafts::DraftSource::Human) {
                 std::string submit_error;
-                impl_->draft_workspace.MarkGroupReady(group_id, submit_error);
+                if (!impl_->draft_workspace.MarkGroupReady(group_id, submit_error)) {
+                    // Continuing would hit the promotion plan's "still being
+                    // written" refusal -- misleading for the user's own edits,
+                    // whose submission is this very accept.
+                    error = "Your edits could not be submitted for acceptance: " + submit_error;
+                    return false;
+                }
             }
         }
     }

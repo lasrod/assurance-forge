@@ -1314,8 +1314,11 @@ namespace {
 core::drafts::DraftPromotionPlan
 PromoteThroughStore(Fixture& fixture, const std::vector<std::string>& group_ids, std::uint64_t sequence) {
     for (const std::string& group_id : group_ids) {
-        std::string submit_error;
-        fixture.store.MarkGroupReady(group_id, submit_error);
+        const core::drafts::DraftChangeGroup* group = fixture.store.workspace()->FindGroup(group_id);
+        EXPECT_NE(group, nullptr) << group_id;
+        if (group != nullptr && group->state == core::drafts::DraftGroupState::Building) {
+            fixture.Submit(group_id);
+        }
     }
     const core::drafts::DraftPromotionPlan plan =
         core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, group_ids, "Jesper");
