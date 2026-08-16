@@ -648,6 +648,24 @@ TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
                                                      const std::string& term_id,
                                                      const TerminologyTermFields& fields);
 
+// (6b) The three Term fields that are neither text nor language-bearing, each
+// written on its own. `apply_update_terminology_term` above replaces a term
+// wholesale, including its description in ONE language -- routing a category
+// change through it would drop a translated definition on the way past. These
+// write exactly the field named and nothing else, so a term's classification
+// and provenance can be edited without touching what it says.
+//
+// `category_ids` replaces the term's whole category set; empty clears it. Each
+// id must resolve to a Category. `origin_id` empty clears the origin; otherwise
+// it must resolve to an element. The library validates both.
+EditOutcome apply_set_term_categories(LibraryDocument& document,
+                                      const std::string& term_id,
+                                      const std::vector<std::string>& category_ids);
+EditOutcome apply_set_term_external_reference(LibraryDocument& document,
+                                              const std::string& term_id,
+                                              const std::string& external_reference);
+EditOutcome apply_set_term_origin(LibraryDocument& document, const std::string& term_id, const std::string& origin_id);
+
 // (7) Delete a terminology package, category, or term, mirroring the primitive
 // the legacy delete mutators compose: `DeleteElement` with the
 // DeleteReferencingRelationships policy so no relationship is left dangling. This

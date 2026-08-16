@@ -105,8 +105,9 @@ patch vocabulary has no ACP operation, and adding one is an ADR 0009 decision
 with its own GSN review, so ACP authoring stays in the application.
 
 `list_terms` returns the case's terminology in term-domain names — each term's
-`value` (the word or phrase being defined), `name` and `definition` — in one
-call. Terms are ordinary elements to the other read tools too:
+`value` (the word or phrase being defined), `name`, `definition`, `categories`,
+`external_reference` and `origin`, plus the `categories` the case defines and
+the ids a term may be filed under — in one call. Terms are ordinary elements to the other read tools too:
 `get_case_overview` counts them under `term`, `find_elements` matches them by
 type or text, and `get_element` fetches one by id. What `list_terms` adds is
 the definition in the listing, which `find_elements` summaries omit, so an
@@ -159,11 +160,27 @@ client's work while still letting all of them reason about the same argument.
 
 Glossary work goes through the same change groups as argument edits:
 `CreateTerm` defines a term (`text` is the term itself, `new_value` its
-definition), `UpdateTerm` revises one field of an existing term (`value`,
-`definition` or `name`), and `RemoveTerm` deletes one. A staged term is visible
-to `list_terms` and the other reads in the working-draft view, revision-checked
-like every draft mutation, and lands in the SACM document only when a human
-promotes the group.
+definition), `UpdateTerm` revises one field of an existing term, and
+`RemoveTerm` deletes one. `CreateCategory` and `UpdateCategory` manage the
+categories terms are classified under (`text` is the category name, `new_value`
+its description). A staged term is visible to `list_terms` and the other reads
+in the working-draft view, revision-checked like every draft mutation, and
+lands in the SACM document only when a human promotes the group.
+
+`UpdateTerm` takes a `field` of `value`, `definition`, `name`, `category`
+(one or more category ids, space separated; empty clears them),
+`external_reference` (a citation string — a URL, a standard clause, a document)
+or `origin` (the id of the element the definition comes from). The last three
+are what answer the terminology check: it reports a term with no category, and
+a term with neither an external reference nor an origin, and before those
+fields were addressable an agent could read both findings and fix neither. A
+category id that does not resolve, or names something that is not a category,
+is refused at staging rather than at acceptance; an `origin` that looks like a
+citation string is refused with a pointer to `external_reference`.
+
+Each field is written by its own seam, so classifying a term cannot disturb its
+definition — routing the whole term through the library's replace-everything
+update would rewrite the definition in one language and drop its translations.
 
 A staged glossary is reviewable on its Draft Changes row, which lists each
 term and its definition in full — a term is deliberately not a GSN node, so
@@ -336,11 +353,13 @@ version control.
   the interactive proposal flow, and only visible in a document that has more
   than one.
 - **SCCG binding is a named subset plus advisory prose**, not "SCCG compliance".
-- **Terminology is terms only.** Categories, external references, term origins
-  and term-to-element associations are read and edited in the application; the
-  MCP vocabulary covers a term's value, name and definition. Created terms land
-  in the case's first terminology package (created on demand) — choosing among
-  several packages is not expressible.
+- **Terminology stops short of deletion and association.** Terms and categories
+  can be created and edited, including a term's categories, external reference
+  and origin. Removing a *category*, and associating a term with an element as
+  a visible context, stay in the application: a category deletion has cascade
+  semantics that need a confirmation the MCP surface cannot raise. Created
+  terms and categories land in the case's first terminology package (created on
+  demand) — choosing among several packages is not expressible.
 
 ## Verification
 

@@ -160,6 +160,21 @@ std::string TitleOf(const core::drafts::DraftWorkspace& workspace, const std::st
     return group->title;
 }
 
+// An element in the working model, or among those the draft removed. A category
+// a term names can be either: created by this group, already accepted, or gone.
+const core::SacmElement* FindElementInGroupView(const core::drafts::DraftMaterializationResult& result,
+                                                const std::string& element_id) {
+    for (const core::SacmElement& candidate : result.working_model.elements) {
+        if (candidate.id == element_id)
+            return &candidate;
+    }
+    for (const core::SacmElement& removed : result.change_index.removed) {
+        if (removed.id == element_id)
+            return &removed;
+    }
+    return nullptr;
+}
+
 // The terms a group touches, with their full text. A term has no canvas node
 // -- glossary content is deliberately not drawn as argument -- so the row is
 // the one place a reviewer can read what a staged definition actually says
@@ -198,6 +213,24 @@ std::vector<std::string> GlossaryLinesForGroup(const core::drafts::DraftMaterial
         std::string line = element->content.empty() ? element->id : element->content;
         if (!element->description.empty())
             line += ": " + element->description;
+        // Classification and source, or a group that only categorizes terms
+        // would list them with their definitions and show nothing of what it
+        // actually changed. Names where the category resolves, so the reviewer
+        // reads "Regulatory terms" rather than an id.
+        if (!element->category_refs.empty()) {
+            std::string categories;
+            for (const std::string& category_ref : element->category_refs) {
+                const core::SacmElement* category = FindElementInGroupView(result, category_ref);
+                const std::string label =
+                    (category != nullptr && !category->name.empty()) ? category->name : category_ref;
+                if (!categories.empty())
+                    categories += ", ";
+                categories += label;
+            }
+            line += " [" + categories + "]";
+        }
+        if (!element->external_reference.empty())
+            line += " (" + element->external_reference + ")";
         if (entry->change == core::drafts::DraftElementChange::Removed)
             line = ui::i18n::trf("{0} (removed)", line);
         lines.push_back(std::move(line));

@@ -230,6 +230,50 @@ TEST(DraftChangesPanel, AGlossaryGroupShowsItsTermsAndDefinitionsInFull) {
     EXPECT_TRUE(has_line("hazard: A system state that, with environmental conditions, could lead to harm."));
     EXPECT_TRUE(has_line("ALARP: Risk reduced as low as reasonably practicable."));
 
+    // A group that only classifies and cites terms must show what it changed.
+    // Listing the terms with their definitions and nothing else would read as a
+    // definition change, which is not what the reviewer is being asked to accept.
+    const std::string classify = fixture.BeginGroup(McpRequest("Classify the glossary"));
+    core::reviews::PatchOperation create_category;
+    create_category.type = core::reviews::PatchOperationType::CreateCategory;
+    create_category.create_ref = "$regulatory";
+    create_category.text = "Regulatory terms";
+    fixture.Stage(classify, {create_category});
+    // Materialized before the id is read: staging only rehearses the
+    // allocation, so the identity is not pinned until the draft is really
+    // materialized. An agent reads the same id out of its staging result.
+    fixture.Materialize();
+    const std::string category_id = fixture.IdentityFor(classify, "$regulatory");
+    ASSERT_FALSE(category_id.empty());
+
+    core::reviews::PatchOperation set_category;
+    set_category.type = core::reviews::PatchOperationType::UpdateTerm;
+    core::reviews::ElementRef alarp_ref;
+    alarp_ref.existing_id = fixture.IdentityFor(terms, "$alarp");
+    set_category.element = alarp_ref;
+    set_category.field = "category";
+    set_category.new_value = category_id;
+    core::reviews::PatchOperation set_source = set_category;
+    set_source.field = "external_reference";
+    set_source.new_value = "HSE R2P2, 2001";
+    fixture.Stage(classify, {set_category, set_source});
+    fixture.Materialize();
+
+    const ui::panels::DraftChangesPanelModel classified = app::areas::BuildDraftChangesPanelModel(fixture.state);
+    const ui::panels::DraftChangeRow* classify_row = FindRow(classified, classify);
+    ASSERT_NE(classify_row, nullptr);
+    ASSERT_FALSE(classify_row->glossary_lines.empty());
+    const auto mentions = [&](const std::string& needle) {
+        for (const std::string& line : classify_row->glossary_lines) {
+            if (line.find(needle) != std::string::npos)
+                return true;
+        }
+        return false;
+    };
+    // The category by name, not by the id the operation carried.
+    EXPECT_TRUE(mentions("[Regulatory terms]"));
+    EXPECT_TRUE(mentions("(HSE R2P2, 2001)"));
+
     // An argument-only group carries no glossary section at all.
     const ui::panels::DraftChangeRow* argument_row = FindRow(model, argument);
     ASSERT_NE(argument_row, nullptr);

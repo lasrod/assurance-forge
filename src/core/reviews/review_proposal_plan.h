@@ -77,11 +77,40 @@ struct ProposalPlan {
         std::string value;
         std::string name;
         std::string definition;
+        std::vector<std::string> category_refs;
+        std::string external_reference;
+        std::string origin_ref;
+    };
+
+    // A Category the proposal introduced, in the same TerminologyPackage a term
+    // would go in. Created before terms, because a term naming one is refused
+    // by the library until it resolves.
+    struct CreatedCategory {
+        std::string id;
+        std::string package_id; // empty = create the package too
+        std::string name;
+        std::string description;
+    };
+
+    // A term's classification and provenance. Separate from `text_writes`
+    // because these are not text and carry no language: the seams behind them
+    // write one field each, so editing a term's category cannot disturb its
+    // definition or the translations of it.
+    struct TermFieldWrite {
+        std::string term_id;
+        std::vector<std::string> category_refs;
+        std::string external_reference;
+        std::string origin_ref;
+        bool write_categories = false;
+        bool write_external_reference = false;
+        bool write_origin = false;
     };
 
     std::vector<CreatedElement> created;
     std::vector<Relationship> created_relationships;
+    std::vector<CreatedCategory> created_categories;
     std::vector<CreatedTerm> created_terms;
+    std::vector<TermFieldWrite> term_field_writes;
     std::vector<TextWrite> text_writes;
     std::vector<FlagWrite> flag_writes;
     std::vector<std::string> deleted_ids;

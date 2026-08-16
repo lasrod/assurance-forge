@@ -1891,6 +1891,47 @@ std::vector<std::string> plan_terminology_delete_cascade(const sacm::model::Docu
 
 } // namespace
 
+EditOutcome apply_set_term_categories(LibraryDocument& document,
+                                      const std::string& term_id,
+                                      const std::vector<std::string>& category_ids) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+    std::vector<sacm::model::ElementId> categories;
+    categories.reserve(category_ids.size());
+    for (const std::string& category : category_ids) {
+        const std::string normalized = normalize_ref(category);
+        if (!normalized.empty())
+            categories.emplace_back(normalized);
+    }
+    return applied_outcome(
+        doc.apply(sacm::commands::SetExpressionCategories{.element = id, .categories = std::move(categories)}));
+}
+
+EditOutcome apply_set_term_external_reference(LibraryDocument& document,
+                                              const std::string& term_id,
+                                              const std::string& external_reference) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+    return applied_outcome(doc.apply(sacm::commands::SetTermExternalReference{
+        .element = id, .external_reference = trim_whitespace(external_reference)}));
+}
+
+EditOutcome apply_set_term_origin(LibraryDocument& document, const std::string& term_id, const std::string& origin_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+    return applied_outcome(
+        doc.apply(sacm::commands::SetTermOrigin{.element = id, .origin = to_optional_id(normalize_ref(origin_id))}));
+}
+
 TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
                                                         const std::string& element_id,
                                                         bool cascade_external_references) {

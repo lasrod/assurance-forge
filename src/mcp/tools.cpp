@@ -147,8 +147,12 @@ nlohmann::json OperationsSchema() {
          "more than one language, state each new element in all of them in the one operation that "
          "creates it -- see \"translations\". Terminology: CreateTerm defines a glossary term "
          "(\"text\" is the term itself, \"new_value\" its definition; the containing terminology "
-         "package is created if the case has none), UpdateTerm revises one (\"field\" of \"value\", "
-         "\"definition\" or \"name\"), RemoveTerm deletes one."},
+         "package is created if the case has none), UpdateTerm revises one field of it, RemoveTerm "
+         "deletes one, and CreateCategory/UpdateCategory manage the categories terms are classified "
+         "under (\"text\" is the category name, \"new_value\" its description). A term with no "
+         "category, and one with neither an external reference nor an origin, are both reported by "
+         "the terminology check -- classify a term with UpdateTerm field \"category\", and cite its "
+         "source with field \"external_reference\"."},
         {"items",
          {{"type", "object"},
           {"properties",
@@ -183,7 +187,10 @@ nlohmann::json OperationsSchema() {
              {{"type", "string"},
               {"description",
                "For UpdateElementText: which field, e.g. \"content\". For UpdateTerm: \"value\", "
-               "\"definition\", or \"name\"."}}},
+               "\"definition\", \"name\", \"category\" (one or more category ids, space separated; "
+               "empty clears them), \"external_reference\" (a citation string such as a URL or a "
+               "standard clause), or \"origin\" (the id of the element the definition comes from). "
+               "For UpdateCategory: \"name\" or \"description\"."}}},
             {"old_value", {{"type", "string"}}},
             {"new_value",
              {{"type", "string"},
@@ -317,10 +324,12 @@ std::vector<ToolDefinition> BuildTools() {
     tools.push_back(ToolDefinition{
         "list_terms",
         "List the case's terminology: each term's value (the word or phrase being defined), its "
-        "name, and its definition. A term bounds what a word means everywhere the argument uses "
-        "it -- SCCG CL.5 flags claims that rely on unbounded terms. Read this before proposing "
-        "argument that leans on a term of art, and stage CreateTerm/UpdateTerm/RemoveTerm "
-        "operations to change the glossary the same way argument edits are staged.",
+        "name, definition, categories, external reference and origin, plus the categories the case "
+        "defines and the ids to classify a term under. A term bounds what a word means everywhere "
+        "the argument uses it -- SCCG CL.5 flags claims that rely on unbounded terms. Read this "
+        "before proposing argument that leans on a term of art, and stage CreateTerm, UpdateTerm, "
+        "RemoveTerm, CreateCategory and UpdateCategory operations to change the glossary the same "
+        "way argument edits are staged.",
         nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
         true,
         &ListTerms,

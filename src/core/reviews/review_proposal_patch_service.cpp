@@ -33,6 +33,8 @@ const char* PrefixFor(PatchOperationType type) {
         return "J";
     case PatchOperationType::CreateTerm:
         return "T";
+    case PatchOperationType::CreateCategory:
+        return "CAT";
     default:
         return "N";
     }
@@ -70,6 +72,8 @@ std::string ElementTypeFor(PatchOperationType type) {
         return "artifactreference";
     case PatchOperationType::CreateTerm:
         return "term";
+    case PatchOperationType::CreateCategory:
+        return "category";
     default:
         return {};
     }
@@ -84,6 +88,23 @@ std::string AssertionDeclarationFor(PatchOperationType type) {
     default:
         return {};
     }
+}
+
+// A whitespace-separated id list, the way XMI writes an idref list. Used for a
+// term's categories, where SACM 10.8 permits several.
+std::vector<std::string> SplitRefList(const std::string& value) {
+    std::vector<std::string> refs;
+    std::istringstream stream(value);
+    std::string ref;
+    while (stream >> ref) {
+        // A leading '#' is the XML-fragment spelling of a reference; tolerated
+        // and normalized so an agent copying an id out of a document works.
+        if (ref.front() == '#')
+            ref.erase(0, 1);
+        if (!ref.empty())
+            refs.push_back(ref);
+    }
+    return refs;
 }
 
 parser::SacmElement* FindElement(parser::AssuranceCase& model, const std::string& id) {
@@ -283,6 +304,25 @@ bool ApplyCreateOperation(const PatchOperation& operation,
         return true;
     }
 
+    // A Category has a name and a description and nothing else: no value, so
+    // `text` is its name rather than a value the way a term's is.
+    if (operation.type == PatchOperationType::CreateCategory) {
+        if (operation.text.empty()) {
+            error = "CreateCategory for " + operation.create_ref.value() +
+                    " needs \"text\": the category's name, such as \"Domain terms\".";
+            return false;
+        }
+        parser::SacmElement element;
+        element.id = id_it->second;
+        element.type = ElementTypeFor(operation.type);
+        WriteField(element.name, element.name_langs, operation.text, {});
+        if (!operation.new_value.empty() || !operation.translations.empty()) {
+            WriteField(element.description, element.description_langs, operation.new_value, operation.translations);
+        }
+        model.elements.push_back(std::move(element));
+        return true;
+    }
+
     // A new element has no primary text to fall back on, so translations
     // without it would create a node that renders empty for every reader who
     // has not switched languages -- an invisible claim in a safety argument.
@@ -386,7 +426,69 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
             WriteField(element->name, element->name_langs, operation.new_value, {});
             return true;
         }
-        error = "UpdateTerm field must be \"value\", \"definition\", or \"name\", not \"" + operation.field + "\".";
+        if (operation.field == kTermFieldCategory) {
+            // Space separated, matching the XMI convention for an idref list, so
+            // a term can carry the several categories SACM 10.8 allows. Empty
+            // clears them -- an uncategorized term is a reportable state, not an
+            // impossible one, so removing a category has to be expressible.
+            std::vector<std::string> categories;
+            for (const std::string& candidate : SplitRefList(operation.new_value)) {
+                const parser::SacmElement* category = FindElement(model, candidate);
+                if (category == nullptr) {
+                    error = "UpdateTerm names category " + candidate +
+                            ", which does not exist. Create it with a "
+                            "CreateCategory operation, or use an id from list_terms.";
+                    return false;
+                }
+                if (category->type != "category") {
+                    error = "UpdateTerm names " + candidate + " as a category, but it is a " + category->type + ".";
+                    return false;
+                }
+                categories.push_back(candidate);
+            }
+            element->category_refs = std::move(categories);
+            return true;
+        }
+        if (operation.field == kTermFieldExternalReference) {
+            element->external_reference = operation.new_value;
+            return true;
+        }
+        if (operation.field == kTermFieldOrigin) {
+            // An origin is a reference to the element the definition came from,
+            // not free text -- the library refuses one that does not resolve, so
+            // catching it here turns an acceptance-time failure into a staging
+            // message the agent can act on.
+            if (!operation.new_value.empty() && FindElement(model, operation.new_value) == nullptr) {
+                error = "UpdateTerm names origin " + operation.new_value +
+                        ", which does not exist. An origin is the id of the element the definition comes from; "
+                        "use \"external_reference\" for a citation string such as a URL or standard clause.";
+                return false;
+            }
+            element->origin_ref = operation.new_value;
+            return true;
+        }
+        error = "UpdateTerm field must be \"value\", \"definition\", \"name\", \"category\", "
+                "\"external_reference\", or \"origin\", not \"" +
+                operation.field + "\".";
+        return false;
+    case PatchOperationType::UpdateCategory:
+        if (element->type != "category") {
+            error = "UpdateCategory targets " + element_id + ", which is a " + element->type + ", not a category.";
+            return false;
+        }
+        if (operation.field == kCategoryFieldName) {
+            if (operation.new_value.empty()) {
+                error = "UpdateCategory on " + element_id + " would blank the category's name.";
+                return false;
+            }
+            WriteField(element->name, element->name_langs, operation.new_value, {});
+            return true;
+        }
+        if (operation.field == kCategoryFieldDescription) {
+            WriteField(element->description, element->description_langs, primary, operation.translations);
+            return true;
+        }
+        error = "UpdateCategory field must be \"name\" or \"description\", not \"" + operation.field + "\".";
         return false;
     case PatchOperationType::UpdateElementName:
         WriteField(element->name, element->name_langs, primary, operation.translations);
@@ -625,6 +727,7 @@ bool ApplyOperation(const PatchOperation& operation,
     case PatchOperationType::SetUndeveloped:
     case PatchOperationType::ClearUndeveloped:
     case PatchOperationType::UpdateTerm:
+    case PatchOperationType::UpdateCategory:
         return ApplyUpdateOperation(operation, model, generated_ids, error);
     case PatchOperationType::AddSupportedBy:
     case PatchOperationType::AddInContextOf:

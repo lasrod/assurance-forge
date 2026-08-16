@@ -357,7 +357,10 @@ TEST(McpServer, ListTermsReturnsValuesAndDefinitions) {
   </argumentPackage>
   <terminologyPackage xmi:id="TP1">
     <name content="Terminology" />
-    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" value="ALARP">
+    <terminologyElement xsi:type="sacm:Category" xmi:id="CAT1">
+      <name content="Regulatory terms" />
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" value="ALARP" category="CAT1" externalReference="HSE R2P2, 2001">
       <name content="ALARP" />
       <description xmi:id="d1">
         <content>
@@ -389,6 +392,17 @@ TEST(McpServer, ListTermsReturnsValuesAndDefinitions) {
     EXPECT_EQ(call.payload["terms"][0]["value"], "ALARP");
     EXPECT_EQ(call.payload["terms"][0]["definition"], "As low as reasonably practicable.");
 
+    // Classification and provenance, and the categories a term may be filed
+    // under. An agent asked to fix an uncategorized term needs the ids it is
+    // allowed to name; without them it invents one and the operation is refused.
+    ASSERT_EQ(call.payload["terms"][0]["categories"].size(), 1u);
+    EXPECT_EQ(call.payload["terms"][0]["categories"][0]["id"], "CAT1");
+    EXPECT_EQ(call.payload["terms"][0]["categories"][0]["name"], "Regulatory terms");
+    EXPECT_EQ(call.payload["terms"][0]["external_reference"], "HSE R2P2, 2001");
+    ASSERT_EQ(call.payload["category_count"], 1);
+    EXPECT_EQ(call.payload["categories"][0]["id"], "CAT1");
+    EXPECT_EQ(call.payload["categories"][0]["name"], "Regulatory terms");
+
     // The stage_operations schema must offer the terminology operations, or an
     // agent that can read terms still cannot propose one.
     const std::optional<nlohmann::json> tools = server.HandleMessage(Request("tools/list", nullptr, 55));
@@ -407,6 +421,17 @@ TEST(McpServer, ListTermsReturnsValuesAndDefinitions) {
         EXPECT_TRUE(has("CreateTerm")) << types.dump();
         EXPECT_TRUE(has("UpdateTerm")) << types.dump();
         EXPECT_TRUE(has("RemoveTerm")) << types.dump();
+        EXPECT_TRUE(has("CreateCategory")) << types.dump();
+        EXPECT_TRUE(has("UpdateCategory")) << types.dump();
+
+        // The field vocabulary has to be discoverable, or an agent that can see
+        // an uncategorized term still has to guess the name of the field that
+        // fixes it.
+        const std::string field_description =
+            tool["inputSchema"]["properties"]["operations"]["items"]["properties"]["field"]["description"]
+                .get<std::string>();
+        EXPECT_NE(field_description.find("category"), std::string::npos) << field_description;
+        EXPECT_NE(field_description.find("external_reference"), std::string::npos) << field_description;
     }
     EXPECT_TRUE(found_stage_operations);
 }

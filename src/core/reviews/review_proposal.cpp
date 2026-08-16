@@ -130,6 +130,7 @@ bool IsCreateOperation(PatchOperationType type) {
     case PatchOperationType::CreateAssumption:
     case PatchOperationType::CreateJustification:
     case PatchOperationType::CreateTerm:
+    case PatchOperationType::CreateCategory:
         return true;
     default:
         return false;
@@ -174,6 +175,10 @@ const char* PatchOperationTypeToString(PatchOperationType type) {
         return "UpdateTerm";
     case PatchOperationType::RemoveTerm:
         return "RemoveTerm";
+    case PatchOperationType::CreateCategory:
+        return "CreateCategory";
+    case PatchOperationType::UpdateCategory:
+        return "UpdateCategory";
     }
     return "UpdateElementText";
 }
@@ -198,6 +203,8 @@ bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& 
         {"CreateTerm", PatchOperationType::CreateTerm},
         {"UpdateTerm", PatchOperationType::UpdateTerm},
         {"RemoveTerm", PatchOperationType::RemoveTerm},
+        {"CreateCategory", PatchOperationType::CreateCategory},
+        {"UpdateCategory", PatchOperationType::UpdateCategory},
     };
     auto it = kTypes.find(value);
     if (it == kTypes.end())
@@ -352,6 +359,18 @@ std::string ComputeElementSemanticHash(const parser::SacmElement& element) {
     hash_translations("name_lang", element.name_langs);
     hash_translations("content_lang", element.content_langs);
     hash_translations("description_lang", element.description_langs);
+    // A term's classification and provenance are part of what it says, so a
+    // proposal written against an uncategorized term must not still look current
+    // after someone categorized it. Hashed only when set, on the same reasoning
+    // the translations above are: an element that has none hashes exactly as it
+    // did before these fields were covered, so proposals saved against one stay
+    // valid.
+    if (!element.external_reference.empty())
+        normalized << "external_reference:" << element.external_reference << '\n';
+    if (!element.origin_ref.empty())
+        normalized << "origin:" << element.origin_ref << '\n';
+    for (const std::string& category : element.category_refs)
+        normalized << "category:" << category << '\n';
     return WithHashPrefix(Sha256::HexDigest(normalized.str()));
 }
 
@@ -466,6 +485,7 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
         case PatchOperationType::RemoveElement:
         case PatchOperationType::UpdateTerm:
         case PatchOperationType::RemoveTerm:
+        case PatchOperationType::UpdateCategory:
             if (!operation.element.has_value()) {
                 result.reason =
                     "Operation " + std::string(PatchOperationTypeToString(operation.type)) + " is missing element_id.";
@@ -499,8 +519,16 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
             return result;
         }
         if (operation.type == PatchOperationType::UpdateTerm && operation.field != kTermFieldValue &&
-            operation.field != kTermFieldDefinition && operation.field != kTermFieldName) {
-            result.reason = "UpdateTerm operations must specify a field of \"value\", \"definition\", or \"name\".";
+            operation.field != kTermFieldDefinition && operation.field != kTermFieldName &&
+            operation.field != kTermFieldCategory && operation.field != kTermFieldExternalReference &&
+            operation.field != kTermFieldOrigin) {
+            result.reason = "UpdateTerm operations must specify a field of \"value\", \"definition\", \"name\", "
+                            "\"category\", \"external_reference\", or \"origin\".";
+            return result;
+        }
+        if (operation.type == PatchOperationType::UpdateCategory && operation.field != kCategoryFieldName &&
+            operation.field != kCategoryFieldDescription) {
+            result.reason = "UpdateCategory operations must specify a field of \"name\" or \"description\".";
             return result;
         }
     }

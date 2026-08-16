@@ -255,24 +255,11 @@ constexpr const char* kNotAppliedNote =
 } // namespace
 
 const std::vector<std::string>& PatchOperationTypeNames() {
-    static const std::vector<std::string> names{"CreateClaim",
-                                                "CreateStrategy",
-                                                "CreateSolution",
-                                                "CreateContext",
-                                                "CreateAssumption",
-                                                "CreateJustification",
-                                                "UpdateElementText",
-                                                "UpdateElementName",
-                                                "SetUndeveloped",
-                                                "ClearUndeveloped",
-                                                "AddSupportedBy",
-                                                "RemoveSupportedBy",
-                                                "AddInContextOf",
-                                                "RemoveInContextOf",
-                                                "RemoveElement",
-                                                "CreateTerm",
-                                                "UpdateTerm",
-                                                "RemoveTerm"};
+    static const std::vector<std::string> names{
+        "CreateClaim",         "CreateStrategy",    "CreateSolution",    "CreateContext",     "CreateAssumption",
+        "CreateJustification", "UpdateElementText", "UpdateElementName", "SetUndeveloped",    "ClearUndeveloped",
+        "AddSupportedBy",      "RemoveSupportedBy", "AddInContextOf",    "RemoveInContextOf", "RemoveElement",
+        "CreateTerm",          "UpdateTerm",        "RemoveTerm",        "CreateCategory",    "UpdateCategory"};
     return names;
 }
 

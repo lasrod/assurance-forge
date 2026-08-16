@@ -37,14 +37,25 @@ enum class PatchOperationType {
     CreateTerm,
     UpdateTerm,
     RemoveTerm,
+    // A Category (clause 10.8) classifies terms. It is an element of type
+    // "category" whose `name` and `description` are its only content.
+    CreateCategory,
+    UpdateCategory,
 };
 
 // The `field` vocabulary UpdateTerm accepts. These are term-domain names an
 // agent can discover from the schema; the patch service maps them onto the flat
-// element's content/description/name.
+// element's content/description/name and its terminology fields.
 constexpr const char* kTermFieldValue = "value";
 constexpr const char* kTermFieldDefinition = "definition";
 constexpr const char* kTermFieldName = "name";
+constexpr const char* kTermFieldCategory = "category";
+constexpr const char* kTermFieldExternalReference = "external_reference";
+constexpr const char* kTermFieldOrigin = "origin";
+
+// The `field` vocabulary UpdateCategory accepts.
+constexpr const char* kCategoryFieldName = "name";
+constexpr const char* kCategoryFieldDescription = "description";
 
 struct ElementRef {
     std::optional<std::string> existing_id;

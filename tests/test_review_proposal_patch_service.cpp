@@ -627,6 +627,121 @@ TEST(ReviewProposalPatchServiceTest, UpdateTermRefusesNonTermsAndTranslatedValue
     }
 }
 
+TEST(ReviewProposalPatchServiceTest, CategoriesAndSourcesAreSetOnTermsThroughUpdateTerm) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    // The shape that answers the terminology check's two Info findings: a
+    // category to classify the term, and a citation for where it comes from.
+    core::reviews::PatchOperation create_category =
+        Create(core::reviews::PatchOperationType::CreateCategory, "$cat", "Regulatory terms");
+    create_category.new_value = "Terms drawn from regulation and standards.";
+    proposal.operations.push_back(create_category);
+
+    // A field value is a plain string, so the category is addressed by the id
+    // the create allocated rather than by its `$cat` handle. Previewing first is
+    // how an agent learns that id too -- staging reports it as a created id.
+    core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ProposalPreviewResult preview = service.BuildPreviewModel(proposal, model);
+    ASSERT_TRUE(preview.success) << preview.error;
+    const std::string category_id = preview.generated_ids.at("$cat");
+
+    core::reviews::PatchOperation classify;
+    classify.type = core::reviews::PatchOperationType::UpdateTerm;
+    classify.element = core::reviews::ElementRef{"T1", std::nullopt};
+    classify.field = "category";
+    classify.new_value = category_id;
+    proposal.operations.push_back(classify);
+
+    core::reviews::PatchOperation cite;
+    cite.type = core::reviews::PatchOperationType::UpdateTerm;
+    cite.element = core::reviews::ElementRef{"T1", std::nullopt};
+    cite.field = "external_reference";
+    cite.new_value = "HSE R2P2, 2001";
+    proposal.operations.push_back(cite);
+
+    const core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+    ASSERT_TRUE(result.success) << result.error;
+    ASSERT_EQ(result.generated_ids.at("$cat"), category_id);
+
+    const parser::SacmElement* category = FindElement(model, category_id);
+    ASSERT_NE(category, nullptr);
+    EXPECT_EQ(category->type, "category");
+    EXPECT_EQ(category->name, "Regulatory terms");
+    EXPECT_EQ(category->description, "Terms drawn from regulation and standards.");
+
+    const parser::SacmElement* term = FindElement(model, "T1");
+    ASSERT_NE(term, nullptr);
+    ASSERT_EQ(term->category_refs.size(), 1u);
+    EXPECT_EQ(term->category_refs.front(), category_id);
+    EXPECT_EQ(term->external_reference, "HSE R2P2, 2001");
+}
+
+TEST(ReviewProposalPatchServiceTest, UpdateTermRefusesACategoryThatIsNotOne) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+
+    // An id that does not exist, and one that exists but is a claim. Both are
+    // refused at staging rather than at acceptance: the library would reject
+    // them either way, and a message the agent gets while it is still building
+    // the group is one it can act on.
+    for (const std::string& bad_ref : {std::string("CAT_NOPE"), std::string("G1")}) {
+        core::reviews::ReviewProposal proposal = ProposalFor(model);
+        core::reviews::PatchOperation classify;
+        classify.type = core::reviews::PatchOperationType::UpdateTerm;
+        classify.element = core::reviews::ElementRef{"T1", std::nullopt};
+        classify.field = "category";
+        classify.new_value = bad_ref;
+        proposal.operations.push_back(classify);
+
+        core::reviews::ReviewProposalPatchService service;
+        core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+        EXPECT_FALSE(result.success) << bad_ref;
+        EXPECT_NE(result.error.find(bad_ref), std::string::npos);
+    }
+
+    // An origin has to resolve too -- it is an element reference, not a
+    // citation string, and the message says which field takes the other.
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+    core::reviews::PatchOperation origin;
+    origin.type = core::reviews::PatchOperationType::UpdateTerm;
+    origin.element = core::reviews::ElementRef{"T1", std::nullopt};
+    origin.field = "origin";
+    origin.new_value = "https://example.com/standard";
+    proposal.operations.push_back(origin);
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+    EXPECT_FALSE(result.success);
+    EXPECT_NE(result.error.find("external_reference"), std::string::npos);
+}
+
+TEST(ReviewProposalPatchServiceTest, ATermsClassificationIsPartOfItsSemanticHash) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+    const parser::SacmElement* before = FindElement(model, "T1");
+    ASSERT_NE(before, nullptr);
+    const std::string unclassified = core::reviews::ComputeElementSemanticHash(*before);
+
+    parser::SacmElement categorized = *before;
+    categorized.category_refs.push_back("CAT1");
+    const std::string classified = core::reviews::ComputeElementSemanticHash(categorized);
+
+    parser::SacmElement cited = *before;
+    cited.external_reference = "HSE R2P2, 2001";
+
+    // Otherwise a proposal written against an uncategorized term still looks
+    // current after someone categorized it, and accepting it would quietly
+    // revert their work.
+    EXPECT_NE(classified, unclassified);
+    EXPECT_NE(core::reviews::ComputeElementSemanticHash(cited), unclassified);
+
+    // A term that has none of these hashes exactly as it did before the fields
+    // were covered, so proposals saved against one stay valid.
+    parser::SacmElement untouched = *before;
+    EXPECT_EQ(core::reviews::ComputeElementSemanticHash(untouched), unclassified);
+}
+
 TEST(ReviewProposalPatchServiceTest, RemoveTermRemovesOnlyTerms) {
     parser::AssuranceCase model = MakeModel();
     model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));

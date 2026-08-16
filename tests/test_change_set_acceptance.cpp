@@ -7,6 +7,7 @@
 #include "core/commands/proposal_commands.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/library_package_projection.h"
+#include "core/terminology_package_service.h"
 #include "core/project_model.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
@@ -436,6 +437,91 @@ TEST(ChangeSetAcceptance, AcceptsTermEditsAgainstAnExistingGlossary) {
     EXPECT_EQ(packages.front().terms.front().value, "ALARP principle");
     EXPECT_EQ(packages.front().terms.front().description,
               "Risk reduced as low as reasonably practicable, per the safety case scope.");
+}
+
+// The reported case: a glossary written over MCP left every term flagged by the
+// terminology check -- no category, no external reference -- and the agent had
+// no operation that could answer either finding. This drives the fix through
+// the real validator: the findings exist first, the staged operations clear
+// them, and the classification survives into the saved file.
+TEST(ChangeSetAcceptance, ClassifyingAndCitingTermsClearsTheTerminologyFindings) {
+    ProjectFixture f = MakeFixture("term_findings", kTerminologySacm);
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    f.model = sacm_adapter::project_case(*loaded.document);
+
+    const auto findings_for = [](const sacm_adapter::LibraryDocument& document) {
+        const sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
+        std::map<core::TerminologyTermIssueKind, int> counts;
+        for (const sacm::TerminologyPackage& terminology : package.terminologyPackages) {
+            for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology))
+                ++counts[issue.kind];
+        }
+        return counts;
+    };
+
+    // Both fixture terms are uncategorized and uncited, which is exactly what
+    // the user saw after a glossary was written over MCP.
+    const std::map<core::TerminologyTermIssueKind, int> before = findings_for(*loaded.document);
+    EXPECT_EQ(before.at(core::TerminologyTermIssueKind::MissingCategory), 2);
+    EXPECT_EQ(before.at(core::TerminologyTermIssueKind::MissingExternalReference), 2);
+
+    core::changesets::ChangeSetStore store;
+    const std::string id = store.Begin(1, "Classify and cite the glossary", "", "", "claude-ai");
+    std::string error;
+    nlohmann::json operations = nlohmann::json::array({nlohmann::json{{"type", "CreateCategory"},
+                                                                      {"create_ref", "$regulatory"},
+                                                                      {"text", "Regulatory terms"},
+                                                                      {"new_value", "Terms drawn from regulation."}}});
+    ASSERT_TRUE(store.Stage(id, ParseOperations(operations), f.model, error)) << error;
+
+    // The id the category will get, reported by staging exactly as an agent
+    // reads it out of the stage_operations result.
+    const core::changesets::ChangeSetDiff staged = core::changesets::ComputeChangeSetDiff(*store.Find(id), f.model);
+    ASSERT_TRUE(staged.success) << staged.error;
+    const std::string category_id = staged.generated_ids.at("$regulatory");
+
+    nlohmann::json classify = nlohmann::json::array();
+    for (const std::string& term_id : {std::string("T1"), std::string("T2")}) {
+        classify.push_back(nlohmann::json{
+            {"type", "UpdateTerm"}, {"element", {{"id", term_id}}}, {"field", "category"}, {"new_value", category_id}});
+        classify.push_back(nlohmann::json{{"type", "UpdateTerm"},
+                                          {"element", {{"id", term_id}}},
+                                          {"field", "external_reference"},
+                                          {"new_value", "HSE R2P2, 2001"}});
+    }
+    ASSERT_TRUE(store.Stage(id, ParseOperations(classify), f.model, error)) << error;
+
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(store.Find(id)->proposal, f.model);
+    ASSERT_EQ(validity.validity, core::reviews::ProposalValidity::Valid) << validity.reason;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai");
+    ASSERT_TRUE(result.success) << result.error;
+
+    // The findings the user was left with are gone, judged by the same
+    // validator that raised them rather than by inspecting fields.
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(reloaded.ok);
+    const std::map<core::TerminologyTermIssueKind, int> after = findings_for(*reloaded.document);
+    EXPECT_EQ(after.count(core::TerminologyTermIssueKind::MissingCategory), 0u);
+    EXPECT_EQ(after.count(core::TerminologyTermIssueKind::MissingExternalReference), 0u);
+
+    const std::vector<sacm::TerminologyPackage> packages =
+        sacm_adapter::project_terminology_packages(*reloaded.document);
+    ASSERT_EQ(packages.size(), 1u);
+    ASSERT_EQ(packages.front().categories.size(), 1u);
+    EXPECT_EQ(packages.front().categories.front().name, "Regulatory terms");
+    for (const sacm::Term& term : packages.front().terms) {
+        ASSERT_EQ(term.category_refs.size(), 1u) << term.id;
+        EXPECT_EQ(term.category_refs.front(), category_id);
+        EXPECT_EQ(term.externalReference, "HSE R2P2, 2001");
+    }
 }
 
 // The application's Accept All, end to end, for a glossary staged over MCP into
