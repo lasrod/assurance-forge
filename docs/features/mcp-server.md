@@ -165,6 +165,11 @@ to `list_terms` and the other reads in the working-draft view, revision-checked
 like every draft mutation, and lands in the SACM document only when a human
 promotes the group.
 
+A staged glossary is reviewable on its Draft Changes row, which lists each
+term and its definition in full — a term is deliberately not a GSN node, so
+unlike an argument change there is no canvas rendering beside the row to read
+it from.
+
 When the case has no `terminologyPackage`, accepting the first `CreateTerm`
 creates one under the root assurance case package rather than refusing — a case
 with no glossary could otherwise never grow one over MCP. Definitions may carry

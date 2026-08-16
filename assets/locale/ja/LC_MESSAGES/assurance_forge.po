@@ -1015,6 +1015,9 @@ msgstr "生成済みレポート: {0}"
 msgid "Get started with Assurance Forge"
 msgstr "Assurance Forge の開始ガイド"
 
+msgid "Glossary:"
+msgstr "用語集:"
+
 msgid "Go"
 msgstr "移動"
 
@@ -2514,6 +2517,9 @@ msgstr "{0}\nクリックしてレビュータブを開きます。"
 
 msgid "{0}  by {1}"
 msgstr "{0}  作業者 {1}"
+
+msgid "{0} (removed)"
+msgstr "{0}（削除）"
 
 msgid "{0} ({1})"
 msgstr "{0} ({1})"

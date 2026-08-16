@@ -195,6 +195,47 @@ TEST(DraftChangesPanel, ARowNamesWhoWroteItAndWhy) {
     EXPECT_EQ(row->review_item_ids.front(), "RI-11");
 }
 
+TEST(DraftChangesPanel, AGlossaryGroupShowsItsTermsAndDefinitionsInFull) {
+    Fixture fixture;
+    const std::string terms = fixture.BeginGroup(McpRequest("Bound the safety vocabulary"));
+    core::reviews::PatchOperation hazard;
+    hazard.type = core::reviews::PatchOperationType::CreateTerm;
+    hazard.create_ref = "$hazard";
+    hazard.text = "hazard";
+    hazard.new_value = "A system state that, with environmental conditions, could lead to harm.";
+    core::reviews::PatchOperation alarp;
+    alarp.type = core::reviews::PatchOperationType::CreateTerm;
+    alarp.create_ref = "$alarp";
+    alarp.text = "ALARP";
+    alarp.new_value = "Risk reduced as low as reasonably practicable.";
+    fixture.Stage(terms, {hazard, alarp});
+
+    const std::string argument = fixture.BeginGroup(McpRequest("Develop the braking claim"));
+    fixture.Stage(argument, {CreateClaimOp("$sub", "Brake wear is monitored."), SupportOp("$sub", "G1")});
+    fixture.Materialize();
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(fixture.state);
+
+    // A term is deliberately not a GSN node, so unlike an argument change there
+    // is no canvas rendering beside this row to read it from. The row itself has
+    // to carry the full text -- a reviewer accepting a glossary is accepting the
+    // definitions, and "2 elements added" is not a reviewable statement of them.
+    const ui::panels::DraftChangeRow* glossary_row = FindRow(model, terms);
+    ASSERT_NE(glossary_row, nullptr);
+    ASSERT_EQ(glossary_row->glossary_lines.size(), 2u);
+    const auto has_line = [&](const std::string& line) {
+        return std::find(glossary_row->glossary_lines.begin(), glossary_row->glossary_lines.end(), line) !=
+               glossary_row->glossary_lines.end();
+    };
+    EXPECT_TRUE(has_line("hazard: A system state that, with environmental conditions, could lead to harm."));
+    EXPECT_TRUE(has_line("ALARP: Risk reduced as low as reasonably practicable."));
+
+    // An argument-only group carries no glossary section at all.
+    const ui::panels::DraftChangeRow* argument_row = FindRow(model, argument);
+    ASSERT_NE(argument_row, nullptr);
+    EXPECT_TRUE(argument_row->glossary_lines.empty());
+}
+
 TEST(DraftChangesPanel, RelationshipChangesAreCountedSeparatelyFromElements) {
     Fixture fixture;
     const std::string group = fixture.BeginGroup(McpRequest("Add a sub-claim"));

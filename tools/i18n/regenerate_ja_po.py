@@ -915,6 +915,8 @@ TRANSLATIONS = {
     'Depends on:': '前提とする変更:',
     'Draft Changes': 'ドラフトの変更',
     'Findings (advisory):': '指摘 (参考):',
+    'Glossary:': '用語集:',
+    '{0} (removed)': '{0}（削除）',
     'Guidelines: {0}': 'ガイドライン: {0}',
     'Keep them for review': '確認のために残す',
     'No unaccepted changes. The argument on screen is the accepted one.': '未受理の変更はありません。画面上の議論は受理済みのものです。',

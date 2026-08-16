@@ -5,6 +5,7 @@
 #include "core/audit/event_store.h"
 #include "core/commands/command_bus.h"
 #include "core/commands/proposal_commands.h"
+#include "core/drafts/draft_promotion_service.h"
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "parser/model_utils.h"
@@ -435,4 +436,85 @@ TEST(ChangeSetAcceptance, AcceptsTermEditsAgainstAnExistingGlossary) {
     EXPECT_EQ(packages.front().terms.front().value, "ALARP principle");
     EXPECT_EQ(packages.front().terms.front().description,
               "Risk reduced as low as reasonably practicable, per the safety case scope.");
+}
+
+// The application's Accept All, end to end, for a glossary staged over MCP into
+// a case that has never had one: draft groups -> promotion plan with compiled,
+// pinned identities -> preflight -> the audited command -> the saved file. This
+// is the path the change-set tests above DO NOT take -- they build the proposal
+// directly -- and it is the path a real MCP contribution is accepted through.
+TEST(ChangeSetAcceptance, AcceptAllPromotesADraftedGlossaryIntoTheSavedFile) {
+    ProjectFixture f = MakeFixture("term_draft_accept_all");
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(f.project.rootPath);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(f.sacm_abs, f.model, error)) << error;
+
+    core::drafts::DraftGroupRequest request;
+    request.title = "Bound the safety vocabulary";
+    request.source = core::drafts::DraftSource::Mcp;
+    request.source_label = "claude-ai";
+    request.source_session_id = "session-terms";
+    const std::string group = drafts.BeginGroup(request, f.model, error);
+    ASSERT_FALSE(group.empty()) << error;
+
+    nlohmann::json operations = nlohmann::json::array();
+    const std::vector<std::pair<std::string, std::string>> glossary = {
+        {"hazard", "A system state that, with environmental conditions, could lead to harm."},
+        {"ALARP", "Risk reduced as low as reasonably practicable."},
+        {"safe state", "A state with an acceptable level of risk."},
+    };
+    for (std::size_t index = 0; index < glossary.size(); ++index) {
+        operations.push_back(nlohmann::json{{"type", "CreateTerm"},
+                                            {"create_ref", "$term" + std::to_string(index)},
+                                            {"text", glossary[index].first},
+                                            {"new_value", glossary[index].second}});
+    }
+    ASSERT_TRUE(drafts.StageOperations(group, ParseOperations(operations), f.model, error)) << error;
+    ASSERT_TRUE(drafts.MarkGroupReady(group, error)) << error;
+
+    // The plan the application computes before touching anything.
+    const core::drafts::DraftPromotionPlan plan = core::drafts::PlanDraftPromotion(
+        *drafts.workspace(), f.model, {group}, "MCP: claude-ai", drafts.authoritative_identities());
+    ASSERT_TRUE(plan.ok) << plan.error;
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+
+    // The preflight the application requires before dispatch, and whose result
+    // it hash-compares against the real apply afterwards.
+    parser::AssuranceCase preflight_model;
+    ASSERT_TRUE(core::commands::PreflightProposalAgainstLibrary(
+        *loaded.document, plan.compiled.proposal, plan.compiled.identities, preflight_model, error))
+        << error;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai");
+    ASSERT_TRUE(result.success) << result.error;
+
+    // The post-apply verification the application performs before consuming the
+    // draft: a mismatch there keeps the draft and reports failure to the user.
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(sacm_adapter::project_case(*loaded.document)),
+              core::reviews::ComputeModelSemanticHash(preflight_model));
+
+    // What the user reopens: the saved file. The terminology panel reads the
+    // package projected from it, so the terms must be there, not merely in the
+    // in-memory document the command mutated.
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(reloaded.ok);
+    const std::vector<sacm::TerminologyPackage> packages =
+        sacm_adapter::project_terminology_packages(*reloaded.document);
+    ASSERT_EQ(packages.size(), 1u) << "accepting the first terms must create the terminology package";
+    ASSERT_EQ(packages.front().terms.size(), glossary.size());
+    for (const auto& [value, definition] : glossary) {
+        const auto found = std::find_if(packages.front().terms.begin(),
+                                        packages.front().terms.end(),
+                                        [&](const sacm::Term& term) { return term.value == value; });
+        ASSERT_NE(found, packages.front().terms.end()) << value << " missing from the saved glossary";
+        EXPECT_EQ(found->description, definition);
+    }
 }

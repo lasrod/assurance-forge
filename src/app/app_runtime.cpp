@@ -962,6 +962,24 @@ void AppRuntime::RebuildDerivedViewsIfNeeded() {
     impl_->problems_dirty.acp = true;
     impl_->problems_dirty.translation = true;
 
+    // The Project Explorer's SACM package tree is cached per file, and for a
+    // long time only the terminology actions invalidated it -- their edits were
+    // the only thing that changed the package structure. Promotion can now
+    // bring a TerminologyPackage into being (a glossary accepted from a draft),
+    // and every model mutation funnels through this rebuild, so the loaded
+    // file's cached tree is dropped here. Without this, an accepted glossary
+    // existed in the saved file and the terminology panel's data but the
+    // explorer -- the way a user navigates to it -- still showed the tree from
+    // before the promotion. Only the loaded file's entry: the other files'
+    // trees are rebuilt from disk, and this rebuild says nothing about them.
+    if (impl_->app_state.current_project.has_value() && !impl_->app_state.loaded_file_path.empty()) {
+        std::error_code relative_error;
+        const std::filesystem::path relative = std::filesystem::relative(
+            impl_->app_state.loaded_file_path, impl_->app_state.current_project->rootPath, relative_error);
+        if (!relative_error && !relative.empty())
+            impl_->sacm_package_tree_cache.erase(relative.generic_string());
+    }
+
     // The accepted model is current again, so a promotion's machine-written
     // translations can now be found and flagged.
     if (!impl_->translation_review_marks_pending_rebuild.empty()) {

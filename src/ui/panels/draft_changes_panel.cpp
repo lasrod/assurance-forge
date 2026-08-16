@@ -124,6 +124,11 @@ void RenderRow(const DraftChangeRow& row, const DraftChangesPanelCallbacks& call
     if (!row.review_item_ids.empty())
         ImGui::TextWrapped("%s", ui::i18n::trf("Review items: {0}", JoinIds(row.review_item_ids)).c_str());
 
+    if (!row.glossary_lines.empty()) {
+        ImGui::Spacing();
+        RenderLabelledList(AF_TR("Glossary:"), row.glossary_lines);
+    }
+
     ImGui::Spacing();
     RenderLabelledList(AF_TR("Depends on:"), row.depends_on_titles);
     // Named before the button is pressed, never after. Widening a selection

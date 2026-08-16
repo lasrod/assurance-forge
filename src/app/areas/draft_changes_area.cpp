@@ -160,6 +160,51 @@ std::string TitleOf(const core::drafts::DraftWorkspace& workspace, const std::st
     return group->title;
 }
 
+// The terms a group touches, with their full text. A term has no canvas node
+// -- glossary content is deliberately not drawn as argument -- so the row is
+// the one place a reviewer can read what a staged definition actually says
+// before accepting it. Post-state for adds and edits (what accepting produces),
+// the removed term's own text for removals.
+std::vector<std::string> GlossaryLinesForGroup(const core::drafts::DraftMaterializationResult& result,
+                                               const std::string& group_id) {
+    std::vector<std::string> lines;
+    for (const std::string& element_id : result.change_index.ChangedElementIds()) {
+        const std::vector<std::string> contributors = result.change_index.ContributingGroupIds(element_id);
+        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
+            continue;
+        const core::drafts::DraftElementEntry* entry = result.change_index.Find(element_id);
+        if (entry == nullptr)
+            continue;
+
+        const core::SacmElement* element = nullptr;
+        if (entry->change == core::drafts::DraftElementChange::Removed) {
+            for (const core::SacmElement& removed : result.change_index.removed) {
+                if (removed.id == element_id) {
+                    element = &removed;
+                    break;
+                }
+            }
+        } else {
+            for (const core::SacmElement& candidate : result.working_model.elements) {
+                if (candidate.id == element_id) {
+                    element = &candidate;
+                    break;
+                }
+            }
+        }
+        if (element == nullptr || element->type != "term")
+            continue;
+
+        std::string line = element->content.empty() ? element->id : element->content;
+        if (!element->description.empty())
+            line += ": " + element->description;
+        if (entry->change == core::drafts::DraftElementChange::Removed)
+            line = ui::i18n::trf("{0} (removed)", line);
+        lines.push_back(std::move(line));
+    }
+    return lines;
+}
+
 } // namespace
 
 ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& state) {
@@ -207,8 +252,10 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
         for (const std::string& dependency : group.depends_on_group_ids)
             row.depends_on_titles.push_back(TitleOf(*workspace, dependency));
 
-        if (materialization != nullptr)
+        if (materialization != nullptr) {
+            row.glossary_lines = GlossaryLinesForGroup(*materialization, group.id);
             row.findings = FindingsForGroup(*materialization, group.id);
+        }
 
         // Promotability is answered by planning the promotion, not by guessing
         // at it. The plan materializes the selection against the accepted

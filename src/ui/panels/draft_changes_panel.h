@@ -60,6 +60,13 @@ struct DraftChangeRow {
     // minus itself. Empty when it stands alone.
     std::vector<std::string> also_accepts_titles;
 
+    // The glossary content this group stages, one line per term: the term, its
+    // definition, and a removal marker where it removes one. Full text rather
+    // than a count, because a term is deliberately not a GSN node -- the canvas
+    // shows an argument change beside its row, but a definition under review is
+    // readable nowhere else on this surface.
+    std::vector<std::string> glossary_lines;
+
     // Findings against what this group would produce, scoped to what it touched.
     // Advisory: they never block acceptance, because the reviewer is the
     // authority on a safety argument and only a mechanically-decidable subset of
