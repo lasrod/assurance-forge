@@ -2178,6 +2178,31 @@ TEST(DraftWorkspace, PromotionReportsMachineWrittenTranslationsForReview) {
     EXPECT_EQ(flagged.front(), IdentityFor(fixture.store, mcp_group, "$sub"));
 }
 
+TEST(DraftWorkspace, ATermsMachineTranslatedDefinitionIsFlaggedForReview) {
+    Fixture fixture;
+    const std::string mcp_group = fixture.BeginGroup("Define ALARP for both languages");
+
+    // A glossary definition is read the same way a claim is: a machine-written
+    // Japanese definition of an abbreviation is text nobody has reviewed in the
+    // language it will be read in. The flagging walks operation translations
+    // generically, so CreateTerm and UpdateTerm ride the same rail as claims --
+    // this pins that a term operation never slips past it.
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateTerm;
+    create.create_ref = "$alarp";
+    create.text = "ALARP";
+    create.new_value = "Risk reduced as low as reasonably practicable.";
+    create.translations["ja"] = "合理的に実行可能な限り低減されたリスク。";
+    fixture.Stage(mcp_group, {create});
+    ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
+
+    const std::vector<std::string> flagged =
+        core::drafts::MachineTranslatedElementIds(*fixture.store.workspace(), {mcp_group});
+
+    ASSERT_EQ(flagged.size(), 1u);
+    EXPECT_EQ(flagged.front(), IdentityFor(fixture.store, mcp_group, "$alarp"));
+}
+
 TEST(DraftWorkspace, RemovingATranslationIsNotFlaggedForReview) {
     Fixture fixture;
     const std::string mcp_group = fixture.BeginGroup("Drop the stale Japanese");
