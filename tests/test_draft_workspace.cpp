@@ -186,6 +186,13 @@ struct Fixture {
         std::string error;
         EXPECT_TRUE(store.StageOperations(group_id, operations, accepted, error)) << error;
     }
+
+    // Only Ready work is promotable (ADR 0010); tests that promote submit
+    // first, as an agent would.
+    void Submit(const std::string& group_id) {
+        std::string error;
+        EXPECT_TRUE(store.MarkGroupReady(group_id, error)) << error;
+    }
 };
 
 const core::SacmElement* FindElement(const core::AssuranceCase& model, const std::string& id) {
@@ -1192,6 +1199,7 @@ TEST(DraftWorkspace, AWordingEditWithNoDependenciesPromotesAlone) {
     fixture.Stage(wording, {UpdateTextOp("G1", "Clarified.")});
     ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
 
+    fixture.Submit(wording);
     const core::drafts::DraftPromotionPlan plan =
         core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {wording}, "Jesper");
     ASSERT_TRUE(plan.ok) << plan.error;
@@ -1216,6 +1224,8 @@ TEST(DraftWorkspace, AcceptingADependentChangeTakesWhatItNeedsAndSaysSo) {
     const std::string editor = fixture.BeginGroup("Reword the sub-claim", "SCCG AI Review");
     fixture.Stage(editor, {UpdateTextOp(sub_id, "Identified hazards are mitigated to ALARP.")});
 
+    fixture.Submit(creator);
+    fixture.Submit(editor);
     const core::drafts::DraftPromotionPlan plan =
         core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {editor}, "Jesper");
     ASSERT_TRUE(plan.ok) << plan.error;
@@ -1251,6 +1261,8 @@ TEST(DraftWorkspace, PromotionIsRefusedWhenTheRemainderCannotBeRebased) {
     // never existed, leaving the creation group with nothing to do -- and the
     // removal itself referring to an element that was never created. Refused,
     // and refused *before* the accepted argument is touched.
+    fixture.Submit(creator);
+    fixture.Submit(remover);
     const core::drafts::DraftPromotionPlan plan =
         core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {remover}, "Jesper");
     if (!plan.ok) {
@@ -1297,9 +1309,14 @@ namespace {
 
 // The store-side half of `AppRuntime::PromoteDraftGroups`: everything it does
 // around the audited command, in the order it does it. `sequence` stands in for
-// the audit transaction the real promotion records.
+// the audit transaction the real promotion records. Groups are submitted
+// first, as the runtime does: only Ready work is promotable (ADR 0010).
 core::drafts::DraftPromotionPlan
 PromoteThroughStore(Fixture& fixture, const std::vector<std::string>& group_ids, std::uint64_t sequence) {
+    for (const std::string& group_id : group_ids) {
+        std::string submit_error;
+        fixture.store.MarkGroupReady(group_id, submit_error);
+    }
     const core::drafts::DraftPromotionPlan plan =
         core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, group_ids, "Jesper");
     EXPECT_TRUE(plan.ok) << plan.error;
@@ -1667,6 +1684,7 @@ TEST(DraftWorkspace, AcceptingClearsTheDraftUndoHistory) {
     fixture.Stage(wording, {UpdateTextOp("G1", "Clarified.")});
     ASSERT_TRUE(fixture.store.Materialize(fixture.accepted, 1).success);
 
+    fixture.Submit(wording);
     const core::drafts::DraftPromotionPlan plan =
         core::drafts::PlanDraftPromotion(*fixture.store.workspace(), fixture.accepted, {wording}, "Jesper");
     ASSERT_TRUE(plan.ok) << plan.error;

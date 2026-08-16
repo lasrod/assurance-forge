@@ -309,7 +309,11 @@ private:
     // audited `ApplyProposalCommand`, so the whole promotion is one transaction
     // with one undo boundary and one audit record naming every contributing
     // source. Only a person reaches this -- there is no tool that does.
-    bool PromoteWorkingDraft(std::string& error);
+    // Accept All: submitted groups plus the user's own edits. On success,
+    // `summary` says what was accepted and exactly what was left behind and
+    // why -- a stranded group silently surviving an "accepted" message is how
+    // the draft workflow lost the user's trust.
+    bool PromoteWorkingDraft(std::string& summary, std::string& error);
 
     // Accepts a dependency-closed selection of draft groups.
     //

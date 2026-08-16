@@ -115,6 +115,13 @@ struct Fixture {
             << error;
     }
 
+    // Only Ready work is promotable (ADR 0010); tests asserting a row is
+    // promotable submit it first, as an agent would.
+    void Submit(const std::string& group_id) {
+        std::string error;
+        EXPECT_TRUE(state.draft_workspace.MarkGroupReady(group_id, error)) << error;
+    }
+
     // What the frame does before any panel renders: publish the materialization
     // the whole frame reads. The panel model must not recompute it.
     void Materialize() {
@@ -217,6 +224,8 @@ TEST(DraftChangesPanel, ARowNamesWhatAcceptingItWouldAlsoAccept) {
 
     const std::string editor = fixture.BeginGroup(McpRequest("Reword the sub-claim", "SCCG AI Review"));
     fixture.Stage(editor, {UpdateTextOp(sub_id, "Foreseeable misuse is mitigated to ALARP.")});
+    fixture.Submit(creator);
+    fixture.Submit(editor);
     fixture.Materialize();
 
     const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(fixture.state);

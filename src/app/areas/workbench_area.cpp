@@ -145,6 +145,12 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
     ui_state.center_view = ui::CenterView::GsnCanvas;
     if (state.IsProposalCanvasActive())
         RenderProposalBanner(state, callbacks);
+    else
+        // The same banner every package tab shows, for the same reason: this
+        // canvas renders the mode-dependent draft view too, and it was the one
+        // surface where "Changes only" could be active with no badge, no mode
+        // buttons, and no way back.
+        RenderWorkingDraftBanner(state, callbacks);
 
     ui::ElementContextActions actions;
     if (state.proposal_controller->preview_active) {
@@ -227,7 +233,13 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     // the outside is indistinguishable from the add having done nothing. That is
     // exactly what "new elements cannot be added" looked like.
     std::optional<parser::AssuranceCase> draft_preview_model;
-    if (!state.agent_preview_case.has_value() && !state.draft_added_ids.empty() && state.draft_canvas_view != nullptr) {
+    const core::drafts::DraftWorkspace* live_draft = state.draft_workspace.workspace();
+    const bool draft_has_groups = live_draft != nullptr && live_draft->has_active_groups();
+    // Gated on the workspace itself, not on the decoration cache: the cache is
+    // refreshed by the derived-view rebuild, which can lag or skip a frame,
+    // and an empty `draft_added_ids` then dropped every proposed element from
+    // the package projection -- the add looked like it did nothing.
+    if (!state.agent_preview_case.has_value() && draft_has_groups && state.draft_canvas_view != nullptr) {
         draft_preview_model = *state.draft_canvas_view;
     }
     std::vector<std::string> preview_added_ids = state.agent_preview_added_ids;

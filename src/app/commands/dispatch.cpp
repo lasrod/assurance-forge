@@ -136,6 +136,11 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
     if (result.sacm_written) {
         state.app_state.has_unsaved_changes = false;
         state.autosave_persisted_pending_edit = true;
+        // The manifest tracks the argument's file hash; an autosave that
+        // leaves it stale makes the next project open warn that the file was
+        // "modified outside Assurance Forge" -- about a write this
+        // application itself just made.
+        state.app_state.refresh_tracked_file_hashes(state.app_state.loaded_file_path);
     }
     return {true, {}, result.sacm_written, result.transaction_sequence};
 }

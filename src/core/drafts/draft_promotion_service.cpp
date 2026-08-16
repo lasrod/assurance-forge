@@ -199,6 +199,20 @@ DraftPromotionPlan PlanDraftPromotion(const DraftWorkspace& workspace,
             plan.added_by_closure.push_back(group_id);
     }
 
+    // Only submitted work is promotable (ADR 0010): Accept cannot commit a
+    // change its author is still writing -- whether it was selected directly
+    // or pulled in by the dependency closure.
+    for (const std::string& group_id : plan.closure) {
+        for (const DraftChangeGroup& group : workspace.groups) {
+            if (group.id != group_id || group.state != DraftGroupState::Building)
+                continue;
+            const std::string name = group.title.empty() ? group.id : group.title;
+            plan.error = "\"" + name + "\" is still being written and has not been submitted by its author. " +
+                         "Accept it after it is submitted, or reject it.";
+            return plan;
+        }
+    }
+
     const std::unordered_set<std::string> promoting(plan.closure.begin(), plan.closure.end());
 
     // What the accepted argument becomes. Rehearsed on a copy of the workspace so

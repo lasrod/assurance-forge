@@ -221,8 +221,17 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
             row.promotable = false;
             row.blocked_reason = AF_TR("A change this one was built on was rejected, so it no longer applies.");
         } else if (state.app_state.loaded_case.has_value()) {
+            // Rehearsed exactly as PromoteDraftGroups will run it: accepting
+            // the user's own edits is their submission, so a human Building
+            // group must not show as blocked when the accept would succeed.
+            core::drafts::DraftWorkspace rehearsal = *workspace;
+            for (core::drafts::DraftChangeGroup& candidate : rehearsal.groups) {
+                if (candidate.state == core::drafts::DraftGroupState::Building &&
+                    candidate.source == core::drafts::DraftSource::Human)
+                    candidate.state = core::drafts::DraftGroupState::Ready;
+            }
             const core::drafts::DraftPromotionPlan plan =
-                core::drafts::PlanDraftPromotion(*workspace,
+                core::drafts::PlanDraftPromotion(rehearsal,
                                                  state.app_state.loaded_case.value(),
                                                  {group.id},
                                                  core::drafts::DraftPromotionAuthor(*workspace, {group.id}),

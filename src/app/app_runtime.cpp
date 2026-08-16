@@ -861,6 +861,11 @@ void AppRuntime::SyncDraftWorkspace() {
     impl_->draft_workspace_argument = argument;
     impl_->draft_workspace.SetProjectRoot(root);
 
+    // A different argument is a different draft; a leftover "Changes only"
+    // mode from the previous one would silently show a subset of the new
+    // case. Every argument starts on the full working view.
+    ui::GetUiState().draft_view_mode = ui::DraftViewMode::WorkingDraft;
+
     if (argument.empty() || !impl_->app_state.loaded_case.has_value()) {
         // Forgets the workspace without touching what is on disk, so the draft
         // is still there when the argument is opened again. Closing the
@@ -1086,9 +1091,10 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         },
         [this]() { impl_->pending_reconcile_audit_store = true; },
         [this]() {
+            std::string summary;
             std::string error;
-            if (PromoteWorkingDraft(error)) {
-                SetStatus(AF_TR("Accepted the working draft."));
+            if (PromoteWorkingDraft(summary, error)) {
+                SetStatus(summary);
             } else {
                 SetStatus(ui::i18n::trf("Could not accept the working draft: {0}", error));
             }
