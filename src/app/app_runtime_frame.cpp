@@ -444,9 +444,13 @@ void AppRuntime::RenderFrame(bool& done) {
         BeginRejectDraftGroups({group_id});
     };
     feedback_dock_callbacks.draft_changes.accept_all = [this]() {
+        std::string summary;
         std::string error;
-        if (!PromoteWorkingDraft(error))
+        if (PromoteWorkingDraft(summary, error)) {
+            SetStatus(summary);
+        } else {
             SetStatus(ui::i18n::trf("Could not accept the draft: {0}", error));
+        }
     };
     feedback_dock_callbacks.draft_changes.focus_group = [this](const std::string& group_id) {
         FocusDraftGroupOnCanvas(group_id);

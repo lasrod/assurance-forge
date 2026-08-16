@@ -267,7 +267,6 @@ TRANSLATIONS = {
     "Discard draft": "ドラフトを破棄",
     "The argument changed since this draft was written.": "このドラフトの作成後に議論が変更されました。",
     "One of this draft's changes no longer applies.": "このドラフトの変更のいずれかが適用できなくなっています。",
-    "Accepted the working draft.": "作業ドラフトを受理しました。",
     "Could not accept the working draft: {0}": "作業ドラフトを受理できませんでした: {0}",
     "Discarded the working draft. The accepted argument is unchanged.": "作業ドラフトを破棄しました。受理済みの議論は変更されていません。",
     "Could not discard the working draft: {0}": "作業ドラフトを破棄できませんでした: {0}",
@@ -1070,6 +1069,8 @@ TRANSLATIONS = {
         "AI クライアントは接続できません: {0}",
     "AI client access request":
         "AI クライアントのアクセス要求",
+    "nothing is ready to accept -- {0} being written, {1} needing your attention":
+        "受理できる変更がありません -- 作成中 {0} 件、要確認 {1} 件",
     "\"{0}\" is asking to read the open project and propose draft changes.":
         "「{0}」が、開いているプロジェクトの読み取りとドラフト変更の提案を求めています。",
     "Project: {0}":
@@ -1170,6 +1171,12 @@ PLURAL_TRANSLATIONS = {
         ['未受理の変更 {0} 件'],
     ("WORKING DRAFT — {0} unaccepted change", "WORKING DRAFT — {0} unaccepted changes"): ["作業ドラフト — 未受理の変更 {0} 件"],
     ("Accepted {0} draft change.", "Accepted {0} draft changes."): ["ドラフトの変更 {0} 件を受理しました。"],
+    ("{0} change still being written was left for its author.",
+     "{0} changes still being written were left for their authors."):
+        ["作成中の変更 {0} 件は作成者に委ねられました。"],
+    ("{0} change needs your attention before it can be accepted.",
+     "{0} changes need your attention before they can be accepted."):
+        ["変更 {0} 件は受理する前に確認が必要です。"],
     ("{0} element", "{0} elements"): ["{0} 要素"],
     ("{0} open finding", "{0} open findings"): ["未解決の指摘 {0} 件"],
     ("{0} item needs attention", "{0} items need attention"):

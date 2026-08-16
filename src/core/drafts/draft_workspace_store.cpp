@@ -760,6 +760,23 @@ DraftWorkspaceStore::MaterializeSnapshot(const core::AssuranceCase& accepted, st
     std::shared_ptr<DraftMaterializationResult> next = std::make_shared<DraftMaterializationResult>();
     bool cacheable = true;
 
+    if (workspace_.has_value() && workspace_->state == DraftWorkspaceState::NeedsRebase &&
+        !workspace_->base_model_hash.empty() &&
+        workspace_->base_model_hash == reviews::ComputeModelSemanticHash(accepted)) {
+        // The accepted argument matches the draft's baseline again -- the
+        // one-frame window while a promotion's deferred re-derive drains, or
+        // an undo that restored it. The draft applies again; staying
+        // NeedsRebase until the argument is reopened would strand it. Checked
+        // FIRST, so the identity-conflict and drift checks below re-evaluate
+        // against today's facts and can re-mark it in the same pass if their
+        // cause still stands.
+        workspace_->state = DraftWorkspaceState::Active;
+        ++workspace_->working_revision;
+        RecordEvent("baseline_restored", {}, "Accepted argument matches the draft baseline again");
+        std::string save_error;
+        Save(save_error);
+    }
+
     if (workspace_.has_value() && workspace_->state != DraftWorkspaceState::NeedsRebase) {
         std::string conflicting_identity;
         for (const DraftChangeGroup* group : workspace_->ActiveGroups()) {

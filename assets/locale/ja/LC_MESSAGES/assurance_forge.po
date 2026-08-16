@@ -169,9 +169,6 @@ msgstr "受理済みベースライン"
 msgid "Accepted the change. The rest of the draft is still unaccepted."
 msgstr "変更を受理しました。ドラフトの残りは未受理のままです。"
 
-msgid "Accepted the working draft."
-msgstr "作業ドラフトを受理しました。"
-
 msgid "Accepted, but the draft could not be updated: {0}"
 msgstr "受け入れましたが、ドラフトを更新できませんでした: {0}"
 
@@ -2458,6 +2455,9 @@ msgstr "要対応"
 msgid "not recorded"
 msgstr "未記録"
 
+msgid "nothing is ready to accept -- {0} being written, {1} needing your attention"
+msgstr "受理できる変更がありません -- 作成中 {0} 件、要確認 {1} 件"
+
 msgid "open"
 msgstr "未解決"
 
@@ -2652,9 +2652,17 @@ msgid "{0} SCCG finding"
 msgid_plural "{0} SCCG findings"
 msgstr[0] "SCCG 指摘 {0} 件"
 
+msgid "{0} change needs your attention before it can be accepted."
+msgid_plural "{0} changes need your attention before they can be accepted."
+msgstr[0] "変更 {0} 件は受理する前に確認が必要です。"
+
 msgid "{0} change now needs attention before it can be accepted."
 msgid_plural "{0} changes now need attention before they can be accepted."
 msgstr[0] "受理するには {0} 件の変更に対応が必要です。"
+
+msgid "{0} change still being written was left for its author."
+msgid_plural "{0} changes still being written were left for their authors."
+msgstr[0] "作成中の変更 {0} 件は作成者に委ねられました。"
 
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."

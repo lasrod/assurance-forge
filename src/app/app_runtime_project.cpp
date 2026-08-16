@@ -1330,21 +1330,64 @@ bool AppRuntime::RejectAgentChangeSet(const std::string& change_set_id, std::str
     return true;
 }
 
-bool AppRuntime::PromoteWorkingDraft(std::string& error) {
+bool AppRuntime::PromoteWorkingDraft(std::string& summary, std::string& error) {
     error.clear();
+    summary.clear();
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || !workspace->has_active_groups()) {
         error = "There is no working draft to accept.";
         return false;
     }
 
+    // Accept All takes submitted work plus the user's own edits -- accepting
+    // is the author's submission for those. Another author's group that is
+    // still being written stays theirs (ADR 0010), and a stranded group needs
+    // the user's decision first; both are counted so the outcome message can
+    // say exactly what was left and why, instead of "accepted" over a banner
+    // that still shows unaccepted changes.
+    std::vector<std::string> selection;
+    int left_building = 0;
+    for (const core::drafts::DraftChangeGroup* group : workspace->ActiveGroups()) {
+        if (group->state == core::drafts::DraftGroupState::Ready || group->source == core::drafts::DraftSource::Human) {
+            selection.push_back(group->id);
+        } else {
+            ++left_building;
+        }
+    }
+    int needs_attention = 0;
+    for (const core::drafts::DraftChangeGroup& group : workspace->groups) {
+        if (group.state == core::drafts::DraftGroupState::NeedsAttention)
+            ++needs_attention;
+    }
+
+    if (selection.empty()) {
+        error = ui::i18n::trf("nothing is ready to accept -- {0} being written, {1} needing your attention",
+                              std::to_string(left_building),
+                              std::to_string(needs_attention));
+        return false;
+    }
+
     // Delegated rather than duplicated, so accept-all cannot skip the checks
     // accept-selected performs -- including the verification that the accepted
     // argument actually ended up holding the change.
-    std::vector<std::string> every_active;
-    for (const core::drafts::DraftChangeGroup* group : workspace->ActiveGroups())
-        every_active.push_back(group->id);
-    return PromoteDraftGroups(every_active, error);
+    const int accepted = static_cast<int>(selection.size());
+    if (!PromoteDraftGroups(selection, error))
+        return false;
+
+    summary = ui::i18n::trnf("Accepted {0} draft change.", "Accepted {0} draft changes.", accepted, accepted);
+    if (left_building > 0) {
+        summary += " " + ui::i18n::trnf("{0} change still being written was left for its author.",
+                                        "{0} changes still being written were left for their authors.",
+                                        left_building,
+                                        left_building);
+    }
+    if (needs_attention > 0) {
+        summary += " " + ui::i18n::trnf("{0} change needs your attention before it can be accepted.",
+                                        "{0} changes need your attention before they can be accepted.",
+                                        needs_attention,
+                                        needs_attention);
+    }
+    return true;
 }
 
 namespace {
@@ -1618,6 +1661,26 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         return false;
     }
 
+    // Accepting the user's own edits is their submission: the acceptor is the
+    // author. Done here, on the shared path, so per-group Accept and Accept
+    // All agree; another author's Building group is refused by the promotion
+    // plan itself.
+    for (const std::string& group_id : group_ids) {
+        for (const core::drafts::DraftChangeGroup& group : workspace->groups) {
+            if (group.id == group_id && group.state == core::drafts::DraftGroupState::Building &&
+                group.source == core::drafts::DraftSource::Human) {
+                std::string submit_error;
+                if (!impl_->draft_workspace.MarkGroupReady(group_id, submit_error)) {
+                    // Continuing would hit the promotion plan's "still being
+                    // written" refusal -- misleading for the user's own edits,
+                    // whose submission is this very accept.
+                    error = "Your edits could not be submitted for acceptance: " + submit_error;
+                    return false;
+                }
+            }
+        }
+    }
+
     const std::string author = core::drafts::DraftPromotionAuthor(*workspace, group_ids);
 
     // Taken before `BeginPromotion` marks the workspace `Promoting`, so what undo
@@ -1783,8 +1846,15 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     // just promoted.
     impl_->translation_review_marks_pending_rebuild.insert(
         impl_->translation_review_marks_pending_rebuild.end(), machine_translated.begin(), machine_translated.end());
-    impl_->app_state.mark_dirty();
+    // Invalidate the materialization cache without claiming unsaved changes:
+    // the command bus already wrote the file, and mark_dirty() here made the
+    // status bar contradict a promotion that was safely on disk.
+    impl_->app_state.bump_case_revision();
     impl_->tree_needs_rebuild = true;
+    // A fully consumed draft takes its view modes with it: the next draft
+    // must not inherit a leftover "Changes only" filter.
+    if (impl_->draft_workspace.workspace() == nullptr)
+        ui::GetUiState().draft_view_mode = ui::DraftViewMode::WorkingDraft;
     return true;
 }
 
