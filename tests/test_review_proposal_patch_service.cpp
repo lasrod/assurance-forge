@@ -464,3 +464,195 @@ TEST(ReviewProposalPatchServiceTest, TranslatingAnElementChangesItsSemanticHash)
     // current, and staged work would overwrite a translation it never saw.
     EXPECT_NE(core::reviews::ComputeElementSemanticHash(*FindElement(model, "G1")), untranslated);
 }
+
+// ---------------------------------------------------------------------------
+// Terminology operations. A term's value lives in `content` and its definition
+// in `description`, mirroring how the library projection lays a Term out, so
+// everything downstream of the patch service -- diffs, hashes, the plan -- sees
+// a term the same way it sees one loaded from a file.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+parser::SacmElement TermElement(std::string id, std::string value, std::string definition) {
+    parser::SacmElement element = Element(std::move(id), "term", "");
+    element.content = std::move(value);
+    element.content_langs["en"] = element.content;
+    element.description = std::move(definition);
+    element.description_langs["en"] = element.description;
+    return element;
+}
+
+} // namespace
+
+TEST(ReviewProposalPatchServiceTest, CreatesTermWithValueDefinitionAndTranslation) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation create = Create(core::reviews::PatchOperationType::CreateTerm, "$term", "hazard");
+    create.new_value = "A system state that could lead to harm.";
+    create.translations["ja"] = "危害につながり得るシステム状態。";
+    proposal.operations.push_back(create);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    const std::string id = result.generated_ids.at("$term");
+    const parser::SacmElement* term = FindElement(model, id);
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->type, "term");
+    EXPECT_EQ(term->content, "hazard");
+    EXPECT_EQ(term->description, "A system state that could lead to harm.");
+    EXPECT_EQ(term->description_langs.at("ja"), "危害につながり得るシステム状態。");
+}
+
+TEST(ReviewProposalPatchServiceTest, CreateTermRequiresTheTermItself) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+    proposal.operations.push_back(Create(core::reviews::PatchOperationType::CreateTerm, "$term", ""));
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    EXPECT_FALSE(result.success);
+    EXPECT_NE(result.error.find("term itself"), std::string::npos);
+}
+
+TEST(ReviewProposalPatchServiceTest, CreateTermRefusesTranslationsWithoutADefinition) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation create = Create(core::reviews::PatchOperationType::CreateTerm, "$term", "hazard");
+    create.translations["ja"] = "危害につながり得るシステム状態。";
+    proposal.operations.push_back(create);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    // A definition that exists only in Japanese is invisible to every reader of
+    // the primary language -- the same rule a created claim follows.
+    EXPECT_FALSE(result.success);
+    EXPECT_NE(result.error.find("definition"), std::string::npos);
+}
+
+TEST(ReviewProposalPatchServiceTest, UpdateTermRewritesValueDefinitionAndName) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation value;
+    value.type = core::reviews::PatchOperationType::UpdateTerm;
+    value.element = core::reviews::ElementRef{"T1", std::nullopt};
+    value.field = "value";
+    value.new_value = "ALARP principle";
+    proposal.operations.push_back(value);
+
+    core::reviews::PatchOperation definition;
+    definition.type = core::reviews::PatchOperationType::UpdateTerm;
+    definition.element = core::reviews::ElementRef{"T1", std::nullopt};
+    definition.field = "definition";
+    definition.new_value = "Risk reduced as low as reasonably practicable, per UK safety law.";
+    definition.translations["ja"] = "合理的に実行可能な限り低減されたリスク。";
+    proposal.operations.push_back(definition);
+
+    core::reviews::PatchOperation name;
+    name.type = core::reviews::PatchOperationType::UpdateTerm;
+    name.element = core::reviews::ElementRef{"T1", std::nullopt};
+    name.field = "name";
+    name.new_value = "ALARP";
+    proposal.operations.push_back(name);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    const parser::SacmElement* term = FindElement(model, "T1");
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->content, "ALARP principle");
+    EXPECT_EQ(term->description, "Risk reduced as low as reasonably practicable, per UK safety law.");
+    EXPECT_EQ(term->description_langs.at("ja"), "合理的に実行可能な限り低減されたリスク。");
+    EXPECT_EQ(term->name, "ALARP");
+}
+
+TEST(ReviewProposalPatchServiceTest, UpdateTermRefusesNonTermsAndTranslatedValues) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+
+    // Targeting an argument element: the operation is for glossary work only.
+    {
+        core::reviews::ReviewProposal proposal = ProposalFor(model);
+        core::reviews::PatchOperation update;
+        update.type = core::reviews::PatchOperationType::UpdateTerm;
+        update.element = core::reviews::ElementRef{"G1", std::nullopt};
+        update.field = "value";
+        update.new_value = "x";
+        proposal.operations.push_back(update);
+        core::reviews::ReviewProposalPatchService service;
+        core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+        EXPECT_FALSE(result.success);
+        EXPECT_NE(result.error.find("not a term"), std::string::npos);
+    }
+
+    // A term's value is one string (SACM 10.11); translations ride on the
+    // definition, and a value carrying one must be refused at staging rather
+    // than declined at acceptance.
+    {
+        core::reviews::ReviewProposal proposal = ProposalFor(model);
+        core::reviews::PatchOperation update;
+        update.type = core::reviews::PatchOperationType::UpdateTerm;
+        update.element = core::reviews::ElementRef{"T1", std::nullopt};
+        update.field = "value";
+        update.new_value = "ALARP";
+        update.translations["ja"] = "アラープ";
+        proposal.operations.push_back(update);
+        core::reviews::ReviewProposalPatchService service;
+        core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+        EXPECT_FALSE(result.success);
+        EXPECT_NE(result.error.find("single string"), std::string::npos);
+    }
+
+    // Blanking the value would leave a term detection can never match.
+    {
+        core::reviews::ReviewProposal proposal = ProposalFor(model);
+        core::reviews::PatchOperation update;
+        update.type = core::reviews::PatchOperationType::UpdateTerm;
+        update.element = core::reviews::ElementRef{"T1", std::nullopt};
+        update.field = "value";
+        proposal.operations.push_back(update);
+        core::reviews::ReviewProposalPatchService service;
+        core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+        EXPECT_FALSE(result.success);
+        EXPECT_NE(result.error.find("blank"), std::string::npos);
+    }
+}
+
+TEST(ReviewProposalPatchServiceTest, RemoveTermRemovesOnlyTerms) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+
+    {
+        core::reviews::ReviewProposal proposal = ProposalFor(model);
+        core::reviews::PatchOperation remove;
+        remove.type = core::reviews::PatchOperationType::RemoveTerm;
+        remove.element = core::reviews::ElementRef{"G2", std::nullopt};
+        proposal.operations.push_back(remove);
+        core::reviews::ReviewProposalPatchService service;
+        core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+        EXPECT_FALSE(result.success);
+        EXPECT_NE(result.error.find("not a term"), std::string::npos);
+        EXPECT_NE(FindElement(model, "G2"), nullptr);
+    }
+
+    {
+        core::reviews::ReviewProposal proposal = ProposalFor(model);
+        core::reviews::PatchOperation remove;
+        remove.type = core::reviews::PatchOperationType::RemoveTerm;
+        remove.element = core::reviews::ElementRef{"T1", std::nullopt};
+        proposal.operations.push_back(remove);
+        core::reviews::ReviewProposalPatchService service;
+        core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+        ASSERT_TRUE(result.success) << result.error;
+        EXPECT_EQ(FindElement(model, "T1"), nullptr);
+    }
+}

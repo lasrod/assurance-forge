@@ -139,7 +139,22 @@ EditOutcome apply_text_edit(LibraryDocument& document,
     }
     case TextField::Content: {
         const auto* element = doc.find_as<sacm::model::ModelElement>(id);
-        if (element == nullptr || !content_maps_to_description(element->kind())) {
+        if (element == nullptr) {
+            return unsupported_outcome();
+        }
+        // A Term's or Expression's POD `content` is its ExpressionElement value
+        // (clause 10.11), which the projection maps there. It is ONE string --
+        // a translated value has nowhere to go, and refusing says so instead of
+        // handing the edit back to a legacy path that would misfile it.
+        if (dynamic_cast<const sacm::model::ExpressionElement*>(element) != nullptr) {
+            if (language != kPrimaryLanguage) {
+                return refused_outcome("AF-EDIT-TERM-VALUE-ONE-LANG",
+                                       "A term's value is a single string and cannot be translated; "
+                                       "translate its definition (the description field) instead.");
+            }
+            return applied_outcome(doc.apply(sacm::commands::SetExpressionValue{.element = id, .value = value}));
+        }
+        if (!content_maps_to_description(element->kind())) {
             return unsupported_outcome();
         }
         // Content is the FIRST Description (the statement, clause 8.9). A primary
@@ -585,6 +600,15 @@ std::string resolve_argument_package_id(const LibraryDocument& document, const s
         return first->id().value();
     }
     return {};
+}
+
+std::string resolve_terminology_package_id(const LibraryDocument& document) {
+    const sacm::model::Document& doc = LibraryDocumentAccess::document(document);
+    const sacm::model::AssuranceCasePackage* root = doc.roots().empty() ? nullptr : doc.roots().front().get();
+    if (root == nullptr || root->terminology_packages().empty()) {
+        return {};
+    }
+    return root->terminology_packages().front()->id().value();
 }
 
 AddChildOutcome apply_create_element(LibraryDocument& document,

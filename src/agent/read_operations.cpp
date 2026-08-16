@@ -380,6 +380,47 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
                       });
 }
 
+Result ListTerms(const ReadContext& context) {
+    if (!HasCase(context)) {
+        return NoCase();
+    }
+
+    nlohmann::json terms = nlohmann::json::array();
+    for (const parser::SacmElement& element : context.argument()->elements) {
+        if (element.type != "term") {
+            continue;
+        }
+        // Term-domain names rather than the flat model's: `content` holds the
+        // value and `description` the definition, which is projection detail an
+        // agent should not need to know.
+        nlohmann::json term{{"id", element.id}, {"value", element.content}};
+        if (!element.name.empty()) {
+            term["name"] = element.name;
+        }
+        if (!element.description.empty()) {
+            term["definition"] = element.description;
+        }
+        nlohmann::json definition_translations = nlohmann::json::object();
+        for (const std::pair<const std::string, std::string>& entry : element.description_langs) {
+            if (entry.first != core::reviews::kPatchPrimaryLanguage && !entry.second.empty()) {
+                definition_translations[entry.first] = entry.second;
+            }
+        }
+        if (!definition_translations.empty()) {
+            term["definition_translations"] = std::move(definition_translations);
+        }
+        terms.push_back(std::move(term));
+    }
+
+    const int count = static_cast<int>(terms.size());
+    nlohmann::json payload{{"terms", std::move(terms)}, {"count", count}};
+    if (count == 0) {
+        payload["note"] = "This case defines no terminology yet. Terms bound the words a safety argument "
+                          "relies on; stage a CreateTerm operation to define one.";
+    }
+    return ReadResult(context, std::move(payload));
+}
+
 Result ListAssuranceClaimPoints(const ReadContext& context) {
     if (!HasCase(context)) {
         return NoCase();

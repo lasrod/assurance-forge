@@ -187,6 +187,12 @@ AddChildOutcome apply_create_element(LibraryDocument& document,
 // would put a proposed claim in the wrong package of a multi-package case.
 std::string resolve_argument_package_id(const LibraryDocument& document, const std::string& element_id);
 
+// The id of the root AssuranceCasePackage's first TerminologyPackage, or empty
+// when the document has none (or has no root package). Empty is an ordinary
+// answer rather than a failure: a case grows its first TerminologyPackage the
+// first time a term is created, so callers treat empty as "create one".
+std::string resolve_terminology_package_id(const LibraryDocument& document);
+
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
     CounterArgument, // Claim             <- AssertedInference (isCounter)

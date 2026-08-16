@@ -104,7 +104,11 @@ bool ApplyProposalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_eve
         // multi-package case is exactly the ambiguity the planner declines on.
         const std::string package_id =
             sacm_adapter::resolve_argument_package_id(*ctx.library_document, proposal_.anchor_element_id);
-        const reviews::ProposalPlan plan = reviews::PlanProposalFromDiff(before, scratch, package_id);
+        // Where a created term goes: the case's first TerminologyPackage, or
+        // nowhere yet -- the plan applier creates one for the case's first term.
+        const std::string terminology_package_id = sacm_adapter::resolve_terminology_package_id(*ctx.library_document);
+        const reviews::ProposalPlan plan =
+            reviews::PlanProposalFromDiff(before, scratch, package_id, terminology_package_id);
 
         decline_reason = plan.unrepresentable_reason;
         if (plan.unrepresentable_reason.empty()) {

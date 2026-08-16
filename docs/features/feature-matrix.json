@@ -1669,6 +1669,28 @@
       "notes": "Launched with no project argument, the adapter initializes without a running application, discovers the single running instance at call time, and connects unbound (ADR 0014). **Access is granted per session**: the first project operation (or `request_project_access`) raises an in-app request — client label, project, Allow while open / Deny — and is refused with `project_access_pending` until the user answers; this applies to `--project` sessions too. Grants are keyed by session id, survive a reconnect to the same instance, and end on deny, revoke, project close/switch, MCP disable, or restart; a re-granted session still owns its draft groups. Multiple running instances are never auto-selected. `--offline-project <path>` is the deliberate read-only escape hatch that never connects. Kept in-development until multi-instance selection and the one-time client setup ship (context envelopes and generation checks shipped with AF-AI-009; rebinding is the fresh grant raised after a project switch)."
     },
     {
+      "id": "AF-AI-022",
+      "area": "AI",
+      "name": "Terminology read and term management from an external AI client",
+      "status": "prototype",
+      "evidence": [
+        "src/agent/read_operations.cpp",
+        "src/agent/change_operations.cpp",
+        "src/core/reviews/review_proposal_patch_service.cpp",
+        "src/core/reviews/review_proposal_plan.cpp",
+        "src/sacm_adapter/document_edit.cpp",
+        "src/core/commands/proposal_commands.cpp",
+        "src/mcp/tools.cpp"
+      ],
+      "tests": [
+        "tests/test_mcp_server.cpp",
+        "tests/test_agent_request_handler.cpp",
+        "tests/test_review_proposal_patch_service.cpp",
+        "tests/test_change_set_acceptance.cpp"
+      ],
+      "notes": "`list_terms` returns every term's value, name and definition in one call, connected and offline; terms also appear in `get_case_overview` counts, `find_elements` and `get_element`. `CreateTerm`, `UpdateTerm` (field `value`/`definition`/`name`) and `RemoveTerm` stage through the same revision-checked change groups as argument edits and promote through the same audited `ApplyProposalCommand`; accepting the first term of a case with no glossary creates the containing `terminologyPackage` rather than refusing. Definitions may carry translations; a term's value is a single string (SACM 10.11) and staging refuses a translated one with an explanation. Addresses SCCG CL.5 by defining a bounding term once instead of repeating it as free text. **Bounded**: terms only — categories, external references, origins and term-to-element associations stay in-application; created terms land in the case's first terminology package; removing a term an argument package references is refused at acceptance by the library's cross-package delete guard. **Prototype with AF-AI-014**: the write path rides the draft workspace, which is still under stability testing; the read path is exercised through the real MCP server process."
+    },
+    {
       "id": "AF-PLAT-001",
       "area": "PLAT",
       "name": "Project model, load and save",

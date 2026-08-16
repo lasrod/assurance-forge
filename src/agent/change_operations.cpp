@@ -269,7 +269,10 @@ const std::vector<std::string>& PatchOperationTypeNames() {
                                                 "RemoveSupportedBy",
                                                 "AddInContextOf",
                                                 "RemoveInContextOf",
-                                                "RemoveElement"};
+                                                "RemoveElement",
+                                                "CreateTerm",
+                                                "UpdateTerm",
+                                                "RemoveTerm"};
     return names;
 }
 

@@ -76,6 +76,11 @@ Result ReadResult(const ReadContext& context, nlohmann::json payload);
 Result GetCaseOverview(const ReadContext& context);
 Result FindElements(const ReadContext& context, const nlohmann::json& arguments);
 Result GetElement(const ReadContext& context, const nlohmann::json& arguments);
+// Every terminology term in the case, with its value, name and definition in
+// one call. `find_elements` can list terms too, but its summaries omit the
+// definition -- the field a glossary exists to provide -- so an agent checking
+// what a case's terms mean would need one get_element round trip per term.
+Result ListTerms(const ReadContext& context);
 // Every assurance claim point in the case: id, name, what it annotates, and how
 // it is resolved (inline text or a confidence argument). Read-only: the patch
 // vocabulary has no ACP operation, and extending it is an ADR 0009 decision.

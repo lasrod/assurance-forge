@@ -43,6 +43,10 @@ ToolResult ListAssuranceClaimPoints(Session& session, const nlohmann::json& argu
     return Run(session, "list_assurance_claim_points", arguments);
 }
 
+ToolResult ListTerms(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "list_terms", arguments);
+}
+
 ToolResult GetArgumentTree(Session& session, const nlohmann::json& arguments) {
     return Run(session, "get_argument_tree", arguments);
 }
@@ -141,7 +145,10 @@ nlohmann::json OperationsSchema() {
          "{\"type\":\"AddSupportedBy\",\"source\":{\"ref\":\"$sub\"},"
          "\"target\":{\"id\":\"G1\"}} puts the new element UNDER G1. When the case is maintained in "
          "more than one language, state each new element in all of them in the one operation that "
-         "creates it -- see \"translations\"."},
+         "creates it -- see \"translations\". Terminology: CreateTerm defines a glossary term "
+         "(\"text\" is the term itself, \"new_value\" its definition; the containing terminology "
+         "package is created if the case has none), UpdateTerm revises one (\"field\" of \"value\", "
+         "\"definition\" or \"name\"), RemoveTerm deletes one."},
         {"items",
          {{"type", "object"},
           {"properties",
@@ -172,10 +179,20 @@ nlohmann::json OperationsSchema() {
                "The SUPPORTED element -- the one that ends up ABOVE. For "
                "AddSupportedBy, the existing goal you are developing. Read it as "
                "\"target is supported by source\"."}}},
-            {"field", {{"type", "string"}, {"description", "For UpdateElementText: which field, e.g. \"content\"."}}},
+            {"field",
+             {{"type", "string"},
+              {"description",
+               "For UpdateElementText: which field, e.g. \"content\". For UpdateTerm: \"value\", "
+               "\"definition\", or \"name\"."}}},
             {"old_value", {{"type", "string"}}},
-            {"new_value", {{"type", "string"}}},
-            {"text", {{"type", "string"}, {"description", "Initial text for a Create* operation."}}},
+            {"new_value",
+             {{"type", "string"},
+              {"description", "The replacement text for an Update* operation; for CreateTerm, the definition."}}},
+            {"text",
+             {{"type", "string"},
+              {"description",
+               "Initial text for a Create* operation. For CreateTerm this is the term itself -- the "
+               "word or phrase being defined."}}},
             // A safety case read by reviewers in two languages has to be
             // written in both, and one operation carrying both is what makes
             // that atomic: the reviewer accepts a bilingual claim or none of
@@ -189,6 +206,8 @@ nlohmann::json OperationsSchema() {
                "must not be repeated here. On a Create* operation \"text\" is required alongside it. "
                "An UpdateElementText carrying only \"translations\" revises just those languages and "
                "leaves the English untouched -- use that to translate argument that already exists. "
+               "On CreateTerm and UpdateTerm, translations apply to the DEFINITION; a term's value is "
+               "a single string and cannot be translated. "
                "Translations you author arrive flagged for human translation review."}}}}}}}};
 }
 
@@ -293,6 +312,18 @@ std::vector<ToolDefinition> BuildTools() {
         nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
         true,
         &ListAssuranceClaimPoints,
+    });
+
+    tools.push_back(ToolDefinition{
+        "list_terms",
+        "List the case's terminology: each term's value (the word or phrase being defined), its "
+        "name, and its definition. A term bounds what a word means everywhere the argument uses "
+        "it -- SCCG CL.5 flags claims that rely on unbounded terms. Read this before proposing "
+        "argument that leans on a term of art, and stage CreateTerm/UpdateTerm/RemoveTerm "
+        "operations to change the glossary the same way argument edits are staged.",
+        nlohmann::json{{"type", "object"}, {"properties", nlohmann::json::object()}},
+        true,
+        &ListTerms,
     });
 
     tools.push_back(ToolDefinition{

@@ -14,20 +14,6 @@ namespace core::reviews {
 
 namespace {
 
-bool IsCreateOperation(PatchOperationType type) {
-    switch (type) {
-    case PatchOperationType::CreateClaim:
-    case PatchOperationType::CreateStrategy:
-    case PatchOperationType::CreateSolution:
-    case PatchOperationType::CreateContext:
-    case PatchOperationType::CreateAssumption:
-    case PatchOperationType::CreateJustification:
-        return true;
-    default:
-        return false;
-    }
-}
-
 bool ElementExists(const parser::AssuranceCase& model, const std::string& id) {
     return std::any_of(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
         return element.id == id;
@@ -100,8 +86,19 @@ std::optional<ElementRef> ReadRefFields(const nlohmann::json& object, const char
     return ref;
 }
 
+// `preview` is the model the whole patch produces and `committed` the one it
+// started from, and a reference is fine in EITHER. The preview is what lets an
+// operation name an element this same proposal creates, by the id staging
+// reported for it. The committed model is what lets a removal name its own
+// target: the point of removing an element is that the preview no longer holds
+// it, and checking only the preview refused every proposal that deletes
+// anything with "that element no longer exists". Feasibility is not weakened by
+// the union -- BuildPreviewModel has already applied the operations in order
+// and rejected any sequence that touches an element after removing it; these
+// checks exist for their messages.
 bool ValidateElementRef(const ElementRef& ref,
-                        const parser::AssuranceCase& model,
+                        const parser::AssuranceCase& preview,
+                        const parser::AssuranceCase& committed,
                         const std::unordered_set<std::string>& known_create_refs,
                         std::string& reason) {
     const bool has_existing = ref.existing_id.has_value() && !ref.existing_id->empty();
@@ -110,7 +107,8 @@ bool ValidateElementRef(const ElementRef& ref,
         reason = "Element references must contain exactly one existing id or create_ref.";
         return false;
     }
-    if (has_existing && !ElementExists(model, ref.existing_id.value())) {
+    if (has_existing && !ElementExists(preview, ref.existing_id.value()) &&
+        !ElementExists(committed, ref.existing_id.value())) {
         reason = "The proposal refers to " + ref.existing_id.value() + ", but that element no longer exists.";
         return false;
     }
@@ -122,6 +120,21 @@ bool ValidateElementRef(const ElementRef& ref,
 }
 
 } // namespace
+
+bool IsCreateOperation(PatchOperationType type) {
+    switch (type) {
+    case PatchOperationType::CreateClaim:
+    case PatchOperationType::CreateStrategy:
+    case PatchOperationType::CreateSolution:
+    case PatchOperationType::CreateContext:
+    case PatchOperationType::CreateAssumption:
+    case PatchOperationType::CreateJustification:
+    case PatchOperationType::CreateTerm:
+        return true;
+    default:
+        return false;
+    }
+}
 
 const char* PatchOperationTypeToString(PatchOperationType type) {
     switch (type) {
@@ -155,6 +168,12 @@ const char* PatchOperationTypeToString(PatchOperationType type) {
         return "RemoveInContextOf";
     case PatchOperationType::RemoveElement:
         return "RemoveElement";
+    case PatchOperationType::CreateTerm:
+        return "CreateTerm";
+    case PatchOperationType::UpdateTerm:
+        return "UpdateTerm";
+    case PatchOperationType::RemoveTerm:
+        return "RemoveTerm";
     }
     return "UpdateElementText";
 }
@@ -176,6 +195,9 @@ bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& 
         {"AddInContextOf", PatchOperationType::AddInContextOf},
         {"RemoveInContextOf", PatchOperationType::RemoveInContextOf},
         {"RemoveElement", PatchOperationType::RemoveElement},
+        {"CreateTerm", PatchOperationType::CreateTerm},
+        {"UpdateTerm", PatchOperationType::UpdateTerm},
+        {"RemoveTerm", PatchOperationType::RemoveTerm},
     };
     auto it = kTypes.find(value);
     if (it == kTypes.end())
@@ -442,12 +464,14 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
         case PatchOperationType::SetUndeveloped:
         case PatchOperationType::ClearUndeveloped:
         case PatchOperationType::RemoveElement:
+        case PatchOperationType::UpdateTerm:
+        case PatchOperationType::RemoveTerm:
             if (!operation.element.has_value()) {
                 result.reason =
                     "Operation " + std::string(PatchOperationTypeToString(operation.type)) + " is missing element_id.";
                 return result;
             }
-            if (!ValidateElementRef(operation.element.value(), reachable, create_refs, reason)) {
+            if (!ValidateElementRef(operation.element.value(), reachable, current_model, create_refs, reason)) {
                 result.reason = reason;
                 return result;
             }
@@ -460,8 +484,8 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
                 result.reason = "Relationship operations require source and target references.";
                 return result;
             }
-            if (!ValidateElementRef(operation.source.value(), reachable, create_refs, reason) ||
-                !ValidateElementRef(operation.target.value(), reachable, create_refs, reason)) {
+            if (!ValidateElementRef(operation.source.value(), reachable, current_model, create_refs, reason) ||
+                !ValidateElementRef(operation.target.value(), reachable, current_model, create_refs, reason)) {
                 result.reason = reason;
                 return result;
             }
@@ -472,6 +496,11 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
 
         if (operation.type == PatchOperationType::UpdateElementText && operation.field.empty()) {
             result.reason = "UpdateElementText operations must specify a field.";
+            return result;
+        }
+        if (operation.type == PatchOperationType::UpdateTerm && operation.field != kTermFieldValue &&
+            operation.field != kTermFieldDefinition && operation.field != kTermFieldName) {
+            result.reason = "UpdateTerm operations must specify a field of \"value\", \"definition\", or \"name\".";
             return result;
         }
     }

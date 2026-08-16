@@ -51,7 +51,7 @@ struct ProjectFixture {
     parser::AssuranceCase model;
 };
 
-ProjectFixture MakeFixture(const std::string& tag) {
+ProjectFixture MakeFixture(const std::string& tag, std::string_view sacm_content = kSampleSacm) {
     ProjectFixture f;
     const std::filesystem::path root =
         std::filesystem::temp_directory_path() /
@@ -60,7 +60,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
     std::filesystem::create_directories(root);
 
     const std::filesystem::path sacm_rel = "argument.sacm";
-    WriteFile(root / sacm_rel, kSampleSacm);
+    WriteFile(root / sacm_rel, sacm_content);
 
     f.project.id = "p";
     f.project.name = "Project";
@@ -80,7 +80,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
     EXPECT_TRUE(pkg.has_value()) << (pkg.has_value() ? "" : pkg.error());
     f.package = std::move(pkg.value());
 
-    std::expected<parser::AssuranceCase, std::string> parsed = parser::parse_sacm_xml_string(kSampleSacm);
+    std::expected<parser::AssuranceCase, std::string> parsed = parser::parse_sacm_xml_string(std::string(sacm_content));
     EXPECT_TRUE(parsed.has_value()) << (parsed.has_value() ? "" : parsed.error());
     f.model = std::move(parsed.value());
     return f;
@@ -277,4 +277,162 @@ TEST(ChangeSetAcceptance, RefusesAChangeSetTheArgumentHasMovedUnder) {
     EXPECT_NE(validity.validity, core::reviews::ProposalValidity::Valid)
         << "a patch built against an older argument must not apply silently";
     EXPECT_FALSE(validity.reason.empty());
+}
+
+// ---------------------------------------------------------------------------
+// Terminology through the same pipeline. A term staged over MCP is promoted by
+// the same audited command as an argument edit, lands in the library document,
+// and survives to the saved XML -- including bringing the case's first
+// TerminologyPackage into being when there is none to put it in.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr const char* kTerminologySacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="AC1">
+  <name content="Sample" />
+  <argumentPackage xmi:id="AP1">
+    <name content="Args" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <name content="Top goal" />
+      <description xmi:id="d1">
+        <content>
+          <value lang="en" content="The system is safe." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <terminologyPackage xmi:id="TP1" gid="gid-TP1">
+    <name content="Terminology" />
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" gid="gid-T1" value="ALARP">
+      <name content="ALARP" />
+      <description xmi:id="d2">
+        <content>
+          <value lang="en" content="As low as reasonably practicable." />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T2" gid="gid-T2" value="SFAIRP">
+      <name content="SFAIRP" />
+      <description xmi:id="d3">
+        <content>
+          <value lang="en" content="So far as is reasonably practicable." />
+        </content>
+      </description>
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>
+)";
+
+const parser::SacmElement* FindTermByValue(const parser::AssuranceCase& model, const std::string& value) {
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type == "term" && element.content == value) {
+            return &element;
+        }
+    }
+    return nullptr;
+}
+
+std::vector<core::reviews::PatchOperation> ParseOperations(const nlohmann::json& operations) {
+    std::vector<core::reviews::PatchOperation> parsed;
+    std::string error;
+    EXPECT_TRUE(agent::ParsePatchOperations(operations, parsed, error)) << error;
+    return parsed;
+}
+
+} // namespace
+
+TEST(ChangeSetAcceptance, AcceptsATermCreationCreatingTheTerminologyPackage) {
+    ProjectFixture f = MakeFixture("term_create");
+
+    core::changesets::ChangeSetStore store;
+    const std::string id = store.Begin(1, "Define the hazard vocabulary", "", "", "claude-ai");
+    std::string error;
+    const nlohmann::json operations = nlohmann::json::array({nlohmann::json{
+        {"type", "CreateTerm"},
+        {"create_ref", "$hazard"},
+        {"text", "hazard"},
+        {"new_value", "A system state that, together with environmental conditions, could lead to harm."}}});
+    ASSERT_TRUE(store.Stage(id, ParseOperations(operations), f.model, error)) << error;
+
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(store.Find(id)->proposal, f.model);
+    ASSERT_EQ(validity.validity, core::reviews::ProposalValidity::Valid) << validity.reason;
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+
+    // What the acceptance preflight predicts and what the real apply produces
+    // must be the same document -- the same convergence the promotion pipeline
+    // verifies by hash before consuming a draft.
+    parser::AssuranceCase preflight_model;
+    ASSERT_TRUE(core::commands::PreflightProposalAgainstLibrary(
+        *loaded.document, store.Find(id)->proposal, {}, preflight_model, error))
+        << error;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai");
+    ASSERT_TRUE(result.success) << result.error;
+
+    const parser::AssuranceCase applied = sacm_adapter::project_case(*loaded.document);
+    const parser::SacmElement* term = FindTermByValue(applied, "hazard");
+    ASSERT_NE(term, nullptr) << "the created term must survive to the library projection";
+    EXPECT_EQ(term->description, "A system state that, together with environmental conditions, could lead to harm.");
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(applied),
+              core::reviews::ComputeModelSemanticHash(preflight_model));
+
+    // The sample file has no terminologyPackage, so accepting the first term
+    // must create one rather than refuse -- otherwise a case with no glossary
+    // could never grow one over MCP.
+    const std::vector<sacm::TerminologyPackage> packages = sacm_adapter::project_terminology_packages(*loaded.document);
+    ASSERT_EQ(packages.size(), 1u);
+    ASSERT_EQ(packages.front().terms.size(), 1u);
+    EXPECT_EQ(packages.front().terms.front().value, "hazard");
+    EXPECT_EQ(packages.front().terms.front().id, term->id);
+}
+
+TEST(ChangeSetAcceptance, AcceptsTermEditsAgainstAnExistingGlossary) {
+    ProjectFixture f = MakeFixture("term_edit", kTerminologySacm);
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    // The model the change set is staged against comes from the library
+    // projection, the way the application's does -- the legacy parser never
+    // sees terms, so staging against its output would refuse every term edit.
+    f.model = sacm_adapter::project_case(*loaded.document);
+
+    core::changesets::ChangeSetStore store;
+    const std::string id = store.Begin(1, "Tighten the ALARP definition", "", "", "claude-ai");
+    std::string error;
+    const nlohmann::json operations = nlohmann::json::array(
+        {nlohmann::json{{"type", "UpdateTerm"},
+                        {"element", {{"id", "T1"}}},
+                        {"field", "definition"},
+                        {"new_value", "Risk reduced as low as reasonably practicable, per the safety case scope."}},
+         nlohmann::json{
+             {"type", "UpdateTerm"}, {"element", {{"id", "T1"}}}, {"field", "value"}, {"new_value", "ALARP principle"}},
+         nlohmann::json{{"type", "RemoveTerm"}, {"element", {{"id", "T2"}}}}});
+    ASSERT_TRUE(store.Stage(id, ParseOperations(operations), f.model, error)) << error;
+
+    const core::reviews::ProposalValidityResult validity =
+        core::reviews::EvaluateReviewProposalValidity(store.Find(id)->proposal, f.model);
+    ASSERT_EQ(validity.validity, core::reviews::ProposalValidity::Valid) << validity.reason;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai");
+    ASSERT_TRUE(result.success) << result.error;
+
+    const std::vector<sacm::TerminologyPackage> packages = sacm_adapter::project_terminology_packages(*loaded.document);
+    ASSERT_EQ(packages.size(), 1u);
+    ASSERT_EQ(packages.front().terms.size(), 1u) << "T2 must be removed";
+    EXPECT_EQ(packages.front().terms.front().id, "T1");
+    EXPECT_EQ(packages.front().terms.front().value, "ALARP principle");
+    EXPECT_EQ(packages.front().terms.front().description,
+              "Risk reduced as low as reasonably practicable, per the safety case scope.");
 }

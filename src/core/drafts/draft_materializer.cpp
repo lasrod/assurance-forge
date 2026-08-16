@@ -8,20 +8,6 @@
 namespace core::drafts {
 namespace {
 
-bool IsCreateOperation(reviews::PatchOperationType type) {
-    switch (type) {
-    case reviews::PatchOperationType::CreateClaim:
-    case reviews::PatchOperationType::CreateStrategy:
-    case reviews::PatchOperationType::CreateSolution:
-    case reviews::PatchOperationType::CreateContext:
-    case reviews::PatchOperationType::CreateAssumption:
-    case reviews::PatchOperationType::CreateJustification:
-        return true;
-    default:
-        return false;
-    }
-}
-
 // A group's operations in the vocabulary the patch service speaks. The draft
 // domain deliberately reuses `ReviewProposal` rather than inventing an operation
 // format, so promotion needs no new command type.
@@ -55,7 +41,7 @@ std::unordered_set<std::string> PinnedIdentities(const DraftWorkspace& workspace
 
 bool GroupNeedsIdentities(const DraftChangeGroup& group) {
     for (const reviews::PatchOperation& operation : group.operations) {
-        if (!IsCreateOperation(operation.type))
+        if (!reviews::IsCreateOperation(operation.type))
             continue;
         if (!operation.create_ref.has_value())
             return true;
