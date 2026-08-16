@@ -402,9 +402,20 @@ Session::OperationResult Session::RunOverBridge(const std::string& op, const nlo
         return result;
     }
 
-    // A successful operation means the session is granted; a denial recorded
-    // earlier has been overturned by the user.
-    denied_by_user_ = false;
+    // A successful operation means the session is granted -- except the
+    // access-status query, which succeeds while reporting any state; clearing
+    // on it would let a client launder a denial away by polling. It carries
+    // the authoritative answer instead.
+    if (op == bridge::kRequestProjectAccessOperation) {
+        const std::string status = response.result.value("status", std::string());
+        if (status == bridge::access_state::kGranted) {
+            denied_by_user_ = false;
+        } else if (status == bridge::access_state::kDenied) {
+            denied_by_user_ = true;
+        }
+    } else {
+        denied_by_user_ = false;
+    }
 
     // The application marks a domain failure inside a successful response, the
     // same distinction MCP draws between a tool error and a protocol error.
