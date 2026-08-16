@@ -11,7 +11,12 @@ agent::ReadContext CurrentReadContext(const AgentRequestContext& context) {
     AgentArgumentView view;
     if (context.current_argument_view)
         view = context.current_argument_view();
-    return agent::ReadContext{context.state, context.project_path, view.model, view.workspace, view.is_working_draft};
+    return agent::ReadContext{context.state,
+                              context.project_path,
+                              context.context_generation,
+                              view.model,
+                              view.workspace,
+                              view.is_working_draft};
 }
 
 // A read operation reports "no case" or "unknown element" as a *tool* failure,
@@ -100,7 +105,8 @@ bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentR
                                         *context.draft_workspace,
                                         context.connection_id,
                                         context.client_label,
-                                        context.source_session_id};
+                                        context.source_session_id,
+                                        context.context_generation};
 
         if (request.op == "get_draft_status" || request.op == "list_change_sets") {
             return FromAgentResult(request.id, agent::GetDraftStatus(draft));

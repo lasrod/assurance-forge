@@ -66,14 +66,12 @@ struct AgentConnection {
     std::string access_state;
 };
 
-// One session waiting for the user's decision (ADR 0014 gate 2).
+// One session waiting for the user's decision (ADR 0014 gate 2). Exactly what
+// the approval modal shows -- a request always concerns the active project,
+// and it outlives neither that project nor the application run.
 struct AccessRequest {
     std::string session_id;
     std::string client_label;
-    // The active project's fingerprint at request time. A request outlives
-    // neither the project it named nor the application run.
-    std::string project_key;
-    std::string requested_utc;
 };
 
 class AgentBridgeController {
@@ -139,6 +137,13 @@ public:
     // calls this when the master gate closes.
     void RevokeAllAccess();
 
+    // Monotonic context generation (ADR 0014): changes whenever the shared
+    // context changes identity -- project switch or close, a grant, a
+    // revocation. Carried on every content response; every draft mutation
+    // names the value it read, so a result computed against one context can
+    // never land in another.
+    std::uint64_t context_generation() const;
+
 private:
     struct PendingRequest;
 
@@ -175,9 +180,11 @@ private:
     std::atomic<uint64_t> next_connection_id_{1};
     std::chrono::steady_clock::time_point last_heartbeat_{};
 
-    // Access bookkeeping, guarded by mutex_. Keys are session_id + "\n" +
-    // project_key -- both components are free of newlines by construction.
-    std::string AccessKey(const std::string& session_id, const std::string& project_key) const;
+    // The one derivation of a session's access state against the active
+    // project (a bridge::access_state constant). Both the dispatch gate and
+    // the connections() display call this, so they cannot disagree. Caller
+    // holds mutex_.
+    const char* AccessStateLocked(const std::string& session_id) const;
     // Appends a request if the session has none pending. Caller holds mutex_.
     void RegisterAccessRequestLocked(const AgentConnection& connection);
 
@@ -186,9 +193,13 @@ private:
     // threads answering hello.
     std::filesystem::path active_project_root_;
     std::string active_project_key_;
+    // Access bookkeeping, keyed by session id alone: entries never outlive
+    // the project they were granted against, because SetActiveProject and
+    // Stop clear all three containers on every identity change.
     std::vector<AccessRequest> pending_access_;
-    std::set<std::string> granted_access_;
-    std::set<std::string> denied_access_;
+    std::set<std::string> granted_sessions_;
+    std::set<std::string> denied_sessions_;
+    std::uint64_t context_generation_ = 1;
     std::condition_variable queued_;
     std::deque<std::shared_ptr<PendingRequest>> pending_;
     // Every connection ever served this session, including finished ones whose

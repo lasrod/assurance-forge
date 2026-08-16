@@ -27,13 +27,16 @@ constexpr std::chrono::seconds kFrameResponseTimeout{30};
 
 // How often the instance record's heartbeat is refreshed. Liveness is the pid,
 // not this timestamp -- the heartbeat exists so a human inspecting the record
-// can see the instance is not merely alive but attended.
-constexpr std::chrono::seconds kHeartbeatInterval{15};
+// can see the instance is not merely alive but attended. Generous, because
+// each refresh is a synchronous file write on the frame thread and nothing
+// machine-readable consumes the value.
+constexpr std::chrono::seconds kHeartbeatInterval{60};
 
 constexpr const char* kProjectNotActiveMessage =
-    "Assurance Forge no longer has this session's project open. Reads and draft "
-    "operations resume automatically when the user opens it again; nothing from "
-    "the newly opened project is shared with this session.";
+    "Assurance Forge no longer has this session's project open. Nothing from "
+    "the newly opened project is shared with this session. When the user opens "
+    "the project again, access must be granted anew before work resumes -- "
+    "\"allow while open\" ended when the project closed.";
 
 constexpr const char* kProjectAccessPendingMessage =
     "Assurance Forge is asking the user to approve this session's access to the "
@@ -41,7 +44,9 @@ constexpr const char* kProjectAccessPendingMessage =
 
 constexpr const char* kProjectAccessDeniedMessage =
     "The user declined this session's access to the open project. Nothing was "
-    "shared. The user can grant access later from the running application.";
+    "shared, and this session will not ask again while the project stays open. "
+    "If the denial was a mistake, the user can reopen the project, or toggle "
+    "MCP off and on in Preferences -- both clear the answer.";
 
 long long CurrentProcessId() {
 #ifdef _WIN32
@@ -103,7 +108,9 @@ bool AgentBridgeController::PublishRecord(std::string& error) {
     record.protocol = bridge::kProtocolVersion;
     record.instance_id = instance_id_;
     record.pid = CurrentProcessId();
-    record.address = listener_ != nullptr ? listener_->address() : bridge::InstanceAddress(instance_id_);
+    // Every caller runs after Listener::Start succeeded, so the listener is
+    // the one source of the address.
+    record.address = listener_->address();
     record.token = token_;
     record.app_version = app_version_;
     const std::string project_key = ActiveProjectKey();
@@ -123,8 +130,22 @@ std::filesystem::path AgentBridgeController::active_project_root() const {
     return active_project_root_;
 }
 
-std::string AgentBridgeController::AccessKey(const std::string& session_id, const std::string& project_key) const {
-    return session_id + "\n" + project_key;
+const char* AgentBridgeController::AccessStateLocked(const std::string& session_id) const {
+    if (active_project_key_.empty()) {
+        return bridge::access_state::kNoProject;
+    }
+    if (granted_sessions_.count(session_id) > 0) {
+        return bridge::access_state::kGranted;
+    }
+    if (denied_sessions_.count(session_id) > 0) {
+        return bridge::access_state::kDenied;
+    }
+    for (const AccessRequest& request : pending_access_) {
+        if (request.session_id == session_id) {
+            return bridge::access_state::kPending;
+        }
+    }
+    return bridge::access_state::kNone;
 }
 
 void AgentBridgeController::RegisterAccessRequestLocked(const AgentConnection& connection) {
@@ -133,12 +154,7 @@ void AgentBridgeController::RegisterAccessRequestLocked(const AgentConnection& c
             return;
         }
     }
-    AccessRequest request;
-    request.session_id = connection.session_id;
-    request.client_label = connection.client_label;
-    request.project_key = active_project_key_;
-    request.requested_utc = core::NowUtcString();
-    pending_access_.push_back(std::move(request));
+    pending_access_.push_back(AccessRequest{connection.session_id, connection.client_label});
 }
 
 std::vector<AccessRequest> AgentBridgeController::PendingAccessRequests() const {
@@ -146,35 +162,61 @@ std::vector<AccessRequest> AgentBridgeController::PendingAccessRequests() const 
     return pending_access_;
 }
 
+std::uint64_t AgentBridgeController::context_generation() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return context_generation_;
+}
+
 void AgentBridgeController::GrantAccess(const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
     if (active_project_key_.empty()) {
         return;
     }
-    granted_access_.insert(AccessKey(session_id, active_project_key_));
-    denied_access_.erase(AccessKey(session_id, active_project_key_));
+    const bool newly_granted = granted_sessions_.insert(session_id).second;
+    const bool was_denied = denied_sessions_.erase(session_id) > 0;
     std::erase_if(pending_access_, [&](const AccessRequest& request) { return request.session_id == session_id; });
+    // The generation says the context changed identity. A redundant grant
+    // changed nothing, and bumping for it would spuriously invalidate every
+    // other session's in-flight work.
+    if (newly_granted || was_denied) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::DenyAccess(const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
+    bool changed = false;
     if (!active_project_key_.empty()) {
-        denied_access_.insert(AccessKey(session_id, active_project_key_));
+        // Denying a currently-granted session ends the grant: the check order
+        // tests granted first, so leaving the grant standing would make the
+        // denial a silent no-op.
+        changed = granted_sessions_.erase(session_id) > 0;
+        changed = denied_sessions_.insert(session_id).second || changed;
     }
     std::erase_if(pending_access_, [&](const AccessRequest& request) { return request.session_id == session_id; });
+    if (changed) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::RevokeAccess(const std::string& session_id) {
     const std::lock_guard<std::mutex> lock(mutex_);
-    std::erase_if(granted_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
-    std::erase_if(denied_access_, [&](const std::string& key) { return key.rfind(session_id + "\n", 0) == 0; });
+    const std::size_t removed = granted_sessions_.erase(session_id) + denied_sessions_.erase(session_id);
+    // A revoke that revoked nothing changed nothing; see GrantAccess.
+    if (removed > 0) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::RevokeAllAccess() {
     const std::lock_guard<std::mutex> lock(mutex_);
-    granted_access_.clear();
-    denied_access_.clear();
+    const bool changed = !granted_sessions_.empty() || !denied_sessions_.empty() || !pending_access_.empty();
+    granted_sessions_.clear();
+    denied_sessions_.clear();
     pending_access_.clear();
+    if (changed) {
+        ++context_generation_;
+    }
 }
 
 void AgentBridgeController::SetActiveProject(const std::filesystem::path& project_root) {
@@ -190,10 +232,12 @@ void AgentBridgeController::SetActiveProject(const std::filesystem::path& projec
 
         // "Allow while open" ends when the project stops being open. Every
         // grant, denial and request here names the previous project, so all
-        // of them end with it.
+        // of them end with it -- this clearing is the invariant that lets the
+        // stores key on session id alone.
         pending_access_.clear();
-        granted_access_.clear();
-        denied_access_.clear();
+        granted_sessions_.clear();
+        denied_sessions_.clear();
+        ++context_generation_;
 
         // Anything queued was staged against the previous project. Refusing it
         // here is what keeps a request from executing against a model it was
@@ -257,8 +301,8 @@ void AgentBridgeController::Stop() {
         active_project_root_.clear();
         active_project_key_.clear();
         pending_access_.clear();
-        granted_access_.clear();
-        denied_access_.clear();
+        granted_sessions_.clear();
+        denied_sessions_.clear();
     }
     queued_.notify_all();
 
@@ -524,24 +568,21 @@ int AgentBridgeController::PollPendingRequests(const OperationHandler& handler) 
         // ADR 0014 gate 2: whether bound at hello or unbound, no project
         // content flows before the user grants this session access to the
         // active project. Client labels are attribution; the grant is keyed
-        // by the session id.
-        std::string access_state = "none";
+        // by the session id. A session with no answer yet raises the request
+        // here, so the first refused operation is also what puts the prompt
+        // in front of the user.
+        std::string access_state;
         {
             const std::lock_guard<std::mutex> lock(mutex_);
-            if (active_project_key_.empty()) {
-                access_state = "no_project";
-            } else if (granted_access_.count(AccessKey(pending->connection.session_id, active_project_key_)) > 0) {
-                access_state = "granted";
-            } else if (denied_access_.count(AccessKey(pending->connection.session_id, active_project_key_)) > 0) {
-                access_state = "denied";
-            } else {
+            access_state = AccessStateLocked(pending->connection.session_id);
+            if (access_state == bridge::access_state::kNone) {
                 RegisterAccessRequestLocked(pending->connection);
-                access_state = "pending";
+                access_state = bridge::access_state::kPending;
             }
         }
 
         if (pending->request.op == bridge::kRequestProjectAccessOperation) {
-            if (access_state == "no_project") {
+            if (access_state == bridge::access_state::kNoProject) {
                 pending->response = bridge::MakeError(pending->request.id,
                                                       bridge::error_code::kNoProject,
                                                       "No project is open to request access to. Ask again "
@@ -552,18 +593,18 @@ int AgentBridgeController::PollPendingRequests(const OperationHandler& handler) 
             continue;
         }
 
-        if (access_state == "no_project") {
+        if (access_state == bridge::access_state::kNoProject) {
             pending->response = bridge::MakeError(pending->request.id,
                                                   bridge::error_code::kNoProject,
                                                   "Assurance Forge is running but has no project open.");
             continue;
         }
-        if (access_state == "pending") {
+        if (access_state == bridge::access_state::kPending) {
             pending->response = bridge::MakeError(
                 pending->request.id, bridge::error_code::kProjectAccessPending, kProjectAccessPendingMessage);
             continue;
         }
-        if (access_state == "denied") {
+        if (access_state == bridge::access_state::kDenied) {
             pending->response = bridge::MakeError(
                 pending->request.id, bridge::error_code::kProjectAccessDenied, kProjectAccessDeniedMessage);
             continue;
@@ -590,19 +631,11 @@ std::vector<AgentConnection> AgentBridgeController::connections() const {
             continue;
         }
         AgentConnection connection = entry->descriptor;
-        if (active_project_key_.empty()) {
-            connection.access_state = "none";
-        } else if (granted_access_.count(AccessKey(connection.session_id, active_project_key_)) > 0) {
-            connection.access_state = "granted";
-        } else if (denied_access_.count(AccessKey(connection.session_id, active_project_key_)) > 0) {
-            connection.access_state = "denied";
-        } else {
-            bool pending = false;
-            for (const AccessRequest& request : pending_access_) {
-                pending = pending || request.session_id == connection.session_id;
-            }
-            connection.access_state = pending ? "pending" : "none";
-        }
+        // The same derivation the dispatch gate uses, so what the user is
+        // shown cannot disagree with what requests are refused with. The one
+        // difference is intentional: listing does not raise a request.
+        connection.access_state =
+            active_project_key_.empty() ? bridge::access_state::kNone : AccessStateLocked(connection.session_id);
         live.push_back(std::move(connection));
     }
     return live;

@@ -2,6 +2,7 @@
 
 #include "app/app_runtime_state.h"
 #include "app/controllers/review_controller.h"
+#include "bridge/protocol.h"
 #include "core/guideline_catalog.h"
 #include "core/sccg/staged_checks.h"
 #include "core/problems/problem_utils.h"
@@ -152,12 +153,12 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
             // The access state rides along so the person responsible for the
             // argument can see not just that a client is attached, but
             // whether it can currently read anything (ADR 0014).
-            if (connection.access_state == "granted") {
+            if (connection.access_state == bridge::access_state::kGranted) {
                 model.connected_agents.push_back(ui::i18n::trf("{0} — access granted", connection.client_label));
-            } else if (connection.access_state == "pending") {
+            } else if (connection.access_state == bridge::access_state::kPending) {
                 model.connected_agents.push_back(
                     ui::i18n::trf("{0} — awaiting your approval", connection.client_label));
-            } else if (connection.access_state == "denied") {
+            } else if (connection.access_state == bridge::access_state::kDenied) {
                 model.connected_agents.push_back(ui::i18n::trf("{0} — access denied", connection.client_label));
             } else {
                 model.connected_agents.push_back(connection.client_label);

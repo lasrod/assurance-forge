@@ -55,12 +55,11 @@ Launched with **no project argument**, the adapter is a *dynamic session*
 it initializes even when no application is running, discovers the running
 instance at call time, and connects **unbound**. An unbound session can report
 status — including the coarse fact that a project is open, never which one —
-and receives no project content: every project operation is refused with
-`project_access_required`. This is the fail-closed interim until the
-access-grant flow exists; the master `mcp.enabled` flag alone never discloses
-whatever project the user has open. With more than one instance running, a
-dynamic session refuses to choose — picking the newest would be picking a
-safety case by timestamp.
+and receives no project content until the user grants it access (see Consent
+below); the master `mcp.enabled` flag alone never discloses whatever project
+the user has open. With more than one instance running, a dynamic session
+refuses to choose — picking the newest would be picking a safety case by
+timestamp.
 
 `--offline-project <path>` is the offline mode above chosen deliberately:
 accepted SACM from the named path, read-only, and it never connects — even
@@ -110,10 +109,16 @@ requirement, not a nicety — an unbounded call on a real case spends the whole
 conversation.
 
 Every case-content response identifies what it returned. Connected reads name
-`view: working_draft` or `view: accepted`, plus `argument_file` and the current
-`working_revision`; an active workspace also supplies `workspace_id`. Offline
-reads name `view: accepted`. A client never has to infer whether text has been
-accepted.
+`view: working_draft` or `view: accepted`, plus `argument_file`, the current
+`working_revision`, and the session's `context_generation`; an active
+workspace also supplies `workspace_id`. Offline reads name `view: accepted`.
+A client never has to infer whether text has been accepted.
+
+Every draft mutation names both values it read: `expected_working_revision`
+(the draft moved) and `expected_context_generation` (the ground under the
+whole session moved — a project switch, a fresh grant, a revocation). Either
+being stale refuses the mutation before anything is stored, so a change
+computed against one context can never land in another (ADR 0014).
 
 ## Changing: integrated draft groups
 

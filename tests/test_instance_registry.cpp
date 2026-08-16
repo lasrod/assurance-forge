@@ -298,6 +298,23 @@ TEST_F(InstanceRegistryTest, FindsTheLiveInstanceThatHasTheProjectOpen) {
     EXPECT_FALSE(std::filesystem::exists(bridge::InstancesDirectory() / "af-dead0000000000.json"));
 }
 
+// Two live instances with the same project open (allowed, with a warning) is
+// a refusal, not a coin toss by directory order: draft groups must not land
+// in the window the user is not looking at.
+TEST_F(InstanceRegistryTest, RefusesToPickBetweenTwoInstancesWithTheSameProject) {
+    const std::filesystem::path project = root_ / "alpha";
+    std::filesystem::create_directories(project);
+    const std::string key = bridge::ProjectKey(project);
+
+    std::string error;
+    ASSERT_TRUE(bridge::WriteInstanceRecord(MakeRecord("af-first000000000", OwnPid(), key), error)) << error;
+    ASSERT_TRUE(bridge::WriteInstanceRecord(MakeRecord("af-second00000000", OwnPid(), key), error)) << error;
+
+    bridge::InstanceRecord found;
+    EXPECT_FALSE(bridge::FindInstanceForProject(project, found, error));
+    EXPECT_NE(error.find("More than one"), std::string::npos) << error;
+}
+
 TEST_F(InstanceRegistryTest, ReportsWhenNoInstanceHasTheProjectOpen) {
     const std::filesystem::path project = root_ / "alpha";
     std::filesystem::create_directories(project);
