@@ -412,3 +412,42 @@ TEST(TreeNodeDisplayNameTest, PrefersTheNameWhenThereIsOne) {
     ui::UiState state;
     EXPECT_EQ(ui::TreeNodeDisplayName(*node, state), "G1: Top goal");
 }
+
+// ----- Terminology stays off the argument tree -----
+
+// A Term or Category is terminology, not argument: GSN has no node for it, the
+// SVG export skips it, and the terminology panel is its home. Building tree
+// nodes for them put every term on the canvas as an orphan box whose label was
+// the full definition text -- one long line beside the argument trees.
+TEST(AssuranceTreeTest, TerminologyElementsProduceNoNodesAndNoOrphans) {
+    parser::AssuranceCase model;
+    model.id = "case-1";
+
+    parser::SacmElement root;
+    root.id = "G1";
+    root.type = "claim";
+    root.name = "Top goal";
+    root.content = "The system is safe";
+    model.elements.push_back(root);
+
+    parser::SacmElement term;
+    term.id = "T1";
+    term.type = "term";
+    term.content = "hazard";
+    term.description = "A system state that, together with environmental conditions, could lead to harm.";
+    model.elements.push_back(term);
+
+    parser::SacmElement category;
+    category.id = "CAT1";
+    category.type = "category";
+    category.name = "Safety vocabulary";
+    model.elements.push_back(category);
+
+    const AssuranceTree tree = AssuranceTree::Build(model);
+
+    ASSERT_NE(tree.root, nullptr);
+    EXPECT_EQ(tree.root->id, "G1");
+    EXPECT_EQ(FindTreeNode(tree, "T1"), nullptr);
+    EXPECT_EQ(FindTreeNode(tree, "CAT1"), nullptr);
+    EXPECT_TRUE(tree.orphans.empty());
+}
