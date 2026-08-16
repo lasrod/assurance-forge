@@ -113,7 +113,12 @@ void ModalHost::RenderAccessRequestModal() {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
-    } else {
+    } else if (!ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) {
+        // Only when no other popup holds the stack. Two root-level modals
+        // both calling OpenPopup every frame replace each other's stack entry
+        // and neither ever renders; an access request arrives asynchronously,
+        // so unlike the user-triggered modals it must yield and try again
+        // once the current popup closes -- the request stays pending.
         ImGui::OpenPopup("###mcp_access_request_modal");
     }
 }
@@ -249,15 +254,12 @@ void ModalHost::RenderPreferencesWindow() {
             return;
         }
         // Only after the write succeeds: the checkbox must reflect what the MCP
-        // server will actually read, not what the user clicked.
+        // server will actually read, not what the user clicked. Closing the
+        // master gate also ends every per-session grant -- enforced by the
+        // frame loop's sweep in AppRuntime::PollAgentBridge, which watches the
+        // flag itself rather than trusting every writer to remember.
         state_.mcp_settings = settings;
         state_.mcp_status.clear();
-        // Closing the master gate invalidates every per-session grant
-        // (ADR 0014): re-enabling later must start from explicit approvals,
-        // not resurrect old ones.
-        if (!enabled && state_.agent_bridge != nullptr) {
-            state_.agent_bridge->RevokeAllAccess();
-        }
     };
     callbacks.set_theme = [](ui::AppTheme theme) { ui::ApplyAppTheme(theme); };
     callbacks.set_language = [](ui::i18n::Language language) { ui::i18n::SetLanguage(language); };

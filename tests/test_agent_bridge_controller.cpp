@@ -288,6 +288,15 @@ TEST_F(AgentBridgeControllerTest, DenyRefusesAndRevokeTakesEffectNextCall) {
     EXPECT_FALSE(revoked.ok);
     EXPECT_EQ(revoked.error_code, bridge::error_code::kProjectAccessPending);
 
+    // Denying a currently-granted session ends the grant -- a denial that
+    // left the grant standing would be a silent no-op.
+    controller.GrantAccess("stable-session-7");
+    ASSERT_TRUE(Exchange(*client, Say("get_case_overview", token, 6)).ok);
+    controller.DenyAccess("stable-session-7");
+    const bridge::Response overturned = Exchange(*client, Say("get_case_overview", token, 7));
+    EXPECT_FALSE(overturned.ok);
+    EXPECT_EQ(overturned.error_code, bridge::error_code::kProjectAccessDenied);
+
     stop.store(true);
     frames.join();
 }

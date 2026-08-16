@@ -1181,6 +1181,10 @@ void AppRuntime::UpdateAgentBridgeForProject() {
     if (impl_->agent_bridge == nullptr) {
         return;
     }
+    // A project open is the retry point for a listener that failed to start:
+    // frequent enough to heal a transient transport failure, rare enough that
+    // the status message cannot spam.
+    impl_->agent_bridge_start_attempted = false;
     EnsureAgentBridgeStarted();
     if (!impl_->agent_bridge->listening()) {
         return;
@@ -1221,6 +1225,15 @@ bool AppRuntime::PollAgentBridge() {
         return false;
     }
     impl_->agent_bridge->WriteHeartbeatIfDue();
+
+    // The master gate is enforced per call in the MCP process (ADR 0007), but
+    // the grant store lives here. Sweeping it whenever the flag is off makes
+    // "disable MCP revokes everything" a property of the mechanism rather
+    // than of whichever UI element happened to flip the flag. Cheap: with
+    // nothing to revoke this is one mutex acquisition per frame.
+    if (!impl_->mcp_settings.enabled) {
+        impl_->agent_bridge->RevokeAllAccess();
+    }
 
     const std::string project_path = impl_->app_state.current_project.has_value()
                                          ? impl_->app_state.current_project->rootPath.generic_string()

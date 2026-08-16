@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <mutex>
 #include <random>
 #include <sstream>
 
@@ -222,7 +223,11 @@ bool WriteInstanceRecord(const InstanceRecord& record, std::string& error) {
         return false;
     }
 #ifdef _WIN32
-    ApplyUserOnlyAclBestEffort(path.parent_path());
+    // Once per process: the directory's ACL cannot change between writes, and
+    // the record is rewritten on every heartbeat -- restamping NTFS security
+    // metadata each time bought nothing.
+    static std::once_flag acl_once;
+    std::call_once(acl_once, [&path] { ApplyUserOnlyAclBestEffort(path.parent_path()); });
 #endif
 
     const nlohmann::json document{
@@ -237,27 +242,42 @@ bool WriteInstanceRecord(const InstanceRecord& record, std::string& error) {
         {"lastHeartbeatUtc", record.last_heartbeat_utc},
     };
 
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
-    if (!file) {
-        error = "Could not write the bridge instance record: " + path.string();
-        return false;
+    // Temp-then-rename, because the record is rewritten in place on every
+    // heartbeat while the adapter enumerates on every call: a truncate-and-
+    // stream write has a window in which a reader parses half a document,
+    // skips the record, and spuriously reports the application absent.
+    const std::filesystem::path temp = path.parent_path() / (record.instance_id + ".tmp");
+    {
+        std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            error = "Could not write the bridge instance record: " + temp.string();
+            return false;
+        }
+        file << document.dump(2);
+        file.close();
+        if (!file) {
+            error = "Could not write the bridge instance record: " + temp.string();
+            return false;
+        }
     }
-    file << document.dump(2);
-    if (!file) {
-        error = "Could not write the bridge instance record: " + path.string();
-        return false;
-    }
-    file.close();
 
 #ifndef _WIN32
     // The token is in this file. Anyone who can read it can drive the
     // application; the containing directory is already user-only, and this makes
-    // the file itself say so too.
-    std::filesystem::permissions(path,
+    // the file itself say so too. Applied before the rename so the readable
+    // window never exists.
+    std::filesystem::permissions(temp,
                                  std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
                                  std::filesystem::perm_options::replace,
                                  ec);
 #endif
+
+    std::filesystem::rename(temp, path, ec);
+    if (ec) {
+        std::filesystem::remove(temp, ec);
+        error = "Could not publish the bridge instance record: " + path.string();
+        return false;
+    }
     return true;
 }
 
@@ -276,20 +296,22 @@ bool IsProcessAlive(long long pid) {
 #ifdef _WIN32
     HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
     if (process == nullptr) {
-        // Access denied still proves existence -- it is some other user's
-        // process, which cannot be one of ours, so treat it as not-alive for
-        // discovery purposes only when lookup failed for a different reason.
-        return GetLastError() == ERROR_ACCESS_DENIED;
+        // Access denied proves a process exists under that pid -- but not
+        // ours: records are written per user, and a pid we cannot even query
+        // is another user's or the system's, i.e. a recycled pid after our
+        // instance died. Treating it as alive would leave a ghost record that
+        // bricks discovery ("more than one instance") until someone deletes
+        // the file by hand.
+        return false;
     }
     DWORD exit_code = 0;
     const BOOL got_code = GetExitCodeProcess(process, &exit_code);
     CloseHandle(process);
     return got_code && exit_code == STILL_ACTIVE;
 #else
-    if (::kill(static_cast<pid_t>(pid), 0) == 0) {
-        return true;
-    }
-    return errno == EPERM;
+    // EPERM proves a process exists under that pid, but one we may not signal
+    // -- another user's, so not ours. Same reasoning as the Windows branch.
+    return ::kill(static_cast<pid_t>(pid), 0) == 0;
 #endif
 }
 
@@ -319,11 +341,44 @@ std::vector<InstanceRecord> EnumerateInstanceRecords() {
     return records;
 }
 
+namespace {
+
+// A crashed instance leaves its record and, on POSIX, its socket file behind
+// -- a random per-run address is never rebound, so nothing else would ever
+// reclaim it. The address delete is confined to paths the registry itself
+// would have chosen: a hostile record must not be able to aim it elsewhere.
+void RemoveDeadInstance(const InstanceRecord& record) {
+    std::error_code ec;
+    const std::filesystem::path address(record.address);
+    if (address.parent_path() == BridgeDirectory()) {
+        std::filesystem::remove(address, ec);
+    }
+    RemoveInstanceRecord(record.instance_id);
+}
+
+} // namespace
+
+std::vector<InstanceRecord> EnumerateLiveInstanceRecords() {
+    // One pass owns the whole liveness policy: a record whose process is gone
+    // is pruned as it is met, and only survivors are returned. Discovery runs
+    // on every MCP call while disconnected, so one directory scan, one parse
+    // and one liveness check per record is also the cheap form.
+    std::vector<InstanceRecord> live;
+    for (InstanceRecord& record : EnumerateInstanceRecords()) {
+        if (IsProcessAlive(record.pid)) {
+            live.push_back(std::move(record));
+        } else {
+            RemoveDeadInstance(record);
+        }
+    }
+    return live;
+}
+
 int PruneStaleInstanceRecords() {
     int pruned = 0;
     for (const InstanceRecord& record : EnumerateInstanceRecords()) {
         if (!IsProcessAlive(record.pid)) {
-            RemoveInstanceRecord(record.instance_id);
+            RemoveDeadInstance(record);
             ++pruned;
         }
     }
@@ -331,27 +386,40 @@ int PruneStaleInstanceRecords() {
 }
 
 bool FindInstanceForProject(const std::filesystem::path& project_root, InstanceRecord& out, std::string& error) {
-    error.clear();
-    PruneStaleInstanceRecords();
+    return FindInstanceForProjectKey(ProjectKey(project_root), out, error);
+}
 
-    const std::string wanted_key = ProjectKey(project_root);
-    for (InstanceRecord& record : EnumerateInstanceRecords()) {
-        if (record.project_key != wanted_key || !IsProcessAlive(record.pid)) {
+bool FindInstanceForProjectKey(const std::string& project_key, InstanceRecord& out, std::string& error) {
+    error.clear();
+    bool found = false;
+    for (InstanceRecord& record : EnumerateLiveInstanceRecords()) {
+        if (record.project_key != project_key) {
             continue;
         }
+        if (found) {
+            // Two instances have this project open. Picking one by directory
+            // order would put an agent's draft groups in whichever window the
+            // enumeration happened to yield -- possibly the one the user is
+            // not looking at.
+            error = "More than one running Assurance Forge has this project open. Close one of them; "
+                    "this session never picks between instances by itself.";
+            return false;
+        }
         out = std::move(record);
-        return true;
+        found = true;
     }
-    error = "No running Assurance Forge has this project open.";
-    return false;
+    if (!found) {
+        error = "No running Assurance Forge has this project open.";
+    }
+    return found;
 }
 
 bool AnotherInstanceHasProjectOpen(const std::filesystem::path& project_root,
                                    const std::string& own_instance_id,
                                    InstanceRecord& out) {
     const std::string wanted_key = ProjectKey(project_root);
-    for (InstanceRecord& record : EnumerateInstanceRecords()) {
-        if (record.instance_id == own_instance_id || record.project_key != wanted_key || !IsProcessAlive(record.pid)) {
+    for (InstanceRecord& record : EnumerateLiveInstanceRecords()) {
+        if (record.instance_id == own_instance_id || record.project_key != wanted_key) {
             continue;
         }
         out = std::move(record);

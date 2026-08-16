@@ -16,11 +16,9 @@
 // **Dynamic** (no configured project, ADR 0014). The session initializes with
 // nothing -- no application, no project -- and discovers the running instance
 // at call time. It connects *unbound*: the application serves it no project
-// content, and every project operation is refused with
-// `project_access_required` until an access grant binds the session to the
-// open project. The grant flow is the next phase; until it exists a dynamic
-// session can report status and nothing else, which is the fail-closed
-// reading of ADR 0014's second gate.
+// content until the user grants this session access to the open project, and
+// ungranted operations are refused with `project_access_pending` while the
+// request is in front of the user.
 //
 // **Explicit offline** (`--offline-project`). The offline mode above, chosen
 // deliberately: reads accepted SACM from the named path, never connects, and
@@ -44,6 +42,7 @@
 
 #include "core/app_state.h"
 
+#include "bridge/instance_registry.h"
 #include "bridge/protocol.h"
 #include "bridge/transport.h"
 
@@ -150,6 +149,13 @@ private:
     Session() = default;
 
     bool ConnectToApplication(std::string& error);
+    // Protocol check, connect and hello against an instance the caller has
+    // already discovered -- discovery and connection stay two steps so no
+    // path scans the registry twice.
+    bool ConnectToInstance(const bridge::InstanceRecord& record, std::string& error);
+    // The one wording for why a dynamic session is not connected, chosen from
+    // the last discovery: status and every failing tool must tell one story.
+    std::string DynamicUnavailableDetail() const;
     bool OpenOffline(std::string& error);
     // Re-establishes the bridge connection when there is none. Cheap when
     // already connected, and cheap when the application is absent -- one
@@ -180,6 +186,15 @@ private:
     std::string last_dynamic_error_;
 
     std::filesystem::path project_path_;
+    // The project fingerprint for a bound session, computed once at open:
+    // canonicalizing and hashing the unchanging path on every reconnect probe
+    // was pure waste.
+    std::string project_key_;
+    // The user answered "Deny" for this session. Remembered here so the
+    // offline copy a bound session may hold cannot serve the very content the
+    // user just declined the moment the application exits. Cleared by any
+    // successful bridge operation (a fresh grant).
+    bool denied_by_user_ = false;
     // Resolved once at open so every consent read hits the same file.
     std::filesystem::path settings_path_;
     bool initialized_ = false;

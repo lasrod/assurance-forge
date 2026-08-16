@@ -87,15 +87,24 @@ bool IsProcessAlive(long long pid);
 // and malformed files are skipped: a caller cannot act on the difference.
 std::vector<InstanceRecord> EnumerateInstanceRecords();
 
+// The records of instances whose process is still running. This owns the
+// liveness policy: a dead instance's record (and its leftover socket file) is
+// pruned as it is met, in the same single pass.
+std::vector<InstanceRecord> EnumerateLiveInstanceRecords();
+
 // Deletes records whose process is gone. Returns how many were removed. Safe
 // for either side to call: only a dead instance's record is ever touched.
 int PruneStaleInstanceRecords();
 
-// The live instance that has `project_root` open, if there is exactly such an
-// instance. Prunes stale records on the way. This is how the project-bound
-// adapter finds its application until dynamic session binding replaces
-// project matching.
+// The live instance that has `project_root` open, if there is exactly one.
+// Two instances with the same project open (allowed, with a warning) is a
+// refusal, not a coin toss: draft groups must not land in the window the user
+// is not looking at. Prunes stale records on the way. This is how the
+// project-bound adapter finds its application until dynamic session binding
+// replaces project matching.
 bool FindInstanceForProject(const std::filesystem::path& project_root, InstanceRecord& out, std::string& error);
+// The same lookup for a caller that has already computed (and cached) the key.
+bool FindInstanceForProjectKey(const std::string& project_key, InstanceRecord& out, std::string& error);
 
 // Advisory single-owner check (ADR 0014): a *different* live instance that has
 // `project_root` open. `own_instance_id` excludes the caller's own record.

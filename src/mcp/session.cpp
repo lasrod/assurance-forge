@@ -96,13 +96,7 @@ bool Session::ConnectToApplication(std::string& error) {
     // unbound. Stale records are pruned on the way.
     bridge::InstanceRecord record;
     if (dynamic_) {
-        bridge::PruneStaleInstanceRecords();
-        std::vector<bridge::InstanceRecord> live;
-        for (bridge::InstanceRecord& candidate : bridge::EnumerateInstanceRecords()) {
-            if (bridge::IsProcessAlive(candidate.pid)) {
-                live.push_back(std::move(candidate));
-            }
-        }
+        std::vector<bridge::InstanceRecord> live = bridge::EnumerateLiveInstanceRecords();
         last_discovery_count_ = static_cast<int>(live.size());
         if (live.empty()) {
             error = "No running Assurance Forge was found.";
@@ -117,10 +111,14 @@ bool Session::ConnectToApplication(std::string& error) {
         }
         record = std::move(live.front());
     } else {
-        if (!bridge::FindInstanceForProject(project_path_, record, error)) {
+        if (!bridge::FindInstanceForProjectKey(project_key_, record, error)) {
             return false;
         }
     }
+    return ConnectToInstance(record, error);
+}
+
+bool Session::ConnectToInstance(const bridge::InstanceRecord& record, std::string& error) {
     if (!bridge::IsSupportedProtocol(record.protocol)) {
         error = bridge::UnsupportedProtocolMessage(record.protocol);
         return false;
@@ -142,7 +140,7 @@ bool Session::ConnectToApplication(std::string& error) {
     hello.args = nlohmann::json{{"client", client_label_.empty() ? "assurance-forge-mcp" : client_label_},
                                 {"session", session_id_}};
     if (!dynamic_) {
-        hello.args["projectKey"] = bridge::ProjectKey(project_path_);
+        hello.args["projectKey"] = project_key_;
     }
 
     std::string reply;
@@ -201,6 +199,9 @@ std::unique_ptr<Session> Session::Open(Config config, std::string& error) {
     session->session_id_ = bridge::GenerateToken();
     session->never_connect_ = config.never_connect || config.offline_only;
     session->offline_only_ = config.offline_only;
+    if (!config.project_path.empty()) {
+        session->project_key_ = bridge::ProjectKey(config.project_path);
+    }
 
     // Dynamic mode: no configured project. The session must initialize even
     // with no application running -- MCP clients launch this process at client
@@ -284,10 +285,10 @@ bool Session::EnsureConnected() {
         }
         bridge::InstanceRecord record;
         std::string error;
-        if (!bridge::FindInstanceForProject(project_path_, record, error)) {
+        if (!bridge::FindInstanceForProjectKey(project_key_, record, error)) {
             break;
         }
-        if (ConnectToApplication(error)) {
+        if (ConnectToInstance(record, error)) {
             mode_ = Mode::Connected;
             return true;
         }
@@ -309,29 +310,18 @@ Session::OperationResult Session::DescribeConnection() {
             result.payload["mode"] = "connected_unbound";
             result.payload["application_version"] = application_version_;
             result.payload["detail"] =
-                "Connected to a running Assurance Forge, but this session is not bound to a project, so "
-                "project content is refused with project_access_required. Until access grants are "
-                "available, launch assurance-forge-mcp with --project <path> to bind the session.";
+                "Connected to a running Assurance Forge. Project content requires the user's per-session "
+                "grant: call request_project_access to see this session's state -- granted means work "
+                "proceeds, pending means the approval is in front of the user, denied means they said no.";
         } else if (last_discovery_count_ > 1) {
             result.payload["mode"] = "multiple_applications";
-            result.payload["detail"] =
-                "More than one Assurance Forge is running, and this session never picks one by itself. "
-                "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
-                "the project directly.";
+            result.payload["detail"] = DynamicUnavailableDetail();
         } else if (last_discovery_count_ == 1) {
-            // An instance was found but not reached -- a crashed process whose
-            // record lingers, or a protocol mismatch between builds. "Start
-            // Assurance Forge" would be the wrong instruction, so the actual
-            // failure is surfaced.
             result.payload["mode"] = "application_unreachable";
-            result.payload["detail"] = last_dynamic_error_.empty()
-                                           ? "A running Assurance Forge was found but could not be reached. The "
-                                             "session retries automatically on the next call."
-                                           : last_dynamic_error_;
+            result.payload["detail"] = DynamicUnavailableDetail();
         } else {
             result.payload["mode"] = "application_unavailable";
-            result.payload["detail"] =
-                "Start Assurance Forge and open a project. This session will discover it automatically.";
+            result.payload["detail"] = DynamicUnavailableDetail();
         }
     } else if (offline_only_) {
         result.payload["mode"] = "offline_read_only";
@@ -341,8 +331,10 @@ Session::OperationResult Session::DescribeConnection() {
     } else if (connection_ != nullptr) {
         result.payload["mode"] = "connected";
         result.payload["application_version"] = application_version_;
-        result.payload["detail"] = "Connected to a running Assurance Forge. Reads answer from the integrated "
-                                   "working draft the user is looking at; draft tools are available.";
+        result.payload["detail"] = "Connected to a running Assurance Forge. Reads and draft tools answer from "
+                                   "the integrated working draft the user is looking at, once the user has "
+                                   "granted this session access -- ungranted calls return "
+                                   "project_access_pending while the approval is in front of the user.";
     } else if (offline_loaded_) {
         result.payload["mode"] = "offline_read_only";
         result.payload["detail"] = "No running Assurance Forge is reachable, so reads serve the accepted case "
@@ -394,9 +386,25 @@ Session::OperationResult Session::RunOverBridge(const std::string& op, const nlo
     }
     if (!response.ok) {
         result.is_error = true;
+        // The stable code travels with the prose: tool guidance tells clients
+        // to branch on values like project_access_pending, so they must be
+        // able to see them rather than pattern-match sentences.
         result.payload = nlohmann::json{{"error", response.error_message}};
+        if (!response.error_code.empty()) {
+            result.payload["error_code"] = response.error_code;
+        }
+        if (response.error_code == bridge::error_code::kProjectAccessDenied) {
+            // The user said no. Remembered so this session's offline copy
+            // cannot serve the declined content the moment the application
+            // exits.
+            denied_by_user_ = true;
+        }
         return result;
     }
+
+    // A successful operation means the session is granted; a denial recorded
+    // earlier has been overturned by the user.
+    denied_by_user_ = false;
 
     // The application marks a domain failure inside a successful response, the
     // same distinction MCP draws between a tool error and a protocol error.
@@ -564,6 +572,19 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
     }
 
     if (offline_loaded_) {
+        if (denied_by_user_) {
+            // The user declined this session's access while the application
+            // was running. The copy on disk is the same safety case, and an
+            // exit of the application must not turn a "no" into a "yes".
+            OperationResult refused;
+            refused.is_error = true;
+            refused.payload =
+                nlohmann::json{{"error",
+                                "The user declined this session's access to the project, so its offline copy stays "
+                                "closed too. Start Assurance Forge and grant access, or start a new session."},
+                               {"error_code", bridge::error_code::kProjectAccessDenied}};
+            return refused;
+        }
         return RunOffline(op, args);
     }
 
@@ -571,17 +592,7 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
     result.is_error = true;
     result.needs_application = true;
     if (dynamic_) {
-        std::string message;
-        if (last_discovery_count_ > 1) {
-            message = "More than one Assurance Forge is running, and this session never picks one by itself. "
-                      "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
-                      "the project directly.";
-        } else if (last_discovery_count_ == 1 && !last_dynamic_error_.empty()) {
-            message = last_dynamic_error_;
-        } else {
-            message = "Start Assurance Forge and open a project. This session will discover it automatically.";
-        }
-        result.payload = nlohmann::json{{"error", message}};
+        result.payload = nlohmann::json{{"error", DynamicUnavailableDetail()}};
         return result;
     }
     result.payload = nlohmann::json{
@@ -589,6 +600,23 @@ Session::OperationResult Session::Run(const std::string& op, const nlohmann::jso
          "Assurance Forge is not reachable, and this session holds no offline copy to read from. Start "
          "Assurance Forge and open this project; the session reconnects automatically on the next call."}};
     return result;
+}
+
+std::string Session::DynamicUnavailableDetail() const {
+    if (last_discovery_count_ > 1) {
+        return "More than one Assurance Forge is running, and this session never picks one by itself. "
+               "Close the extra instances, or launch assurance-forge-mcp with --project <path> to name "
+               "the project directly.";
+    }
+    if (last_discovery_count_ == 1) {
+        // An instance was found but not reached -- a crashed process whose
+        // record lingers, or a protocol mismatch between builds. "Start
+        // Assurance Forge" would be the wrong instruction.
+        return last_dynamic_error_.empty() ? "A running Assurance Forge was found but could not be reached. "
+                                             "The session retries automatically on the next call."
+                                           : last_dynamic_error_;
+    }
+    return "Start Assurance Forge and open a project. This session will discover it automatically.";
 }
 
 } // namespace mcp

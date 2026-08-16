@@ -23,7 +23,7 @@ AiReviewGuidelineSelection SelectReviewProfileGuidelines(const core::GuidelineCa
 }
 
 AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCatalog& guideline_catalog,
-                                                         const parser::SacmElement& element,
+                                                         const core::SacmElement& element,
                                                          const core::TreeNode* node) {
     const parser::ReviewProfile* match = nullptr;
     for (const parser::ReviewProfile& profile : guideline_catalog.document.review_profiles) {

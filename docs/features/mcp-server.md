@@ -55,12 +55,11 @@ Launched with **no project argument**, the adapter is a *dynamic session*
 it initializes even when no application is running, discovers the running
 instance at call time, and connects **unbound**. An unbound session can report
 status — including the coarse fact that a project is open, never which one —
-and receives no project content: every project operation is refused with
-`project_access_required`. This is the fail-closed interim until the
-access-grant flow exists; the master `mcp.enabled` flag alone never discloses
-whatever project the user has open. With more than one instance running, a
-dynamic session refuses to choose — picking the newest would be picking a
-safety case by timestamp.
+and receives no project content until the user grants it access (see Consent
+below); the master `mcp.enabled` flag alone never discloses whatever project
+the user has open. With more than one instance running, a dynamic session
+refuses to choose — picking the newest would be picking a safety case by
+timestamp.
 
 `--offline-project <path>` is the offline mode above chosen deliberately:
 accepted SACM from the named path, read-only, and it never connects — even

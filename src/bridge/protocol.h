@@ -57,13 +57,10 @@ inline constexpr const char* kBadRequest = "bad_request";
 inline constexpr const char* kNoProject = "no_project";
 // The application is running but the project this session was launched for is
 // not the one the user has open. Distinct from `no_project` so the adapter can
-// say precisely why content stopped, and recoverable without reconnecting: the
-// same connection serves again when the user reopens the project.
+// say precisely why content stopped. The connection survives, but the grant
+// does not: "allow while open" ends with the project, so reopening it starts
+// a fresh access request rather than silently resuming.
 inline constexpr const char* kProjectNotActive = "project_not_active";
-// The connection is unbound: its hello named no project, and no access grant
-// exists. Project content is never served to an unbound connection (ADR 0014
-// gate 2) -- the master consent flag alone does not disclose a project.
-inline constexpr const char* kProjectAccessRequired = "project_access_required";
 // An access request is in front of the user right now. Retry after approval.
 inline constexpr const char* kProjectAccessPending = "project_access_pending";
 // The user declined this session's access request.
@@ -84,6 +81,17 @@ inline constexpr const char* kIdentifyOperation = "identify";
 // or denied -- never with content; the approval itself is a human decision in
 // the application, on the frame thread, at human speed.
 inline constexpr const char* kRequestProjectAccessOperation = "request_project_access";
+
+// The request states `request_project_access` reports. Wire values: an MCP
+// client branches on them, so they live here with the other stable strings
+// rather than as literals scattered over the app.
+namespace access_state {
+inline constexpr const char* kGranted = "granted";
+inline constexpr const char* kPending = "pending";
+inline constexpr const char* kDenied = "denied";
+inline constexpr const char* kNone = "none";
+inline constexpr const char* kNoProject = "no_project";
+} // namespace access_state
 
 struct Request {
     int protocol = kProtocolVersion;

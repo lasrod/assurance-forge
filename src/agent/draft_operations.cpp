@@ -27,26 +27,6 @@ Result DraftError(std::string message, std::uint64_t current_revision) {
     return Result{nlohmann::json{{"error", std::move(message)}, {"current_working_revision", current_revision}}, true};
 }
 
-bool CheckExpectedRevision(const DraftContext& context, const nlohmann::json& arguments, Result& refusal) {
-    const nlohmann::json::const_iterator supplied = arguments.find("expected_working_revision");
-    if (supplied == arguments.end() || !supplied->is_number_integer() || supplied->get<std::int64_t>() < 0) {
-        refusal = DraftError("Argument \"expected_working_revision\" is required. Read get_draft_status or any "
-                             "case-content result, then retry with the revision it reports.",
-                             context.store.revision());
-        return false;
-    }
-
-    const std::uint64_t expected = supplied->get<std::uint64_t>();
-    const std::uint64_t current = context.store.revision();
-    if (expected != current) {
-        refusal = DraftError("The integrated draft changed after you read it. Re-read the working draft and decide "
-                             "whether your operation still means the same thing before retrying.",
-                             current);
-        return false;
-    }
-    return true;
-}
-
 // The revision says the draft moved; the generation says the ground under the
 // whole session moved -- a project switch, a fresh grant, a revocation. A
 // mutation computed before such a change must not land after it (ADR 0014),
@@ -73,6 +53,28 @@ bool CheckExpectedContextGeneration(const DraftContext& context, const nlohmann:
         return false;
     }
     return true;
+}
+
+// One gate for both mutation preconditions, so a new handler cannot take the
+// revision check without the generation check.
+bool CheckExpectedRevision(const DraftContext& context, const nlohmann::json& arguments, Result& refusal) {
+    const nlohmann::json::const_iterator supplied = arguments.find("expected_working_revision");
+    if (supplied == arguments.end() || !supplied->is_number_integer() || supplied->get<std::int64_t>() < 0) {
+        refusal = DraftError("Argument \"expected_working_revision\" is required. Read get_draft_status or any "
+                             "case-content result, then retry with the revision it reports.",
+                             context.store.revision());
+        return false;
+    }
+
+    const std::uint64_t expected = supplied->get<std::uint64_t>();
+    const std::uint64_t current = context.store.revision();
+    if (expected != current) {
+        refusal = DraftError("The integrated draft changed after you read it. Re-read the working draft and decide "
+                             "whether your operation still means the same thing before retrying.",
+                             current);
+        return false;
+    }
+    return CheckExpectedContextGeneration(context, arguments, refusal);
 }
 
 std::string ArgumentFile(const DraftContext& context) {
@@ -275,8 +277,6 @@ Result BeginChangeGroup(const DraftContext& context, const nlohmann::json& argum
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
-    if (!CheckExpectedContextGeneration(context, arguments, refusal))
-        return refusal;
 
     const std::string title = StringArgument(arguments, "title");
     if (title.empty())
@@ -306,8 +306,6 @@ Result StageDraftOperations(const DraftContext& context, const nlohmann::json& a
         return Result::Error("No assurance case is loaded, so there is nothing to draft against.");
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
-        return refusal;
-    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
 
     const std::string group_id = GroupIdArgument(context, arguments);
@@ -345,8 +343,6 @@ Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arg
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
-    if (!CheckExpectedContextGeneration(context, arguments, refusal))
-        return refusal;
 
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -369,8 +365,6 @@ Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arg
 Result RemoveChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
-        return refusal;
-    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -400,8 +394,6 @@ Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& ar
 Result SubmitChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
-        return refusal;
-    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -466,8 +458,6 @@ Result UnstageDraftOperations(const DraftContext& context, const nlohmann::json&
         return Result::Error("No assurance case is loaded, so there is nothing to draft against.");
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
-        return refusal;
-    if (!CheckExpectedContextGeneration(context, arguments, refusal))
         return refusal;
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
