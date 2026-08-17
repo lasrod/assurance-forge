@@ -322,27 +322,51 @@ std::filesystem::path ProjectService::ManifestPath(const AssuranceProject& proje
     return project.rootPath / kManifestFileName;
 }
 
+std::filesystem::path ProjectService::PlanProjectRoot(const std::string& project_name,
+                                                      const std::filesystem::path& parent_location) {
+    return parent_location / TrimWhitespace(project_name);
+}
+
+CreateProjectObstacle ProjectService::FindCreateProjectObstacle(const std::string& project_name,
+                                                                const std::filesystem::path& parent_location) {
+    if (TrimWhitespace(project_name).empty())
+        return CreateProjectObstacle::NameRequired;
+    if (parent_location.empty())
+        return CreateProjectObstacle::LocationRequired;
+
+    // `exists` rather than `is_directory`: a FILE with the project's name would
+    // also stop `create_directories`, and reporting "already exists" is true of
+    // both and is what the user has to act on.
+    std::error_code ec;
+    if (std::filesystem::exists(PlanProjectRoot(project_name, parent_location), ec))
+        return CreateProjectObstacle::FolderExists;
+    return CreateProjectObstacle::None;
+}
+
 bool ProjectService::CreateEmptyProject(const std::string& project_name,
                                         const std::filesystem::path& parent_location,
                                         AssuranceProject& project,
                                         ProjectLoadReport& report,
                                         std::string& error) {
-    std::string clean_name = TrimWhitespace(project_name);
-    if (clean_name.empty()) {
+    // Asked through the shared rule so the create and the dialog that offers it
+    // cannot disagree about what is allowed.
+    switch (FindCreateProjectObstacle(project_name, parent_location)) {
+    case CreateProjectObstacle::NameRequired:
         error = "Project name is required.";
         return false;
-    }
-    if (parent_location.empty()) {
+    case CreateProjectObstacle::LocationRequired:
         error = "Project location is required.";
         return false;
+    case CreateProjectObstacle::FolderExists:
+        error = "Project folder already exists: " + PlanProjectRoot(project_name, parent_location).string();
+        return false;
+    case CreateProjectObstacle::None:
+        break;
     }
 
-    std::filesystem::path root = parent_location / clean_name;
+    const std::string clean_name = TrimWhitespace(project_name);
+    const std::filesystem::path root = PlanProjectRoot(project_name, parent_location);
     std::error_code ec;
-    if (std::filesystem::exists(root, ec)) {
-        error = "Project folder already exists: " + root.string();
-        return false;
-    }
 
     for (const char* directory : kProjectDirectories) {
         if (!std::filesystem::create_directories(root / directory, ec) && ec) {

@@ -3,6 +3,7 @@
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/app_state.h"
+#include "core/project_service.h"
 
 #include <cstddef>
 #include <optional>
@@ -32,6 +33,23 @@ public:
     char open_project_path_buf[kPathBufferSize] = "";
     char project_file_name_buf[256] = "main.sacm";
     std::vector<RecentProjectEntry> recent_projects;
+
+    // Whether the name in the create dialog can be used, re-asked whenever it
+    // changes rather than every frame: the parent can be a network share, where
+    // a per-frame existence check is a per-frame round trip.
+    core::CreateProjectObstacle create_project_obstacle = core::CreateProjectObstacle::None;
+    // What a create actually refused, when one was attempted and failed. The
+    // check above cannot see everything -- a folder appearing between the check
+    // and the press, a permission the write finds out about -- and a dialog that
+    // answers a press with nothing at all is the defect this exists to close.
+    std::string create_project_error;
+    // The same, for the add-a-file-to-the-project dialog, which had the same
+    // silence: a name already in the project refused and said nothing.
+    std::string create_project_file_error;
+
+    // Re-asks the obstacle for what is currently typed. Called when the dialog
+    // opens and on every edit of the name.
+    void RefreshCreateProjectObstacle();
 
     void ScanDirectory();
     void BeginProjectFileCreate(ProjectFileCreateKind kind, const std::string& default_name);
