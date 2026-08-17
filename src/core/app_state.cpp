@@ -293,7 +293,33 @@ bool AppState::create_empty_project(const std::string& project_name, const std::
     current_project = std::move(project);
     last_project_load_report = std::move(report);
     status_message = "Created project: " + current_project->name;
+
+    // A new project needs its audit store as much as an opened one. Opening ran
+    // this and creating did not, so a project was auditable only from its SECOND
+    // session: in the first, `CommandBus::Open` found no manifest, the session
+    // ran with no command bus, and every edit took the unaudited path. Accepting
+    // a draft then reported the SACM file as unwritten and left the draft frozen
+    // mid-promotion -- the visible symptom of a store that was never created.
+    EnsureAuditStoreForFirstArgument();
     return true;
+}
+
+void AppState::EnsureAuditStoreForFirstArgument() {
+    if (!current_project.has_value())
+        return;
+    for (const ProjectFileEntry& entry : current_project->files) {
+        if (entry.role != ProjectFileRole::SacmArgument || entry.relativePath.empty())
+            continue;
+        audit::EnsureAuditStoreResult audit_result;
+        std::string audit_error;
+        if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
+            // Non-fatal, as on the open path: the project is on disk and usable.
+            // Reported so the failure is not silent -- a project running without
+            // an audit store loses its history and cannot accept a draft.
+            last_project_load_report.warnings.push_back("Audit store initialization failed: " + audit_error);
+        }
+        return;
+    }
 }
 
 bool AppState::open_project(const std::string& project_or_manifest_path) {
@@ -311,18 +337,9 @@ bool AppState::open_project(const std::string& project_or_manifest_path) {
 
     // Auto-migrate existing projects: ensure an audit store exists so the
     // history-timeline subsystem has a starting snapshot. The first
-    // SacmArgument file is treated as the project's primary working SACM.
-    for (const ProjectFileEntry& entry : current_project->files) {
-        if (entry.role == ProjectFileRole::SacmArgument && !entry.relativePath.empty()) {
-            audit::EnsureAuditStoreResult audit_result;
-            std::string audit_error;
-            if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
-                // Non-fatal: surface as a warning but allow the project to open.
-                last_project_load_report.warnings.push_back("Audit store initialization failed: " + audit_error);
-            }
-            break;
-        }
-    }
+    // SacmArgument file is treated as the project's primary working SACM. This
+    // is also what repaired a project created before creating did it itself.
+    EnsureAuditStoreForFirstArgument();
     return true;
 }
 

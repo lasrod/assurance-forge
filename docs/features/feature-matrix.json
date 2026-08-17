@@ -1563,7 +1563,7 @@
       "tests": [
         "tests/test_draft_workspace.cpp"
       ],
-      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`, and undoing one restores the accepted baseline and the pre-promotion draft together (AF-AI-017). The surviving groups are re-anchored to the argument the library **produced**, not to the one the patch predicted: the two agree for argument edits but not for terminology, where the seams stamp a gid a flat patch cannot know, and anchoring to the prediction declared every surviving group stale against the argument the user had just accepted into. Selection is per group from the Draft Changes panel (AF-AI-018) or per element from the Inspector's contribution list, with accept-all from the banner. Rejecting a group that others are built on now names them and offers the choice: reject them too, or keep them marked `NeedsAttention` — excluded from materialization, because left in they would fail to apply and block the whole draft, but retained in the workspace and recoverable by retargeting their operations. The audit transaction carries the promoted group ids, the contributing source labels, the guidelines served, the review items answered and each author's rationale, because accepting a draft consumes it and the log is then the only record of where the change came from. **Kept at prototype until the release-gate scenario in #273 passes in the running application.**"
+      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`, and undoing one restores the accepted baseline and the pre-promotion draft together (AF-AI-017). A promotion that fails after its marker is written clears the marker rather than leaving the workspace in `Promoting`, where it refuses editing, accepting **and** discarding until the application restarts — a failed accept must not take away every way to respond to it. The surviving groups are re-anchored to the argument the library **produced**, not to the one the patch predicted: the two agree for argument edits but not for terminology, where the seams stamp a gid a flat patch cannot know, and anchoring to the prediction declared every surviving group stale against the argument the user had just accepted into. Selection is per group from the Draft Changes panel (AF-AI-018) or per element from the Inspector's contribution list, with accept-all from the banner. Rejecting a group that others are built on now names them and offers the choice: reject them too, or keep them marked `NeedsAttention` — excluded from materialization, because left in they would fail to apply and block the whole draft, but retained in the workspace and recoverable by retargeting their operations. The audit transaction carries the promoted group ids, the contributing source labels, the guidelines served, the review items answered and each author's rationale, because accepting a draft consumes it and the log is then the only record of where the change came from. **Kept at prototype until the release-gate scenario in #273 passes in the running application.**"
     },
     {
       "id": "AF-AI-016",
@@ -1697,13 +1697,15 @@
       "status": "supported",
       "evidence": [
         "src/core/project_service.cpp",
-        "src/core/project_file_io.cpp"
+        "src/core/project_file_io.cpp",
+        "src/core/app_state.cpp"
       ],
       "tests": [
         "tests/test_project_service.cpp",
-        "tests/test_project_model.cpp"
+        "tests/test_project_model.cpp",
+        "tests/test_app_state.cpp"
       ],
-      "notes": ""
+      "notes": "Creating a project initializes its audit store, as opening one already did. Without it a new project had no manifest and no baseline until its second session: the command bus could not open, every edit took the unaudited path, and accepting a draft reported the SACM file as unwritten and froze the draft mid-promotion. The create dialog reports a name already taken in the parent folder instead of refusing silently."
     },
     {
       "id": "AF-PLAT-002",

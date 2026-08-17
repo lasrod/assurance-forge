@@ -1792,8 +1792,19 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         return false;
     }
     if (!outcome.sacm_written) {
-        error = "The promotion was recorded in the audit log, but the accepted SACM file was not written. "
-                "The draft is retained in a pending state until recovery confirms the file.";
+        // The accepted file does not have it, so the promotion did not happen.
+        // The marker is cleared rather than left standing: a workspace held in
+        // `Promoting` refuses editing, accepting AND discarding, so leaving it
+        // there answers a failed accept by taking away every way to respond to
+        // it. Cancelling restores the draft exactly as it was, which is the
+        // state the file agrees with, and the user can retry.
+        std::string cancel_error;
+        impl_->draft_workspace.CancelPromotion(cancel_error);
+        error = "The accepted SACM file was not written, so nothing was accepted. The draft has been kept as it "
+                "was. This project has no audit store -- reopen it to build one, then try again.";
+        if (!cancel_error.empty())
+            error += " Draft recovery could not clear its promotion marker: " + cancel_error;
+        impl_->tree_needs_rebuild = true;
         return false;
     }
 
@@ -1822,8 +1833,16 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     const std::string produced = core::reviews::ComputeModelSemanticHash(produced_model);
     const std::string expected = core::reviews::ComputeModelSemanticHash(expected_model);
     if (produced != expected) {
+        // The draft is kept, and the marker that would freeze it is not. The
+        // groups survive either way; what `Promoting` adds is a workspace that
+        // cannot be edited, accepted or discarded until the application is
+        // restarted, which is no help to someone who has just been told to undo.
+        std::string cancel_error;
+        impl_->draft_workspace.CancelPromotion(cancel_error);
         error = "The accepted argument does not match what was about to be accepted, so the draft has been kept. "
                 "Undo this change and report it: the promotion path dropped part of the result.";
+        if (!cancel_error.empty())
+            error += " Draft recovery could not clear its promotion marker: " + cancel_error;
         impl_->app_state.mark_dirty();
         impl_->tree_needs_rebuild = true;
         return false;

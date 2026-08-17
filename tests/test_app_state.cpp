@@ -1,5 +1,6 @@
 #include "core/app_state.h"
 #include "core/assurance_tree.h"
+#include "core/commands/command_bus.h"
 #include "core/terminology_package_service.h"
 #include "core/acp/assurance_claim_point.h"
 #include "sacm_adapter/library_load.h"
@@ -185,6 +186,39 @@ TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
     EXPECT_EQ(state.loaded_file_path, sacm_path);
     EXPECT_TRUE(state.loaded_case.has_value());
     EXPECT_TRUE(state.sacm_package.has_value());
+}
+
+// A project must be auditable in the session that creates it.
+//
+// Opening a project initialized the audit store and creating one did not, so a
+// new project had no manifest and no baseline until its SECOND session. In the
+// first, the command bus could not open, every edit took the unaudited path,
+// and accepting a draft reported the SACM file as unwritten and left the draft
+// frozen mid-promotion. Found from a project whose `.af` held a zero-byte
+// transaction log, no manifest and no snapshots at all.
+TEST(AppStateTest, ACreatedProjectIsAuditableInTheSessionThatCreatedIt) {
+    TempDir temp(MakeTempDir());
+    core::AppState state;
+    ASSERT_TRUE(state.create_empty_project("Project", temp.path.string())) << state.status_message;
+    ASSERT_TRUE(state.current_project.has_value());
+
+    const std::filesystem::path root = state.current_project->rootPath;
+    EXPECT_TRUE(std::filesystem::exists(root / ".af" / "manifest.af.json"))
+        << "no manifest means CommandBus::Open fails and the session runs unaudited";
+    EXPECT_TRUE(std::filesystem::exists(root / ".af" / "snapshots" / "snapshot_000000"))
+        << "the history timeline has no starting point without snapshot 0";
+    EXPECT_TRUE(state.last_project_load_report.warnings.empty())
+        << "audit store initialization reported a problem while creating the project";
+
+    // The thing that actually failed for the user: the bus is what records a
+    // promotion and writes the accepted file.
+    const core::ProjectFileEntry* main_entry =
+        FindProjectFileWithRole(state.current_project.value(), core::ProjectFileRole::SacmArgument);
+    ASSERT_NE(main_entry, nullptr);
+    std::string bus_error;
+    const std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(state.current_project.value(), root / main_entry->relativePath, bus_error);
+    EXPECT_NE(bus, nullptr) << bus_error;
 }
 
 TEST(AppStateTest, FailedProjectSacmOpenPreservesCurrentDocument) {

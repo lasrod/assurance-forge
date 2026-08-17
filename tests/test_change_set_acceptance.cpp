@@ -326,6 +326,41 @@ constexpr const char* kTerminologySacm = R"(<?xml version="1.0" encoding="UTF-8"
 </sacm:AssuranceCasePackage>
 )";
 
+// A case whose glossary is already classified and cited -- the state a project
+// reaches once terms have been given a category and a source. The argument
+// itself is ordinary; what matters is that the terms carry fields the semantic
+// hash now covers.
+constexpr const char* kClassifiedGlossarySacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="AC1">
+  <name content="Sample" />
+  <argumentPackage xmi:id="AP1">
+    <name content="Args" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <name content="Top goal" />
+      <description xmi:id="d1">
+        <content>
+          <value lang="en" content="The system is safe." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <terminologyPackage xmi:id="TP1" gid="gid-TP1">
+    <name content="Terminology" />
+    <terminologyElement xsi:type="sacm:Category" xmi:id="CAT1" gid="gid-CAT1">
+      <name content="Regulatory terms" />
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" gid="gid-T1" value="ALARP" category="CAT1" externalReference="HSE R2P2, 2001">
+      <name content="ALARP" />
+      <description xmi:id="d2">
+        <content>
+          <value lang="en" content="As low as reasonably practicable." />
+        </content>
+      </description>
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>
+)";
+
 const parser::SacmElement* FindTermByValue(const parser::AssuranceCase& model, const std::string& value) {
     for (const parser::SacmElement& element : model.elements) {
         if (element.type == "term" && element.content == value) {
@@ -522,6 +557,64 @@ TEST(ChangeSetAcceptance, ClassifyingAndCitingTermsClearsTheTerminologyFindings)
         EXPECT_EQ(term.category_refs.front(), category_id);
         EXPECT_EQ(term.externalReference, "HSE R2P2, 2001");
     }
+}
+
+// Promotion refuses to consume the draft unless the argument the library
+// produced is exactly what the isolated rehearsal predicted, and the rehearsal
+// gets there by serializing the document and reading it back. Anything the
+// semantic hash covers that does not survive that round trip therefore fails
+// the check -- and strands the workspace mid-promotion, because the verification
+// returns before the draft is released.
+//
+// A claim edit in a case whose glossary is classified is the shape that matters:
+// the hash is over the whole model, so a term nobody touched can still decide
+// whether an ordinary AI claim review can be accepted.
+TEST(ChangeSetAcceptance, PromotionVerificationHoldsForACaseWithAClassifiedGlossary) {
+    ProjectFixture f = MakeFixture("classified_glossary_verify", kClassifiedGlossarySacm);
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    f.model = sacm_adapter::project_case(*loaded.document);
+
+    core::changesets::ChangeSetStore store;
+    const std::string id = store.Begin(1, "Reword the top goal", "", "", "Claim review");
+    std::string error;
+    const nlohmann::json operations =
+        nlohmann::json::array({nlohmann::json{{"type", "UpdateElementText"},
+                                              {"element", {{"id", "G1"}}},
+                                              {"field", "content"},
+                                              {"new_value", "The system is acceptably safe."}}});
+    ASSERT_TRUE(store.Stage(id, ParseOperations(operations), f.model, error)) << error;
+
+    // Exactly what the runtime compares: the rehearsal's result against the real
+    // one. A mismatch here is what leaves the banner saying the promotion is
+    // recorded but the file is not confirmed.
+    parser::AssuranceCase preflight_model;
+    ASSERT_TRUE(core::commands::PreflightProposalAgainstLibrary(
+        *loaded.document, store.Find(id)->proposal, {}, preflight_model, error))
+        << error;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    ASSERT_TRUE(bus->Execute(command, ctx, "Claim review").success);
+
+    const parser::AssuranceCase produced = sacm_adapter::project_case(*loaded.document);
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(produced),
+              core::reviews::ComputeModelSemanticHash(preflight_model))
+        << "the rehearsal round-trips the document through the serializer, so a term field that does not "
+           "survive that trip fails every promotion in a case that has one";
+
+    // Named individually so a failure says which field moved rather than only
+    // that a hash did.
+    const parser::SacmElement* rehearsed_term = FindTermByValue(preflight_model, "ALARP");
+    const parser::SacmElement* produced_term = FindTermByValue(produced, "ALARP");
+    ASSERT_NE(rehearsed_term, nullptr);
+    ASSERT_NE(produced_term, nullptr);
+    EXPECT_EQ(rehearsed_term->category_refs, produced_term->category_refs);
+    EXPECT_EQ(rehearsed_term->external_reference, produced_term->external_reference);
+    EXPECT_EQ(rehearsed_term->origin_ref, produced_term->origin_ref);
 }
 
 // Accepting one group must leave the rest of the draft applying.
