@@ -855,6 +855,34 @@ TRANSLATIONS = {
         "{0} は自分自身によって支持されているため、何も立証しません。",
     "Show cycle": "循環を表示",
 
+    # ===== SCCG staged-check findings (set in core/sccg, translated at display
+    # by check id in app/areas/staged_finding_text.cpp; the English template
+    # must stay byte-identical to the detail core/sccg/staged_checks.cpp
+    # builds -- a test holds the two together) =====
+    "This claim has no support and is not marked undeveloped, so a reviewer cannot tell whether "
+    "evidence is missing or still to come. Give it support, or mark it undeveloped to say so "
+    "deliberately.":
+        "この主張には支持がなく、未展開とも示されていないため、レビュー担当者はエビデンスが欠けているのか"
+        "これから追加されるのかを判断できません。支持を与えるか、意図的である旨を示すために未展開として"
+        "マークしてください。",
+    "This strategy develops into nothing. A decomposition step that produces no sub-claims states "
+    "an inference the argument never makes.":
+        "この戦略は何にも展開されていません。サブ主張を生まない分解ステップは、議論が一度も行わない推論を"
+        "宣言していることになります。",
+    "This is a solution -- the artefact or observation the argument rests on -- so it should be a "
+    "leaf. Elements hanging beneath it are not carrying the role the structure says they are.":
+        "これはソリューション、すなわち議論が依拠する成果物または観察であり、末端要素であるべきです。"
+        "その下にぶら下がる要素は、構造が示す役割を果たしていません。",
+    "These operations put a claim in its own support chain, so the argument supports itself and "
+    "establishes nothing.":
+        "これらの操作は主張を自身の支持連鎖に組み込むため、議論が自らを支持することになり、何も立証しません。",
+    "This claim uses \"{0}\", which SCCG names as a term needing bounds. Say what it means here -- "
+    "against which hazards, in which operating conditions, to what standard -- in the claim or in "
+    "attached context.":
+        "この主張は「{0}」を使用しており、SCCG はこれを境界付けが必要な用語として挙げています。どのハザード"
+        "に対して、どの運用条件で、どの基準に照らしてなのか、その意味を主張内または付属するコンテキストで"
+        "明示してください。",
+
     # ===== GSN v3 well-formedness diagnostics (app/structure_problem_sync) =====
     "Relationship {0} refers to {1}, which is not in this case. The relationship is not drawn, "
     "so the argument shown is smaller than the one stored.":

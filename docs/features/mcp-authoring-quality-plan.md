@@ -2,8 +2,11 @@
 
 - **Status:** Phase 1 implemented (`AF-AI-023` — doctrine in `initialize`
   instructions, pre-write read results and the operation schema, with the
-  prompt-quoted sets widened). Phases 2–4 planned. Extends capability matrix
-  row `AF-AI-010` (SCCG guidance and checks for an external AI client); the
+  prompt-quoted sets widened). The structured-findings prerequisite is
+  implemented: every finding carries its catalog check id and parameters, the
+  panels translate by template, and a drift test holds the embedded statements
+  against the catalog. Phases 2–4 planned. Extends capability matrix row
+  `AF-AI-010` (SCCG guidance and checks for an external AI client); the
   remaining rows land with the first implementing commit of their phase.
 - **Date:** 2026-08-17. The problem statement below describes the coverage as
   it stood when the plan was written; phase 1 has since widened the prompt

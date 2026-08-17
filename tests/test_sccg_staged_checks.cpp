@@ -1,5 +1,7 @@
 #include "core/sccg/staged_checks.h"
 
+#include "core/guideline_catalog.h"
+
 #include <gtest/gtest.h>
 
 #include <string>
@@ -143,6 +145,12 @@ TEST(SccgStagedChecks, CL5_FlagsAnUnboundedQualifier) {
         if (finding.guideline_id == "CL.5") {
             EXPECT_EQ(finding.severity, core::sccg::FindingSeverity::Advisory);
             EXPECT_NE(finding.detail.find("safe"), std::string::npos);
+            // The term rides as a parameter too, so a display surface can
+            // interpolate it into a translated template instead of parsing
+            // the English sentence back apart.
+            EXPECT_EQ(finding.check_id, "check-bounded-qualifiers");
+            ASSERT_EQ(finding.params.size(), 1u);
+            EXPECT_EQ(finding.params[0], "safe");
         }
     }
 }
@@ -194,8 +202,32 @@ TEST(SccgStagedChecks, ReportsNothingWhenNothingWasStaged) {
     EXPECT_TRUE(core::sccg::CheckStagedArgument(model, {}).empty());
 }
 
-// Every finding names its guideline and carries SCCG's own wording, so a
-// reviewer can check the rule rather than take the tool's word for it.
+// A support cycle is structurally wrong wherever it appears: an argument that
+// assumes its own conclusion establishes nothing. Reported when the staged
+// operations touch any element of the cycle.
+TEST(SccgStagedChecks, FlagsASupportCycleTouchingTheChange) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "First of a cycle", true));
+    model.elements.push_back(Claim("G2", "Second of a cycle", true));
+    model.elements.push_back(Supports("R1", "G2", "G1"));
+    model.elements.push_back(Supports("R2", "G1", "G2"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
+
+    bool cycle_reported = false;
+    for (const core::sccg::StagedFinding& finding : findings) {
+        if (finding.check_id != "check-circular-support") {
+            continue;
+        }
+        cycle_reported = true;
+        EXPECT_EQ(finding.severity, core::sccg::FindingSeverity::Problem);
+    }
+    EXPECT_TRUE(cycle_reported);
+}
+
+// Every finding names its guideline, the catalog's check id, and SCCG's own
+// wording, so a reviewer can check the rule rather than take the tool's word
+// for it, and a display surface can translate by a stable key.
 TEST(SccgStagedChecks, EveryFindingCitesTheGuidelineItServes) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "The vehicle is safe"));
@@ -205,7 +237,46 @@ TEST(SccgStagedChecks, EveryFindingCitesTheGuidelineItServes) {
     ASSERT_FALSE(findings.empty());
     for (const core::sccg::StagedFinding& finding : findings) {
         EXPECT_FALSE(finding.guideline_id.empty());
+        EXPECT_FALSE(finding.check_id.empty());
         EXPECT_FALSE(finding.statement.empty());
         EXPECT_FALSE(finding.detail.empty());
+    }
+}
+
+// The statements the checks embed are quotes, not paraphrases. Each one must
+// still open the guideline it cites -- embedded as a prefix, because a check
+// may deliberately quote only the statement's first sentence. A constant that
+// drifts from the catalog would put SCCG's name on words SCCG never wrote.
+TEST(SccgStagedChecks, EveryEmbeddedStatementStillQuotesTheCatalog) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+
+    // One model tripping every check, so every embedded statement is compared.
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "The vehicle is safe"));
+    model.elements.push_back(Claim("G2", "Top goal", true));
+    model.elements.push_back(Strategy("S1", "Argue over hazards"));
+    model.elements.push_back(Supports("R1", "S1", "G2"));
+    model.elements.push_back(Claim("G3", "Another goal", true));
+    model.elements.push_back(Solution("Sn1"));
+    model.elements.push_back(Claim("G4", "A goal under evidence", true));
+    model.elements.push_back(Evidences("R2", "Sn1", "G3"));
+    model.elements.push_back(Supports("R3", "G4", "Sn1"));
+    model.elements.push_back(Claim("G5", "First of a cycle", true));
+    model.elements.push_back(Claim("G6", "Second of a cycle", true));
+    model.elements.push_back(Supports("R4", "G6", "G5"));
+    model.elements.push_back(Supports("R5", "G5", "G6"));
+
+    const std::vector<core::sccg::StagedFinding> findings =
+        core::sccg::CheckStagedArgument(model, {"G1", "G2", "S1", "G3", "Sn1", "G4", "G5", "G6"});
+
+    ASSERT_FALSE(findings.empty());
+    for (const core::sccg::StagedFinding& finding : findings) {
+        const parser::Guideline* guideline = catalog.document.FindGuidelineById(finding.guideline_id);
+        ASSERT_NE(guideline, nullptr) << finding.guideline_id;
+        EXPECT_EQ(guideline->statement.rfind(finding.statement, 0), 0u)
+            << finding.guideline_id << ": the embedded statement is no longer how the catalog opens.\n"
+            << "embedded: " << finding.statement << "\ncatalog:  " << guideline->statement;
     }
 }

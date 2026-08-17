@@ -497,6 +497,7 @@ add_executable(tests
     tests/test_agent_change_canvas.cpp
     tests/test_change_set_acceptance.cpp
     tests/test_sccg_staged_checks.cpp
+    tests/test_staged_finding_text.cpp
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
     tests/test_mcp_modes.cpp

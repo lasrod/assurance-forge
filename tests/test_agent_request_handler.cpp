@@ -229,6 +229,19 @@ TEST(AgentRequestHandler, McpDraftGroupsAreRevisionCheckedAndVisibleToSubsequent
     const std::uint64_t staged_revision = staged.result["working_revision"].get<std::uint64_t>();
     EXPECT_GT(staged_revision, begun_revision);
 
+    // The unsupported claim just staged is reported with the catalog's stable
+    // check id on the wire, the key an agent deduplicates findings on across
+    // staging calls rather than re-reading the sentence each time.
+    ASSERT_TRUE(staged.result.contains("findings")) << staged.result.dump();
+    bool unsupported_claim_reported = false;
+    for (const nlohmann::json& finding : staged.result["findings"]) {
+        if (finding.value("guideline_id", "") == "EV.1" && finding.value("element_id", "") == created_id) {
+            unsupported_claim_reported = true;
+            EXPECT_EQ(finding.value("check_id", ""), "check-evidence-trace") << finding.dump();
+        }
+    }
+    EXPECT_TRUE(unsupported_claim_reported) << staged.result.dump();
+
     const bridge::Response developed = app::HandleAgentRequest(
         MakeRequest(
             "stage_operations",

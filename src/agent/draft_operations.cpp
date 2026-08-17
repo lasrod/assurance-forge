@@ -211,6 +211,10 @@ nlohmann::json FindingsJson(const core::drafts::DraftMaterializationResult& mate
     for (const core::sccg::StagedFinding& finding : materialized.sccg_findings) {
         findings.push_back(nlohmann::json{{"kind", "sccg"},
                                           {"guideline_id", finding.guideline_id},
+                                          // The catalog's stable name for the rule, so an agent can
+                                          // deduplicate findings across staging calls instead of
+                                          // re-reading the sentence each time.
+                                          {"check_id", finding.check_id},
                                           {"element_id", finding.element_id},
                                           {"message", finding.detail},
                                           {"severity", core::sccg::FindingSeverityToString(finding.severity)}});

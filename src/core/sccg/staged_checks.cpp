@@ -15,23 +15,40 @@ namespace {
 // The guidelines these checks serve, with SCCG's own wording. Held here rather
 // than read from the catalog so a finding is self-describing in a tool result,
 // and so a check cannot silently outlive the guideline it claims to enforce --
-// changing one means changing the other in the same place.
+// changing one means changing the other in the same place. A test holds each
+// embedded statement against the loaded catalog, so the constants cannot
+// quietly diverge from the guidelines they quote.
+//
+// `check_id` is the catalog's own name for the rule (`tool.suggested_checks`),
+// carried on every finding: the stable key agents deduplicate on and the
+// panels translate by.
 struct Guideline {
     const char* id;
+    const char* check_id;
     const char* statement;
 };
 
 constexpr Guideline kEvidencePath{
     "EV.1",
+    "check-evidence-trace",
     "Show, for each claim, the evidence path that supports it, either directly or through "
     "stated sub-claims and intermediate arguments."};
 constexpr Guideline kInferenceStep{"AR.2",
+                                   "check-explicit-strategy",
                                    "State how the parent claim is being decomposed or argued; do not make the reviewer "
                                    "infer the decomposition rule from wording alone."};
-constexpr Guideline kStructureCarriesArgument{"AR.1",
-                                              "Use the assurance case structure to make each element's role clear."};
+constexpr Guideline kStructureCarriesArgument{
+    "AR.1", "check-element-role-misuse", "Use the assurance case structure to make each element's role clear."};
+// The cycle finding quotes AR.1 -- structure carrying the argument is what a
+// cycle breaks -- but its catalog check id is LF.1's, because a support cycle
+// IS the catalog's circular-reasoning check. When phase 2 of the authoring
+// plan adds LF.1's textual near-duplication check, the attribution is
+// revisited together with it.
+constexpr Guideline kCircularSupport{
+    "AR.1", "check-circular-support", "Use the assurance case structure to make each element's role clear."};
 constexpr Guideline kBoundQualifiers{
     "CL.5",
+    "check-bounded-qualifiers",
     "Do not leave broad evaluative terms or universal qualifiers unbounded. This includes "
     "terms such as safe, timely, effective, normal, robust, all, every, and never."};
 
@@ -80,8 +97,15 @@ void Add(std::vector<StagedFinding>& findings,
          const Guideline& guideline,
          std::string detail,
          const std::string& element_id,
-         FindingSeverity severity) {
-    findings.push_back(StagedFinding{guideline.id, guideline.statement, std::move(detail), element_id, severity});
+         FindingSeverity severity,
+         std::vector<std::string> params = {}) {
+    findings.push_back(StagedFinding{guideline.id,
+                                     guideline.check_id,
+                                     guideline.statement,
+                                     std::move(detail),
+                                     std::move(params),
+                                     element_id,
+                                     severity});
 }
 
 } // namespace
@@ -181,7 +205,8 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
                         "against which hazards, in which operating conditions, to what standard -- "
                         "in the claim or in attached context.",
                     id,
-                    FindingSeverity::Advisory);
+                    FindingSeverity::Advisory,
+                    {term});
                 break;
             }
         }
@@ -201,7 +226,7 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             continue;
         }
         Add(findings,
-            kStructureCarriesArgument,
+            kCircularSupport,
             "These operations put a claim in its own support chain, so the argument supports "
             "itself and establishes nothing.",
             cycle.element_ids.empty() ? std::string() : cycle.element_ids.front(),

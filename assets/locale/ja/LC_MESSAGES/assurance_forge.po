@@ -2203,11 +2203,20 @@ msgstr "テーマ"
 msgid "There is nothing to reject."
 msgstr "却下できるものがありません。"
 
+msgid "These operations put a claim in its own support chain, so the argument supports itself and establishes nothing."
+msgstr "これらの操作は主張を自身の支持連鎖に組み込むため、議論が自らを支持することになり、何も立証しません。"
+
 msgid "They stop being applied to the working draft and are marked as needing attention, so their author can retarget them."
 msgstr "作業ドラフトへの適用が停止され、要対応として表示されます。作成者が対象を修正できます。"
 
 msgid "This change was written against {0}. Open that argument to review it."
 msgstr "この変更は {0} に対して作成されました。レビューするにはその論証を開いてください。"
+
+msgid "This claim has no support and is not marked undeveloped, so a reviewer cannot tell whether evidence is missing or still to come. Give it support, or mark it undeveloped to say so deliberately."
+msgstr "この主張には支持がなく、未展開とも示されていないため、レビュー担当者はエビデンスが欠けているのかこれから追加されるのかを判断できません。支持を与えるか、意図的である旨を示すために未展開としてマークしてください。"
+
+msgid "This claim uses \"{0}\", which SCCG names as a term needing bounds. Say what it means here -- against which hazards, in which operating conditions, to what standard -- in the claim or in attached context."
+msgstr "この主張は「{0}」を使用しており、SCCG はこれを境界付けが必要な用語として挙げています。どのハザードに対して、どの運用条件で、どの基準に照らしてなのか、その意味を主張内または付属するコンテキストで明示してください。"
 
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
@@ -2239,6 +2248,9 @@ msgstr "このフレーム: {0:.2f} ms ({1} バケット)"
 msgid "This is a preview. The project model has not been changed."
 msgstr "これはプレビューです。プロジェクトモデルは変更されていません。"
 
+msgid "This is a solution -- the artefact or observation the argument rests on -- so it should be a leaf. Elements hanging beneath it are not carrying the role the structure says they are."
+msgstr "これはソリューション、すなわち議論が依拠する成果物または観察であり、末端要素であるべきです。その下にぶら下がる要素は、構造が示す役割を果たしていません。"
+
 msgid "This node only ({0})"
 msgstr "このノードのみ ({0})"
 
@@ -2247,6 +2259,9 @@ msgstr "このプロジェクトは別の Assurance Forge インスタンス（�
 
 msgid "This project does not have an audit store yet."
 msgstr "このプロジェクトにはまだ監査ストアがありません。"
+
+msgid "This strategy develops into nothing. A decomposition step that produces no sub-claims states an inference the argument never makes."
+msgstr "この戦略は何にも展開されていません。サブ主張を生まない分解ステップは、議論が一度も行わない推論を宣言していることになります。"
 
 msgid "This will rebuild the audit store."
 msgstr "監査ストアを再構築します。"
