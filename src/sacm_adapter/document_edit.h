@@ -187,6 +187,12 @@ AddChildOutcome apply_create_element(LibraryDocument& document,
 // would put a proposed claim in the wrong package of a multi-package case.
 std::string resolve_argument_package_id(const LibraryDocument& document, const std::string& element_id);
 
+// The id of the root AssuranceCasePackage's first TerminologyPackage, or empty
+// when the document has none (or has no root package). Empty is an ordinary
+// answer rather than a failure: a case grows its first TerminologyPackage the
+// first time a term is created, so callers treat empty as "create one".
+std::string resolve_terminology_package_id(const LibraryDocument& document);
+
 // The source of a dialectic challenge, mirroring core::ChallengeSourceType.
 enum class ChallengeSource {
     CounterArgument, // Claim             <- AssertedInference (isCounter)
@@ -641,6 +647,24 @@ TerminologyEditOutcome apply_update_terminology_category(LibraryDocument& docume
 TerminologyEditOutcome apply_update_terminology_term(LibraryDocument& document,
                                                      const std::string& term_id,
                                                      const TerminologyTermFields& fields);
+
+// (6b) The three Term fields that are neither text nor language-bearing, each
+// written on its own. `apply_update_terminology_term` above replaces a term
+// wholesale, including its description in ONE language -- routing a category
+// change through it would drop a translated definition on the way past. These
+// write exactly the field named and nothing else, so a term's classification
+// and provenance can be edited without touching what it says.
+//
+// `category_ids` replaces the term's whole category set; empty clears it. Each
+// id must resolve to a Category. `origin_id` empty clears the origin; otherwise
+// it must resolve to an element. The library validates both.
+EditOutcome apply_set_term_categories(LibraryDocument& document,
+                                      const std::string& term_id,
+                                      const std::vector<std::string>& category_ids);
+EditOutcome apply_set_term_external_reference(LibraryDocument& document,
+                                              const std::string& term_id,
+                                              const std::string& external_reference);
+EditOutcome apply_set_term_origin(LibraryDocument& document, const std::string& term_id, const std::string& origin_id);
 
 // (7) Delete a terminology package, category, or term, mirroring the primitive
 // the legacy delete mutators compose: `DeleteElement` with the

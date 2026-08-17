@@ -2094,7 +2094,9 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             return false;
         }
         const std::string package_id = sacm_adapter::resolve_argument_package_id(document, proposal.anchor_element_id);
-        const reviews::ProposalPlan plan = reviews::PlanProposalFromDiff(before, scratch, package_id);
+        const std::string terminology_package_id = sacm_adapter::resolve_terminology_package_id(document);
+        const reviews::ProposalPlan plan =
+            reviews::PlanProposalFromDiff(before, scratch, package_id, terminology_package_id);
         if (plan.unrepresentable_reason.empty()) {
             return reviews::ApplyProposalPlanToLibrary(document, plan, out_error);
         }

@@ -4,6 +4,7 @@
 #include "app/agent_request_handler.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/areas/draft_changes_area.h"
 #include "app/commands/dispatch.h"
 #include "app/confidence_problem_sync.h"
 #include "app/native_file_dialogs.h"
@@ -1791,8 +1792,19 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
         return false;
     }
     if (!outcome.sacm_written) {
-        error = "The promotion was recorded in the audit log, but the accepted SACM file was not written. "
-                "The draft is retained in a pending state until recovery confirms the file.";
+        // The accepted file does not have it, so the promotion did not happen.
+        // The marker is cleared rather than left standing: a workspace held in
+        // `Promoting` refuses editing, accepting AND discarding, so leaving it
+        // there answers a failed accept by taking away every way to respond to
+        // it. Cancelling restores the draft exactly as it was, which is the
+        // state the file agrees with, and the user can retry.
+        std::string cancel_error;
+        impl_->draft_workspace.CancelPromotion(cancel_error);
+        error = "The accepted SACM file was not written, so nothing was accepted. The draft has been kept as it "
+                "was. This project has no audit store -- reopen it to build one, then try again.";
+        if (!cancel_error.empty())
+            error += " Draft recovery could not clear its promotion marker: " + cancel_error;
+        impl_->tree_needs_rebuild = true;
         return false;
     }
 
@@ -1821,8 +1833,16 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     const std::string produced = core::reviews::ComputeModelSemanticHash(produced_model);
     const std::string expected = core::reviews::ComputeModelSemanticHash(expected_model);
     if (produced != expected) {
+        // The draft is kept, and the marker that would freeze it is not. The
+        // groups survive either way; what `Promoting` adds is a workspace that
+        // cannot be edited, accepted or discarded until the application is
+        // restarted, which is no help to someone who has just been told to undo.
+        std::string cancel_error;
+        impl_->draft_workspace.CancelPromotion(cancel_error);
         error = "The accepted argument does not match what was about to be accepted, so the draft has been kept. "
                 "Undo this change and report it: the promotion path dropped part of the result.";
+        if (!cancel_error.empty())
+            error += " Draft recovery could not clear its promotion marker: " + cancel_error;
         impl_->app_state.mark_dirty();
         impl_->tree_needs_rebuild = true;
         return false;
@@ -1848,7 +1868,17 @@ bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, s
     // Promoted groups leave the active workspace; the rest stay visible against
     // the new baseline. The base hash moves with it, or the next open would call
     // the draft stale against an argument the user just accepted into.
-    if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, plan.promoted_model, error)) {
+    //
+    // Re-anchored to what was PRODUCED, not to what was predicted. They are the
+    // same for an argument edit, which is why this stood for so long, but the
+    // terminology seams stamp a legacy gid on a created term and the flat patch
+    // that predicted the promotion cannot know one. The baseline then described
+    // an argument that never existed, and the next open declared every surviving
+    // group stale against the argument the user had just accepted into -- the
+    // exact failure the comment above says this line exists to prevent. The
+    // authoritative projection is already in hand from the verification above,
+    // and using it holds for any future field only the library can fill in.
+    if (!impl_->draft_workspace.RemovePromotedGroups(plan.closure, produced_model, error)) {
         impl_->app_state.status_message = ui::i18n::trf("Accepted, but the draft could not be updated: {0}", error);
     }
     // Accepting the argument is not the same as accepting a translation of it.
@@ -1990,25 +2020,24 @@ void AppRuntime::CancelPendingDraftRejection() {
     impl_->pending_draft_rejection = {};
 }
 
-void AppRuntime::FocusDraftGroupOnCanvas(const std::string& group_id) {
-    const std::shared_ptr<const core::drafts::DraftMaterializationResult> materialization =
-        impl_->draft_frame_materialization;
-    if (materialization == nullptr)
-        return;
-
-    // The index is keyed by element, so the group's elements are found by asking
-    // each changed element who contributed to it. In materialization order, so
-    // "the first element this group changed" is stable between frames rather
-    // than whichever the map happened to yield first.
-    for (const std::string& element_id : materialization->change_index.ChangedElementIds()) {
-        const std::vector<std::string> contributors = materialization->change_index.ContributingGroupIds(element_id);
-        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
-            continue;
-        // A removed element is not on the canvas to be centred on, but the
-        // presentation view keeps it as a tombstone, so selecting it still lands
-        // somewhere the user can see.
-        impl_->events.Emit(SelectionChangedEvent{element_id, true});
+void AppRuntime::FocusDraftGroup(const std::string& group_id) {
+    // Which view can show this group's change is decided in `draft_changes_area`
+    // so it can be tested without a window; this only carries the answer out.
+    const areas::DraftGroupFocus focus = areas::ResolveDraftGroupFocus(*impl_, group_id);
+    switch (focus.kind) {
+    case areas::DraftGroupFocusKind::Canvas:
+        impl_->events.Emit(SelectionChangedEvent{focus.element_id, true});
         impl_->events.Emit(CenterRequestEvent{CenterViewRequest::GsnCanvas, true, false, true});
+        return;
+    case areas::DraftGroupFocusKind::Terminology:
+        // The same route the canvas term card's "Open term" takes: the
+        // terminology view, with the term selected and filtered to.
+        OpenTerminologyTermFromCanvas(focus.package_ref, focus.term_ref);
+        return;
+    case areas::DraftGroupFocusKind::None:
+        // Nowhere better than where they already are, with the row in front of
+        // them. Moving them to a view the change is invisible in reads as a
+        // click that did nothing.
         return;
     }
 }

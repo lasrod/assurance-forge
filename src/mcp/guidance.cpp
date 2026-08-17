@@ -100,6 +100,9 @@ constexpr const char* kWorkflow =
     "contradictory second version over it.\n"
     "5. `submit_change_group` when finished, then tell the user it is waiting for them in Assurance "
     "Forge.\n\n"
+    "Terminology: `list_terms` shows the case's defined terms with their definitions. When a claim "
+    "leans on a broad or evaluative term (CL.5), prefer defining it once with a `CreateTerm` "
+    "operation over restating a bound in every claim that uses it.\n\n"
     "You are not editing the accepted safety case. Nothing you stage takes effect until a person promotes "
     "it. Never tell the user you have changed their argument.\n";
 

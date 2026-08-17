@@ -148,6 +148,31 @@ TEST(ReviewProposalTest, ReportsBrokenForDuplicateCreateRefs) {
     EXPECT_NE(result.reason.find("Duplicate"), std::string::npos);
 }
 
+// A removal's own target is, by design, absent from the model the patch
+// produces -- that is what removing means. Reference checks used to run against
+// only that preview, so every proposal that deleted anything was reported
+// Broken with "that element no longer exists", including a lone RemoveElement
+// of a perfectly current element.
+TEST(ReviewProposalTest, AProposalThatOnlyRemovesAnExistingElementIsValid) {
+    parser::AssuranceCase model = MakeCase();
+
+    core::reviews::ReviewProposal proposal;
+    proposal.id = "proposal-0002";
+    proposal.anchor_element_id = "G12";
+    proposal.affected_existing_element_ids = {"G12"};
+    proposal.base_model_hash = core::reviews::ComputeModelSemanticHash(model);
+    proposal.base_element_hashes["G12"] = core::reviews::ComputeElementSemanticHash(model.elements.front());
+
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveElement;
+    remove.element = core::reviews::ElementRef{"G12", std::nullopt};
+    proposal.operations.push_back(remove);
+
+    core::reviews::ProposalValidityResult result = core::reviews::EvaluateReviewProposalValidity(proposal, model);
+
+    EXPECT_EQ(result.validity, core::reviews::ProposalValidity::Valid) << result.reason;
+}
+
 TEST(ReviewProposalManagerTest, SavesListsLoadsAndDeletesProposalFiles) {
     TempDir temp(MakeTempDir());
     parser::AssuranceCase model = MakeCase();

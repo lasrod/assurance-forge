@@ -1,5 +1,6 @@
 #include "app/controllers/project_controller.h"
 
+#include "core/project_service.h"
 #include "core/string_utils.h"
 #include "ui/imgui_buffer_utils.h"
 
@@ -57,7 +58,15 @@ void ProjectController::ScanDirectory() {
 void ProjectController::BeginProjectFileCreate(ProjectFileCreateKind kind, const std::string& default_name) {
     pending_project_file_kind = kind;
     ui::CopyToBuffer(project_file_name_buf, sizeof(project_file_name_buf), default_name);
+    create_project_file_error.clear();
     show_project_file_name_modal = true;
+}
+
+void ProjectController::RefreshCreateProjectObstacle() {
+    create_project_obstacle = core::ProjectService::FindCreateProjectObstacle(project_name_buf, project_parent_buf);
+    // A stale refusal must not outlive the name it was about: the user's next
+    // keystroke is them answering it.
+    create_project_error.clear();
 }
 
 void ProjectController::LoadRecentProjectsPreference(const std::string& content) {

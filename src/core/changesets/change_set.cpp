@@ -22,7 +22,12 @@ bool DiffersMeaningfully(const parser::SacmElement& before, const parser::SacmEl
            before.target_refs != after.target_refs || before.reasoning_ref != after.reasoning_ref ||
            before.assertion_declaration != after.assertion_declaration || before.is_counter != after.is_counter ||
            before.name_langs != after.name_langs || before.content_langs != after.content_langs ||
-           before.description_langs != after.description_langs;
+           before.description_langs != after.description_langs ||
+           // A term's classification and provenance. Without these a change set
+           // that only categorizes a term or cites its source reports the term
+           // as unchanged, and the preview a reviewer accepts shows nothing.
+           before.category_refs != after.category_refs || before.external_reference != after.external_reference ||
+           before.origin_ref != after.origin_ref;
 }
 
 std::map<std::string, const parser::SacmElement*> ById(const parser::AssuranceCase& model) {

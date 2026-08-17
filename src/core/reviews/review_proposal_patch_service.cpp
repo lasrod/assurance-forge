@@ -13,20 +13,6 @@
 namespace core::reviews {
 namespace {
 
-bool IsCreateOperation(PatchOperationType type) {
-    switch (type) {
-    case PatchOperationType::CreateClaim:
-    case PatchOperationType::CreateStrategy:
-    case PatchOperationType::CreateSolution:
-    case PatchOperationType::CreateContext:
-    case PatchOperationType::CreateAssumption:
-    case PatchOperationType::CreateJustification:
-        return true;
-    default:
-        return false;
-    }
-}
-
 bool IsRelationshipType(const std::string& type) {
     return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
 }
@@ -45,6 +31,10 @@ const char* PrefixFor(PatchOperationType type) {
         return "A";
     case PatchOperationType::CreateJustification:
         return "J";
+    case PatchOperationType::CreateTerm:
+        return "T";
+    case PatchOperationType::CreateCategory:
+        return "CAT";
     default:
         return "N";
     }
@@ -80,6 +70,10 @@ std::string ElementTypeFor(PatchOperationType type) {
     case PatchOperationType::CreateSolution:
     case PatchOperationType::CreateContext:
         return "artifactreference";
+    case PatchOperationType::CreateTerm:
+        return "term";
+    case PatchOperationType::CreateCategory:
+        return "category";
     default:
         return {};
     }
@@ -94,6 +88,23 @@ std::string AssertionDeclarationFor(PatchOperationType type) {
     default:
         return {};
     }
+}
+
+// A whitespace-separated id list, the way XMI writes an idref list. Used for a
+// term's categories, where SACM 10.8 permits several.
+std::vector<std::string> SplitRefList(const std::string& value) {
+    std::vector<std::string> refs;
+    std::istringstream stream(value);
+    std::string ref;
+    while (stream >> ref) {
+        // A leading '#' is the XML-fragment spelling of a reference; tolerated
+        // and normalized so an agent copying an id out of a document works.
+        if (ref.front() == '#')
+            ref.erase(0, 1);
+        if (!ref.empty())
+            refs.push_back(ref);
+    }
+    return refs;
 }
 
 parser::SacmElement* FindElement(parser::AssuranceCase& model, const std::string& id) {
@@ -264,6 +275,54 @@ bool ApplyCreateOperation(const PatchOperation& operation,
         return false;
     }
 
+    // A term's fields differ from an argument element's: `text` is the term
+    // itself (the value that term detection matches in claim text) and
+    // `new_value` is its definition. Routed apart from SetElementText because
+    // the value maps to `content` where the generic non-claim path would write
+    // `description` -- which for a term is the definition, not the term.
+    if (operation.type == PatchOperationType::CreateTerm) {
+        if (operation.text.empty()) {
+            error = "CreateTerm for " + operation.create_ref.value() +
+                    " needs \"text\": the term itself, the word or phrase being defined.";
+            return false;
+        }
+        if (!operation.translations.empty() && operation.new_value.empty()) {
+            error = "CreateTerm for " + operation.create_ref.value() +
+                    " supplies translations but no definition; give the " + std::string(kPatchPrimaryLanguage) +
+                    " definition in \"new_value\". Translations apply to the definition -- a term's value is a "
+                    "single string.";
+            return false;
+        }
+        parser::SacmElement element;
+        element.id = id_it->second;
+        element.type = ElementTypeFor(operation.type);
+        WriteField(element.content, element.content_langs, operation.text, {});
+        if (!operation.new_value.empty() || !operation.translations.empty()) {
+            WriteField(element.description, element.description_langs, operation.new_value, operation.translations);
+        }
+        model.elements.push_back(std::move(element));
+        return true;
+    }
+
+    // A Category has a name and a description and nothing else: no value, so
+    // `text` is its name rather than a value the way a term's is.
+    if (operation.type == PatchOperationType::CreateCategory) {
+        if (operation.text.empty()) {
+            error = "CreateCategory for " + operation.create_ref.value() +
+                    " needs \"text\": the category's name, such as \"Domain terms\".";
+            return false;
+        }
+        parser::SacmElement element;
+        element.id = id_it->second;
+        element.type = ElementTypeFor(operation.type);
+        WriteField(element.name, element.name_langs, operation.text, {});
+        if (!operation.new_value.empty() || !operation.translations.empty()) {
+            WriteField(element.description, element.description_langs, operation.new_value, operation.translations);
+        }
+        model.elements.push_back(std::move(element));
+        return true;
+    }
+
     // A new element has no primary text to fall back on, so translations
     // without it would create a node that renders empty for every reader who
     // has not switched languages -- an invisible claim in a safety argument.
@@ -329,6 +388,113 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
                                                    : std::nullopt;
 
     switch (operation.type) {
+    case PatchOperationType::UpdateTerm:
+        if (element->type != "term") {
+            error = "UpdateTerm targets " + element_id + ", which is a " + element->type +
+                    ", not a term. Use UpdateElementText for argument elements.";
+            return false;
+        }
+        if (operation.field == kTermFieldValue) {
+            // The value is what term detection matches in claim text; a term
+            // whose value is blank can never resolve, so blanking it is refused
+            // rather than applied. It is also ONE string -- SACM 10.11 gives an
+            // ExpressionElement a single value -- so translations cannot ride
+            // on this field.
+            if (!operation.translations.empty()) {
+                error = "A term's value is a single string; translations apply to its definition. "
+                        "Use field \"definition\" to translate what the term means.";
+                return false;
+            }
+            if (operation.new_value.empty()) {
+                error = "UpdateTerm on " + element_id +
+                        " would blank the term's value. Use RemoveTerm to "
+                        "remove the term instead.";
+                return false;
+            }
+            WriteField(element->content, element->content_langs, operation.new_value, {});
+            return true;
+        }
+        if (operation.field == kTermFieldDefinition) {
+            WriteField(element->description, element->description_langs, primary, operation.translations);
+            return true;
+        }
+        if (operation.field == kTermFieldName) {
+            if (!operation.translations.empty()) {
+                error = "A term's name is one SACM LangString; state it in the primary language only.";
+                return false;
+            }
+            WriteField(element->name, element->name_langs, operation.new_value, {});
+            return true;
+        }
+        if (operation.field == kTermFieldCategory) {
+            // Space separated, matching the XMI convention for an idref list, so
+            // a term can carry the several categories SACM 10.8 allows. Empty
+            // clears them -- an uncategorized term is a reportable state, not an
+            // impossible one, so removing a category has to be expressible.
+            std::vector<std::string> categories;
+            for (const std::string& candidate : SplitRefList(operation.new_value)) {
+                const parser::SacmElement* category = FindElement(model, candidate);
+                if (category == nullptr) {
+                    error = "UpdateTerm names category " + candidate +
+                            ", which does not exist. Create it with a "
+                            "CreateCategory operation, or use an id from list_terms.";
+                    return false;
+                }
+                if (category->type != "category") {
+                    error = "UpdateTerm names " + candidate + " as a category, but it is a " + category->type + ".";
+                    return false;
+                }
+                // A term belongs to a category once. Repeating an id -- easy in
+                // a space-separated list -- would otherwise store a duplicate
+                // reference that shows up twice in `list_terms` and changes the
+                // element's hash without changing what it classifies.
+                if (std::find(categories.begin(), categories.end(), candidate) == categories.end())
+                    categories.push_back(candidate);
+            }
+            element->category_refs = std::move(categories);
+            return true;
+        }
+        if (operation.field == kTermFieldExternalReference) {
+            element->external_reference = operation.new_value;
+            return true;
+        }
+        if (operation.field == kTermFieldOrigin) {
+            // An origin is a reference to the element the definition came from,
+            // not free text -- the library refuses one that does not resolve, so
+            // catching it here turns an acceptance-time failure into a staging
+            // message the agent can act on.
+            if (!operation.new_value.empty() && FindElement(model, operation.new_value) == nullptr) {
+                error = "UpdateTerm names origin " + operation.new_value +
+                        ", which does not exist. An origin is the id of the element the definition comes from; "
+                        "use \"external_reference\" for a citation string such as a URL or standard clause.";
+                return false;
+            }
+            element->origin_ref = operation.new_value;
+            return true;
+        }
+        error = "UpdateTerm field must be \"value\", \"definition\", \"name\", \"category\", "
+                "\"external_reference\", or \"origin\", not \"" +
+                operation.field + "\".";
+        return false;
+    case PatchOperationType::UpdateCategory:
+        if (element->type != "category") {
+            error = "UpdateCategory targets " + element_id + ", which is a " + element->type + ", not a category.";
+            return false;
+        }
+        if (operation.field == kCategoryFieldName) {
+            if (operation.new_value.empty()) {
+                error = "UpdateCategory on " + element_id + " would blank the category's name.";
+                return false;
+            }
+            WriteField(element->name, element->name_langs, operation.new_value, {});
+            return true;
+        }
+        if (operation.field == kCategoryFieldDescription) {
+            WriteField(element->description, element->description_langs, primary, operation.translations);
+            return true;
+        }
+        error = "UpdateCategory field must be \"name\" or \"description\", not \"" + operation.field + "\".";
+        return false;
     case PatchOperationType::UpdateElementName:
         WriteField(element->name, element->name_langs, primary, operation.translations);
         return true;
@@ -484,6 +650,36 @@ bool ApplyRemoveRelationshipOperation(const PatchOperation& operation,
     return true;
 }
 
+// Removing a term takes only the term: nothing in the flat model references a
+// term directly (a visible term context references its ArtifactReference), so
+// there is no relationship sweep. Whether the term is referenced from an
+// argument package in the authoritative document is the library's call at
+// acceptance -- an in-use term's removal is refused there rather than silently
+// cascading (SACM-CMD-007).
+bool ApplyRemoveTermOperation(const PatchOperation& operation,
+                              parser::AssuranceCase& model,
+                              const std::map<std::string, std::string>& generated_ids,
+                              std::string& error) {
+    std::string element_id;
+    if (!ResolveOptionalElementRef(operation.element, model, generated_ids, "element", element_id, error))
+        return false;
+    const parser::SacmElement* element = FindElement(model, element_id);
+    if (element == nullptr) {
+        error = "RemoveTerm references missing element " + element_id + ".";
+        return false;
+    }
+    if (element->type != "term") {
+        error = "RemoveTerm targets " + element_id + ", which is a " + element->type +
+                ", not a term. Use RemoveElement for argument elements.";
+        return false;
+    }
+    model.elements.erase(std::remove_if(model.elements.begin(),
+                                        model.elements.end(),
+                                        [&](const parser::SacmElement& entry) { return entry.id == element_id; }),
+                         model.elements.end());
+    return true;
+}
+
 bool ApplyRemoveElementOperation(const PatchOperation& operation,
                                  parser::AssuranceCase& model,
                                  const std::map<std::string, std::string>& generated_ids,
@@ -535,6 +731,8 @@ bool ApplyOperation(const PatchOperation& operation,
     case PatchOperationType::UpdateElementName:
     case PatchOperationType::SetUndeveloped:
     case PatchOperationType::ClearUndeveloped:
+    case PatchOperationType::UpdateTerm:
+    case PatchOperationType::UpdateCategory:
         return ApplyUpdateOperation(operation, model, generated_ids, error);
     case PatchOperationType::AddSupportedBy:
     case PatchOperationType::AddInContextOf:
@@ -544,6 +742,8 @@ bool ApplyOperation(const PatchOperation& operation,
         return ApplyRemoveRelationshipOperation(operation, model, generated_ids, error);
     case PatchOperationType::RemoveElement:
         return ApplyRemoveElementOperation(operation, model, generated_ids, error);
+    case PatchOperationType::RemoveTerm:
+        return ApplyRemoveTermOperation(operation, model, generated_ids, error);
     default:
         error = "Unsupported proposal operation.";
         return false;

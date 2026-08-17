@@ -76,6 +76,9 @@ msgstr "この変更が前提としていた変更が却下されたため、適
 msgid "A full editor for this SACM package type will be added in a later workflow."
 msgstr "この SACM パッケージ種別の完全なエディターは後のワークフローで追加されます。"
 
+msgid "A project named \"{0}\" is already in this folder. Choose another name."
+msgstr "このフォルダーには「{0}」という名前のプロジェクトが既にあります。別の名前を選んでください。"
+
 msgid "ACP"
 msgstr "ACP"
 
@@ -483,6 +486,9 @@ msgstr "変更は提案ドラフトに記録されています。レビューパ
 
 msgid "Changes only"
 msgstr "変更のみ"
+
+msgid "Choose a parent location."
+msgstr "親フォルダーを選んでください。"
 
 msgid "Choose a target TerminologyPackage."
 msgstr "対象の TerminologyPackage を選択してください。"
@@ -1014,6 +1020,9 @@ msgstr "生成済みレポート: {0}"
 
 msgid "Get started with Assurance Forge"
 msgstr "Assurance Forge の開始ガイド"
+
+msgid "Glossary:"
+msgstr "用語集:"
 
 msgid "Go"
 msgstr "移動"
@@ -2514,6 +2523,9 @@ msgstr "{0}\nクリックしてレビュータブを開きます。"
 
 msgid "{0}  by {1}"
 msgstr "{0}  作業者 {1}"
+
+msgid "{0} (removed)"
+msgstr "{0}（削除）"
 
 msgid "{0} ({1})"
 msgstr "{0} ({1})"

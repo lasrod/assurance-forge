@@ -99,6 +99,11 @@ struct AppState {
     bool refresh_tracked_file_hashes(const std::filesystem::path& file_path);
     void mark_dirty();
 
+    // Initializes the audit store against the project's first SACM argument, the
+    // file the history timeline and the command bus are anchored to. Idempotent;
+    // a failure is recorded as a load warning rather than refusing the project.
+    void EnsureAuditStoreForFirstArgument();
+
     bool create_empty_project(const std::string& project_name, const std::string& parent_location);
     bool open_project(const std::string& project_or_manifest_path);
     bool create_project_sacm_file(const std::string& file_name, ProjectFileEntry* created_entry = nullptr);

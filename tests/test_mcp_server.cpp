@@ -339,6 +339,103 @@ TEST(McpServer, GetElementReportsAnUnknownIdAsAToolError) {
     EXPECT_NE(call.payload.value("error", std::string{}).find("no-such-element"), std::string::npos);
 }
 
+TEST(McpServer, ListTermsReturnsValuesAndDefinitions) {
+    // The round-trip fixture has no terminology, so this writes one that does.
+    // The shape mirrors the kitchen-blender example: terms with a value
+    // attribute and their definition in a description child.
+    const std::filesystem::path fixture = TestSettingsDirectory() / "list_terms_fixture.sacm";
+    {
+        std::ofstream out(fixture, std::ios::trunc | std::ios::binary);
+        out << R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="AC1">
+  <name content="Terms" />
+  <argumentPackage xmi:id="AP1">
+    <name content="Args" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <name content="Top goal" />
+    </argumentElement>
+  </argumentPackage>
+  <terminologyPackage xmi:id="TP1">
+    <name content="Terminology" />
+    <terminologyElement xsi:type="sacm:Category" xmi:id="CAT1">
+      <name content="Regulatory terms" />
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" value="ALARP" category="CAT1" externalReference="HSE R2P2, 2001">
+      <name content="ALARP" />
+      <description xmi:id="d1">
+        <content>
+          <value lang="en" content="As low as reasonably practicable." />
+        </content>
+      </description>
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>
+)";
+    }
+
+    mcp::Session::Config config;
+    config.project_path = fixture;
+    config.settings_path = WriteSettings("terms_consenting.json", {{"mcp", {{"enabled", true}}}});
+    std::string error;
+    std::unique_ptr<mcp::Session> session = mcp::Session::Open(std::move(config), error);
+    ASSERT_NE(session, nullptr) << error;
+    mcp::Server server(*session);
+    Initialize(server);
+
+    const ToolCall call = CallTool(server, "list_terms");
+
+    ASSERT_FALSE(call.is_error) << call.payload.dump();
+    ASSERT_EQ(call.payload["count"], 1);
+    // Term-domain names, not the flat model's: an agent reads "value" and
+    // "definition", never that a definition happens to live in "description".
+    EXPECT_EQ(call.payload["terms"][0]["id"], "T1");
+    EXPECT_EQ(call.payload["terms"][0]["value"], "ALARP");
+    EXPECT_EQ(call.payload["terms"][0]["definition"], "As low as reasonably practicable.");
+
+    // Classification and provenance, and the categories a term may be filed
+    // under. An agent asked to fix an uncategorized term needs the ids it is
+    // allowed to name; without them it invents one and the operation is refused.
+    ASSERT_EQ(call.payload["terms"][0]["categories"].size(), 1u);
+    EXPECT_EQ(call.payload["terms"][0]["categories"][0]["id"], "CAT1");
+    EXPECT_EQ(call.payload["terms"][0]["categories"][0]["name"], "Regulatory terms");
+    EXPECT_EQ(call.payload["terms"][0]["external_reference"], "HSE R2P2, 2001");
+    ASSERT_EQ(call.payload["category_count"], 1);
+    EXPECT_EQ(call.payload["categories"][0]["id"], "CAT1");
+    EXPECT_EQ(call.payload["categories"][0]["name"], "Regulatory terms");
+
+    // The stage_operations schema must offer the terminology operations, or an
+    // agent that can read terms still cannot propose one.
+    const std::optional<nlohmann::json> tools = server.HandleMessage(Request("tools/list", nullptr, 55));
+    ASSERT_TRUE(tools.has_value());
+    bool found_stage_operations = false;
+    for (const nlohmann::json& tool : (*tools)["result"]["tools"]) {
+        if (tool["name"] != "stage_operations") {
+            continue;
+        }
+        found_stage_operations = true;
+        const nlohmann::json& types =
+            tool["inputSchema"]["properties"]["operations"]["items"]["properties"]["type"]["enum"];
+        const auto has = [&types](const char* name) {
+            return std::find(types.begin(), types.end(), nlohmann::json(name)) != types.end();
+        };
+        EXPECT_TRUE(has("CreateTerm")) << types.dump();
+        EXPECT_TRUE(has("UpdateTerm")) << types.dump();
+        EXPECT_TRUE(has("RemoveTerm")) << types.dump();
+        EXPECT_TRUE(has("CreateCategory")) << types.dump();
+        EXPECT_TRUE(has("UpdateCategory")) << types.dump();
+
+        // The field vocabulary has to be discoverable, or an agent that can see
+        // an uncategorized term still has to guess the name of the field that
+        // fixes it.
+        const std::string field_description =
+            tool["inputSchema"]["properties"]["operations"]["items"]["properties"]["field"]["description"]
+                .get<std::string>();
+        EXPECT_NE(field_description.find("category"), std::string::npos) << field_description;
+        EXPECT_NE(field_description.find("external_reference"), std::string::npos) << field_description;
+    }
+    EXPECT_TRUE(found_stage_operations);
+}
+
 TEST(McpServer, GetElementRequiresAnId) {
     std::unique_ptr<mcp::Session> session = OpenConsentingSession();
     ASSERT_NE(session, nullptr);

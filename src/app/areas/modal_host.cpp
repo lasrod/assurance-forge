@@ -493,15 +493,38 @@ void ModalHost::RenderCreateProjectModal() {
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(AF_TR("Project name").c_str());
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText("##project_name",
-                         state_.project_controller->project_name_buf,
-                         sizeof(state_.project_controller->project_name_buf));
+        if (ImGui::InputText("##project_name",
+                             state_.project_controller->project_name_buf,
+                             sizeof(state_.project_controller->project_name_buf))) {
+            state_.project_controller->RefreshCreateProjectObstacle();
+        }
 
         ImGui::TextUnformatted(AF_TR("Parent location").c_str());
         ImGui::TextDisabled("%s", state_.project_controller->project_parent_buf);
 
+        // Said while the name is being typed, not after a press that could only
+        // fail. An empty name is left unremarked -- the field is visibly empty
+        // and nagging about it before anything has been typed helps nobody --
+        // but it still holds the button, so Create never does nothing.
+        const core::CreateProjectObstacle obstacle = state_.project_controller->create_project_obstacle;
+        if (obstacle == core::CreateProjectObstacle::FolderExists) {
+            ImGui::TextColored(ui::GetWarningColor(),
+                               "%s",
+                               ui::i18n::trf("A project named \"{0}\" is already in this folder. Choose another name.",
+                                             core::TrimWhitespace(state_.project_controller->project_name_buf))
+                                   .c_str());
+        } else if (obstacle == core::CreateProjectObstacle::LocationRequired) {
+            ImGui::TextColored(ui::GetWarningColor(), "%s", AF_TR("Choose a parent location.").c_str());
+        }
+        // A create that was attempted and refused anyway: the folder appeared
+        // between the check and the press, or the write itself failed.
+        if (!state_.project_controller->create_project_error.empty()) {
+            ImGui::TextColored(ui::GetErrorColor(), "%s", state_.project_controller->create_project_error.c_str());
+        }
+
         ImGui::Spacing();
 
+        ImGui::BeginDisabled(obstacle != core::CreateProjectObstacle::None);
         if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(110.0f, 0.0f))) {
             if (state_.app_state.create_empty_project(state_.project_controller->project_name_buf,
                                                       state_.project_controller->project_parent_buf)) {
@@ -515,17 +538,29 @@ void ModalHost::RenderCreateProjectModal() {
                 }
                 callbacks_.open_first_project_sacm_file();
                 callbacks_.touch_current_project_recent();
+                state_.project_controller->create_project_error.clear();
                 state_.project_controller->show_create_project_modal = false;
                 ImGui::CloseCurrentPopup();
+            } else {
+                // Re-asked first (the refresh clears any previous refusal), then
+                // the real reason is kept in front of the user instead of going
+                // to the status bar, which this very dialog is covering.
+                state_.project_controller->RefreshCreateProjectObstacle();
+                state_.project_controller->create_project_error = state_.app_state.status_message;
             }
         }
+        ImGui::EndDisabled();
         ImGui::SameLine();
         if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(110.0f, 0.0f))) {
+            state_.project_controller->create_project_error.clear();
             state_.project_controller->show_create_project_modal = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_create_project_modal) {
+        // Asked once as the dialog opens, so a name that is already taken is
+        // reported before a key is pressed rather than after a dead press.
+        state_.project_controller->RefreshCreateProjectObstacle();
         ImGui::OpenPopup((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str());
     }
 }
@@ -540,9 +575,15 @@ void ModalHost::RenderProjectFileNameModal() {
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(AF_TR("File name").c_str());
         ImGui::SetNextItemWidth(420.0f);
-        ImGui::InputText("##project_file_name",
-                         state_.project_controller->project_file_name_buf,
-                         sizeof(state_.project_controller->project_file_name_buf));
+        if (ImGui::InputText("##project_file_name",
+                             state_.project_controller->project_file_name_buf,
+                             sizeof(state_.project_controller->project_file_name_buf))) {
+            // The next keystroke is the user answering the refusal.
+            state_.project_controller->create_project_file_error.clear();
+        }
+        if (!state_.project_controller->create_project_file_error.empty()) {
+            ImGui::TextColored(ui::GetErrorColor(), "%s", state_.project_controller->create_project_file_error.c_str());
+        }
         ImGui::Spacing();
 
         if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(110.0f, 0.0f))) {
@@ -567,12 +608,19 @@ void ModalHost::RenderProjectFileNameModal() {
                     callbacks_.open_first_project_sacm_file) {
                     callbacks_.open_first_project_sacm_file();
                 }
+                state_.project_controller->create_project_file_error.clear();
                 state_.project_controller->show_project_file_name_modal = false;
                 ImGui::CloseCurrentPopup();
+            } else {
+                // The same silence the create-project dialog had: a name that
+                // is already taken refused, said so to a status bar this dialog
+                // covers, and left the button looking broken.
+                state_.project_controller->create_project_file_error = state_.app_state.status_message;
             }
         }
         ImGui::SameLine();
         if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(110.0f, 0.0f))) {
+            state_.project_controller->create_project_file_error.clear();
             state_.project_controller->show_project_file_name_modal = false;
             ImGui::CloseCurrentPopup();
         }

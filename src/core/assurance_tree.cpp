@@ -240,8 +240,18 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
     std::unordered_map<std::string, TreeNode*> node_by_id;
 
     // Step 1: Create a TreeNode for every non-relationship element.
+    //
+    // Terminology assets are excluded: a Term or Category is glossary content
+    // with no GSN node kind, and nothing ever wires one into the argument, so
+    // each became an orphan the layout packed onto the canvas -- a stray box
+    // whose label was the term's full definition. The SVG export already
+    // whitelists them away; this is the same policy on the canvas side. (A
+    // term participates in the drawn argument only through its
+    // ArtifactReference, which the visible-term-context pass handles.)
     for (const auto& element : ac.elements) {
         if (is_relationship(element.type))
+            continue;
+        if (element.type == "term" || element.type == "category")
             continue;
 
         auto node = std::make_unique<TreeNode>();

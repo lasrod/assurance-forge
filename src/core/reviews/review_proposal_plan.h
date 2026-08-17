@@ -65,8 +65,52 @@ struct ProposalPlan {
         bool undeveloped = false;
     };
 
+    // A glossary term the proposal introduced. Terms live in a
+    // TerminologyPackage, not an ArgumentPackage, so they carry their own
+    // package id -- empty when the case has none yet, in which case the
+    // applier creates the case's first TerminologyPackage and puts the term
+    // there. Definition translations arrive as ordinary Description
+    // `text_writes` after the term exists, like a created claim's do.
+    struct CreatedTerm {
+        std::string id;
+        std::string package_id; // the TerminologyPackage; empty = create one
+        std::string value;
+        std::string name;
+        std::string definition;
+        std::vector<std::string> category_refs;
+        std::string external_reference;
+        std::string origin_ref;
+    };
+
+    // A Category the proposal introduced, in the same TerminologyPackage a term
+    // would go in. Created before terms, because a term naming one is refused
+    // by the library until it resolves.
+    struct CreatedCategory {
+        std::string id;
+        std::string package_id; // empty = create the package too
+        std::string name;
+        std::string description;
+    };
+
+    // A term's classification and provenance. Separate from `text_writes`
+    // because these are not text and carry no language: the seams behind them
+    // write one field each, so editing a term's category cannot disturb its
+    // definition or the translations of it.
+    struct TermFieldWrite {
+        std::string term_id;
+        std::vector<std::string> category_refs;
+        std::string external_reference;
+        std::string origin_ref;
+        bool write_categories = false;
+        bool write_external_reference = false;
+        bool write_origin = false;
+    };
+
     std::vector<CreatedElement> created;
     std::vector<Relationship> created_relationships;
+    std::vector<CreatedCategory> created_categories;
+    std::vector<CreatedTerm> created_terms;
+    std::vector<TermFieldWrite> term_field_writes;
     std::vector<TextWrite> text_writes;
     std::vector<FlagWrite> flag_writes;
     std::vector<std::string> deleted_ids;
@@ -84,8 +128,15 @@ struct ProposalPlan {
 // The POD model is flat and records no package, so the caller resolves it from
 // the document; an empty value with any created element makes the plan
 // unrepresentable rather than guessing.
-ProposalPlan
-PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, const std::string& package_for_created);
+//
+// `terminology_package_for_created` names the TerminologyPackage a created term
+// belongs in. Unlike the argument package, empty is NOT unrepresentable: a case
+// that has never had a glossary has no package to resolve, and the applier
+// creates one -- refusing would make the first term impossible to add over MCP.
+ProposalPlan PlanProposalFromDiff(const AssuranceCase& before,
+                                  const AssuranceCase& after,
+                                  const std::string& package_for_created,
+                                  const std::string& terminology_package_for_created);
 
 // Writes `plan` to `document` through the sacm_adapter seams, in an order that
 // keeps the document loadable at every step: elements, then the relationships

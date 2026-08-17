@@ -87,7 +87,7 @@ draft-group ownership persists across an application restart.
 ## Reading
 
 `get_case_overview`, `find_elements`, `get_element`, `get_argument_tree`,
-`list_case_files`, `open_case_file`.
+`list_case_files`, `open_case_file`, `list_terms`.
 
 `suggest_placement(topic)` answers a question substring search cannot: *where
 does new argument about this belong?* It returns ranked goals and strategies
@@ -103,6 +103,16 @@ agent should read before proposing changes nearby; `get_element` also carries
 the ACPs on the element and on the relationships touching it. Read-only: the
 patch vocabulary has no ACP operation, and adding one is an ADR 0009 decision
 with its own GSN review, so ACP authoring stays in the application.
+
+`list_terms` returns the case's terminology in term-domain names — each term's
+`value` (the word or phrase being defined), `name`, `definition`, `categories`,
+`external_reference` and `origin`, plus the `categories` the case defines and
+the ids a term may be filed under — in one call. Terms are ordinary elements to the other read tools too:
+`get_case_overview` counts them under `term`, `find_elements` matches them by
+type or text, and `get_element` fetches one by id. What `list_terms` adds is
+the definition in the listing, which `find_elements` summaries omit, so an
+agent checking what a case's terms mean does not need one `get_element` round
+trip per term.
 
 Hard limits on `find_elements` and `get_argument_tree` are a correctness
 requirement, not a nicety — an unbounded call on a real case spends the whole
@@ -145,6 +155,56 @@ semantic graph rather than silent last-writer-wins.
 An MCP session may inspect the whole working draft but may mutate only groups it
 created. This prevents one client from rewriting human, SCCG, or another
 client's work while still letting all of them reason about the same argument.
+
+### Terminology operations
+
+Glossary work goes through the same change groups as argument edits:
+`CreateTerm` defines a term (`text` is the term itself, `new_value` its
+definition), `UpdateTerm` revises one field of an existing term, and
+`RemoveTerm` deletes one. `CreateCategory` and `UpdateCategory` manage the
+categories terms are classified under (`text` is the category name, `new_value`
+its description). A staged term is visible to `list_terms` and the other reads
+in the working-draft view, revision-checked like every draft mutation, and
+lands in the SACM document only when a human promotes the group.
+
+`UpdateTerm` takes a `field` of `value`, `definition`, `name`, `category`
+(one or more category ids, space separated; empty clears them),
+`external_reference` (a citation string — a URL, a standard clause, a document)
+or `origin` (the id of the element the definition comes from). The last three
+are what answer the terminology check: it reports a term with no category, and
+a term with neither an external reference nor an origin, and before those
+fields were addressable an agent could read both findings and fix neither. A
+category id that does not resolve, or names something that is not a category,
+is refused at staging rather than at acceptance; an `origin` that looks like a
+citation string is refused with a pointer to `external_reference`.
+
+Each field is written by its own seam, so classifying a term cannot disturb its
+definition — routing the whole term through the library's replace-everything
+update would rewrite the definition in one language and drop its translations.
+
+A staged glossary is reviewable on its Draft Changes row, which lists each
+term with its definition, categories and source in full — a term is
+deliberately not a GSN node, so unlike an argument change there is no canvas
+rendering beside the row to read it from. Clicking such a row therefore does
+not jump to the canvas: it opens the terminology view for a term already in the
+accepted glossary, and stays on the row for one this draft created, which that
+view cannot show until it is promoted.
+
+When the case has no `terminologyPackage`, accepting the first `CreateTerm`
+creates one under the root assurance case package rather than refusing — a case
+with no glossary could otherwise never grow one over MCP. Definitions may carry
+`translations`; a term's value is a single string (SACM 10.11) and cannot,
+which staging enforces with an explanation rather than at acceptance.
+
+Terms address SCCG CL.5 directly: a claim relying on a broad evaluative term
+(*safe*, *timely*, *all*) is answerable by defining the term once instead of
+repeating a bound in every claim. A term defined at case level is in scope for
+term detection across the whole case.
+
+`RemoveTerm` of a term that an argument package references (for example as a
+visible term context) is refused at acceptance by the SACM library's
+cross-package delete guard; removing such a term remains an in-application
+action where the cascade can be shown and confirmed.
 
 **Staging changes no accepted assurance data.** It writes only recovery state
 under `.af/drafts`, with source label, session identity, operations, stable
@@ -296,6 +356,13 @@ version control.
   the interactive proposal flow, and only visible in a document that has more
   than one.
 - **SCCG binding is a named subset plus advisory prose**, not "SCCG compliance".
+- **Terminology stops short of deletion and association.** Terms and categories
+  can be created and edited, including a term's categories, external reference
+  and origin. Removing a *category*, and associating a term with an element as
+  a visible context, stay in the application: a category deletion has cascade
+  semantics that need a confirmation the MCP surface cannot raise. Created
+  terms and categories land in the case's first terminology package (created on
+  demand) — choosing among several packages is not expressible.
 
 ## Verification
 
@@ -309,7 +376,13 @@ version control.
   `project_not_active` refusal.
 - `tests/test_agent_request_handler.cpp` — connected reads use the integrated
   working model; MCP groups persist, support multi-call editing, and refuse a
-  stale revision after another contributor changes the draft.
+  stale revision after another contributor changes the draft; terms stage
+  through change groups and read back through `list_terms` in the working-draft
+  view.
+- `tests/test_change_set_acceptance.cpp` — accepting a staged `CreateTerm`
+  creates the terminology package when the case has none, matches the
+  acceptance preflight by semantic hash, and term edits and removals land in
+  the library document.
 - `tests/test_draft_workspace.cpp` — staging changes no accepted SACM; stable ids,
   restart recovery, combined materialization and human promotion are verified.
 - `tests/test_sccg_staged_checks.cpp` — one test per mechanical rule.

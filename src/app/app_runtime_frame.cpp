@@ -453,7 +453,7 @@ void AppRuntime::RenderFrame(bool& done) {
         }
     };
     feedback_dock_callbacks.draft_changes.focus_group = [this](const std::string& group_id) {
-        FocusDraftGroupOnCanvas(group_id);
+        FocusDraftGroup(group_id);
     };
     {
         core::perf::ScopedTimer s("app.area.feedback_dock");

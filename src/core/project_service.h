@@ -7,8 +7,35 @@
 
 namespace core {
 
+// Why a project cannot be created at `parent_location / project_name`.
+//
+// Reported as a reason rather than a message because `core` holds no display
+// text (the UI layer owns translation). The create refuses on these and the
+// create dialog asks the same question while the user types, so what the button
+// does and what the dialog says cannot drift apart -- a press that could only
+// fail is refused before it is made instead of appearing to do nothing.
+enum class CreateProjectObstacle {
+    None,
+    NameRequired,
+    LocationRequired,
+    // A file or directory is already at that path. Creating over it would put a
+    // new project's manifest beside another project's files.
+    FolderExists,
+};
+
 class ProjectService {
 public:
+    // The obstacle to creating this project, or `None` when there is none.
+    // Cheap enough to ask while the user types, and the single place the rule
+    // lives.
+    static CreateProjectObstacle FindCreateProjectObstacle(const std::string& project_name,
+                                                           const std::filesystem::path& parent_location);
+
+    // The path `CreateEmptyProject` would use, so a caller can name it in a
+    // message without reimplementing the trim.
+    static std::filesystem::path PlanProjectRoot(const std::string& project_name,
+                                                 const std::filesystem::path& parent_location);
+
     static bool CreateEmptyProject(const std::string& project_name,
                                    const std::filesystem::path& parent_location,
                                    AssuranceProject& project,

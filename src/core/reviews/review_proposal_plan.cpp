@@ -141,6 +141,20 @@ CollectTextWrites(const SacmElement& before, const SacmElement& after, std::vect
                     }
                     continue;
                 }
+                // A term's `content` is its ExpressionElement value -- one
+                // string, no languages (clause 10.11). The seam writes it via
+                // SetExpressionValue, which has no language to take, so a
+                // translated value must decline HERE rather than hard-fail
+                // mid-apply. The patch service already refuses to stage one;
+                // this guards the shapes it cannot see, e.g. a hand-written
+                // proposal file.
+                if (field == ElementTextField::Content && after.type == "term") {
+                    if (decline_reason.empty()) {
+                        decline_reason = "term " + after.id + " changes its value in '" + language +
+                                         "', and a term's value is one string; translate its definition instead";
+                    }
+                    continue;
+                }
                 out.push_back(ProposalPlan::TextWrite{
                     .element_id = after.id, .field = field, .language = language, .value = value});
             }
@@ -159,9 +173,36 @@ CollectTextWrites(const SacmElement& before, const SacmElement& after, std::vect
 // Fields no seam in this plan can write. Reported rather than silently skipped:
 // a proposal that changed one of these would otherwise appear to apply and then
 // not have.
+// The terminology fields that changed between the two states, as a write, or
+// nothing when they are identical. Only a term has them; a change to them on any
+// other kind is a shape no operation produces and is declined by the caller
+// rather than written somewhere it does not belong.
+std::optional<ProposalPlan::TermFieldWrite> CollectTermFieldWrite(const SacmElement& before, const SacmElement& after) {
+    ProposalPlan::TermFieldWrite write;
+    write.term_id = after.id;
+    write.write_categories = before.category_refs != after.category_refs;
+    write.write_external_reference = before.external_reference != after.external_reference;
+    write.write_origin = before.origin_ref != after.origin_ref;
+    if (!write.write_categories && !write.write_external_reference && !write.write_origin)
+        return std::nullopt;
+    write.category_refs = after.category_refs;
+    write.external_reference = after.external_reference;
+    write.origin_ref = after.origin_ref;
+    return write;
+}
+
+bool TerminologyFieldsDiffer(const SacmElement& before, const SacmElement& after) {
+    return before.category_refs != after.category_refs || before.external_reference != after.external_reference ||
+           before.origin_ref != after.origin_ref;
+}
+
 std::string UnsupportedFieldChange(const SacmElement& before, const SacmElement& after) {
     if (before.type != after.type)
         return "element " + after.id + " changed type";
+    // Terminology fields belong to a term and are written by their own seams;
+    // on anything else there is nowhere to put them.
+    if (after.type != "term" && TerminologyFieldsDiffer(before, after))
+        return "element " + after.id + " is a " + after.type + " and cannot carry terminology fields";
     if (before.gid != after.gid)
         return "element " + after.id + " changed gid";
     if (before.gsn_identifier != after.gsn_identifier)
@@ -179,8 +220,10 @@ std::string UnsupportedFieldChange(const SacmElement& before, const SacmElement&
 
 } // namespace
 
-ProposalPlan
-PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, const std::string& package_for_created) {
+ProposalPlan PlanProposalFromDiff(const AssuranceCase& before,
+                                  const AssuranceCase& after,
+                                  const std::string& package_for_created,
+                                  const std::string& terminology_package_for_created) {
     ProposalPlan plan;
 
     const auto decline = [&plan](std::string reason) {
@@ -242,6 +285,38 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
                 plan.created_relationships.push_back(AsRelationship(updated));
                 continue;
             }
+            if (updated.type == "category") {
+                plan.created_categories.push_back(ProposalPlan::CreatedCategory{
+                    .id = updated.id,
+                    .package_id = terminology_package_for_created,
+                    .name = updated.name,
+                    .description = updated.description,
+                });
+                continue;
+            }
+            if (updated.type == "term") {
+                plan.created_terms.push_back(ProposalPlan::CreatedTerm{
+                    .id = updated.id,
+                    .package_id = terminology_package_for_created,
+                    .value = updated.content,
+                    .name = updated.name,
+                    .definition = updated.description,
+                    .category_refs = updated.category_refs,
+                    .external_reference = updated.external_reference,
+                    .origin_ref = updated.origin_ref,
+                });
+                // Definition translations are written after the term exists,
+                // the way a created claim's are. Seeding the primaries here
+                // keeps CollectTextWrites to the non-primary languages only.
+                SacmElement term_so_far;
+                term_so_far.id = updated.id;
+                term_so_far.type = updated.type;
+                term_so_far.name = updated.name;
+                term_so_far.content = updated.content;
+                term_so_far.description = updated.description;
+                decline(CollectTextWrites(term_so_far, updated, plan.text_writes));
+                continue;
+            }
             sacm_adapter::NewElementKind kind = sacm_adapter::NewElementKind::Claim;
             if (!SeamKindFor(updated, kind)) {
                 decline("no seam creates a " + updated.type + " (" + updated.id + ")");
@@ -292,6 +367,10 @@ PlanProposalFromDiff(const AssuranceCase& before, const AssuranceCase& after, co
             continue;
         }
         decline(CollectTextWrites(*original, updated, plan.text_writes));
+        if (std::optional<ProposalPlan::TermFieldWrite> term_write = CollectTermFieldWrite(*original, updated);
+            term_write.has_value()) {
+            plan.term_field_writes.push_back(std::move(term_write.value()));
+        }
         if (original->undeveloped != updated.undeveloped) {
             plan.flag_writes.push_back(
                 ProposalPlan::FlagWrite{.element_id = updated.id, .undeveloped = updated.undeveloped});
@@ -357,6 +436,101 @@ bool ApplyProposalPlanToLibrary(sacm_adapter::LibraryDocument& document,
             out_error = "creating relationship " + relationship.id + " failed" +
                         (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
             return false;
+        }
+    }
+
+    // Terminology before text writes, so a definition translation on a created
+    // term has a term to land on. When the case has no TerminologyPackage yet,
+    // the first term or category brings one into being -- the alternative is a
+    // vocabulary that can define terms but only into a container that cannot
+    // exist. Resolved through one helper so a group adding both a category and
+    // a term does not create two packages.
+    std::string created_terminology_package_id;
+    const auto terminology_package_for =
+        [&](const std::string& declared, const std::string& for_element, std::string& resolved) -> bool {
+        if (!declared.empty()) {
+            resolved = declared;
+            return true;
+        }
+        if (created_terminology_package_id.empty()) {
+            const sacm_adapter::TerminologyCreateOutcome outcome =
+                sacm_adapter::apply_create_terminology_package(document, "Terminology", "");
+            if (!outcome.supported || !outcome.applied) {
+                out_error = "creating a terminology package for " + for_element + " failed" +
+                            (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
+                return false;
+            }
+            created_terminology_package_id = outcome.element_id;
+        }
+        resolved = created_terminology_package_id;
+        return true;
+    };
+
+    // Categories first: a term naming one is refused until it resolves.
+    for (const ProposalPlan::CreatedCategory& category : plan.created_categories) {
+        std::string package_id;
+        if (!terminology_package_for(category.package_id, category.id, package_id))
+            return false;
+        const sacm_adapter::TerminologyCreateOutcome outcome = sacm_adapter::apply_create_terminology_category(
+            document, package_id, category.name, category.description, category.id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = "creating category " + category.id + " failed" +
+                        (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
+            return false;
+        }
+    }
+
+    for (const ProposalPlan::CreatedTerm& term : plan.created_terms) {
+        std::string package_id;
+        if (!terminology_package_for(term.package_id, term.id, package_id))
+            return false;
+        const sacm_adapter::TerminologyCreateOutcome outcome = sacm_adapter::apply_create_terminology_term(
+            document,
+            package_id,
+            sacm_adapter::TerminologyTermFields{.value = term.value,
+                                                .name = term.name,
+                                                .description = term.definition,
+                                                .category_refs = term.category_refs,
+                                                .external_reference = term.external_reference,
+                                                .origin = term.origin_ref},
+            term.id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = "creating term " + term.id + " failed" +
+                        (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
+            return false;
+        }
+    }
+
+    // An existing term's classification and provenance, one field at a time so
+    // nothing else about the term -- least of all a translated definition -- is
+    // disturbed on the way past.
+    for (const ProposalPlan::TermFieldWrite& write : plan.term_field_writes) {
+        if (write.write_categories) {
+            const sacm_adapter::EditOutcome outcome =
+                sacm_adapter::apply_set_term_categories(document, write.term_id, write.category_refs);
+            if (!outcome.supported || !outcome.applied) {
+                out_error = "setting categories on " + write.term_id + " failed" +
+                            (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
+                return false;
+            }
+        }
+        if (write.write_external_reference) {
+            const sacm_adapter::EditOutcome outcome =
+                sacm_adapter::apply_set_term_external_reference(document, write.term_id, write.external_reference);
+            if (!outcome.supported || !outcome.applied) {
+                out_error = "setting the external reference on " + write.term_id + " failed" +
+                            (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
+                return false;
+            }
+        }
+        if (write.write_origin) {
+            const sacm_adapter::EditOutcome outcome =
+                sacm_adapter::apply_set_term_origin(document, write.term_id, write.origin_ref);
+            if (!outcome.supported || !outcome.applied) {
+                out_error = "setting the origin on " + write.term_id + " failed" +
+                            (outcome.diagnostics.empty() ? "" : ": " + outcome.diagnostics.front().message);
+                return false;
+            }
         }
     }
 

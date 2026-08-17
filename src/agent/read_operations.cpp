@@ -142,6 +142,17 @@ nlohmann::json ElementDetail(const parser::SacmElement& element) {
     if (!element.reasoning_ref.empty()) {
         detail["reasoning_ref"] = element.reasoning_ref;
     }
+    // A term's classification and provenance, under the names the terminology
+    // operations use rather than the flat model's.
+    if (!element.category_refs.empty()) {
+        detail["category_refs"] = element.category_refs;
+    }
+    if (!element.external_reference.empty()) {
+        detail["external_reference"] = element.external_reference;
+    }
+    if (!element.origin_ref.empty()) {
+        detail["origin"] = element.origin_ref;
+    }
     // The secondary-language text itself, per field, so an agent revising a
     // translated claim can see what the other language currently says rather
     // than overwriting a human translator's wording sight unseen.
@@ -378,6 +389,97 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
                           {"limit", limit},
                           {"truncated", total > returned},
                       });
+}
+
+Result ListTerms(const ReadContext& context) {
+    if (!HasCase(context)) {
+        return NoCase();
+    }
+
+    // Categories are listed alongside the terms, and named on each term that
+    // uses one, because an agent asked to classify a term needs the ids it may
+    // reference: a category id it invents is refused, and the reply that says
+    // so is a round trip it did not need to spend.
+    std::map<std::string, std::string> category_names;
+    nlohmann::json categories = nlohmann::json::array();
+    for (const parser::SacmElement& element : context.argument()->elements) {
+        if (element.type != "category") {
+            continue;
+        }
+        category_names[element.id] = element.name;
+        nlohmann::json category{{"id", element.id}};
+        if (!element.name.empty()) {
+            category["name"] = element.name;
+        }
+        if (!element.description.empty()) {
+            category["description"] = element.description;
+        }
+        categories.push_back(std::move(category));
+    }
+
+    nlohmann::json terms = nlohmann::json::array();
+    for (const parser::SacmElement& element : context.argument()->elements) {
+        if (element.type != "term") {
+            continue;
+        }
+        // Term-domain names rather than the flat model's: `content` holds the
+        // value and `description` the definition, which is projection detail an
+        // agent should not need to know.
+        nlohmann::json term{{"id", element.id}, {"value", element.content}};
+        if (!element.name.empty()) {
+            term["name"] = element.name;
+        }
+        if (!element.description.empty()) {
+            term["definition"] = element.description;
+        }
+        if (!element.category_refs.empty()) {
+            nlohmann::json term_categories = nlohmann::json::array();
+            for (const std::string& category_ref : element.category_refs) {
+                nlohmann::json entry{{"id", category_ref}};
+                const std::map<std::string, std::string>::const_iterator named = category_names.find(category_ref);
+                if (named != category_names.end() && !named->second.empty()) {
+                    entry["name"] = named->second;
+                }
+                term_categories.push_back(std::move(entry));
+            }
+            term["categories"] = std::move(term_categories);
+        }
+        if (!element.external_reference.empty()) {
+            term["external_reference"] = element.external_reference;
+        }
+        if (!element.origin_ref.empty()) {
+            term["origin"] = element.origin_ref;
+        }
+        nlohmann::json definition_translations = nlohmann::json::object();
+        for (const std::pair<const std::string, std::string>& entry : element.description_langs) {
+            if (entry.first != core::reviews::kPatchPrimaryLanguage && !entry.second.empty()) {
+                definition_translations[entry.first] = entry.second;
+            }
+        }
+        if (!definition_translations.empty()) {
+            term["definition_translations"] = std::move(definition_translations);
+        }
+        terms.push_back(std::move(term));
+    }
+
+    const int count = static_cast<int>(terms.size());
+    const int category_count = static_cast<int>(categories.size());
+    nlohmann::json payload{{"terms", std::move(terms)},
+                           {"count", count},
+                           {"categories", std::move(categories)},
+                           {"category_count", category_count}};
+    if (count == 0) {
+        payload["note"] = "This case defines no terminology yet. Terms bound the words a safety argument "
+                          "relies on; stage a CreateTerm operation to define one.";
+    } else if (category_count == 0) {
+        // Said once here rather than left to be discovered per term: the
+        // terminology check reports every uncategorized term, and the fix for
+        // all of them starts with creating a category to put them in.
+        payload["note"] = "This case defines no terminology categories, so every term is uncategorized. "
+                          "Stage a CreateCategory operation, then classify each term with an UpdateTerm "
+                          "operation whose field is \"category\".";
+    }
+    return ReadResult(context, std::move(payload));
 }
 
 Result ListAssuranceClaimPoints(const ReadContext& context) {

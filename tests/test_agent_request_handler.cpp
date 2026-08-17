@@ -293,6 +293,80 @@ TEST(AgentRequestHandler, McpDraftGroupsAreRevisionCheckedAndVisibleToSubsequent
     EXPECT_EQ(restored->state, core::drafts::DraftGroupState::Ready);
 }
 
+// Terminology goes through the same change groups as argument edits: a staged
+// term is visible to reads in the working-draft view, revision-checked, and
+// never touches the accepted model until a human promotes it.
+TEST(AgentRequestHandler, TermsStageThroughChangeGroupsAndListTermsSeesThem) {
+    TempDir workspace{UniqueTempPath("term-draft")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 44;
+    context.source_session_id = "stable-mcp-session-44";
+    context.current_argument_view = [&] {
+        const core::drafts::DraftWorkspace* draft = drafts.workspace();
+        if (draft == nullptr || !draft->has_active_groups())
+            return app::AgentArgumentView{&state.loaded_case.value(), nullptr};
+        const core::drafts::DraftMaterializationResult& materialized =
+            drafts.Materialize(state.loaded_case.value(), state.case_revision);
+        return app::AgentArgumentView{&materialized.working_model, draft, true};
+    };
+
+    // A fresh project defines no terminology, and the empty answer says so
+    // rather than leaving the agent to wonder whether the tool works.
+    const bridge::Response empty = app::HandleAgentRequest(MakeRequest("list_terms"), context);
+    ASSERT_TRUE(empty.ok);
+    ASSERT_FALSE(empty.result.value("isError", true)) << empty.result.dump();
+    EXPECT_EQ(empty.result["count"], 0);
+    EXPECT_TRUE(empty.result.contains("note"));
+
+    const bridge::Response begun =
+        app::HandleAgentRequest(MakeRequest("begin_change_group",
+                                            {{"title", "Bound the term 'hazard'"},
+                                             {"rationale", "CL.5: claims use 'hazard' without a bound."},
+                                             {"expected_working_revision", 0}}),
+                                context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+    const std::uint64_t begun_revision = begun.result["working_revision"].get<std::uint64_t>();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest("stage_operations",
+                    {{"group_id", group_id},
+                     {"expected_working_revision", begun_revision},
+                     {"operations",
+                      nlohmann::json::array(
+                          {{{"type", "CreateTerm"},
+                            {"create_ref", "$hazard"},
+                            {"text", "hazard"},
+                            {"new_value", "A system state that could lead to harm in the operating context."}}})}}),
+        context);
+    ASSERT_TRUE(staged.ok);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    const std::string term_id = staged.result["created_element_ids"]["$hazard"].get<std::string>();
+
+    // The staged term reads back through the working-draft view with its
+    // term-domain fields, not the flat model's storage names.
+    const bridge::Response listed = app::HandleAgentRequest(MakeRequest("list_terms"), context);
+    ASSERT_FALSE(listed.result.value("isError", true)) << listed.result.dump();
+    EXPECT_EQ(listed.result["view"], "working_draft");
+    ASSERT_EQ(listed.result["count"], 1);
+    EXPECT_EQ(listed.result["terms"][0]["id"], term_id);
+    EXPECT_EQ(listed.result["terms"][0]["value"], "hazard");
+    EXPECT_EQ(listed.result["terms"][0]["definition"],
+              "A system state that could lead to harm in the operating context.");
+
+    EXPECT_EQ(parser::FindElementById(state.loaded_case.value(), term_id), nullptr)
+        << "staging a term through MCP must not mutate the accepted model";
+}
+
 TEST(AgentRequestHandler, HumanDraftMutationMakesAnMcpRevisionStale) {
     TempDir workspace{UniqueTempPath("cross-source-stale")};
     core::AppState state;

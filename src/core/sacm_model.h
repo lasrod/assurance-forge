@@ -60,6 +60,17 @@ struct SacmElement {
     std::string structure_ref;                // from structure attribute (argumentreasoning, 11.12)
     std::string assertion_declaration;        // from assertionDeclaration attribute
     bool is_counter = false;                  // from isCounter attribute (GSN dialectic challenge)
+
+    // Terminology fields (SACM clause 10.7), populated for `term` elements only.
+    // A term's value is carried in `content` and its definition in `description`,
+    // like any other element's text; these are the three fields a term has that
+    // nothing else does. They are here rather than only in the legacy
+    // `sacm::Term` because the whole edit pipeline -- proposals, drafts, diffs,
+    // semantic hashes -- runs on this POD, so a field it cannot hold is a field
+    // no proposal can change.
+    std::vector<std::string> category_refs; // ids of the Categories classifying this term (10.8)
+    std::string external_reference;         // citation string: a URL, standard clause, or document
+    std::string origin_ref;                 // id of the element this term's definition comes from
 };
 
 struct AcpRecord {

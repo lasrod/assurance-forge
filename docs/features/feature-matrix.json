@@ -1188,7 +1188,7 @@
         "tests/test_terminology_commands.cpp",
         "tests/test_save_from_library.cpp"
       ],
-      "notes": "Documented in docs/features/terminology-assist.md. Glossary edits now apply straight to the SACM library rather than through the legacy conversion, so they work on cases the conversion could not represent (an ArgumentGroup, a nested ArgumentPackage) where every glossary edit used to be refused. Deleting a term that elements still reference now names them in the confirmation (\"also removes 2 elements that reference it\") and removes them on Yes, where before the reference was silently left pointing at nothing. The answer is recorded in the audit log, so a replay reproduces the decision rather than re-deciding it, and the status line reports the count actually removed. No cascade is offered for a file opened outside a project, where the edit path cannot honour it. A term still assigned to a category continues to block deleting that category, as before."
+      "notes": "Documented in docs/features/terminology-assist.md. Glossary edits now apply straight to the SACM library rather than through the legacy conversion, so they work on cases the conversion could not represent (an ArgumentGroup, a nested ArgumentPackage) where every glossary edit used to be refused. Deleting a term that elements still reference now names them in the confirmation (\"also removes 2 elements that reference it\") and removes them on Yes, where before the reference was silently left pointing at nothing. The answer is recorded in the audit log, so a replay reproduces the decision rather than re-deciding it, and the status line reports the count actually removed. No cascade is offered for a file opened outside a project, where the edit path cannot honour it. A term still assigned to a category continues to block deleting that category, as before. Terms and categories are glossary content, not argument: they never render as GSN canvas nodes or navigator orphans (the tree builder excludes them, matching the SVG export's whitelist), and a term reaches the drawn argument only through a visible term context."
     },
     {
       "id": "AF-ENG-011",
@@ -1563,7 +1563,7 @@
       "tests": [
         "tests/test_draft_workspace.cpp"
       ],
-      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`, and undoing one restores the accepted baseline and the pre-promotion draft together (AF-AI-017). Selection is per group from the Draft Changes panel (AF-AI-018) or per element from the Inspector's contribution list, with accept-all from the banner. Rejecting a group that others are built on now names them and offers the choice: reject them too, or keep them marked `NeedsAttention` — excluded from materialization, because left in they would fail to apply and block the whole draft, but retained in the workspace and recoverable by retargeting their operations. The audit transaction carries the promoted group ids, the contributing source labels, the guidelines served, the review items answered and each author's rationale, because accepting a draft consumes it and the log is then the only record of where the change came from. **Kept at prototype until the release-gate scenario in #273 passes in the running application.**"
+      "notes": "Accept a coherent change group without accepting the rest of the draft, with the dependency closure computed and shown first: a wording edit promotes alone, a new argument branch cannot promote without the strategy and relationships that make it meaningful. Remaining groups are rebased onto the prospective baseline and validated before anything is written, and promotion is refused before mutation if they cannot be. Promotion itself stays the unchanged audited `ApplyProposalCommand`, and undoing one restores the accepted baseline and the pre-promotion draft together (AF-AI-017). The deferred library re-derive bumps `case_revision` when it swaps the models, so the per-package canvas tab rebuilds: the dispatch bumps that counter a frame earlier while the old projection is still in place, and without a second bump the tab matched its own stamp and kept drawing text the accepted change had already replaced while the inspector showed the new text beside it. A promotion that fails after its marker is written clears the marker rather than leaving the workspace in `Promoting`, where it refuses editing, accepting **and** discarding until the application restarts — a failed accept must not take away every way to respond to it. The surviving groups are re-anchored to the argument the library **produced**, not to the one the patch predicted: the two agree for argument edits but not for terminology, where the seams stamp a gid a flat patch cannot know, and anchoring to the prediction declared every surviving group stale against the argument the user had just accepted into. Selection is per group from the Draft Changes panel (AF-AI-018) or per element from the Inspector's contribution list, with accept-all from the banner. Rejecting a group that others are built on now names them and offers the choice: reject them too, or keep them marked `NeedsAttention` — excluded from materialization, because left in they would fail to apply and block the whole draft, but retained in the workspace and recoverable by retargeting their operations. The audit transaction carries the promoted group ids, the contributing source labels, the guidelines served, the review items answered and each author's rationale, because accepting a draft consumes it and the log is then the only record of where the change came from. **Kept at prototype until the release-gate scenario in #273 passes in the running application.**"
     },
     {
       "id": "AF-AI-016",
@@ -1610,7 +1610,7 @@
       "tests": [
         "tests/test_draft_changes_panel.cpp"
       ],
-      "notes": "One row per change group in the working draft, replacing the split proposal / change-set views that showed one source at a time and could not show a combination at all. Each row names who wrote it and in which session, its rationale, what it adds, changes and removes — with relationships counted separately from elements, because a changed support relationship can alter the meaning of an argument more than a reworded claim can — the guidelines it serves, the review items it answers, what it depends on, findings against what it would produce, and whether it can be accepted right now. Promotability is answered by planning the promotion against the materialized working model rather than guessed at, and a row that cannot be accepted says so on the row rather than in the status bar. Accepting names what else it would accept before the button is pressed. Selecting a row selects its first changed element and centres the canvas on it. A whole draft held back — stale, promoting, or unmaterializable — is explained once above the list, because in that state no single group is the explanation. **Prototype**: not yet seen in the running application against a real multi-source draft, which is the #273 release gate."
+      "notes": "One row per change group in the working draft, replacing the split proposal / change-set views that showed one source at a time and could not show a combination at all. Each row names who wrote it and in which session, its rationale, what it adds, changes and removes — with relationships counted separately from elements, because a changed support relationship can alter the meaning of an argument more than a reworded claim can — the guidelines it serves, the review items it answers, what it depends on, findings against what it would produce, and whether it can be accepted right now. Promotability is answered by planning the promotion against the materialized working model rather than guessed at, and a row that cannot be accepted says so on the row rather than in the status bar. Accepting names what else it would accept before the button is pressed. Selecting a row takes the user to its first changed element in whichever view can show it: the GSN canvas for argument, the terminology view for a term that is already in the accepted glossary, and nowhere at all for a term this draft created — that view reads accepted terminology, so going there would report the term missing, and the row's own glossary lines are where it is readable. A glossary group additionally lists each staged term with its definition, categories and source in full on the row — a term is deliberately not a GSN node (AF-AI-022), so there is no canvas rendering beside the row to read it from. A whole draft held back — stale, promoting, or unmaterializable — is explained once above the list, because in that state no single group is the explanation. **Prototype**: not yet seen in the running application against a real multi-source draft, which is the #273 release gate."
     },
     {
       "id": "AF-AI-019",
@@ -1669,19 +1669,43 @@
       "notes": "Launched with no project argument, the adapter initializes without a running application, discovers the single running instance at call time, and connects unbound (ADR 0014). **Access is granted per session**: the first project operation (or `request_project_access`) raises an in-app request — client label, project, Allow while open / Deny — and is refused with `project_access_pending` until the user answers; this applies to `--project` sessions too. Grants are keyed by session id, survive a reconnect to the same instance, and end on deny, revoke, project close/switch, MCP disable, or restart; a re-granted session still owns its draft groups. Multiple running instances are never auto-selected. `--offline-project <path>` is the deliberate read-only escape hatch that never connects. Kept in-development until multi-instance selection and the one-time client setup ship (context envelopes and generation checks shipped with AF-AI-009; rebinding is the fresh grant raised after a project switch)."
     },
     {
+      "id": "AF-AI-022",
+      "area": "AI",
+      "name": "Terminology read and management from an external AI client",
+      "status": "prototype",
+      "evidence": [
+        "src/agent/read_operations.cpp",
+        "src/agent/change_operations.cpp",
+        "src/core/reviews/review_proposal_patch_service.cpp",
+        "src/core/reviews/review_proposal_plan.cpp",
+        "src/sacm_adapter/document_edit.cpp",
+        "src/core/commands/proposal_commands.cpp",
+        "src/mcp/tools.cpp"
+      ],
+      "tests": [
+        "tests/test_mcp_server.cpp",
+        "tests/test_agent_request_handler.cpp",
+        "tests/test_review_proposal_patch_service.cpp",
+        "tests/test_change_set_acceptance.cpp"
+      ],
+      "notes": "`list_terms` returns every term's value, name, definition, categories, external reference and origin in one call, together with the categories the case defines, connected and offline; terms and categories also appear in `get_case_overview` counts, `find_elements` and `get_element`. `CreateTerm`, `UpdateTerm`, `RemoveTerm`, `CreateCategory` and `UpdateCategory` stage through the same revision-checked change groups as argument edits and promote through the same audited `ApplyProposalCommand`; accepting the first term or category of a case with no glossary creates the containing `terminologyPackage` rather than refusing. `UpdateTerm` fields are `value`, `definition`, `name`, `category` (space-separated ids), `external_reference` and `origin` — the last three are what answer the terminology check's \"no category\" and \"no external reference/source\" findings, which an agent could previously read but not fix. Each field is written by its own seam so classifying a term cannot rewrite its definition or drop the translations of it; an unresolvable category or origin is refused at staging, not at acceptance. Definitions may carry translations; a term's value is a single string (SACM 10.11) and staging refuses a translated one with an explanation. Addresses SCCG CL.5 by defining a bounding term once instead of repeating it as free text. **Bounded**: removing a *category*, and associating a term with an element as a visible context, stay in-application (a category delete has cascade semantics needing a confirmation this surface cannot raise); created terms and categories land in the case's first terminology package; removing a term an argument package references is refused at acceptance by the library's cross-package delete guard. **Prototype with AF-AI-014**: the write path rides the draft workspace, which is still under stability testing; the read path is exercised through the real MCP server process."
+    },
+    {
       "id": "AF-PLAT-001",
       "area": "PLAT",
       "name": "Project model, load and save",
       "status": "supported",
       "evidence": [
         "src/core/project_service.cpp",
-        "src/core/project_file_io.cpp"
+        "src/core/project_file_io.cpp",
+        "src/core/app_state.cpp"
       ],
       "tests": [
         "tests/test_project_service.cpp",
-        "tests/test_project_model.cpp"
+        "tests/test_project_model.cpp",
+        "tests/test_app_state.cpp"
       ],
-      "notes": ""
+      "notes": "Creating a project initializes its audit store, as opening one already did. Without it a new project had no manifest and no baseline until its second session: the command bus could not open, every edit took the unaudited path, and accepting a draft reported the SACM file as unwritten and froze the draft mid-promotion. The create dialog reports a name already taken in the parent folder instead of refusing silently."
     },
     {
       "id": "AF-PLAT-002",

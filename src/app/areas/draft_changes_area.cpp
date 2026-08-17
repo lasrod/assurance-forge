@@ -160,7 +160,156 @@ std::string TitleOf(const core::drafts::DraftWorkspace& workspace, const std::st
     return group->title;
 }
 
+// An element in the working model, or among those the draft removed. A category
+// a term names can be either: created by this group, already accepted, or gone.
+const core::SacmElement* FindElementInGroupView(const core::drafts::DraftMaterializationResult& result,
+                                                const std::string& element_id) {
+    for (const core::SacmElement& candidate : result.working_model.elements) {
+        if (candidate.id == element_id)
+            return &candidate;
+    }
+    for (const core::SacmElement& removed : result.change_index.removed) {
+        if (removed.id == element_id)
+            return &removed;
+    }
+    return nullptr;
+}
+
+// The terms a group touches, with their full text. A term has no canvas node
+// -- glossary content is deliberately not drawn as argument -- so the row is
+// the one place a reviewer can read what a staged definition actually says
+// before accepting it. Post-state for adds and edits (what accepting produces),
+// the removed term's own text for removals.
+std::vector<std::string> GlossaryLinesForGroup(const core::drafts::DraftMaterializationResult& result,
+                                               const std::string& group_id) {
+    std::vector<std::string> lines;
+    for (const std::string& element_id : result.change_index.ChangedElementIds()) {
+        const std::vector<std::string> contributors = result.change_index.ContributingGroupIds(element_id);
+        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
+            continue;
+        const core::drafts::DraftElementEntry* entry = result.change_index.Find(element_id);
+        if (entry == nullptr)
+            continue;
+
+        const core::SacmElement* element = nullptr;
+        if (entry->change == core::drafts::DraftElementChange::Removed) {
+            for (const core::SacmElement& removed : result.change_index.removed) {
+                if (removed.id == element_id) {
+                    element = &removed;
+                    break;
+                }
+            }
+        } else {
+            for (const core::SacmElement& candidate : result.working_model.elements) {
+                if (candidate.id == element_id) {
+                    element = &candidate;
+                    break;
+                }
+            }
+        }
+        if (element == nullptr || element->type != "term")
+            continue;
+
+        std::string line = element->content.empty() ? element->id : element->content;
+        if (!element->description.empty())
+            line += ": " + element->description;
+        // Classification and source, or a group that only categorizes terms
+        // would list them with their definitions and show nothing of what it
+        // actually changed. Names where the category resolves, so the reviewer
+        // reads "Regulatory terms" rather than an id.
+        if (!element->category_refs.empty()) {
+            std::string categories;
+            for (const std::string& category_ref : element->category_refs) {
+                const core::SacmElement* category = FindElementInGroupView(result, category_ref);
+                const std::string label =
+                    (category != nullptr && !category->name.empty()) ? category->name : category_ref;
+                if (!categories.empty())
+                    categories += ", ";
+                categories += label;
+            }
+            line += " [" + categories + "]";
+        }
+        if (!element->external_reference.empty())
+            line += " (" + element->external_reference + ")";
+        if (entry->change == core::drafts::DraftElementChange::Removed)
+            line = ui::i18n::trf("{0} (removed)", line);
+        lines.push_back(std::move(line));
+    }
+    return lines;
+}
+
+// The accepted terminology package holding `term_id`, or nothing when the term
+// is not in the accepted glossary -- which is the ordinary case for a term this
+// draft created and nobody has promoted yet.
+//
+// Searches the case-level packages and each argument package's, mirroring where
+// the terminology panel itself looks for one.
+bool FindAcceptedTerm(const sacm::AssuranceCasePackage& package,
+                      const std::string& term_id,
+                      core::TerminologyPackageRef& out_package_ref,
+                      core::TerminologyTermRef& out_term_ref) {
+    const core::TerminologyTermRef wanted{term_id, {}};
+    const auto search = [&](const std::vector<sacm::TerminologyPackage>& packages) {
+        for (const sacm::TerminologyPackage& terminology : packages) {
+            if (core::FindTerminologyTerm(terminology, wanted) == nullptr)
+                continue;
+            out_package_ref = core::TerminologyPackageRef{terminology.id, terminology.gid};
+            out_term_ref = wanted;
+            return true;
+        }
+        return false;
+    };
+
+    if (search(package.terminologyPackages))
+        return true;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        if (search(argument_package.terminologyPackages))
+            return true;
+    }
+    return false;
+}
+
 } // namespace
+
+DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::string& group_id) {
+    DraftGroupFocus focus;
+    const core::drafts::DraftMaterializationResult* materialization = state.draft_frame_materialization.get();
+    if (materialization == nullptr)
+        return focus;
+
+    // In materialization order, so "the first element this group changed" is
+    // stable between frames rather than whichever the map happened to yield.
+    for (const std::string& element_id : materialization->change_index.ChangedElementIds()) {
+        const std::vector<std::string> contributors = materialization->change_index.ContributingGroupIds(element_id);
+        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
+            continue;
+
+        const core::SacmElement* element = FindElementInGroupView(*materialization, element_id);
+        if (element != nullptr && element->type == "term") {
+            if (state.app_state.has_projected_package() &&
+                FindAcceptedTerm(state.app_state.projected_package(), element_id, focus.package_ref, focus.term_ref)) {
+                focus.kind = DraftGroupFocusKind::Terminology;
+                focus.element_id = element_id;
+            }
+            // Otherwise the term exists only in the draft, and the row is the
+            // only place it can be read. Leave the user on it.
+            return focus;
+        }
+        if (element != nullptr && element->type == "category") {
+            // A category is glossary structure with no view of its own until it
+            // is accepted; the row names it.
+            return focus;
+        }
+
+        // A removed element is not on the canvas to be centred on, but the
+        // presentation view keeps it as a tombstone, so selecting it still lands
+        // somewhere the user can see.
+        focus.kind = DraftGroupFocusKind::Canvas;
+        focus.element_id = element_id;
+        return focus;
+    }
+    return focus;
+}
 
 ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& state) {
     ui::panels::DraftChangesPanelModel model;
@@ -207,8 +356,10 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
         for (const std::string& dependency : group.depends_on_group_ids)
             row.depends_on_titles.push_back(TitleOf(*workspace, dependency));
 
-        if (materialization != nullptr)
+        if (materialization != nullptr) {
+            row.glossary_lines = GlossaryLinesForGroup(*materialization, group.id);
             row.findings = FindingsForGroup(*materialization, group.id);
+        }
 
         // Promotability is answered by planning the promotion, not by guessing
         // at it. The plan materializes the selection against the accepted

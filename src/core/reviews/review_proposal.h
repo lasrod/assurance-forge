@@ -30,7 +30,32 @@ enum class PatchOperationType {
     AddInContextOf,
     RemoveInContextOf,
     RemoveElement,
+    // Terminology (SACM clause 10). A term is an element of type "term" in the
+    // flat model: its value (the word or phrase being defined) lives in
+    // `content` and its definition in `description`, mirroring how
+    // `sacm_adapter::project_case` projects a library Term.
+    CreateTerm,
+    UpdateTerm,
+    RemoveTerm,
+    // A Category (clause 10.8) classifies terms. It is an element of type
+    // "category" whose `name` and `description` are its only content.
+    CreateCategory,
+    UpdateCategory,
 };
+
+// The `field` vocabulary UpdateTerm accepts. These are term-domain names an
+// agent can discover from the schema; the patch service maps them onto the flat
+// element's content/description/name and its terminology fields.
+constexpr const char* kTermFieldValue = "value";
+constexpr const char* kTermFieldDefinition = "definition";
+constexpr const char* kTermFieldName = "name";
+constexpr const char* kTermFieldCategory = "category";
+constexpr const char* kTermFieldExternalReference = "external_reference";
+constexpr const char* kTermFieldOrigin = "origin";
+
+// The `field` vocabulary UpdateCategory accepts.
+constexpr const char* kCategoryFieldName = "name";
+constexpr const char* kCategoryFieldDescription = "description";
 
 struct ElementRef {
     std::optional<std::string> existing_id;
@@ -100,6 +125,13 @@ struct ReviewProposalSummary {
 
 const char* PatchOperationTypeToString(PatchOperationType type);
 bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& type);
+
+// Whether this operation brings a new element into being and therefore needs a
+// patch-local create_ref and a pinned identity. One definition, used by the
+// validity gate, the patch service and the draft materializer alike: three
+// private copies of this list is how a new create operation gets staged with an
+// id one of them never pins.
+bool IsCreateOperation(PatchOperationType type);
 
 std::string SerializeReviewProposal(const ReviewProposal& proposal);
 bool DeserializeReviewProposal(const std::string& content, ReviewProposal& proposal, std::string& error);

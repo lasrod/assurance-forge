@@ -57,6 +57,47 @@ std::string ReportSummary(const core::ProjectLoadReport& report) {
 
 } // namespace
 
+// The rule the create dialog asks while the user types, and the one the create
+// itself refuses on. One rule with two callers: a dialog that offers a Create
+// the create would reject is how "nothing happens when I press it" is built.
+TEST(ProjectServiceTest, TheCreateObstacleAndTheCreateItselfAgree) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path& parent = tmp.path;
+
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("MySafetyCase", parent),
+              core::CreateProjectObstacle::None);
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("   ", parent),
+              core::CreateProjectObstacle::NameRequired);
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("MySafetyCase", {}),
+              core::CreateProjectObstacle::LocationRequired);
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, project, report, error)) << error;
+
+    // The reported case: the same name a second time. The obstacle now says so,
+    // which is what lets the dialog say so before the button is pressed...
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("MySafetyCase", parent),
+              core::CreateProjectObstacle::FolderExists);
+    // ...and the surrounding whitespace a user leaves behind must not hide it,
+    // since the create trims before joining the path too.
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("  MySafetyCase  ", parent),
+              core::CreateProjectObstacle::FolderExists);
+
+    // ...and the create still refuses, naming the folder rather than failing mute.
+    core::AssuranceProject second;
+    std::string second_error;
+    EXPECT_FALSE(core::ProjectService::CreateEmptyProject("MySafetyCase", parent, second, report, second_error));
+    EXPECT_NE(second_error.find("already exists"), std::string::npos) << second_error;
+
+    // A plain file in the way is an obstacle for the same reason a folder is:
+    // the create cannot make a directory there either.
+    std::ofstream(parent / "TakenByAFile") << "not a project";
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("TakenByAFile", parent),
+              core::CreateProjectObstacle::FolderExists);
+}
+
 TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) {
     TempDir tmp(MakeTempParent());
     auto& parent = tmp.path;

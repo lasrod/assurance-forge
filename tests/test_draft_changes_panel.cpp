@@ -195,6 +195,170 @@ TEST(DraftChangesPanel, ARowNamesWhoWroteItAndWhy) {
     EXPECT_EQ(row->review_item_ids.front(), "RI-11");
 }
 
+TEST(DraftChangesPanel, AGlossaryGroupShowsItsTermsAndDefinitionsInFull) {
+    Fixture fixture;
+    const std::string terms = fixture.BeginGroup(McpRequest("Bound the safety vocabulary"));
+    core::reviews::PatchOperation hazard;
+    hazard.type = core::reviews::PatchOperationType::CreateTerm;
+    hazard.create_ref = "$hazard";
+    hazard.text = "hazard";
+    hazard.new_value = "A system state that, with environmental conditions, could lead to harm.";
+    core::reviews::PatchOperation alarp;
+    alarp.type = core::reviews::PatchOperationType::CreateTerm;
+    alarp.create_ref = "$alarp";
+    alarp.text = "ALARP";
+    alarp.new_value = "Risk reduced as low as reasonably practicable.";
+    fixture.Stage(terms, {hazard, alarp});
+
+    const std::string argument = fixture.BeginGroup(McpRequest("Develop the braking claim"));
+    fixture.Stage(argument, {CreateClaimOp("$sub", "Brake wear is monitored."), SupportOp("$sub", "G1")});
+    fixture.Materialize();
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(fixture.state);
+
+    // A term is deliberately not a GSN node, so unlike an argument change there
+    // is no canvas rendering beside this row to read it from. The row itself has
+    // to carry the full text -- a reviewer accepting a glossary is accepting the
+    // definitions, and "2 elements added" is not a reviewable statement of them.
+    const ui::panels::DraftChangeRow* glossary_row = FindRow(model, terms);
+    ASSERT_NE(glossary_row, nullptr);
+    ASSERT_EQ(glossary_row->glossary_lines.size(), 2u);
+    const auto has_line = [&](const std::string& line) {
+        return std::find(glossary_row->glossary_lines.begin(), glossary_row->glossary_lines.end(), line) !=
+               glossary_row->glossary_lines.end();
+    };
+    EXPECT_TRUE(has_line("hazard: A system state that, with environmental conditions, could lead to harm."));
+    EXPECT_TRUE(has_line("ALARP: Risk reduced as low as reasonably practicable."));
+
+    // A group that only classifies and cites terms must show what it changed.
+    // Listing the terms with their definitions and nothing else would read as a
+    // definition change, which is not what the reviewer is being asked to accept.
+    const std::string classify = fixture.BeginGroup(McpRequest("Classify the glossary"));
+    core::reviews::PatchOperation create_category;
+    create_category.type = core::reviews::PatchOperationType::CreateCategory;
+    create_category.create_ref = "$regulatory";
+    create_category.text = "Regulatory terms";
+    fixture.Stage(classify, {create_category});
+    // Materialized before the id is read: staging only rehearses the
+    // allocation, so the identity is not pinned until the draft is really
+    // materialized. An agent reads the same id out of its staging result.
+    fixture.Materialize();
+    const std::string category_id = fixture.IdentityFor(classify, "$regulatory");
+    ASSERT_FALSE(category_id.empty());
+
+    core::reviews::PatchOperation set_category;
+    set_category.type = core::reviews::PatchOperationType::UpdateTerm;
+    core::reviews::ElementRef alarp_ref;
+    alarp_ref.existing_id = fixture.IdentityFor(terms, "$alarp");
+    set_category.element = alarp_ref;
+    set_category.field = "category";
+    set_category.new_value = category_id;
+    core::reviews::PatchOperation set_source = set_category;
+    set_source.field = "external_reference";
+    set_source.new_value = "HSE R2P2, 2001";
+    fixture.Stage(classify, {set_category, set_source});
+    fixture.Materialize();
+
+    const ui::panels::DraftChangesPanelModel classified = app::areas::BuildDraftChangesPanelModel(fixture.state);
+    const ui::panels::DraftChangeRow* classify_row = FindRow(classified, classify);
+    ASSERT_NE(classify_row, nullptr);
+    ASSERT_FALSE(classify_row->glossary_lines.empty());
+    const auto mentions = [&](const std::string& needle) {
+        for (const std::string& line : classify_row->glossary_lines) {
+            if (line.find(needle) != std::string::npos)
+                return true;
+        }
+        return false;
+    };
+    // The category by name, not by the id the operation carried.
+    EXPECT_TRUE(mentions("[Regulatory terms]"));
+    EXPECT_TRUE(mentions("(HSE R2P2, 2001)"));
+
+    // An argument-only group carries no glossary section at all.
+    const ui::panels::DraftChangeRow* argument_row = FindRow(model, argument);
+    ASSERT_NE(argument_row, nullptr);
+    EXPECT_TRUE(argument_row->glossary_lines.empty());
+}
+
+// Clicking a row takes the user to the change. Which view that is depends on
+// what the group touched, because the GSN canvas deliberately does not draw
+// terms -- sending a glossary group there lands on a diagram where nothing is
+// highlighted, which reads as a click that did nothing.
+TEST(DraftChangesPanel, ARowGoesToTheViewThatCanActuallyShowTheChange) {
+    Fixture fixture;
+
+    // An argument group still goes to the canvas, where its claim is drawn.
+    const std::string argument = fixture.BeginGroup(McpRequest("Develop the braking claim"));
+    fixture.Stage(argument, {CreateClaimOp("$sub", "Brake wear is monitored."), SupportOp("$sub", "G1")});
+    fixture.Materialize();
+
+    const app::areas::DraftGroupFocus argument_focus = app::areas::ResolveDraftGroupFocus(fixture.state, argument);
+    EXPECT_EQ(argument_focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(argument_focus.element_id, fixture.IdentityFor(argument, "$sub"));
+
+    // A group defining a term does not: the term is not in the accepted
+    // glossary the terminology view reads, so going there would report it
+    // missing. The row's own glossary lines are where it is readable.
+    const std::string terms = fixture.BeginGroup(McpRequest("Define hazard"));
+    core::reviews::PatchOperation hazard;
+    hazard.type = core::reviews::PatchOperationType::CreateTerm;
+    hazard.create_ref = "$hazard";
+    hazard.text = "hazard";
+    hazard.new_value = "A system state that could lead to harm.";
+    fixture.Stage(terms, {hazard});
+    fixture.Materialize();
+
+    const app::areas::DraftGroupFocus staged_focus = app::areas::ResolveDraftGroupFocus(fixture.state, terms);
+    EXPECT_EQ(staged_focus.kind, app::areas::DraftGroupFocusKind::None)
+        << "a term this draft created is not in the accepted glossary yet";
+}
+
+// Once a term IS part of the accepted glossary, a group that edits it goes to
+// the terminology view, where its definition, category and source are readable.
+TEST(DraftChangesPanel, AGroupEditingAnAcceptedTermGoesToTheTerminologyView) {
+    Fixture fixture;
+
+    // An accepted glossary, as the terminology view reads it.
+    sacm::AssuranceCasePackage package;
+    package.id = "AC1";
+    sacm::TerminologyPackage terminology;
+    terminology.id = "TP1";
+    terminology.gid = "gid-TP1";
+    sacm::Term term;
+    term.id = "T1";
+    term.gid = "gid-T1";
+    term.value = "ALARP";
+    term.description = "As low as reasonably practicable.";
+    terminology.terms.push_back(term);
+    package.terminologyPackages.push_back(terminology);
+    fixture.state.app_state.sacm_package = package;
+
+    // The same term in the accepted flat model the draft is written against.
+    core::SacmElement projected;
+    projected.id = "T1";
+    projected.gid = "gid-T1";
+    projected.type = "term";
+    projected.content = "ALARP";
+    projected.description = "As low as reasonably practicable.";
+    fixture.state.app_state.loaded_case->elements.push_back(projected);
+
+    const std::string classify = fixture.BeginGroup(McpRequest("Cite the ALARP definition"));
+    core::reviews::PatchOperation cite;
+    cite.type = core::reviews::PatchOperationType::UpdateTerm;
+    core::reviews::ElementRef target;
+    target.existing_id = "T1";
+    cite.element = target;
+    cite.field = "external_reference";
+    cite.new_value = "HSE R2P2, 2001";
+    fixture.Stage(classify, {cite});
+    fixture.Materialize();
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftGroupFocus(fixture.state, classify);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Terminology);
+    EXPECT_EQ(focus.term_ref.id, "T1");
+    EXPECT_EQ(focus.package_ref.id, "TP1");
+}
+
 TEST(DraftChangesPanel, RelationshipChangesAreCountedSeparatelyFromElements) {
     Fixture fixture;
     const std::string group = fixture.BeginGroup(McpRequest("Add a sub-claim"));

@@ -200,6 +200,20 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         projected.content_langs["en"] = projected.content;
     }
 
+    // A Term's classification and provenance (clause 10.7). Projected so an edit
+    // can address them: the terminology validator reports a term with neither an
+    // external reference nor an origin, and a proposal cannot answer a finding
+    // about a field the model it edits does not carry.
+    if (const auto* term = dynamic_cast<const sacm::model::Term*>(&element)) {
+        projected.external_reference = term->external_reference();
+        if (term->origin().has_value()) {
+            projected.origin_ref = term->origin()->value();
+        }
+        for (const sacm::model::ElementId& category : term->categories()) {
+            projected.category_refs.push_back(category.value());
+        }
+    }
+
     if (const auto* assertion = dynamic_cast<const sacm::model::Assertion*>(&element)) {
         projected.assertion_declaration = sacm::model::assertion_declaration_name(assertion->assertion_declaration());
         // A GSN Justification is stored as `axiomatic` plus a vendor gsn.role

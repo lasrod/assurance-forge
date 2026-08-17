@@ -139,7 +139,22 @@ EditOutcome apply_text_edit(LibraryDocument& document,
     }
     case TextField::Content: {
         const auto* element = doc.find_as<sacm::model::ModelElement>(id);
-        if (element == nullptr || !content_maps_to_description(element->kind())) {
+        if (element == nullptr) {
+            return unsupported_outcome();
+        }
+        // A Term's or Expression's POD `content` is its ExpressionElement value
+        // (clause 10.11), which the projection maps there. It is ONE string --
+        // a translated value has nowhere to go, and refusing says so instead of
+        // handing the edit back to a legacy path that would misfile it.
+        if (dynamic_cast<const sacm::model::ExpressionElement*>(element) != nullptr) {
+            if (language != kPrimaryLanguage) {
+                return refused_outcome("AF-EDIT-TERM-VALUE-ONE-LANG",
+                                       "A term's value is a single string and cannot be translated; "
+                                       "translate its definition (the description field) instead.");
+            }
+            return applied_outcome(doc.apply(sacm::commands::SetExpressionValue{.element = id, .value = value}));
+        }
+        if (!content_maps_to_description(element->kind())) {
             return unsupported_outcome();
         }
         // Content is the FIRST Description (the statement, clause 8.9). A primary
@@ -585,6 +600,38 @@ std::string resolve_argument_package_id(const LibraryDocument& document, const s
         return first->id().value();
     }
     return {};
+}
+
+namespace {
+
+// The first TerminologyPackage anywhere under `package`, searching the package
+// itself before descending. AssuranceCasePackages nest (clause 9.2), and only
+// they hold terminology -- an ArgumentPackage has no `terminology_packages()`
+// in the library model -- so a case whose glossary sits in a nested case
+// package is found here rather than reported as having none, which would have
+// created a second package beside the one already in use.
+const sacm::model::TerminologyPackage* first_terminology_package(const sacm::model::AssuranceCasePackage& package) {
+    if (!package.terminology_packages().empty()) {
+        return package.terminology_packages().front().get();
+    }
+    for (const auto& nested : package.assurance_case_packages()) {
+        if (const sacm::model::TerminologyPackage* found = first_terminology_package(*nested)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+std::string resolve_terminology_package_id(const LibraryDocument& document) {
+    const sacm::model::Document& doc = LibraryDocumentAccess::document(document);
+    const sacm::model::AssuranceCasePackage* root = doc.roots().empty() ? nullptr : doc.roots().front().get();
+    if (root == nullptr) {
+        return {};
+    }
+    const sacm::model::TerminologyPackage* found = first_terminology_package(*root);
+    return found == nullptr ? std::string{} : found->id().value();
 }
 
 AddChildOutcome apply_create_element(LibraryDocument& document,
@@ -1866,6 +1913,52 @@ std::vector<std::string> plan_terminology_delete_cascade(const sacm::model::Docu
 }
 
 } // namespace
+
+EditOutcome apply_set_term_categories(LibraryDocument& document,
+                                      const std::string& term_id,
+                                      const std::vector<std::string>& category_ids) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+    // A term belongs to a category once. Naming the same one twice is a
+    // duplicate reference in the document, not a stronger classification.
+    std::vector<sacm::model::ElementId> categories;
+    categories.reserve(category_ids.size());
+    for (const std::string& category : category_ids) {
+        const std::string normalized = normalize_ref(category);
+        if (normalized.empty())
+            continue;
+        const sacm::model::ElementId candidate(normalized);
+        if (std::find(categories.begin(), categories.end(), candidate) == categories.end())
+            categories.push_back(candidate);
+    }
+    return applied_outcome(
+        doc.apply(sacm::commands::SetExpressionCategories{.element = id, .categories = std::move(categories)}));
+}
+
+EditOutcome apply_set_term_external_reference(LibraryDocument& document,
+                                              const std::string& term_id,
+                                              const std::string& external_reference) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+    return applied_outcome(doc.apply(sacm::commands::SetTermExternalReference{
+        .element = id, .external_reference = trim_whitespace(external_reference)}));
+}
+
+EditOutcome apply_set_term_origin(LibraryDocument& document, const std::string& term_id, const std::string& origin_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(term_id);
+    if (doc.find_as<sacm::model::Term>(id) == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
+    }
+    return applied_outcome(
+        doc.apply(sacm::commands::SetTermOrigin{.element = id, .origin = to_optional_id(normalize_ref(origin_id))}));
+}
 
 TerminologyEditOutcome apply_delete_terminology_element(LibraryDocument& document,
                                                         const std::string& element_id,
