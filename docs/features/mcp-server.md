@@ -246,9 +246,9 @@ than choosing one proposal to preview.
 
 ## SCCG
 
-Three mechanisms, weakest first. A plan to widen all three — so the guidance
-lands even when the user's prompt says nothing about SCCG — is
-[MCP authoring quality](mcp-authoring-quality-plan.md).
+Three mechanisms, weakest first — then the doctrine, which exists because all
+three land only when the user or client asks. The plan for the rest of this
+surface is [MCP authoring quality](mcp-authoring-quality-plan.md).
 
 **Resources.** `sccg://guidelines` publishes the catalog, so a client can load
 the rules at the start of a session.
@@ -260,6 +260,17 @@ rules *before* it writes.
 
 **Checks on staged work.** Returned in the result of every staging call so the
 agent self-corrects, and shown on the integrated draft for the reviewer.
+
+**The authoring doctrine** (AF-AI-023). A ~15-line condensation — one rule per
+line, each naming the guideline it condenses, every SCCG family represented —
+delivered through the channels that reach the model even when nobody asked:
+`initialize.instructions`, an `authoring_guidance` field on the pre-write reads
+(`get_case_overview`, `get_argument_tree`, `suggest_placement`,
+`get_draft_status` — the looped reads stay lean deliberately), and the
+operation schema's `text` description, which is in context at the moment a
+claim's words are generated. Every id the doctrine names is resolved against
+the catalog by a test, so the condensation cannot outlive the rules it
+condenses.
 
 !!! warning "What the checks do and do not cover"
     Most of SCCG is prose only a reader can judge — whether a claim is

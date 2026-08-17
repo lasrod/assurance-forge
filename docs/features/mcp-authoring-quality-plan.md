@@ -1,9 +1,13 @@
 # MCP authoring quality — SCCG without being asked
 
-- **Status:** Planned. Extends capability matrix row `AF-AI-010` (SCCG guidance
-  and checks for an external AI client); the rows this plan adds are listed at
-  the end and land with the first implementing commit.
-- **Date:** 2026-08-17
+- **Status:** Phase 1 implemented (`AF-AI-023` — doctrine in `initialize`
+  instructions, pre-write read results and the operation schema, with the
+  prompt-quoted sets widened). Phases 2–4 planned. Extends capability matrix
+  row `AF-AI-010` (SCCG guidance and checks for an external AI client); the
+  remaining rows land with the first implementing commit of their phase.
+- **Date:** 2026-08-17. The problem statement below describes the coverage as
+  it stood when the plan was written; phase 1 has since widened the prompt
+  quotes and added the unprompted channels.
 - **Architecture:** ADR 0003 — SACM XML as the source of truth (why nothing here
   rewrites an agent's argument); ADR 0005 and ADR 0013 — no second inference
   path in the server; ADR 0009 and ADR 0010 — the integrated draft and human

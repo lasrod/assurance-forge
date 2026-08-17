@@ -18,6 +18,11 @@
 //
 // A client supporting none of these still gets (3), which is why the checks
 // exist at all.
+//
+// (1) and (2) share a weakness: they land only when the user asks. The
+// authoring doctrine below is the answer -- a condensation delivered through
+// the channels that reach the model unprompted (`initialize` instructions,
+// pre-write read results), so the casual prompt still meets the house rules.
 
 #include <nlohmann/json.hpp>
 
@@ -59,6 +64,19 @@ struct PromptDefinition {
 const std::vector<ResourceDefinition>& BuiltinResources();
 const std::vector<ResourceTemplateDefinition>& BuiltinResourceTemplates();
 const std::vector<PromptDefinition>& BuiltinPrompts();
+
+// The authoring doctrine: the rules an agent most needs while its hands are on
+// the keyboard, one line per guideline, condensed from the catalog. The prompts
+// and resources above reach only an agent whose user asked for them; this text
+// travels in `initialize` instructions and on the pre-write read results, the
+// channels that land when the user's prompt says nothing about SCCG. See
+// docs/features/mcp-authoring-quality-plan.md, phase 1.
+const std::string& AuthoringDoctrine();
+
+// The guideline ids the doctrine names, in the order it states them. Exists so
+// a test can hold every named id against the loaded catalog -- a condensation
+// that names a guideline the catalog no longer has is quietly lying.
+const std::vector<std::string>& AuthoringDoctrineGuidelineIds();
 
 // Reads one resource. `found` distinguishes "no such uri" from "the catalog
 // could not be loaded", which are different problems with different fixes.

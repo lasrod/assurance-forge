@@ -119,7 +119,70 @@ constexpr const char* kLanguages =
     "use for the same concept. Say plainly which languages you wrote, and that a human still has to "
     "check the translation.\n";
 
+// One rule per line, each carrying the id of the guideline it condenses. The
+// pairing is the contract: a line without an id would be our rule rather than
+// SCCG's, and an id without a line in the catalog is caught by the tests that
+// resolve every id below against the loaded catalog.
+struct DoctrineLine {
+    const char* guideline_id;
+    const char* rule;
+};
+
+// Chosen for the mistakes a model actually makes when a user types "add an
+// argument that X is safe": bundled properties, essays in one goal, inference
+// smuggled into claim text, invented evidence. Every SCCG family is
+// represented so none is invisible to a client that reads nothing else.
+constexpr DoctrineLine kDoctrineLines[] = {
+    {"CL.1", "State each claim as a short proposition a reviewer could judge true or false"},
+    {"CL.2", "Put one claim in one goal -- \"safe and secure\" is two goals, needing different evidence"},
+    {"CL.3", "Keep goal text short: scope belongs in context, reasoning in a strategy, topics in sub-claims"},
+    {"CL.5",
+     "Bound every broad or universal qualifier -- safe, all, normal -- in the claim, its context, or a "
+     "defined term"},
+    {"CL.6",
+     "Keep inference out of claim text: \"because\" and \"therefore\" signal a decomposition the "
+     "structure should be making"},
+    {"AR.1",
+     "Let structure carry the argument: a goal asserts, a strategy states the reasoning, a solution is "
+     "a leaf naming evidence"},
+    {"AR.2",
+     "State the inference step explicitly rather than making the reviewer infer the decomposition rule "
+     "from wording"},
+    {"EV.1", "Give every claim a path to evidence, or mark it undeveloped deliberately; never invent evidence"},
+    {"EV.3", "Make a solution claim the fact the evidence establishes, not the name of the document holding it"},
+    {"EV.4", "Cite precise evidence locations -- section, clause, table, test id -- not a whole annex"},
+    {"EV.8", "Cite evidence at a fixed version, never a live \"latest\""},
+    {"SU.2", "Make assumptions explicit and justify why each is reasonable"},
+    {"LF.3", "Do not argue from absence -- \"no failures observed\" is not evidence of safety"},
+    {"RD.1", "Signpost each element's role in its wording, so no reader has to guess what job the text does"},
+    {"RD.4", "Use no promotional language: the argument persuades by structure and evidence, not adjectives"},
+};
+
 } // namespace
+
+const std::string& AuthoringDoctrine() {
+    static const std::string doctrine = [] {
+        std::ostringstream out;
+        out << "Writing assurance argument here follows the Safety Case Core Guidelines (SCCG):\n";
+        for (const DoctrineLine& line : kDoctrineLines) {
+            out << "- " << line.rule << " (" << line.guideline_id << ").\n";
+        }
+        out << "The full catalog is the resource sccg://guidelines; one rule is sccg://guideline/<id>.";
+        return out.str();
+    }();
+    return doctrine;
+}
+
+const std::vector<std::string>& AuthoringDoctrineGuidelineIds() {
+    static const std::vector<std::string> ids = [] {
+        std::vector<std::string> collected;
+        for (const DoctrineLine& line : kDoctrineLines) {
+            collected.emplace_back(line.guideline_id);
+        }
+        return collected;
+    }();
+    return ids;
+}
 
 const std::vector<ResourceDefinition>& BuiltinResources() {
     static const std::vector<ResourceDefinition> resources{
@@ -235,12 +298,20 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "citation field yet, so that text is the trace.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines, which are what this project's reviews apply:\n\n"
-            << GuidelinesFor({"CL.1", "CL.2", "CL.5", "CL.6", "AR.1", "AR.2", "AR.4", "EV.1"});
+            // CL.3, SU.2, LF.3 and RD.1 joined the set when the doctrine work
+            // found the SU, LF and RD families quoted in no prompt at all --
+            // drafting from a standard is exactly where assumptions, arguing
+            // from absence, and role signposting go wrong.
+            << GuidelinesFor(
+                   {"CL.1", "CL.2", "CL.3", "CL.5", "CL.6", "AR.1", "AR.2", "AR.4", "EV.1", "SU.2", "LF.3", "RD.1"});
         return out.str();
     }
 
     if (name == "add_argumentation") {
         const std::string topic = Argument(arguments, "topic", "the topic the user named");
+        // CL.2, CL.3 and LF.1 joined with the doctrine work: new argument
+        // added mid-case is where bundled claims and support that quietly
+        // restates its parent most often appear.
         out << "Add argument establishing " << topic << " to this safety case.\n\n"
             << "Find where it belongs before writing anything. Read the argument tree, look for "
                "claims already covering nearby ground, and attach to the branch whose scope this "
@@ -250,7 +321,7 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "addition to it.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
-            << GuidelinesFor({"CL.1", "CL.5", "AR.2", "AR.5", "AR.6", "EV.1"});
+            << GuidelinesFor({"CL.1", "CL.2", "CL.3", "CL.5", "AR.2", "AR.5", "AR.6", "EV.1", "LF.1"});
         return out.str();
     }
 
@@ -270,7 +341,9 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "diff.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
-            << GuidelinesFor({"AR.1", "AR.2", "AR.4", "AR.5", "CL.2"});
+            // RD.1 joined with the doctrine work: moving argument is where an
+            // element's wording and its new place most easily fall out of step.
+            << GuidelinesFor({"AR.1", "AR.2", "AR.4", "AR.5", "CL.2", "RD.1"});
         return out.str();
     }
 
