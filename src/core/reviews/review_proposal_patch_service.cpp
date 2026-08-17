@@ -444,7 +444,12 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
                     error = "UpdateTerm names " + candidate + " as a category, but it is a " + category->type + ".";
                     return false;
                 }
-                categories.push_back(candidate);
+                // A term belongs to a category once. Repeating an id -- easy in
+                // a space-separated list -- would otherwise store a duplicate
+                // reference that shows up twice in `list_terms` and changes the
+                // element's hash without changing what it classifies.
+                if (std::find(categories.begin(), categories.end(), candidate) == categories.end())
+                    categories.push_back(candidate);
             }
             element->category_refs = std::move(categories);
             return true;

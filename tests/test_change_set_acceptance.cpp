@@ -13,6 +13,7 @@
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_parser.h"
 #include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
@@ -557,6 +558,69 @@ TEST(ChangeSetAcceptance, ClassifyingAndCitingTermsClearsTheTerminologyFindings)
         EXPECT_EQ(term.category_refs.front(), category_id);
         EXPECT_EQ(term.externalReference, "HSE R2P2, 2001");
     }
+}
+
+// A glossary in a nested assurance case package is still the case's glossary.
+//
+// `resolve_terminology_package_id` looked only at the root package's own
+// terminology, so a case keeping its glossary one level down was read as having
+// none -- and accepting a term created a SECOND terminology package beside the
+// one already in use, splitting the vocabulary in two.
+TEST(ChangeSetAcceptance, ATermJoinsTheGlossaryInANestedCasePackageRatherThanStartingAnother) {
+    constexpr const char* kNestedGlossarySacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="AC1">
+  <name content="Outer" />
+  <argumentPackage xmi:id="AP1">
+    <name content="Args" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1">
+      <name content="Top goal" />
+    </argumentElement>
+  </argumentPackage>
+  <assuranceCasePackage xmi:id="AC2">
+    <name content="Inner" />
+    <terminologyPackage xmi:id="TP_NESTED" gid="gid-TP_NESTED">
+      <name content="Terminology" />
+      <terminologyElement xsi:type="sacm:Term" xmi:id="T1" gid="gid-T1" value="ALARP">
+        <name content="ALARP" />
+      </terminologyElement>
+    </terminologyPackage>
+  </assuranceCasePackage>
+</sacm:AssuranceCasePackage>
+)";
+
+    ProjectFixture f = MakeFixture("nested_glossary", kNestedGlossarySacm);
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    f.model = sacm_adapter::project_case(*loaded.document);
+
+    EXPECT_EQ(sacm_adapter::resolve_terminology_package_id(*loaded.document), "TP_NESTED")
+        << "the nested package is the case's glossary and a created term belongs in it";
+
+    core::changesets::ChangeSetStore store;
+    const std::string id = store.Begin(1, "Define hazard", "", "", "claude-ai");
+    std::string error;
+    const nlohmann::json operations = nlohmann::json::array({nlohmann::json{
+        {"type", "CreateTerm"}, {"create_ref", "$hazard"}, {"text", "hazard"}, {"new_value", "Could lead to harm."}}});
+    ASSERT_TRUE(store.Stage(id, ParseOperations(operations), f.model, error)) << error;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(store.Find(id)->proposal);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    ASSERT_TRUE(bus->Execute(command, ctx, "MCP: claude-ai").success);
+
+    // One glossary, holding both terms -- not a second one beside it.
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_EQ(sacm_adapter::resolve_terminology_package_id(*reloaded.document), "TP_NESTED");
+    const parser::AssuranceCase after = sacm_adapter::project_case(*reloaded.document);
+    int terminology_packages = 0;
+    for (const parser::SacmElement& element : after.elements) {
+        if (element.type == "terminologypackage")
+            ++terminology_packages;
+    }
+    EXPECT_NE(FindTermByValue(after, "hazard"), nullptr) << "the created term is missing";
+    EXPECT_NE(FindTermByValue(after, "ALARP"), nullptr) << "the existing term was displaced";
 }
 
 // Promotion refuses to consume the draft unless the argument the library

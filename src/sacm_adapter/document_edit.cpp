@@ -602,13 +602,36 @@ std::string resolve_argument_package_id(const LibraryDocument& document, const s
     return {};
 }
 
+namespace {
+
+// The first TerminologyPackage anywhere under `package`, searching the package
+// itself before descending. AssuranceCasePackages nest (clause 9.2), and only
+// they hold terminology -- an ArgumentPackage has no `terminology_packages()`
+// in the library model -- so a case whose glossary sits in a nested case
+// package is found here rather than reported as having none, which would have
+// created a second package beside the one already in use.
+const sacm::model::TerminologyPackage* first_terminology_package(const sacm::model::AssuranceCasePackage& package) {
+    if (!package.terminology_packages().empty()) {
+        return package.terminology_packages().front().get();
+    }
+    for (const auto& nested : package.assurance_case_packages()) {
+        if (const sacm::model::TerminologyPackage* found = first_terminology_package(*nested)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
 std::string resolve_terminology_package_id(const LibraryDocument& document) {
     const sacm::model::Document& doc = LibraryDocumentAccess::document(document);
     const sacm::model::AssuranceCasePackage* root = doc.roots().empty() ? nullptr : doc.roots().front().get();
-    if (root == nullptr || root->terminology_packages().empty()) {
+    if (root == nullptr) {
         return {};
     }
-    return root->terminology_packages().front()->id().value();
+    const sacm::model::TerminologyPackage* found = first_terminology_package(*root);
+    return found == nullptr ? std::string{} : found->id().value();
 }
 
 AddChildOutcome apply_create_element(LibraryDocument& document,
@@ -1899,12 +1922,17 @@ EditOutcome apply_set_term_categories(LibraryDocument& document,
     if (doc.find_as<sacm::model::Term>(id) == nullptr) {
         return refused_outcome("SACM-CMD-002", "'" + term_id + "' is not a Term");
     }
+    // A term belongs to a category once. Naming the same one twice is a
+    // duplicate reference in the document, not a stronger classification.
     std::vector<sacm::model::ElementId> categories;
     categories.reserve(category_ids.size());
     for (const std::string& category : category_ids) {
         const std::string normalized = normalize_ref(category);
-        if (!normalized.empty())
-            categories.emplace_back(normalized);
+        if (normalized.empty())
+            continue;
+        const sacm::model::ElementId candidate(normalized);
+        if (std::find(categories.begin(), categories.end(), candidate) == categories.end())
+            categories.push_back(candidate);
     }
     return applied_outcome(
         doc.apply(sacm::commands::SetExpressionCategories{.element = id, .categories = std::move(categories)}));

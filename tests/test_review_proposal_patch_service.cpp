@@ -678,6 +678,33 @@ TEST(ReviewProposalPatchServiceTest, CategoriesAndSourcesAreSetOnTermsThroughUpd
     EXPECT_EQ(term->external_reference, "HSE R2P2, 2001");
 }
 
+TEST(ReviewProposalPatchServiceTest, ATermBelongsToACategoryOnceHoweverOftenItIsNamed) {
+    parser::AssuranceCase model = MakeModel();
+    model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
+    parser::SacmElement category = Element("CAT1", "category", "Regulatory terms");
+    model.elements.push_back(category);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    // The list is space separated, so repeating an id is an easy slip. Storing
+    // it twice would show the category twice in `list_terms` and move the
+    // element's hash without changing what it classifies.
+    core::reviews::PatchOperation classify;
+    classify.type = core::reviews::PatchOperationType::UpdateTerm;
+    classify.element = core::reviews::ElementRef{"T1", std::nullopt};
+    classify.field = "category";
+    classify.new_value = "CAT1 CAT1  #CAT1";
+    proposal.operations.push_back(classify);
+
+    core::reviews::ReviewProposalPatchService service;
+    const core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_TRUE(result.success) << result.error;
+    const parser::SacmElement* term = FindElement(model, "T1");
+    ASSERT_NE(term, nullptr);
+    ASSERT_EQ(term->category_refs.size(), 1u) << "the same category was stored more than once";
+    EXPECT_EQ(term->category_refs.front(), "CAT1");
+}
+
 TEST(ReviewProposalPatchServiceTest, UpdateTermRefusesACategoryThatIsNotOne) {
     parser::AssuranceCase model = MakeModel();
     model.elements.push_back(TermElement("T1", "ALARP", "As low as reasonably practicable."));
