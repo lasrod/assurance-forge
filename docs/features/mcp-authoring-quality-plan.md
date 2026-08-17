@@ -5,7 +5,10 @@
   prompt-quoted sets widened). The structured-findings prerequisite is
   implemented: every finding carries its catalog check id and parameters, the
   panels translate by template, and a drift test holds the embedded statements
-  against the catalog. Phases 2–4 planned. Extends capability matrix row
+  against the catalog. Phase 2 batch 1 implemented (`AF-AI-024`,
+  in-development): CL.2, CL.6, RD.1, RD.4, EV.7, EV.8 and LF.3, taking the
+  mechanical set from four checks to twelve — see the correction notes under
+  the candidate table. Phases 3–4 planned. Extends capability matrix row
   `AF-AI-010` (SCCG guidance and checks for an external AI client); the
   remaining rows land with the first implementing commit of their phase.
 - **Date:** 2026-08-17. The problem statement below describes the coverage as
@@ -184,6 +187,26 @@ it per check: RD.5 (passive voice hiding agency — lexically too noisy),
 AR.5 (scope and terminology drift across a decomposition — needs reading both
 levels), AR.4, EV.6, LF.2, LF.4, LF.7, SU.1, SU.4 and the rest of SU — all
 judgement. They are phase 4's material.
+
+**Corrections the catalog forced during batch 1** (CL.2, CL.6, RD.1, RD.4,
+EV.7, EV.8, LF.3 — implemented; the rest of the table still pending):
+
+- **The connectives signature belongs to RD.1, not CL.6.** The catalog's CL.6
+  is about chaining lifecycle steps — its bad example is "mitigated and
+  validated" — so the implemented CL.6 check pairs step verbs. "Because" in a
+  claim is the catalog's own RD.1 bad example, so the connectives check
+  (`because`, `therefore`) reports under `check-element-signposting`.
+- **The "Argument over…" goal-opener signature is deferred.** It was this
+  plan's invention; no catalog hint backs it, and RD.1's template is already
+  taken by the connectives case. It returns, if at all, with its own evidence.
+- **CL.4 is deferred, not firm.** Its "lexical fragment" list ("appropriate",
+  "adequate") appears nowhere in the catalog — implementing it would break the
+  rule that word lists derive from the guideline. It waits for either a
+  catalog word list or the phase 4 judgement channel.
+- **EV.7/EV.8 marker sets** are derived from the statements, hints and the
+  examples' own wording (`rev`, `approved`, `snapshot`, `captured`,
+  `confluence`, `wiki`), and both checks accept a four-digit year as a fixing
+  marker.
 
 ## Phase 3 — rehearsal and refusal
 

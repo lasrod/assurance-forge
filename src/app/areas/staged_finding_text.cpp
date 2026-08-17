@@ -32,6 +32,47 @@ std::string StagedFindingText(const core::sccg::StagedFinding& finding) {
                              "what standard -- in the claim or in attached context.",
                              finding.params[0]);
     }
+    if (finding.check_id == "check-single-property" && finding.params.size() == 2) {
+        return ui::i18n::trf("This claim joins \"{0} and {1}\" -- two distinct properties needing different "
+                             "evidence and review. Give each its own goal, so one can fail without hiding "
+                             "the other.",
+                             finding.params[0],
+                             finding.params[1]);
+    }
+    if (finding.check_id == "check-claim-step-mixing" && finding.params.size() == 2) {
+        return ui::i18n::trf("This claim chains \"{0} and {1}\" -- different logical steps answering "
+                             "different review questions. Give each step its own claim, and let the "
+                             "structure show the decomposition.",
+                             finding.params[0],
+                             finding.params[1]);
+    }
+    if (finding.check_id == "check-element-signposting" && !finding.params.empty()) {
+        return ui::i18n::trf("This claim carries its own reasoning (\"{0}\"), so a reviewer cannot tell the "
+                             "claim from the argument for it. State the claim alone; the reasoning belongs "
+                             "in a strategy and the evidence in a solution.",
+                             finding.params[0]);
+    }
+    if (finding.check_id == "check-promotional-language" && !finding.params.empty()) {
+        return ui::i18n::trf("This text calls the work \"{0}\". Promotional language persuades nobody "
+                             "reviewing a safety argument; state what was shown, and under which "
+                             "assumptions.",
+                             finding.params[0]);
+    }
+    if (finding.check_id == "check-evidence-control-attributes") {
+        return AF_TR("This evidence reference carries no owner, version, date, or status, so a reviewer "
+                     "cannot tell which artifact was assessed or whether it has changed since. Cite the "
+                     "controlled version.");
+    }
+    if (finding.check_id == "check-evidence-state-fixed" && !finding.params.empty()) {
+        return ui::i18n::trf("This evidence cites \"{0}\", which reads as live mutable content. Cite a fixed "
+                             "version, revision, or archived snapshot, so the reviewed argument always "
+                             "refers to the same content.",
+                             finding.params[0]);
+    }
+    if (finding.check_id == "check-completeness-vs-absence") {
+        return AF_TR("This text treats the absence of discovered evidence as support. Not finding something "
+                     "does not establish the claim; argue from what the applied methods can show.");
+    }
     // Unknown check: English is better than nothing, and the fallback showing
     // up in a review is the signal that a template is missing here.
     return finding.detail;

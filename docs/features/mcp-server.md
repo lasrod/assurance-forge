@@ -278,11 +278,17 @@ condenses.
     decidable here, and claiming otherwise would make a green result read as
     conformance.
 
-    The mechanical set is: **EV.1** a claim with no support and no undeveloped
+    The mechanical set is the twelve catalog-bound checks AF-AI-024 records:
+    the structural four (**EV.1** a claim with no support and no undeveloped
     marker; **AR.2** a strategy that develops into nothing; **AR.1** a solution
-    with children, and support cycles; **CL.5** an unbounded qualifier from the
-    list SCCG itself names. Findings are advisory and never block acceptance —
-    the reviewer is the authority on a safety argument.
+    with children, and support cycles) and the lexical eight (**CL.5**
+    unbounded qualifiers, **CL.2** bundled properties, **CL.6** chained
+    lifecycle steps, **RD.1** reasoning inside claim text, **RD.4** promotional
+    language, **EV.7** uncontrolled evidence references, **EV.8** mutable
+    sources cited unfixed, **LF.3** absence offered as support). Every lexical
+    check is proven against the guideline's own bad and good examples, read
+    from the catalog. Findings are advisory and never block acceptance — the
+    reviewer is the authority on a safety argument.
 
 ## Consent
 

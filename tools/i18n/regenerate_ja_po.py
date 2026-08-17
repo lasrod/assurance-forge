@@ -882,6 +882,37 @@ TRANSLATIONS = {
         "この主張は「{0}」を使用しており、SCCG はこれを境界付けが必要な用語として挙げています。どのハザード"
         "に対して、どの運用条件で、どの基準に照らしてなのか、その意味を主張内または付属するコンテキストで"
         "明示してください。",
+    "This claim joins \"{0} and {1}\" -- two distinct properties needing different evidence and "
+    "review. Give each its own goal, so one can fail without hiding the other.":
+        "この主張は「{0} と {1}」を結合しており、これらは異なるエビデンスと審査を必要とする別個の性質です。"
+        "それぞれを独立したゴールにして、一方の不成立がもう一方を隠さないようにしてください。",
+    "This claim chains \"{0} and {1}\" -- different logical steps answering different review "
+    "questions. Give each step its own claim, and let the structure show the decomposition.":
+        "この主張は「{0} と {1}」を連結しており、これらは異なる審査上の問いに答える別個の論理ステップです。"
+        "各ステップを独立した主張にして、分解は構造で示してください。",
+    "This claim carries its own reasoning (\"{0}\"), so a reviewer cannot tell the claim from the "
+    "argument for it. State the claim alone; the reasoning belongs in a strategy and the evidence "
+    "in a solution.":
+        "この主張は自らの論拠（「{0}」）を含んでいるため、レビュー担当者は主張とその論証を区別できません。"
+        "主張は主張のみを述べ、論拠は戦略に、エビデンスはソリューションに置いてください。",
+    "This text calls the work \"{0}\". Promotional language persuades nobody reviewing a safety "
+    "argument; state what was shown, and under which assumptions.":
+        "このテキストは成果を「{0}」と称しています。宣伝的な言葉は安全性議論のレビューでは何の説得力も"
+        "持ちません。何がどの前提の下で示されたのかを述べてください。",
+    "This evidence reference carries no owner, version, date, or status, so a reviewer cannot tell "
+    "which artifact was assessed or whether it has changed since. Cite the controlled version.":
+        "このエビデンス参照には所有者・バージョン・日付・ステータスのいずれもないため、レビュー担当者は"
+        "どの成果物が評価されたのか、その後変更されていないかを判断できません。管理されたバージョンを"
+        "引用してください。",
+    "This evidence cites \"{0}\", which reads as live mutable content. Cite a fixed version, "
+    "revision, or archived snapshot, so the reviewed argument always refers to the same content.":
+        "このエビデンスは「{0}」を引用しており、これは変更されうるライブコンテンツと読めます。レビューされた"
+        "議論が常に同じ内容を参照するよう、固定されたバージョン、リビジョン、またはアーカイブ済み"
+        "スナップショットを引用してください。",
+    "This text treats the absence of discovered evidence as support. Not finding something does "
+    "not establish the claim; argue from what the applied methods can show.":
+        "このテキストは、反証が見つからなかったことを支持として扱っています。何かが見つからないことは主張を"
+        "立証しません。適用した手法が示せることに基づいて論証してください。",
 
     # ===== GSN v3 well-formedness diagnostics (app/structure_problem_sync) =====
     "Relationship {0} refers to {1}, which is not in this case. The relationship is not drawn, "

@@ -34,11 +34,12 @@ parser::SacmElement Strategy(const std::string& id, const std::string& text) {
     return element;
 }
 
-parser::SacmElement Solution(const std::string& id) {
+parser::SacmElement Solution(const std::string& id, const std::string& text = std::string()) {
     parser::SacmElement element;
     element.id = id;
     element.type = "artifactreference";
     element.name = id;
+    element.content = text;
     return element;
 }
 
@@ -74,6 +75,35 @@ bool Mentions(const std::vector<core::sccg::StagedFinding>& findings,
         }
     }
     return false;
+}
+
+const core::sccg::StagedFinding* FindByCheck(const std::vector<core::sccg::StagedFinding>& findings,
+                                             const std::string& check_id,
+                                             const std::string& element_id) {
+    for (const core::sccg::StagedFinding& finding : findings) {
+        if (finding.check_id == check_id && finding.element_id == element_id) {
+            return &finding;
+        }
+    }
+    return nullptr;
+}
+
+// One claim, checked. The text is the whole model, which is exactly the shape
+// of the lexical checks: they judge sentences, not structure.
+std::vector<core::sccg::StagedFinding> CheckClaimText(const std::string& text) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", text, /*undeveloped=*/true));
+    return core::sccg::CheckStagedArgument(model, {"G1"});
+}
+
+// One solution with the given text, evidencing a claim so it holds the
+// Solution role the evidence checks apply to.
+std::vector<core::sccg::StagedFinding> CheckSolutionText(const std::string& text) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Top goal", /*undeveloped=*/true));
+    model.elements.push_back(Solution("Sn1", text));
+    model.elements.push_back(Evidences("R1", "Sn1", "G1"));
+    return core::sccg::CheckStagedArgument(model, {"Sn1"});
 }
 
 } // namespace
@@ -202,6 +232,144 @@ TEST(SccgStagedChecks, ReportsNothingWhenNothingWasStaged) {
     EXPECT_TRUE(core::sccg::CheckStagedArgument(model, {}).empty());
 }
 
+// CL.2 -- one main claim per goal. "Safe and secure" is two claims needing two
+// evidence sets, and bundling them hides whichever one would have failed.
+TEST(SccgStagedChecks, CL2_FlagsTwoPropertiesJoinedInOneGoal) {
+    const std::vector<core::sccg::StagedFinding> findings = CheckClaimText("Planning software is safe and secure");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-single-property", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "CL.2");
+    EXPECT_EQ(finding->severity, core::sccg::FindingSeverity::Advisory);
+    ASSERT_EQ(finding->params.size(), 2u);
+    EXPECT_EQ(finding->params[0], "safe");
+    EXPECT_EQ(finding->params[1], "secure");
+}
+
+// A conjunction between things that are not evaluative properties is ordinary
+// English, not a bundled claim.
+TEST(SccgStagedChecks, CL2_AcceptsACompoundNounConjunction) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("The hazard log and the FMEA are consistent");
+
+    EXPECT_EQ(FindByCheck(findings, "check-single-property", "G1"), nullptr);
+}
+
+// CL.6 -- different logical steps in one claim. "Mitigated and validated" are
+// two review questions with two evidence sets.
+TEST(SccgStagedChecks, CL6_FlagsChainedLifecycleSteps) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("All identified hazards have been mitigated and validated");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-claim-step-mixing", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "CL.6");
+    ASSERT_EQ(finding->params.size(), 2u);
+    EXPECT_EQ(finding->params[0], "mitigated");
+    EXPECT_EQ(finding->params[1], "validated");
+}
+
+TEST(SccgStagedChecks, CL6_AcceptsOneStepPerClaim) {
+    const std::vector<core::sccg::StagedFinding> findings = CheckClaimText("Defined mitigations are implemented");
+
+    EXPECT_EQ(FindByCheck(findings, "check-claim-step-mixing", "G1"), nullptr);
+}
+
+// RD.1 -- signpost each element's role. A claim that carries "because" is a
+// claim and its argument compressed into one sentence, and a reviewer can no
+// longer challenge them separately.
+TEST(SccgStagedChecks, RD1_FlagsReasoningInsideAClaim) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("The braking controller is acceptable because tests passed");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-element-signposting", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "RD.1");
+    ASSERT_EQ(finding->params.size(), 1u);
+    EXPECT_EQ(finding->params[0], "because");
+}
+
+TEST(SccgStagedChecks, RD1_AcceptsAClaimStatedAlone) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("Braking controller performance meets the defined criteria");
+
+    EXPECT_EQ(FindByCheck(findings, "check-element-signposting", "G1"), nullptr);
+}
+
+// RD.4 -- no promotional language. The words come from the guideline's own
+// detection hints.
+TEST(SccgStagedChecks, RD4_FlagsPromotionalLanguage) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("A world-class safety architecture delivers assurance");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-promotional-language", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "RD.4");
+    ASSERT_EQ(finding->params.size(), 1u);
+    EXPECT_EQ(finding->params[0], "world-class");
+}
+
+TEST(SccgStagedChecks, RD4_AcceptsAPlainStatement) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("The architecture prevents hazardous actuation for fault classes F1-F4");
+
+    EXPECT_EQ(FindByCheck(findings, "check-promotional-language", "G1"), nullptr);
+}
+
+// EV.7 -- evidence under document control. A reference with no owner, version,
+// date or status could be anything, assessed at any time.
+TEST(SccgStagedChecks, EV7_FlagsAnUncontrolledEvidenceReference) {
+    const std::vector<core::sccg::StagedFinding> findings = CheckSolutionText("Test summary on team wiki");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-evidence-control-attributes", "Sn1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "EV.7");
+}
+
+TEST(SccgStagedChecks, EV7_AcceptsAControlledReference) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckSolutionText("Test summary TSR-11, rev D, approved 2026-03-14");
+
+    EXPECT_EQ(FindByCheck(findings, "check-evidence-control-attributes", "Sn1"), nullptr);
+}
+
+// EV.8 -- cite fixed evidence. A wiki page is whatever it says today, which is
+// not what the reviewer approved.
+TEST(SccgStagedChecks, EV8_FlagsAMutableSourceWithNothingFixingItsState) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckSolutionText("See braking verification page in Confluence");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-evidence-state-fixed", "Sn1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "EV.8");
+    ASSERT_EQ(finding->params.size(), 1u);
+    EXPECT_EQ(finding->params[0], "confluence");
+}
+
+TEST(SccgStagedChecks, EV8_AcceptsAnArchivedSnapshotOfAMutableSource) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckSolutionText("Archived snapshot of Confluence page CP-118, version 17, captured 2026-03-11");
+
+    EXPECT_EQ(FindByCheck(findings, "check-evidence-state-fixed", "Sn1"), nullptr);
+}
+
+// LF.3 -- do not argue from ignorance. "No failures were found" reports the
+// reach of the search, not the safety of the system.
+TEST(SccgStagedChecks, LF3_FlagsArguingFromAbsence) {
+    const std::vector<core::sccg::StagedFinding> findings = CheckClaimText("No further hazards were found in review");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-completeness-vs-absence", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "LF.3");
+}
+
+TEST(SccgStagedChecks, LF3_AcceptsArguingFromWhatWasApplied) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("Complementary hazard identification methods have been applied");
+
+    EXPECT_EQ(FindByCheck(findings, "check-completeness-vs-absence", "G1"), nullptr);
+}
+
 // A support cycle is structurally wrong wherever it appears: an argument that
 // assumes its own conclusion establishes nothing. Reported when the staged
 // operations touch any element of the cycle.
@@ -240,6 +408,53 @@ TEST(SccgStagedChecks, EveryFindingCitesTheGuidelineItServes) {
         EXPECT_FALSE(finding.check_id.empty());
         EXPECT_FALSE(finding.statement.empty());
         EXPECT_FALSE(finding.detail.empty());
+    }
+}
+
+// The catalog's own examples are the acceptance corpus for every lexical
+// check: it must fire on the guideline's `bad` example and stay silent on its
+// `good` one, read from the catalog at test time rather than copied here. A
+// check that cannot tell SCCG's own bad from its own good has no business
+// commenting on anyone else's argument.
+TEST(SccgStagedChecks, EveryLexicalCheckSeparatesTheCatalogsOwnExamples) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+
+    struct CorpusEntry {
+        const char* guideline_id;
+        const char* check_id;
+        bool solution_role; // the evidence checks judge Solution text
+    };
+    const std::vector<CorpusEntry> corpus{
+        {"CL.5", "check-bounded-qualifiers", false},
+        {"CL.2", "check-single-property", false},
+        {"CL.6", "check-claim-step-mixing", false},
+        {"RD.1", "check-element-signposting", false},
+        {"RD.4", "check-promotional-language", false},
+        {"LF.3", "check-completeness-vs-absence", false},
+        {"EV.7", "check-evidence-control-attributes", true},
+        {"EV.8", "check-evidence-state-fixed", true},
+    };
+
+    for (const CorpusEntry& entry : corpus) {
+        const parser::Guideline* guideline = catalog.document.FindGuidelineById(entry.guideline_id);
+        ASSERT_NE(guideline, nullptr) << entry.guideline_id;
+        ASSERT_FALSE(guideline->examples.bad.empty()) << entry.guideline_id;
+        ASSERT_FALSE(guideline->examples.good.empty()) << entry.guideline_id;
+
+        const std::vector<core::sccg::StagedFinding> on_bad =
+            entry.solution_role ? CheckSolutionText(guideline->examples.bad) : CheckClaimText(guideline->examples.bad);
+        EXPECT_NE(FindByCheck(on_bad, entry.check_id, entry.solution_role ? "Sn1" : "G1"), nullptr)
+            << entry.check_id << " did not fire on the catalog's own bad example:\n"
+            << guideline->examples.bad;
+
+        const std::vector<core::sccg::StagedFinding> on_good = entry.solution_role
+                                                                   ? CheckSolutionText(guideline->examples.good)
+                                                                   : CheckClaimText(guideline->examples.good);
+        EXPECT_EQ(FindByCheck(on_good, entry.check_id, entry.solution_role ? "Sn1" : "G1"), nullptr)
+            << entry.check_id << " fired on the catalog's own good example:\n"
+            << guideline->examples.good;
     }
 }
 

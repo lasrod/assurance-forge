@@ -35,11 +35,12 @@ parser::SacmElement Strategy(const std::string& id, const std::string& text) {
     return element;
 }
 
-parser::SacmElement Solution(const std::string& id) {
+parser::SacmElement Solution(const std::string& id, const std::string& text = std::string()) {
     parser::SacmElement element;
     element.id = id;
     element.type = "artifactreference";
     element.name = id;
+    element.content = text;
     return element;
 }
 
@@ -64,7 +65,7 @@ parser::SacmElement Evidences(const std::string& id, const std::string& artifact
 // One model that trips every mechanical check, so the round-trip below covers
 // every template the helper knows. A check added without a template shows up
 // here as a finding whose English came from the fallback -- which still
-// passes -- so the coverage assertion counts distinct check ids too.
+// passes -- so the coverage assertion pins the exact check-id set too.
 parser::AssuranceCase ModelWithEveryFinding() {
     parser::AssuranceCase model;
     // EV.1: no support, not undeveloped. CL.5: "safe" unbounded.
@@ -84,15 +85,43 @@ parser::AssuranceCase ModelWithEveryFinding() {
     model.elements.push_back(Claim("G6", "Second of a cycle", true));
     model.elements.push_back(Supports("R4", "G6", "G5"));
     model.elements.push_back(Supports("R5", "G5", "G6"));
+    // The lexical checks, one claim each.
+    model.elements.push_back(Claim("G7", "Planning software is safe and secure", true));
+    model.elements.push_back(Claim("G8", "Hazards have been mitigated and validated", true));
+    model.elements.push_back(Claim("G9", "Braking is acceptable because tests passed", true));
+    model.elements.push_back(Claim("G10", "A world-class architecture delivers assurance", true));
+    model.elements.push_back(Claim("G11", "No further hazards were found", true));
+    // An uncontrolled, mutable evidence reference: EV.7 and EV.8 together.
+    model.elements.push_back(Claim("G12", "Verification is reported", true));
+    model.elements.push_back(Solution("Sn2", "Test summary on team wiki"));
+    model.elements.push_back(Evidences("R6", "Sn2", "G12"));
     return model;
+}
+
+const std::vector<std::string>& EveryCheckId() {
+    static const std::vector<std::string> ids{
+        "check-evidence-trace",
+        "check-explicit-strategy",
+        "check-element-role-misuse",
+        "check-circular-support",
+        "check-bounded-qualifiers",
+        "check-single-property",
+        "check-claim-step-mixing",
+        "check-element-signposting",
+        "check-promotional-language",
+        "check-completeness-vs-absence",
+        "check-evidence-control-attributes",
+        "check-evidence-state-fixed",
+    };
+    return ids;
 }
 
 } // namespace
 
 TEST(StagedFindingText, EnglishOutputMatchesTheFindingDetailForEveryCheck) {
     const parser::AssuranceCase model = ModelWithEveryFinding();
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1", "G2", "S1", "G3", "Sn1", "G4", "G5", "G6"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(
+        model, {"G1", "G2", "S1", "G3", "Sn1", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12", "Sn2"});
 
     // Every template the helper knows must actually be exercised: a model that
     // stopped tripping a check would let its template rot unverified.
@@ -102,7 +131,12 @@ TEST(StagedFindingText, EnglishOutputMatchesTheFindingDetailForEveryCheck) {
             seen.push_back(finding.check_id);
         }
     }
-    EXPECT_EQ(seen.size(), 5u) << "expected every mechanical check to fire in this model";
+    for (const std::string& check_id : EveryCheckId()) {
+        EXPECT_NE(std::find(seen.begin(), seen.end(), check_id), seen.end())
+            << check_id << " never fired, so its template was not exercised";
+    }
+    EXPECT_EQ(seen.size(), EveryCheckId().size())
+        << "a check fired that this test does not know -- add it to EveryCheckId and the model";
 
     // No Japanese catalog is loaded in tests, so AF_TR/trf return the English
     // template -- which must be the sentence core already wrote.
