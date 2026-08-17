@@ -320,6 +320,7 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
     const core::drafts::DraftMaterializationResult* materialization = state.draft_frame_materialization.get();
     model.has_workspace = true;
     model.workspace_blocked_reason = WorkspaceBlockedReason(*workspace, materialization);
+    model.accept_error = ui::DraftAcceptError(ui::GetUiState(), workspace->working_revision);
     model.selected_group_id = ui::GetUiState().selected_draft_group_id;
 
     const std::map<std::string, GroupCounts> counts =

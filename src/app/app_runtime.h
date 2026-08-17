@@ -214,6 +214,13 @@ private:
     // the working draft. Run with the derived views, from the same change index.
     void RefreshDraftDecorations();
 
+    // The accept, without the bookkeeping that records why it refused.
+    bool PromoteDraftGroupsUnrecorded(const std::vector<std::string>& group_ids, std::string& error);
+
+    // Keeps or clears the refusal the draft surfaces show. Stamped with the
+    // workspace revision so it expires when the draft changes underneath it.
+    void RecordDraftAcceptOutcome(bool accepted, const std::string& error);
+
     // Rebuilds what the inspector shows for the selected element: the accepted
     // and working text, the ordered contributions, and the dependency closure
     // accepting it would actually take.
@@ -320,6 +327,9 @@ private:
     // The closure is computed and both halves are materialized -- the selection
     // against the accepted baseline, the remainder against the result -- before
     // anything is written. If either fails, nothing is.
+    //
+    // Every refusal is recorded for the draft surfaces to show, so an accept that
+    // did not happen is answerable after the status line has gone.
     bool PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error);
 
     // How far a rejection reaches past what the user picked.

@@ -467,9 +467,25 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
     const ImU32 banner_bg =
         ui::LerpColor(theme.surface_1, needs_rebase || blocked || promoting ? theme.attention : theme.accent, 0.18f);
     const ImU32 banner_ink = ui::InkOn(banner_bg);
+
+    // Why the last accept did nothing, if it did nothing. Measured before the
+    // child is sized: a banner of fixed height would clip the explanation, which
+    // is the same defect as not showing it.
+    const std::string accept_error = ui::DraftAcceptError(ui_state, workspace->working_revision).empty()
+                                         ? std::string{}
+                                         : ui::i18n::trf("The last accept did not happen: {0}",
+                                                         ui::DraftAcceptError(ui_state, workspace->working_revision));
+    float banner_height = ImGui::GetTextLineHeightWithSpacing() * 4.2f;
+    if (!accept_error.empty()) {
+        const float wrap_width =
+            std::max(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().WindowPadding.x * 2.0f, 1.0f);
+        banner_height +=
+            ImGui::CalcTextSize(accept_error.c_str(), nullptr, false, wrap_width).y + ImGui::GetStyle().ItemSpacing.y;
+    }
+
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(banner_ink));
-    ImGui::BeginChild("##working_draft_banner", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 4.2f), true);
+    ImGui::BeginChild("##working_draft_banner", ImVec2(0.0f, banner_height), true);
 
     // Stated in words, not implied by a tint. This is the line that stops a
     // proposal being read as the accepted safety argument.
@@ -500,6 +516,14 @@ void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbac
                            AF_TR("Promotion is recorded, but the accepted SACM file is not yet confirmed. "
                                  "The draft is retained and cannot be edited or discarded.")
                                .c_str());
+    }
+
+    // Next to the button that did nothing, and wrapped in full: the status bar
+    // is one line and cut this sentence off before it reached the reason.
+    if (!accept_error.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        ImGui::TextWrapped("%s", accept_error.c_str());
+        ImGui::PopStyleColor();
     }
 
     DraftViewModeButton(ui_state, ui::DraftViewMode::WorkingDraft, AF_TR("Working draft"), "##draft_view_working");

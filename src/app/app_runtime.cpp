@@ -865,6 +865,10 @@ void AppRuntime::SyncDraftWorkspace() {
     // mode from the previous one would silently show a subset of the new
     // case. Every argument starts on the full working view.
     ui::GetUiState().draft_view_mode = ui::DraftViewMode::WorkingDraft;
+    // And a refusal from the previous argument's draft says nothing about this
+    // one. Revisions are per workspace, so the stamp alone would not expire it.
+    ui::GetUiState().draft_accept_error.clear();
+    ui::GetUiState().draft_accept_error_revision = 0;
 
     if (argument.empty() || !impl_->app_state.loaded_case.has_value()) {
         // Forgets the workspace without touching what is on disk, so the draft

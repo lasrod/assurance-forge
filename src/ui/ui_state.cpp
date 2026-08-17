@@ -38,6 +38,13 @@ bool ModelHasTranslations(const parser::AssuranceCase& ac, const std::string& se
     return false;
 }
 
+const std::string& DraftAcceptError(const UiState& ui_state, std::uint64_t workspace_revision) {
+    static const std::string kNone;
+    if (ui_state.draft_accept_error.empty() || ui_state.draft_accept_error_revision != workspace_revision)
+        return kNone;
+    return ui_state.draft_accept_error;
+}
+
 void BeginAiReviewSpinner(UiState& ui_state,
                           const std::string& element_id,
                           std::unordered_set<std::string> review_scope_element_ids) {

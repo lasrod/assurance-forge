@@ -1376,6 +1376,8 @@ bool AppRuntime::PromoteWorkingDraft(std::string& summary, std::string& error) {
         error = ui::i18n::trf("nothing is ready to accept -- {0} being written, {1} needing your attention",
                               std::to_string(left_building),
                               std::to_string(needs_attention));
+        // This refusal never reaches `PromoteDraftGroups`, so it records itself.
+        RecordDraftAcceptOutcome(false, error);
         return false;
     }
 
@@ -1652,7 +1654,28 @@ parser::AssuranceCase* AppRuntime::InspectorModel() {
     return &impl_->inspector_model;
 }
 
+void AppRuntime::RecordDraftAcceptOutcome(bool accepted, const std::string& error) {
+    ui::UiState& ui_state = ui::GetUiState();
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    if (accepted || error.empty() || workspace == nullptr) {
+        ui_state.draft_accept_error.clear();
+        ui_state.draft_accept_error_revision = 0;
+        return;
+    }
+    ui_state.draft_accept_error = error;
+    ui_state.draft_accept_error_revision = workspace->working_revision;
+}
+
 bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
+    const bool accepted = PromoteDraftGroupsUnrecorded(group_ids, error);
+    // Recorded on the one path every accept takes -- the banner, the panel row
+    // and the inspector all arrive here -- so no caller can leave a refusal with
+    // nowhere to be read.
+    RecordDraftAcceptOutcome(accepted, error);
+    return accepted;
+}
+
+bool AppRuntime::PromoteDraftGroupsUnrecorded(const std::vector<std::string>& group_ids, std::string& error) {
     error.clear();
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || group_ids.empty()) {
