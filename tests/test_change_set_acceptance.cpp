@@ -524,6 +524,94 @@ TEST(ChangeSetAcceptance, ClassifyingAndCitingTermsClearsTheTerminologyFindings)
     }
 }
 
+// Accepting one group must leave the rest of the draft applying.
+//
+// Promotion re-anchors the surviving groups to the newly accepted argument. Two
+// models could serve: the one the patch service PREDICTED, and the one the
+// library PRODUCED. They agree for an argument edit, which is why re-anchoring
+// to the prediction stood for so long -- and they disagree for terminology,
+// because the seams stamp a legacy gid a flat patch cannot know. Anchored to the
+// prediction, the next open compared a baseline describing an argument that
+// never existed, declared the draft stale, and applied none of it: terminology
+// work that had been accepted appeared to stop taking effect.
+TEST(ChangeSetAcceptance, AcceptingATerminologyGroupLeavesTheRestOfTheDraftApplying) {
+    ProjectFixture f = MakeFixture("promoted_model_parity");
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(f.project.rootPath);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(f.sacm_abs, f.model, error)) << error;
+
+    core::drafts::DraftGroupRequest request;
+    request.title = "Define a term";
+    request.source = core::drafts::DraftSource::Mcp;
+    request.source_label = "claude-ai";
+    const std::string group = drafts.BeginGroup(request, f.model, error);
+    ASSERT_FALSE(group.empty()) << error;
+
+    const nlohmann::json operations =
+        nlohmann::json::array({nlohmann::json{{"type", "CreateTerm"},
+                                              {"create_ref", "$hazard"},
+                                              {"text", "hazard"},
+                                              {"new_value", "A system state that could lead to harm."}}});
+    ASSERT_TRUE(drafts.StageOperations(group, ParseOperations(operations), f.model, error)) << error;
+    ASSERT_TRUE(drafts.MarkGroupReady(group, error)) << error;
+
+    // A second group, left unaccepted. This is the ordinary case -- an agent
+    // stages more than one contribution -- and it is what makes the divergence
+    // visible: accepting one group must not strand the others.
+    core::drafts::DraftGroupRequest later_request;
+    later_request.title = "Develop the top goal";
+    later_request.source = core::drafts::DraftSource::Mcp;
+    later_request.source_label = "claude-ai";
+    const std::string later = drafts.BeginGroup(later_request, f.model, error);
+    ASSERT_FALSE(later.empty()) << error;
+    const nlohmann::json later_operations = nlohmann::json::array(
+        {nlohmann::json{{"type", "CreateClaim"}, {"create_ref", "$sub"}, {"text", "Maintenance is adequate."}},
+         nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"ref", "$sub"}}}, {"target", {{"id", "G1"}}}}});
+    ASSERT_TRUE(drafts.StageOperations(later, ParseOperations(later_operations), f.model, error)) << error;
+
+    const core::drafts::DraftPromotionPlan plan = core::drafts::PlanDraftPromotion(
+        *drafts.workspace(), f.model, {group}, "MCP: claude-ai", drafts.authoritative_identities());
+    ASSERT_TRUE(plan.ok) << plan.error;
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    ASSERT_TRUE(bus->Execute(command, ctx, "MCP: claude-ai").success);
+
+    const parser::AssuranceCase authoritative = sacm_adapter::project_case(*loaded.document);
+
+    // The hazard this exists for. The terminology seams stamp a legacy gid on a
+    // created term and the flat patch that predicted the promotion cannot know
+    // one, so the two models genuinely disagree. If this ever stops holding --
+    // the prediction became exact -- the guard below is moot and can go; until
+    // then it is why the runtime must not re-anchor to the prediction.
+    ASSERT_NE(core::reviews::ComputeModelSemanticHash(plan.promoted_model),
+              core::reviews::ComputeModelSemanticHash(authoritative))
+        << "expected the predicted and produced models to differ for a created term";
+
+    // Re-anchored the way `AppRuntime::PromoteDraftGroups` does it: to the
+    // argument the library produced, not the one the patch predicted.
+    ASSERT_TRUE(drafts.RemovePromotedGroups({group}, authoritative, error)) << error;
+
+    core::drafts::DraftWorkspaceStore reopened;
+    reopened.SetProjectRoot(f.project.rootPath);
+    ASSERT_TRUE(reopened.Open(f.sacm_abs, authoritative, error)) << error;
+    ASSERT_TRUE(reopened.has_workspace()) << "the unaccepted group must survive";
+    EXPECT_EQ(reopened.workspace()->state, core::drafts::DraftWorkspaceState::Active)
+        << "accepting a terminology group must not strand the rest of the draft";
+    ASSERT_NE(reopened.workspace()->FindGroup(later), nullptr);
+
+    // And it still applies: a surviving group that materializes is the whole
+    // point of the baseline being right.
+    const core::drafts::DraftMaterializationResult& materialized = reopened.Materialize(authoritative, 1);
+    EXPECT_TRUE(materialized.success) << materialized.error;
+}
+
 // The application's Accept All, end to end, for a glossary staged over MCP into
 // a case that has never had one: draft groups -> promotion plan with compiled,
 // pinned identities -> preflight -> the audited command -> the saved file. This

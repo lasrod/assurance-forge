@@ -238,7 +238,78 @@ std::vector<std::string> GlossaryLinesForGroup(const core::drafts::DraftMaterial
     return lines;
 }
 
+// The accepted terminology package holding `term_id`, or nothing when the term
+// is not in the accepted glossary -- which is the ordinary case for a term this
+// draft created and nobody has promoted yet.
+//
+// Searches the case-level packages and each argument package's, mirroring where
+// the terminology panel itself looks for one.
+bool FindAcceptedTerm(const sacm::AssuranceCasePackage& package,
+                      const std::string& term_id,
+                      core::TerminologyPackageRef& out_package_ref,
+                      core::TerminologyTermRef& out_term_ref) {
+    const core::TerminologyTermRef wanted{term_id, {}};
+    const auto search = [&](const std::vector<sacm::TerminologyPackage>& packages) {
+        for (const sacm::TerminologyPackage& terminology : packages) {
+            if (core::FindTerminologyTerm(terminology, wanted) == nullptr)
+                continue;
+            out_package_ref = core::TerminologyPackageRef{terminology.id, terminology.gid};
+            out_term_ref = wanted;
+            return true;
+        }
+        return false;
+    };
+
+    if (search(package.terminologyPackages))
+        return true;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        if (search(argument_package.terminologyPackages))
+            return true;
+    }
+    return false;
+}
+
 } // namespace
+
+DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::string& group_id) {
+    DraftGroupFocus focus;
+    const core::drafts::DraftMaterializationResult* materialization = state.draft_frame_materialization.get();
+    if (materialization == nullptr)
+        return focus;
+
+    // In materialization order, so "the first element this group changed" is
+    // stable between frames rather than whichever the map happened to yield.
+    for (const std::string& element_id : materialization->change_index.ChangedElementIds()) {
+        const std::vector<std::string> contributors = materialization->change_index.ContributingGroupIds(element_id);
+        if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
+            continue;
+
+        const core::SacmElement* element = FindElementInGroupView(*materialization, element_id);
+        if (element != nullptr && element->type == "term") {
+            if (state.app_state.has_projected_package() &&
+                FindAcceptedTerm(state.app_state.projected_package(), element_id, focus.package_ref, focus.term_ref)) {
+                focus.kind = DraftGroupFocusKind::Terminology;
+                focus.element_id = element_id;
+            }
+            // Otherwise the term exists only in the draft, and the row is the
+            // only place it can be read. Leave the user on it.
+            return focus;
+        }
+        if (element != nullptr && element->type == "category") {
+            // A category is glossary structure with no view of its own until it
+            // is accepted; the row names it.
+            return focus;
+        }
+
+        // A removed element is not on the canvas to be centred on, but the
+        // presentation view keeps it as a tombstone, so selecting it still lands
+        // somewhere the user can see.
+        focus.kind = DraftGroupFocusKind::Canvas;
+        focus.element_id = element_id;
+        return focus;
+    }
+    return focus;
+}
 
 ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& state) {
     ui::panels::DraftChangesPanelModel model;

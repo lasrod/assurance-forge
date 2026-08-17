@@ -183,9 +183,12 @@ definition — routing the whole term through the library's replace-everything
 update would rewrite the definition in one language and drop its translations.
 
 A staged glossary is reviewable on its Draft Changes row, which lists each
-term and its definition in full — a term is deliberately not a GSN node, so
-unlike an argument change there is no canvas rendering beside the row to read
-it from.
+term with its definition, categories and source in full — a term is
+deliberately not a GSN node, so unlike an argument change there is no canvas
+rendering beside the row to read it from. Clicking such a row therefore does
+not jump to the canvas: it opens the terminology view for a term already in the
+accepted glossary, and stays on the row for one this draft created, which that
+view cannot show until it is promoted.
 
 When the case has no `terminologyPackage`, accepting the first `CreateTerm`
 creates one under the root assurance case package rather than refusing — a case

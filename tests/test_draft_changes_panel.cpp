@@ -280,6 +280,85 @@ TEST(DraftChangesPanel, AGlossaryGroupShowsItsTermsAndDefinitionsInFull) {
     EXPECT_TRUE(argument_row->glossary_lines.empty());
 }
 
+// Clicking a row takes the user to the change. Which view that is depends on
+// what the group touched, because the GSN canvas deliberately does not draw
+// terms -- sending a glossary group there lands on a diagram where nothing is
+// highlighted, which reads as a click that did nothing.
+TEST(DraftChangesPanel, ARowGoesToTheViewThatCanActuallyShowTheChange) {
+    Fixture fixture;
+
+    // An argument group still goes to the canvas, where its claim is drawn.
+    const std::string argument = fixture.BeginGroup(McpRequest("Develop the braking claim"));
+    fixture.Stage(argument, {CreateClaimOp("$sub", "Brake wear is monitored."), SupportOp("$sub", "G1")});
+    fixture.Materialize();
+
+    const app::areas::DraftGroupFocus argument_focus = app::areas::ResolveDraftGroupFocus(fixture.state, argument);
+    EXPECT_EQ(argument_focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(argument_focus.element_id, fixture.IdentityFor(argument, "$sub"));
+
+    // A group defining a term does not: the term is not in the accepted
+    // glossary the terminology view reads, so going there would report it
+    // missing. The row's own glossary lines are where it is readable.
+    const std::string terms = fixture.BeginGroup(McpRequest("Define hazard"));
+    core::reviews::PatchOperation hazard;
+    hazard.type = core::reviews::PatchOperationType::CreateTerm;
+    hazard.create_ref = "$hazard";
+    hazard.text = "hazard";
+    hazard.new_value = "A system state that could lead to harm.";
+    fixture.Stage(terms, {hazard});
+    fixture.Materialize();
+
+    const app::areas::DraftGroupFocus staged_focus = app::areas::ResolveDraftGroupFocus(fixture.state, terms);
+    EXPECT_EQ(staged_focus.kind, app::areas::DraftGroupFocusKind::None)
+        << "a term this draft created is not in the accepted glossary yet";
+}
+
+// Once a term IS part of the accepted glossary, a group that edits it goes to
+// the terminology view, where its definition, category and source are readable.
+TEST(DraftChangesPanel, AGroupEditingAnAcceptedTermGoesToTheTerminologyView) {
+    Fixture fixture;
+
+    // An accepted glossary, as the terminology view reads it.
+    sacm::AssuranceCasePackage package;
+    package.id = "AC1";
+    sacm::TerminologyPackage terminology;
+    terminology.id = "TP1";
+    terminology.gid = "gid-TP1";
+    sacm::Term term;
+    term.id = "T1";
+    term.gid = "gid-T1";
+    term.value = "ALARP";
+    term.description = "As low as reasonably practicable.";
+    terminology.terms.push_back(term);
+    package.terminologyPackages.push_back(terminology);
+    fixture.state.app_state.sacm_package = package;
+
+    // The same term in the accepted flat model the draft is written against.
+    core::SacmElement projected;
+    projected.id = "T1";
+    projected.gid = "gid-T1";
+    projected.type = "term";
+    projected.content = "ALARP";
+    projected.description = "As low as reasonably practicable.";
+    fixture.state.app_state.loaded_case->elements.push_back(projected);
+
+    const std::string classify = fixture.BeginGroup(McpRequest("Cite the ALARP definition"));
+    core::reviews::PatchOperation cite;
+    cite.type = core::reviews::PatchOperationType::UpdateTerm;
+    core::reviews::ElementRef target;
+    target.existing_id = "T1";
+    cite.element = target;
+    cite.field = "external_reference";
+    cite.new_value = "HSE R2P2, 2001";
+    fixture.Stage(classify, {cite});
+    fixture.Materialize();
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftGroupFocus(fixture.state, classify);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Terminology);
+    EXPECT_EQ(focus.term_ref.id, "T1");
+    EXPECT_EQ(focus.package_ref.id, "TP1");
+}
+
 TEST(DraftChangesPanel, RelationshipChangesAreCountedSeparatelyFromElements) {
     Fixture fixture;
     const std::string group = fixture.BeginGroup(McpRequest("Add a sub-claim"));
