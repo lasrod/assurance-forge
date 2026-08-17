@@ -349,6 +349,9 @@ bool DraftWorkspaceStore::StageOperations(const std::string& group_id,
     PushEditUndo(group->title.empty() ? std::string("Staged operations") : group->title);
 
     group->operations.insert(group->operations.end(), operations.begin(), operations.end());
+    // The acknowledgment described a submission this staging supersedes: the
+    // findings it waved through were findings about different operations.
+    group->acknowledged_findings.clear();
     group->updated_utc = NowUtcString();
     ++workspace.working_revision;
     RecordEvent("operations_staged", group_id, std::to_string(operations.size()) + " operations");
@@ -423,6 +426,8 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
 
     group->operations = operations;
     group->generated_ids = std::move(retained_identities);
+    // See StageOperations: the acknowledgment belonged to the replaced shape.
+    group->acknowledged_findings.clear();
     group->updated_utc = NowUtcString();
     // The rehearsal above proved these operations apply on top of everything
     // active, which is exactly the condition that stranded it. So it is no longer
@@ -435,7 +440,9 @@ bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
     return Save(error);
 }
 
-bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id, std::string& error) {
+bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id,
+                                         std::string& error,
+                                         std::vector<std::string> acknowledged_findings) {
     error.clear();
     if (!workspace_.has_value()) {
         error = "There is no draft workspace for this argument.";
@@ -463,9 +470,17 @@ bool DraftWorkspaceStore::MarkGroupReady(const std::string& group_id, std::strin
     PushEditUndo(group->title.empty() ? std::string("Marked ready") : group->title);
 
     group->state = DraftGroupState::Ready;
+    // Replaced, not appended: this submission's acknowledgment describes this
+    // submission's standing findings, and a clean resubmit clears the record.
+    group->acknowledged_findings = std::move(acknowledged_findings);
     group->updated_utc = NowUtcString();
     ++workspace.working_revision;
     RecordEvent("group_ready", group_id, group->title);
+    if (!group->acknowledged_findings.empty()) {
+        RecordEvent("findings_acknowledged",
+                    group_id,
+                    std::to_string(group->acknowledged_findings.size()) + " problem findings acknowledged");
+    }
     InvalidateMaterialization();
     return Save(error);
 }

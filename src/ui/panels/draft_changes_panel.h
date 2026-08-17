@@ -73,6 +73,12 @@ struct DraftChangeRow {
     // SCCG can be checked at all.
     std::vector<std::string> findings;
 
+    // Problem findings the author acknowledged at submit rather than resolved.
+    // Provenance, shown as stored: the reviewer must see exactly what the
+    // author waved through, and the live findings above already carry the
+    // translated current state.
+    std::vector<std::string> acknowledged_findings;
+
     // Whether it can be accepted against what is open right now. Computed every
     // frame rather than when the button is pressed: "Accept does nothing" was the
     // reported defect in the surface this replaces, where the refusal was real,

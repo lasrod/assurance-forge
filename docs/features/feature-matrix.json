@@ -1721,6 +1721,26 @@
       "notes": "Phase 2 of docs/features/mcp-authoring-quality-plan.md. Twelve checks, up from four: EV.1 (unsupported claim not marked undeveloped), AR.2 (strategy developing into nothing), AR.1 (solution with children; support cycles), CL.5 (unbounded qualifier), and batch 1 of the widening — CL.2 (two properties joined by a conjunction), CL.6 (lifecycle steps chained in one claim), RD.1 (reasoning smuggled into claim text), RD.4 (promotional language), EV.7 (evidence with no owner, version, date or status), EV.8 (mutable source cited with nothing fixing its state), LF.3 (absence of discovered evidence offered as support). Every check binds to the catalog's `suggested_checks` id, carried on the finding and on the MCP wire; every word list is derived from the guideline's statement, detection hints or examples, never invented; and each lexical check must fire on its guideline's own `bad` example and stay silent on the `good` one, read from the catalog at test time. A drift test holds each embedded statement to be a prefix of the catalog's. All lexical findings are advisory — the reviewer judges the words, the check only points — and the panels translate them by check id (the structured-findings seam), so the widening reaches the human review surfaces and MCP clients from one implementation. **In-development**: the remaining candidates (CL.1, CL.3, CL.4, EV.3, EV.4, LF.1's textual half, LF.6, AR.8, SU.2) need threshold or judgement calibration the catalog alone does not give — CL.4 in particular offers no lexical list to derive from — and land batch by batch under the same acceptance rule."
     },
     {
+      "id": "AF-AI-025",
+      "area": "AI",
+      "name": "Pre-flight rehearsal and submit-time refusal of problem findings",
+      "status": "supported",
+      "evidence": [
+        "src/agent/draft_operations.cpp",
+        "src/mcp/tools.cpp",
+        "src/mcp/session.cpp",
+        "src/core/drafts/draft_workspace_store.cpp",
+        "src/core/drafts/draft_persistence.cpp",
+        "src/ui/panels/draft_changes_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_agent_request_handler.cpp",
+        "tests/test_mcp_modes.cpp",
+        "tests/test_draft_workspace.cpp"
+      ],
+      "notes": "Phase 3 of docs/features/mcp-authoring-quality-plan.md — where the guidance gains teeth. **`check_operations`** rehearses operations on a copy of the integrated draft: the same validation and findings `stage_operations` would return, with nothing stored, no revision moved, no element ids allocated, and nothing drawn on the user's canvas — an agent iterates privately until its work is clean, then stages once. It is the one draft-vocabulary tool that works offline, because a rehearsal against the accepted copy is a read; the byte-identical sweep covers it. **Submit-time refusal**: `submit_change_group` refuses while problem-severity findings (SCCG Problem checks and GSN well-formedness findings) stand against the group, naming each one in `problem_findings`. The gate sits at submit, not at staging — staging is deliberately incremental and every intermediate shape is legitimately unfinished, but submit is the author declaring itself done. The explicit escape is `acknowledge_findings: true`, which submits anyway and records the acknowledged findings on the group — persisted, surviving restart, shown to the reviewer on the Draft Changes row, and cleared when the group's operations change, because the waved-through findings described a different shape. Advisory findings never refuse anything, deliberately: gating on them would train agents to acknowledge reflexively, which would spend the gate. Promotion authority is untouched — the human reviewer's decision is not gated by anything here."
+    },
+    {
       "id": "AF-PLAT-001",
       "area": "PLAT",
       "name": "Project model, load and save",

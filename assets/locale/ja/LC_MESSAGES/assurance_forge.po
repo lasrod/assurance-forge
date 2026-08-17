@@ -2059,6 +2059,9 @@ msgstr "ストラテジ表現の移行に失敗しました: {0}"
 msgid "Strategy {0} is wired as an end of relationship {1}. A Strategy is the reasoning of an inference, not one of its ends."
 msgstr "戦略 {0} が関係 {1} の端点として接続されています。戦略は推論の理由付けであり、その端点ではありません。"
 
+msgid "Submitted despite these problem findings, acknowledged by the author:"
+msgstr "作成者が以下の問題指摘を承知の上で提出しました:"
+
 msgid "Summary:"
 msgstr "要約:"
 

@@ -913,6 +913,8 @@ TRANSLATIONS = {
     "not establish the claim; argue from what the applied methods can show.":
         "このテキストは、反証が見つからなかったことを支持として扱っています。何かが見つからないことは主張を"
         "立証しません。適用した手法が示せることに基づいて論証してください。",
+    "Submitted despite these problem findings, acknowledged by the author:":
+        "作成者が以下の問題指摘を承知の上で提出しました:",
 
     # ===== GSN v3 well-formedness diagnostics (app/structure_problem_sync) =====
     "Relationship {0} refers to {1}, which is not in this case. The relationship is not drawn, "

@@ -120,6 +120,10 @@ ToolResult StageOperations(Session& session, const nlohmann::json& arguments) {
     return Run(session, "stage_operations", arguments);
 }
 
+ToolResult CheckOperations(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "check_operations", arguments);
+}
+
 ToolResult UnstageOperations(Session& session, const nlohmann::json& arguments) {
     return Run(session, "unstage_operations", arguments);
 }
@@ -490,12 +494,20 @@ std::vector<ToolDefinition> BuildTools() {
     tools.push_back(ToolDefinition{
         "submit_change_group",
         "Mark one of this MCP session's groups ready for human review. This does not accept or apply it; only the "
-        "user can promote draft work in Assurance Forge.",
+        "user can promote draft work in Assurance Forge. Refused while problem-severity findings stand against the "
+        "group -- fix them, or acknowledge them explicitly to hand the group over anyway.",
         nlohmann::json{{"type", "object"},
                        {"properties",
                         [&] {
                             nlohmann::json properties = DraftGroupIdSchema();
                             properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            properties["acknowledge_findings"] = nlohmann::json{
+                                {"type", "boolean"},
+                                {"description",
+                                 "Submit despite standing problem-severity findings. The acknowledged findings are "
+                                 "recorded on the group, so the reviewer sees the shape was flagged and the author "
+                                 "chose to proceed. Do not pass this on the first attempt: read the refusal's "
+                                 "problem_findings and fix what can be fixed."}};
                             return properties;
                         }()},
                        {"required", nlohmann::json::array({"expected_working_revision"})}},
@@ -574,7 +586,8 @@ std::vector<ToolDefinition> BuildTools() {
         "stage_operations",
         "Append operations to a draft change group. They are checked against the complete integrated working draft "
         "and refused together if they would not materialize. Returns stable ids for created elements. This does not "
-        "change accepted SACM.",
+        "change accepted SACM. To iterate on unfinished work without drawing it on the user's canvas, rehearse with "
+        "check_operations first.",
         nlohmann::json{{"type", "object"},
                        {"properties",
                         [&] {
@@ -586,6 +599,26 @@ std::vector<ToolDefinition> BuildTools() {
                        {"required", nlohmann::json::array({"operations", "expected_working_revision"})}},
         true,
         &StageOperations,
+    });
+
+    tools.push_back(ToolDefinition{
+        "check_operations",
+        "Rehearse operations against the integrated working draft without staging them: the same validation and "
+        "findings stage_operations would return, computed on a copy. Nothing is stored, no element ids are "
+        "allocated, and nothing appears on the user's canvas -- iterate here until the findings are clean, then "
+        "stage once. With group_id (or this session's open group) the rehearsal appends to that group, exactly as "
+        "staging would; with no group it rehearses the operations as a group of their own. Also works offline, "
+        "against the accepted case.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["operations"] = OperationsSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"operations"})}},
+        true,
+        &CheckOperations,
     });
 
     tools.push_back(ToolDefinition{
@@ -626,6 +659,13 @@ std::vector<ToolDefinition> BuildTools() {
                         [&] {
                             nlohmann::json properties = DraftGroupIdSchema();
                             properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            // The submit gate applies to the alias too -- it is
+                            // the same operation underneath.
+                            properties["acknowledge_findings"] = nlohmann::json{
+                                {"type", "boolean"},
+                                {"description",
+                                 "Submit despite standing problem-severity findings; they are recorded on the "
+                                 "group for the reviewer."}};
                             return properties;
                         }()},
                        {"required", nlohmann::json::array({"expected_working_revision"})}},

@@ -2267,3 +2267,32 @@ TEST(DraftWorkspace, TranslatingAnExistingClaimLeavesItsEnglishAlone) {
     EXPECT_EQ(goal->content, "The braking subsystem meets its stated performance targets.");
     EXPECT_EQ(goal->content_langs.at("ja"), "制動サブシステムは所定の性能目標を満たす。");
 }
+
+// A submission that acknowledged problem findings is provenance: it survives a
+// restart, the reviewer reads it on the group, and it does not outlive the
+// operations it described -- staging into the group again clears it, because
+// the findings it waved through were findings about a different shape.
+TEST(DraftWorkspace, AcknowledgedFindingsPersistAndClearWhenTheGroupChanges) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup("Submitted with problems");
+    fixture.Stage(group, {CreateClaimOp("$sub", "A supported sub-claim."), SupportOp("$sub", "G1")});
+
+    std::string error;
+    ASSERT_TRUE(fixture.store.MarkGroupReady(group, error, {"AR.2 S1: This strategy develops into nothing."})) << error;
+    ASSERT_EQ(fixture.store.workspace()->FindGroup(group)->acknowledged_findings.size(), 1u);
+
+    // A second store opening the same directory is a restart.
+    core::drafts::DraftWorkspaceStore reopened;
+    reopened.SetProjectRoot(fixture.dir.path);
+    ASSERT_TRUE(reopened.Open(fixture.argument_file, fixture.accepted, error)) << error;
+    const core::drafts::DraftChangeGroup* recovered = reopened.workspace()->FindGroup(group);
+    ASSERT_NE(recovered, nullptr);
+    ASSERT_EQ(recovered->acknowledged_findings.size(), 1u);
+    EXPECT_EQ(recovered->acknowledged_findings.front(), "AR.2 S1: This strategy develops into nothing.");
+
+    // Staging again supersedes the acknowledged submission.
+    std::vector<core::reviews::PatchOperation> more{CreateClaimOp("$more", "Another sub-claim."),
+                                                    SupportOp("$more", "G1")};
+    ASSERT_TRUE(reopened.StageOperations(group, more, fixture.accepted, error)) << error;
+    EXPECT_TRUE(reopened.workspace()->FindGroup(group)->acknowledged_findings.empty());
+}

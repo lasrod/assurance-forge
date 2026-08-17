@@ -147,6 +147,13 @@ struct DraftContext {
 Result GetDraftStatus(const DraftContext& context);
 Result BeginChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
 Result StageDraftOperations(const DraftContext& context, const nlohmann::json& arguments);
+// Rehearses operations without staging them: the same validation and findings
+// StageDraftOperations would produce, computed on a copy of the workspace.
+// Stores nothing, allocates no durable identities, draws nothing on the user's
+// canvas -- which is what lets an agent iterate privately until its work is
+// clean and then stage once. The one draft operation that works offline too,
+// because a rehearsal against the accepted copy is a read.
+Result CheckDraftOperations(const DraftContext& context, const nlohmann::json& arguments);
 Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
 Result RemoveChangeGroup(const DraftContext& context, const nlohmann::json& arguments);
 Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& arguments);

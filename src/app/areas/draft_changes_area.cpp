@@ -358,6 +358,8 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
         for (const std::string& dependency : group.depends_on_group_ids)
             row.depends_on_titles.push_back(TitleOf(*workspace, dependency));
 
+        row.acknowledged_findings = group.acknowledged_findings;
+
         if (materialization != nullptr) {
             row.glossary_lines = GlossaryLinesForGroup(*materialization, group.id);
             row.findings = FindingsForGroup(*materialization, group.id);

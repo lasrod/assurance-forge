@@ -8,9 +8,13 @@
   against the catalog. Phase 2 batch 1 implemented (`AF-AI-024`,
   in-development): CL.2, CL.6, RD.1, RD.4, EV.7, EV.8 and LF.3, taking the
   mechanical set from four checks to twelve — see the correction notes under
-  the candidate table. Phases 3–4 planned. Extends capability matrix row
-  `AF-AI-010` (SCCG guidance and checks for an external AI client); the
-  remaining rows land with the first implementing commit of their phase.
+  the candidate table. Phase 3 implemented (`AF-AI-025`): `check_operations`
+  rehearses on a copy, connected and offline, and `submit_change_group`
+  refuses standing problem findings unless explicitly acknowledged, with the
+  acknowledgment persisted on the group and shown to the reviewer. Phase 4
+  planned. Extends capability matrix row `AF-AI-010` (SCCG guidance and checks
+  for an external AI client); the remaining rows land with the first
+  implementing commit of their phase.
 - **Date:** 2026-08-17. The problem statement below describes the coverage as
   it stood when the plan was written; phase 1 has since widened the prompt
   quotes and added the unprompted channels.
