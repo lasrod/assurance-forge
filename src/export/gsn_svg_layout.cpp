@@ -19,6 +19,9 @@ constexpr double kSupportGap = 88.0;
 constexpr double kTextLineHeight = 18.0;
 constexpr double kTextCharWidth = 7.0;
 constexpr double kTextVerticalPadding = 38.0;
+constexpr double kSolutionTextRatio = 0.72;        // usable text height as a fraction of the circle diameter
+constexpr double kSolutionDiameterTolerance = 1.0; // bisection precision for the circle diameter
+constexpr int kSolutionGrowthDoublings = 8;        // bound on the search for a diameter that fits
 
 bool IsSideInformation(GsnNodeKind kind) {
     return kind == GsnNodeKind::Context || kind == GsnNodeKind::Assumption || kind == GsnNodeKind::Justification;
@@ -90,8 +93,49 @@ size_t WrappedLineCount(const GsnNode& node, double width) {
     return lines;
 }
 
+bool SolutionTextFits(const GsnNode& node, double diameter) {
+    const double required_height =
+        static_cast<double>(WrappedLineCount(node, diameter)) * kTextLineHeight + kTextVerticalPadding;
+    return required_height <= diameter * kSolutionTextRatio;
+}
+
+// Smallest diameter at or above `base_diameter` that holds the wrapped text.
+//
+// The trap the canvas renderer also fell into: a circle's text box widens with
+// the circle, so line counts taken at the base width size a disc far larger
+// than the text needs. Re-count at each candidate diameter instead. The line
+// count never grows with the diameter, so bisection converges.
+double SolutionDiameter(const GsnNode& node, double base_diameter) {
+    if (SolutionTextFits(node, base_diameter))
+        return base_diameter;
+
+    double low = base_diameter;
+    double high = base_diameter * 2.0;
+    for (int i = 0; i < kSolutionGrowthDoublings; ++i) {
+        if (SolutionTextFits(node, high))
+            break;
+        low = high;
+        high *= 2.0;
+    }
+    while (high - low > kSolutionDiameterTolerance) {
+        const double mid = (low + high) * 0.5;
+        if (SolutionTextFits(node, mid))
+            high = mid;
+        else
+            low = mid;
+    }
+    return high;
+}
+
 void ApplyNodeSize(GsnNode& node) {
     const NodeSizeLimits limits = SizeLimitsFor(node.kind);
+    if (node.kind == GsnNodeKind::Solution) {
+        const double diameter = SolutionDiameter(node, std::max(limits.base_width, limits.base_height));
+        node.width = diameter;
+        node.height = diameter;
+        return;
+    }
+
     double width = limits.base_width;
     size_t line_count = WrappedLineCount(node, width);
     while (width < limits.max_width && line_count > 5) {
@@ -100,14 +144,8 @@ void ApplyNodeSize(GsnNode& node) {
     }
 
     const double required_height = static_cast<double>(line_count) * kTextLineHeight + kTextVerticalPadding;
-    if (node.kind == GsnNodeKind::Solution) {
-        const double diameter = std::max({limits.base_width, width, required_height / 0.72});
-        node.width = diameter;
-        node.height = diameter;
-    } else {
-        node.width = width;
-        node.height = std::max(limits.base_height, required_height);
-    }
+    node.width = width;
+    node.height = std::max(limits.base_height, required_height);
 }
 
 core::NodeRole ToCoreRole(GsnNodeKind kind) {

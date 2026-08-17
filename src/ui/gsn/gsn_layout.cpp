@@ -38,6 +38,8 @@ static constexpr float kCircleTextRatio = 0.7f;    // effective text height as f
 static constexpr float kNodeWidthGrowthStep = 20.0f;
 static constexpr float kMaxNodeWidth = 460.0f;
 static constexpr float kMaxStadiumWidth = 520.0f;
+static constexpr float kSolutionDiameterTolerance = 1.0f; // bisection precision for the circle diameter
+static constexpr int kSolutionGrowthDoublings = 8;        // bound on the search for a diameter that fits
 
 static bool is_stadium_role(core::NodeRole role) {
     return role == core::NodeRole::Context || role == core::NodeRole::Assumption ||
@@ -108,6 +110,51 @@ static float ComputeRequiredHeight(const std::string& label,
     return height;
 }
 
+// True when the label, wrapped to the text box inscribed in a circle of this
+// diameter, fits inside that box.
+static bool
+SolutionLabelFits(const std::string& label, float diameter, float font_size, ImFont* bold_font, ImFont* normal_font) {
+    float text_wrap = ComputeTextWrapWidth(core::NodeRole::Solution, diameter, diameter);
+    float required_height =
+        MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font) + DpiSize(kTextPadding) * 2.0f;
+    return required_height <= diameter * kCircleTextRatio;
+}
+
+// Smallest diameter at or above `base_diameter` whose inscribed text box holds
+// the label.
+//
+// A circle's text box widens as the circle grows, so the label has to be
+// re-measured at every candidate diameter. Measuring it once at the base
+// diameter counts the lines of a narrow wrap and then sizes a circle wide
+// enough to stack all of them -- which is how a solution whose text fits in a
+// 280px disc ended up drawn as a 550px one with a thin ribbon of text across
+// the middle. The required height never grows with the diameter, so "fits"
+// flips exactly once and bisection finds the crossing.
+static float ComputeSolutionDiameter(
+    const std::string& label, float base_diameter, float font_size, ImFont* bold_font, ImFont* normal_font) {
+    if (SolutionLabelFits(label, base_diameter, font_size, bold_font, normal_font))
+        return base_diameter;
+
+    float low = base_diameter;
+    float high = base_diameter * 2.0f;
+    for (int i = 0; i < kSolutionGrowthDoublings; ++i) {
+        if (SolutionLabelFits(label, high, font_size, bold_font, normal_font))
+            break;
+        low = high;
+        high *= 2.0f;
+    }
+
+    const float tolerance = DpiSize(kSolutionDiameterTolerance);
+    while (high - low > tolerance) {
+        float mid = (low + high) * 0.5f;
+        if (SolutionLabelFits(label, mid, font_size, bold_font, normal_font))
+            high = mid;
+        else
+            low = mid;
+    }
+    return high;
+}
+
 // ===== Compute node size based on text content =====
 // Measures text using ImGui font metrics and returns the required node dimensions.
 // Nodes grow horizontally before becoming tall so wrapped text keeps a readable shape.
@@ -126,16 +173,10 @@ static ImVec2 ComputeNodeSize(const std::string& label, core::NodeRole role) {
     ImFont* normal_font = ImGui::GetFont();
 
     if (is_solution) {
-        // For circles, grow diameter so text area (kCircleTextRatio * diameter) fits
-        float text_wrap = ComputeTextWrapWidth(role, base_width, base_height);
-        float required_text_height =
-            MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font) + DpiSize(kTextPadding) * 2.0f;
-        float final_height = base_height;
-        float needed_diameter = required_text_height / kCircleTextRatio;
-        if (needed_diameter > final_height)
-            final_height = needed_diameter;
-        // Keep square (width = height for circles)
-        return ImVec2(std::max(base_width, final_height), final_height);
+        // Circles stay square, and grow only as far as the wrapped label needs.
+        float diameter =
+            ComputeSolutionDiameter(label, std::max(base_width, base_height), font_size, bold_font, normal_font);
+        return ImVec2(diameter, diameter);
     }
 
     float final_width = base_width;

@@ -8,6 +8,8 @@
 #include "ui/tree_view.h"
 
 #include <algorithm>
+#include <cfloat>
+#include <cstring>
 #include <gtest/gtest.h>
 #include <string>
 #include <unordered_map>
@@ -316,6 +318,55 @@ TEST(LayoutTest, SolutionMinimumSizeIsUnchanged) {
     ASSERT_EQ(layout.size(), 1u);
     EXPECT_FLOAT_EQ(layout[0].size.x, scaled_size(160.0f));
     EXPECT_FLOAT_EQ(layout[0].size.y, scaled_size(160.0f));
+}
+
+// Text box inscribed in a Solution circle of this diameter, mirroring
+// ui::gsn::ComputeTextWrapWidth for the Solution role.
+static float solution_text_wrap(float diameter) {
+    const float radius = diameter * 0.5f;
+    const float inset = radius * 0.29f;
+    return std::max((radius - inset) * 2.0f - scaled_size(6.0f) * 2.0f, scaled_size(40.0f));
+}
+
+// True when the label, wrapped to that box, fits inside the circle's usable
+// text height. g_BoldFont is null in tests, so both halves use the same font --
+// exactly what the layout engine measures.
+static bool solution_label_fits(const std::string& label, float diameter) {
+    ImFont* font = ImGui::GetFont();
+    const float font_size = ImGui::GetFontSize();
+    const float wrap = solution_text_wrap(diameter);
+    const char* start = label.c_str();
+    const char* newline = strchr(start, '\n');
+    const ImVec2 first = font->CalcTextSizeA(font_size, FLT_MAX, wrap, start, newline ? newline : nullptr);
+    ImVec2 rest(0.0f, 0.0f);
+    if (newline)
+        rest = font->CalcTextSizeA(font_size, FLT_MAX, wrap, newline + 1, nullptr);
+    return first.y + rest.y + scaled_size(6.0f) * 2.0f <= diameter * 0.7f;
+}
+
+TEST(LayoutTest, SolutionCircleGrowsOnlyAsFarAsItsLabelNeeds) {
+    // A circle's text box widens as the circle grows. Measuring the label once
+    // at the base diameter counts the lines of a narrow wrap and then sizes a
+    // disc tall enough to stack all of them -- roughly twice the diameter the
+    // text actually occupies, with a thin ribbon of text across the middle.
+    ScopedImGuiFrame imgui_frame;
+
+    AssuranceTree tree;
+    const std::string label = long_layout_label("Sn4");
+    TreeNode* node = add_layout_node(tree, "Sn4", NodeRole::Solution, ElementGroup::Group1, label);
+    tree.root = node;
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+    ASSERT_EQ(layout.size(), 1u);
+
+    const float diameter = layout[0].size.x;
+    EXPECT_FLOAT_EQ(layout[0].size.y, diameter); // circles stay square
+    EXPECT_GT(diameter, scaled_size(160.0f));    // it did have to grow
+    EXPECT_TRUE(solution_label_fits(label, diameter)) << "label overflows a " << diameter << "px circle";
+    // And no further: a meaningfully smaller circle must not fit the label.
+    EXPECT_FALSE(solution_label_fits(label, diameter - scaled_size(24.0f)))
+        << "circle is oversized: the label still fits " << scaled_size(24.0f) << "px smaller";
 }
 
 TEST(LayoutTest, WideNodesAreCenteredWithinExpandedColumns) {

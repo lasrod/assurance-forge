@@ -453,6 +453,36 @@ TEST(GsnSvgExporterTest, LayoutResizesLongTextNodes) {
     EXPECT_GT(projection.diagram.nodes.front().height, 86.0);
 }
 
+TEST(GsnSvgExporterTest, SolutionCircleGrowsOnlyAsFarAsItsTextNeeds) {
+    // A circle's text box widens with the circle. Counting the wrapped lines at
+    // the base width and then sizing a disc tall enough to stack them produces
+    // a circle roughly twice the size the text occupies.
+    parser::AssuranceCase model;
+    model.elements = {Element("G10", "claim", "Unknown hazardous scenarios", "Area 3 risk is acceptable."),
+                      Element("Sn4",
+                              "artifactreference",
+                              "Scenario exploration and simulation campaign results",
+                              "Scenario exploration and simulation campaign results: coverage report against the "
+                              "scenario catalogue, simulation results over the parameter space, and the estimate of "
+                              "residual unknown hazardous scenarios derived from field operation and incident "
+                              "reporting."),
+                      Relationship("ev1", "assertedevidence", {"Sn4"}, {"G10"})};
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model);
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+
+    const export_gsn::GsnNode* found = FindNode(projection.diagram, "Sn4");
+    ASSERT_NE(found, nullptr);
+    const export_gsn::GsnNode& solution = *found;
+    ASSERT_EQ(solution.kind, export_gsn::GsnNodeKind::Solution);
+    EXPECT_DOUBLE_EQ(solution.width, solution.height);
+    EXPECT_GT(solution.width, 116.0); // it did have to grow
+    // The text fills a fair share of the disc rather than a ribbon across its
+    // middle. 380 is well above what this text needs and well below what the
+    // single-measurement sizing produced.
+    EXPECT_LT(solution.width, 380.0);
+}
+
 TEST(GsnSvgExporterTest, LayoutKeepsShortTitleAndContentAtBaseHeight) {
     parser::AssuranceCase model;
     model.elements = {Element("G1", "claim", "Goal", "Short claim.")};
