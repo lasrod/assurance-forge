@@ -369,6 +369,34 @@ TEST(LayoutTest, SolutionCircleGrowsOnlyAsFarAsItsLabelNeeds) {
         << "circle is oversized: the label still fits " << scaled_size(24.0f) << "px smaller";
 }
 
+TEST(LayoutTest, SolutionCircleHoldsALabelNoWidthCanShorten) {
+    // Hard line breaks are the case a growth search can fall short on: no
+    // diameter wraps them away, so the height they need is the same at every
+    // size and only a very large circle holds them. A search that grows by
+    // doubling and gives up after a bound returns the largest size it tried,
+    // which is a circle the text still overflows. Sizing down from the
+    // single-measurement bound cannot: that bound holds the label by
+    // construction, whatever the label is.
+    ScopedImGuiFrame imgui_frame;
+
+    std::string label = "Sn9: Verification log\n";
+    for (int line = 0; line < 6000; ++line)
+        label += "entry\n";
+
+    AssuranceTree tree;
+    TreeNode* node = add_layout_node(tree, "Sn9", NodeRole::Solution, ElementGroup::Group1, label);
+    tree.root = node;
+
+    ui::gsn::LayoutEngine engine;
+    auto layout = engine.ComputeLayout(tree);
+    ASSERT_EQ(layout.size(), 1u);
+
+    const float diameter = layout[0].size.x;
+    EXPECT_FLOAT_EQ(layout[0].size.y, diameter);
+    EXPECT_TRUE(solution_label_fits(label, diameter))
+        << "the label overflows the " << diameter << "px circle it was given";
+}
+
 TEST(LayoutTest, WideNodesAreCenteredWithinExpandedColumns) {
     GsnLayoutInput input;
     GsnLayoutInputNode wide;

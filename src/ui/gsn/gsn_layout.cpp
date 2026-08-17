@@ -39,7 +39,6 @@ static constexpr float kNodeWidthGrowthStep = 20.0f;
 static constexpr float kMaxNodeWidth = 460.0f;
 static constexpr float kMaxStadiumWidth = 520.0f;
 static constexpr float kSolutionDiameterTolerance = 1.0f; // bisection precision for the circle diameter
-static constexpr int kSolutionGrowthDoublings = 8;        // bound on the search for a diameter that fits
 
 static bool is_stadium_role(core::NodeRole role) {
     return role == core::NodeRole::Context || role == core::NodeRole::Assumption ||
@@ -110,14 +109,18 @@ static float ComputeRequiredHeight(const std::string& label,
     return height;
 }
 
-// True when the label, wrapped to the text box inscribed in a circle of this
-// diameter, fits inside that box.
+// Height the label needs inside the text box inscribed in a circle of this
+// diameter, padding included. Never increases as the diameter does: a wider box
+// wraps the same words into the same number of lines or fewer.
+static float
+SolutionTextHeight(const std::string& label, float diameter, float font_size, ImFont* bold_font, ImFont* normal_font) {
+    float text_wrap = ComputeTextWrapWidth(core::NodeRole::Solution, diameter, diameter);
+    return MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font) + DpiSize(kTextPadding) * 2.0f;
+}
+
 static bool
 SolutionLabelFits(const std::string& label, float diameter, float font_size, ImFont* bold_font, ImFont* normal_font) {
-    float text_wrap = ComputeTextWrapWidth(core::NodeRole::Solution, diameter, diameter);
-    float required_height =
-        MeasureLabelHeight(label, font_size, text_wrap, bold_font, normal_font) + DpiSize(kTextPadding) * 2.0f;
-    return required_height <= diameter * kCircleTextRatio;
+    return SolutionTextHeight(label, diameter, font_size, bold_font, normal_font) <= diameter * kCircleTextRatio;
 }
 
 // Smallest diameter at or above `base_diameter` whose inscribed text box holds
@@ -128,21 +131,24 @@ SolutionLabelFits(const std::string& label, float diameter, float font_size, ImF
 // diameter counts the lines of a narrow wrap and then sizes a circle wide
 // enough to stack all of them -- which is how a solution whose text fits in a
 // 280px disc ended up drawn as a 550px one with a thin ribbon of text across
-// the middle. The required height never grows with the diameter, so "fits"
-// flips exactly once and bisection finds the crossing.
+// the middle.
+//
+// That single measurement is still useful, as the *upper* bound: the base
+// diameter yields the most lines any diameter can, so a circle tall enough for
+// them always holds the label, whatever the label is. Growth searches downward
+// from a bound it has proved rather than upward towards one it hopes to reach --
+// which is what a doubling loop does, and a bounded one can stop before it gets
+// there and hand bisection two diameters that both overflow. Since the required
+// height never grows with the diameter, "fits" flips exactly once between the
+// two ends and bisection finds the crossing.
 static float ComputeSolutionDiameter(
     const std::string& label, float base_diameter, float font_size, ImFont* bold_font, ImFont* normal_font) {
-    if (SolutionLabelFits(label, base_diameter, font_size, bold_font, normal_font))
+    const float height_at_base = SolutionTextHeight(label, base_diameter, font_size, bold_font, normal_font);
+    if (height_at_base <= base_diameter * kCircleTextRatio)
         return base_diameter;
 
     float low = base_diameter;
-    float high = base_diameter * 2.0f;
-    for (int i = 0; i < kSolutionGrowthDoublings; ++i) {
-        if (SolutionLabelFits(label, high, font_size, bold_font, normal_font))
-            break;
-        low = high;
-        high *= 2.0f;
-    }
+    float high = height_at_base / kCircleTextRatio; // fits by construction, and exceeds `low`
 
     const float tolerance = DpiSize(kSolutionDiameterTolerance);
     while (high - low > tolerance) {
