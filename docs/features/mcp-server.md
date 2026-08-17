@@ -246,7 +246,9 @@ than choosing one proposal to preview.
 
 ## SCCG
 
-Three mechanisms, weakest first.
+Three mechanisms, weakest first. A plan to widen all three — so the guidance
+lands even when the user's prompt says nothing about SCCG — is
+[MCP authoring quality](mcp-authoring-quality-plan.md).
 
 **Resources.** `sccg://guidelines` publishes the catalog, so a client can load
 the rules at the start of a session.
