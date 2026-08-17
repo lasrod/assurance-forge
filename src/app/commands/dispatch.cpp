@@ -155,6 +155,18 @@ void ApplyPendingLibraryRederive(AppRuntimeState& state) {
         core::RebuildDerivedViewsFromLibrary(*state.app_state.library_document,
                                              state.app_state.loaded_case.value(),
                                              state.app_state.sacm_package.value());
+        // This replaces the models every render-side cache is derived from, so
+        // it is a model change and has to be announced as one.
+        //
+        // The dispatch that scheduled this re-derive bumped `case_revision`
+        // during the PREVIOUS frame, while `loaded_case` still held the
+        // pre-edit projection -- so panels that rebuilt later in that frame
+        // stamped their caches with the new revision over the old content. The
+        // per-package canvas tab is one: it keys its visible case and tree on
+        // exactly this counter, so it then matched on every later frame and kept
+        // drawing text the edit had already replaced, while the inspector -- which
+        // reads `loaded_case` directly -- showed the new text beside it.
+        state.app_state.bump_case_revision();
     }
 }
 

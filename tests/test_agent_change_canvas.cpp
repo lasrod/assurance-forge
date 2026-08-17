@@ -1,7 +1,9 @@
 #include "app/areas/workbench_area.h"
 
 #include "agent/operations.h"
+#include "app/app_runtime_state.h"
 #include "app/areas/review_panel_area.h"
+#include "app/commands/dispatch.h"
 #include "core/app_state.h"
 #include "core/argument_package_projection.h"
 #include "core/changesets/change_set_store.h"
@@ -236,4 +238,42 @@ TEST(AgentChangeCanvas, ShowsTheReviewerTheSameSccgFindingsTheAgentGot) {
         }
     }
     EXPECT_TRUE(names_a_guideline) << described.front();
+}
+
+// A library-primary edit replaces `loaded_case` one frame AFTER the dispatch
+// that made it, and every render-side cache keyed on `case_revision` has to be
+// told when that happens.
+//
+// The dispatch bumps the revision while the old projection is still in place, so
+// a panel that rebuilds later in that same frame stamps its cache with the new
+// revision over the old content. If the re-derive then lands silently, the stamp
+// still matches and the cache is never rebuilt: the per-package canvas tab kept
+// drawing text an accepted change had already replaced, while the inspector --
+// which reads `loaded_case` directly -- showed the new text beside it.
+TEST(AgentChangeCanvas, TheDeferredLibraryRederiveAnnouncesItselfAsAModelChange) {
+    TempDir workspace{UniqueTempPath("rederive_revision")};
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.create_empty_project("Project", workspace.path.string()))
+        << state.app_state.status_message;
+    ASSERT_TRUE(state.app_state.current_project.has_value());
+
+    bool opened = false;
+    for (const core::ProjectFileEntry& entry : state.app_state.current_project->files) {
+        if (entry.role == core::ProjectFileRole::SacmArgument) {
+            opened = state.app_state.open_project_file(entry);
+            break;
+        }
+    }
+    ASSERT_TRUE(opened) << state.app_state.status_message;
+    ASSERT_NE(state.app_state.library_document, nullptr);
+
+    // What the frame does at its top, standing in for the frame after a
+    // library-primary command committed.
+    const std::uint64_t stamped_by_the_dispatch = state.app_state.case_revision;
+    state.rederive_views_from_library = true;
+    app::commands::ApplyPendingLibraryRederive(state);
+
+    EXPECT_NE(state.app_state.case_revision, stamped_by_the_dispatch)
+        << "the models were replaced without saying so, so a cache stamped before the swap still matches";
+    EXPECT_FALSE(state.rederive_views_from_library);
 }
