@@ -3,6 +3,12 @@
 - Status: Accepted
 - Date: 2026-08-02
 - Deciders: Assurance Forge maintainers
+- **Superseded in part by [ADR 0016](0016-the-draft-is-a-sacm-document.md):** the
+  operation-log storage, identity pinning, positional preconditions, dependency
+  closure and compiled-proposal promotion are replaced by a draft that is itself
+  a SACM document, accepted as one atomic write. The provenance requirement, the
+  `.af/.gitignore` decision, the non-export and non-hashed properties, and
+  human-controlled promotion stand.
 - Supersedes in part: ADR 0008's "Change sets are held in memory" consequence
 - Supersedes in part: the persisted one-`ReviewProposal`-per-review-item workflow
 

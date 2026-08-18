@@ -49,10 +49,11 @@ to point at the replacement. This keeps the decision history intact.
 | [0006](0006-sacm-23-independent-library.md) | SACM 2.3 as an independent reusable library | Accepted |
 | [0007](0007-mcp-server-consent.md) | Explicit consent for sharing assurance cases over MCP | Accepted (superseded in part by 0009, 0014) |
 | [0008](0008-one-owner-for-the-open-project.md) | One owner for the open project | Accepted (superseded in part by 0009, 0010, 0014) |
-| [0009](0009-one-integrated-working-draft-per-argument.md) | One integrated working draft per argument file | Accepted |
-| [0010](0010-draft-provenance-persistence-and-human-promotion.md) | Draft provenance, persistence, and human-controlled promotion | Accepted |
+| [0009](0009-one-integrated-working-draft-per-argument.md) | One integrated working draft per argument file | Accepted (superseded in part by 0016) |
+| [0010](0010-draft-provenance-persistence-and-human-promotion.md) | Draft provenance, persistence, and human-controlled promotion | Accepted (superseded in part by 0016) |
 | [0011](0011-panels-own-their-view-types.md) | Panels own their view types | Accepted |
 | [0012](0012-a-claim-carries-one-description.md) | A claim carries one Description | Accepted |
 | [0013](0013-review-methods-independent-of-inference-providers.md) | Review methods are independent of inference providers | Accepted |
 | [0014](0014-projectless-mcp-discovery-with-runtime-case-binding.md) | Projectless MCP discovery with explicit runtime case binding | Accepted |
 | [0015](0015-versioned-provider-profiles-and-fail-closed-selection.md) | Versioned AI provider profiles and fail-closed selection | Accepted |
+| [0016](0016-the-draft-is-a-sacm-document.md) | The working draft is a SACM document, not a list of operations | Accepted |
