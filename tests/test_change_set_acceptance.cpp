@@ -619,6 +619,7 @@ TEST(ChangeSetAcceptance, ATermJoinsTheGlossaryInANestedCasePackageRatherThanSta
         if (element.type == "terminologypackage")
             ++terminology_packages;
     }
+    EXPECT_EQ(terminology_packages, 1) << "accepting into a nested glossary must not create a second one";
     EXPECT_NE(FindTermByValue(after, "hazard"), nullptr) << "the created term is missing";
     EXPECT_NE(FindTermByValue(after, "ALARP"), nullptr) << "the existing term was displaced";
 }

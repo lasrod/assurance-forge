@@ -73,10 +73,12 @@ static ImVec2 RectBorderToward(ImVec2 mn, ImVec2 mx, ImVec2 toward) {
 // painted beneath the shapes they connect, so a badge drawn with its edge ends
 // up under the node it points at -- and an added or removed support
 // relationship is exactly the change a reviewer must not miss.
+namespace {
 struct DeferredDraftEdgeBadge {
     ImVec2 midpoint;
     DraftEdgeDecoration decoration;
 };
+} // namespace
 
 // ===== Zoom constants =====
 static constexpr float kZoomMin = 0.25f; // minimum zoom level (25%)
