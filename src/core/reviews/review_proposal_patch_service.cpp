@@ -502,6 +502,26 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
         if (operation.field == "name") {
             WriteField(element->name, element->name_langs, primary, operation.translations);
         } else if (operation.field == "content" || operation.field.empty()) {
+            // Which field holds an element's text is decided by its kind, not by
+            // the caller, and the two refusals here are one rule seen from both
+            // sides -- the mirror of the `description` guard below.
+            //
+            // An omitted field is resolved rather than refused: the caller
+            // asserted nothing, so there is nothing to contradict. A field that
+            // NAMES `content` on a kind that has none is refused, because the
+            // promotion seam cannot write it either; letting it through produced
+            // a draft that rendered correctly and then failed acceptance with
+            // "writing text on C2 failed" and no way forward.
+            if (!core::ElementCarriesContent(*element)) {
+                if (!operation.field.empty()) {
+                    error = "Element " + element_id + " is a " + element->type +
+                            ", which has no content; its text is its description. "
+                            "Update the 'description' field instead.";
+                    return false;
+                }
+                WriteField(element->description, element->description_langs, primary, operation.translations);
+                return true;
+            }
             WriteField(element->content, element->content_langs, primary, operation.translations);
         } else if (operation.field == "description") {
             // Refused rather than ignored. Before ADR 0012 this landed in a
