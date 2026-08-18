@@ -104,12 +104,17 @@ bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentR
                                    agent::Result::Error("This is a standalone SACM file rather than a project, so "
                                                         "there is nowhere to record a proposed change."));
         }
-        const agent::DraftContext draft{context.state,
-                                        *context.draft_workspace,
-                                        context.connection_id,
-                                        context.client_label,
-                                        context.source_session_id,
-                                        context.context_generation};
+        agent::DraftContext draft{context.state,
+                                  *context.draft_workspace,
+                                  context.connection_id,
+                                  context.client_label,
+                                  context.source_session_id,
+                                  context.context_generation};
+        // Taken from the read view the handler already computed, so a mutation
+        // and a read in the same session never disagree about whether the
+        // client is looking at accepted content.
+        draft.working_draft_active = read.is_working_draft;
+        draft.document = context.draft_document;
 
         if (request.op == "get_draft_status" || request.op == "list_change_sets") {
             return FromAgentResult(request.id, agent::GetDraftStatus(draft));

@@ -356,6 +356,40 @@ bool DraftWorkspaceStore::StageOperations(const std::string& group_id,
     return Save(error);
 }
 
+bool DraftWorkspaceStore::RecordAppliedOperations(const std::string& group_id,
+                                                  const std::vector<reviews::PatchOperation>& operations,
+                                                  std::string& error) {
+    error.clear();
+    if (!workspace_.has_value()) {
+        error = "There is no draft workspace for this argument.";
+        return false;
+    }
+    DraftWorkspace& workspace = workspace_.value();
+    DraftChangeGroup* group = workspace.FindGroup(group_id);
+    if (group == nullptr) {
+        error = "No draft change group with id " + group_id + ".";
+        return false;
+    }
+    if (!group->open()) {
+        error = "Draft change group " + group_id + " is no longer open.";
+        return false;
+    }
+    if (operations.empty()) {
+        error = "No operations were supplied.";
+        return false;
+    }
+
+    // Deliberately no `CanStageOperations`, no `NeedsRebase` gate and no
+    // materialization invalidation. The document holds the change already; this
+    // records who made it. Refusing here would leave the ledger describing a
+    // draft that has moved on without it.
+    group->operations.insert(group->operations.end(), operations.begin(), operations.end());
+    group->updated_utc = NowUtcString();
+    ++workspace.working_revision;
+    RecordEvent("operations_staged", group_id, std::to_string(operations.size()) + " operations");
+    return Save(error);
+}
+
 bool DraftWorkspaceStore::ReplaceOperations(const std::string& group_id,
                                             const std::vector<reviews::PatchOperation>& operations,
                                             const core::AssuranceCase& accepted,

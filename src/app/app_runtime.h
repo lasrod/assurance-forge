@@ -322,6 +322,35 @@ private:
     // the draft workflow lost the user's trust.
     bool PromoteWorkingDraft(std::string& summary, std::string& error);
 
+    // Accepts the draft document over the accepted argument (ADR 0016).
+    //
+    // One atomic write of a document that has already been produced in full,
+    // rather than a sequence of operations replayed against the accepted
+    // argument. Nothing can refuse half-way through, so the accepted safety case
+    // cannot end up in a state nobody chose -- that is a property of the shape
+    // of this accept, not of its error handling.
+    //
+    // Only a person reaches this. There is no tool that does.
+    bool AcceptDraftDocument(std::string& summary, std::string& error);
+
+    // Deletes the draft document and its file, in every state without
+    // exception. Returns the leftover worth mentioning -- a file that would not
+    // delete -- rather than a failure, because a discard that can be refused is
+    // how the previous design produced a draft a user could neither accept, nor
+    // edit, nor get rid of.
+    void DiscardDraftDocument(std::string& warning);
+
+private:
+    // Re-reads the accepted argument after `AcceptDraftDocument` has replaced it
+    // on disk, and reopens the draft state against what is now accepted.
+    //
+    // Re-read rather than reconstructed in memory: the `.sacm` is the source of
+    // truth (ADR 0003), and deriving the post-accept state from anything else
+    // would put a second answer beside the file -- the shape ADR 0016 removed
+    // from staging, reintroduced at accept.
+    bool ReloadAcceptedArgumentAfterAccept(std::string& error);
+
+public:
     // Accepts a dependency-closed selection of draft groups.
     //
     // The closure is computed and both halves are materialized -- the selection

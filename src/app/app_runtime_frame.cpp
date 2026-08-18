@@ -144,7 +144,12 @@ void AppRuntime::RenderFrame(bool& done) {
         // unrelated happened to rebuild the tree.
         ui::UiState& ui_state = ui::GetUiState();
         static ui::DraftViewMode last_draft_view_mode = ui::DraftViewMode::WorkingDraft;
-        const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+        // Both counters, because either alone misses a draft that moved. The
+        // document moves on every content change, including the user's own edits
+        // and a discard; the change-group ledger moves when a group is opened,
+        // submitted or rejected. Summed only to detect movement -- nothing reads
+        // this value as an identity.
+        const std::uint64_t draft_revision = impl_->draft_workspace.revision() + impl_->draft_document.revision();
         if (ui_state.draft_view_mode != last_draft_view_mode || draft_revision != impl_->draft_revision_drawn) {
             impl_->tree_needs_rebuild = true;
             last_draft_view_mode = ui_state.draft_view_mode;
@@ -158,6 +163,21 @@ void AppRuntime::RenderFrame(bool& done) {
         // open, and a workspace still pointing at the previous one would
         // decorate this argument's identically-named elements.
         core::perf::ScopedTimer s("app.draft_workspace");
+        // An accept in the previous frame replaced the accepted argument on
+        // disk. Re-read it here, at the frame boundary, before anything derives
+        // a view from it -- doing it inside the accept would have replaced the
+        // models the canvas was still rendering from.
+        if (impl_->pending_accepted_argument_reload) {
+            impl_->pending_accepted_argument_reload = false;
+            std::string reload_error;
+            if (!ReloadAcceptedArgumentAfterAccept(reload_error)) {
+                // The safety case was written and is correct. What failed is
+                // reading it back, so say which of the two happened rather than
+                // leaving the user to conclude the accept did not work.
+                SetStatus(ui::i18n::trf(
+                    "The draft was accepted and written, but the argument could not be re-read: {0}", reload_error));
+            }
+        }
         SyncDraftWorkspace();
         // Published once per frame so every UI area reads the same argument.
         // Resolved here rather than in each area because an area that quietly

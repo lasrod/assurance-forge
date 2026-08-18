@@ -130,23 +130,49 @@ whole session moved — a project switch, a fresh grant, a revocation). Either
 being stale refuses the mutation before anything is stored, so a change
 computed against one context can never land in another (ADR 0014).
 
-## Changing: integrated draft groups
+## Changing: the working draft
 
-An agent contributes one coherent **change group** to the same working draft as
-the user and SCCG review.
+The working draft is **a SACM document** — a copy of the accepted argument that
+contributors edit directly (ADR 0016). An agent's operations are applied to that
+document through the same library seams the application uses on the accepted
+one, so a change the model cannot hold is refused in the call that made it,
+naming the operation by its position in the batch. There is no staging model to
+accept something the accept would later have to refuse.
+
+An agent still contributes one coherent **change group**, which is now the
+record of who contributed what rather than a container of pending operations.
 
 1. Read the case or call `get_draft_status` and retain `working_revision`.
 2. `begin_change_group` with a title, rationale and that expected revision.
-3. `stage_operations` in small steps. Each call returns stable generated ids,
-   combined findings and the next revision.
-4. Use `replace_change_group` to revise the group wholesale after feedback;
-   `describe_change_group` and `describe_working_draft` inspect the contribution
-   and its effect on the combination.
+3. `stage_operations` in small steps. Each call applies its batch to the draft
+   document and returns the ids the document allocated, what the draft now
+   changes about the accepted argument, findings against it, and the next
+   revision.
+4. `describe_change_group` and `describe_working_draft` inspect the contribution
+   and what the draft as a whole now changes.
 5. `get_draft_events(after_revision)` reports what other contributors changed.
-6. `submit_change_group` marks the work ready for the user. `remove_change_group`
-   or `close_change_group` abandons it without deleting its provenance record.
+6. `submit_change_group` marks the work ready for the user; `close_change_group`
+   ends the group without deleting its provenance record.
 
-Every modifying call carries `expected_working_revision`. If a human edit, SCCG
+A batch is **atomic**: if any operation is refused, none of them is applied and
+the draft is exactly as it was. Ids returned by `stage_operations` are real and
+addressable immediately — the document allocated them when it created the
+element, and nothing later reallocates them.
+
+`replace_change_group`, `remove_change_group` and `unstage_operations` are
+**refused** against a document-backed draft, and say so. They withdraw
+operations from a log; the draft holds a document. Reporting them as done while
+the change was still in the draft would be a success message over an edit that
+never went away. To reverse a change, edit the draft back — set the text to what
+it was, or remove the element that was added — or ask the user to discard the
+whole draft.
+
+Accept is all-or-nothing and belongs to the user alone. It writes the draft over
+the accepted argument as one atomic replacement, so it cannot half-apply.
+
+Every modifying call carries `expected_working_revision`. The revision tracks
+the draft document as well as the change-group record, so a user editing the
+argument moves it — their edits go into the same draft. If a human edit, SCCG
 review or another MCP client changed the shared draft, the call is refused with
 `current_working_revision`; the agent rereads and decides whether its intended
 operation still means the same thing. This is optimistic concurrency over the

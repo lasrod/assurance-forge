@@ -160,6 +160,9 @@ msgstr "すべて受理"
 msgid "Accept change"
 msgstr "変更を受け入れる"
 
+msgid "Accept draft"
+msgstr "ドラフトを受理"
+
 msgid "Accept this change"
 msgstr "この変更を受理"
 
@@ -171,6 +174,9 @@ msgstr "受理済みベースライン"
 
 msgid "Accepted the change. The rest of the draft is still unaccepted."
 msgstr "変更を受理しました。ドラフトの残りは未受理のままです。"
+
+msgid "Accepted the working draft: {0} added, {1} changed, {2} removed."
+msgstr "作業ドラフトを受理しました: 追加 {0} 件、変更 {1} 件、削除 {2} 件。"
 
 msgid "Accepted, but the draft could not be updated: {0}"
 msgstr "受け入れましたが、ドラフトを更新できませんでした: {0}"
@@ -2185,6 +2191,12 @@ msgstr "添付された提案も削除されます。"
 msgid "The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized from the current SACM file on disk."
 msgstr "現在の `.af/manifest.af.json`、`.af/snapshots/`、`.af/audit/` はタイムスタンプ付きの `.af/backup_<UTC>/` フォルダーに移動され、ディスク上の現在の SACM ファイルから新しい監査ストアが初期化されます。"
 
+msgid "The draft was accepted and written, but the argument could not be re-read: {0}"
+msgstr "ドラフトは受理され書き込まれましたが、議論を再読み込みできませんでした: {0}"
+
+msgid "The draft was accepted, but its change record could not be cleared: {0}"
+msgstr "ドラフトは受理されましたが、その変更記録を消去できませんでした: {0}"
+
 msgid "The last accept did not happen: {0}"
 msgstr "直前の受理は行われませんでした: {0}"
 
@@ -2538,6 +2550,9 @@ msgstr "{0} ({1})"
 
 msgid "{0} added, {1} changed, {2} removed"
 msgstr "追加 {0}、変更 {1}、削除 {2}"
+
+msgid "{0} added, {1} changed, {2} removed."
+msgstr "追加 {0} 件、変更 {1} 件、削除 {2} 件。"
 
 msgid "{0} and {1} both use the GSN identifier {2}, so neither can be referred to unambiguously."
 msgstr "{0} と {1} が同じ GSN 識別子 {2} を使用しているため、どちらも一意に参照できません。"

@@ -83,6 +83,22 @@ std::vector<std::string> ChangedElementFields(const core::SacmElement& accepted,
     return fields;
 }
 
+DraftChangeIndex ChangeIndexFromDiff(const DraftDocumentDiff& diff) {
+    DraftChangeIndex index;
+    for (const DraftDocumentChange& change : diff.changes) {
+        if (change.change == DraftElementChange::Unchanged)
+            continue;
+        DraftElementEntry entry;
+        entry.change = change.change;
+        index.elements.emplace(change.element_id, std::move(entry));
+    }
+    index.removed = diff.removed;
+    index.added_count = diff.added_count;
+    index.modified_count = diff.modified_count;
+    index.removed_count = diff.removed_count;
+    return index;
+}
+
 const DraftDocumentChange* DraftDocumentDiff::Find(const std::string& element_id) const {
     for (const DraftDocumentChange& change : changes) {
         if (change.element_id == element_id)

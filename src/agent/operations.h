@@ -19,6 +19,7 @@
 
 #include "core/app_state.h"
 #include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_document_store.h"
 #include "core/drafts/draft_workspace.h"
 #include "core/drafts/draft_workspace_store.h"
 
@@ -142,6 +143,46 @@ struct DraftContext {
     // revision: the revision says the draft moved, the generation says the
     // ground under the whole session moved.
     std::uint64_t context_generation = 0;
+
+    // Whether the argument the application is rendering is the draft rather than
+    // the accepted document. Supplied by the caller, which already knows -- it
+    // is the same answer the read path labels its content with, so a client
+    // cannot be told "accepted" by one operation and "working_draft" by another
+    // in the same breath.
+    bool working_draft_active = false;
+
+    // The draft document a contributor's operations are applied to (ADR 0016).
+    // Null where there is none to edit -- a standalone SACM file, or an argument
+    // the library could not load -- and staging then falls back to the
+    // operation-staging store until that store is retired.
+    core::drafts::DraftDocumentStore* document = nullptr;
+
+    // True when the draft document is the thing being edited, which is what
+    // decides whether a refusal comes from the model that will hold the change.
+    bool document_backed() const {
+        return document != nullptr && document->active();
+    }
+
+    // The staleness token a mutating client must name.
+    //
+    // The DOCUMENT's counter whenever there is a document, because that is the
+    // one that moves on every change to the argument -- including the user's own
+    // edits, which go into the same draft -- and because it only ever increases,
+    // for the whole life of the store, across accepts and discards alike. A
+    // token minted before an accept can therefore never be revalidated by a
+    // later draft that happens to have reached the same number.
+    //
+    // Not summed with the workspace's. That one restarts at zero when the
+    // workspace is discarded, so a sum could go backwards and re-issue a value a
+    // client is still holding -- which is precisely the staleness this check
+    // exists to catch. What the workspace counter alone would report, opening or
+    // submitting a change group, is not a change to the argument; a client that
+    // needs to see other contributors' group activity reads `get_draft_events`.
+    std::uint64_t working_revision() const {
+        if (document != nullptr && document->active())
+            return document->revision();
+        return store.revision();
+    }
 };
 
 Result GetDraftStatus(const DraftContext& context);

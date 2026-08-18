@@ -242,12 +242,16 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     // exactly what "new elements cannot be added" looked like.
     std::optional<parser::AssuranceCase> draft_preview_model;
     const core::drafts::DraftWorkspace* live_draft = state.draft_workspace.workspace();
-    const bool draft_has_groups = live_draft != nullptr && live_draft->has_active_groups();
-    // Gated on the workspace itself, not on the decoration cache: the cache is
+    // A document-backed draft belongs to no change group at all -- the user's own
+    // edits go straight into the document -- so asking the workspace alone would
+    // drop every element such a draft adds and draw the accepted argument back.
+    const bool draft_has_changes =
+        state.DraftDocumentHasChanges() || (live_draft != nullptr && live_draft->has_active_groups());
+    // Gated on the draft itself, not on the decoration cache: the cache is
     // refreshed by the derived-view rebuild, which can lag or skip a frame,
     // and an empty `draft_added_ids` then dropped every proposed element from
     // the package projection -- the add looked like it did nothing.
-    if (!state.agent_preview_case.has_value() && draft_has_groups && state.draft_canvas_view != nullptr) {
+    if (!state.agent_preview_case.has_value() && draft_has_changes && state.draft_canvas_view != nullptr) {
         draft_preview_model = *state.draft_canvas_view;
     }
     std::vector<std::string> preview_added_ids = state.agent_preview_added_ids;

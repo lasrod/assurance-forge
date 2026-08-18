@@ -276,3 +276,45 @@ TEST(DraftDocumentDiffTest, RevertingAnElementRemovesItFromTheDiffEntirely) {
     EXPECT_EQ(Find(diff, "G1"), nullptr) << "a reverted element is not a change";
     EXPECT_NE(Find(diff, "G2"), nullptr);
 }
+
+// The bridge onto the index the canvas already consumes. Everything that
+// decorated a node, ghosted a removal or narrowed the "changes only" view was
+// written against `DraftChangeIndex` when a draft was a list of operations, and
+// it has to keep working now that the answer comes from a comparison instead.
+TEST(DraftDocumentDiffTest, TheComparisonBecomesTheChangeIndexTheCanvasConsumes) {
+    const core::AssuranceCase accepted = AcceptedCase();
+    core::AssuranceCase draft = accepted;
+    draft.elements[0].content = "The blender is acceptably safe for domestic use.";
+    draft.elements.push_back(Claim("G9", "Overheating is prevented."));
+    draft.elements.erase(draft.elements.begin() + 2); // the context
+
+    const core::drafts::DraftDocumentDiff diff = core::drafts::DiffAcceptedAgainstDraft(accepted, draft);
+    const core::drafts::DraftChangeIndex index = core::drafts::ChangeIndexFromDiff(diff);
+
+    EXPECT_EQ(index.added_count, diff.added_count);
+    EXPECT_EQ(index.modified_count, diff.modified_count);
+    EXPECT_EQ(index.removed_count, diff.removed_count);
+    EXPECT_TRUE(index.touches_anything());
+
+    ASSERT_NE(index.Find("G1"), nullptr);
+    EXPECT_EQ(index.Find("G1")->change, core::drafts::DraftElementChange::Modified);
+    ASSERT_NE(index.Find("G9"), nullptr);
+    EXPECT_EQ(index.Find("G9")->change, core::drafts::DraftElementChange::Added);
+    ASSERT_NE(index.Find("C1"), nullptr);
+    EXPECT_EQ(index.Find("C1")->change, core::drafts::DraftElementChange::Removed);
+
+    // Unchanged elements must not appear, or every check keyed on
+    // `ChangedElementIds` would report the whole argument as touched.
+    EXPECT_EQ(index.Find("G2"), nullptr);
+
+    // A removed element is absent from the draft by definition, so a renderer
+    // that wants to show what is going needs it carried here in full.
+    ASSERT_EQ(index.removed.size(), 1u);
+    EXPECT_EQ(index.removed.front().id, "C1");
+    EXPECT_EQ(index.removed.front().description, "Indoor household use.");
+
+    // Empty, and it has to be: a document records what it holds, not who put it
+    // there. A caller that wants attribution reads the element's provenance
+    // tags, and must not be quietly handed an empty list as though it were one.
+    EXPECT_TRUE(index.ContributingGroupIds("G1").empty());
+}
