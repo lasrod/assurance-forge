@@ -20,6 +20,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -609,16 +610,25 @@ TEST(ChangeSetAcceptance, ATermJoinsTheGlossaryInANestedCasePackageRatherThanSta
     core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
     ASSERT_TRUE(bus->Execute(command, ctx, "MCP: claude-ai").success);
 
-    // One glossary, holding both terms -- not a second one beside it.
+    // One glossary, holding both terms -- not a second one beside it. Counted
+    // in the saved XMI rather than the case projection: the projection lists
+    // drawn nodes and deliberately omits packages, so it can never see a
+    // second glossary, however many the file grows.
     sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(f.sacm_abs);
     ASSERT_TRUE(reloaded.ok);
     EXPECT_EQ(sacm_adapter::resolve_terminology_package_id(*reloaded.document), "TP_NESTED");
-    const parser::AssuranceCase after = sacm_adapter::project_case(*reloaded.document);
+    std::ifstream saved(f.sacm_abs, std::ios::binary);
+    const std::string saved_xml((std::istreambuf_iterator<char>(saved)), std::istreambuf_iterator<char>());
     int terminology_packages = 0;
-    for (const parser::SacmElement& element : after.elements) {
-        if (element.type == "terminologypackage")
+    for (std::size_t at = saved_xml.find("<terminologyPackage"); at != std::string::npos;
+         at = saved_xml.find("<terminologyPackage", at + 1)) {
+        // The bare element only: "<terminologyPackageInterface" must not count.
+        const char following = saved_xml[at + std::string_view("<terminologyPackage").size()];
+        if (following == ' ' || following == '>' || following == '/')
             ++terminology_packages;
     }
+    EXPECT_EQ(terminology_packages, 1) << "accepting into a nested glossary must not create a second one";
+    const parser::AssuranceCase after = sacm_adapter::project_case(*reloaded.document);
     EXPECT_NE(FindTermByValue(after, "hazard"), nullptr) << "the created term is missing";
     EXPECT_NE(FindTermByValue(after, "ALARP"), nullptr) << "the existing term was displaced";
 }
