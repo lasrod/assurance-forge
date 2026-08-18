@@ -299,21 +299,37 @@ TEST(AgentDraftDocument, TheWorkingRevisionMovesWhenTheDocumentMovesUnderTheClie
     ASSERT_TRUE(project.Open("revision"));
     const app::AgentRequestContext context = project.Context();
 
-    const std::uint64_t before = CurrentRevision(context);
-    // Stands in for the user editing the argument in the application: the draft
-    // document moves without any change group being touched.
-    project.document.MarkChanged();
-    EXPECT_GT(CurrentRevision(context), before);
-
+    const std::string anchor = FirstClaimId(project.state.loaded_case.value());
+    ASSERT_FALSE(anchor.empty());
     const auto [group_id, revision] = BeginGroup(context, CurrentRevision(context));
     ASSERT_FALSE(group_id.empty());
+
+    // The first staged edit is what brings the draft into existence.
+    const bridge::Response staged =
+        app::HandleAgentRequest(MakeRequest("stage_operations",
+                                            {{"group_id", group_id},
+                                             {"expected_working_revision", revision},
+                                             {"operations",
+                                              nlohmann::json::array({{{"type", "UpdateElementName"},
+                                                                      {"element", {{"id", anchor}}},
+                                                                      {"new_value", "A first contribution"}}})}}),
+                                context);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    const std::uint64_t after_staging = CurrentRevision(context);
+
+    // Stands in for the user editing the argument in the application: their
+    // edits go into the same draft, so the token moves with no change group
+    // touched at all.
+    project.document.MarkChanged();
+    EXPECT_GT(CurrentRevision(context), after_staging);
+
     const bridge::Response stale = app::HandleAgentRequest(
         MakeRequest("stage_operations",
                     {{"group_id", group_id},
-                     {"expected_working_revision", before},
+                     {"expected_working_revision", after_staging},
                      {"operations",
                       nlohmann::json::array({{{"type", "UpdateElementName"},
-                                              {"element", {{"id", FirstClaimId(project.state.loaded_case.value())}}},
+                                              {"element", {{"id", anchor}}},
                                               {"new_value", "Written against a draft that has moved"}}})}}),
         context);
     EXPECT_TRUE(stale.result.value("isError", false)) << stale.result.dump();
@@ -362,11 +378,10 @@ TEST(AgentDraftDocument, AcceptingWritesWhatTheClientStagedIntoTheAcceptedArgume
     EXPECT_FALSE(project.document.active());
     EXPECT_FALSE(std::filesystem::exists(project.document.path()));
 
-    // And a draft reopened against the new accepted argument changes nothing,
-    // which is what "there is no unaccepted work left" looks like.
+    // And reopening the argument finds no draft at all, which is what "there is
+    // no unaccepted work left" looks like -- not an empty one sitting beside the
+    // argument waiting to go stale against the user's next edit.
     core::drafts::DraftDocumentStore reopened;
     ASSERT_TRUE(reopened.Open(project.workspace.path, accepted_path, *project.state.library_document, error)) << error;
-    const core::drafts::DraftDocumentDiff diff =
-        core::drafts::DiffAcceptedAgainstDraft(project.state.loaded_case.value(), reopened.Projection());
-    EXPECT_FALSE(diff.touches_anything()) << "a fresh draft of the accepted argument must change nothing";
+    EXPECT_FALSE(reopened.active()) << "the accept consumed the draft; nothing should remain to reopen";
 }

@@ -493,6 +493,7 @@ add_executable(tests
     tests/test_change_sets.cpp
     tests/test_draft_changes_panel.cpp
     tests/test_draft_document_diff.cpp
+    tests/test_draft_document_lifecycle.cpp
     tests/test_draft_document_store.cpp
     tests/test_draft_operation_apply.cpp
     tests/test_draft_workspace.cpp

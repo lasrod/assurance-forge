@@ -284,6 +284,18 @@ struct AppRuntimeState {
     std::uint64_t draft_document_index_revision = ~std::uint64_t{0};
     std::uint64_t draft_document_index_case_revision = ~std::uint64_t{0};
 
+    // How far the working draft has moved, whichever half of it moved.
+    //
+    // The document moves on every change to the argument -- MCP, SCCG and the
+    // user's own edits all go into it -- and the change-group ledger moves when a
+    // group is opened, submitted or rejected. A cache watching only the ledger
+    // stopped rebuilding the moment the draft became a document, and went on
+    // showing content the edit had already replaced. Summed to detect movement
+    // only; nothing may read this as an identity.
+    std::uint64_t DraftRevision() const {
+        return draft_workspace.revision() + draft_document.revision();
+    }
+
     // Recomputes the two cached values above when either side has moved.
     void RefreshDraftDocumentView();
 

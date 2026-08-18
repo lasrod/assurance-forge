@@ -439,6 +439,17 @@ Result StageOntoDraftDocument(const DraftContext& context,
                               const std::vector<core::reviews::PatchOperation>& operations,
                               const nlohmann::json& arguments) {
     core::drafts::DraftDocumentStore& document = *context.document;
+    // The first unaccepted change to this argument is what brings the draft into
+    // existence, copied from the argument as it stands right now -- not as it
+    // stood when someone opened the file.
+    if (!document.active()) {
+        std::string create_error;
+        if (context.accepted_document == nullptr || !document.EnsureDraft(*context.accepted_document, create_error)) {
+            return DraftError(create_error.empty() ? "A working draft could not be created for this argument."
+                                                   : create_error,
+                              context.working_revision());
+        }
+    }
     const core::drafts::DraftOperationResult applied = core::drafts::ApplyOperationsToDraftDocument(
         *document.document(), operations, AnchorForOperations(arguments, operations));
     if (!applied.applied) {

@@ -157,10 +157,19 @@ struct DraftContext {
     // operation-staging store until that store is retired.
     core::drafts::DraftDocumentStore* document = nullptr;
 
-    // True when the draft document is the thing being edited, which is what
+    // The accepted document a draft is copied from when this contributor makes
+    // the first unaccepted change to the argument. Null alongside `document`.
+    //
+    // Needed because a draft is created at the first edit rather than when the
+    // argument is opened: an argument nobody has drafted against has no draft,
+    // so there is nothing to go stale against the user's own accepted edits.
+    const sacm_adapter::LibraryDocument* accepted_document = nullptr;
+
+    // True when the draft document is what this contributor edits -- including
+    // before the first edit, when the draft is about to be created. This is what
     // decides whether a refusal comes from the model that will hold the change.
     bool document_backed() const {
-        return document != nullptr && document->active();
+        return document != nullptr && (document->active() || accepted_document != nullptr);
     }
 
     // The staleness token a mutating client must name.

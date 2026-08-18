@@ -270,6 +270,7 @@ TRANSLATIONS = {
     "Accepted the working draft: {0} added, {1} changed, {2} removed.": "作業ドラフトを受理しました: 追加 {0} 件、変更 {1} 件、削除 {2} 件。",
     "The draft was accepted, but its change record could not be cleared: {0}": "ドラフトは受理されましたが、その変更記録を消去できませんでした: {0}",
     "The draft was accepted and written, but the argument could not be re-read: {0}": "ドラフトは受理され書き込まれましたが、議論を再読み込みできませんでした: {0}",
+    "The edit was made, but the draft could not be written to disk: {0}": "編集は適用されましたが、ドラフトをディスクに書き込めませんでした: {0}",
     "The argument changed since this draft was written.": "このドラフトの作成後に議論が変更されました。",
     "One of this draft's changes no longer applies.": "このドラフトの変更のいずれかが適用できなくなっています。",
     "Could not accept the working draft: {0}": "作業ドラフトを受理できませんでした: {0}",

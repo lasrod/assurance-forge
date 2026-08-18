@@ -84,6 +84,7 @@ TEST(DraftDocumentStoreTest, ANewDraftIsACopyOfTheAcceptedArgumentAndChangesNoth
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
     ASSERT_TRUE(store.active());
 
     const core::drafts::DraftDocumentDiff diff =
@@ -103,6 +104,7 @@ TEST(DraftDocumentStoreTest, OpeningADraftDoesNotWriteAFileUntilItIsSaved) {
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
 
     EXPECT_FALSE(std::filesystem::exists(store.path()));
     ASSERT_TRUE(store.Save(error)) << error;
@@ -120,6 +122,7 @@ TEST(DraftDocumentStoreTest, AnEditToTheDraftLeavesTheAcceptedFileByteIdentical)
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
 
     const std::string claim_id = FirstClaimId(store.Projection());
     ASSERT_FALSE(claim_id.empty());
@@ -140,6 +143,7 @@ TEST(DraftDocumentStoreTest, AnEditShowsUpAsExactlyOneModifiedElement) {
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
 
     const std::string claim_id = FirstClaimId(store.Projection());
     ASSERT_FALSE(claim_id.empty());
@@ -169,6 +173,7 @@ TEST(DraftDocumentStoreTest, ReopeningRestoresTheDraftRatherThanRederivingIt) {
         core::drafts::DraftDocumentStore store;
         std::string error;
         ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+        ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
         claim_id = FirstClaimId(store.Projection());
         ASSERT_FALSE(claim_id.empty());
         ASSERT_TRUE(sacm_adapter::apply_text_edit(
@@ -203,6 +208,7 @@ TEST(DraftDocumentStoreTest, AcceptReplacesTheAcceptedArgumentAndClearsTheDraft)
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
     const std::string claim_id = FirstClaimId(store.Projection());
     ASSERT_FALSE(claim_id.empty());
     ASSERT_TRUE(sacm_adapter::apply_text_edit(
@@ -241,6 +247,7 @@ TEST(DraftDocumentStoreTest, AcceptStripsDraftProvenanceFromTheAcceptedFile) {
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
     const std::string claim_id = FirstClaimId(store.Projection());
     ASSERT_FALSE(claim_id.empty());
 
@@ -272,6 +279,7 @@ TEST(DraftDocumentStoreTest, DiscardIsAvailableAndLeavesTheAcceptedArgumentUntou
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
     const std::string claim_id = FirstClaimId(store.Projection());
     ASSERT_TRUE(sacm_adapter::apply_text_edit(
                     *store.document(), claim_id, sacm_adapter::TextField::Content, "en", "Discarded wording.")
@@ -295,6 +303,7 @@ TEST(DraftDocumentStoreTest, DiscardingWhenThereIsNothingToDiscardSucceeds) {
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
 
     // Never saved, so there is no file behind it.
     store.Discard(error);
@@ -314,6 +323,7 @@ TEST(DraftDocumentStoreTest, DiscardDropsTheDraftEvenWhenTheFileCannotBeDeleted)
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
     ASSERT_TRUE(store.Save(error)) << error;
     const std::filesystem::path draft_path = store.path();
 
@@ -347,6 +357,7 @@ TEST(DraftDocumentStoreTest, AcceptingADraftThatChangedNothingIsHarmless) {
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
     ASSERT_TRUE(store.AcceptInto(argument, error)) << error;
 
     sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(argument);

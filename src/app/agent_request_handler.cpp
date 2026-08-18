@@ -115,6 +115,7 @@ bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentR
         // client is looking at accepted content.
         draft.working_draft_active = read.is_working_draft;
         draft.document = context.draft_document;
+        draft.accepted_document = context.state.library_document.get();
 
         if (request.op == "get_draft_status" || request.op == "list_change_sets") {
             return FromAgentResult(request.id, agent::GetDraftStatus(draft));

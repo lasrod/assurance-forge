@@ -123,6 +123,11 @@ std::unique_ptr<Fixture> MakeFixture(const std::string& stem) {
     std::string error;
     if (!fixture->store.Open(fixture->root, fixture->argument, *fixture->accepted, error))
         return nullptr;
+    // A draft is created by the first unaccepted change, not by opening the
+    // argument. These tests are about what an operation does to a draft, so they
+    // start with one.
+    if (!fixture->store.EnsureDraft(*fixture->accepted, error))
+        return nullptr;
     return fixture;
 }
 

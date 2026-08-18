@@ -17,6 +17,7 @@
 #include "bridge/instance_registry.h"
 #include "core/translation_review_store.h"
 #include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_operation_apply.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
@@ -1624,6 +1625,16 @@ MakeHumanCreateRefsUnique(const core::drafts::DraftChangeGroup& group,
 } // namespace
 
 bool AppRuntime::DraftEditingActive() const {
+    // A draft document that exists is unaccepted work, and an edit made while it
+    // exists belongs in it: otherwise the edit lands in the accepted argument,
+    // the draft no longer descends from what it is compared against, and the
+    // comparison reports the user's own new elements as things the draft removes.
+    //
+    // A draft document that does NOT exist deliberately does not make this true.
+    // Ordinary editing of an argument nobody is drafting against goes to the
+    // accepted document, exactly as before.
+    if (impl_->draft_document.active())
+        return true;
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     return workspace != nullptr && workspace->has_active_groups() &&
            workspace->state == core::drafts::DraftWorkspaceState::Active;
@@ -1639,6 +1650,34 @@ bool AppRuntime::StageHumanDraftOperations(const std::string& title,
     }
 
     const std::string author = impl_->reviewer_name.empty() ? std::string("You") : impl_->reviewer_name;
+
+    // The draft document takes the edit whenever there is a document to take it
+    // (ADR 0016) -- through the same seams an MCP client's operations go
+    // through, so the user's hand edits are accepted or refused by the model
+    // that will hold them, in the gesture that made them.
+    //
+    // Deliberately BEFORE the change group below. The group is the record of who
+    // contributed what; the document is the argument. Recording a contribution
+    // the document refused would leave the ledger describing an edit that never
+    // happened.
+    if (impl_->draft_document.active() && impl_->app_state.library_document != nullptr) {
+        const core::drafts::DraftOperationResult applied =
+            core::drafts::ApplyOperationsToDraftDocument(*impl_->draft_document.document(), operations);
+        if (!applied.applied) {
+            error = applied.error;
+            return false;
+        }
+        impl_->draft_document.MarkChanged();
+        std::string save_error;
+        if (!impl_->draft_document.Save(save_error)) {
+            // The edit is in the draft; only the recovery copy of it is not. Said
+            // plainly rather than reported as a refusal, which would invite the
+            // user to repeat an edit that already landed.
+            SetStatus(ui::i18n::trf("The edit was made, but the draft could not be written to disk: {0}", save_error));
+        }
+        impl_->tree_needs_rebuild = true;
+        return true;
+    }
 
     // One group for the session's hand edits rather than one per click: a
     // reviewer accepting later wants "my corrections", not forty groups of one
@@ -1788,9 +1827,10 @@ parser::AssuranceCase* AppRuntime::InspectorModel() {
     if (!DraftEditingActive())
         return &impl_->app_state.loaded_case.value();
 
-    // Refreshed on the same key the materialization is cached under, so this
-    // copy is made when something actually changed rather than every frame.
-    const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+    // Refreshed when the draft actually moved rather than every frame. Both
+    // halves, or a document-backed draft leaves the inspector showing content
+    // the user's own edit has already replaced.
+    const std::uint64_t draft_revision = impl_->DraftRevision();
     if (!impl_->inspector_model_valid || impl_->inspector_model_draft_revision != draft_revision ||
         impl_->inspector_model_case_revision != impl_->app_state.case_revision) {
         impl_->inspector_model = CurrentArgumentView();

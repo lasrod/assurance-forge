@@ -144,12 +144,7 @@ void AppRuntime::RenderFrame(bool& done) {
         // unrelated happened to rebuild the tree.
         ui::UiState& ui_state = ui::GetUiState();
         static ui::DraftViewMode last_draft_view_mode = ui::DraftViewMode::WorkingDraft;
-        // Both counters, because either alone misses a draft that moved. The
-        // document moves on every content change, including the user's own edits
-        // and a discard; the change-group ledger moves when a group is opened,
-        // submitted or rejected. Summed only to detect movement -- nothing reads
-        // this value as an identity.
-        const std::uint64_t draft_revision = impl_->draft_workspace.revision() + impl_->draft_document.revision();
+        const std::uint64_t draft_revision = impl_->DraftRevision();
         if (ui_state.draft_view_mode != last_draft_view_mode || draft_revision != impl_->draft_revision_drawn) {
             impl_->tree_needs_rebuild = true;
             last_draft_view_mode = ui_state.draft_view_mode;
@@ -193,7 +188,7 @@ void AppRuntime::RenderFrame(bool& done) {
         // materialized so the two cannot disagree. Anything that changes these
         // later in the frame becomes visible at the next frame's publish.
         impl_->draft_canvas_view_case_revision = impl_->app_state.case_revision;
-        impl_->draft_canvas_view_draft_revision = impl_->draft_workspace.revision();
+        impl_->draft_canvas_view_draft_revision = impl_->DraftRevision();
         impl_->draft_canvas_view_mode = ui::GetUiState().draft_view_mode;
         // Every frame, not with the derived views.
         //
