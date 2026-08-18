@@ -420,3 +420,101 @@ TEST(DraftOperationApplyTest, StagingNeverTouchesTheAcceptedArgument) {
     ASSERT_TRUE(after.has_value());
     EXPECT_EQ(after.value(), before.value()) << "the accepted argument does not move until a human accepts";
 }
+
+// A GSN Strategy is the reasoning of an inference, never one of its ends
+// (docs/sacm/sacm-gsn-mapping.md, rule 5). Wiring it as an end produces an
+// argument that looks perfectly ordinary on the canvas and is reported as an
+// error by the well-formedness check -- which is what a user saw.
+TEST(DraftOperationApplyTest, AStrategyAttachesAsReasoningRatherThanAsAnEnd) {
+    const std::unique_ptr<Fixture> fixture = MakeFixture("strategy-reasoning");
+    ASSERT_NE(fixture, nullptr);
+    const std::string goal = FirstClaimId(*fixture->store.document());
+    ASSERT_FALSE(goal.empty());
+
+    const core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+        *fixture->store.document(),
+        {Create(core::reviews::PatchOperationType::CreateStrategy, "$s", "Argue over the identified hazards"),
+         Supports(ByRef("$s"), ById(goal))},
+        goal);
+    ASSERT_TRUE(result.applied) << result.error;
+    const std::string strategy = result.created_ids.at("$s");
+
+    // A bare strategy carries no relationship at all: an AssertedInference with
+    // only a reasoning end has no source, which SACM's source [1..*] forbids.
+    const core::AssuranceCase model = fixture->Draft();
+    for (const core::SacmElement& element : model.elements) {
+        const bool names_strategy =
+            std::find(element.source_refs.begin(), element.source_refs.end(), strategy) != element.source_refs.end() ||
+            std::find(element.target_refs.begin(), element.target_refs.end(), strategy) != element.target_refs.end();
+        EXPECT_FALSE(names_strategy) << "relationship " << element.id << " wires the strategy as one of its ends";
+    }
+}
+
+// A GSN Solution and a GSN Context are both ArtifactReference and are told apart
+// only by the relationship that attaches them. Attaching a Solution by inference
+// leaves it indistinguishable from a Context, and it renders as one.
+TEST(DraftOperationApplyTest, ASolutionAttachesAsEvidenceSoItIsNotIndistinguishableFromAContext) {
+    const std::unique_ptr<Fixture> fixture = MakeFixture("solution-evidence");
+    ASSERT_NE(fixture, nullptr);
+    const std::string goal = FirstClaimId(*fixture->store.document());
+    ASSERT_FALSE(goal.empty());
+
+    const core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+        *fixture->store.document(),
+        {Create(core::reviews::PatchOperationType::CreateSolution, "$sn", "Triggering condition analysis"),
+         Supports(ByRef("$sn"), ById(goal))},
+        goal);
+    ASSERT_TRUE(result.applied) << result.error;
+    const std::string solution = result.created_ids.at("$sn");
+
+    bool attached_as_evidence = false;
+    const core::AssuranceCase model = fixture->Draft();
+    for (const core::SacmElement& element : model.elements) {
+        if (std::find(element.source_refs.begin(), element.source_refs.end(), solution) == element.source_refs.end())
+            continue;
+        EXPECT_EQ(element.type, "assertedevidence")
+            << "a solution attached by " << element.type << " renders with Context notation";
+        if (element.type == "assertedevidence")
+            attached_as_evidence = true;
+    }
+    EXPECT_TRUE(attached_as_evidence) << "the solution was not attached to anything";
+}
+
+// The sub-goal that gives a deferred strategy inference its source. Without
+// this, the strategy a user adds can never gain the inference that makes it
+// mean anything.
+TEST(DraftOperationApplyTest, ASubGoalUnderAStrategyMaterializesTheStrategysInference) {
+    const std::unique_ptr<Fixture> fixture = MakeFixture("strategy-subgoal");
+    ASSERT_NE(fixture, nullptr);
+    const std::string goal = FirstClaimId(*fixture->store.document());
+    ASSERT_FALSE(goal.empty());
+
+    const core::drafts::DraftOperationResult staged = core::drafts::ApplyOperationsToDraftDocument(
+        *fixture->store.document(),
+        {Create(core::reviews::PatchOperationType::CreateStrategy, "$s", "Argue over the identified hazards"),
+         Supports(ByRef("$s"), ById(goal)),
+         Create(core::reviews::PatchOperationType::CreateClaim, "$g", "Blade hazards are controlled"),
+         Supports(ByRef("$g"), ByRef("$s"))},
+        goal);
+    ASSERT_TRUE(staged.applied) << staged.error;
+    const std::string strategy = staged.created_ids.at("$s");
+    const std::string subgoal = staged.created_ids.at("$g");
+
+    // One inference, from the sub-goal to the goal the strategy supports, with
+    // the strategy as its reasoning rather than as an end.
+    const core::AssuranceCase model = fixture->Draft();
+    bool found = false;
+    for (const core::SacmElement& element : model.elements) {
+        if (element.type != "assertedinference")
+            continue;
+        if (std::find(element.source_refs.begin(), element.source_refs.end(), subgoal) == element.source_refs.end())
+            continue;
+        found = true;
+        EXPECT_NE(std::find(element.target_refs.begin(), element.target_refs.end(), goal), element.target_refs.end())
+            << "the strategy's inference must conclude at the goal the strategy supports";
+        EXPECT_EQ(std::find(element.source_refs.begin(), element.source_refs.end(), strategy),
+                  element.source_refs.end())
+            << "the strategy must not be a source of its own inference";
+    }
+    EXPECT_TRUE(found) << "no inference was materialized for the strategy's first sub-goal";
+}

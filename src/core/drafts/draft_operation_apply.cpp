@@ -107,6 +107,17 @@ std::string Describe(const sacm_adapter::EditOutcome& outcome, const std::string
     return what + ".";
 }
 
+// The same wording for the seams that report an AddChildOutcome. Two structs
+// rather than one is a `sacm_adapter` shape, not a difference an agent reading
+// the refusal should have to notice.
+std::string DescribeChild(const sacm_adapter::AddChildOutcome& outcome, const std::string& what) {
+    if (!outcome.diagnostics.empty())
+        return what + ": " + outcome.diagnostics.front().message;
+    if (!outcome.supported)
+        return what + ", and this model has no way to express it.";
+    return what + ".";
+}
+
 // Resolves an operand to a real element id, following `create_ref` into what
 // this batch has already created.
 bool ResolveRef(const std::optional<reviews::ElementRef>& ref,
@@ -194,6 +205,7 @@ struct Applier {
     bool ApplyUpdateText(const PatchOperation& operation, std::string& error);
     bool ApplyUpdateName(const PatchOperation& operation, std::string& error);
     bool ApplyUndeveloped(const PatchOperation& operation, bool undeveloped, std::string& error);
+    bool ApplyAddSupport(const PatchOperation& operation, std::string& error);
     bool ApplyAddRelationship(const PatchOperation& operation, sacm_adapter::RelationshipKind kind, std::string& error);
     bool ApplyRemoveRelationship(const PatchOperation& operation, const std::string& type, std::string& error);
     bool ApplyRemoveElement(const PatchOperation& operation, std::string& error);
@@ -560,6 +572,37 @@ bool Applier::ApplyUndeveloped(const PatchOperation& operation, bool undeveloped
     return true;
 }
 
+// Support attaches by the relationship the child's GSN role requires, which is
+// not always an AssertedInference and is sometimes no relationship at all.
+//
+// Delegated rather than decided here. A GSN Solution and a GSN Context are the
+// same SACM type and differ only in how they attach, and a GSN Strategy is the
+// reasoning of an inference rather than one of its ends -- so an operation that
+// always built an AssertedInference produced a Solution indistinguishable from a
+// Context (it then rendered with Context notation) and a Strategy wired as an
+// end, which the GSN well-formedness check reports as an error against an
+// argument that looks perfectly ordinary on the canvas.
+bool Applier::ApplyAddSupport(const PatchOperation& operation, std::string& error) {
+    std::string source_id;
+    std::string target_id;
+    if (!ResolveRef(operation.source, created, "source", source_id, error))
+        return false;
+    if (!ResolveRef(operation.target, created, "target", target_id, error))
+        return false;
+
+    // `source` is the premise and `target` the conclusion, which is SACM's
+    // direction; GSN's SupportedBy runs the other way and the reader swaps them
+    // (docs/sacm/sacm-gsn-mapping.md). So the element being attached UNDER the
+    // parent is the source.
+    const sacm_adapter::AddChildOutcome outcome =
+        sacm_adapter::apply_attach_child(document, target_id, source_id, ids.Next("R"));
+    if (!outcome.supported || !outcome.applied) {
+        error = DescribeChild(outcome, "The support from " + source_id + " to " + target_id + " could not be created");
+        return false;
+    }
+    return true;
+}
+
 bool Applier::ApplyAddRelationship(const PatchOperation& operation,
                                    sacm_adapter::RelationshipKind kind,
                                    std::string& error) {
@@ -658,7 +701,7 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
     case PatchOperationType::ClearUndeveloped:
         return ApplyUndeveloped(operation, false, error);
     case PatchOperationType::AddSupportedBy:
-        return ApplyAddRelationship(operation, sacm_adapter::RelationshipKind::AssertedInference, error);
+        return ApplyAddSupport(operation, error);
     case PatchOperationType::AddInContextOf:
         return ApplyAddRelationship(operation, sacm_adapter::RelationshipKind::AssertedContext, error);
     case PatchOperationType::RemoveSupportedBy:

@@ -540,6 +540,45 @@ EditOutcome apply_add_relationship(LibraryDocument& document,
                                    const std::vector<std::string>& targets,
                                    const std::string& reasoning);
 
+// Attaches an element that ALREADY exists under `parent_id` as SUPPORT, with the
+// relationship its GSN role requires.
+//
+// The attach half of `apply_add_child`, for the create-then-attach shape a patch
+// vocabulary uses. It exists so that knowledge lives in one place: which
+// relationship carries which kind of support is decided here and in
+// `apply_add_child` alone, and both read the same rules.
+//
+// The child's SACM kind decides, because in GSN the notation follows the kind:
+//
+//   * `ArgumentReasoning` (a GSN Strategy) is the *reasoning* of an inference,
+//     never one of its ends (docs/sacm/sacm-gsn-mapping.md). A strategy attached
+//     before it has sub-goals gets no relationship at all -- one would have no
+//     source, which SACM's source [1..*] forbids (clause 11.13) -- only the
+//     `strategyTarget` vendor tag naming the goal it will support, exactly as
+//     `apply_add_child` does. `new_relationship_id` is empty.
+//   * A `Claim` under an `ArgumentReasoning` parent is a sub-goal of that
+//     strategy: it becomes a source of the strategy's single inference,
+//     materializing it on the first sub-goal and extending it on later ones.
+//   * `ArtifactReference` (a GSN Solution) attaches by `AssertedEvidence`.
+//     Solution and Context are the same SACM type and are told apart ONLY by the
+//     relationship that attaches them, so attaching a Solution by inference
+//     produces a document in which it is indistinguishable from a Context -- and
+//     it then renders with Context notation.
+//   * Anything else attaches by `AssertedInference`.
+//
+// Context, assumption and justification attachment is NOT this seam's business:
+// those are `AssertedContext` regardless of the child's kind, which is the
+// caller's stated intent rather than something to infer. Use
+// `apply_add_relationship` with `RelationshipKind::AssertedContext`.
+//
+// `relationship_id` is used verbatim when non-empty, for id-deterministic
+// replay; empty lets the library generate it. It is ignored where no
+// relationship is created.
+AddChildOutcome apply_attach_child(LibraryDocument& document,
+                                   const std::string& parent_id,
+                                   const std::string& child_id,
+                                   const std::string& relationship_id = {});
+
 // ---------------------------------------------------------------------------
 // Terminology edit seams (Phase 0 part 2).
 //

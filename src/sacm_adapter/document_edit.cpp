@@ -445,6 +445,16 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
 
 } // namespace
 
+// The support relationship an already-existing child attaches by. Mirrors
+// `plan_child`'s choice for the create path, from the child's SACM kind.
+sacm::metadata::ElementKind support_relationship_for_child(sacm::metadata::ElementKind child_kind) {
+    // A GSN Solution and a GSN Context are both ArtifactReference and are told
+    // apart only by how they attach. Support means evidence.
+    if (child_kind == sacm::metadata::ElementKind::ArtifactReference)
+        return sacm::metadata::ElementKind::AssertedEvidence;
+    return sacm::metadata::ElementKind::AssertedInference;
+}
+
 AddChildOutcome apply_add_child(LibraryDocument& document,
                                 const std::string& parent_id,
                                 ChildKind kind,
@@ -560,6 +570,100 @@ AddChildOutcome apply_add_child(LibraryDocument& document,
     outcome.supported = true;
     outcome.applied = true;
     outcome.new_element_id = created_id.value();
+    outcome.new_relationship_id = linked.created_ids().front().value();
+    return outcome;
+}
+
+AddChildOutcome apply_attach_child(LibraryDocument& document,
+                                   const std::string& parent_id,
+                                   const std::string& child_id,
+                                   const std::string& relationship_id) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId parent(parent_id);
+    const sacm::model::ElementId child(child_id);
+
+    const sacm::model::SACMElement* parent_element = doc.find(parent);
+    const sacm::model::SACMElement* child_element = doc.find(child);
+    if (parent_element == nullptr || child_element == nullptr) {
+        return unsupported_child();
+    }
+    const sacm::model::ArgumentPackage* package = owning_argument_package(parent_element);
+    if (package == nullptr) {
+        return unsupported_child();
+    }
+    const sacm::model::ElementId package_id = package->id();
+
+    // A Strategy is the reasoning of an inference, not one of its ends. Attached
+    // before it has sub-goals it gets no relationship at all -- one would have no
+    // source -- only the tag naming the goal it will support, which is what
+    // `apply_add_child` records for a newly created strategy.
+    if (child_element->kind() == sacm::metadata::ElementKind::ArgumentReasoning) {
+        const sacm::commands::MutationResult tagged = doc.apply(
+            sacm::commands::AddTaggedValue{.element = child, .key = kGsnStrategyTargetTagKey, .value = parent_id});
+        if (!tagged.applied) {
+            return failed_child(tagged);
+        }
+        AddChildOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = true;
+        outcome.new_element_id = child_id;
+        return outcome; // no relationship yet -- materialized on the first sub-goal
+    }
+
+    // A Claim under a Strategy is a sub-goal of it: a source of the strategy's
+    // single inference, materialized on the first and extended on later ones.
+    if (child_element->kind() == sacm::metadata::ElementKind::Claim &&
+        parent_element->kind() == sacm::metadata::ElementKind::ArgumentReasoning) {
+        if (const sacm::model::AssertedRelationship* inference = find_strategy_inference(*package, parent)) {
+            const sacm::model::ElementId inference_id = inference->id();
+            const sacm::commands::MutationResult extended =
+                doc.apply(sacm::commands::AddRelationshipSource{.relationship = inference_id, .source = child});
+            if (!extended.applied) {
+                return failed_child(extended);
+            }
+            AddChildOutcome outcome;
+            outcome.supported = true;
+            outcome.applied = true;
+            outcome.new_element_id = child_id;
+            return outcome;
+        }
+        const auto* strategy_model = doc.find_as<sacm::model::ModelElement>(parent);
+        const std::string target = strategy_model != nullptr ? strategy_target_of(*strategy_model) : std::string{};
+        if (target.empty()) {
+            return unsupported_child();
+        }
+        const sacm::commands::MutationResult materialized =
+            doc.apply(sacm::commands::CreateAssertedRelationship{.parent = package_id,
+                                                                 .kind = sacm::metadata::ElementKind::AssertedInference,
+                                                                 .id = to_optional_id(relationship_id),
+                                                                 .sources = {child},
+                                                                 .targets = {sacm::model::ElementId(target)},
+                                                                 .reasoning = parent});
+        if (!materialized.applied || materialized.created_ids().empty()) {
+            return failed_child(materialized);
+        }
+        AddChildOutcome outcome;
+        outcome.supported = true;
+        outcome.applied = true;
+        outcome.new_element_id = child_id;
+        outcome.new_relationship_id = materialized.created_ids().front().value();
+        return outcome;
+    }
+
+    const sacm::commands::MutationResult linked = doc.apply(sacm::commands::CreateAssertedRelationship{
+        .parent = package_id,
+        .kind = support_relationship_for_child(child_element->kind()),
+        .id = to_optional_id(relationship_id),
+        .sources = {child},
+        .targets = {parent},
+    });
+    if (!linked.applied || linked.created_ids().empty()) {
+        return failed_child(linked);
+    }
+    AddChildOutcome outcome;
+    outcome.supported = true;
+    outcome.applied = true;
+    outcome.new_element_id = child_id;
     outcome.new_relationship_id = linked.created_ids().front().value();
     return outcome;
 }
