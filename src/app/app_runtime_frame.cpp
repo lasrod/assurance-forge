@@ -169,6 +169,12 @@ void AppRuntime::RenderFrame(bool& done) {
         // later panels still held pointers into that published snapshot.
         impl_->draft_frame_materialization.reset();
         impl_->draft_canvas_view = impl_->app_state.loaded_case.has_value() ? &CurrentCanvasView() : nullptr;
+        // The stamp canvas caches key on, read at the same point the view is
+        // materialized so the two cannot disagree. Anything that changes these
+        // later in the frame becomes visible at the next frame's publish.
+        impl_->draft_canvas_view_case_revision = impl_->app_state.case_revision;
+        impl_->draft_canvas_view_draft_revision = impl_->draft_workspace.revision();
+        impl_->draft_canvas_view_mode = ui::GetUiState().draft_view_mode;
         // Every frame, not with the derived views.
         //
         // `RebuildDerivedViewsIfNeeded` returns early unless the tree is dirty,

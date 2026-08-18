@@ -28,6 +28,7 @@
 #include "core/tree_editing.h"
 #include "legacy_sacm/sacm_package_tree.h"
 #include "ui/timeline/timeline_state.h"
+#include "ui/ui_state.h"
 
 namespace core::commands {
 class CommandBus;
@@ -261,6 +262,19 @@ struct AppRuntimeState {
     // case while the rest of the application has moved to the working model.
     // Null before the first frame; falls back to the accepted case.
     const parser::AssuranceCase* draft_canvas_view = nullptr;
+    // The inputs `draft_canvas_view` was built from, published beside it. A
+    // canvas cache whose content comes from the published view must decide
+    // staleness against these, never against the live `app_state.case_revision`,
+    // `draft_workspace.revision()` or `ui::UiState::draft_view_mode`: all three
+    // can move mid-frame after the view is materialized -- a mode button click
+    // lands during the workbench render, and a completed AI review stages draft
+    // groups in the same frame's poll. A cache keyed on live state records the
+    // new key against the previous frame's content and then never rebuilds, so
+    // the canvas stays one state change behind. See
+    // docs/architecture/frame-and-draft-views.md.
+    std::uint64_t draft_canvas_view_case_revision = 0;
+    std::uint64_t draft_canvas_view_draft_revision = 0;
+    ui::DraftViewMode draft_canvas_view_mode = ui::DraftViewMode::WorkingDraft;
     // Owns the materialized model backing `draft_canvas_view` for the entire
     // frame. Draft accept/discard can invalidate the store while ImGui is still
     // rendering; retaining this immutable snapshot prevents the canvas and
