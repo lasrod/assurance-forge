@@ -178,8 +178,18 @@ struct Applier {
     IdAllocator& ids;
     std::string package_id;
     std::map<std::string, std::string>& created;
+    // The TerminologyPackage created for this batch, if it had to create one.
+    // Remembered so a batch defining three terms in a case with no glossary
+    // makes one package rather than three.
+    std::string created_terminology_package_id;
 
+    bool TerminologyPackage(std::string& out, std::string& error);
     bool ApplyCreate(const PatchOperation& operation, std::string& error);
+    bool ApplyCreateTerm(const PatchOperation& operation, std::string& error);
+    bool ApplyCreateCategory(const PatchOperation& operation, std::string& error);
+    bool ApplyUpdateTerm(const PatchOperation& operation, std::string& error);
+    bool ApplyUpdateCategory(const PatchOperation& operation, std::string& error);
+    bool ApplyRemoveTerm(const PatchOperation& operation, std::string& error);
     bool ApplyUpdateText(const PatchOperation& operation, std::string& error);
     bool ApplyUpdateName(const PatchOperation& operation, std::string& error);
     bool ApplyUndeveloped(const PatchOperation& operation, bool undeveloped, std::string& error);
@@ -188,6 +198,258 @@ struct Applier {
     bool ApplyRemoveElement(const PatchOperation& operation, std::string& error);
     bool Apply(const PatchOperation& operation, std::string& error);
 };
+
+// The glossary this batch's terms go in, created on demand.
+//
+// A case with no TerminologyPackage grows its first one here rather than
+// refusing: a project could otherwise never gain a glossary over MCP, and
+// refusing would be a worse answer than filing the term somewhere obvious.
+bool Applier::TerminologyPackage(std::string& out, std::string& error) {
+    if (!created_terminology_package_id.empty()) {
+        out = created_terminology_package_id;
+        return true;
+    }
+    const std::string existing = sacm_adapter::resolve_terminology_package_id(document);
+    if (!existing.empty()) {
+        out = existing;
+        return true;
+    }
+    const sacm_adapter::TerminologyCreateOutcome outcome =
+        sacm_adapter::apply_create_terminology_package(document, "Terminology", "");
+    if (!outcome.supported || !outcome.applied) {
+        error = outcome.diagnostics.empty()
+                    ? "This case has no glossary and one could not be created."
+                    : "This case has no glossary and one could not be created: " + outcome.diagnostics.front().message;
+        return false;
+    }
+    created_terminology_package_id = outcome.element_id;
+    out = created_terminology_package_id;
+    return true;
+}
+
+bool Applier::ApplyCreateTerm(const PatchOperation& operation, std::string& error) {
+    if (!operation.create_ref.has_value() || operation.create_ref->empty()) {
+        error = "A create operation needs a create_ref so later operations can refer to what it made.";
+        return false;
+    }
+    if (operation.text.empty()) {
+        error = "A term needs the word or phrase it defines, in \"text\".";
+        return false;
+    }
+    // SACM gives an ExpressionElement one value (clause 10.11), so a term cannot
+    // be stated in two languages. Refused here rather than at acceptance, with
+    // the field that CAN carry translations named.
+    if (!operation.translations.empty() && operation.new_value.empty()) {
+        error = "A term's value is a single string and cannot be translated. Translate its definition instead.";
+        return false;
+    }
+
+    std::string terminology_package;
+    if (!TerminologyPackage(terminology_package, error))
+        return false;
+
+    const std::string id = ids.Next("T");
+    sacm_adapter::TerminologyTermFields fields;
+    fields.value = operation.text;
+    fields.description = operation.new_value;
+    const sacm_adapter::TerminologyCreateOutcome outcome =
+        sacm_adapter::apply_create_terminology_term(document, terminology_package, fields, id);
+    if (!outcome.supported || !outcome.applied) {
+        error = outcome.diagnostics.empty() ? "The term could not be created."
+                                            : "The term could not be created: " + outcome.diagnostics.front().message;
+        return false;
+    }
+    const std::string new_id = outcome.element_id.empty() ? id : outcome.element_id;
+    created.emplace(operation.create_ref.value(), new_id);
+
+    // Definition translations land after the term exists, on the field that
+    // holds the definition.
+    for (const auto& [language, value] : operation.translations) {
+        if (language == reviews::kPatchPrimaryLanguage)
+            continue;
+        const sacm_adapter::EditOutcome translated =
+            sacm_adapter::apply_text_edit(document, new_id, sacm_adapter::TextField::Description, language, value);
+        if (!translated.supported || !translated.applied) {
+            error = Describe(translated, "The '" + language + "' definition of " + new_id + " could not be set");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Applier::ApplyCreateCategory(const PatchOperation& operation, std::string& error) {
+    if (!operation.create_ref.has_value() || operation.create_ref->empty()) {
+        error = "A create operation needs a create_ref so later operations can refer to what it made.";
+        return false;
+    }
+    if (operation.text.empty()) {
+        error = "A category needs a name, in \"text\".";
+        return false;
+    }
+    std::string terminology_package;
+    if (!TerminologyPackage(terminology_package, error))
+        return false;
+
+    const std::string id = ids.Next("CAT");
+    const sacm_adapter::TerminologyCreateOutcome outcome = sacm_adapter::apply_create_terminology_category(
+        document, terminology_package, operation.text, operation.new_value, id);
+    if (!outcome.supported || !outcome.applied) {
+        error = outcome.diagnostics.empty()
+                    ? "The category could not be created."
+                    : "The category could not be created: " + outcome.diagnostics.front().message;
+        return false;
+    }
+    created.emplace(operation.create_ref.value(), outcome.element_id.empty() ? id : outcome.element_id);
+    return true;
+}
+
+bool Applier::ApplyUpdateTerm(const PatchOperation& operation, std::string& error) {
+    std::string term_id;
+    if (!ResolveRef(operation.element, created, "element", term_id, error))
+        return false;
+
+    const core::AssuranceCase model = sacm_adapter::project_case(document);
+    const core::SacmElement* term = FindProjected(model, term_id);
+    if (term == nullptr) {
+        error = "There is no element " + term_id + " in this argument.";
+        return false;
+    }
+    if (term->type != "term") {
+        error = "UpdateTerm targets " + term_id + ", which is a " + term->type +
+                ", not a term. Use UpdateElementText for argument elements.";
+        return false;
+    }
+
+    if (operation.field == reviews::kTermFieldValue) {
+        if (!operation.translations.empty()) {
+            error = "A term's value is a single string; translations apply to its definition. "
+                    "Use field \"definition\" to translate what the term means.";
+            return false;
+        }
+        if (operation.new_value.empty()) {
+            error = "This would blank the term's value. Use RemoveTerm to remove the term instead.";
+            return false;
+        }
+        return WriteTextAndTranslations(
+            document, term_id, sacm_adapter::TextField::Content, operation.new_value, {}, "value", error);
+    }
+    if (operation.field == reviews::kTermFieldDefinition) {
+        return WriteTextAndTranslations(document,
+                                        term_id,
+                                        sacm_adapter::TextField::Description,
+                                        operation.new_value,
+                                        operation.translations,
+                                        "definition",
+                                        error);
+    }
+    if (operation.field == reviews::kTermFieldName) {
+        if (!operation.translations.empty()) {
+            error = "A term's name is one SACM LangString; state it in the primary language only.";
+            return false;
+        }
+        return WriteTextAndTranslations(
+            document, term_id, sacm_adapter::TextField::Name, operation.new_value, {}, "name", error);
+    }
+    if (operation.field == reviews::kTermFieldCategory) {
+        // Space separated, matching the XMI convention for an idref list, so a
+        // term can carry the several categories clause 10.8 allows. Empty clears
+        // them: an uncategorized term is a reportable state, not an impossible
+        // one, so removing a category has to be expressible.
+        std::vector<std::string> categories;
+        std::string current;
+        for (const char character : operation.new_value) {
+            if (character == ' ' || character == '\t' || character == '\n') {
+                if (!current.empty())
+                    categories.push_back(std::exchange(current, {}));
+                continue;
+            }
+            current += character;
+        }
+        if (!current.empty())
+            categories.push_back(current);
+
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_term_categories(document, term_id, categories);
+        if (!outcome.supported || !outcome.applied) {
+            error = Describe(outcome, "The categories of " + term_id + " could not be set");
+            return false;
+        }
+        return true;
+    }
+    if (operation.field == reviews::kTermFieldExternalReference) {
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_term_external_reference(document, term_id, operation.new_value);
+        if (!outcome.supported || !outcome.applied) {
+            error = Describe(outcome, "The external reference of " + term_id + " could not be set");
+            return false;
+        }
+        return true;
+    }
+    if (operation.field == reviews::kTermFieldOrigin) {
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_term_origin(document, term_id, operation.new_value);
+        if (!outcome.supported || !outcome.applied) {
+            error = Describe(outcome, "The origin of " + term_id + " could not be set");
+            return false;
+        }
+        return true;
+    }
+    error = "Unsupported UpdateTerm field \"" + operation.field +
+            "\". Use value, definition, name, category, external_reference or origin.";
+    return false;
+}
+
+bool Applier::ApplyUpdateCategory(const PatchOperation& operation, std::string& error) {
+    std::string category_id;
+    if (!ResolveRef(operation.element, created, "element", category_id, error))
+        return false;
+
+    const core::AssuranceCase model = sacm_adapter::project_case(document);
+    const core::SacmElement* category = FindProjected(model, category_id);
+    if (category == nullptr) {
+        error = "There is no element " + category_id + " in this argument.";
+        return false;
+    }
+    if (category->type != "category") {
+        error = "UpdateCategory targets " + category_id + ", which is a " + category->type + ", not a category.";
+        return false;
+    }
+
+    if (operation.field == reviews::kCategoryFieldName) {
+        return WriteTextAndTranslations(
+            document, category_id, sacm_adapter::TextField::Name, operation.new_value, {}, "name", error);
+    }
+    if (operation.field == reviews::kCategoryFieldDescription) {
+        return WriteTextAndTranslations(document,
+                                        category_id,
+                                        sacm_adapter::TextField::Description,
+                                        operation.new_value,
+                                        operation.translations,
+                                        "description",
+                                        error);
+    }
+    error = "Unsupported UpdateCategory field \"" + operation.field + "\". Use name or description.";
+    return false;
+}
+
+bool Applier::ApplyRemoveTerm(const PatchOperation& operation, std::string& error) {
+    std::string term_id;
+    if (!ResolveRef(operation.element, created, "element", term_id, error))
+        return false;
+    // No cascade. Removing a term an argument package references crosses a
+    // package boundary, which the library refuses by default precisely so it
+    // cannot happen without someone being asked -- and this surface has no way
+    // to ask. The refusal names the situation instead of widening the removal.
+    const sacm_adapter::TerminologyEditOutcome outcome =
+        sacm_adapter::apply_delete_terminology_element(document, term_id, /*cascade_external_references=*/false);
+    if (!outcome.supported || !outcome.applied) {
+        error = outcome.diagnostics.empty()
+                    ? "Term " + term_id + " could not be removed."
+                    : "Term " + term_id + " could not be removed: " + outcome.diagnostics.front().message;
+        return false;
+    }
+    return true;
+}
 
 bool Applier::ApplyCreate(const PatchOperation& operation, std::string& error) {
     sacm_adapter::NewElementKind kind = sacm_adapter::NewElementKind::Claim;
@@ -403,16 +665,15 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
     case PatchOperationType::RemoveElement:
         return ApplyRemoveElement(operation, error);
     case PatchOperationType::CreateTerm:
+        return ApplyCreateTerm(operation, error);
     case PatchOperationType::UpdateTerm:
+        return ApplyUpdateTerm(operation, error);
     case PatchOperationType::RemoveTerm:
+        return ApplyRemoveTerm(operation, error);
     case PatchOperationType::CreateCategory:
+        return ApplyCreateCategory(operation, error);
     case PatchOperationType::UpdateCategory:
-        // Deliberately refused rather than approximated. The terminology seams
-        // exist and are a direct mapping, but routing them is its own slice and
-        // a half-routed glossary would put terms in the draft that acceptance
-        // could not carry -- the failure this redesign removes.
-        error = "Terminology operations are not yet routed onto the working draft document.";
-        return false;
+        return ApplyUpdateCategory(operation, error);
     }
     error = "Unsupported operation.";
     return false;
@@ -444,8 +705,11 @@ DraftOperationResult ApplyOperationsToDraftDocument(sacm_adapter::LibraryDocumen
     }
 
     IdAllocator ids(scratch);
-    Applier applier{
-        scratch, ids, sacm_adapter::resolve_argument_package_id(scratch, anchor_element_id), result.created_ids};
+    Applier applier{scratch,
+                    ids,
+                    sacm_adapter::resolve_argument_package_id(scratch, anchor_element_id),
+                    result.created_ids,
+                    /*created_terminology_package_id=*/{}};
 
     for (std::size_t index = 0; index < operations.size(); ++index) {
         std::string error;

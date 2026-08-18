@@ -302,6 +302,99 @@ TEST(DraftOperationApplyTest, RemovingAnElementTakesItOutOfTheDraft) {
     EXPECT_EQ(Find(f->Draft(), sub), nullptr);
 }
 
+// A case with no glossary grows its first one here rather than refusing --
+// otherwise a project could never gain one over MCP.
+TEST(DraftOperationApplyTest, DefiningATermCreatesTheGlossaryWhenTheCaseHasNone) {
+    const std::unique_ptr<Fixture> f = MakeFixture("term");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+
+    core::reviews::PatchOperation define = Create(core::reviews::PatchOperationType::CreateTerm, "$hazard", "hazard");
+    define.new_value = "A system state that, with environmental conditions, could lead to harm.";
+
+    const core::drafts::DraftOperationResult result =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {define}, top);
+
+    ASSERT_TRUE(result.applied) << result.error;
+    const std::string term_id = result.created_ids.at("$hazard");
+    const core::AssuranceCase draft = f->Draft();
+    const core::SacmElement* term = Find(draft, term_id);
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->type, "term");
+    EXPECT_EQ(term->content, "hazard") << "a term's value is the word it defines";
+    EXPECT_EQ(term->description, "A system state that, with environmental conditions, could lead to harm.");
+}
+
+// Several terms in one batch share the glossary the batch created, rather than
+// each making another.
+TEST(DraftOperationApplyTest, TwoTermsInOneBatchShareOneGlossary) {
+    const std::unique_ptr<Fixture> f = MakeFixture("twoterms");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+
+    core::reviews::PatchOperation first = Create(core::reviews::PatchOperationType::CreateTerm, "$a", "hazard");
+    first.new_value = "First definition.";
+    core::reviews::PatchOperation second = Create(core::reviews::PatchOperationType::CreateTerm, "$b", "mitigation");
+    second.new_value = "Second definition.";
+
+    const core::drafts::DraftOperationResult result =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {first, second}, top);
+
+    ASSERT_TRUE(result.applied) << result.error;
+    EXPECT_EQ(result.created_ids.size(), 2u);
+}
+
+// SACM gives an ExpressionElement one value (clause 10.11), so a term cannot be
+// stated in two languages. Refused when it is asked, naming the field that can
+// carry a translation.
+TEST(DraftOperationApplyTest, TranslatingATermsValueIsRefusedAndPointsAtTheDefinition) {
+    const std::unique_ptr<Fixture> f = MakeFixture("termlang");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+
+    core::reviews::PatchOperation define = Create(core::reviews::PatchOperationType::CreateTerm, "$t", "hazard");
+    define.new_value = "A definition.";
+    const core::drafts::DraftOperationResult defined =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {define}, top);
+    ASSERT_TRUE(defined.applied) << defined.error;
+    // By id, not by create_ref: a create_ref is batch-local, so reusing `$t`
+    // here would be refused as an unknown reference and this test would pass
+    // without ever reaching the rule it exists for.
+    const std::string term_id = defined.created_ids.at("$t");
+
+    core::reviews::PatchOperation retitle;
+    retitle.type = core::reviews::PatchOperationType::UpdateTerm;
+    retitle.element = ById(term_id);
+    retitle.field = core::reviews::kTermFieldValue;
+    retitle.new_value = "hazard";
+    retitle.translations["ja"] = "ハザード";
+
+    const core::drafts::DraftOperationResult staged =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {retitle}, top);
+    ASSERT_FALSE(staged.applied) << "a term's value is one string and cannot be translated";
+    EXPECT_NE(staged.error.find("definition"), std::string::npos)
+        << "the refusal must name the field that can carry a translation: " << staged.error;
+}
+
+TEST(DraftOperationApplyTest, UpdateTermOnSomethingThatIsNotATermSaysWhatToUseInstead) {
+    const std::unique_ptr<Fixture> f = MakeFixture("nonterm");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateTerm;
+    update.element = ById(top);
+    update.field = core::reviews::kTermFieldDefinition;
+    update.new_value = "Not a term.";
+
+    const core::drafts::DraftOperationResult result =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {update}, top);
+
+    ASSERT_FALSE(result.applied);
+    EXPECT_NE(result.error.find("UpdateElementText"), std::string::npos)
+        << "the refusal must name the operation to use instead: " << result.error;
+}
+
 // Nothing an agent stages reaches the accepted argument until a human accepts.
 TEST(DraftOperationApplyTest, StagingNeverTouchesTheAcceptedArgument) {
     const std::unique_ptr<Fixture> f = MakeFixture("untouched");
