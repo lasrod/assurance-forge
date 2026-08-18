@@ -779,6 +779,102 @@ TEST(ChangeSetAcceptance, AcceptingATerminologyGroupLeavesTheRestOfTheDraftApply
     EXPECT_TRUE(materialized.success) << materialized.error;
 }
 
+// A BILINGUAL contribution, accepted end to end. The shape every MCP client
+// asked for "EN + JA" produces, and the one the application refused outright.
+//
+// The proposal planner declined a non-primary-language NAME -- "a SACM name is
+// one LangString" -- three hours before the seam gained the reserved
+// `sacm.import.name` TaggedValue write that carries exactly that
+// (SACM23-LIB-002). The rationale went stale the same evening and the decline
+// stayed. With the compatibility path since removed, Accept All then refused a
+// whole 64-operation draft over one translated goal name, and said so only in a
+// status line that truncated mid-sentence.
+//
+// A person can type that same Japanese name into the inspector and it saves. An
+// agent proposing it could not get it accepted at all.
+TEST(ChangeSetAcceptance, AcceptAllPromotesATranslatedNameIntoTheSavedFile) {
+    ProjectFixture f = MakeFixture("translated_name_accept_all");
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(f.project.rootPath);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(f.sacm_abs, f.model, error)) << error;
+
+    core::drafts::DraftGroupRequest request;
+    request.title = "Restate the top goal in English and Japanese";
+    request.source = core::drafts::DraftSource::Mcp;
+    request.source_label = "claude-ai 0.1.0";
+    const std::string group = drafts.BeginGroup(request, f.model, error);
+    ASSERT_FALSE(group.empty()) << error;
+
+    // A name and a statement, each in both languages -- and a created claim that
+    // carries its translations too, because a draft that only ever edited
+    // existing elements would miss the create path into `CollectTextWrites`.
+    const nlohmann::json operations = nlohmann::json::array(
+        {nlohmann::json{{"type", "UpdateElementName"},
+                        {"element", {{"id", "G1"}}},
+                        {"new_value", "The autonomous vehicle is acceptably safe"},
+                        {"translations", {{"ja", "本自動運転車両は許容可能な安全性を有する"}}}},
+         nlohmann::json{
+             {"type", "UpdateElementText"},
+             {"element", {{"id", "G1"}}},
+             {"field", "content"},
+             {"new_value", "The vehicle is acceptably safe within the defined operating scope."},
+             {"translations", {{"ja", "本自動運転車両は、定義された運行設計領域において許容可能な安全性を有する。"}}}},
+         nlohmann::json{{"type", "CreateClaim"},
+                        {"create_ref", "$sotif"},
+                        {"text", "Unknown hazardous scenarios are sufficiently reduced."},
+                        {"translations", {{"ja", "未知の危険シナリオは十分に低減されている。"}}}},
+         nlohmann::json{{"type", "AddSupportedBy"}, {"source", {{"ref", "$sotif"}}}, {"target", {{"id", "G1"}}}}});
+    ASSERT_TRUE(drafts.StageOperations(group, ParseOperations(operations), f.model, error)) << error;
+    ASSERT_TRUE(drafts.MarkGroupReady(group, error)) << error;
+
+    const core::drafts::DraftPromotionPlan plan = core::drafts::PlanDraftPromotion(
+        *drafts.workspace(), f.model, {group}, "MCP: claude-ai 0.1.0", drafts.authoritative_identities());
+    ASSERT_TRUE(plan.ok) << plan.error;
+
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(loaded.ok);
+
+    // The preflight is where the refusal actually landed: the library declined
+    // the plan, the compatibility path was gone, and the accept failed before
+    // touching the document.
+    parser::AssuranceCase preflight_model;
+    ASSERT_TRUE(core::commands::PreflightProposalAgainstLibrary(
+        *loaded.document, plan.compiled.proposal, plan.compiled.identities, preflight_model, error))
+        << error;
+
+    std::unique_ptr<core::commands::CommandBus> bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_NE(bus, nullptr) << error;
+    core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
+    core::commands::CommandContext ctx{f.model, f.package, loaded.document.get()};
+    const core::commands::CommandResult result = bus->Execute(command, ctx, "MCP: claude-ai 0.1.0");
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(core::reviews::ComputeModelSemanticHash(sacm_adapter::project_case(*loaded.document)),
+              core::reviews::ComputeModelSemanticHash(preflight_model));
+
+    // What the user reopens. The translated name has to be in the file, not only
+    // in the document the command mutated -- it rides in a TaggedValue, which is
+    // exactly the kind of thing that looks right in memory and vanishes on load.
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(f.sacm_abs);
+    ASSERT_TRUE(reloaded.ok);
+    const parser::AssuranceCase saved = sacm_adapter::project_case(*reloaded.document);
+    const parser::SacmElement* goal = parser::FindElementById(saved, "G1");
+    ASSERT_NE(goal, nullptr);
+    EXPECT_EQ(goal->name, "The autonomous vehicle is acceptably safe");
+    ASSERT_TRUE(goal->name_langs.contains("ja")) << "the accepted Japanese name did not survive the save";
+    EXPECT_EQ(goal->name_langs.at("ja"), "本自動運転車両は許容可能な安全性を有する");
+    ASSERT_TRUE(goal->content_langs.contains("ja"));
+
+    const parser::SacmElement* created = nullptr;
+    for (const parser::SacmElement& element : saved.elements) {
+        if (element.type == "claim" && element.id != "G1")
+            created = &element;
+    }
+    ASSERT_NE(created, nullptr) << "the created sub-goal is missing from the saved file";
+    ASSERT_TRUE(created->content_langs.contains("ja")) << "a created element lost its translation";
+}
+
 // The application's Accept All, end to end, for a glossary staged over MCP into
 // a case that has never had one: draft groups -> promotion plan with compiled,
 // pinned identities -> preflight -> the audited command -> the saved file. This

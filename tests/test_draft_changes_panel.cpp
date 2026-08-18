@@ -479,3 +479,33 @@ TEST(DraftChangesPanel, AWholeDraftHeldBackIsExplainedOnceRatherThanPerRow) {
     for (const ui::panels::DraftChangeRow& row : model.rows)
         EXPECT_FALSE(row.promotable) << "nothing is acceptable while the draft is stale";
 }
+
+// A refusal outlives the frame it happened in.
+//
+// The reported defect: Accept All was pressed, the accept refused, and the user
+// was left looking at a draft that still said "1 unaccepted change" with nothing
+// on screen saying why. The reason existed -- it went to the status bar, which
+// is one line, transient, and truncated the sentence before the reason.
+TEST(DraftChangesPanel, ARefusedAcceptIsStillExplainedAfterTheStatusLineIsGone) {
+    Fixture fixture;
+    const std::string group = fixture.BeginGroup(McpRequest("Restate the top goal in English and Japanese"));
+    fixture.Stage(group, {UpdateTextOp("G1", "Clarified.")});
+    fixture.Materialize();
+
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.draft_accept_error = "the library could not express this proposal";
+    ui_state.draft_accept_error_revision = fixture.state.draft_workspace.workspace()->working_revision;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(fixture.state);
+    EXPECT_EQ(model.accept_error, "the library could not express this proposal");
+
+    // And it expires with the draft it was about. An agent staging more work
+    // moves the revision, and a stale refusal would describe work that may no
+    // longer be there -- worse than saying nothing.
+    fixture.Stage(group, {UpdateTextOp("G1", "Clarified again.")});
+    const ui::panels::DraftChangesPanelModel after = app::areas::BuildDraftChangesPanelModel(fixture.state);
+    EXPECT_TRUE(after.accept_error.empty()) << "a refusal about an older draft must not be shown against this one";
+
+    ui_state.draft_accept_error.clear();
+    ui_state.draft_accept_error_revision = 0;
+}

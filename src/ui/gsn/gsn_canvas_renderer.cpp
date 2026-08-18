@@ -69,6 +69,17 @@ static ImVec2 RectBorderToward(ImVec2 mn, ImVec2 mx, ImVec2 toward) {
     return ImVec2(c.x + dx * t, c.y + dy * t);
 }
 
+// A draft relationship badge held back until the nodes are drawn. Edges are
+// painted beneath the shapes they connect, so a badge drawn with its edge ends
+// up under the node it points at -- and an added or removed support
+// relationship is exactly the change a reviewer must not miss.
+namespace {
+struct DeferredDraftEdgeBadge {
+    ImVec2 midpoint;
+    DraftEdgeDecoration decoration;
+};
+} // namespace
+
 // ===== Zoom constants =====
 static constexpr float kZoomMin = 0.25f; // minimum zoom level (25%)
 static constexpr float kZoomMax = 3.0f;  // maximum zoom level (300%)
@@ -282,6 +293,7 @@ void GsnCanvas::Render(UiState& ui_state,
     }
 
     // Draw edges first (beneath nodes)
+    std::vector<DeferredDraftEdgeBadge> draft_edge_badges;
     {
         core::perf::ScopedTimer perf_scope_edges("gsn.edges");
         for (const auto& child_node : layout_nodes_) {
@@ -319,11 +331,9 @@ void GsnCanvas::Render(UiState& ui_state,
                 if (!ui_state.draft_edge_status.empty()) {
                     const auto draft_edge = ui_state.draft_edge_status.find(edge_key);
                     if (draft_edge != ui_state.draft_edge_status.end()) {
-                        DrawDraftEdgeDecoration(draw_list,
-                                                ImVec2((parent_side.x + attachment_edge.x) * 0.5f,
-                                                       (parent_side.y + attachment_edge.y) * 0.5f),
-                                                zoom,
-                                                draft_edge->second);
+                        draft_edge_badges.push_back({ImVec2((parent_side.x + attachment_edge.x) * 0.5f,
+                                                            (parent_side.y + attachment_edge.y) * 0.5f),
+                                                     draft_edge->second});
                     }
                 }
                 if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
@@ -373,11 +383,9 @@ void GsnCanvas::Render(UiState& ui_state,
                 if (!ui_state.draft_edge_status.empty()) {
                     const auto draft_edge = ui_state.draft_edge_status.find(edge_key);
                     if (draft_edge != ui_state.draft_edge_status.end()) {
-                        DrawDraftEdgeDecoration(
-                            draw_list,
-                            ImVec2((parent_bottom.x + child_top.x) * 0.5f, (parent_bottom.y + child_top.y) * 0.5f),
-                            zoom,
-                            draft_edge->second);
+                        draft_edge_badges.push_back(
+                            {ImVec2((parent_bottom.x + child_top.x) * 0.5f, (parent_bottom.y + child_top.y) * 0.5f),
+                             draft_edge->second});
                     }
                 }
                 if (RelationshipEdgeSelected(ui_state, acp_target, edge_key))
@@ -585,6 +593,12 @@ void GsnCanvas::Render(UiState& ui_state,
             ++frame_stats.nodes_drawn;
         }
     } // gsn.nodes
+
+    // Draft relationship badges on top of everything: their edges run between
+    // nodes and often under one, so drawing them with the edges hides the badge
+    // behind the very element the changed relationship attaches to.
+    for (const DeferredDraftEdgeBadge& badge : draft_edge_badges)
+        DrawDraftEdgeDecoration(draw_list, badge.midpoint, zoom, badge.decoration);
 
     RenderPinnedTerminologyCard(terminology_card_state_, terminology_package, actions);
     if (terminology_card_state_.pinned && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&

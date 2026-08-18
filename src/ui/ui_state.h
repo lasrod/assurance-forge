@@ -213,6 +213,20 @@ struct UiState {
     // What the draft does to the selected element, refreshed each frame.
     DraftElementDetailView draft_selected_detail;
 
+    // Why the last accept did not happen, kept until the draft moves on.
+    //
+    // A refused accept used to be reported only in the status bar, which is one
+    // line, transient, and truncates. What the user was left with was a banner
+    // still saying "1 unaccepted change" and no way to find out why -- for a
+    // 64-operation draft refused over a single translated name. The banner and
+    // the Draft Changes panel show this until the draft or the argument changes,
+    // because the question "why did nothing happen" outlives one frame.
+    std::string draft_accept_error;
+    // The workspace revision the message was recorded against. A message about a
+    // draft that has since changed is worse than none: it describes work that
+    // may no longer be there.
+    std::uint64_t draft_accept_error_revision = 0;
+
     // Which version of the argument the canvas is showing while a working draft
     // is active (ADR 0009).
     //
@@ -274,6 +288,12 @@ UiState& GetUiState();
 
 // Returns true if any element in the assurance case has a non-empty secondary language entry.
 bool ModelHasTranslations(const parser::AssuranceCase& ac, const std::string& secondary_lang = "ja");
+
+// Why the last accept refused, or empty when there is nothing to say about the
+// draft as it stands now. `workspace_revision` is the live workspace's; a
+// message recorded against an older one has been overtaken by a change to the
+// draft and is dropped rather than shown against work it no longer describes.
+const std::string& DraftAcceptError(const UiState& ui_state, std::uint64_t workspace_revision);
 
 // Marks `element_id` as having an AI review in progress; tracks the scope
 // (used for highlighting all elements involved in the run) and the primary

@@ -110,10 +110,13 @@ bool KindCanHoldText(sacm_adapter::NewElementKind kind) {
 // Collects the per-language writes that turn `before`'s text into `after`'s.
 //
 // Returns a decline reason rather than emitting a write the seam would reject.
-// SACM's name is ONE LangString (clause 8.6), so `apply_text_edit` declines a
-// non-primary-language name; planning one anyway would pass the representability
-// check and then hard-fail mid-apply, with elements already written and no way
-// back -- the exact failure planning first exists to prevent.
+// The rule is what `apply_text_edit` will actually accept, not what SACM can
+// hold in the field of that name: a translated NAME is written to the reserved
+// `sacm.import.name` TaggedValue that import already uses for the overflow and
+// the projection merges back into `name_langs` (SACM23-LIB-002). Declining it
+// here -- which this did, from three hours before the seam gained that write
+// until it was found -- refuses a whole AI-authored bilingual draft that a
+// person could type into the inspector one field at a time.
 std::string
 CollectTextWrites(const SacmElement& before, const SacmElement& after, std::vector<ProposalPlan::TextWrite>& out) {
     std::string decline_reason;
@@ -134,13 +137,6 @@ CollectTextWrites(const SacmElement& before, const SacmElement& after, std::vect
                 continue; // already covered by the scalar
             const auto found = before_langs.find(language);
             if (found == before_langs.end() || found->second != value) {
-                if (field == ElementTextField::Name) {
-                    if (decline_reason.empty()) {
-                        decline_reason = "element " + after.id + " changes its name in '" + language +
-                                         "', and a SACM name is one LangString";
-                    }
-                    continue;
-                }
                 // A term's `content` is its ExpressionElement value -- one
                 // string, no languages (clause 10.11). The seam writes it via
                 // SetExpressionValue, which has no language to take, so a

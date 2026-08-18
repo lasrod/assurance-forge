@@ -94,6 +94,11 @@ struct DraftChangesPanelModel {
     // or materialization failed. Rendered above the rows, because in that state
     // no per-row reason is the real explanation.
     std::string workspace_blocked_reason;
+    // Why the last accept refused, kept until the draft changes. A refusal that
+    // lives only in the status bar leaves a user looking at a draft that says it
+    // has unaccepted changes, an Accept button that appears to do nothing, and
+    // no way to find out which of the two is wrong.
+    std::string accept_error;
     std::string selected_group_id;
 };
 
