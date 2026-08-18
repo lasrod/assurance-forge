@@ -167,7 +167,7 @@ bool WriteTextAndTranslations(sacm_adapter::LibraryDocument& document,
         const sacm_adapter::EditOutcome translated =
             sacm_adapter::apply_text_edit(document, element_id, field, language, value);
         if (!translated.supported || !translated.applied) {
-            error = Describe(translated, "The '" + language + "' " + what + " of " + element_id + " could not be set");
+            error = Describe(translated, std::format("The '{}' {} of {} could not be set", language, what, element_id));
             return false;
         }
     }
@@ -271,7 +271,7 @@ bool Applier::ApplyCreateTerm(const PatchOperation& operation, std::string& erro
         const sacm_adapter::EditOutcome translated =
             sacm_adapter::apply_text_edit(document, new_id, sacm_adapter::TextField::Description, language, value);
         if (!translated.supported || !translated.applied) {
-            error = Describe(translated, "The '" + language + "' definition of " + new_id + " could not be set");
+            error = Describe(translated, std::format("The '{}' definition of {} could not be set", language, new_id));
             return false;
         }
     }
@@ -603,8 +603,10 @@ bool Applier::ApplyRemoveRelationship(const PatchOperation& operation, const std
         // link between two elements, and deleting it would withdraw support the
         // caller never mentioned.
         if (element.source_refs.size() > 1) {
-            error = "The link from " + source_id + " to " + target_id + " is part of a relationship that also " +
-                    "supports other elements, and removing one of its ends is not expressible yet.";
+            error = std::format("The link from {} to {} is part of a relationship that also supports other "
+                                "elements, and removing one of its ends is not expressible yet.",
+                                source_id,
+                                target_id);
             return false;
         }
         const sacm_adapter::DeleteOutcome removed = sacm_adapter::apply_delete_element(document, element.id);
