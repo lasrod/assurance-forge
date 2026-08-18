@@ -962,6 +962,8 @@ TRANSLATIONS = {
         "プロジェクトを保存しました: {0}",
     "Warning: could not read the draft for this argument: {0}":
         "警告: この議論のドラフトを読み込めませんでした: {0}",
+    "Warning: could not read the working draft for this argument: {0}":
+        "警告: この議論の作業ドラフトを読み込めませんでした: {0}",
     "Discarded proposal draft.":
         "提案ドラフトを破棄しました。",
     "Select an element before changing manual review status.":

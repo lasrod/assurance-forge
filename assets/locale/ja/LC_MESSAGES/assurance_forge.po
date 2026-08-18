@@ -2374,6 +2374,9 @@ msgstr "警告"
 msgid "Warning: could not read the draft for this argument: {0}"
 msgstr "警告: この議論のドラフトを読み込めませんでした: {0}"
 
+msgid "Warning: could not read the working draft for this argument: {0}"
+msgstr "警告: この議論の作業ドラフトを読み込めませんでした: {0}"
+
 msgid "Warnings"
 msgstr "警告"
 

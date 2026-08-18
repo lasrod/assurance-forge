@@ -9,6 +9,8 @@ add_library(af_core OBJECT
     changesets/change_set_store.cpp
     drafts/draft_change_index.cpp
     drafts/draft_document_diff.cpp
+    drafts/draft_document_store.cpp
+    drafts/draft_operation_apply.cpp
     drafts/draft_materializer.cpp
     drafts/draft_dependency_graph.cpp
     drafts/draft_persistence.cpp
