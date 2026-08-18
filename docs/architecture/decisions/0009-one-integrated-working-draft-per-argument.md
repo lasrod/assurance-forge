@@ -3,6 +3,11 @@
 - Status: Accepted
 - Date: 2026-08-02
 - Deciders: Assurance Forge maintainers
+- **Superseded in part by [ADR 0016](0016-the-draft-is-a-sacm-document.md):** the
+  change vocabulary, the materialization mechanism and the
+  working/presentation snapshot design are replaced by a draft that is itself a
+  SACM document. The consent, ownership, one-draft-per-argument and
+  no-AI-promotion decisions below stand.
 - Supersedes in part: ADR 0007's "its only write surface is `ReviewProposal`
   drafts" scope statement
 - Supersedes in part: ADR 0008's representation of agent work as independent
