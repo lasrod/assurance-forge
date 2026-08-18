@@ -27,8 +27,10 @@ flowchart TD
 | `*_controller` | Orchestrates UI actions and core services. |
 | `guideline_catalog` | SCCG guideline data used by review workflows and AI prompts. |
 | `ai_*` | AI settings, secret storage, HTTP client, provider, service, and task runner. |
-| `current_tree` | Derived hierarchy built from `app_state.loaded_case`. |
+| `current_tree` | Derived hierarchy built from the working argument (accepted case plus active draft groups). |
 | `tree_needs_rebuild` | Marks `current_tree` stale after model changes. |
+| `draft_workspace` | The integrated working draft for the open argument: ordered change groups awaiting promotion (ADR 0009, 0010). |
+| `draft_canvas_view` + stamp | The argument the canvas draws this frame, published once per frame together with the revisions and view mode it was built from. See [Frame Ordering and Draft Views](frame-and-draft-views.md). |
 | layout ratios | Runtime layout sizes for side panels and bottom panel. These are not persisted in the current code. |
 
 `core::AppState` owns the loaded data:
@@ -46,18 +48,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[RenderFrame] --> B[Poll async work]
-    B --> C[Process menus and modal requests]
-    C --> D{tree_needs_rebuild?}
-    D -- yes --> E[Build core::AssuranceTree from parser model]
-    D -- no --> F[Keep current tree]
-    E --> G[Render left panels]
-    F --> G
-    G --> H[Render center tabs]
-    H --> I[Render problems panel]
-    I --> J[Render right panels]
-    J --> K[Render modals]
+    A[RenderFrame] --> B[Menu bar, shortcuts, change detectors]
+    B --> C[Agent bridge poll]
+    C --> D[Sync draft workspace, publish draft_canvas_view + stamp]
+    D --> E{tree_needs_rebuild?}
+    E -- yes --> F[Rebuild derived views from the working argument]
+    E -- no --> G[Keep current views]
+    F --> H[AI review poll, proposal preview, problems]
+    G --> H
+    H --> I[Render panels: explorer, navigator, workbench, dock, inspector]
+    I --> J[Status bar and modal host]
 ```
+
+The ordering within a frame is load-bearing: the agent bridge runs before the
+draft view is published, the publish runs before any panel renders, and user
+input mutates state mid-render — visible at the next frame's publish. The full
+timeline, the published-view contract, and the rules for canvas caches are in
+[Frame Ordering and Draft Views](frame-and-draft-views.md).
 
 ## Event Bus
 

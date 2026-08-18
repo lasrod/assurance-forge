@@ -80,6 +80,8 @@ nav:
       - Layers and Ownership: architecture/layers-and-ownership.md
       - Legacy Bridge Migration Plan: architecture/legacy-bridge-migration-plan.md
       - Runtime and State: architecture/runtime-state.md
+      - Frame Ordering and Draft Views: architecture/frame-and-draft-views.md
+      - Promotable by Construction: architecture/promotable-by-construction.md
       - Parser and SACM: architecture/parser-sacm.md
       - App Shell and UI Areas: architecture/app-shell.md
       - UI Panels: architecture/ui-panels.md

@@ -139,6 +139,62 @@ TEST(ReviewProposalPatchServiceTest, AppliesUpdateElementText) {
     EXPECT_EQ(FindElement(model, "G1")->content, "Updated claim content");
 }
 
+// The two halves of one rule: an element's text lives in exactly one field,
+// decided by its kind (core::ClaimLikeCarriesStatementAsDescription). Naming the
+// other field is refused HERE, while the operation is being staged, because the
+// promotion seam cannot write it either -- and a refusal that waits until
+// promotion produces a draft the user can see, cannot accept, and cannot fix.
+//
+// Only the claim half was guarded. An MCP client followed the tool schema's
+// "e.g. \"content\"" onto a context, staged it, watched it appear in the working
+// draft, and then could never accept it: `apply_text_edit` maps Content to a
+// Description only for Claim and ArgumentReasoning, so promotion failed with
+// "writing text on C2 failed" and no way forward.
+TEST(ReviewProposalPatchServiceTest, RefusesContentOnAnElementWhoseTextIsItsDescription) {
+    parser::AssuranceCase model = MakeModel();
+    parser::SacmElement context = Element("C1", "artifactreference", "System boundary");
+    context.description = "The case covers the motor and the jar.";
+    model.elements.push_back(context);
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"C1", std::nullopt};
+    update.field = "content";
+    update.new_value = "The case covers the motor, the jar and the lid.";
+    proposal.operations.push_back(update);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_FALSE(result.success) << "staging must refuse a field the promotion seam cannot write";
+    EXPECT_NE(result.error.find("description"), std::string::npos)
+        << "the refusal must name the field to use instead, not only the one refused: " << result.error;
+    ASSERT_NE(FindElement(model, "C1"), nullptr);
+    EXPECT_TRUE(FindElement(model, "C1")->content.empty()) << "a refused operation must leave the element untouched";
+}
+
+TEST(ReviewProposalPatchServiceTest, RefusesDescriptionOnAClaimWhoseDescriptionIsItsStatement) {
+    parser::AssuranceCase model = MakeModel();
+    core::reviews::ReviewProposal proposal = ProposalFor(model);
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{"G1", std::nullopt};
+    update.field = "description";
+    update.new_value = "A note beside the claim.";
+    proposal.operations.push_back(update);
+
+    core::reviews::ReviewProposalPatchService service;
+    core::reviews::ApplyProposalResult result = service.ApplyProposal(proposal, model);
+
+    ASSERT_FALSE(result.success) << "a claim carries one description and it is the statement (ADR 0012)";
+    EXPECT_NE(result.error.find("content"), std::string::npos)
+        << "the refusal must name the field to use instead: " << result.error;
+    EXPECT_EQ(FindElement(model, "G1")->content, "Original content");
+    EXPECT_TRUE(FindElement(model, "G1")->description.empty());
+}
+
 TEST(ReviewProposalPatchServiceTest, BuildsPreviewWithExistingElementEditWithoutMutatingCurrentModel) {
     parser::AssuranceCase model = MakeModel();
     core::reviews::ReviewProposal proposal = ProposalFor(model);
