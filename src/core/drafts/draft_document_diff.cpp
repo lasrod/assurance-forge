@@ -129,8 +129,13 @@ DraftDocumentDiff DiffAcceptedAgainstDraft(const core::AssuranceCase& accepted, 
         DraftDocumentChange change;
         change.element_id = element.id;
         change.change = DraftElementChange::Removed;
-        by_id.emplace(element.id, std::move(change));
-        diff.removed.push_back(element);
+        // Appended only when this id was actually recorded, so the two halves of
+        // a removal cannot disagree. `removed_count` is derived from the map
+        // below, which takes the first occurrence of a duplicate id the way
+        // `IndexById` does; pushing unconditionally would report one removal and
+        // hand the renderer two elements to draw.
+        if (by_id.emplace(element.id, std::move(change)).second)
+            diff.removed.push_back(element);
     }
 
     diff.changes.reserve(by_id.size());

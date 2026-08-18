@@ -148,6 +148,26 @@ TEST(DraftDocumentDiffTest, ARemovedElementIsReportedAndCarriedInFull) {
         << "the removed element must arrive intact, not as a bare id";
 }
 
+// A malformed accepted document must not produce a diff that contradicts
+// itself. `removed_count` is derived from the per-id change map, which takes the
+// first occurrence of a duplicate id, so the removal list has to follow the same
+// rule -- otherwise a panel reports one removal and lists two, and a renderer
+// iterating the list draws a tombstone the count says is not there.
+TEST(DraftDocumentDiffTest, ADuplicateAcceptedIdKeepsTheRemovalListAndItsCountAgreeing) {
+    core::AssuranceCase accepted = AcceptedCase();
+    accepted.elements.push_back(Claim("G2", "A second element wearing an id that is already taken."));
+
+    core::AssuranceCase draft = accepted;
+    std::erase_if(draft.elements, [](const core::SacmElement& element) { return element.id == "G2"; });
+
+    const core::drafts::DraftDocumentDiff diff = core::drafts::DiffAcceptedAgainstDraft(accepted, draft);
+
+    EXPECT_EQ(diff.removed_count, 1);
+    ASSERT_EQ(diff.removed.size(), 1u)
+        << "the removal list and the count it is reported by must describe the same removals";
+    EXPECT_EQ(diff.removed.front().content, "Blade hazards are controlled.") << "first wins, as everywhere else";
+}
+
 // A relationship is an element like any other here. Under the operation-based
 // design a text or endpoint change targeting a relationship id was silently
 // dropped by the planner -- accept reported success and the change was absent
