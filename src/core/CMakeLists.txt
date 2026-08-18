@@ -1,4 +1,4 @@
-add_library(af_core OBJECT
+﻿add_library(af_core OBJECT
     acp/acp_editing.cpp
     acp/acp_relationship_index.cpp
     acp/assurance_claim_point.cpp
@@ -9,6 +9,7 @@ add_library(af_core OBJECT
     changesets/change_set_store.cpp
     drafts/draft_change_index.cpp
     drafts/draft_document_diff.cpp
+    drafts/draft_document_store.cpp
     drafts/draft_materializer.cpp
     drafts/draft_dependency_graph.cpp
     drafts/draft_persistence.cpp

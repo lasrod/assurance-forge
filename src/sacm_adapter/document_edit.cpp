@@ -2444,6 +2444,64 @@ EditOutcome apply_remove_acp_tags(LibraryDocument& document, const std::string& 
     return outcome;
 }
 
+EditOutcome apply_set_tagged_value(LibraryDocument& document,
+                                   const std::string& element_id,
+                                   const std::string& key,
+                                   const std::string& value,
+                                   const std::string& language) {
+    if (element_id.empty() || key.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(element_id);
+    if (doc.find_as<sacm::model::ModelElement>(id) == nullptr) {
+        return EditOutcome{.supported = false};
+    }
+    return applied_outcome(doc.apply(sacm::commands::SetTaggedValue{
+        .element = id,
+        .key = key,
+        .value = value,
+        .language = language,
+    }));
+}
+
+EditOutcome apply_remove_tagged_values_with_prefix(LibraryDocument& document, const std::string& key_prefix) {
+    if (key_prefix.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+
+    // Every target is collected before the first delete. Removing a tag mutates
+    // the element's tag list, and deleting from a list while walking it is how a
+    // strip silently skips half of what it was asked to remove -- which here
+    // would leave draft provenance in an accepted safety case.
+    std::vector<sacm::model::ElementId> targets;
+    doc.for_each_element([&targets, &key_prefix](const sacm::model::SACMElement& element) {
+        const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+        if (model_element == nullptr) {
+            return;
+        }
+        for (const auto& tag : model_element->tagged_values()) {
+            const std::string_view key = tag->key().primary();
+            if (key.size() >= key_prefix.size() && key.compare(0, key_prefix.size(), key_prefix) == 0) {
+                targets.push_back(tag->id());
+            }
+        }
+    });
+
+    EditOutcome outcome;
+    outcome.applied = true;
+    for (const sacm::model::ElementId& id : targets) {
+        const sacm::commands::MutationResult removed = doc.apply(sacm::commands::DeleteElement{.target = id});
+        fill_diagnostics(outcome.diagnostics, removed);
+        if (!removed.applied) {
+            outcome.applied = false;
+            return outcome;
+        }
+    }
+    return outcome;
+}
+
 EditOutcome apply_set_meta_claims(LibraryDocument& document,
                                   const std::string& element_id,
                                   const std::vector<std::string>& meta_claim_ids) {

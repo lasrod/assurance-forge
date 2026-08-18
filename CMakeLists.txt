@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+﻿cmake_minimum_required(VERSION 3.21)
 project(assurance-forge LANGUAGES C CXX)
 
 if(APPLE)
@@ -338,7 +338,7 @@ af_copy_sccg_data(assurance-forge)
 # A headless companion binary an MCP client launches, speaking JSON-RPC 2.0 over
 # stdin/stdout. Deliberately a plain add_executable rather than
 # hello_imgui_add_app: it has no window, no event loop, and must not drag in the
-# GUI runtime. It links no af_ui and no af_ai — the layer gate forbids `mcp/`
+# GUI runtime. It links no af_ui and no af_ai â€” the layer gate forbids `mcp/`
 # from including either, which is what keeps the MCP server and the in-app AI
 # review from growing a shared inference path (docs/features/mcp-server.md).
 add_executable(assurance-forge-mcp src/mcp/main.cpp)
@@ -492,6 +492,7 @@ add_executable(tests
     tests/test_change_sets.cpp
     tests/test_draft_changes_panel.cpp
     tests/test_draft_document_diff.cpp
+    tests/test_draft_document_store.cpp
     tests/test_draft_workspace.cpp
     tests/test_draft_materialization_cost.cpp
     tests/test_draft_example_project.cpp

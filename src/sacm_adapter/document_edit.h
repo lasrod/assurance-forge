@@ -271,6 +271,41 @@ EditOutcome apply_upsert_acp_tags(LibraryDocument& document, const std::string& 
 // the element carries none -- nothing to do is not a failure.
 EditOutcome apply_remove_acp_tags(LibraryDocument& document, const std::string& element_id, const std::string& acp_id);
 
+// Set the vendor TaggedValue `key` on `element_id` to `value` (clause 8.12),
+// replacing any existing tag under the same key.
+//
+// The general writer behind conventions that are Assurance Forge's rather than
+// SACM's. Draft provenance uses it (ADR 0016): who proposed a change is recorded
+// on the element they touched, so it travels with the argument instead of in an
+// index beside it that can disagree.
+//
+// An UPSERT, because `SetTaggedValue` replaces where `AddTaggedValue` always
+// creates -- and two tags under one key means the reader keeps the first and the
+// second edit silently disappears on load.
+EditOutcome apply_set_tagged_value(LibraryDocument& document,
+                                   const std::string& element_id,
+                                   const std::string& key,
+                                   const std::string& value,
+                                   const std::string& language = {});
+
+// Drop every TaggedValue in the document whose key begins with `key_prefix`,
+// wherever it sits.
+//
+// This is how a draft's provenance leaves the argument on the way to being
+// accepted (ADR 0016). A draft records who proposed each change as
+// `assuranceForge.draft.*` tags on the elements they touched; the accepted file
+// must carry the argument and not the record of who was still proposing it, so
+// accept strips them as it produces the accepted document.
+//
+// Document-wide rather than per element because the caller is answering "no
+// draft provenance survives this", and an element-at-a-time strip leaves that
+// claim resting on the caller having enumerated every element correctly.
+//
+// Reports `applied == true` when there was nothing to remove: the postcondition
+// is "no tag with this prefix remains", and a document that already satisfies it
+// has not failed.
+EditOutcome apply_remove_tagged_values_with_prefix(LibraryDocument& document, const std::string& key_prefix);
+
 // Replace an Assertion's clause-11.6 meta-claims. An ACP on a RELATIONSHIP is
 // carried partly by `metaClaim` and not only by vendor tags, so retracting or
 // re-resolving one has to rewrite this list; `SetMetaClaims` is the library
