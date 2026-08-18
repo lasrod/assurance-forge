@@ -5,6 +5,7 @@
 #include "sacm_adapter/document_edit.h"
 
 #include <algorithm>
+#include <format>
 #include <optional>
 #include <unordered_set>
 #include <utility>
@@ -114,7 +115,7 @@ bool ResolveRef(const std::optional<reviews::ElementRef>& ref,
                 std::string& out,
                 std::string& error) {
     if (!ref.has_value()) {
-        error = std::string("This operation needs a ") + role + ".";
+        error = std::format("This operation needs a {}.", role);
         return false;
     }
     if (ref->existing_id.has_value() && !ref->existing_id->empty()) {
@@ -132,7 +133,7 @@ bool ResolveRef(const std::optional<reviews::ElementRef>& ref,
         out = found->second;
         return true;
     }
-    error = std::string("The ") + role + " must name an existing element by id, or a create_ref this batch creates.";
+    error = std::format("The {} must name an existing element by id, or a create_ref this batch creates.", role);
     return false;
 }
 
@@ -157,7 +158,7 @@ bool WriteTextAndTranslations(sacm_adapter::LibraryDocument& document,
     const sacm_adapter::EditOutcome written =
         sacm_adapter::apply_text_edit(document, element_id, field, reviews::kPatchPrimaryLanguage, primary);
     if (!written.supported || !written.applied) {
-        error = Describe(written, std::string("The ") + what + " of " + element_id + " could not be set");
+        error = Describe(written, std::format("The {} of {} could not be set", what, element_id));
         return false;
     }
     for (const auto& [language, value] : translations) {
