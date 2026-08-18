@@ -84,11 +84,17 @@ public:
 
     // Deletes the draft and forgets it.
     //
-    // Always available, and succeeds when there is nothing to delete. ADR 0016
-    // requires this without exception: a state offering neither accept, nor
-    // edit, nor discard is the trap the previous design could reach, and the
-    // only exit from it was hand-editing a file.
-    bool Discard(std::string& error);
+    // Returns nothing, and that is the point. ADR 0016 requires discard to be
+    // available in every state without exception -- a state offering neither
+    // accept, nor edit, nor discard is the trap the previous design could reach,
+    // and the only exit from it was hand-editing a file. A `bool` invites a
+    // caller to treat discard as refusable and leave the draft applied to
+    // everything the user is looking at, so there is no `bool` to misread.
+    //
+    // `out_warning` describes a leftover the user may want to know about -- a
+    // file that would not delete -- but the draft is gone from this session
+    // either way. It is a note, not a failure.
+    void Discard(std::string& out_warning);
 
     // Writes the draft to `accepted_path` as the accepted argument, strips the
     // draft provenance on the way, and discards the draft.

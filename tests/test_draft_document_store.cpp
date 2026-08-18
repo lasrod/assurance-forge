@@ -186,8 +186,11 @@ TEST(DraftDocumentStoreTest, ReopeningRestoresTheDraftRatherThanRederivingIt) {
         core::drafts::DiffAcceptedAgainstDraft(sacm_adapter::project_case(*accepted), projection);
     EXPECT_EQ(diff.modified_count, 1) << "the unaccepted edit must survive a reopen";
     for (const core::SacmElement& element : projection.elements) {
-        if (element.id == claim_id)
+        // Braced: a gtest assertion expands to an if/else, so a braceless `if`
+        // around one is a dangling else that GCC rejects under -Werror.
+        if (element.id == claim_id) {
             EXPECT_EQ(element.content, "Survives a restart.");
+        }
     }
 }
 
@@ -276,7 +279,8 @@ TEST(DraftDocumentStoreTest, DiscardIsAvailableAndLeavesTheAcceptedArgumentUntou
     ASSERT_TRUE(store.Save(error)) << error;
     const std::filesystem::path draft_path = store.path();
 
-    ASSERT_TRUE(store.Discard(error)) << error;
+    store.Discard(error);
+    EXPECT_TRUE(error.empty()) << error;
     EXPECT_FALSE(store.active());
     EXPECT_FALSE(std::filesystem::exists(draft_path));
     EXPECT_EQ(ReadFile(argument), before) << "a discarded draft leaves the accepted file byte-identical";
@@ -293,8 +297,35 @@ TEST(DraftDocumentStoreTest, DiscardingWhenThereIsNothingToDiscardSucceeds) {
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
 
     // Never saved, so there is no file behind it.
-    EXPECT_TRUE(store.Discard(error)) << error;
+    store.Discard(error);
+    EXPECT_TRUE(error.empty()) << error;
     EXPECT_FALSE(store.active());
+}
+
+// Discard reports no outcome to test, which is the guarantee: there is no `bool`
+// for a caller to read as "the draft is still there". A leftover file comes back
+// as a note, and the draft is gone from the session regardless.
+TEST(DraftDocumentStoreTest, DiscardDropsTheDraftEvenWhenTheFileCannotBeDeleted) {
+    const TempDir root = MakeTempDir("discardlocked");
+    const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
+    const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
+    ASSERT_NE(accepted, nullptr);
+
+    core::drafts::DraftDocumentStore store;
+    std::string error;
+    ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.Save(error)) << error;
+    const std::filesystem::path draft_path = store.path();
+
+    // Standing in for a file that will not delete: a directory where the draft
+    // file was. `remove` refuses a non-empty directory on every platform, which
+    // is the failure this asserts we survive rather than a contrived one.
+    std::filesystem::remove(draft_path);
+    std::filesystem::create_directories(draft_path / "occupied");
+
+    store.Discard(error);
+    EXPECT_FALSE(error.empty()) << "the leftover has to be reported to somebody";
+    EXPECT_FALSE(store.active()) << "but the draft is gone from this session either way";
 }
 
 // Two arguments in one project legitimately reuse ids such as `G1`. Their drafts

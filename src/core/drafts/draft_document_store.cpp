@@ -157,16 +157,17 @@ bool DraftDocumentStore::Save(std::string& error) {
     return true;
 }
 
-bool DraftDocumentStore::Discard(std::string& error) {
-    error.clear();
+void DraftDocumentStore::Discard(std::string& out_warning) {
+    out_warning.clear();
     std::error_code remove_error;
     if (!impl_->path.empty()) {
         std::filesystem::remove(impl_->path, remove_error);
         if (remove_error) {
-            // Reported, but the in-memory draft is dropped regardless. A file
-            // that will not delete must not be able to hold the user in a state
-            // where the draft is still applied to everything they look at.
-            error = "The working draft file could not be deleted: " + remove_error.message();
+            // Noted, not failed. The in-memory draft is dropped regardless: a
+            // file that will not delete must not be able to hold the user in a
+            // state where the draft is still applied to everything they look at.
+            out_warning =
+                "The working draft was discarded, but its file could not be deleted: " + remove_error.message();
         }
         // The per-argument directory goes too when it is empty, so a project
         // does not accumulate a directory per argument anyone ever drafted
@@ -176,7 +177,6 @@ bool DraftDocumentStore::Discard(std::string& error) {
         std::filesystem::remove(impl_->path.parent_path(), directory_error);
     }
     Close();
-    return error.empty();
 }
 
 bool DraftDocumentStore::AcceptInto(const std::filesystem::path& accepted_path, std::string& error) {

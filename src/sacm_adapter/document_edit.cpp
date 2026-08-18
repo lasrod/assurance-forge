@@ -2455,7 +2455,12 @@ EditOutcome apply_set_tagged_value(LibraryDocument& document,
     sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
     const sacm::model::ElementId id(element_id);
     if (doc.find_as<sacm::model::ModelElement>(id) == nullptr) {
-        return EditOutcome{.supported = false};
+        // REFUSED, not unsupported. In this seam `supported == false` means "no
+        // library mapping yet, keep the caller's other path authoritative" -- so
+        // reporting it for an id that does not resolve would tell a caller the
+        // operation is unimplemented when in fact it named something that is not
+        // there, and would hand back no diagnostic to say which.
+        return refused_outcome("SACM-CMD-002", "'" + element_id + "' is not an element that can carry a tagged value");
     }
     return applied_outcome(doc.apply(sacm::commands::SetTaggedValue{
         .element = id,
