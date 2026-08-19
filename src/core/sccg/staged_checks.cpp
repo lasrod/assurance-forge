@@ -4,6 +4,7 @@
 #include "core/problems/argument_cycles.h"
 
 #include <algorithm>
+#include <format>
 #include <cctype>
 #include <set>
 #include <string>
@@ -85,6 +86,11 @@ constexpr Guideline kEvidenceControl{
     "check-evidence-control-attributes",
     "Evidence cited in the safety case should be under configuration or document control, with "
     "clear ownership, version or revision, date, status, and a stable retrieval location."};
+constexpr Guideline kEvidenceCitationPrecision{
+    "EV.4",
+    "check-evidence-citation-precision",
+    "Reference the exact section, figure, table, dataset, or artifact portion that supports the "
+    "claim when practical."};
 constexpr Guideline kEvidenceFixed{
     "EV.8",
     "check-evidence-state-fixed",
@@ -136,6 +142,28 @@ const std::vector<std::string>& ReasoningConnectives() {
 const std::vector<std::string>& PromotionalWords() {
     static const std::vector<std::string> words{"world-class", "cutting-edge", "outstanding", "best-in-class"};
     return words;
+}
+
+// EV.4: any of these reads as a citation pointing inside an artifact rather
+// than at the whole of it. Taken from the guideline's statement ("section,
+// figure, table, dataset, or artifact portion") and the words its own good
+// example uses to do the pointing.
+const std::vector<std::string>& CitationLocators() {
+    static const std::vector<std::string> locators{"section",
+                                                   "figure",
+                                                   "table",
+                                                   "dataset",
+                                                   "clause",
+                                                   "appendix",
+                                                   "chapter",
+                                                   "annex",
+                                                   "page",
+                                                   "scenario",
+                                                   "scenarios",
+                                                   "test",
+                                                   "case",
+                                                   "req"};
+    return locators;
 }
 
 // EV.7: any of these reads as the evidence being under document control. The
@@ -226,7 +254,7 @@ bool FindConjunctionPair(const std::string& haystack_lower,
             if (left == right) {
                 continue;
             }
-            if (ContainsWord(haystack_lower, left + " and " + right)) {
+            if (ContainsWord(haystack_lower, std::format("{} and {}", left, right))) {
                 first = left;
                 second = right;
                 return true;
@@ -238,6 +266,31 @@ bool FindConjunctionPair(const std::string& haystack_lower,
 
 // A four-digit year with non-digit boundaries. EV.7's good example carries its
 // date as "approved 2026-03-14"; the year alone is the robust part to detect.
+// A dotted number -- "6.3", "12.4.1" -- points inside an artifact just as well
+// as the word "section" does, and a citation carrying one has already answered
+// EV.4. A version ("rev 1.2") reads the same way and so silences the check:
+// that is the safe direction to be wrong in, because a false complaint about a
+// citation that is in fact precise is what teaches a reviewer to ignore
+// findings.
+bool ContainsSectionNumber(const std::string& text) {
+    for (std::size_t at = 0; at + 2 < text.size(); ++at) {
+        if (std::isdigit(static_cast<unsigned char>(text[at])) == 0) {
+            continue;
+        }
+        std::size_t digits_end = at;
+        while (digits_end < text.size() && std::isdigit(static_cast<unsigned char>(text[digits_end])) != 0) {
+            ++digits_end;
+        }
+        const bool dotted = digits_end + 1 < text.size() && text[digits_end] == '.' &&
+                            std::isdigit(static_cast<unsigned char>(text[digits_end + 1])) != 0;
+        if (dotted) {
+            return true;
+        }
+        at = digits_end;
+    }
+    return false;
+}
+
 bool ContainsYear(const std::string& text) {
     for (std::size_t at = 0; at + 4 <= text.size(); ++at) {
         const bool starts_19_or_20 = (text.compare(at, 2, "19") == 0 || text.compare(at, 2, "20") == 0);
@@ -449,9 +502,11 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             if (FindConjunctionPair(text, PropertyWords(), first, second)) {
                 Add(findings,
                     kSingleProperty,
-                    "This claim joins \"" + first + " and " + second +
-                        "\" -- two distinct properties needing different evidence and review. Give "
-                        "each its own goal, so one can fail without hiding the other.",
+                    std::format("This claim joins \"{} and {}\" -- two distinct properties needing "
+                                "different evidence and review. Give each its own goal, so one can "
+                                "fail without hiding the other.",
+                                first,
+                                second),
                     id,
                     FindingSeverity::Advisory,
                     {first, second});
@@ -461,9 +516,11 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             if (FindConjunctionPair(text, StepVerbs(), first, second)) {
                 Add(findings,
                     kStepMixing,
-                    "This claim chains \"" + first + " and " + second +
-                        "\" -- different logical steps answering different review questions. Give "
-                        "each step its own claim, and let the structure show the decomposition.",
+                    std::format("This claim chains \"{} and {}\" -- different logical steps answering "
+                                "different review questions. Give each step its own claim, and let "
+                                "the structure show the decomposition.",
+                                first,
+                                second),
                     id,
                     FindingSeverity::Advisory,
                     {first, second});
@@ -522,6 +579,20 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
                     "This evidence reference carries no owner, version, date, or status, so a "
                     "reviewer cannot tell which artifact was assessed or whether it has changed "
                     "since. Cite the controlled version.",
+                    id,
+                    FindingSeverity::Advisory);
+            }
+
+            // EV.4: a whole-artifact citation with nothing pointing inside it.
+            // Deliberately silent when the reference carries a section number in
+            // any form -- "6.3", "§6" -- because the guideline asks for the
+            // portion to be identified, not for a particular word to appear.
+            if (FirstWordIn(text, CitationLocators()).empty() && !ContainsSectionNumber(text)) {
+                Add(findings,
+                    kEvidenceCitationPrecision,
+                    "This evidence names an artifact but no part of it, so a reviewer cannot find "
+                    "the material that supports the claim. Cite the section, table, figure or "
+                    "scenarios the argument rests on.",
                     id,
                     FindingSeverity::Advisory);
             }

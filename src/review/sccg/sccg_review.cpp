@@ -85,6 +85,26 @@ nlohmann::json UnavailableDataPackagesToJson(const AiReviewDataPackageBundle* da
     return packages;
 }
 
+nlohmann::json PrecheckResultsToJson(const std::vector<review::sccg::PrecheckResult>* precheck_results) {
+    nlohmann::json results = nlohmann::json::array();
+    if (!precheck_results)
+        return results;
+    for (const review::sccg::PrecheckResult& result : *precheck_results) {
+        nlohmann::json entry{
+            {"precheck_id", result.precheck_id},
+            {"display_name", result.display_name},
+            {"related_guideline_ids", StringVectorToJson(result.guideline_ids)},
+            {"result_type", result.result_type},
+            {"interpretation", result.interpretation},
+            {"status", result.unavailable ? "not_run" : (result.candidate ? "candidate" : "clear")},
+        };
+        if (!result.detail.empty())
+            entry["detail"] = result.detail;
+        results.push_back(std::move(entry));
+    }
+    return results;
+}
+
 nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) {
     if (!review_profile)
         return nlohmann::json(nullptr);
@@ -585,7 +605,8 @@ AiReviewRequestArtifacts
 BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const std::vector<const parser::Guideline*>& guidelines_to_review,
                               const parser::ReviewProfile* review_profile,
-                              const AiReviewDataPackageBundle* data_packages) {
+                              const AiReviewDataPackageBundle* data_packages,
+                              const std::vector<review::sccg::PrecheckResult>* precheck_results) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
     nlohmann::json parent = payload.parent.transform([](const AiReviewElement& p) { return ReviewElementToJson(p); })
                                 .value_or(nlohmann::json(nullptr));
@@ -600,6 +621,7 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
 
     AiReviewRequestArtifacts artifacts;
     artifacts.systemInstruction = kAiReviewSystemInstruction;
+    artifacts.precheckResultsJson = PrecheckResultsToJson(precheck_results).dump(2);
     artifacts.selectedElementJson = selected.dump(2);
     artifacts.parentElementJson = parent.dump(2);
     artifacts.childElementsJson = children.dump(2);
@@ -620,6 +642,9 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         "IDs.\n\n"
         "Review only the selected element. Use related elements and data packages only as context.\n\n"
         "Do not invent missing project information.\n"
+        "Pre-check results are candidate signals a tool decided mechanically, not findings. Observe each "
+        "one's stated interpretation: a candidate still needs your judgement, and a check reported not_run "
+        "was never performed, which is not the same as passing.\n"
         "Treat unavailable data packages as unavailable; do not assume their contents.\n"
         "Do not claim that a rule is violated unless the provided data supports that finding.\n"
         "If there is no clear violation, return an empty findings array.\n"
@@ -627,6 +652,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         "## SCCG review profile{}\n\n"
         "{}\n\n"
         "## SCCG rules\n\n"
+        "{}\n\n"
+        "## Deterministic pre-check results\n\n"
         "{}\n\n"
         "## Available data packages\n\n"
         "{}\n\n"
@@ -643,6 +670,7 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         review_profile_heading,
         artifacts.reviewProfileJson,
         artifacts.guidelinesJson,
+        artifacts.precheckResultsJson,
         artifacts.availableDataPackagesJson,
         artifacts.unavailableDataPackagesJson,
         artifacts.selectedElementJson,

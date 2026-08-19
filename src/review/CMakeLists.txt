@@ -2,6 +2,7 @@ add_library(af_review OBJECT
     sccg/sccg_review.cpp
     sccg/sccg_profile_selector.cpp
     sccg/suggestion_mapping.cpp
+    sccg/sccg_prechecks.cpp
 )
 # The review layer owns review methods: what to review, which SCCG profile
 # applies, what data is packaged, how the request is worded, and how a result

@@ -908,6 +908,11 @@ TRANSLATIONS = {
         "このエビデンス参照には所有者・バージョン・日付・ステータスのいずれもないため、レビュー担当者は"
         "どの成果物が評価されたのか、その後変更されていないかを判断できません。管理されたバージョンを"
         "引用してください。",
+    "This evidence names an artifact but no part of it, so a reviewer cannot find the material "
+    "that supports the claim. Cite the section, table, figure or scenarios the argument rests on.":
+        "このエビデンスは成果物を示していますが、その一部を特定していないため、レビュー担当者は主張を"
+        "支持する箇所を見つけられません。議論が依拠するセクション、表、図、またはシナリオを引用して"
+        "ください。",
     "This evidence cites \"{0}\", which reads as live mutable content. Cite a fixed version, "
     "revision, or archived snapshot, so the reviewed argument always refers to the same content.":
         "このエビデンスは「{0}」を引用しており、これは変更されうるライブコンテンツと読めます。レビューされた"

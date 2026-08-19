@@ -328,8 +328,13 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
+    // Step 4 of the SCCG review workflow, which had never run: deterministic
+    // pre-checks, decided before the model is asked for judgement.
+    const std::vector<review::sccg::PrecheckResult> precheck_results =
+        review::sccg::RunPrechecks(guideline_catalog.document, *assurance_case, current_tree, selected_element_id);
+
     pending_review_ = review::BuildAiReviewRequestArtifacts(
-        payload, guideline_selection.guidelines, guideline_selection.review_profile, &data_packages);
+        payload, guideline_selection.guidelines, guideline_selection.review_profile, &data_packages, &precheck_results);
     pending_review_element_id_ = payload.selected.id;
     pending_review_element_type_ = payload.selected.type;
     pending_review_profile_id_ =
