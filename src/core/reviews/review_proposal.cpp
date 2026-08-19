@@ -199,7 +199,12 @@ bool ParseElementRef(const nlohmann::json& source,
                      std::string& error) {
     const nlohmann::json::const_iterator found = source.find(field);
     if (found == source.end() || found->is_null()) {
-        return true; // Absent is fine; the operation type decides what it needs.
+        // Absent is fine; the operation type decides what it needs. Cleared
+        // rather than left alone because this fills an object the caller owns,
+        // and a ref surviving from a previous parse would attach an operation
+        // to an element its JSON never named.
+        out.reset();
+        return true;
     }
     if (!found->is_object()) {
         error = std::string(field) + " must be an object like {\"id\": \"G1\"} or {\"ref\": \"$goal\"}.";
@@ -232,6 +237,7 @@ bool ParseElementRef(const nlohmann::json& source,
 bool ParseTranslations(const nlohmann::json& source, std::map<std::string, std::string>& out, std::string& error) {
     const nlohmann::json::const_iterator found = source.find("translations");
     if (found == source.end() || found->is_null()) {
+        out.clear();
         return true;
     }
     if (!found->is_object()) {

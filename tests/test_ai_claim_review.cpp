@@ -1,9 +1,11 @@
 ﻿#include "review/sccg/sccg_review.h"
 
 #include "core/assurance_tree.h"
+#include "core/reviews/review_proposal.h"
 
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <utility>
 #include <vector>
 
@@ -270,4 +272,82 @@ TEST(AiClaimReviewTest, ReportsMissingFindingsArray) {
 
     EXPECT_FALSE(parsed.errorMessage.empty());
     EXPECT_NE(parsed.errorMessage.find("findings"), std::string::npos);
+}
+
+// A repair the parser cannot read is reported, not dropped: a finding whose
+// operations silently vanished reads as a finding nobody could fix.
+TEST(AiClaimReviewTest, ReportsAProposedOperationItCannotRead) {
+    const std::string response = R"json({
+      "reviewed_element_id": "G1",
+      "findings": [
+        {
+          "source": "SCCG",
+          "guideline_id": "AR.2",
+          "severity": "warning",
+          "message": "No reasoning step.",
+          "proposed_operations": [{"type": "NotARealOperation"}]
+        }
+      ]
+    })json";
+
+    const review::AiReviewParseResult parsed = review::ParseAiReviewResponse(response, "G1");
+
+    EXPECT_TRUE(parsed.errorMessage.empty());
+    ASSERT_EQ(parsed.problems.size(), 1u);
+    ASSERT_EQ(parsed.proposedOperations.size(), 1u);
+    EXPECT_TRUE(parsed.proposedOperations[0].empty());
+    ASSERT_EQ(parsed.rejectedOperationReasons.size(), 1u);
+    EXPECT_NE(parsed.rejectedOperationReasons[0].find("NotARealOperation"), std::string::npos);
+}
+
+// The structural repair SCCG describes for AR.2, read off the wire.
+TEST(AiClaimReviewTest, ParsesAStructuralRepairFromAFinding) {
+    const std::string response = R"json({
+      "reviewed_element_id": "G1",
+      "findings": [
+        {
+          "source": "SCCG",
+          "guideline_id": "AR.2",
+          "severity": "warning",
+          "message": "This decomposition states no reasoning step.",
+          "proposed_operations": [
+            {"type": "CreateStrategy", "create_ref": "$strategy", "text": "Argue over hazard classes"},
+            {"type": "AddSupportedBy", "source": {"ref": "$strategy"}, "target": {"id": "G1"}}
+          ]
+        }
+      ]
+    })json";
+
+    const review::AiReviewParseResult parsed = review::ParseAiReviewResponse(response, "G1");
+
+    EXPECT_TRUE(parsed.rejectedOperationReasons.empty());
+    ASSERT_EQ(parsed.proposedOperations.size(), 1u);
+    ASSERT_EQ(parsed.proposedOperations[0].size(), 2u);
+    EXPECT_EQ(parsed.proposedOperations[0][0].type, core::reviews::PatchOperationType::CreateStrategy);
+    ASSERT_TRUE(parsed.proposedOperations[0][0].create_ref.has_value());
+    EXPECT_EQ(parsed.proposedOperations[0][0].create_ref.value(), "$strategy");
+    // The ref form the schema advertises has to survive the parse, or the
+    // attachment would name nothing.
+    ASSERT_TRUE(parsed.proposedOperations[0][1].source.has_value());
+    ASSERT_TRUE(parsed.proposedOperations[0][1].source->create_ref.has_value());
+    EXPECT_EQ(parsed.proposedOperations[0][1].source->create_ref.value(), "$strategy");
+    ASSERT_TRUE(parsed.proposedOperations[0][1].target.has_value());
+    ASSERT_TRUE(parsed.proposedOperations[0][1].target->existing_id.has_value());
+    EXPECT_EQ(parsed.proposedOperations[0][1].target->existing_id.value(), "G1");
+}
+
+// The parser fills an object the caller owns, so a second parse must not leave
+// the first one's refs behind.
+TEST(AiClaimReviewTest, ClearsRefsCarriedOverFromAnEarlierParse) {
+    core::reviews::PatchOperation operation;
+    std::string error;
+    ASSERT_TRUE(core::reviews::ParsePatchOperationJson(
+        nlohmann::json::parse(R"json({"type": "AddSupportedBy", "source": {"id": "G2"}})json"), operation, error))
+        << error;
+    ASSERT_TRUE(operation.source.has_value());
+
+    ASSERT_TRUE(core::reviews::ParsePatchOperationJson(
+        nlohmann::json::parse(R"json({"type": "SetUndeveloped", "element": {"id": "G1"}})json"), operation, error))
+        << error;
+    EXPECT_FALSE(operation.source.has_value()) << "a ref survived from the previous operation";
 }

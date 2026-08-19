@@ -531,6 +531,13 @@ void AiReviewController::PollTask() {
         }
     }
 
+    // A repair the parser could not read must not look like a finding that had
+    // none. The reviewer is deciding whether to trust this review; an operation
+    // it asked for and we dropped is part of that picture.
+    for (const std::string& rejected : parse_result.rejectedOperationReasons) {
+        events_.Emit(StatusMessageEvent{"AI review proposed a change that could not be read: " + rejected});
+    }
+
     EmitReviewVisualEvent(events_,
                           parse_result.problems.empty() ? ElementReviewVisualEventKind::AiNoFindings
                                                         : ElementReviewVisualEventKind::AiFindings,

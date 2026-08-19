@@ -740,9 +740,9 @@ std::string BuildExpectedAiReviewResponseSchemaText() {
         {
           "type": "CreateStrategy | CreateClaim | CreateSolution | CreateContext | CreateAssumption | CreateJustification | CreateTerm | UpdateElementText | SetUndeveloped | ClearUndeveloped | AddSupportedBy | RemoveSupportedBy | AddInContextOf | RemoveInContextOf",
           "create_ref": "string",
-          "element": {"id": "string"},
-          "source": {"id": "string"},
-          "target": {"id": "string"},
+          "element": {"id": "existing element id"},
+          "source": {"id": "existing element id"} | {"ref": "$a_create_ref"},
+          "target": {"id": "existing element id"} | {"ref": "$a_create_ref"},
           "text": "string",
           "field": "string",
           "old_value": "string",
