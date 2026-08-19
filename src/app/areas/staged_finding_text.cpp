@@ -74,6 +74,11 @@ std::string StagedFindingText(const core::sccg::StagedFinding& finding) {
                      "cannot tell which artifact was assessed or whether it has changed since. Cite the "
                      "controlled version.");
     }
+    if (finding.check_id == "check-evidence-citation-precision") {
+        return AF_TR("This evidence names an artifact but no part of it, so a reviewer cannot find "
+                     "the material that supports the claim. Cite the section, table, figure or "
+                     "scenarios the argument rests on.");
+    }
     if (finding.check_id == "check-evidence-state-fixed" && !finding.params.empty()) {
         return ui::i18n::trf("This evidence cites \"{0}\", which reads as live mutable content. Cite a fixed "
                              "version, revision, or archived snapshot, so the reviewed argument always "

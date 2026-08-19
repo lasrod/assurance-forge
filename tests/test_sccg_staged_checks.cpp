@@ -444,6 +444,52 @@ TEST(SccgStagedChecks, EV8_AcceptsAnArchivedSnapshotOfAMutableSource) {
     EXPECT_EQ(FindByCheck(findings, "check-evidence-state-fixed", "Sn1"), nullptr);
 }
 
+// EV.4 -- cite the part of the artifact that supports the claim. The last of
+// SCCG's five published pre-checks to be implemented; the registry had carried
+// it since the catalog was first parsed.
+TEST(SccgStagedChecks, EV4_FlagsAWholeArtifactCitation) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Braking is verified", true));
+    model.elements.push_back(Solution("Sn1", "See validation report, approved rev C"));
+    model.elements.push_back(Evidences("R1", "Sn1", "G1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"Sn1"});
+
+    ASSERT_TRUE(Mentions(findings, "EV.4", "Sn1"));
+    for (const core::sccg::StagedFinding& finding : findings) {
+        if (finding.guideline_id == "EV.4") {
+            EXPECT_EQ(finding.check_id, "check-evidence-citation-precision");
+            EXPECT_EQ(finding.severity, core::sccg::FindingSeverity::Advisory);
+        }
+    }
+}
+
+TEST(SccgStagedChecks, EV4_AcceptsACitationNamingThePartItRestsOn) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Braking is verified", true));
+    model.elements.push_back(
+        Solution("Sn1", "Validation report VR-04 rev C, section 6.3, table 12, scenarios S14-S21"));
+    model.elements.push_back(Evidences("R1", "Sn1", "G1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"Sn1"});
+
+    EXPECT_FALSE(Mentions(findings, "EV.4", "Sn1"));
+}
+
+// A dotted number points inside an artifact as well as the word does. Without
+// this the check would complain about a citation that is already precise, which
+// is what teaches a reviewer to ignore findings.
+TEST(SccgStagedChecks, EV4_AcceptsADottedSectionNumberWithoutTheWord) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Braking is verified", true));
+    model.elements.push_back(Solution("Sn1", "Validation report VR-04 rev C, 6.3.2"));
+    model.elements.push_back(Evidences("R1", "Sn1", "G1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"Sn1"});
+
+    EXPECT_FALSE(Mentions(findings, "EV.4", "Sn1"));
+}
+
 // LF.3 -- do not argue from ignorance. "No failures were found" reports the
 // reach of the search, not the safety of the system.
 TEST(SccgStagedChecks, LF3_FlagsArguingFromAbsence) {

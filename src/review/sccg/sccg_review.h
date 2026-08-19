@@ -4,6 +4,7 @@
 #include "core/problems/problem_item.h"
 #include "core/reviews/review_proposal.h"
 #include "parser/guidelines_parser.h"
+#include "review/sccg/sccg_prechecks.h"
 #include "parser/xml_parser.h"
 
 #include <optional>
@@ -45,6 +46,7 @@ struct AiReviewDataPackageBundle {
 
 struct AiReviewRequestArtifacts {
     std::string systemInstruction;
+    std::string precheckResultsJson;
     std::string selectedElementJson;
     std::string parentElementJson;
     std::string childElementsJson;
@@ -101,10 +103,12 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                                  AiReviewDataPackageBundle& out_packages,
                                  std::string& out_error);
 
-AiReviewRequestArtifacts BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
-                                                       const std::vector<const parser::Guideline*>& guidelines,
-                                                       const parser::ReviewProfile* review_profile = nullptr,
-                                                       const AiReviewDataPackageBundle* data_packages = nullptr);
+AiReviewRequestArtifacts
+BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
+                              const std::vector<const parser::Guideline*>& guidelines,
+                              const parser::ReviewProfile* review_profile = nullptr,
+                              const AiReviewDataPackageBundle* data_packages = nullptr,
+                              const std::vector<review::sccg::PrecheckResult>* precheck_results = nullptr);
 AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const std::vector<const parser::Guideline*>& guidelines,
                                         const parser::ReviewProfile* review_profile = nullptr,

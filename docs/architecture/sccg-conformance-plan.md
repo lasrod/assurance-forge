@@ -372,27 +372,30 @@ directions tested.
 
 ### S3 — Pre-checks (workflow stage 4)
 
+**Status: done** — `review::sccg::RunPrechecks`, driven by the published
+`prechecks` registry, with EV.4 the last check implemented.
+
 *Depends on: `feat/mcp-authoring-guidance` landing. Parallel with S1/S2.*
 
 Scoped to what remains after #406 phases 1–3. Two of the five pre-checks are
 substantively covered by that branch's EV.7 and EV.8 checks; this phase closes
 the rest and fixes the mislabelling.
 
-- [ ] **Fix the `check-explicit-strategy` mislabelling.** Either implement the
+- [x] **Fix the `check-explicit-strategy` mislabelling.** Either implement the
       Goal-with-children-and-no-strategy check the ID names, or move the
       strategy-develops-into-nothing check to an ID that describes it. Do not
       ship the current pairing.
-- [ ] Implement `check-evidence-citation-precision` (EV.4), the remaining
+- [x] Implement `check-evidence-citation-precision` (EV.4), the remaining
       unimplemented pre-check.
-- [ ] Widen the staging scope input for the relationship-element defect —
+- [x] Widen the staging scope input for the relationship-element defect —
       without it, a Goal-side check can never fire.
-- [ ] `review::sccg::RunPrechecks`, so stage 4 exists on the **review** path,
+- [x] `review::sccg::RunPrechecks`, so stage 4 exists on the **review** path,
       not only at staging time. Reuse the branch's check implementations rather
       than writing a second set (5.4).
-- [ ] Distinguish the two registries in the code: the catalog's per-guideline
+- [x] Distinguish the two registries in the code: the catalog's per-guideline
       `suggested_checks` and the published `prechecks.json` are different
       things, and a `check_id` from one must not be presented as the other.
-- [ ] Surface pre-check results in the review prompt, carrying SCCG's own
+- [x] Surface pre-check results in the review prompt, carrying SCCG's own
       `interpretation` wording.
 
 **Exit:** all five SCCG pre-checks run, are individually tested, and are named

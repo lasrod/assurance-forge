@@ -117,6 +117,7 @@ const std::vector<std::string>& EveryCheckId() {
         "check-promotional-language",
         "check-completeness-vs-absence",
         "check-evidence-control-attributes",
+        "check-evidence-citation-precision",
         "check-evidence-state-fixed",
     };
     return ids;

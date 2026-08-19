@@ -2263,6 +2263,9 @@ msgstr "この要素は変更が提案されています。"
 msgid "This evidence cites \"{0}\", which reads as live mutable content. Cite a fixed version, revision, or archived snapshot, so the reviewed argument always refers to the same content."
 msgstr "このエビデンスは「{0}」を引用しており、これは変更されうるライブコンテンツと読めます。レビューされた議論が常に同じ内容を参照するよう、固定されたバージョン、リビジョン、またはアーカイブ済みスナップショットを引用してください。"
 
+msgid "This evidence names an artifact but no part of it, so a reviewer cannot find the material that supports the claim. Cite the section, table, figure or scenarios the argument rests on."
+msgstr "このエビデンスは成果物を示していますが、その一部を特定していないため、レビュー担当者は主張を支持する箇所を見つけられません。議論が依拠するセクション、表、図、またはシナリオを引用してください。"
+
 msgid "This evidence reference carries no owner, version, date, or status, so a reviewer cannot tell which artifact was assessed or whether it has changed since. Cite the controlled version."
 msgstr "このエビデンス参照には所有者・バージョン・日付・ステータスのいずれもないため、レビュー担当者はどの成果物が評価されたのか、その後変更されていないかを判断できません。管理されたバージョンを引用してください。"
 
