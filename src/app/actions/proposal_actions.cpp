@@ -35,7 +35,6 @@
 namespace app::actions {
 
 using core::NowUtcString;
-using core::TrimWhitespace;
 using detail::ApplyProposalPreviewVisualState;
 using detail::CreatedElementRef;
 using detail::CreateOperationFor;
