@@ -343,7 +343,7 @@ af_copy_sccg_data(assurance-forge)
 # review from growing a shared inference path (docs/features/mcp-server.md).
 add_executable(assurance-forge-mcp src/mcp/main.cpp)
 target_link_libraries(assurance-forge-mcp PRIVATE
-    af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
+    af_mcp af_agent af_review af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge-mcp PRIVATE bcrypt advapi32)
@@ -430,6 +430,7 @@ add_executable(tests
     tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_ai_review_actions.cpp
+    tests/test_review_suggestion_mapping.cpp
     tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
     tests/test_review_external_reload.cpp

@@ -13,6 +13,7 @@
 #include "core/string_utils.h"
 #include "core/time_utils.h"
 #include "parser/model_utils.h"
+#include "review/sccg/suggestion_mapping.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -39,7 +40,6 @@ using detail::ApplyProposalPreviewVisualState;
 using detail::CreatedElementRef;
 using detail::CreateOperationFor;
 using detail::DeleteProposalPatchFile;
-using detail::ElementTextTarget;
 using detail::GenerateCreateRef;
 using detail::IsContextLike;
 using detail::PreviewIdForProposalRef;
@@ -48,7 +48,6 @@ using detail::RemoveModeField;
 using detail::SameElementRef;
 using detail::SaveProject;
 using detail::SetStatus;
-using detail::TextTargetFor;
 using detail::TrackAffectedRef;
 ProposalActions::ProposalActions(AppRuntimeState& state) : state_(state) {}
 
@@ -423,49 +422,40 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         return;
     }
 
-    size_t staged_count = 0;
+    // The mapping itself lives in `review`: what a finding asks for is review
+    // behaviour, and an external client submitting a result has to get the same
+    // groups from the same code (ADR 0013). What stays here is the part that
+    // touches application state -- reading review items, writing the workspace,
+    // and telling the user.
+    std::vector<review::ReviewSuggestion> suggestions;
     for (const AiReviewProposalSuggestion& suggestion : event.suggestions) {
-        const std::string suggested_text = TrimWhitespace(suggestion.suggested_text);
-        if (suggested_text.empty())
-            continue;
-
         std::optional<core::reviews::ReviewItem> item =
             state_.review_controller->GetItemById(suggestion.review_item_id);
+        // A finding that already carries a group was staged by an earlier run;
+        // staging it twice would put the same change on the canvas twice.
         if (!item.has_value() || !item->draft_group_ids.empty())
             continue;
+        suggestions.push_back(review::ReviewSuggestion{suggestion.review_item_id,
+                                                       item->element_id,
+                                                       suggestion.suggested_text,
+                                                       item->title,
+                                                       item->message,
+                                                       item->guideline_ids});
+    }
 
-        const parser::SacmElement* anchor = parser::FindElementByIdOrGidValue(working, item->element_id);
-        if (!anchor)
-            continue;
+    const review::ReviewSuggestionContext context{event.review_profile_name, event.review_run_id};
+    const std::vector<review::SuggestedDraftGroup> mapped =
+        review::MapSuggestionsToDraftGroups(working, suggestions, context);
 
-        const ElementTextTarget text_target = TextTargetFor(*anchor);
-        if (TrimWhitespace(text_target.current_text) == suggested_text)
-            continue;
-
-        core::drafts::DraftGroupRequest request;
-        request.title = item->title.empty() ? "AI suggested change" : item->title;
-        request.summary = "AI suggested replacement text for " + anchor->id + ".";
-        request.rationale = item->message;
-        request.source = core::drafts::DraftSource::SccgAiReview;
-        request.source_label = event.review_profile_name.empty() ? "SCCG AI Review" : event.review_profile_name;
-        request.source_session_id = event.review_run_id;
-        request.guideline_ids = item->guideline_ids;
-        request.review_item_ids = {item->id};
-
+    size_t staged_count = 0;
+    for (const review::SuggestedDraftGroup& group : mapped) {
         std::string error;
-        const std::string group_id = state_.draft_workspace.BeginGroup(request, accepted, error);
+        const std::string group_id = state_.draft_workspace.BeginGroup(group.request, accepted, error);
         if (group_id.empty()) {
             SetStatus(state_, "AI suggested change could not be added to the working draft: " + error);
             continue;
         }
-
-        core::reviews::PatchOperation operation;
-        operation.type = core::reviews::PatchOperationType::UpdateElementText;
-        operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
-        operation.field = text_target.field;
-        operation.old_value = text_target.current_text;
-        operation.new_value = suggested_text;
-        if (!state_.draft_workspace.StageOperations(group_id, {operation}, accepted, error)) {
+        if (!state_.draft_workspace.StageOperations(group_id, group.operations, accepted, error)) {
             std::string reject_error;
             state_.draft_workspace.RejectGroup(group_id, reject_error);
             SetStatus(state_, "AI suggested change could not be staged in the working draft: " + error);
@@ -475,7 +465,7 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
             SetStatus(state_, "AI suggested change was staged but could not be marked ready: " + error);
             continue;
         }
-        if (!state_.review_controller->AddDraftGroup(item->id, group_id)) {
+        if (!state_.review_controller->AddDraftGroup(group.review_item_id, group_id)) {
             std::string reject_error;
             state_.draft_workspace.RejectGroup(group_id, reject_error);
             SetStatus(state_, "AI suggested change could not be linked to its review finding.");

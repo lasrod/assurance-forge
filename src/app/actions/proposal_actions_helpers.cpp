@@ -216,12 +216,6 @@ bool IsContextLike(core::NewElementKind kind) {
            kind == core::NewElementKind::Justification;
 }
 
-ElementTextTarget TextTargetFor(const parser::SacmElement& element) {
-    if (element.type == "claim" || element.type == "argumentreasoning")
-        return {"content", element.content};
-    return {"description", element.description};
-}
-
 const char* RemoveModeField(core::RemoveMode mode) {
     return mode == core::RemoveMode::NodeAndDescendants ? core::reviews::kReviewProposalRemoveModeNodeAndDescendants
                                                         : core::reviews::kReviewProposalRemoveModeNodeOnly;

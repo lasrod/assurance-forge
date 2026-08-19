@@ -90,6 +90,7 @@ nav:
       - Review and AI: architecture/review-ai.md
       - Integrated Draft Workspace (planned): architecture/integrated-draft-workspace-plan.md
       - AI Inference and Projectless MCP (planned): architecture/ai-inference-and-projectless-mcp-plan.md
+      - SCCG Tool-Integration Conformance (planned): architecture/sccg-conformance-plan.md
       - Decisions (ADRs):
           - Overview: architecture/decisions/index.md
           - ADR Template: architecture/decisions/adr-template.md
