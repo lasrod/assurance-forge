@@ -4,6 +4,7 @@
 #include "core/problems/argument_cycles.h"
 
 #include <algorithm>
+#include <format>
 #include <cctype>
 #include <set>
 #include <string>
@@ -253,7 +254,7 @@ bool FindConjunctionPair(const std::string& haystack_lower,
             if (left == right) {
                 continue;
             }
-            if (ContainsWord(haystack_lower, left + " and " + right)) {
+            if (ContainsWord(haystack_lower, std::format("{} and {}", left, right))) {
                 first = left;
                 second = right;
                 return true;
@@ -501,9 +502,11 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             if (FindConjunctionPair(text, PropertyWords(), first, second)) {
                 Add(findings,
                     kSingleProperty,
-                    "This claim joins \"" + first + " and " + second +
-                        "\" -- two distinct properties needing different evidence and review. Give "
-                        "each its own goal, so one can fail without hiding the other.",
+                    std::format("This claim joins \"{} and {}\" -- two distinct properties needing "
+                                "different evidence and review. Give each its own goal, so one can "
+                                "fail without hiding the other.",
+                                first,
+                                second),
                     id,
                     FindingSeverity::Advisory,
                     {first, second});
@@ -513,9 +516,11 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             if (FindConjunctionPair(text, StepVerbs(), first, second)) {
                 Add(findings,
                     kStepMixing,
-                    "This claim chains \"" + first + " and " + second +
-                        "\" -- different logical steps answering different review questions. Give "
-                        "each step its own claim, and let the structure show the decomposition.",
+                    std::format("This claim chains \"{} and {}\" -- different logical steps answering "
+                                "different review questions. Give each step its own claim, and let "
+                                "the structure show the decomposition.",
+                                first,
+                                second),
                     id,
                     FindingSeverity::Advisory,
                     {first, second});
