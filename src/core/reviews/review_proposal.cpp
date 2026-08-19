@@ -183,6 +183,123 @@ const char* PatchOperationTypeToString(PatchOperationType type) {
     return "UpdateElementText";
 }
 
+namespace {
+
+std::string StringArgument(const nlohmann::json& arguments, const char* key) {
+    const nlohmann::json::const_iterator found = arguments.find(key);
+    if (found == arguments.end() || !found->is_string()) {
+        return {};
+    }
+    return found->get<std::string>();
+}
+
+bool ParseElementRef(const nlohmann::json& source,
+                     const char* field,
+                     std::optional<ElementRef>& out,
+                     std::string& error) {
+    const nlohmann::json::const_iterator found = source.find(field);
+    if (found == source.end() || found->is_null()) {
+        // Absent is fine; the operation type decides what it needs. Cleared
+        // rather than left alone because this fills an object the caller owns,
+        // and a ref surviving from a previous parse would attach an operation
+        // to an element its JSON never named.
+        out.reset();
+        return true;
+    }
+    if (!found->is_object()) {
+        error = std::string(field) + " must be an object like {\"id\": \"G1\"} or {\"ref\": \"$goal\"}.";
+        return false;
+    }
+
+    const nlohmann::json::const_iterator id = found->find("id");
+    const nlohmann::json::const_iterator ref = found->find("ref");
+    const bool has_id = id != found->end() && id->is_string() && !id->get<std::string>().empty();
+    const bool has_ref = ref != found->end() && ref->is_string() && !ref->get<std::string>().empty();
+    if (has_id == has_ref) {
+        error = std::string(field) + " must carry exactly one of \"id\" (an existing element) or "
+                                     "\"ref\" (one this change set creates).";
+        return false;
+    }
+
+    ElementRef parsed;
+    if (has_id) {
+        parsed.existing_id = id->get<std::string>();
+    } else {
+        parsed.create_ref = ref->get<std::string>();
+    }
+    out = parsed;
+    return true;
+}
+
+// Reads the optional lang -> text map. Rejecting a bad shape rather than
+// dropping it matters: an agent told to write a bilingual claim would otherwise
+// be told the claim was staged, and the Japanese would simply be missing.
+bool ParseTranslations(const nlohmann::json& source, std::map<std::string, std::string>& out, std::string& error) {
+    const nlohmann::json::const_iterator found = source.find("translations");
+    if (found == source.end() || found->is_null()) {
+        out.clear();
+        return true;
+    }
+    if (!found->is_object()) {
+        error = "translations must be an object of language code to text, like {\"ja\": \"...\"}.";
+        return false;
+    }
+    for (nlohmann::json::const_iterator it = found->begin(); it != found->end(); ++it) {
+        if (!it.value().is_string()) {
+            error = "translations[\"" + it.key() + "\"] must be a string.";
+            return false;
+        }
+        if (it.key().empty()) {
+            error = "translations has an empty language code; use a code like \"ja\".";
+            return false;
+        }
+        if (it.key() == kPatchPrimaryLanguage) {
+            error = std::string("translations must not carry \"") + kPatchPrimaryLanguage +
+                    "\"; the primary language goes in \"text\" or \"new_value\".";
+            return false;
+        }
+        out[it.key()] = it.value().get<std::string>();
+    }
+    return true;
+}
+
+bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& out, std::string& error) {
+    if (!source.is_object()) {
+        error = "Each operation must be an object.";
+        return false;
+    }
+    const std::string type = StringArgument(source, "type");
+    if (type.empty()) {
+        error = "Each operation needs a \"type\".";
+        return false;
+    }
+    if (!PatchOperationTypeFromString(type, out.type)) {
+        error = "Unknown operation type \"" + type + "\".";
+        return false;
+    }
+
+    if (!ParseElementRef(source, "element", out.element, error) ||
+        !ParseElementRef(source, "source", out.source, error) ||
+        !ParseElementRef(source, "target", out.target, error)) {
+        return false;
+    }
+
+    const std::string create_ref = StringArgument(source, "create_ref");
+    if (!create_ref.empty()) {
+        out.create_ref = create_ref;
+    }
+    out.field = StringArgument(source, "field");
+    out.old_value = StringArgument(source, "old_value");
+    out.new_value = StringArgument(source, "new_value");
+    out.text = StringArgument(source, "text");
+    if (!ParseTranslations(source, out.translations, error)) {
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
 bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& type) {
     static const std::unordered_map<std::string, PatchOperationType> kTypes = {
         {"CreateClaim", PatchOperationType::CreateClaim},
@@ -211,6 +328,10 @@ bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& 
         return false;
     type = it->second;
     return true;
+}
+
+bool ParsePatchOperationJson(const nlohmann::json& source, PatchOperation& out, std::string& error) {
+    return ParsePatchOperationJsonImpl(source, out, error);
 }
 
 std::string SerializeReviewProposal(const ReviewProposal& proposal) {

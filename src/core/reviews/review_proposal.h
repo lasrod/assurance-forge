@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include "parser/xml_parser.h"
 
 #include <filesystem>
@@ -125,6 +127,15 @@ struct ReviewProposalSummary {
 
 const char* PatchOperationTypeToString(PatchOperationType type);
 bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& type);
+
+// Reads one operation from the JSON an AI writes. One parser rather than one
+// per caller: an external client staging over MCP and a SCCG review proposing a
+// repair describe the same edit, and two readers of one wire vocabulary are how
+// the two surfaces come to accept different things.
+//
+// `error` is worded for the model that produced the JSON, since it is what has
+// to correct it.
+bool ParsePatchOperationJson(const nlohmann::json& source, PatchOperation& out, std::string& error);
 
 // Whether this operation brings a new element into being and therefore needs a
 // patch-local create_ref and a pinned identity. One definition, used by the

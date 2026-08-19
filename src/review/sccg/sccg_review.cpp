@@ -736,6 +736,19 @@ std::string BuildExpectedAiReviewResponseSchemaText() {
       "suggested_fix": "string",
             "suggested_element_text": "string",
       "suggested_claim_wording": "string",
+      "proposed_operations": [
+        {
+          "type": "CreateStrategy | CreateClaim | CreateSolution | CreateContext | CreateAssumption | CreateJustification | CreateTerm | UpdateElementText | SetUndeveloped | ClearUndeveloped | AddSupportedBy | RemoveSupportedBy | AddInContextOf | RemoveInContextOf",
+          "create_ref": "string",
+          "element": {"id": "existing element id"},
+          "source": {"id": "existing element id"} | {"ref": "$a_create_ref"},
+          "target": {"id": "existing element id"} | {"ref": "$a_create_ref"},
+          "text": "string",
+          "field": "string",
+          "old_value": "string",
+          "new_value": "string"
+        }
+      ],
       "related_element_ids": ["string"]
     }
   ]
@@ -752,6 +765,18 @@ Field rules:
 - suggested_fix should describe how the user can improve the selected element or its immediate review context.
 - suggested_element_text should provide replacement text for the selected element when a concise text edit would fix the finding. Use this for selected strategies, reasoning steps, claims, or other reviewed elements when appropriate.
 - suggested_claim_wording is a legacy alias for claim wording suggestions. Prefer suggested_element_text; leave suggested_claim_wording empty unless the selected element is a claim and you need claim-specific wording.
+- proposed_operations is how a finding asks for a repair SCCG describes as adding or restructuring, rather than rewording. Leave it empty when a text edit is the whole fix.
+  - A "Create..." operation names the new element with "create_ref" (any label you choose, e.g. "$strategy") and its text in "text". Attach it with a second operation whose "source" or "target" carries {"ref": "$strategy"}.
+  - AddSupportedBy attaches "source" beneath "target"; AddInContextOf attaches context, assumption or justification to "target".
+  - Reference an existing element as {"id": "G1"} and a new one as {"ref": "$strategy"}.
+  - Every existing element you touch must be one shown to you in the data packages above. Operations reaching outside them are refused.
+- What SCCG asks for, when the repair is structural:
+  - AR.2, a decomposition with no stated reasoning: CreateStrategy, then AddSupportedBy it under the parent and re-attach the sub-claims beneath it.
+  - EV.1, a claim with no evidence path: CreateSolution and AddSupportedBy, or SetUndeveloped when the work is genuinely outstanding.
+  - CL.3, AR.3, AR.6, AR.7, RD.1, RD.6, scope or a dependency hidden in the claim text: CreateContext or CreateAssumption, then AddInContextOf.
+  - SU.2, SU.9, an assumption that is really an unsupported claim: CreateClaim and attach it, so it needs support.
+  - CL.5, an unbounded qualifier: CreateTerm, defining the term once, rather than restating the bound in every claim.
+- Do not propose an operation you cannot justify from a provided guideline. A finding with no repair is better than an invented one.
 - related_element_ids should include the selected element ID and any parent/child IDs relevant to the finding.
 - If there are no findings, return "findings": [].
 
@@ -835,6 +860,29 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             if (suggested_element_text.empty())
                 suggested_element_text = JsonStringValue(finding, "suggested_claim_wording");
             result.suggestedElementTexts.push_back(std::move(suggested_element_text));
+
+            // Parsed here, judged later: whether an operation is one this review
+            // is allowed to make depends on the model and the reviewed scope,
+            // neither of which parsing has. A malformed operation is dropped
+            // with its reason so the finding still reaches the reviewer.
+            std::vector<core::reviews::PatchOperation> operations;
+            const nlohmann::json::const_iterator proposed = finding.find("proposed_operations");
+            if (proposed != finding.end() && proposed->is_array()) {
+                size_t operation_index = 0;
+                for (const nlohmann::json& operation_json : *proposed) {
+                    ++operation_index;
+                    core::reviews::PatchOperation operation;
+                    std::string operation_error;
+                    if (!core::reviews::ParsePatchOperationJson(operation_json, operation, operation_error)) {
+                        result.rejectedOperationReasons.push_back("Finding " + std::to_string(finding_index) +
+                                                                  ", operation " + std::to_string(operation_index) +
+                                                                  ": " + operation_error);
+                        continue;
+                    }
+                    operations.push_back(std::move(operation));
+                }
+            }
+            result.proposedOperations.push_back(std::move(operations));
         }
 
         return result;

@@ -2,6 +2,7 @@
 
 #include "core/assurance_tree.h"
 #include "core/problems/problem_item.h"
+#include "core/reviews/review_proposal.h"
 #include "parser/guidelines_parser.h"
 #include "parser/xml_parser.h"
 
@@ -67,6 +68,14 @@ struct AiReviewParseResult {
     std::string reviewedElementType;
     std::vector<core::ProblemItem> problems;
     std::vector<std::string> suggestedElementTexts;
+    // Per finding, in the same order as `problems`: the structural repair it
+    // asks for, when SCCG's answer is to add or re-attach an element rather
+    // than to reword one. Empty for a finding a text edit fixes.
+    std::vector<std::vector<core::reviews::PatchOperation>> proposedOperations;
+    // Operations the model asked for that were refused, worded for a reader.
+    // Reported rather than dropped: a finding whose repair silently vanished
+    // reads as a finding with no repair.
+    std::vector<std::string> rejectedOperationReasons;
 };
 
 using ParsedAiReviewResponse = AiReviewParseResult;

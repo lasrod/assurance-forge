@@ -285,6 +285,111 @@ TEST(AiReviewActionsTest, RefusesSuggestionsWhenAReviewedElementChanged) {
     EXPECT_TRUE(linked->draft_group_ids.empty()) << "the reviewed text changed under the suggestion";
 }
 
+// S5's exit criterion, end to end against the real draft workspace: an AR.2
+// finding produces a draft group that ADDS a strategy and hangs the sub-claim
+// beneath it. No amount of rewording the goal expresses this repair, which is
+// what the review could do before.
+//
+// Staging through the workspace is the point of testing it here rather than in
+// the mapper's own tests: the draft document refuses an operation the SACM model
+// cannot hold, in the call that makes it (ADR 0016).
+TEST(AiReviewActionsTest, AnAr2FindingStagesACreatedStrategyAndItsAttachments) {
+    TempDir temp = MakeTempDir("structural");
+    app::AppRuntimeState state;
+    state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
+    OpenDraftStore(state, temp, *state.app_state.loaded_case);
+    ASSERT_TRUE(state.review_controller->AddOrUpdateItem(MakeReviewItem()));
+
+    const core::drafts::DraftMaterializationResult& before =
+        state.draft_workspace.Materialize(*state.app_state.loaded_case, state.app_state.case_revision);
+    ASSERT_TRUE(before.success) << before.error;
+
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateStrategy;
+    create.create_ref = "$strategy";
+    create.text = "Argue over the credible hazard classes";
+
+    core::reviews::PatchOperation attach;
+    attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+    attach.source = core::reviews::ElementRef{std::nullopt, "$strategy"};
+    attach.target = core::reviews::ElementRef{"G1", std::nullopt};
+
+    app::AiReviewProposalSuggestionsEvent event;
+    event.review_profile_name = "Claim review";
+    event.review_run_id = "run-ar2";
+    event.reviewed_element_ids = {"G1", "G2"};
+    event.reviewed_scope_hash = core::reviews::ComputeScopeSemanticHash(before.working_model, {"G1", "G2"});
+    app::AiReviewProposalSuggestion suggestion;
+    suggestion.review_item_id = "ai-review-G1-claim_review-1";
+    suggestion.element_id = "G1";
+    suggestion.proposed_operations = {create, attach};
+    event.suggestions.push_back(std::move(suggestion));
+
+    app::actions::ProposalActions(state).CreateAiGenerated(event);
+
+    const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
+    ASSERT_NE(workspace, nullptr);
+    ASSERT_EQ(workspace->ActiveGroups().size(), 1u);
+    const core::drafts::DraftChangeGroup& group = workspace->groups.back();
+    EXPECT_EQ(group.source, core::drafts::DraftSource::SccgAiReview);
+    EXPECT_EQ(group.state, core::drafts::DraftGroupState::Ready);
+    EXPECT_EQ(group.operations.size(), 2u);
+
+    // The strategy is really in the working argument, not just in the ledger.
+    const core::drafts::DraftMaterializationResult& after =
+        state.draft_workspace.Materialize(*state.app_state.loaded_case, state.app_state.case_revision);
+    ASSERT_TRUE(after.success) << after.error;
+    bool strategy_present = false;
+    for (const parser::SacmElement& element : after.working_model.elements) {
+        if (element.content == "Argue over the credible hazard classes")
+            strategy_present = true;
+    }
+    EXPECT_TRUE(strategy_present) << "the created strategy never reached the working draft";
+
+    // Accepted SACM is untouched until a human promotes it.
+    EXPECT_EQ(state.app_state.loaded_case->elements.size(), 2u);
+}
+
+// The scope rule reaches the application surface, not only the mapper: an
+// operation naming an element this review never read stages nothing.
+TEST(AiReviewActionsTest, RefusesAStructuralRepairReachingOutsideTheReviewedScope) {
+    TempDir temp = MakeTempDir("out_of_scope");
+    app::AppRuntimeState state;
+    state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
+    OpenDraftStore(state, temp, *state.app_state.loaded_case);
+    ASSERT_TRUE(state.review_controller->AddOrUpdateItem(MakeReviewItem()));
+
+    const core::drafts::DraftMaterializationResult& before =
+        state.draft_workspace.Materialize(*state.app_state.loaded_case, state.app_state.case_revision);
+    ASSERT_TRUE(before.success) << before.error;
+
+    core::reviews::PatchOperation reach;
+    reach.type = core::reviews::PatchOperationType::AddSupportedBy;
+    reach.source = core::reviews::ElementRef{"G2", std::nullopt};
+    reach.target = core::reviews::ElementRef{"G1", std::nullopt};
+
+    app::AiReviewProposalSuggestionsEvent event;
+    event.review_profile_name = "Claim review";
+    event.review_run_id = "run-reach";
+    // The review read only G1; G2 is a branch it never saw.
+    event.reviewed_element_ids = {"G1"};
+    event.reviewed_scope_hash = core::reviews::ComputeScopeSemanticHash(before.working_model, {"G1"});
+    app::AiReviewProposalSuggestion suggestion;
+    suggestion.review_item_id = "ai-review-G1-claim_review-1";
+    suggestion.element_id = "G1";
+    suggestion.proposed_operations = {reach};
+    event.suggestions.push_back(std::move(suggestion));
+
+    app::actions::ProposalActions(state).CreateAiGenerated(event);
+
+    // A draft is created by the first unaccepted change, so refusing every
+    // operation leaves no workspace at all -- which is the strongest form of
+    // "nothing was staged" this surface can show.
+    const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
+    EXPECT_TRUE(workspace == nullptr || workspace->ActiveGroups().empty());
+    EXPECT_TRUE(state.review_controller->GetItemById("ai-review-G1-claim_review-1")->draft_group_ids.empty());
+}
+
 TEST(AiReviewActionsTest, RefusesToStageSuggestionsWhenTheWorkingDraftChangedAfterReview) {
     TempDir temp = MakeTempDir("stale");
     app::AppRuntimeState state;
