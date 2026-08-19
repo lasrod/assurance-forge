@@ -748,10 +748,12 @@ TEST(AgentRequestHandler, SubmitRefusesStandingProblemFindingsUntilAcknowledged)
     ASSERT_FALSE(submitted.result.value("isError", true)) << submitted.result.dump();
     EXPECT_EQ(submitted.result.value("state", ""), "ready");
     ASSERT_TRUE(submitted.result.contains("acknowledged_findings")) << submitted.result.dump();
-    bool acknowledged_ar2 = false;
+    // The empty strategy is AR.1 role misuse: the element is not doing the job
+    // its role names. AR.2's check is on a decomposition with no reasoning step.
+    bool acknowledged_role_misuse = false;
     for (const nlohmann::json& entry : submitted.result["acknowledged_findings"]) {
-        if (entry.get<std::string>().find("AR.2") != std::string::npos)
-            acknowledged_ar2 = true;
+        if (entry.get<std::string>().find("AR.1") != std::string::npos)
+            acknowledged_role_misuse = true;
     }
-    EXPECT_TRUE(acknowledged_ar2) << submitted.result.dump();
+    EXPECT_TRUE(acknowledged_role_misuse) << submitted.result.dump();
 }

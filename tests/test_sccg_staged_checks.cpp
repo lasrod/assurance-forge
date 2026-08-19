@@ -131,9 +131,12 @@ TEST(SccgStagedChecks, EV1_AcceptsAClaimDeliberatelyMarkedUndeveloped) {
     EXPECT_FALSE(Mentions(findings, "EV.1", "G1"));
 }
 
-// AR.2 -- state the inference step. A strategy that develops into nothing
-// announces a decomposition the argument never performs.
-TEST(SccgStagedChecks, AR2_FlagsAStrategyThatDevelopsIntoNothing) {
+// AR.1 -- let structure carry the argument. A strategy that develops into
+// nothing announces a decomposition the argument never performs, so the element
+// is not doing the job its role says it does. This cites AR.1 rather than AR.2
+// because AR.2's catalog check (`check-explicit-strategy`) asks the opposite
+// question, about the decomposition above; see the AR.2 tests below.
+TEST(SccgStagedChecks, AR1_FlagsAStrategyThatDevelopsIntoNothing) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "Top goal", true));
     model.elements.push_back(Strategy("S1", "Argue over hazards"));
@@ -141,15 +144,15 @@ TEST(SccgStagedChecks, AR2_FlagsAStrategyThatDevelopsIntoNothing) {
 
     const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"S1"});
 
-    ASSERT_TRUE(Mentions(findings, "AR.2", "S1"));
+    ASSERT_TRUE(Mentions(findings, "AR.1", "S1"));
     for (const core::sccg::StagedFinding& finding : findings) {
-        if (finding.guideline_id == "AR.2") {
+        if (finding.guideline_id == "AR.1" && finding.element_id == "S1") {
             EXPECT_EQ(finding.severity, core::sccg::FindingSeverity::Problem);
         }
     }
 }
 
-TEST(SccgStagedChecks, AR2_AcceptsAStrategyWithASubGoal) {
+TEST(SccgStagedChecks, AR1_AcceptsAStrategyWithASubGoal) {
     parser::AssuranceCase model;
     model.elements.push_back(Claim("G1", "Top goal", true));
     model.elements.push_back(Strategy("S1", "Argue over hazards"));
@@ -159,7 +162,95 @@ TEST(SccgStagedChecks, AR2_AcceptsAStrategyWithASubGoal) {
 
     const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"S1"});
 
-    EXPECT_FALSE(Mentions(findings, "AR.2", "S1"));
+    EXPECT_FALSE(Mentions(findings, "AR.1", "S1"));
+}
+
+// AR.2 -- state the inference step. The catalog's `check-explicit-strategy` is
+// a check on the decomposition: "whether each decomposition has an explicit
+// reasoning step stating how children support the parent". It fires on the
+// parent, which is what AR.2's own bad example is.
+TEST(SccgStagedChecks, AR2_FlagsADecompositionWithNoReasoningStep) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Autonomy function safety is acceptable", true));
+    model.elements.push_back(Claim("G2", "Perception safety is acceptable", true));
+    model.elements.push_back(Claim("G3", "Planning safety is acceptable", true));
+    model.elements.push_back(Supports("R1", "G2", "G1"));
+    model.elements.push_back(Supports("R2", "G3", "G1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
+
+    ASSERT_TRUE(Mentions(findings, "AR.2", "G1"));
+    for (const core::sccg::StagedFinding& finding : findings) {
+        if (finding.guideline_id == "AR.2") {
+            EXPECT_EQ(finding.check_id, "check-explicit-strategy");
+            // SCCG publishes this as a boolean_candidate: a candidate finding a
+            // reviewer still judges, not a defect.
+            EXPECT_EQ(finding.severity, core::sccg::FindingSeverity::Advisory);
+        }
+    }
+}
+
+TEST(SccgStagedChecks, AR2_AcceptsADecompositionThroughAStrategy) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Autonomy function safety is acceptable", true));
+    model.elements.push_back(Strategy("S1", "Break the claim down by UL 4600 autonomy topic"));
+    model.elements.push_back(Claim("G2", "Perception safety is acceptable", true));
+    model.elements.push_back(Claim("G3", "Planning safety is acceptable", true));
+    model.elements.push_back(Supports("R1", "S1", "G1"));
+    model.elements.push_back(Supports("R2", "G2", "S1"));
+    model.elements.push_back(Supports("R3", "G3", "S1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
+
+    EXPECT_FALSE(Mentions(findings, "AR.2", "G1"));
+}
+
+// Narrowed deliberately: one child is a refinement, not a decomposition, and
+// AR.2 asks why *these* children were chosen.
+TEST(SccgStagedChecks, AR2_AcceptsASingleSubClaim) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Top goal", true));
+    model.elements.push_back(Claim("G2", "The one thing it rests on", true));
+    model.elements.push_back(Supports("R1", "G2", "G1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
+
+    EXPECT_FALSE(Mentions(findings, "AR.2", "G1"));
+}
+
+// A claim resting directly on evidence is not decomposed at all.
+TEST(SccgStagedChecks, AR2_AcceptsAClaimSupportedOnlyByEvidence) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Top goal", true));
+    model.elements.push_back(Solution("E1", "Test report TR-1 rev C"));
+    model.elements.push_back(Solution("E2", "Test report TR-2 rev A"));
+    // AssertedEvidence, not AssertedInference: it is what gives an artifact the
+    // Solution role, and with an inference these would be generic nodes and the
+    // test would pass without ever exercising the evidence case.
+    model.elements.push_back(Evidences("R1", "E1", "G1"));
+    model.elements.push_back(Evidences("R2", "E2", "G1"));
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G1"});
+
+    EXPECT_FALSE(Mentions(findings, "AR.2", "G1"));
+}
+
+// The case that matters for an agent: it attaches a second sub-claim to a goal
+// that already existed. Only the new child and the new relationship are
+// reported changed, so without resolving relationships to their endpoints the
+// parent-side check would never see the decomposition it is about.
+TEST(SccgStagedChecks, AR2_FiresWhenAChildIsAttachedToAnExistingGoal) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Claim("G1", "Autonomy function safety is acceptable", true));
+    model.elements.push_back(Claim("G2", "Perception safety is acceptable", true));
+    model.elements.push_back(Claim("G3", "Planning safety is acceptable", true));
+    model.elements.push_back(Supports("R1", "G2", "G1"));
+    model.elements.push_back(Supports("R2", "G3", "G1"));
+
+    // G1 is untouched by this change set; the agent added G3 and its edge.
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, {"G3", "R2"});
+
+    EXPECT_TRUE(Mentions(findings, "AR.2", "G1"));
 }
 
 // CL.5 -- bound vague and universal qualifiers. This is the one lexical check,

@@ -233,7 +233,7 @@ TEST(AgentChangeCanvas, ShowsTheReviewerTheSameSccgFindingsTheAgentGot) {
     // than take the tool's word for it.
     bool names_a_guideline = false;
     for (const std::string& line : described) {
-        if (line.find("AR.2") != std::string::npos || line.find("EV.1") != std::string::npos) {
+        if (line.find("AR.1") != std::string::npos || line.find("EV.1") != std::string::npos) {
             names_a_guideline = true;
         }
     }

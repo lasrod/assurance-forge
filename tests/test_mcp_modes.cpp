@@ -243,7 +243,10 @@ TEST(McpOffline, ChecksOperationsAsARehearsalWithoutWritingAnything) {
     bool empty_strategy_reported = false;
     bool unsupported_claim_reported = false;
     for (const nlohmann::json& finding : checked.payload["findings"]) {
-        if (finding.value("check_id", "") == "check-explicit-strategy")
+        // A strategy that develops into nothing is AR.1 role misuse. AR.2's
+        // `check-explicit-strategy` asks the opposite question, about a
+        // decomposition that has no reasoning step at all.
+        if (finding.value("check_id", "") == "check-element-role-misuse")
             empty_strategy_reported = true;
         if (finding.value("check_id", "") == "check-evidence-trace")
             unsupported_claim_reported = true;

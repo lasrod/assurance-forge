@@ -33,6 +33,14 @@ constexpr Guideline kEvidencePath{
     "check-evidence-trace",
     "Show, for each claim, the evidence path that supports it, either directly or through "
     "stated sub-claims and intermediate arguments."};
+// `check-explicit-strategy` is the catalog's check on a *decomposition*:
+// "Check whether each decomposition has an explicit reasoning step stating how
+// children support the parent." It therefore fires on the parent claim, not on
+// the strategy -- AR.2's own bad example is a goal whose several children carry
+// no stated rule. A check that instead reported a strategy developing into
+// nothing while wearing this id would answer a different question under SCCG's
+// name, and a clean result would read as SCCG's check having passed. That
+// check still exists below; it cites AR.1, which is the guideline it serves.
 constexpr Guideline kInferenceStep{"AR.2",
                                    "check-explicit-strategy",
                                    "State how the parent claim is being decomposed or argued; do not make the reviewer "
@@ -265,6 +273,33 @@ void Add(std::vector<StagedFinding>& findings,
                                      severity});
 }
 
+// AR.2's `check-explicit-strategy`, stated as the catalog states it: a
+// decomposition whose children carry no reasoning step.
+//
+// Two deliberate narrowings, both toward silence. A single sub-claim is a
+// refinement rather than a decomposition -- AR.2 asks why *these* children were
+// chosen, a question one child does not raise -- and a claim supported directly
+// by evidence is not decomposed at all. GSN permits goal-to-goal support
+// without a strategy, so this is advisory: SCCG publishes the check as a
+// `boolean_candidate`, a candidate finding a reviewer still has to judge, and a
+// false structural complaint against an imported argument costs more than a
+// missed one.
+bool IsUnexplainedDecomposition(const TreeNode& claim) {
+    size_t sub_claims = 0;
+    for (const TreeNode* child : claim.group1_children) {
+        if (child == nullptr) {
+            continue;
+        }
+        if (child->role == NodeRole::Strategy) {
+            return false;
+        }
+        if (child->role == NodeRole::Claim) {
+            ++sub_claims;
+        }
+    }
+    return sub_claims >= 2;
+}
+
 } // namespace
 
 const char* FindingSeverityToString(FindingSeverity severity) {
@@ -275,9 +310,28 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
                                                const std::vector<std::string>& changed_element_ids) {
     std::vector<StagedFinding> findings;
 
-    const std::set<std::string> changed(changed_element_ids.begin(), changed_element_ids.end());
+    std::set<std::string> changed(changed_element_ids.begin(), changed_element_ids.end());
     if (changed.empty()) {
         return findings;
+    }
+
+    // A relationship is its own element, so attaching a child reports the new
+    // relationship and the new child as changed and leaves the parent looking
+    // untouched -- though its child set is exactly what changed. Relationship
+    // ids are not tree nodes and would otherwise be dropped here, so resolving
+    // them to the elements they connect both rescues an id that reports nothing
+    // and gives the parent-side checks the parent they are about. Without this,
+    // `check-explicit-strategy` could only ever fire when a decomposition was
+    // created whole in one change set.
+    for (const parser::SacmElement& element : preview.elements) {
+        if (element.id.empty() || changed.count(element.id) == 0) {
+            continue;
+        }
+        if (element.source_refs.empty() || element.target_refs.empty()) {
+            continue;
+        }
+        changed.insert(element.source_refs.begin(), element.source_refs.end());
+        changed.insert(element.target_refs.begin(), element.target_refs.end());
     }
 
     // Built rather than walked by hand: the tree already resolves which SACM
@@ -314,16 +368,34 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
                     id,
                     FindingSeverity::Advisory);
             }
+            if (IsUnexplainedDecomposition(*node)) {
+                Add(findings,
+                    kInferenceStep,
+                    "This claim is broken into sub-claims with no reasoning step saying how they "
+                    "were chosen or why together they support it. Add a strategy stating the "
+                    "decomposition rule.",
+                    id,
+                    FindingSeverity::Advisory);
+            }
             break;
 
         case NodeRole::Strategy:
+            // AR.1, not AR.2: an argument element's role is to explain the
+            // reasoning, and one that develops into nothing is not performing
+            // it. AR.2's check is on the decomposition above, handled under
+            // NodeRole::Claim.
             if (!has_support) {
+                // The role word is a discriminator, not an interpolation:
+                // `check-element-role-misuse` now backs two findings needing two
+                // sentences, and check_id alone can no longer choose between
+                // them at display.
                 Add(findings,
-                    kInferenceStep,
+                    kStructureCarriesArgument,
                     "This strategy develops into nothing. A decomposition step that produces no "
                     "sub-claims states an inference the argument never makes.",
                     id,
-                    FindingSeverity::Problem);
+                    FindingSeverity::Problem,
+                    {"strategy"});
             }
             break;
 
@@ -335,7 +407,8 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
                     "it should be a leaf. Elements hanging beneath it are not carrying the role "
                     "the structure says they are.",
                     id,
-                    FindingSeverity::Problem);
+                    FindingSeverity::Problem,
+                    {"solution"});
             }
             break;
 

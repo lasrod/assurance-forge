@@ -5,15 +5,26 @@
 namespace app::areas {
 
 std::string StagedFindingText(const core::sccg::StagedFinding& finding) {
-    // Keyed by check id, not guideline id: AR.1 backs two different findings
-    // (a solution with children, and a support cycle) that need two different
-    // sentences.
+    // Keyed by check id, not guideline id: AR.1 backs three different findings
+    // (a solution with children, a strategy developing into nothing, and a
+    // support cycle) that need three different sentences. Where two of them
+    // share a check id, `params[0]` chooses between them.
     if (finding.check_id == "check-evidence-trace") {
         return AF_TR("This claim has no support and is not marked undeveloped, so a reviewer cannot "
                      "tell whether evidence is missing or still to come. Give it support, or mark "
                      "it undeveloped to say so deliberately.");
     }
     if (finding.check_id == "check-explicit-strategy") {
+        return AF_TR("This claim is broken into sub-claims with no reasoning step saying how they "
+                     "were chosen or why together they support it. Add a strategy stating the "
+                     "decomposition rule.");
+    }
+    // Two findings share this check id, because both really are the catalog's
+    // role-misuse question. `params[0]` names which role, so the sentences stay
+    // separately translatable rather than one being a parameterized shell of the
+    // other -- they say different things, not the same thing about a different
+    // element.
+    if (finding.check_id == "check-element-role-misuse" && !finding.params.empty() && finding.params[0] == "strategy") {
         return AF_TR("This strategy develops into nothing. A decomposition step that produces no "
                      "sub-claims states an inference the argument never makes.");
     }

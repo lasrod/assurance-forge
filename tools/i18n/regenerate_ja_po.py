@@ -869,6 +869,10 @@ TRANSLATIONS = {
     "an inference the argument never makes.":
         "この戦略は何にも展開されていません。サブ主張を生まない分解ステップは、議論が一度も行わない推論を"
         "宣言していることになります。",
+    "This claim is broken into sub-claims with no reasoning step saying how they were chosen or "
+    "why together they support it. Add a strategy stating the decomposition rule.":
+        "この主張はサブ主張に分解されていますが、それらがどのように選ばれ、なぜ合わせて主張を支持するのかを"
+        "述べる推論ステップがありません。分解の根拠を示す戦略を追加してください。",
     "This is a solution -- the artefact or observation the argument rests on -- so it should be a "
     "leaf. Elements hanging beneath it are not carrying the role the structure says they are.":
         "これはソリューション、すなわち議論が依拠する成果物または観察であり、末端要素であるべきです。"

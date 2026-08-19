@@ -70,10 +70,16 @@ parser::AssuranceCase ModelWithEveryFinding() {
     parser::AssuranceCase model;
     // EV.1: no support, not undeveloped. CL.5: "safe" unbounded.
     model.elements.push_back(Claim("G1", "The vehicle is safe"));
-    // AR.2: a strategy developing into nothing.
+    // AR.1 role misuse: a strategy developing into nothing.
     model.elements.push_back(Claim("G2", "Top goal", true));
     model.elements.push_back(Strategy("S1", "Argue over hazards"));
     model.elements.push_back(Supports("R1", "S1", "G2"));
+    // AR.2 check-explicit-strategy: a decomposition with no reasoning step.
+    model.elements.push_back(Claim("G13", "Autonomy function safety is acceptable", true));
+    model.elements.push_back(Claim("G14", "Perception safety is acceptable", true));
+    model.elements.push_back(Claim("G15", "Planning safety is acceptable", true));
+    model.elements.push_back(Supports("R7", "G14", "G13"));
+    model.elements.push_back(Supports("R8", "G15", "G13"));
     // AR.1 role misuse: a solution with children.
     model.elements.push_back(Claim("G3", "Another goal", true));
     model.elements.push_back(Solution("Sn1"));
@@ -120,8 +126,25 @@ const std::vector<std::string>& EveryCheckId() {
 
 TEST(StagedFindingText, EnglishOutputMatchesTheFindingDetailForEveryCheck) {
     const parser::AssuranceCase model = ModelWithEveryFinding();
-    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(
-        model, {"G1", "G2", "S1", "G3", "Sn1", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12", "Sn2"});
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model,
+                                                                                            {"G1",
+                                                                                             "G2",
+                                                                                             "S1",
+                                                                                             "G3",
+                                                                                             "Sn1",
+                                                                                             "G4",
+                                                                                             "G5",
+                                                                                             "G6",
+                                                                                             "G7",
+                                                                                             "G8",
+                                                                                             "G9",
+                                                                                             "G10",
+                                                                                             "G11",
+                                                                                             "G12",
+                                                                                             "Sn2",
+                                                                                             "G13",
+                                                                                             "G14",
+                                                                                             "G15"});
 
     // Every template the helper knows must actually be exercised: a model that
     // stopped tripping a check would let its template rot unverified.

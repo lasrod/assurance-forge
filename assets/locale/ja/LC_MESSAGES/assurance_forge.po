@@ -2224,6 +2224,9 @@ msgstr "この主張は「{0} と {1}」を連結しており、これらは異�
 msgid "This claim has no support and is not marked undeveloped, so a reviewer cannot tell whether evidence is missing or still to come. Give it support, or mark it undeveloped to say so deliberately."
 msgstr "この主張には支持がなく、未展開とも示されていないため、レビュー担当者はエビデンスが欠けているのかこれから追加されるのかを判断できません。支持を与えるか、意図的である旨を示すために未展開としてマークしてください。"
 
+msgid "This claim is broken into sub-claims with no reasoning step saying how they were chosen or why together they support it. Add a strategy stating the decomposition rule."
+msgstr "この主張はサブ主張に分解されていますが、それらがどのように選ばれ、なぜ合わせて主張を支持するのかを述べる推論ステップがありません。分解の根拠を示す戦略を追加してください。"
+
 msgid "This claim joins \"{0} and {1}\" -- two distinct properties needing different evidence and review. Give each its own goal, so one can fail without hiding the other."
 msgstr "この主張は「{0} と {1}」を結合しており、これらは異なるエビデンスと審査を必要とする別個の性質です。それぞれを独立したゴールにして、一方の不成立がもう一方を隠さないようにしてください。"
 
