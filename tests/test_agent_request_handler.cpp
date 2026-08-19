@@ -711,7 +711,7 @@ TEST(AgentRequestHandler, SubmitRefusesStandingProblemFindingsUntilAcknowledged)
     ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
     const std::string group_id = begun.result["group_id"].get<std::string>();
 
-    // A strategy that develops into nothing: AR.2, Problem severity.
+    // A strategy that develops into nothing: AR.1 role misuse, Problem severity.
     const bridge::Response staged = app::HandleAgentRequest(
         MakeRequest(
             "stage_operations",

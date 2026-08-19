@@ -167,14 +167,18 @@ check the agent gets.
 unchanged; *tune* means thresholds or word lists need calibrating against real
 cases before shipping.
 
+Signatures below are as implemented. Where batch 1 differed from this plan's
+first draft, the reason is under **Corrections the catalog forced** after the
+table.
+
 | Guideline | Catalog check id | Decidable signature | Severity | Confidence |
 |---|---|---|---|---|
 | CL.1 | `check-claim-is-proposition` | Claim text with no predicate (bare noun phrase), or requirement phrasing ("shall", "must ensure") in place of a proposition | Advisory | tune |
 | CL.2 | `check-single-property` | Coordinating conjunction joining distinct properties in one goal ("safe and secure", "complete and correct", "as well as") | Advisory | firm |
 | CL.3 | `check-claim-length-and-role-mixing` | Sentence and word count over threshold; enumeration markers the catalog names ("including", "covering", "considering", "with respect to") introducing a topic list | Advisory | tune |
-| CL.4 | `check-claim-ambiguity` | The lexical fragment only: "appropriate", "adequate", "as necessary", "etc." — the same pattern as the existing CL.5 list | Advisory | firm |
-| CL.6 | `check-claim-step-mixing` | Inference connectives inside one claim ("because", "therefore", "since", "which means") | Advisory | firm |
-| RD.1 | `check-element-signposting` | Role/text mismatch: a goal or solution whose text opens with strategy signposting ("Argument over…", "Argument by…") | Problem | firm |
+| CL.4 | `check-claim-ambiguity` | **Deferred.** The word list appears nowhere in the catalog, and inventing one breaks the rule that word lists derive from the guideline. Waits for a catalog list or the phase 4 judgement channel | Advisory | deferred |
+| CL.6 | `check-claim-step-mixing` | Chained lifecycle-step verbs in one claim — the catalog's own bad example is "mitigated and validated" | Advisory | firm |
+| RD.1 | `check-element-signposting` | Inference connectives inside claim text ("because", "therefore") — the catalog's own RD.1 bad example. The "Argument over…" opener signature is deferred; it was this plan's invention and no catalog hint backs it | Advisory | firm |
 | RD.4 | `check-promotional-language` | Promotional adjectives ("excellent", "world-class", "state-of-the-art", "best-in-class") | Advisory | firm |
 | EV.3 | `check-claim-subject-not-document` | Solution text that is only an artifact name — a filename or a bare "X report" with no stated fact | Advisory | tune |
 | EV.4 | `check-evidence-citation-precision` | Evidence reference with no section, clause, table or test id — a dist precheck today unimplemented | Advisory | tune |

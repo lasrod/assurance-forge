@@ -61,7 +61,7 @@ nav:
     - Terminology Assist: features/terminology-assist.md
     - Confidence Panel Prototype: features/confidence-panel-prototype.md
     - MCP Server: features/mcp-server.md
-    - MCP Authoring Quality (planned): features/mcp-authoring-quality-plan.md
+    - MCP Authoring Quality: features/mcp-authoring-quality-plan.md
   - Roadmap:
     - Product Roadmap: roadmap/public.md
     - Workflow: roadmap/workflow.md

@@ -293,8 +293,9 @@ condenses.
 
     The mechanical set is the twelve catalog-bound checks AF-AI-024 records:
     the structural four (**EV.1** a claim with no support and no undeveloped
-    marker; **AR.2** a strategy that develops into nothing; **AR.1** a solution
-    with children, and support cycles) and the lexical eight (**CL.5**
+    marker; **AR.2** a decomposition whose sub-claims carry no reasoning step;
+    **AR.1** a solution with children, a strategy that develops into nothing,
+    and support cycles) and the lexical eight (**CL.5**
     unbounded qualifiers, **CL.2** bundled properties, **CL.6** chained
     lifecycle steps, **RD.1** reasoning inside claim text, **RD.4** promotional
     language, **EV.7** uncontrolled evidence references, **EV.8** mutable
