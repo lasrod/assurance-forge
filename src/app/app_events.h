@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/reviews/review_proposal.h"
+
 #include <algorithm>
 #include <functional>
 #include <string>
@@ -78,6 +80,9 @@ struct AiReviewProposalSuggestion {
     std::string review_item_id;
     std::string element_id;
     std::string suggested_text;
+    // The structural repair this finding asks for, where SCCG's answer is to
+    // add or re-attach an element rather than reword one.
+    std::vector<core::reviews::PatchOperation> proposed_operations;
 };
 
 struct AiReviewProposalSuggestionsEvent {

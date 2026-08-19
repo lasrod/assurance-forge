@@ -442,14 +442,17 @@ links later is not a schema break.
 
 ### S5 — Structural proposals
 
+**Status: done** — `proposed_operations[]` on a finding, bounded by the
+profile's own data packages.
+
 *Depends on: S1, S2. This is the phase that closes G1 and G2.*
 
-- [ ] Add `proposed_operations[]` to the result contract and schema text.
-- [ ] Validate against the vocabulary, the 5.2 scope rule, and the three
+- [x] Add `proposed_operations[]` to the result contract and schema text.
+- [x] Validate against the vocabulary, the 5.2 scope rule, and the three
       layered checks.
-- [ ] Normalize `suggested_element_text` into one `UpdateElementText`.
-- [ ] Stage multi-operation groups, atomically per 13.6.
-- [ ] Prompt guidance describing when each `Create*` is the SCCG repair.
+- [x] Normalize `suggested_element_text` into one `UpdateElementText`.
+- [x] Stage multi-operation groups, atomically per 13.6.
+- [x] Prompt guidance describing when each `Create*` is the SCCG repair.
 
 **Exit:** an AR.2 finding on a goal with children and no strategy produces a
 draft group containing `CreateStrategy` plus the re-parenting operations, the

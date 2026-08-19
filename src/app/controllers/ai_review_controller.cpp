@@ -519,10 +519,15 @@ void AiReviewController::PollTask() {
                                                             problem.severity,
                                                             timestamp,
                                                             problem.guideline_id));
-        if (problem_index < parse_result.suggestedElementTexts.size() &&
-            !parse_result.suggestedElementTexts[problem_index].empty()) {
-            proposal_suggestions.push_back(AiReviewProposalSuggestion{
-                review_item_id, pending_review_element_id_, parse_result.suggestedElementTexts[problem_index]});
+        const std::string suggested_text = problem_index < parse_result.suggestedElementTexts.size()
+                                               ? parse_result.suggestedElementTexts[problem_index]
+                                               : std::string{};
+        const std::vector<core::reviews::PatchOperation> operations =
+            problem_index < parse_result.proposedOperations.size() ? parse_result.proposedOperations[problem_index]
+                                                                   : std::vector<core::reviews::PatchOperation>{};
+        if (!suggested_text.empty() || !operations.empty()) {
+            proposal_suggestions.push_back(
+                AiReviewProposalSuggestion{review_item_id, pending_review_element_id_, suggested_text, operations});
         }
     }
 

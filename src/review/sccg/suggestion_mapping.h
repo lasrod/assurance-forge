@@ -37,12 +37,25 @@ struct ReviewSuggestion {
     std::string title;
     std::string message;
     std::vector<std::string> guideline_ids;
+    // The structural repair the finding asks for, when SCCG's answer is to add
+    // or re-attach an element rather than reword one. Takes precedence over
+    // `suggested_text`, which stays the shorthand for the text-only case.
+    std::vector<core::reviews::PatchOperation> proposed_operations;
 };
 
-// Which review run these suggestions came from.
+// Which review run these suggestions came from, and what it was allowed to see.
 struct ReviewSuggestionContext {
     std::string review_profile_name;
     std::string review_run_id;
+    // The elements the review read -- `review::ReviewedElementIds`. A proposal
+    // may touch these and elements it creates itself, and nothing else.
+    //
+    // The bound is SCCG's own: a profile's required data packages say what a
+    // review of this element is entitled to reason about, so they also say how
+    // far its repair may reach. A review shown one claim and its children has no
+    // business rewiring a branch it never saw, and a reviewer should not have to
+    // check whether it did.
+    std::vector<std::string> reviewed_element_ids;
 };
 
 // A group the review is asking for, and the operations that make it. The caller
@@ -81,8 +94,16 @@ ElementTextTarget TextTargetFor(const parser::SacmElement& element);
 // in the model, or whose text already matches what the element says. None of
 // those is an error worth telling a user about: they are a review agreeing with
 // a change that already happened.
-std::vector<SuggestedDraftGroup> MapSuggestionsToDraftGroups(const parser::AssuranceCase& working,
-                                                             const std::vector<ReviewSuggestion>& suggestions,
-                                                             const ReviewSuggestionContext& context);
+// Groups that should be staged, and what was refused on the way. Refusals are
+// carried rather than dropped: a finding whose repair silently vanished reads
+// to a reviewer as a finding nobody could fix.
+struct SuggestionMappingResult {
+    std::vector<SuggestedDraftGroup> groups;
+    std::vector<std::string> refusals;
+};
+
+SuggestionMappingResult MapSuggestionsToDraftGroups(const parser::AssuranceCase& working,
+                                                    const std::vector<ReviewSuggestion>& suggestions,
+                                                    const ReviewSuggestionContext& context);
 
 } // namespace review

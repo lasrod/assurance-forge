@@ -439,15 +439,18 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
                                                        suggestion.suggested_text,
                                                        item->title,
                                                        item->message,
-                                                       item->guideline_ids});
+                                                       item->guideline_ids,
+                                                       suggestion.proposed_operations});
     }
 
-    const review::ReviewSuggestionContext context{event.review_profile_name, event.review_run_id};
-    const std::vector<review::SuggestedDraftGroup> mapped =
-        review::MapSuggestionsToDraftGroups(working, suggestions, context);
+    const review::ReviewSuggestionContext context{
+        event.review_profile_name, event.review_run_id, event.reviewed_element_ids};
+    const review::SuggestionMappingResult mapped = review::MapSuggestionsToDraftGroups(working, suggestions, context);
+    for (const std::string& refusal : mapped.refusals)
+        SetStatus(state_, refusal);
 
     size_t staged_count = 0;
-    for (const review::SuggestedDraftGroup& group : mapped) {
+    for (const review::SuggestedDraftGroup& group : mapped.groups) {
         std::string error;
         const std::string group_id = state_.draft_workspace.BeginGroup(group.request, accepted, error);
         if (group_id.empty()) {
