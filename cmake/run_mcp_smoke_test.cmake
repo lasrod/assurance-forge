@@ -112,7 +112,11 @@ endforeach()
 #     document title, so an empty heading here was the observable defect).
 #   - CL.1 proves real guideline text came back, not a placeholder.
 #   - CL.5 proves the translate prompt carries the qualifier rule it cites.
-foreach(_needle "# Safety Case Core Guidelines" "CL.1" "CL.5")
+#   - "is two goals" is a phrase unique to the authoring doctrine, so it proves
+#     the initialize instructions carried the doctrine through the shipped
+#     binary -- in both consent modes, because the doctrine is the public house
+#     rules, not case content.
+foreach(_needle "# Safety Case Core Guidelines" "CL.1" "CL.5" "is two goals")
     string(FIND "${_stdout}" "${_needle}" _found)
     if(_found EQUAL -1)
         message(FATAL_ERROR "SCCG surface did not contain ${_needle}\nstdout:\n${_stdout}")

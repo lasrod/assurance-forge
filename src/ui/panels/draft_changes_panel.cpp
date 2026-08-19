@@ -144,6 +144,20 @@ void RenderRow(const DraftChangeRow& row, const DraftChangesPanelCallbacks& call
         }
     }
 
+    if (!row.acknowledged_findings.empty()) {
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        // The header is translated; the entries are provenance and appear as
+        // stored, because the reviewer must see exactly what the author
+        // acknowledged, not a later rendering of it.
+        ImGui::TextUnformatted(AF_TR("Submitted despite these problem findings, acknowledged by the author:").c_str());
+        ImGui::PopStyleColor();
+        for (const std::string& finding : row.acknowledged_findings) {
+            ImGui::Bullet();
+            ImGui::TextWrapped("%s", finding.c_str());
+        }
+    }
+
     if (row.needs_attention) {
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));

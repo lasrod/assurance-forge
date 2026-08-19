@@ -187,6 +187,10 @@ nlohmann::json GroupJson(const core::drafts::DraftChangeGroup& group, bool inclu
                            {"depends_on_group_ids", group.depends_on_group_ids},
                            {"guideline_ids", group.guideline_ids},
                            {"review_item_ids", group.review_item_ids}};
+    // Only when something was acknowledged: an absent key reads as the normal
+    // case, and the normal case is a clean submission.
+    if (!group.acknowledged_findings.empty())
+        payload["acknowledged_findings"] = group.acknowledged_findings;
     if (include_operations)
         payload["operations"] = OperationsJson(group);
     return payload;
@@ -211,6 +215,10 @@ nlohmann::json FindingsJson(const core::drafts::DraftMaterializationResult& mate
     for (const core::sccg::StagedFinding& finding : materialized.sccg_findings) {
         findings.push_back(nlohmann::json{{"kind", "sccg"},
                                           {"guideline_id", finding.guideline_id},
+                                          // The catalog's stable name for the rule, so an agent can
+                                          // deduplicate findings across staging calls instead of
+                                          // re-reading the sentence each time.
+                                          {"check_id", finding.check_id},
                                           {"element_id", finding.element_id},
                                           {"message", finding.detail},
                                           {"severity", core::sccg::FindingSeverityToString(finding.severity)}});
@@ -337,6 +345,66 @@ Result StageDraftOperations(const DraftContext& context, const nlohmann::json& a
     return Result::Ok(std::move(payload));
 }
 
+Result CheckDraftOperations(const DraftContext& context, const nlohmann::json& arguments) {
+    if (!context.state.loaded_case.has_value())
+        return Result::Error("No assurance case is loaded, so there is nothing to check against.");
+
+    std::vector<core::reviews::PatchOperation> operations;
+    std::string error;
+    const nlohmann::json::const_iterator supplied = arguments.find("operations");
+    if (supplied == arguments.end() || !ParsePatchOperations(*supplied, operations, error))
+        return DraftError(error.empty() ? "\"operations\" must be a non-empty array." : error,
+                          context.store.revision());
+
+    // The whole point is that nothing below touches the store: the rehearsal
+    // runs on a copy of the workspace, so no revision moves, nothing is saved,
+    // and nothing flickers onto the user's canvas while the agent iterates.
+    core::drafts::DraftWorkspace rehearsal;
+    if (context.store.workspace() != nullptr)
+        rehearsal = *context.store.workspace();
+
+    // An explicit group_id -- or the session's open group, exactly the default
+    // stage_operations would use -- rehearses "appended to that group".
+    // Without one, the operations rehearse as a group of their own.
+    const std::string group_id = GroupIdArgument(context, arguments);
+    if (!group_id.empty()) {
+        Result refusal;
+        if (FindOwnedGroup(context, group_id, refusal) == nullptr)
+            return refusal;
+        core::drafts::DraftChangeGroup* target = rehearsal.FindGroup(group_id);
+        target->operations.insert(target->operations.end(), operations.begin(), operations.end());
+    } else {
+        core::drafts::DraftChangeGroup hypothetical;
+        hypothetical.id = "$rehearsal";
+        while (rehearsal.FindGroup(hypothetical.id) != nullptr)
+            hypothetical.id += "$";
+        hypothetical.sequence = rehearsal.next_sequence++;
+        hypothetical.title = "Rehearsal";
+        hypothetical.source = core::drafts::DraftSource::Mcp;
+        hypothetical.source_session_id = SessionId(context);
+        hypothetical.operations = operations;
+        rehearsal.groups.push_back(std::move(hypothetical));
+    }
+
+    core::drafts::DraftMaterializationResult materialized = core::drafts::MaterializeDraft(
+        rehearsal, context.state.loaded_case.value(), context.store.authoritative_identities());
+
+    nlohmann::json payload;
+    payload["materializes"] = materialized.success;
+    payload["checked_operation_count"] = static_cast<int>(operations.size());
+    if (materialized.success)
+        payload["findings"] = FindingsJson(materialized);
+    else
+        payload["problem"] = materialized.error;
+    // Ids allocated during the rehearsal die with it, and returning them would
+    // invite an agent to refer to an element that will get a different id when
+    // the operations are really staged.
+    payload["rehearsal"] = "Nothing was staged and no element ids were allocated. When the operations are "
+                           "clean, stage them with stage_operations.";
+    AddWorkspaceEnvelope(context, payload);
+    return Result::Ok(std::move(payload));
+}
+
 Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     if (!context.state.loaded_case.has_value())
         return Result::Error("No assurance case is loaded, so there is nothing to draft against.");
@@ -391,6 +459,41 @@ Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& ar
     return DescribeGroupResult(context, *group);
 }
 
+// The Problem-severity findings standing against one group in the current
+// working draft, each named the way the group's author saw it in the staging
+// results. Advisory findings are deliberately absent: they are the reviewer's
+// judgement call, and gating on them would train agents to acknowledge
+// reflexively -- which would spend the one gate this surface has.
+std::vector<std::string> StandingProblemFindings(const DraftContext& context, const std::string& group_id) {
+    std::vector<std::string> problems;
+    if (!context.state.loaded_case.has_value())
+        return problems;
+    const core::drafts::DraftMaterializationResult& materialized =
+        context.store.Materialize(context.state.loaded_case.value(), context.state.case_revision);
+    if (!materialized.success)
+        return problems;
+
+    const auto attributed_to_group = [&](const std::string& element_id) {
+        const std::vector<std::string> contributors = materialized.change_index.ContributingGroupIds(element_id);
+        return std::find(contributors.begin(), contributors.end(), group_id) != contributors.end();
+    };
+
+    for (const core::sccg::StagedFinding& finding : materialized.sccg_findings) {
+        if (finding.severity != core::sccg::FindingSeverity::Problem || !attributed_to_group(finding.element_id))
+            continue;
+        problems.push_back(finding.guideline_id + " " + finding.element_id + ": " + finding.detail);
+    }
+    // GSN well-formedness findings are always problems -- that is what
+    // well-formedness means -- so they gate alongside the SCCG problems.
+    for (const core::GsnFinding& finding : materialized.gsn_findings) {
+        if (finding.element_id.empty() || !attributed_to_group(finding.element_id))
+            continue;
+        problems.push_back(std::string(core::GsnRequirementId(finding.rule)) + " " + finding.element_id + ": " +
+                           finding.detail);
+    }
+    return problems;
+}
+
 Result SubmitChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
@@ -401,8 +504,32 @@ Result SubmitChangeGroup(const DraftContext& context, const nlohmann::json& argu
     if (FindOwnedGroup(context, group_id, refusal) == nullptr)
         return refusal;
 
+    // The gate sits here, not at staging: staging is deliberately incremental
+    // and every intermediate shape is legitimately unfinished, but submit is
+    // the author declaring itself done -- the one moment "a reviewer will
+    // certainly reject this shape" is worth refusing over.
+    const std::vector<std::string> standing_problems = StandingProblemFindings(context, group_id);
+    const bool acknowledged = arguments.contains("acknowledge_findings") &&
+                              arguments["acknowledge_findings"].is_boolean() &&
+                              arguments["acknowledge_findings"].get<bool>();
+    if (!standing_problems.empty() && !acknowledged) {
+        nlohmann::json problems = nlohmann::json::array();
+        for (const std::string& problem : standing_problems)
+            problems.push_back(problem);
+        return Result{nlohmann::json{{"error",
+                                      "This group still has " + std::to_string(standing_problems.size()) +
+                                          " problem-severity finding" + (standing_problems.size() == 1 ? "" : "s") +
+                                          " a reviewer will certainly reject, listed in problem_findings. Fix them "
+                                          "and submit again -- or repeat this call with \"acknowledge_findings\": "
+                                          "true to hand the group over anyway, which records the acknowledgment on "
+                                          "the group for the reviewer to see."},
+                                     {"problem_findings", std::move(problems)},
+                                     {"current_working_revision", context.store.revision()}},
+                      true};
+    }
+
     std::string error;
-    if (!context.store.MarkGroupReady(group_id, error))
+    if (!context.store.MarkGroupReady(group_id, error, acknowledged ? standing_problems : std::vector<std::string>{}))
         return DraftError(error, context.store.revision());
     return DescribeChangeGroup(context, nlohmann::json{{"group_id", group_id}});
 }

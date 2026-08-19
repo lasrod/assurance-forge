@@ -10,3 +10,4 @@ Then Terminology Assist when you need to manage controlled vocabulary, define ac
 - [Terminology Assist](terminology-assist.md)
 - [Confidence Panel Prototype](confidence-panel-prototype.md)
 - [MCP Server](mcp-server.md) — read and build integrated draft groups from your own AI client
+- [MCP Authoring Quality](mcp-authoring-quality-plan.md) — deliver SCCG authoring guidance through the channels that reach an agent even when the user's prompt says nothing about it. Phases 1-3 are implemented; judgement where mechanics end is still planned

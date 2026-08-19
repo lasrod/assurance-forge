@@ -2059,6 +2059,9 @@ msgstr "ストラテジ表現の移行に失敗しました: {0}"
 msgid "Strategy {0} is wired as an end of relationship {1}. A Strategy is the reasoning of an inference, not one of its ends."
 msgstr "戦略 {0} が関係 {1} の端点として接続されています。戦略は推論の理由付けであり、その端点ではありません。"
 
+msgid "Submitted despite these problem findings, acknowledged by the author:"
+msgstr "作成者が以下の問題指摘を承知の上で提出しました:"
+
 msgid "Summary:"
 msgstr "要約:"
 
@@ -2206,11 +2209,32 @@ msgstr "テーマ"
 msgid "There is nothing to reject."
 msgstr "却下できるものがありません。"
 
+msgid "These operations put a claim in its own support chain, so the argument supports itself and establishes nothing."
+msgstr "これらの操作は主張を自身の支持連鎖に組み込むため、議論が自らを支持することになり、何も立証しません。"
+
 msgid "They stop being applied to the working draft and are marked as needing attention, so their author can retarget them."
 msgstr "作業ドラフトへの適用が停止され、要対応として表示されます。作成者が対象を修正できます。"
 
 msgid "This change was written against {0}. Open that argument to review it."
 msgstr "この変更は {0} に対して作成されました。レビューするにはその論証を開いてください。"
+
+msgid "This claim carries its own reasoning (\"{0}\"), so a reviewer cannot tell the claim from the argument for it. State the claim alone; the reasoning belongs in a strategy and the evidence in a solution."
+msgstr "この主張は自らの論拠（「{0}」）を含んでいるため、レビュー担当者は主張とその論証を区別できません。主張は主張のみを述べ、論拠は戦略に、エビデンスはソリューションに置いてください。"
+
+msgid "This claim chains \"{0} and {1}\" -- different logical steps answering different review questions. Give each step its own claim, and let the structure show the decomposition."
+msgstr "この主張は「{0} と {1}」を連結しており、これらは異なる審査上の問いに答える別個の論理ステップです。各ステップを独立した主張にして、分解は構造で示してください。"
+
+msgid "This claim has no support and is not marked undeveloped, so a reviewer cannot tell whether evidence is missing or still to come. Give it support, or mark it undeveloped to say so deliberately."
+msgstr "この主張には支持がなく、未展開とも示されていないため、レビュー担当者はエビデンスが欠けているのかこれから追加されるのかを判断できません。支持を与えるか、意図的である旨を示すために未展開としてマークしてください。"
+
+msgid "This claim is broken into sub-claims with no reasoning step saying how they were chosen or why together they support it. Add a strategy stating the decomposition rule."
+msgstr "この主張はサブ主張に分解されていますが、それらがどのように選ばれ、なぜ合わせて主張を支持するのかを述べる推論ステップがありません。分解の根拠を示す戦略を追加してください。"
+
+msgid "This claim joins \"{0} and {1}\" -- two distinct properties needing different evidence and review. Give each its own goal, so one can fail without hiding the other."
+msgstr "この主張は「{0} と {1}」を結合しており、これらは異なるエビデンスと審査を必要とする別個の性質です。それぞれを独立したゴールにして、一方の不成立がもう一方を隠さないようにしてください。"
+
+msgid "This claim uses \"{0}\", which SCCG names as a term needing bounds. Say what it means here -- against which hazards, in which operating conditions, to what standard -- in the claim or in attached context."
+msgstr "この主張は「{0}」を使用しており、SCCG はこれを境界付けが必要な用語として挙げています。どのハザードに対して、どの運用条件で、どの基準に照らしてなのか、その意味を主張内または付属するコンテキストで明示してください。"
 
 msgid "This confidence assessment may be stale because the element changed after the value was stored."
 msgstr "この信頼度評価は古い可能性があります — 値が保存された後に要素が変更されました。"
@@ -2236,11 +2260,20 @@ msgstr "この要素は削除が提案されています。"
 msgid "This element is proposed to change."
 msgstr "この要素は変更が提案されています。"
 
+msgid "This evidence cites \"{0}\", which reads as live mutable content. Cite a fixed version, revision, or archived snapshot, so the reviewed argument always refers to the same content."
+msgstr "このエビデンスは「{0}」を引用しており、これは変更されうるライブコンテンツと読めます。レビューされた議論が常に同じ内容を参照するよう、固定されたバージョン、リビジョン、またはアーカイブ済みスナップショットを引用してください。"
+
+msgid "This evidence reference carries no owner, version, date, or status, so a reviewer cannot tell which artifact was assessed or whether it has changed since. Cite the controlled version."
+msgstr "このエビデンス参照には所有者・バージョン・日付・ステータスのいずれもないため、レビュー担当者はどの成果物が評価されたのか、その後変更されていないかを判断できません。管理されたバージョンを引用してください。"
+
 msgid "This frame: {0:.2f} ms render across {1} buckets"
 msgstr "このフレーム: {0:.2f} ms ({1} バケット)"
 
 msgid "This is a preview. The project model has not been changed."
 msgstr "これはプレビューです。プロジェクトモデルは変更されていません。"
+
+msgid "This is a solution -- the artefact or observation the argument rests on -- so it should be a leaf. Elements hanging beneath it are not carrying the role the structure says they are."
+msgstr "これはソリューション、すなわち議論が依拠する成果物または観察であり、末端要素であるべきです。その下にぶら下がる要素は、構造が示す役割を果たしていません。"
 
 msgid "This node only ({0})"
 msgstr "このノードのみ ({0})"
@@ -2250,6 +2283,15 @@ msgstr "このプロジェクトは別の Assurance Forge インスタンス（�
 
 msgid "This project does not have an audit store yet."
 msgstr "このプロジェクトにはまだ監査ストアがありません。"
+
+msgid "This strategy develops into nothing. A decomposition step that produces no sub-claims states an inference the argument never makes."
+msgstr "この戦略は何にも展開されていません。サブ主張を生まない分解ステップは、議論が一度も行わない推論を宣言していることになります。"
+
+msgid "This text calls the work \"{0}\". Promotional language persuades nobody reviewing a safety argument; state what was shown, and under which assumptions."
+msgstr "このテキストは成果を「{0}」と称しています。宣伝的な言葉は安全性議論のレビューでは何の説得力も持ちません。何がどの前提の下で示されたのかを述べてください。"
+
+msgid "This text treats the absence of discovered evidence as support. Not finding something does not establish the claim; argue from what the applied methods can show."
+msgstr "このテキストは、反証が見つからなかったことを支持として扱っています。何かが見つからないことは主張を立証しません。適用した手法が示せることに基づいて論証してください。"
 
 msgid "This will rebuild the audit store."
 msgstr "監査ストアを再構築します。"

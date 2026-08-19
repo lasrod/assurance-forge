@@ -137,14 +137,27 @@ the user and SCCG review.
 
 1. Read the case or call `get_draft_status` and retain `working_revision`.
 2. `begin_change_group` with a title, rationale and that expected revision.
-3. `stage_operations` in small steps. Each call returns stable generated ids,
+3. `check_operations` rehearses operations on a copy of the draft first — the
+   same validation and findings staging would return, with nothing stored, no
+   ids allocated and nothing drawn on the user's canvas, so an agent iterates
+   privately instead of flickering half-finished work in front of the user. It
+   also works offline, against the accepted case.
+4. `stage_operations` in small steps. Each call returns stable generated ids,
    combined findings and the next revision.
-4. Use `replace_change_group` to revise the group wholesale after feedback;
+5. Use `replace_change_group` to revise the group wholesale after feedback;
    `describe_change_group` and `describe_working_draft` inspect the contribution
    and its effect on the combination.
-5. `get_draft_events(after_revision)` reports what other contributors changed.
-6. `submit_change_group` marks the work ready for the user. `remove_change_group`
-   or `close_change_group` abandons it without deleting its provenance record.
+6. `get_draft_events(after_revision)` reports what other contributors changed.
+7. `submit_change_group` marks the work ready for the user — and is **refused
+   while problem-severity findings stand against the group**, each one named in
+   the refusal. Staging deliberately never refuses on findings, because every
+   intermediate shape is legitimately unfinished; submit is the author
+   declaring itself done. `acknowledge_findings: true` submits anyway and
+   records the acknowledged findings on the group, where the reviewer sees
+   them; a later restage clears the record, since it described a superseded
+   shape. Advisory findings never refuse anything. `remove_change_group`
+   or `close_change_group` abandons the group without deleting its provenance
+   record.
 
 Every modifying call carries `expected_working_revision`. If a human edit, SCCG
 review or another MCP client changed the shared draft, the call is refused with
@@ -246,7 +259,9 @@ than choosing one proposal to preview.
 
 ## SCCG
 
-Three mechanisms, weakest first.
+Three mechanisms, weakest first — then the doctrine, which exists because all
+three land only when the user or client asks. The plan for the rest of this
+surface is [MCP authoring quality](mcp-authoring-quality-plan.md).
 
 **Resources.** `sccg://guidelines` publishes the catalog, so a client can load
 the rules at the start of a session.
@@ -259,17 +274,37 @@ rules *before* it writes.
 **Checks on staged work.** Returned in the result of every staging call so the
 agent self-corrects, and shown on the integrated draft for the reviewer.
 
+**The authoring doctrine** (AF-AI-023). A ~15-line condensation — one rule per
+line, each naming the guideline it condenses, every SCCG family represented —
+delivered through the channels that reach the model even when nobody asked:
+`initialize.instructions`, an `authoring_guidance` field on the pre-write reads
+(`get_case_overview`, `get_argument_tree`, `suggest_placement`,
+`get_draft_status` — the looped reads stay lean deliberately), and the
+operation schema's `text` description, which is in context at the moment a
+claim's words are generated. Every id the doctrine names is resolved against
+the catalog by a test, so the condensation cannot outlive the rules it
+condenses.
+
 !!! warning "What the checks do and do not cover"
     Most of SCCG is prose only a reader can judge — whether a claim is
     *sufficiently* justified, whether evidence is *relevant*. Those are not
     decidable here, and claiming otherwise would make a green result read as
     conformance.
 
-    The mechanical set is: **EV.1** a claim with no support and no undeveloped
-    marker; **AR.2** a strategy that develops into nothing; **AR.1** a solution
-    with children, and support cycles; **CL.5** an unbounded qualifier from the
-    list SCCG itself names. Findings are advisory and never block acceptance —
-    the reviewer is the authority on a safety argument.
+    The mechanical set is the twelve catalog-bound checks AF-AI-024 records:
+    the structural four (**EV.1** a claim with no support and no undeveloped
+    marker; **AR.2** a decomposition whose sub-claims carry no reasoning step;
+    **AR.1** a solution with children, a strategy that develops into nothing,
+    and support cycles) and the lexical eight (**CL.5**
+    unbounded qualifiers, **CL.2** bundled properties, **CL.6** chained
+    lifecycle steps, **RD.1** reasoning inside claim text, **RD.4** promotional
+    language, **EV.7** uncontrolled evidence references, **EV.8** mutable
+    sources cited unfixed, **LF.3** absence offered as support). Every lexical
+    check is proven against the guideline's own bad and good examples, read
+    from the catalog. Lexical findings are advisory. Problem-severity findings
+    gate one thing only: an agent's `submit_change_group`, which refuses until
+    they are fixed or explicitly acknowledged (AF-AI-025). Nothing here ever
+    blocks *acceptance* — the reviewer is the authority on a safety argument.
 
 ## Consent
 

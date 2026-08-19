@@ -196,6 +196,7 @@ nlohmann::json SccgFindingsJson(const core::changesets::ChangeSetDiff& diff) {
     for (const core::sccg::StagedFinding& finding : core::sccg::CheckStagedArgument(diff.preview_model, touched)) {
         findings.push_back(nlohmann::json{
             {"guideline_id", finding.guideline_id},
+            {"check_id", finding.check_id},
             {"guideline", finding.statement},
             {"element_id", finding.element_id},
             {"detail", finding.detail},

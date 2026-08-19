@@ -1,6 +1,7 @@
 #include "app/areas/draft_changes_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/staged_finding_text.h"
 #include "core/drafts/draft_dependency_graph.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "parser/model_utils.h"
@@ -145,10 +146,11 @@ std::vector<std::string> FindingsForGroup(const core::drafts::DraftMaterializati
         const std::vector<std::string> contributors = result.change_index.ContributingGroupIds(finding.element_id);
         if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
             continue;
-        // Joined rather than translated: a guideline id and a detail with a
-        // colon between them is not a sentence a translator can improve.
-        findings.push_back(finding.guideline_id.empty() ? finding.detail
-                                                        : finding.guideline_id + ": " + finding.detail);
+        // The detail is translated by check id; the join stays untranslated
+        // because a guideline id and a colon are not a sentence a translator
+        // can improve.
+        const std::string text = StagedFindingText(finding);
+        findings.push_back(finding.guideline_id.empty() ? text : finding.guideline_id + ": " + text);
     }
     return findings;
 }
@@ -356,6 +358,8 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
 
         for (const std::string& dependency : group.depends_on_group_ids)
             row.depends_on_titles.push_back(TitleOf(*workspace, dependency));
+
+        row.acknowledged_findings = group.acknowledged_findings;
 
         if (materialization != nullptr) {
             row.glossary_lines = GlossaryLinesForGroup(*materialization, group.id);

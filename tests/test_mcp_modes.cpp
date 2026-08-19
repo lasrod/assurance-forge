@@ -208,6 +208,56 @@ TEST(McpOffline, LeavesEveryProjectFileByteIdentical) {
     EXPECT_EQ(SnapshotTree(fixture->project_root), before);
 }
 
+// The one draft-vocabulary tool that works offline, because it is a read: the
+// rehearsal runs on a copy and the accepted case is all it needs. An agent can
+// therefore polish its operations before the application is even running.
+TEST(McpOffline, ChecksOperationsAsARehearsalWithoutWritingAnything) {
+    std::unique_ptr<Fixture> fixture = MakeOfflineFixture("checkops");
+    ASSERT_NE(fixture, nullptr);
+
+    const std::map<std::string, std::string> before = SnapshotTree(fixture->project_root);
+
+    mcp::Server server(*fixture->session);
+    Initialize(server);
+
+    const ToolCall claims = CallTool(server, "find_elements", {{"type", "claim"}, {"limit", 1}});
+    ASSERT_FALSE(claims.is_error) << claims.payload.dump();
+    ASSERT_FALSE(claims.payload["matches"].empty());
+    const std::string top_goal = claims.payload["matches"][0]["id"].get<std::string>();
+
+    // An empty strategy under the top goal: the rehearsal reports the AR.2
+    // problem staging would, and an unsupported claim reports EV.1.
+    const ToolCall checked = CallTool(
+        server,
+        "check_operations",
+        {{"operations",
+          nlohmann::json::array(
+              {{{"type", "CreateStrategy"}, {"create_ref", "$s"}, {"text", "Argue over hazards"}},
+               {{"type", "AddSupportedBy"}, {"source", {{"ref", "$s"}}}, {"target", {{"id", top_goal}}}},
+               {{"type", "CreateClaim"}, {"create_ref", "$c"}, {"text", "An unsupported rehearsed claim"}}})}});
+    ASSERT_FALSE(checked.is_error) << checked.payload.dump();
+    EXPECT_TRUE(checked.payload.value("materializes", false));
+    EXPECT_EQ(checked.payload["view"], "accepted");
+    EXPECT_TRUE(checked.payload.contains("rehearsal"));
+
+    bool empty_strategy_reported = false;
+    bool unsupported_claim_reported = false;
+    for (const nlohmann::json& finding : checked.payload["findings"]) {
+        // A strategy that develops into nothing is AR.1 role misuse. AR.2's
+        // `check-explicit-strategy` asks the opposite question, about a
+        // decomposition that has no reasoning step at all.
+        if (finding.value("check_id", "") == "check-element-role-misuse")
+            empty_strategy_reported = true;
+        if (finding.value("check_id", "") == "check-evidence-trace")
+            unsupported_claim_reported = true;
+    }
+    EXPECT_TRUE(empty_strategy_reported) << checked.payload.dump();
+    EXPECT_TRUE(unsupported_claim_reported) << checked.payload.dump();
+
+    // A rehearsal is a read: not a byte moved, no `.af/drafts` appeared.
+    EXPECT_EQ(SnapshotTree(fixture->project_root), before);
+}
+
 TEST(McpOffline, ListsEveryArgumentAndMarksTheLoadedOne) {
     std::unique_ptr<Fixture> fixture = MakeOfflineFixture("listfiles");
     ASSERT_NE(fixture, nullptr);

@@ -37,6 +37,7 @@ add_library(af_app OBJECT
     areas/project_explorer_area.cpp
     areas/proposal_editor_area.cpp
     areas/review_panel_area.cpp
+    areas/staged_finding_text.cpp
     areas/term_usages_area.cpp
     areas/workbench_area.cpp
     commands/dispatch.cpp

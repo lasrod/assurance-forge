@@ -118,7 +118,13 @@ nlohmann::json Server::HandleInitialize(const jsonrpc::Request& request) {
     // promise -- but a client that never calls get_connection_status should
     // still learn from the handshake what kind of session it got and that a
     // missing application heals without restarting anything.
-    const std::string instructions =
+    //
+    // The authoring doctrine rides along because this field is the one text a
+    // client may hand its model without anyone asking -- the user's prompt
+    // rarely says what SCCG says, so the handshake has to. Clients differ in
+    // whether they surface instructions at all, which is why the same doctrine
+    // also travels on the pre-write read results (see mcp/tools.cpp).
+    const std::string mode_statement =
         session_.connected()
             ? "Connected to a running Assurance Forge" +
                   (session_.application_version().empty() ? std::string() : " " + session_.application_version()) +
@@ -129,6 +135,7 @@ nlohmann::json Server::HandleInitialize(const jsonrpc::Request& request) {
               "the last accepted version on disk and draft tools are unavailable. The session connects "
               "automatically once the application has the project open -- call get_connection_status to "
               "check, and simply retry after the user starts Assurance Forge.";
+    const std::string instructions = mode_statement + "\n\n" + AuthoringDoctrine();
 
     return jsonrpc::MakeResult(request.id,
                                nlohmann::json{

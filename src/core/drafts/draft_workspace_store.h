@@ -114,7 +114,13 @@ public:
                            const core::AssuranceCase& accepted,
                            std::string& error);
 
-    bool MarkGroupReady(const std::string& group_id, std::string& error);
+    // `acknowledged_findings` records the Problem findings the submitter chose
+    // to hand over unresolved -- see DraftChangeGroup::acknowledged_findings.
+    // The caller decides whether submission with standing problems is allowed;
+    // the store only keeps the record.
+    bool MarkGroupReady(const std::string& group_id,
+                        std::string& error,
+                        std::vector<std::string> acknowledged_findings = {});
 
     // Rejects a group. It stops taking part in materialization but is kept, so
     // the record of what was proposed and declined survives.

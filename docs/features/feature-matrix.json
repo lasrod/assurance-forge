@@ -1494,7 +1494,7 @@
         "tests/test_agent_request_handler.cpp",
         "tests/test_draft_workspace.cpp"
       ],
-      "notes": "Three mechanisms. **Resources**: `sccg://guidelines` publishes the catalog over MCP (with a heading fallback, because the dist files the runtime loads carry no document metadata), and `resources/templates/list` publishes `sccg://guideline/{id}` for one guideline at a time. The MCP executable carries its own `data/sccg/dist` copy, and the stdio smoke test drives `resources/read` and `prompts/get` through the real process in both consent modes — SCCG is the public corpus, not case content, so it is deliberately readable before consent. **Prompts**: `draft_argument_from_standard`, `add_argumentation`, `restructure_case` and `translate_case` each carry the guidance for that job, quoted from the catalog so prompt and guideline cannot drift (`translate_case` quotes CL.5, the qualifier rule its prose states informally); the workflow text tells agents to use revision-checked integrated draft groups, and to write every new element in each language the case is maintained in (AF-AI-019). **Checks**: every staging result returns SCCG and structural findings against the complete materialized draft, and the same findings are available through `describe_working_draft`. The mechanical set is deliberately narrow and individually tested — EV.1 (claim with no support and no undeveloped marker), AR.2 (strategy developing into nothing), AR.1 (solution with children; support cycles), CL.5 (unbounded qualifier from the list SCCG names). Most of SCCG is prose only a reader can judge, so this is **not** \"SCCG compliance\": findings are advisory and never block promotion."
+      "notes": "Three mechanisms. **Resources**: `sccg://guidelines` publishes the catalog over MCP (with a heading fallback, because the dist files the runtime loads carry no document metadata), and `resources/templates/list` publishes `sccg://guideline/{id}` for one guideline at a time. The MCP executable carries its own `data/sccg/dist` copy, and the stdio smoke test drives `resources/read` and `prompts/get` through the real process in both consent modes — SCCG is the public corpus, not case content, so it is deliberately readable before consent. **Prompts**: `draft_argument_from_standard`, `add_argumentation`, `restructure_case` and `translate_case` each carry the guidance for that job, quoted from the catalog so prompt and guideline cannot drift (`translate_case` quotes CL.5, the qualifier rule its prose states informally); the workflow text tells agents to use revision-checked integrated draft groups, and to write every new element in each language the case is maintained in (AF-AI-019). **Checks**: every staging result returns SCCG and structural findings against the complete materialized draft, and the same findings are available through `describe_working_draft`. The mechanical set is the deliberately narrow, individually tested subset AF-AI-024 records — twelve checks, each bound to the catalog's own check id. Most of SCCG is prose only a reader can judge, so this is **not** \"SCCG compliance\": findings are advisory and never block promotion. All three mechanisms here land only when the client or user reaches for them; AF-AI-023 adds the channels that land unprompted, and docs/features/mcp-authoring-quality-plan.md is the plan for widening the whole surface."
     },
     {
       "id": "AF-AI-011",
@@ -1691,6 +1691,56 @@
         "tests/test_change_set_acceptance.cpp"
       ],
       "notes": "`list_terms` returns every term's value, name, definition, categories, external reference and origin in one call, together with the categories the case defines, connected and offline; terms and categories also appear in `get_case_overview` counts, `find_elements` and `get_element`. `CreateTerm`, `UpdateTerm`, `RemoveTerm`, `CreateCategory` and `UpdateCategory` stage through the same revision-checked change groups as argument edits and promote through the same audited `ApplyProposalCommand`; accepting the first term or category of a case with no glossary creates the containing `terminologyPackage` rather than refusing. `UpdateTerm` fields are `value`, `definition`, `name`, `category` (space-separated ids), `external_reference` and `origin` — the last three are what answer the terminology check's \"no category\" and \"no external reference/source\" findings, which an agent could previously read but not fix. Each field is written by its own seam so classifying a term cannot rewrite its definition or drop the translations of it; an unresolvable category or origin is refused at staging, not at acceptance. Definitions may carry translations; a term's value is a single string (SACM 10.11) and staging refuses a translated one with an explanation. Addresses SCCG CL.5 by defining a bounding term once instead of repeating it as free text. **Bounded**: removing a *category*, and associating a term with an element as a visible context, stay in-application (a category delete has cascade semantics needing a confirmation this surface cannot raise); created terms and categories land in the case's first terminology package; removing a term an argument package references is refused at acceptance by the library's cross-package delete guard. **Prototype with AF-AI-014**: the write path rides the draft workspace, which is still under stability testing; the read path is exercised through the real MCP server process."
+    },
+    {
+      "id": "AF-AI-023",
+      "area": "AI",
+      "name": "Authoring doctrine delivered in every MCP session",
+      "status": "supported",
+      "evidence": [
+        "src/mcp/guidance.cpp",
+        "src/mcp/server.cpp",
+        "src/mcp/tools.cpp"
+      ],
+      "tests": [
+        "tests/test_mcp_server.cpp"
+      ],
+      "notes": "Phase 1 of docs/features/mcp-authoring-quality-plan.md. The SCCG prompts and resources (AF-AI-010) land only when the user asks for them; this row is the answer for the user who types \"add an argument that braking is safe\" and says nothing about SCCG. A ~15-line authoring doctrine — one rule per line, each naming the guideline it condenses, every SCCG family represented — travels in the three channels that reach the model unprompted: `initialize.instructions` (alongside the connection-mode statement), an `authoring_guidance` field on the four pre-write reads (`get_case_overview`, `get_argument_tree`, `suggest_placement`, `get_draft_status` — the looped reads `get_element` and `find_elements` stay lean deliberately, so the guidance is not noise a model learns to skip), and the operation schema's `text` description, which is in context at the exact moment a claim's words are generated. A test resolves every id the doctrine names through the server's own `sccg://guideline/<id>` resource, so a condensation naming a guideline the catalog no longer has fails rather than quietly lying; the stdio smoke test proves the doctrine crosses the shipped binary's transport in both consent modes (the doctrine is the public house rules, not case content). The prompt-quoted sets also widened — the SU, LF and RD families were previously quoted in no prompt at all."
+    },
+    {
+      "id": "AF-AI-024",
+      "area": "AI",
+      "name": "Widened mechanical SCCG checks, catalog-bound and example-tested",
+      "status": "in-development",
+      "evidence": [
+        "src/core/sccg/staged_checks.cpp",
+        "src/app/areas/staged_finding_text.cpp"
+      ],
+      "tests": [
+        "tests/test_sccg_staged_checks.cpp",
+        "tests/test_staged_finding_text.cpp"
+      ],
+      "notes": "Phase 2 of docs/features/mcp-authoring-quality-plan.md. Twelve checks, up from four: EV.1 (unsupported claim not marked undeveloped), AR.2 (a decomposition whose sub-claims carry no reasoning step -- the catalog's `check-explicit-strategy`, advisory because GSN permits goal-to-goal support), AR.1 (solution with children; strategy developing into nothing; support cycles), CL.5 (unbounded qualifier), and batch 1 of the widening — CL.2 (two properties joined by a conjunction), CL.6 (lifecycle steps chained in one claim), RD.1 (reasoning smuggled into claim text), RD.4 (promotional language), EV.7 (evidence with no owner, version, date or status), EV.8 (mutable source cited with nothing fixing its state), LF.3 (absence of discovered evidence offered as support). Every check binds to the catalog's `suggested_checks` id, carried on the finding and on the MCP wire; every word list is derived from the guideline's statement, detection hints or examples, never invented; and each lexical check must fire on its guideline's own `bad` example and stay silent on the `good` one, read from the catalog at test time. A drift test holds each embedded statement to be a prefix of the catalog's. All lexical findings are advisory — the reviewer judges the words, the check only points — and the panels translate them by check id (the structured-findings seam), so the widening reaches the human review surfaces and MCP clients from one implementation. **In-development**: the remaining candidates (CL.1, CL.3, CL.4, EV.3, EV.4, LF.1's textual half, LF.6, AR.8, SU.2) need threshold or judgement calibration the catalog alone does not give — CL.4 in particular offers no lexical list to derive from — and land batch by batch under the same acceptance rule."
+    },
+    {
+      "id": "AF-AI-025",
+      "area": "AI",
+      "name": "Pre-flight rehearsal and submit-time refusal of problem findings",
+      "status": "supported",
+      "evidence": [
+        "src/agent/draft_operations.cpp",
+        "src/mcp/tools.cpp",
+        "src/mcp/session.cpp",
+        "src/core/drafts/draft_workspace_store.cpp",
+        "src/core/drafts/draft_persistence.cpp",
+        "src/ui/panels/draft_changes_panel.cpp"
+      ],
+      "tests": [
+        "tests/test_agent_request_handler.cpp",
+        "tests/test_mcp_modes.cpp",
+        "tests/test_draft_workspace.cpp"
+      ],
+      "notes": "Phase 3 of docs/features/mcp-authoring-quality-plan.md — where the guidance gains teeth. **`check_operations`** rehearses operations on a copy of the integrated draft: the same validation and findings `stage_operations` would return, with nothing stored, no revision moved, no element ids allocated, and nothing drawn on the user's canvas — an agent iterates privately until its work is clean, then stages once. It is the one draft-vocabulary tool that works offline, because a rehearsal against the accepted copy is a read; the byte-identical sweep covers it. **Submit-time refusal**: `submit_change_group` refuses while problem-severity findings (SCCG Problem checks and GSN well-formedness findings) stand against the group, naming each one in `problem_findings`. The gate sits at submit, not at staging — staging is deliberately incremental and every intermediate shape is legitimately unfinished, but submit is the author declaring itself done. The explicit escape is `acknowledge_findings: true`, which submits anyway and records the acknowledged findings on the group — persisted, surviving restart, shown to the reviewer on the Draft Changes row, and cleared when the group's operations change, because the waved-through findings described a different shape. Advisory findings never refuse anything, deliberately: gating on them would train agents to acknowledge reflexively, which would spend the gate. Promotion authority is untouched — the human reviewer's decision is not gated by anything here."
     },
     {
       "id": "AF-PLAT-001",

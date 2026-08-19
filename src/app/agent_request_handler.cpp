@@ -58,11 +58,11 @@ agent::Result OpenCaseFile(const nlohmann::json& args, const AgentRequestContext
 
 bool IsDraftOperation(const std::string& op) {
     return op == "get_draft_status" || op == "begin_change_group" || op == "begin_change_set" ||
-           op == "stage_operations" || op == "replace_change_group" || op == "remove_change_group" ||
-           op == "describe_change_group" || op == "describe_change_set" || op == "submit_change_group" ||
-           op == "submit_change_set" || op == "describe_working_draft" || op == "get_draft_events" ||
-           op == "close_change_group" || op == "unstage_operations" || op == "discard_change_set" ||
-           op == "list_change_sets";
+           op == "stage_operations" || op == "check_operations" || op == "replace_change_group" ||
+           op == "remove_change_group" || op == "describe_change_group" || op == "describe_change_set" ||
+           op == "submit_change_group" || op == "submit_change_set" || op == "describe_working_draft" ||
+           op == "get_draft_events" || op == "close_change_group" || op == "unstage_operations" ||
+           op == "discard_change_set" || op == "list_change_sets";
 }
 
 } // namespace
@@ -118,6 +118,9 @@ bridge::Response HandleAgentRequest(const bridge::Request& request, const AgentR
             return FromAgentResult(request.id, agent::BeginChangeGroup(draft, request.args));
         if (request.op == "stage_operations") {
             return FromAgentResult(request.id, agent::StageDraftOperations(draft, request.args));
+        }
+        if (request.op == "check_operations") {
+            return FromAgentResult(request.id, agent::CheckDraftOperations(draft, request.args));
         }
         if (request.op == "replace_change_group")
             return FromAgentResult(request.id, agent::ReplaceChangeGroup(draft, request.args));
