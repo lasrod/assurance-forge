@@ -343,7 +343,7 @@ af_copy_sccg_data(assurance-forge)
 # review from growing a shared inference path (docs/features/mcp-server.md).
 add_executable(assurance-forge-mcp src/mcp/main.cpp)
 target_link_libraries(assurance-forge-mcp PRIVATE
-    af_mcp af_agent af_review af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
+    af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
 if(WIN32)
     target_link_libraries(assurance-forge-mcp PRIVATE bcrypt advapi32)

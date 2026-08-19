@@ -110,6 +110,48 @@ TEST(ReviewSuggestionMapping, WritesAContextElementThroughItsDescription) {
     EXPECT_EQ(groups[0].operations[0].old_value, "Operating conditions");
 }
 
+// A Term carries its value in `content`, and the review prompt shows the model
+// whichever field is populated. Choosing the field by element type instead
+// staged the suggestion into `description`, which added text nobody reviewed
+// and left the value they objected to standing.
+TEST(ReviewSuggestionMapping, WritesATermThroughTheFieldItsValueLivesIn) {
+    parser::AssuranceCase model;
+    parser::SacmElement term;
+    term.id = "T1";
+    term.type = "term";
+    term.name = "T1";
+    term.content = "safe";
+    model.elements.push_back(term);
+
+    const std::vector<review::SuggestedDraftGroup> groups =
+        review::MapSuggestionsToDraftGroups(model, {Suggestion("item-1", "T1", "safe within the stated ODD")}, {});
+
+    ASSERT_EQ(groups.size(), 1u);
+    EXPECT_EQ(groups[0].operations[0].type, core::reviews::PatchOperationType::UpdateElementText);
+    EXPECT_EQ(groups[0].operations[0].field, "content");
+    EXPECT_EQ(groups[0].operations[0].old_value, "safe");
+}
+
+// With neither content nor description, the review reads the name -- so that is
+// what the suggestion replaces. Staging it as text would write an empty field
+// the reviewer never saw and leave the name they objected to in place.
+TEST(ReviewSuggestionMapping, ReplacesTheNameWhenTheNameIsWhatTheReviewRead) {
+    parser::AssuranceCase model;
+    parser::SacmElement solution;
+    solution.id = "Sn1";
+    solution.type = "artifactreference";
+    solution.name = "Test report";
+    model.elements.push_back(solution);
+
+    const std::vector<review::SuggestedDraftGroup> groups =
+        review::MapSuggestionsToDraftGroups(model, {Suggestion("item-1", "Sn1", "Test report TR-1 rev C")}, {});
+
+    ASSERT_EQ(groups.size(), 1u);
+    EXPECT_EQ(groups[0].operations[0].type, core::reviews::PatchOperationType::UpdateElementName);
+    EXPECT_EQ(groups[0].operations[0].old_value, "Test report");
+    EXPECT_EQ(groups[0].operations[0].new_value, "Test report TR-1 rev C");
+}
+
 // The three silent drops. None is an error worth a message: each is a review
 // agreeing with a change that already happened, or naming something gone.
 TEST(ReviewSuggestionMapping, DropsEmptySuggestions) {

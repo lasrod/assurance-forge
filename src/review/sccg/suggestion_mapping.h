@@ -54,10 +54,18 @@ struct SuggestedDraftGroup {
     std::string review_item_id;
 };
 
-// Which field of an element carries the text a review would replace. Exposed
-// because the review request builder and the mapper have to agree on it: a
-// suggestion offered against `content` and staged against `description` would
-// silently write the wrong field.
+// Which field of an element carries the text a review reads, and therefore the
+// field a suggested replacement belongs in.
+//
+// This is one function because the review request builder and the mapper have
+// to agree, and when they were two they disagreed: the request showed the model
+// whichever of content/description was populated (falling back to the name),
+// while the mapper chose by element type. A Term or Expression carries its
+// value in `content`, so a suggestion the model made against the text it was
+// shown was staged into `description` -- adding text nobody reviewed and
+// leaving the sentence they objected to untouched.
+//
+// `field` is "content", "description" or "name", in that order of preference.
 struct ElementTextTarget {
     std::string field;
     std::string current_text;

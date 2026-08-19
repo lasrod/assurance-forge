@@ -10,9 +10,11 @@
 namespace review {
 
 ElementTextTarget TextTargetFor(const parser::SacmElement& element) {
-    if (element.type == "claim" || element.type == "argumentreasoning")
+    if (!element.content.empty())
         return {"content", element.content};
-    return {"description", element.description};
+    if (!element.description.empty())
+        return {"description", element.description};
+    return {"name", element.name};
 }
 
 std::vector<SuggestedDraftGroup> MapSuggestionsToDraftGroups(const parser::AssuranceCase& working,
@@ -45,10 +47,18 @@ std::vector<SuggestedDraftGroup> MapSuggestionsToDraftGroups(const parser::Assur
         group.request.guideline_ids = suggestion.guideline_ids;
         group.request.review_item_ids = {suggestion.review_item_id};
 
+        // An element with neither content nor description is read by its name,
+        // so that is what the suggestion replaces. Staging it as text would
+        // write into an empty field the reviewer never saw and leave the name
+        // they objected to standing.
+        const bool replaces_the_name = text_target.field == "name";
+
         core::reviews::PatchOperation operation;
-        operation.type = core::reviews::PatchOperationType::UpdateElementText;
+        operation.type = replaces_the_name ? core::reviews::PatchOperationType::UpdateElementName
+                                           : core::reviews::PatchOperationType::UpdateElementText;
         operation.element = core::reviews::ElementRef{anchor->id, std::nullopt};
-        operation.field = text_target.field;
+        if (!replaces_the_name)
+            operation.field = text_target.field;
         operation.old_value = text_target.current_text;
         operation.new_value = suggested_text;
         group.operations.push_back(std::move(operation));

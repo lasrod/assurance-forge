@@ -1,6 +1,7 @@
 #include "review/sccg/sccg_review.h"
 
 #include "core/string_utils.h"
+#include "review/sccg/suggestion_mapping.h"
 
 #include <algorithm>
 #include <format>
@@ -172,12 +173,11 @@ std::string NodeRoleName(core::NodeRole role) {
     return "other";
 }
 
+// The text the model is shown for an element. Delegates so that the field a
+// suggestion is staged into cannot drift from the text the suggestion answered;
+// they were two rules once, and they disagreed.
 std::string ElementText(const parser::SacmElement& element) {
-    if (!element.content.empty())
-        return element.content;
-    if (!element.description.empty())
-        return element.description;
-    return element.name;
+    return TextTargetFor(element).current_text;
 }
 
 nlohmann::json

@@ -341,6 +341,16 @@ linked into `af_agent` and the MCP executable.
 **Exit:** behaviour unchanged; existing review tests pass untouched; a caller
 with no `app` and no provider can map a validated result to group requests.
 
+**One deliberate behaviour change.** Moving the mapping put it beside the
+request builder and exposed that the two disagreed about which field carries an
+element's text. The request showed the model whichever of `content` /
+`description` was populated, falling back to `name`; the mapper chose by element
+type. So a suggestion against a Term or Expression -- whose value is `content`
+-- was staged into `description`, adding text nobody reviewed and leaving the
+text they objected to standing. The two now share one preference order, and an
+element read by its name is repaired with `UpdateElementName` rather than an
+empty-field text write.
+
 ### S2 — Scope hash, narrow form
 
 *Depends on: S1. Blocks: S5.*
