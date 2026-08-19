@@ -65,6 +65,44 @@ core::GuidelineCatalog MakeClaimReviewCatalog() {
     return core::BuildGuidelineCatalog(std::move(document), "test-sccg.yaml");
 }
 
+parser::AssuranceCase MakeAcceptedCaseWithASecondBranch() {
+    parser::AssuranceCase model = MakeAcceptedCase();
+    parser::SacmElement other;
+    other.id = "G2";
+    other.type = "claim";
+    other.name = "Unrelated goal";
+    other.content = "UNRELATED_BASELINE_WORDING";
+    other.assertion_declaration = "asserted";
+    model.elements.push_back(std::move(other));
+    return model;
+}
+
+// An edit by somebody else -- MCP here, but the user's own hand edits land in
+// the same draft -- to whichever element is named.
+std::string StageDraftEditTo(app::AppRuntimeState& state,
+                             const parser::AssuranceCase& accepted,
+                             const std::string& element_id,
+                             const std::string& old_text,
+                             const std::string& new_text) {
+    core::drafts::DraftGroupRequest request;
+    request.title = "Someone else's edit";
+    request.source = core::drafts::DraftSource::Mcp;
+    request.source_label = "Test MCP";
+    std::string error;
+    const std::string group_id = state.draft_workspace.BeginGroup(request, accepted, error);
+    EXPECT_FALSE(group_id.empty()) << error;
+
+    core::reviews::PatchOperation update;
+    update.type = core::reviews::PatchOperationType::UpdateElementText;
+    update.element = core::reviews::ElementRef{element_id, std::nullopt};
+    update.field = "content";
+    update.old_value = old_text;
+    update.new_value = new_text;
+    EXPECT_TRUE(state.draft_workspace.StageOperations(group_id, {update}, accepted, error)) << error;
+    EXPECT_TRUE(state.draft_workspace.MarkGroupReady(group_id, error)) << error;
+    return group_id;
+}
+
 std::string StageExistingDraftEdit(app::AppRuntimeState& state, const parser::AssuranceCase& accepted) {
     core::drafts::DraftGroupRequest request;
     request.title = "MCP wording";
@@ -150,7 +188,8 @@ TEST(AiReviewActionsTest, SuggestedTextBecomesAReadySccgDraftGroupAgainstTheRevi
     event.review_profile_id = "claim_review";
     event.review_profile_name = "Claim review";
     event.review_run_id = "run-42";
-    event.reviewed_model_hash = core::reviews::ComputeModelSemanticHash(before.working_model);
+    event.reviewed_element_ids = {"G1"};
+    event.reviewed_scope_hash = core::reviews::ComputeScopeSemanticHash(before.working_model, {"G1"});
     event.suggestions.push_back({"ai-review-G1-claim_review-1", "G1", "AI_SUGGESTED_WORKING_DRAFT_WORDING"});
 
     app::actions::ProposalActions(state).CreateAiGenerated(event);
@@ -183,6 +222,69 @@ TEST(AiReviewActionsTest, SuggestedTextBecomesAReadySccgDraftGroupAgainstTheRevi
               "AI_SUGGESTED_WORKING_DRAFT_WORDING");
 }
 
+// The reason a scope hash exists. AI review and MCP write into the same draft,
+// and so does the user's own hand editing, so on an actively edited case a
+// whole-model hash discards nearly every completed review -- including reviews
+// of branches nothing touched (ADR 0013).
+TEST(AiReviewActionsTest, StagesSuggestionsWhenOnlyAnUnreviewedElementChanged) {
+    TempDir temp = MakeTempDir("unrelated_edit");
+    app::AppRuntimeState state;
+    state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
+    OpenDraftStore(state, temp, *state.app_state.loaded_case);
+    ASSERT_TRUE(state.review_controller->AddOrUpdateItem(MakeReviewItem()));
+
+    const core::drafts::DraftMaterializationResult& before =
+        state.draft_workspace.Materialize(*state.app_state.loaded_case, state.app_state.case_revision);
+    ASSERT_TRUE(before.success) << before.error;
+
+    app::AiReviewProposalSuggestionsEvent event;
+    event.review_profile_name = "Claim review";
+    event.review_run_id = "run-unrelated";
+    event.reviewed_element_ids = {"G1"};
+    event.reviewed_scope_hash = core::reviews::ComputeScopeSemanticHash(before.working_model, {"G1"});
+    event.suggestions.push_back({"ai-review-G1-claim_review-1", "G1", "AI_SUGGESTED_WORDING"});
+
+    // Somebody else edits a branch this review never read, while it is running.
+    StageDraftEditTo(state, *state.app_state.loaded_case, "G2", "UNRELATED_BASELINE_WORDING", "SOMEONE_ELSES_EDIT");
+
+    app::actions::ProposalActions(state).CreateAiGenerated(event);
+
+    const std::optional<core::reviews::ReviewItem> linked =
+        state.review_controller->GetItemById("ai-review-G1-claim_review-1");
+    ASSERT_TRUE(linked.has_value());
+    EXPECT_FALSE(linked->draft_group_ids.empty()) << "a review of an untouched branch is still valid";
+}
+
+// The other direction: an edit to an element the review actually read does
+// invalidate it, because the suggestion answers text that no longer stands.
+TEST(AiReviewActionsTest, RefusesSuggestionsWhenAReviewedElementChanged) {
+    TempDir temp = MakeTempDir("in_scope_edit");
+    app::AppRuntimeState state;
+    state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
+    OpenDraftStore(state, temp, *state.app_state.loaded_case);
+    ASSERT_TRUE(state.review_controller->AddOrUpdateItem(MakeReviewItem()));
+
+    const core::drafts::DraftMaterializationResult& before =
+        state.draft_workspace.Materialize(*state.app_state.loaded_case, state.app_state.case_revision);
+    ASSERT_TRUE(before.success) << before.error;
+
+    app::AiReviewProposalSuggestionsEvent event;
+    event.review_profile_name = "Claim review";
+    event.review_run_id = "run-in-scope";
+    event.reviewed_element_ids = {"G1"};
+    event.reviewed_scope_hash = core::reviews::ComputeScopeSemanticHash(before.working_model, {"G1"});
+    event.suggestions.push_back({"ai-review-G1-claim_review-1", "G1", "AI_SUGGESTED_WORDING"});
+
+    StageDraftEditTo(state, *state.app_state.loaded_case, "G1", "ACCEPTED_BASELINE_WORDING", "SOMEONE_ELSES_EDIT");
+
+    app::actions::ProposalActions(state).CreateAiGenerated(event);
+
+    const std::optional<core::reviews::ReviewItem> linked =
+        state.review_controller->GetItemById("ai-review-G1-claim_review-1");
+    ASSERT_TRUE(linked.has_value());
+    EXPECT_TRUE(linked->draft_group_ids.empty()) << "the reviewed text changed under the suggestion";
+}
+
 TEST(AiReviewActionsTest, RefusesToStageSuggestionsWhenTheWorkingDraftChangedAfterReview) {
     TempDir temp = MakeTempDir("stale");
     app::AppRuntimeState state;
@@ -194,7 +296,8 @@ TEST(AiReviewActionsTest, RefusesToStageSuggestionsWhenTheWorkingDraftChangedAft
     app::AiReviewProposalSuggestionsEvent event;
     event.review_profile_name = "Claim review";
     event.review_run_id = "run-stale";
-    event.reviewed_model_hash = "model-hash-before-an-intervening-edit";
+    event.reviewed_element_ids = {"G1"};
+    event.reviewed_scope_hash = "scope-hash-before-an-intervening-edit";
     event.suggestions.push_back({"ai-review-G1-claim_review-1", "G1", "STALE_SUGGESTION"});
 
     app::actions::ProposalActions(state).CreateAiGenerated(event);

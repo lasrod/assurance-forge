@@ -353,15 +353,18 @@ empty-field text write.
 
 ### S2 — Scope hash, narrow form
 
+**Status: done** — `core::reviews::ComputeScopeSemanticHash` over
+`review::ReviewedElementIds`.
+
 *Depends on: S1. Blocks: S5.*
 
 Implements sibling plan §13.5 at the smallest useful width.
 
-- [ ] Record the reviewed element IDs on the plan (the union of the data
+- [x] Record the reviewed element IDs on the plan (the union of the data
       packages' IDs).
-- [ ] Hash those elements rather than the whole model, replacing the
+- [x] Hash those elements rather than the whole model, replacing the
       `ComputeModelSemanticHash(working)` comparison.
-- [ ] Refuse only on scope-hash or context-generation change.
+- [x] Refuse only on scope-hash change (context generation is the MCP path's, and lands with S6).
 
 **Exit:** an edit to an unrelated branch — by the user or by MCP — no longer
 discards a completed review; an edit to a reviewed element still does. Both

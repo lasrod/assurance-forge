@@ -85,9 +85,12 @@ struct AiReviewProposalSuggestionsEvent {
     std::string review_profile_id;
     std::string review_profile_name;
     std::string review_run_id;
-    // Semantic hash of the complete working model sent for review. Suggested
-    // edits must not be staged if that model changed while the request ran.
-    std::string reviewed_model_hash;
+    // The elements the review read, and their semantic hash. Suggested edits are
+    // refused when that scope moved while the request ran -- an edit elsewhere,
+    // by the user or by another contributor to the same draft, leaves a review
+    // of an untouched branch perfectly valid (ADR 0013).
+    std::vector<std::string> reviewed_element_ids;
+    std::string reviewed_scope_hash;
 };
 
 enum class CenterViewRequest {

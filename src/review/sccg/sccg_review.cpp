@@ -4,6 +4,7 @@
 #include "review/sccg/suggestion_mapping.h"
 
 #include <algorithm>
+#include <set>
 #include <format>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -675,6 +676,46 @@ AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const parser::ReviewProfile* review_profile,
                                         const AiReviewDataPackageBundle* data_packages) {
     return BuildAiReviewRequestArtifacts(payload, guidelines, review_profile, data_packages);
+}
+
+namespace {
+
+void CollectElementIdsFromJson(const nlohmann::json& value, std::set<std::string>& element_ids) {
+    if (value.is_object()) {
+        for (const auto& item : value.items()) {
+            if ((item.key() == "element_id" || item.key() == "ancestor_id") && item.value().is_string()) {
+                element_ids.insert(item.value().get<std::string>());
+            }
+            CollectElementIdsFromJson(item.value(), element_ids);
+        }
+        return;
+    }
+    if (value.is_array()) {
+        for (const nlohmann::json& child : value) {
+            CollectElementIdsFromJson(child, element_ids);
+        }
+    }
+}
+
+} // namespace
+
+std::vector<std::string> ReviewedElementIds(const AiReviewPayload& payload,
+                                            const AiReviewDataPackageBundle& data_packages) {
+    std::set<std::string> element_ids;
+    if (!payload.selected.id.empty())
+        element_ids.insert(payload.selected.id);
+    if (payload.parent.has_value() && !payload.parent->id.empty())
+        element_ids.insert(payload.parent->id);
+    for (const AiReviewElement& child : payload.children) {
+        if (!child.id.empty())
+            element_ids.insert(child.id);
+    }
+    for (const AiReviewDataPackage& data_package : data_packages.available) {
+        const nlohmann::json parsed = nlohmann::json::parse(data_package.json, nullptr, false);
+        if (!parsed.is_discarded())
+            CollectElementIdsFromJson(parsed, element_ids);
+    }
+    return std::vector<std::string>(element_ids.begin(), element_ids.end());
 }
 
 std::string BuildExpectedAiReviewResponseSchemaText() {

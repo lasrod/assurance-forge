@@ -137,6 +137,15 @@ std::string SerializeReviewProposal(const ReviewProposal& proposal);
 bool DeserializeReviewProposal(const std::string& content, ReviewProposal& proposal, std::string& error);
 
 std::string ComputeModelSemanticHash(const parser::AssuranceCase& model);
+// The same hash over only the elements named, for asking whether the part of a
+// model somebody actually read has changed. A review is stale when its own
+// scope moved; hashing the whole model instead makes an edit anywhere -- by the
+// user, or by another contributor to the same draft -- discard a completed
+// review of an untouched branch (ADR 0013).
+//
+// Ids naming nothing are folded in as absent, so an element disappearing from
+// the model changes the hash rather than being silently skipped.
+std::string ComputeScopeSemanticHash(const parser::AssuranceCase& model, const std::vector<std::string>& element_ids);
 std::string ComputeElementSemanticHash(const parser::SacmElement& element);
 ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& proposal,
                                                       const parser::AssuranceCase& current_model);

@@ -101,6 +101,16 @@ AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const parser::ReviewProfile* review_profile = nullptr,
                                         const AiReviewDataPackageBundle* data_packages = nullptr);
 
+// Every element the review actually read: the payload's own elements plus every
+// element id carried by the data packages. Derived from what was sent rather
+// than tracked beside it, so a package that starts including another element
+// cannot quietly fall outside the scope.
+//
+// This is the set a review is judged stale against, and -- once findings may
+// propose structural changes -- the set they are allowed to touch.
+std::vector<std::string> ReviewedElementIds(const AiReviewPayload& payload,
+                                            const AiReviewDataPackageBundle& data_packages);
+
 std::string BuildExpectedAiReviewResponseSchemaText();
 std::string StripJsonCodeFence(const std::string& response_text);
 AiReviewParseResult ParseAiReviewResponse(const std::string& response_text, const std::string& selected_element_id);

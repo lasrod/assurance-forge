@@ -388,6 +388,30 @@ std::string ComputeModelSemanticHash(const parser::AssuranceCase& model) {
     return WithHashPrefix(Sha256::HexDigest(normalized.str()));
 }
 
+std::string ComputeScopeSemanticHash(const parser::AssuranceCase& model, const std::vector<std::string>& element_ids) {
+    std::unordered_map<std::string, const parser::SacmElement*> by_id;
+    by_id.reserve(model.elements.size());
+    for (const parser::SacmElement& element : model.elements) {
+        if (!element.id.empty())
+            by_id.emplace(element.id, &element);
+    }
+
+    // Sorted and de-duplicated so the hash depends on which elements were read,
+    // not on the order a caller happened to collect them in.
+    std::vector<std::string> ids(element_ids.begin(), element_ids.end());
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+
+    std::ostringstream normalized;
+    normalized << model.id << '\n';
+    for (const std::string& id : ids) {
+        const auto found = by_id.find(id);
+        normalized << id << '\t' << (found == by_id.end() ? "<absent>" : ComputeElementSemanticHash(*found->second))
+                   << '\n';
+    }
+    return WithHashPrefix(Sha256::HexDigest(normalized.str()));
+}
+
 ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& proposal,
                                                       const parser::AssuranceCase& current_model) {
     ProposalValidityResult result;
