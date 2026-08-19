@@ -83,42 +83,6 @@ void EmitReviewVisualEvent(AppEvents& events,
         kind, element_id, review_profile_id, review_profile_name, message, std::move(review_scope_element_ids)});
 }
 
-void CollectElementIdsFromJson(const nlohmann::json& value, std::unordered_set<std::string>& element_ids) {
-    if (value.is_object()) {
-        for (const auto& item : value.items()) {
-            if ((item.key() == "element_id" || item.key() == "ancestor_id") && item.value().is_string()) {
-                element_ids.insert(item.value().get<std::string>());
-            }
-            CollectElementIdsFromJson(item.value(), element_ids);
-        }
-        return;
-    }
-    if (value.is_array()) {
-        for (const nlohmann::json& child : value) {
-            CollectElementIdsFromJson(child, element_ids);
-        }
-    }
-}
-
-std::unordered_set<std::string> BuildReviewScopeElementIds(const review::AiReviewPayload& payload,
-                                                           const review::AiReviewDataPackageBundle& data_packages) {
-    std::unordered_set<std::string> element_ids;
-    if (!payload.selected.id.empty())
-        element_ids.insert(payload.selected.id);
-    if (payload.parent.has_value() && !payload.parent->id.empty())
-        element_ids.insert(payload.parent->id);
-    for (const review::AiReviewElement& child : payload.children) {
-        if (!child.id.empty())
-            element_ids.insert(child.id);
-    }
-    for (const review::AiReviewDataPackage& data_package : data_packages.available) {
-        nlohmann::json parsed = nlohmann::json::parse(data_package.json, nullptr, false);
-        if (!parsed.is_discarded())
-            CollectElementIdsFromJson(parsed, element_ids);
-    }
-    return element_ids;
-}
-
 core::reviews::ReviewItem MakeAiReviewItem(const std::string& id,
                                            const std::string& element_id,
                                            const std::string& title,
@@ -372,9 +336,11 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id;
     pending_review_profile_name_ =
         guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "";
-    pending_review_scope_element_ids_ = BuildReviewScopeElementIds(payload, data_packages);
+    const std::vector<std::string> reviewed_ids = review::ReviewedElementIds(payload, data_packages);
+    pending_review_scope_element_ids_ = std::unordered_set<std::string>(reviewed_ids.begin(), reviewed_ids.end());
+    pending_review_scope_element_id_list_ = reviewed_ids;
     pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
-    pending_review_model_hash_ = core::reviews::ComputeModelSemanticHash(*assurance_case);
+    pending_review_scope_hash_ = core::reviews::ComputeScopeSemanticHash(*assurance_case, reviewed_ids);
     pending_review_run_id_.clear();
     last_raw_response_.clear();
     last_parse_error_.clear();
@@ -587,7 +553,8 @@ void AiReviewController::PollTask() {
         event.review_profile_id = pending_review_profile_id_;
         event.review_profile_name = pending_review_profile_name_;
         event.review_run_id = pending_review_run_id_;
-        event.reviewed_model_hash = pending_review_model_hash_;
+        event.reviewed_scope_hash = pending_review_scope_hash_;
+        event.reviewed_element_ids = pending_review_scope_element_id_list_;
         events_.Emit(std::move(event));
     }
 }
@@ -602,7 +569,8 @@ void AiReviewController::CancelPendingRequest() {
     pending_review_scope_element_ids_.clear();
     pending_guideline_ids_.clear();
     pending_review_run_id_.clear();
-    pending_review_model_hash_.clear();
+    pending_review_scope_hash_.clear();
+    pending_review_scope_element_id_list_.clear();
 }
 
 bool AiReviewController::IsReviewRunning() const {

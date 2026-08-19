@@ -413,11 +413,11 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         return;
     }
     const parser::AssuranceCase& working = materialized.working_model;
-    if (!event.reviewed_model_hash.empty() &&
-        event.reviewed_model_hash != core::reviews::ComputeModelSemanticHash(working)) {
+    if (!event.reviewed_scope_hash.empty() &&
+        event.reviewed_scope_hash != core::reviews::ComputeScopeSemanticHash(working, event.reviewed_element_ids)) {
         SetStatus(state_,
-                  "AI review completed, but its suggested changes were not added because the working draft "
-                  "changed while the review was running. Run the review again.");
+                  "AI review completed, but its suggested changes were not added because the elements it "
+                  "reviewed changed while it was running. Run the review again.");
         return;
     }
 
