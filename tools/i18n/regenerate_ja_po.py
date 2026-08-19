@@ -977,6 +977,7 @@ TRANSLATIONS = {
     'Accepting this also accepts:': 'これを受理すると次も受理されます:',
     'Built on it:': 'これを前提とする変更:',
     'Could not accept the draft: {0}': 'ドラフトを受理できませんでした: {0}',
+    'The last accept did not happen: {0}': '直前の受理は行われませんでした: {0}',
     'A project named "{0}" is already in this folder. Choose another name.': 'このフォルダーには「{0}」という名前のプロジェクトが既にあります。別の名前を選んでください。',
     'Choose a parent location.': '親フォルダーを選んでください。',
     'Depends on:': '前提とする変更:',
@@ -1026,6 +1027,8 @@ TRANSLATIONS = {
         "プロジェクトを保存しました: {0}",
     "Warning: could not read the draft for this argument: {0}":
         "警告: この議論のドラフトを読み込めませんでした: {0}",
+    "Warning: could not read the working draft for this argument: {0}":
+        "警告: この議論の作業ドラフトを読み込めませんでした: {0}",
     "Discarded proposal draft.":
         "提案ドラフトを破棄しました。",
     "Select an element before changing manual review status.":

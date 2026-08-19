@@ -412,16 +412,27 @@ void DrawCounterChallengeDecoration(
 
 namespace {
 
+// Where a badge sits relative to the point it is given: flush with a node's
+// top-left corner, or straddling the midpoint of an edge.
+enum class BadgeAlignment { AnchorLeft, AnchorCentered };
+
 // A short word pinned above the node saying what the agent is proposing. The
 // border carries the same meaning for anyone reading at a glance; this carries
 // it for anyone who cannot separate the colours.
-void DrawProposedChangeBadge(ImDrawList* draw_list, ImVec2 top_left, float zoom, ImU32 color, const char* label) {
+void DrawProposedChangeBadge(ImDrawList* draw_list,
+                             ImVec2 anchor,
+                             float zoom,
+                             ImU32 color,
+                             const char* label,
+                             BadgeAlignment alignment = BadgeAlignment::AnchorLeft) {
     const float scale = DpiScale() * zoom;
     const ImVec2 text_size = ImGui::CalcTextSize(label);
     const float pad_x = 4.0f * scale;
     const float pad_y = 2.0f * scale;
-    const ImVec2 badge_min(top_left.x, top_left.y - text_size.y - 2.0f * pad_y - 5.0f * scale);
-    const ImVec2 badge_max(badge_min.x + text_size.x + 2.0f * pad_x, badge_min.y + text_size.y + 2.0f * pad_y);
+    const float badge_width = text_size.x + 2.0f * pad_x;
+    const float badge_left = alignment == BadgeAlignment::AnchorCentered ? anchor.x - badge_width * 0.5f : anchor.x;
+    const ImVec2 badge_min(badge_left, anchor.y - text_size.y - 2.0f * pad_y - 5.0f * scale);
+    const ImVec2 badge_max(badge_min.x + badge_width, badge_min.y + text_size.y + 2.0f * pad_y);
 
     draw_list->AddRectFilled(badge_min, badge_max, color, 3.0f * scale);
     draw_list->AddText(ImVec2(badge_min.x + pad_x, badge_min.y + pad_y), InkOn(color), label);
@@ -580,7 +591,14 @@ void DrawDraftEdgeDecoration(ImDrawList* draw_list,
     }
     if (!decoration.source_label.empty())
         label += " · " + decoration.source_label;
-    DrawProposedChangeBadge(draw_list, midpoint, zoom, removed ? theme.danger : theme.accent, label.c_str());
+    // Centred on the edge rather than starting at its midpoint: a badge that
+    // runs off to one side reads as belonging to the node it lands on.
+    DrawProposedChangeBadge(draw_list,
+                            midpoint,
+                            zoom,
+                            removed ? theme.danger : theme.accent,
+                            label.c_str(),
+                            BadgeAlignment::AnchorCentered);
 }
 
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary) {

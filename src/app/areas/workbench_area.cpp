@@ -210,13 +210,21 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     RenderWorkingDraftBanner(state, callbacks);
 
     ArgumentPackageTabCache& cache = g_argument_package_canvas_caches[tab.key];
-    const std::uint64_t current_revision = state.app_state.case_revision;
+    // The cache content is rebuilt from `state.draft_canvas_view`, so it is
+    // keyed on the stamp published with that view -- never on the live case
+    // revision, draft revision or view mode. The live values can move between
+    // the frame-start publish and this check (the banner's mode buttons render
+    // above this line, and a completed AI review stages draft groups in the
+    // same frame's poll); keying on them records the new key against the
+    // previous frame's view, and the tab then draws the argument from before
+    // the change until the next key change. With the published stamp the
+    // rebuild happens one frame later, from a view that matches it.
+    // The change-set revision stays live because the agent bridge only mutates
+    // change sets before the publish point in the frame.
+    const std::uint64_t current_revision = state.draft_canvas_view_case_revision;
     const std::uint64_t change_set_revision = state.agent_change_sets.revision();
-    // Folded into the change-set revision so the per-package cache is
-    // invalidated by a draft mutation or a view-mode switch as well. Without it
-    // the tab keeps drawing the argument it built before the draft moved.
     const std::uint64_t draft_revision =
-        state.draft_workspace.revision() * 8u + static_cast<std::uint64_t>(ui::GetUiState().draft_view_mode);
+        state.draft_canvas_view_draft_revision * 8u + static_cast<std::uint64_t>(state.draft_canvas_view_mode);
     const ui::UiState& ui_state_for_lang = ui::GetUiState();
     const bool inputs_match = cache.valid && cache.case_revision == current_revision &&
                               cache.change_set_revision == CombineRevisions(change_set_revision, draft_revision) &&
@@ -276,7 +284,11 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
     ui::ElementContextActions actions = MakeCanvasContextActions(callbacks);
     ui_state.proposal_canvas_active = false;
     ui::gsn::GsnCanvas& renderer = g_argument_package_canvas_renderers[tab.key];
-    renderer.SetCaseRevision(CombineRevisions(state.app_state.case_revision, change_set_revision));
+    // The renderer caches (ACP targets) key on this revision together with the
+    // case pointer it is given, and it is given `cache.visible_case` -- so the
+    // revision is the cache's own recorded identity, which moves exactly when
+    // the visible case is rebuilt. The live revisions move at other times.
+    renderer.SetCaseRevision(CombineRevisions(cache.case_revision, cache.change_set_revision));
     if (!cache.renderer_seeded) {
         core::perf::ScopedTimer perf_scope("app.wb.set_tree");
         renderer.SetTree(cache.visible_tree, ui_state.selected_element_id);

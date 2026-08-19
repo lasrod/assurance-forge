@@ -24,7 +24,7 @@ updates:
     commit-message:
       prefix: "deps"
     labels:
-      - "area: build"
+      - "area: build-ci"
     groups:
       # One PR for the batch rather than six. A submodule bump has to be built
       # on all three CI platforms to mean anything, and six parallel PRs each
@@ -45,7 +45,7 @@ updates:
     commit-message:
       prefix: "ci"
     labels:
-      - "area: build"
+      - "area: build-ci"
     groups:
       actions:
         patterns:

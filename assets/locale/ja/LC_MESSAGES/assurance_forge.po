@@ -2188,6 +2188,9 @@ msgstr "添付された提案も削除されます。"
 msgid "The current `.af/manifest.af.json`, `.af/snapshots/`, and `.af/audit/` will be moved to a timestamped `.af/backup_<UTC>/` folder, and a fresh audit store will be initialized from the current SACM file on disk."
 msgstr "現在の `.af/manifest.af.json`、`.af/snapshots/`、`.af/audit/` はタイムスタンプ付きの `.af/backup_<UTC>/` フォルダーに移動され、ディスク上の現在の SACM ファイルから新しい監査ストアが初期化されます。"
 
+msgid "The last accept did not happen: {0}"
+msgstr "直前の受理は行われませんでした: {0}"
+
 msgid "The replayed audit history does not reproduce the on-disk SACM. This usually means edits were applied through a path that did not record transactions. Pinned historical views may be inaccurate."
 msgstr "再生された監査履歴がディスク上の SACM を再現できません。通常、これはトランザクションを記録しない経路で編集が適用されたことを意味します。固定された履歴ビューは正確でない可能性があります。"
 
@@ -2412,6 +2415,9 @@ msgstr "警告"
 
 msgid "Warning: could not read the draft for this argument: {0}"
 msgstr "警告: この議論のドラフトを読み込めませんでした: {0}"
+
+msgid "Warning: could not read the working draft for this argument: {0}"
+msgstr "警告: この議論の作業ドラフトを読み込めませんでした: {0}"
 
 msgid "Warnings"
 msgstr "警告"

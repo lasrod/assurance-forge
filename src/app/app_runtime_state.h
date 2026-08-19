@@ -8,6 +8,7 @@
 #include "app/app_events.h"
 #include "app/controllers/agent_bridge_controller.h"
 #include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_document_store.h"
 #include "core/drafts/draft_workspace_store.h"
 #include "app/controllers/ai_review_controller.h"
 #include "app/controllers/acp_controller.h"
@@ -28,6 +29,7 @@
 #include "core/tree_editing.h"
 #include "legacy_sacm/sacm_package_tree.h"
 #include "ui/timeline/timeline_state.h"
+#include "ui/ui_state.h"
 
 namespace core::commands {
 class CommandBus;
@@ -237,6 +239,24 @@ struct AppRuntimeState {
     // state, not loaded project data. The accepted case in `app_state` stays
     // exactly what the user accepted; this is what has been proposed against it.
     core::drafts::DraftWorkspaceStore draft_workspace;
+    // The working draft as a SACM document (ADR 0016), which is what
+    // contributors now edit and what accept replaces the argument with.
+    //
+    // Held beside `draft_workspace` while the switchover runs rather than
+    // replacing it outright: the operation-based store still backs the Draft
+    // Changes panel and the promotion path, and removing it in the same change
+    // that introduces this one would leave no working configuration to bisect
+    // between. The two never both hold changes for one argument -- staging goes
+    // to this one.
+    core::drafts::DraftDocumentStore draft_document;
+    // The draft document's projection, and whether it differs from the accepted
+    // argument, cached against the store's revision. `CurrentArgumentView` is
+    // asked several times a frame by the canvas, the navigator and the
+    // inspector, and projecting a document per call would put a full re-parse of
+    // the argument into the interactive loop.
+    parser::AssuranceCase draft_document_view;
+    std::uint64_t draft_document_view_revision = ~std::uint64_t{0};
+    bool draft_document_view_differs = false;
     // What `draft_workspace` was last opened for. A draft belongs to one
     // argument file -- element ids repeat across a project's arguments, so a
     // draft written against one must never decorate another's identically-named
@@ -261,6 +281,19 @@ struct AppRuntimeState {
     // case while the rest of the application has moved to the working model.
     // Null before the first frame; falls back to the accepted case.
     const parser::AssuranceCase* draft_canvas_view = nullptr;
+    // The inputs `draft_canvas_view` was built from, published beside it. A
+    // canvas cache whose content comes from the published view must decide
+    // staleness against these, never against the live `app_state.case_revision`,
+    // `draft_workspace.revision()` or `ui::UiState::draft_view_mode`: all three
+    // can move mid-frame after the view is materialized -- a mode button click
+    // lands during the workbench render, and a completed AI review stages draft
+    // groups in the same frame's poll. A cache keyed on live state records the
+    // new key against the previous frame's content and then never rebuilds, so
+    // the canvas stays one state change behind. See
+    // docs/architecture/frame-and-draft-views.md.
+    std::uint64_t draft_canvas_view_case_revision = 0;
+    std::uint64_t draft_canvas_view_draft_revision = 0;
+    ui::DraftViewMode draft_canvas_view_mode = ui::DraftViewMode::WorkingDraft;
     // Owns the materialized model backing `draft_canvas_view` for the entire
     // frame. Draft accept/discard can invalidate the store while ImGui is still
     // rendering; retaining this immutable snapshot prevents the canvas and

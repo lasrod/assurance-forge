@@ -106,6 +106,23 @@ inline bool ClaimLikeCarriesStatementAsDescription(const SacmElement& element) {
     return element.type == "claim" || element.type == "argumentreasoning";
 }
 
+// True for the element kinds that actually HAVE a `content`: a claim-like
+// element's statement (clause 8.9) and a Term's or Expression's value (clause
+// 10.11). Every other kind -- an artifact reference, a relationship, a package --
+// keeps `content` permanently empty: the projection never fills it, and the
+// promotion seam has no library operation to write it.
+//
+// The companion of the rule above, and it exists for the same reason. A POD
+// `SacmElement` carries name/content/description for every kind, so writing
+// `content` on a context succeeds against this struct, survives materialization,
+// and renders in the working draft -- then fails at promotion, where the seam
+// refuses, leaving a draft that can be seen and never accepted. Asking this
+// question while an operation is being STAGED is what keeps the flat model from
+// admitting a change the document cannot hold.
+inline bool ElementCarriesContent(const SacmElement& element) {
+    return ClaimLikeCarriesStatementAsDescription(element) || element.type == "term" || element.type == "expression";
+}
+
 } // namespace core
 
 // Transitional aliases: the SACM POD types historically lived in

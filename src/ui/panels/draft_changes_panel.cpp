@@ -208,6 +208,14 @@ void RenderDraftChangesPanel(const DraftChangesPanelModel& model, const DraftCha
         ImGui::PopStyleColor();
         ImGui::Spacing();
     }
+    // The last refusal, in full, above the rows it was about. Pressing Accept
+    // and watching the count stay where it was is the moment this answers.
+    if (!model.accept_error.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        ImGui::TextWrapped("%s", ui::i18n::trf("The last accept did not happen: {0}", model.accept_error).c_str());
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+    }
 
     const std::size_t count = model.rows.size();
     ImGui::TextUnformatted(

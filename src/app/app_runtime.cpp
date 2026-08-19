@@ -32,6 +32,7 @@
 #include "core/app_state.h"
 #include "core/derived_views.h"
 #include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_document_diff.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
@@ -579,6 +580,26 @@ const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
     }
     const parser::AssuranceCase& accepted = impl_->app_state.loaded_case.value();
 
+    // The draft document first (ADR 0016). It is the working argument whenever
+    // it differs from the accepted one; a draft that has changed nothing is
+    // indistinguishable from no draft, which is why the comparison rather than
+    // the store's existence decides.
+    //
+    // Cached against the store's revision so the projection and the comparison
+    // do not run on every caller in a frame -- this is asked several times per
+    // frame by the canvas, the navigator and the inspector.
+    if (impl_->draft_document.active()) {
+        const std::uint64_t revision = impl_->draft_document.revision();
+        if (revision != impl_->draft_document_view_revision) {
+            impl_->draft_document_view = impl_->draft_document.Projection();
+            impl_->draft_document_view_differs =
+                core::drafts::DiffAcceptedAgainstDraft(accepted, impl_->draft_document_view).touches_anything();
+            impl_->draft_document_view_revision = revision;
+        }
+        if (impl_->draft_document_view_differs)
+            return impl_->draft_document_view;
+    }
+
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || !workspace->has_active_groups()) {
         return accepted;
@@ -865,12 +886,17 @@ void AppRuntime::SyncDraftWorkspace() {
     // mode from the previous one would silently show a subset of the new
     // case. Every argument starts on the full working view.
     ui::GetUiState().draft_view_mode = ui::DraftViewMode::WorkingDraft;
+    // And a refusal from the previous argument's draft says nothing about this
+    // one. Revisions are per workspace, so the stamp alone would not expire it.
+    ui::GetUiState().draft_accept_error.clear();
+    ui::GetUiState().draft_accept_error_revision = 0;
 
     if (argument.empty() || !impl_->app_state.loaded_case.has_value()) {
         // Forgets the workspace without touching what is on disk, so the draft
         // is still there when the argument is opened again. Closing the
         // application is not a decision about unaccepted work.
         impl_->draft_workspace.Close();
+        impl_->draft_document.Close();
         return;
     }
 
@@ -881,6 +907,23 @@ void AppRuntime::SyncDraftWorkspace() {
         // only copy.
         impl_->app_state.status_message =
             ui::i18n::trf("Warning: could not read the draft for this argument: {0}", error);
+    }
+
+    // The draft document (ADR 0016). Opened from the accepted LIBRARY document
+    // rather than the projection, because that document is what a draft is a
+    // copy of -- projecting and re-serializing would drop whatever the flat
+    // model has no field for, and the draft would differ from the argument it
+    // was copied from before anyone edited it.
+    //
+    // Absent a library document there is nothing to copy, so the draft stays
+    // closed rather than being faked from the projection.
+    impl_->draft_document.Close();
+    if (impl_->app_state.library_document != nullptr) {
+        std::string draft_error;
+        if (!impl_->draft_document.Open(root, argument, *impl_->app_state.library_document, draft_error)) {
+            impl_->app_state.status_message =
+                ui::i18n::trf("Warning: could not read the working draft for this argument: {0}", draft_error);
+        }
     }
 
     // Snapshots accumulate one per promotion and are only consumed by an undo,

@@ -81,6 +81,8 @@ nav:
       - Layers and Ownership: architecture/layers-and-ownership.md
       - Legacy Bridge Migration Plan: architecture/legacy-bridge-migration-plan.md
       - Runtime and State: architecture/runtime-state.md
+      - Frame Ordering and Draft Views: architecture/frame-and-draft-views.md
+      - Promotable by Construction: architecture/promotable-by-construction.md
       - Parser and SACM: architecture/parser-sacm.md
       - App Shell and UI Areas: architecture/app-shell.md
       - UI Panels: architecture/ui-panels.md
@@ -107,6 +109,7 @@ nav:
           - 0013 Review methods independent of inference providers: architecture/decisions/0013-review-methods-independent-of-inference-providers.md
           - 0014 Projectless MCP discovery with runtime case binding: architecture/decisions/0014-projectless-mcp-discovery-with-runtime-case-binding.md
           - 0015 Versioned provider profiles and fail-closed selection: architecture/decisions/0015-versioned-provider-profiles-and-fail-closed-selection.md
+          - 0016 The working draft is a SACM document: architecture/decisions/0016-the-draft-is-a-sacm-document.md
       - Generated Class Diagrams: architecture/generated-class-diagrams.md
   - Developer Guide:
       - Overview: developer-guide/index.md
