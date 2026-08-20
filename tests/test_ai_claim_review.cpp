@@ -442,8 +442,9 @@ TEST(AiClaimReviewTest, SuppliesPriorFindingsAsChangeHistory) {
 
     ASSERT_TRUE(HasPackage(packages, "CHANGE_HISTORY"));
     for (const review::AiReviewDataPackage& package : packages.available) {
-        if (package.id == "CHANGE_HISTORY")
+        if (package.id == "CHANGE_HISTORY") {
             EXPECT_NE(package.json.find("CL.5 unbounded qualifier"), std::string::npos);
+        }
     }
 }
 
@@ -512,7 +513,8 @@ TEST(AiClaimReviewTest, IncludesHistoryForInScopeElementsBeyondTheSelectedOne) {
 
     ASSERT_TRUE(HasPackage(packages, "CHANGE_HISTORY"));
     for (const review::AiReviewDataPackage& package : packages.available) {
-        if (package.id == "CHANGE_HISTORY")
+        if (package.id == "CHANGE_HISTORY") {
             EXPECT_NE(package.json.find("SU.11 challenge left unresolved"), std::string::npos) << package.json;
+        }
     }
 }
