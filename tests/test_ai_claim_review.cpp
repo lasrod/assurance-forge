@@ -356,6 +356,12 @@ TEST(AiClaimReviewTest, ClearsRefsCarriedOverFromAnEarlierParse) {
 
 namespace {
 
+// Takes an lvalue only: returning a pointer into a temporary bundle compiled
+// fine and passed in Release, where the freed memory happened to still hold the
+// value. Debug poisons it, which is how CI found what the local run could not.
+const review::AiReviewUnavailableDataPackage* Unavailable(const review::AiReviewDataPackageBundle&& packages,
+                                                          const std::string& id) = delete;
+
 const review::AiReviewUnavailableDataPackage* Unavailable(const review::AiReviewDataPackageBundle& packages,
                                                           const std::string& id) {
     for (const review::AiReviewUnavailableDataPackage& package : packages.unavailable) {
@@ -412,8 +418,8 @@ TEST(AiClaimReviewTest, ReportsAnEmptyGlossaryAsEmptyRatherThanUnimplemented) {
     parser::AssuranceCase assurance_case;
     assurance_case.elements.push_back(MakeElement("G1", "claim", "Top goal", "The vehicle is safe."));
 
-    const review::AiReviewUnavailableDataPackage* glossary =
-        Unavailable(CollectFor(assurance_case, "G1", nullptr), "PROJECT_GLOSSARY");
+    const review::AiReviewDataPackageBundle packages = CollectFor(assurance_case, "G1", nullptr);
+    const review::AiReviewUnavailableDataPackage* glossary = Unavailable(packages, "PROJECT_GLOSSARY");
     ASSERT_NE(glossary, nullptr);
     EXPECT_EQ(glossary->absence, review::DataPackageAbsence::Empty);
 }
@@ -450,8 +456,8 @@ TEST(AiClaimReviewTest, LeavesOutHistoryForElementsOutsideTheReview) {
     elsewhere.title = "A finding on another branch";
     context.review_items.push_back(std::move(elsewhere));
 
-    const review::AiReviewUnavailableDataPackage* history =
-        Unavailable(CollectFor(CaseWithATerm(), "G1", &context), "CHANGE_HISTORY");
+    const review::AiReviewDataPackageBundle packages = CollectFor(CaseWithATerm(), "G1", &context);
+    const review::AiReviewUnavailableDataPackage* history = Unavailable(packages, "CHANGE_HISTORY");
     ASSERT_NE(history, nullptr);
     EXPECT_EQ(history->absence, review::DataPackageAbsence::Empty);
 }
