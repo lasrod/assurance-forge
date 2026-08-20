@@ -251,13 +251,6 @@ void AddUnavailable(AiReviewDataPackageBundle& packages,
     packages.unavailable.push_back(AiReviewUnavailableDataPackage{id, reason, required, absence});
 }
 
-void AddUnavailable(AiReviewDataPackageBundle& packages,
-                    const std::string& id,
-                    const std::string& reason,
-                    bool required) {
-    packages.unavailable.push_back(AiReviewUnavailableDataPackage{id, reason, required});
-}
-
 bool HasUnavailable(const AiReviewDataPackageBundle& packages, const std::string& id) {
     return std::find_if(packages.unavailable.begin(),
                         packages.unavailable.end(),
