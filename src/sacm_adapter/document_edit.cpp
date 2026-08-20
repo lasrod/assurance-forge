@@ -443,8 +443,6 @@ AddChildOutcome apply_add_subgoal_under_strategy(sacm::model::Document& doc,
     return outcome;
 }
 
-} // namespace
-
 // The support relationship an already-existing child attaches by. Mirrors
 // `plan_child`'s choice for the create path, from the child's SACM kind.
 sacm::metadata::ElementKind support_relationship_for_child(sacm::metadata::ElementKind child_kind) {
@@ -454,6 +452,8 @@ sacm::metadata::ElementKind support_relationship_for_child(sacm::metadata::Eleme
         return sacm::metadata::ElementKind::AssertedEvidence;
     return sacm::metadata::ElementKind::AssertedInference;
 }
+
+} // namespace
 
 AddChildOutcome apply_add_child(LibraryDocument& document,
                                 const std::string& parent_id,

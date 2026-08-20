@@ -462,7 +462,8 @@ namespace {
 // put a proposed claim in the wrong package of a multi-package case.
 std::string AnchorForOperations(const nlohmann::json& arguments,
                                 const std::vector<core::reviews::PatchOperation>& operations) {
-    const std::string supplied = StringArgument(arguments, "anchor_element_id");
+    // Not const: it is returned, and constness would turn the return into a copy.
+    std::string supplied = StringArgument(arguments, "anchor_element_id");
     if (!supplied.empty())
         return supplied;
     for (const core::reviews::PatchOperation& operation : operations) {
