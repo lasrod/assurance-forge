@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 namespace core {
@@ -380,8 +381,13 @@ std::uint64_t TerminologyContentStamp(const sacm::AssuranceCasePackage& package)
 
 } // namespace
 
-TerminologyService::TerminologyService(const sacm::AssuranceCasePackage& package)
-    : package_(package), content_stamp_(TerminologyContentStamp(package)) {}
+TerminologyService::TerminologyService(const sacm::AssuranceCasePackage& package) : package_(package) {}
+
+std::uint64_t TerminologyService::ContentStamp() const {
+    if (!content_stamp_.has_value())
+        content_stamp_ = TerminologyContentStamp(package_);
+    return content_stamp_.value();
+}
 
 TerminologyScopeContext TerminologyService::BuildScopeContextForElement(const std::string& element_ref) const {
     TerminologyScopeContext scope;
