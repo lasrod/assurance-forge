@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 namespace core {
@@ -332,7 +333,61 @@ void AddExplicitContextTerms(std::vector<TerminologyScopedTermRef>& terms,
 
 } // namespace
 
+namespace {
+
+// Everything a resolution depends on: which terms exist, what they match, what
+// they say, and how they are classified. A change to any of it can change what
+// the canvas draws, so a cache keyed on this stamp refreshes when it should and
+// stays put when nothing terminological moved.
+void MixInto(std::uint64_t& stamp, std::string_view text) {
+    // FNV-1a. Cheap, order-sensitive, and good enough to notice an edit -- this
+    // decides when to re-detect, not what is true.
+    for (const char character : text)
+        stamp = (stamp ^ static_cast<unsigned char>(character)) * 1099511628211ULL;
+    stamp = (stamp ^ 0xffULL) * 1099511628211ULL; // field boundary
+}
+
+void MixTerminologyPackage(std::uint64_t& stamp, const sacm::TerminologyPackage& package) {
+    MixInto(stamp, package.id);
+    MixInto(stamp, package.gid);
+    for (const sacm::Category& category : package.categories) {
+        MixInto(stamp, category.id);
+        MixInto(stamp, category.name);
+        MixInto(stamp, category.description);
+    }
+    for (const sacm::Term& term : package.terms) {
+        MixInto(stamp, term.id);
+        MixInto(stamp, term.gid);
+        MixInto(stamp, term.value);
+        MixInto(stamp, term.name);
+        MixInto(stamp, term.description);
+        MixInto(stamp, term.externalReference);
+        MixInto(stamp, term.origin);
+        for (const std::string& category_ref : term.category_refs)
+            MixInto(stamp, category_ref);
+    }
+}
+
+std::uint64_t TerminologyContentStamp(const sacm::AssuranceCasePackage& package) {
+    std::uint64_t stamp = 14695981039346656037ULL;
+    for (const sacm::TerminologyPackage& terminology_package : package.terminologyPackages)
+        MixTerminologyPackage(stamp, terminology_package);
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        for (const sacm::TerminologyPackage& terminology_package : argument_package.terminologyPackages)
+            MixTerminologyPackage(stamp, terminology_package);
+    }
+    return stamp;
+}
+
+} // namespace
+
 TerminologyService::TerminologyService(const sacm::AssuranceCasePackage& package) : package_(package) {}
+
+std::uint64_t TerminologyService::ContentStamp() const {
+    if (!content_stamp_.has_value())
+        content_stamp_ = TerminologyContentStamp(package_);
+    return content_stamp_.value();
+}
 
 TerminologyScopeContext TerminologyService::BuildScopeContextForElement(const std::string& element_ref) const {
     TerminologyScopeContext scope;

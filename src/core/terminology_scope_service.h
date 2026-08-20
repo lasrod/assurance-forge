@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -101,6 +102,22 @@ public:
                                                   const std::string& text,
                                                   const TerminologyDetectionOptions& options = {}) const;
 
+    // A stamp over the terminology content this service resolves against.
+    //
+    // Callers cache detection results across frames and need to know when a
+    // cached result has gone stale. The package POINTER cannot tell them: a
+    // term edited in place leaves the package at the same address, so a canvas
+    // keyed on the pointer alone kept drawing the old resolution until the
+    // project was reloaded -- a term corrected in the editor stayed wrong on
+    // the canvas until the application restarted.
+    //
+    // Computed on the first request and kept, so a caller that never asks pays
+    // nothing. Most do not: the element panel, the problems sync and the usage
+    // scans all build a service to resolve with, and hashing every term for
+    // them would put the cost of a large glossary on paths that have no cache
+    // to invalidate.
+    std::uint64_t ContentStamp() const;
+
     // Returns the package this service operates on. The pointer is stable
     // for the lifetime of the service and can be used as a cache
     // invalidation key by callers that rebuild a service each frame.
@@ -110,6 +127,10 @@ public:
 
 private:
     const sacm::AssuranceCasePackage& package_;
+    // Mutable because it is a memo of `package_`, not state of its own: asking
+    // for the stamp twice must not cost twice, and a service is const to every
+    // caller that resolves through it.
+    mutable std::optional<std::uint64_t> content_stamp_;
 };
 
 bool LooksImportantUndefinedTerm(const std::string& text);

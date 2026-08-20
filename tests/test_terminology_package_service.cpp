@@ -1,4 +1,5 @@
 #include "core/terminology_package_service.h"
+#include "core/terminology_scope_service.h"
 #include "legacy_sacm/sacm_parser.h"
 #include "legacy_sacm/sacm_serializer.h"
 
@@ -690,4 +691,39 @@ TEST(TerminologyPackageService, CreatedCategoriesSerializeAndParseWithTermAssign
     ASSERT_EQ(reparsed->terms.size(), 1u);
     ASSERT_EQ(reparsed->terms.front().category_refs.size(), 1u);
     EXPECT_EQ(reparsed->terms.front().category_refs.front(), category.category_ref.id);
+}
+
+// The canvas caches detected occurrences across frames and needs to know when a
+// cached result has gone stale. It cannot tell from the package pointer: a term
+// edited in place leaves the package at the same address, so a correction made
+// in the editor kept drawing as it was until the project was reloaded.
+TEST(TerminologyContentStamp, ChangesWhenATermChangesAndNotOtherwise) {
+    sacm::AssuranceCasePackage package;
+    sacm::TerminologyPackage terminology;
+    terminology.id = "TP1";
+    sacm::Term term;
+    term.id = "T1";
+    term.value = "HARA (Hazard Analysis and Risk Assessment)";
+    terminology.terms.push_back(term);
+    package.terminologyPackages.push_back(terminology);
+
+    const std::uint64_t before = core::TerminologyService(package).ContentStamp();
+    EXPECT_EQ(core::TerminologyService(package).ContentStamp(), before)
+        << "an unchanged package must stamp the same, or the canvas re-detects every frame";
+
+    // The correction a user makes when the term never matched the text.
+    package.terminologyPackages[0].terms[0].value = "HARA";
+    const std::uint64_t after_value = core::TerminologyService(package).ContentStamp();
+    EXPECT_NE(after_value, before) << "a term's value changed and the stamp did not";
+
+    package.terminologyPackages[0].terms[0].description = "Hazard Analysis and Risk Assessment.";
+    const std::uint64_t after_definition = core::TerminologyService(package).ContentStamp();
+    EXPECT_NE(after_definition, after_value) << "a term's definition changed and the stamp did not";
+
+    // Something outside terminology must not churn the cache.
+    sacm::ArgumentPackage argument_package;
+    argument_package.id = "AP1";
+    package.argumentPackages.push_back(argument_package);
+    EXPECT_EQ(core::TerminologyService(package).ContentStamp(), after_definition)
+        << "an argument-side change must not invalidate terminology detection";
 }
