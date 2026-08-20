@@ -359,6 +359,28 @@ const char* FindingSeverityToString(FindingSeverity severity) {
     return severity == FindingSeverity::Problem ? "problem" : "advisory";
 }
 
+const std::vector<std::string>& ImplementedCheckIds() {
+    // Written out rather than derived from a run: a check that happens not to
+    // fire on one argument is still implemented, and a list built from findings
+    // would shrink to whatever the last case tripped.
+    static const std::vector<std::string> ids{
+        "check-evidence-trace",
+        "check-explicit-strategy",
+        "check-element-role-misuse",
+        "check-circular-support",
+        "check-bounded-qualifiers",
+        "check-single-property",
+        "check-claim-step-mixing",
+        "check-element-signposting",
+        "check-promotional-language",
+        "check-completeness-vs-absence",
+        "check-evidence-citation-precision",
+        "check-evidence-control-attributes",
+        "check-evidence-state-fixed",
+    };
+    return ids;
+}
+
 std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& preview,
                                                const std::vector<std::string>& changed_element_ids) {
     std::vector<StagedFinding> findings;

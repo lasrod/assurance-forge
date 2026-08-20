@@ -2,6 +2,7 @@
 
 #include "core/guideline_catalog.h"
 
+#include <algorithm>
 #include <sstream>
 #include <string>
 
@@ -55,9 +56,59 @@ void AppendGuideline(std::ostringstream& out, const parser::Guideline& guideline
     }
 }
 
-// The guidance that belongs with a particular job. Quoting the catalog rather
-// than paraphrasing it keeps the prompt and the published guideline the same
-// text, so one cannot drift from the other.
+// The guidelines a review of this output will actually apply.
+//
+// These sets used to be written by hand, which made the criteria an agent was
+// given when it *wrote* a claim a different, separately maintained set from the
+// ones applied when the same claim was *reviewed*. An agent could satisfy the
+// prompt and still fail the review, and the two would drift further apart every
+// time SCCG revised a profile, with nothing to notice.
+//
+// Naming the profiles instead means the catalog decides. A guideline added to
+// `claim_review` upstream reaches the agent that writes claims, in the same
+// release, without anybody remembering to copy an id.
+std::vector<std::string> GuidelineIdsForProfiles(const core::GuidelineCatalog& catalog,
+                                                 const std::vector<std::string>& profile_ids) {
+    std::vector<std::string> ids;
+    for (const std::string& profile_id : profile_ids) {
+        const parser::ReviewProfile* profile = catalog.document.FindReviewProfileById(profile_id);
+        if (profile == nullptr) {
+            continue;
+        }
+        for (const std::string& guideline_id : profile->guideline_ids) {
+            if (std::find(ids.begin(), ids.end(), guideline_id) == ids.end()) {
+                ids.push_back(guideline_id);
+            }
+        }
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+std::string GuidelinesForProfiles(const std::vector<std::string>& profile_ids) {
+    std::string error;
+    const core::GuidelineCatalog* catalog = Catalog(error);
+    if (catalog == nullptr) {
+        return "(The SCCG catalog is unavailable: " + error + ")";
+    }
+    const std::vector<std::string> ids = GuidelineIdsForProfiles(*catalog, profile_ids);
+    if (ids.empty()) {
+        return "(No SCCG review profile in this catalog matched: the guidelines below could not be resolved.)";
+    }
+
+    std::ostringstream out;
+    for (const std::string& id : ids) {
+        const parser::Guideline* guideline = catalog->document.FindGuidelineById(id);
+        if (guideline != nullptr) {
+            AppendGuideline(out, *guideline);
+        }
+    }
+    return out.str();
+}
+
+// A named set, for the one job whose guidance is deliberately narrower than any
+// review profile. Quoting the catalog rather than paraphrasing it keeps the
+// prompt and the published guideline the same text.
 std::string GuidelinesFor(const std::vector<std::string>& ids) {
     std::string error;
     const core::GuidelineCatalog* catalog = Catalog(error);
@@ -283,6 +334,26 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
     return {};
 }
 
+std::vector<std::string> ReviewProfilesForPrompt(const std::string& name) {
+    if (name == "draft_argument_from_standard") {
+        return {"claim_review",
+                "strategy_review",
+                "assumption_review",
+                "context_review",
+                "evidence_review",
+                "justification_review"};
+    }
+    if (name == "add_argumentation") {
+        return {"claim_review", "strategy_review", "context_review"};
+    }
+    if (name == "restructure_case") {
+        return {"claim_review", "strategy_review"};
+    }
+    // `translate_case` deliberately carries one guideline, not a profile: a
+    // translation that needed the rest has stopped being a translation.
+    return {};
+}
+
 std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments) {
     std::ostringstream out;
 
@@ -304,8 +375,11 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
             // found the SU, LF and RD families quoted in no prompt at all --
             // drafting from a standard is exactly where assumptions, arguing
             // from absence, and role signposting go wrong.
-            << GuidelinesFor(
-                   {"CL.1", "CL.2", "CL.3", "CL.5", "CL.6", "AR.1", "AR.2", "AR.4", "EV.1", "SU.2", "LF.3", "RD.1"});
+            // Drafting a structure produces claims, strategies, assumptions,
+            // context and evidence stubs, and each is reviewed under its own
+            // profile. Naming them all is what makes the criteria the agent
+            // writes to the criteria it will be judged by.
+            << GuidelinesForProfiles(ReviewProfilesForPrompt(name));
         return out.str();
     }
 
@@ -323,7 +397,9 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "addition to it.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
-            << GuidelinesFor({"CL.1", "CL.2", "CL.3", "CL.5", "AR.2", "AR.5", "AR.6", "EV.1", "LF.1"});
+            // Adding argument writes claims and the reasoning that connects
+            // them, and usually the context that bounds them.
+            << GuidelinesForProfiles(ReviewProfilesForPrompt(name));
         return out.str();
     }
 
@@ -345,7 +421,7 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
             << "Follow these guidelines:\n\n"
             // RD.1 joined with the doctrine work: moving argument is where an
             // element's wording and its new place most easily fall out of step.
-            << GuidelinesFor({"AR.1", "AR.2", "AR.4", "AR.5", "CL.2", "RD.1"});
+            << GuidelinesForProfiles(ReviewProfilesForPrompt(name));
         return out.str();
     }
 

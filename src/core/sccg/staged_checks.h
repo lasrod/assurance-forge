@@ -67,6 +67,13 @@ struct StagedFinding {
 // `changed_element_ids` limits reporting to what this change set touched: an
 // agent should not be handed findings about parts of the argument it did not
 // write, which are the user's business and not the agent's to fix.
+// Every check `CheckStagedArgument` can decide, by its catalog id. Published so
+// a result can state what was actually examined: an agent reading an empty
+// findings array otherwise has no way to tell "these checks found nothing" from
+// "this argument conforms to SCCG", and those are very different claims about a
+// safety case.
+const std::vector<std::string>& ImplementedCheckIds();
+
 std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& preview,
                                                const std::vector<std::string>& changed_element_ids);
 
