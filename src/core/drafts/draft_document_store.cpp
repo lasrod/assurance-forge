@@ -1,5 +1,7 @@
 #include "core/drafts/draft_document_store.h"
 
+#include "core/derived_views.h"
+
 #include "core/project_file_io.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
@@ -114,7 +116,16 @@ const sacm_adapter::LibraryDocument* DraftDocumentStore::document() const {
 core::AssuranceCase DraftDocumentStore::Projection() const {
     if (impl_->document == nullptr)
         return core::AssuranceCase{};
-    return sacm_adapter::project_case(*impl_->document);
+    // The same render passes the accepted view gets, because this is drawn on
+    // the same canvas by the same code. A bare `project_case` renders a term as
+    // a drawn context node with unrefreshed display fields -- so a term the user
+    // had just defined showed on their canvas as though it had no definition,
+    // and stayed that way until a restart re-ran the passes through load_file.
+    // A bare strategy loses its placement the same way.
+    core::AssuranceCase model;
+    sacm::AssuranceCasePackage package;
+    core::RebuildDerivedViewsFromLibrary(*impl_->document, model, package);
+    return model;
 }
 
 const std::filesystem::path& DraftDocumentStore::path() const {
