@@ -185,21 +185,13 @@ const char* PatchOperationTypeToString(PatchOperationType type) {
 
 namespace {
 
-std::string StringArgument(const nlohmann::json& arguments, const char* key) {
-    const nlohmann::json::const_iterator found = arguments.find(key);
-    if (found == arguments.end() || !found->is_string()) {
-        return {};
-    }
-    return found->get<std::string>();
-}
-
 // A scalar field, refused when it is present with the wrong type.
 //
-// `StringArgument` returns an empty string for anything that is not a string, so
-// `"new_value": 123` reached the applier as "no value" and the operation applied
-// nothing while reporting success -- the same silent drop as a key the parser
-// does not read, arriving through a key it does. Absent and null still mean
-// absent: the operation type decides what it needs.
+// It replaces a reader that returned an empty string for anything that was not a
+// string, so `"new_value": 123` reached the applier as "no value" and the
+// operation applied nothing while reporting success -- the same silent drop as a
+// key the parser does not read, arriving through a key it does. Absent and null
+// still mean absent: the operation type decides what it needs.
 bool RequireStringField(const nlohmann::json& source, const char* key, std::string& out, std::string& error) {
     const nlohmann::json::const_iterator found = source.find(key);
     if (found == source.end() || found->is_null()) {
