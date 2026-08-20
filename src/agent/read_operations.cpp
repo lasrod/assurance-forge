@@ -464,6 +464,11 @@ Result ListTerms(const ReadContext& context) {
 
     const int count = static_cast<int>(terms.size());
     const int category_count = static_cast<int>(categories.size());
+    int undefined_terms = 0;
+    for (const nlohmann::json& term : terms) {
+        if (term.value("definition", "").empty())
+            ++undefined_terms;
+    }
     nlohmann::json payload{{"terms", std::move(terms)},
                            {"count", count},
                            {"categories", std::move(categories)},
@@ -471,6 +476,15 @@ Result ListTerms(const ReadContext& context) {
     if (count == 0) {
         payload["note"] = "This case defines no terminology yet. Terms bound the words a safety argument "
                           "relies on; stage a CreateTerm operation to define one.";
+    } else if (undefined_terms > 0) {
+        // Said here because this is where an agent looks at the glossary it is
+        // about to add to, and a term whose definition is empty is invisible in
+        // a list that carries a `definition` field for every term. Staging
+        // refuses to create another one; these already exist.
+        payload["note"] = std::to_string(undefined_terms) +
+                          " term(s) in this case have no definition, so the "
+                          "glossary shows a word with nothing beside it. Supply each with an UpdateTerm "
+                          "operation whose field is \"definition\".";
     } else if (category_count == 0) {
         // Said once here rather than left to be discovered per term: the
         // terminology check reports every uncategorized term, and the fix for

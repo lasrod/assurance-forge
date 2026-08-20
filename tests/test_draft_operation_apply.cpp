@@ -518,3 +518,44 @@ TEST(DraftOperationApplyTest, ASubGoalUnderAStrategyMaterializesTheStrategysInfe
     }
     EXPECT_TRUE(found) << "no inference was materialized for the strategy's first sub-goal";
 }
+
+// Reported twice from real sessions: an agent staged a whole glossary, set the
+// category and external reference the guidance names as checked, and left every
+// definition empty -- because nothing asked for one. The terms reached the
+// accepted argument as words with nothing beside them, which reads as a defined
+// glossary and is not one.
+TEST(DraftOperationApplyTest, ATermWithNoDefinitionIsRefusedAndSaysWhereItGoes) {
+    const std::unique_ptr<Fixture> f = MakeFixture("nodefinition");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+
+    core::reviews::PatchOperation define = Create(core::reviews::PatchOperationType::CreateTerm, "$alarp", "ALARP");
+
+    const core::drafts::DraftOperationResult result =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {define}, top);
+
+    ASSERT_FALSE(result.applied) << "a term that defines nothing must not be staged";
+    EXPECT_NE(result.error.find("new_value"), std::string::npos)
+        << "the refusal must say where the definition goes: " << result.error;
+    EXPECT_NE(result.error.find("ALARP"), std::string::npos)
+        << "the refusal must name the term it is about: " << result.error;
+}
+
+// The refusal must not cost the ordinary case.
+TEST(DraftOperationApplyTest, ATermWithADefinitionStillStages) {
+    const std::unique_ptr<Fixture> f = MakeFixture("withdefinition");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+
+    core::reviews::PatchOperation define = Create(core::reviews::PatchOperationType::CreateTerm, "$alarp", "ALARP");
+    define.new_value = "As low as reasonably practicable.";
+
+    const core::drafts::DraftOperationResult result =
+        core::drafts::ApplyOperationsToDraftDocument(*f->store.document(), {define}, top);
+
+    ASSERT_TRUE(result.applied) << result.error;
+    const core::AssuranceCase draft = f->Draft();
+    const core::SacmElement* term = Find(draft, result.created_ids.at("$alarp"));
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->description, "As low as reasonably practicable.");
+}

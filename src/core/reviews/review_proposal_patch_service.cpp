@@ -293,6 +293,15 @@ bool ApplyCreateOperation(const PatchOperation& operation,
                     "single string.";
             return false;
         }
+        // Same rule as the staging path: a word with no meaning beside it is not
+        // a term, and a glossary of them reads as defined.
+        if (operation.new_value.empty()) {
+            error = "CreateTerm for " + operation.create_ref.value() + " has no definition. Put what \"" +
+                    operation.text +
+                    "\" means in \"new_value\": a term with no definition reads as defined and "
+                    "is not. Revise it later with UpdateTerm field \"definition\".";
+            return false;
+        }
         parser::SacmElement element;
         element.id = id_it->second;
         element.type = ElementTypeFor(operation.type);
