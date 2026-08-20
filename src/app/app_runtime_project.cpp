@@ -17,6 +17,7 @@
 #include "bridge/instance_registry.h"
 #include "core/translation_review_store.h"
 #include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_operation_apply.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
@@ -1252,6 +1253,7 @@ bool AppRuntime::PollAgentBridge() {
                                               connection.session_id,
                                               impl_->agent_bridge->context_generation(),
                                               &impl_->draft_workspace,
+                                              &impl_->draft_document,
                                               [this] {
                                                   SyncDraftWorkspace();
                                                   if (!impl_->app_state.loaded_case.has_value())
@@ -1259,14 +1261,15 @@ bool AppRuntime::PollAgentBridge() {
                                                   const core::drafts::DraftWorkspace* workspace =
                                                       impl_->draft_workspace.workspace();
                                                   const parser::AssuranceCase& view = CurrentArgumentView();
-                                                  // CurrentArgumentView deliberately falls back to accepted
-                                                  // content if a recovered draft cannot materialize. Label
-                                                  // the bytes actually returned, not merely the workspace's
-                                                  // desired state, so an MCP client never mistakes that
-                                                  // fallback for the integrated working model.
+                                                  // Whether the bytes returned are the accepted argument, asked
+                                                  // of the bytes themselves. CurrentArgumentView returns the
+                                                  // draft document when it differs, the materialized workspace
+                                                  // when that is what is being rendered, and the accepted model
+                                                  // when a recovered draft cannot be shown -- and only the
+                                                  // identity of what came back distinguishes the three. Asking
+                                                  // the workspace instead would call a document-backed draft
+                                                  // with no change groups "accepted" while the client reads it.
                                                   const bool is_working =
-                                                      workspace != nullptr && workspace->has_active_groups() &&
-                                                      workspace->state == core::drafts::DraftWorkspaceState::Active &&
                                                       &view != &impl_->app_state.loaded_case.value();
                                                   return AgentArgumentView{&view, workspace, is_working};
                                               }};
@@ -1331,9 +1334,154 @@ bool AppRuntime::RejectAgentChangeSet(const std::string& change_set_id, std::str
     return true;
 }
 
+bool AppRuntime::AcceptDraftDocument(std::string& summary, std::string& error) {
+    error.clear();
+    summary.clear();
+    if (!impl_->draft_document.active() || !impl_->app_state.loaded_case.has_value()) {
+        error = "There is no working draft to accept.";
+        return false;
+    }
+
+    // Counted before the accept, because the accept consumes the draft: by the
+    // time it has returned there is nothing left to ask what it contained.
+    const core::drafts::DraftDocumentDiff diff = impl_->DraftDocumentChanges();
+    if (!diff.touches_anything()) {
+        error = "The working draft changes nothing, so there is nothing to accept.";
+        RecordDraftAcceptOutcome(false, error);
+        return false;
+    }
+    const int added = diff.added_count;
+    const int modified = diff.modified_count;
+    const int removed = diff.removed_count;
+
+    const std::filesystem::path accepted_path = impl_->app_state.loaded_file_path;
+    if (!impl_->draft_document.AcceptInto(accepted_path, error)) {
+        RecordDraftAcceptOutcome(false, error);
+        return false;
+    }
+
+    // The change groups described work that is now accepted. Left standing they
+    // would keep `has_active_groups()` true, and the materializer would try to
+    // apply the very operations the accepted argument already holds.
+    std::string workspace_error;
+    if (impl_->draft_workspace.workspace() != nullptr && !impl_->draft_workspace.DiscardWorkspace(workspace_error)) {
+        // Not a failure of the accept: the safety case is written and correct.
+        // The leftover is recovery state describing changes that are now part of
+        // the argument.
+        impl_->app_state.status_message =
+            ui::i18n::trf("The draft was accepted, but its change record could not be cleared: {0}", workspace_error);
+    }
+
+    // The accepted file on disk is now the draft, and the application has to
+    // re-read it: the file is the source of truth (ADR 0003), and deriving the
+    // new state from anything else would let the two disagree in exactly the way
+    // this design removed.
+    //
+    // Not here, though. This is reached from a button rendered mid-frame, and
+    // re-reading replaces the models the canvas is still drawing from. The
+    // reload happens at the next frame boundary, which is where every other
+    // wholesale model replacement in this application happens.
+    impl_->pending_accepted_argument_reload = true;
+    impl_->tree_needs_rebuild = true;
+
+    summary = ui::i18n::trf("Accepted the working draft: {0} added, {1} changed, {2} removed.",
+                            std::to_string(added),
+                            std::to_string(modified),
+                            std::to_string(removed));
+    RecordDraftAcceptOutcome(true, {});
+    return true;
+}
+
+void AppRuntime::DiscardDraftDocument(std::string& warning) {
+    warning.clear();
+    impl_->draft_document.Discard(warning);
+    // Everything unaccepted goes together. A ledger surviving the document it
+    // described would leave the banner counting changes that no longer exist.
+    std::string workspace_error;
+    if (impl_->draft_workspace.workspace() != nullptr)
+        impl_->draft_workspace.DiscardWorkspace(workspace_error);
+    // Reopened against the accepted argument, so the next edit has a draft to go
+    // into. Creating one writes nothing until something is staged.
+    impl_->draft_workspace_argument.clear();
+    SyncDraftWorkspace();
+    impl_->tree_needs_rebuild = true;
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.draft_accept_error.clear();
+    ui_state.draft_accept_error_revision = 0;
+}
+
+bool AppRuntime::ReloadAcceptedArgumentAfterAccept(std::string& error) {
+    error.clear();
+    const std::filesystem::path accepted_path = impl_->app_state.loaded_file_path;
+
+    bool reloaded = false;
+    bool through_project = false;
+    if (impl_->app_state.current_project.has_value()) {
+        for (const core::ProjectFileEntry& entry : impl_->app_state.current_project->files) {
+            if (entry.role != core::ProjectFileRole::SacmArgument)
+                continue;
+            if (impl_->app_state.current_project->rootPath / entry.relativePath != accepted_path)
+                continue;
+            // Restores the active-file role and path, and rolls back to the
+            // previous model if the reload fails -- so a draft that produced an
+            // unreadable document leaves the application showing something
+            // rather than nothing.
+            through_project = true;
+            reloaded = impl_->app_state.open_project_file(entry);
+            break;
+        }
+    }
+    // Only when the file is not one of the project's arguments. Retrying a
+    // failed `open_project_file` with `load_file` would throw away the rollback
+    // it just performed and leave no argument loaded at all -- a worse answer
+    // than the previous one for a user whose accepted file was written
+    // successfully.
+    if (!reloaded && !through_project)
+        reloaded = impl_->app_state.load_file(accepted_path.string());
+    if (!reloaded) {
+        error = impl_->app_state.status_message.empty()
+                    ? std::string("The accepted argument was written but could not be read back.")
+                    : impl_->app_state.status_message;
+        return false;
+    }
+
+    // The manifest records the argument's hash, and this write made it wrong.
+    // Left stale, the next project open reports the file as modified outside
+    // Assurance Forge -- about a write this application just made, on behalf of
+    // a user who approved it.
+    impl_->app_state.refresh_tracked_file_hashes(accepted_path);
+
+    // NOTE (#409): the audit log does not yet record this accept. ADR 0016 says
+    // it should remain one audited transaction carrying the approver and the
+    // resulting document, but a file-replacement accept has no command in the
+    // audit vocabulary to be, and inventing one here would be a decision made in
+    // passing. Until it exists, an accept is a change to the `.sacm` that the
+    // recorded history cannot reproduce, and the replay verifier says so on the
+    // next project open.
+    impl_->document_dirty = false;
+    impl_->app_state.has_unsaved_changes = false;
+    impl_->problems_dirty.MarkAll();
+    impl_->tree_needs_rebuild = true;
+    impl_->inspector_model_valid = false;
+
+    // Forces the draft state to be reopened against what is now accepted:
+    // SyncDraftWorkspace returns early while the argument path is unchanged, and
+    // the path is exactly what an accept does not change.
+    impl_->draft_workspace_argument.clear();
+    SyncDraftWorkspace();
+    return true;
+}
+
 bool AppRuntime::PromoteWorkingDraft(std::string& summary, std::string& error) {
     error.clear();
     summary.clear();
+    // A document-backed draft is the whole working argument, so accepting it is
+    // accepting everything -- there is no per-group selection left to make
+    // (ADR 0016). The group path below survives only for an argument that has no
+    // draft document, and goes when the operation-staging store does.
+    if (impl_->draft_document.active() && impl_->DraftDocumentHasChanges())
+        return AcceptDraftDocument(summary, error);
+
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || !workspace->has_active_groups()) {
         error = "There is no working draft to accept.";
@@ -1477,6 +1625,16 @@ MakeHumanCreateRefsUnique(const core::drafts::DraftChangeGroup& group,
 } // namespace
 
 bool AppRuntime::DraftEditingActive() const {
+    // A draft document that exists is unaccepted work, and an edit made while it
+    // exists belongs in it: otherwise the edit lands in the accepted argument,
+    // the draft no longer descends from what it is compared against, and the
+    // comparison reports the user's own new elements as things the draft removes.
+    //
+    // A draft document that does NOT exist deliberately does not make this true.
+    // Ordinary editing of an argument nobody is drafting against goes to the
+    // accepted document, exactly as before.
+    if (impl_->draft_document.active())
+        return true;
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     return workspace != nullptr && workspace->has_active_groups() &&
            workspace->state == core::drafts::DraftWorkspaceState::Active;
@@ -1492,6 +1650,34 @@ bool AppRuntime::StageHumanDraftOperations(const std::string& title,
     }
 
     const std::string author = impl_->reviewer_name.empty() ? std::string("You") : impl_->reviewer_name;
+
+    // The draft document takes the edit whenever there is a document to take it
+    // (ADR 0016) -- through the same seams an MCP client's operations go
+    // through, so the user's hand edits are accepted or refused by the model
+    // that will hold them, in the gesture that made them.
+    //
+    // Deliberately BEFORE the change group below. The group is the record of who
+    // contributed what; the document is the argument. Recording a contribution
+    // the document refused would leave the ledger describing an edit that never
+    // happened.
+    if (impl_->draft_document.active() && impl_->app_state.library_document != nullptr) {
+        const core::drafts::DraftOperationResult applied =
+            core::drafts::ApplyOperationsToDraftDocument(*impl_->draft_document.document(), operations);
+        if (!applied.applied) {
+            error = applied.error;
+            return false;
+        }
+        impl_->draft_document.MarkChanged();
+        std::string save_error;
+        if (!impl_->draft_document.Save(save_error)) {
+            // The edit is in the draft; only the recovery copy of it is not. Said
+            // plainly rather than reported as a refusal, which would invite the
+            // user to repeat an edit that already landed.
+            SetStatus(ui::i18n::trf("The edit was made, but the draft could not be written to disk: {0}", save_error));
+        }
+        impl_->tree_needs_rebuild = true;
+        return true;
+    }
 
     // One group for the session's hand edits rather than one per click: a
     // reviewer accepting later wants "my corrections", not forty groups of one
@@ -1641,9 +1827,10 @@ parser::AssuranceCase* AppRuntime::InspectorModel() {
     if (!DraftEditingActive())
         return &impl_->app_state.loaded_case.value();
 
-    // Refreshed on the same key the materialization is cached under, so this
-    // copy is made when something actually changed rather than every frame.
-    const std::uint64_t draft_revision = impl_->draft_workspace.revision();
+    // Refreshed when the draft actually moved rather than every frame. Both
+    // halves, or a document-backed draft leaves the inspector showing content
+    // the user's own edit has already replaced.
+    const std::uint64_t draft_revision = impl_->DraftRevision();
     if (!impl_->inspector_model_valid || impl_->inspector_model_draft_revision != draft_revision ||
         impl_->inspector_model_case_revision != impl_->app_state.case_revision) {
         impl_->inspector_model = CurrentArgumentView();
@@ -1656,14 +1843,19 @@ parser::AssuranceCase* AppRuntime::InspectorModel() {
 
 void AppRuntime::RecordDraftAcceptOutcome(bool accepted, const std::string& error) {
     ui::UiState& ui_state = ui::GetUiState();
+    // Stamped against whichever draft the refusal is about, so it expires when
+    // that draft moves and not before. The two are never both the working draft:
+    // staging goes to the document when there is one.
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
-    if (accepted || error.empty() || workspace == nullptr) {
+    const bool document_backed = impl_->draft_document.active();
+    if (accepted || error.empty() || (!document_backed && workspace == nullptr)) {
         ui_state.draft_accept_error.clear();
         ui_state.draft_accept_error_revision = 0;
         return;
     }
     ui_state.draft_accept_error = error;
-    ui_state.draft_accept_error_revision = workspace->working_revision;
+    ui_state.draft_accept_error_revision =
+        document_backed ? impl_->draft_document.revision() : workspace->working_revision;
 }
 
 bool AppRuntime::PromoteDraftGroups(const std::vector<std::string>& group_ids, std::string& error) {
@@ -2067,6 +2259,17 @@ void AppRuntime::FocusDraftGroup(const std::string& group_id) {
 
 bool AppRuntime::DiscardWorkingDraft(std::string& error) {
     error.clear();
+    if (impl_->draft_document.active()) {
+        // Always succeeds, because ADR 0016 requires discard to be available in
+        // every state without exception. A leftover file is reported as a note
+        // beside the discard, not as a refusal that would leave the draft
+        // applied to everything the user is looking at.
+        std::string warning;
+        DiscardDraftDocument(warning);
+        if (!warning.empty())
+            impl_->app_state.status_message = warning;
+        return true;
+    }
     if (!impl_->draft_workspace.DiscardWorkspace(error))
         return false;
     impl_->tree_needs_rebuild = true;

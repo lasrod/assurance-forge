@@ -48,19 +48,36 @@ public:
     DraftDocumentStore(const DraftDocumentStore&) = delete;
     DraftDocumentStore& operator=(const DraftDocumentStore&) = delete;
 
-    // Opens the draft for this argument, creating it from `accepted` when none
-    // exists on disk. An existing draft is loaded as it was left; it is NOT
-    // re-derived from `accepted`, because re-deriving would silently discard
-    // unaccepted work.
+    // Opens the draft for this argument if there is one on disk, and otherwise
+    // leaves no draft active. Succeeds either way: an argument nobody has
+    // drafted against is the ordinary case, not a failure.
     //
-    // Creating does not write the file. A draft that has changed nothing is
-    // indistinguishable from no draft at all, and writing one on open would put
-    // an unaccepted `.sacm` in the project directory for every argument a user
-    // merely looked at.
+    // An existing draft is loaded as it was left; it is NOT re-derived from
+    // `accepted`, because re-deriving would silently discard unaccepted work.
+    //
+    // **Opening an argument does not create a draft**, and that is load-bearing
+    // rather than a saving. The comparison against the accepted document is only
+    // meaningful while the draft descends from the argument it is compared with,
+    // and a draft cloned for every argument anyone opened stopped descending from
+    // it the moment the user edited the accepted argument -- every element they
+    // added was then in the accepted document and absent from the draft, which
+    // the comparison reported, correctly and uselessly, as the draft removing
+    // their own new work.
     bool Open(const std::filesystem::path& project_root,
               const std::filesystem::path& argument_path,
               const sacm_adapter::LibraryDocument& accepted,
               std::string& error);
+
+    // Creates the draft from `accepted` if there is not already one open, so a
+    // contributor about to make the first unaccepted change has something to
+    // make it to. A no-op when a draft is already active -- a second contributor
+    // joins the draft in progress rather than replacing it.
+    //
+    // Called at the moment of the first edit rather than on open, so the copy is
+    // taken from the argument as it stands then. Creating does not write the
+    // file: the caller saves once the edit has actually been applied, so a
+    // refused edit leaves no unaccepted `.sacm` in the project directory.
+    bool EnsureDraft(const sacm_adapter::LibraryDocument& accepted, std::string& error);
 
     // Forgets the in-memory draft without touching the file. For closing a
     // project, not for discarding work.

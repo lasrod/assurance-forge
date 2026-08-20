@@ -3,6 +3,7 @@
 #include "ai/libcurl_http_client.h"
 #include "ai/openai_provider.h"
 #include "core/commands/command_bus.h"
+#include "sacm_adapter/case_projection.h"
 #include "ui/imgui_buffer_utils.h"
 
 namespace app {
@@ -11,6 +12,45 @@ AppRuntimeState::~AppRuntimeState() = default;
 
 bool AppRuntimeState::IsProposalCanvasActive() const {
     return proposal_controller->IsCanvasActive();
+}
+
+void AppRuntimeState::RefreshDraftDocumentView() {
+    if (!draft_document.active() || !app_state.loaded_case.has_value()) {
+        // Guarded, because this is asked several times a frame and the no-draft
+        // case is the ordinary one: clearing unconditionally would rebuild two
+        // empty containers per call for every argument nobody is drafting
+        // against.
+        if (draft_document_view_revision == ~std::uint64_t{0})
+            return;
+        draft_document_view = parser::AssuranceCase{};
+        draft_document_changes = core::drafts::DraftDocumentDiff{};
+        draft_document_view_differs = false;
+        // Reset to the sentinel, not to the current revisions: leaving the
+        // stamps behind would let a draft opened at the same revision as the one
+        // just closed reuse this empty result.
+        draft_document_view_revision = ~std::uint64_t{0};
+        draft_document_view_case_revision = ~std::uint64_t{0};
+        return;
+    }
+    const std::uint64_t revision = draft_document.revision();
+    if (revision == draft_document_view_revision && app_state.case_revision == draft_document_view_case_revision)
+        return;
+
+    draft_document_view = draft_document.Projection();
+    draft_document_changes = core::drafts::DiffAcceptedAgainstDraft(app_state.loaded_case.value(), draft_document_view);
+    draft_document_view_differs = draft_document_changes.touches_anything();
+    draft_document_view_revision = revision;
+    draft_document_view_case_revision = app_state.case_revision;
+}
+
+const core::drafts::DraftDocumentDiff& AppRuntimeState::DraftDocumentChanges() {
+    RefreshDraftDocumentView();
+    return draft_document_changes;
+}
+
+bool AppRuntimeState::DraftDocumentHasChanges() {
+    RefreshDraftDocumentView();
+    return draft_document_view_differs;
 }
 
 AppRuntimeState::AppRuntimeState() {

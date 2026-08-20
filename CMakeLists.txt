@@ -490,11 +490,13 @@ add_executable(tests
     tests/test_instance_registry.cpp
     tests/test_bridge_transport.cpp
     tests/test_agent_request_handler.cpp
+    tests/test_agent_draft_document.cpp
     tests/test_agent_acp_reads.cpp
     tests/test_agent_bridge_controller.cpp
     tests/test_change_sets.cpp
     tests/test_draft_changes_panel.cpp
     tests/test_draft_document_diff.cpp
+    tests/test_draft_document_lifecycle.cpp
     tests/test_draft_document_store.cpp
     tests/test_draft_operation_apply.cpp
     tests/test_draft_workspace.cpp

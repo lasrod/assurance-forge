@@ -588,17 +588,8 @@ const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
     // Cached against the store's revision so the projection and the comparison
     // do not run on every caller in a frame -- this is asked several times per
     // frame by the canvas, the navigator and the inspector.
-    if (impl_->draft_document.active()) {
-        const std::uint64_t revision = impl_->draft_document.revision();
-        if (revision != impl_->draft_document_view_revision) {
-            impl_->draft_document_view = impl_->draft_document.Projection();
-            impl_->draft_document_view_differs =
-                core::drafts::DiffAcceptedAgainstDraft(accepted, impl_->draft_document_view).touches_anything();
-            impl_->draft_document_view_revision = revision;
-        }
-        if (impl_->draft_document_view_differs)
-            return impl_->draft_document_view;
-    }
+    if (impl_->DraftDocumentHasChanges())
+        return impl_->draft_document_view;
 
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || !workspace->has_active_groups()) {
@@ -625,7 +616,8 @@ const parser::AssuranceCase& AppRuntime::CurrentArgumentView() {
 const parser::AssuranceCase& AppRuntime::CurrentCanvasView() {
     const parser::AssuranceCase& working = CurrentArgumentView();
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
-    if (workspace == nullptr || !workspace->has_active_groups() || !impl_->app_state.loaded_case.has_value()) {
+    const bool has_draft = impl_->DraftDocumentHasChanges() || (workspace != nullptr && workspace->has_active_groups());
+    if (!has_draft || !impl_->app_state.loaded_case.has_value()) {
         return working;
     }
 
@@ -660,7 +652,8 @@ void AppRuntime::RefreshDraftDecorations() {
     impl_->draft_added_ids.clear();
 
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
-    if (workspace == nullptr || !workspace->has_active_groups())
+    const bool document_backed = impl_->DraftDocumentHasChanges();
+    if (!document_backed && (workspace == nullptr || !workspace->has_active_groups()))
         return;
     // In "accepted baseline" the canvas is deliberately showing what the user
     // has now. Marking it up with what is proposed would contradict the mode
@@ -676,11 +669,14 @@ void AppRuntime::RefreshDraftDecorations() {
         if (entry == nullptr)
             continue;
 
+        // Empty for a document-backed draft: the comparison records what changed,
+        // not who changed it, so the decoration carries no source label until
+        // provenance is read from the element's tagged values.
         const std::vector<std::string> contributors = index.ContributingGroupIds(element_id);
         ui::DraftNodeDecoration decoration;
         decoration.change = entry->change;
         decoration.multiple_contributions = contributors.size() > 1;
-        if (!contributors.empty()) {
+        if (!contributors.empty() && workspace != nullptr) {
             const core::drafts::DraftChangeGroup* group = workspace->FindGroup(contributors.back());
             if (group != nullptr) {
                 decoration.source_label = group->source_label.empty()
@@ -848,6 +844,18 @@ void AppRuntime::RefreshSelectedDraftDetail() {
 
 const core::drafts::DraftChangeIndex& AppRuntime::CurrentDraftChangeIndex() {
     static const core::drafts::DraftChangeIndex kEmpty;
+    // A document-backed draft answers this from the comparison (ADR 0016), which
+    // is derived from the two documents and so cannot disagree with what is on
+    // the canvas. Cached on the same key as the comparison itself.
+    if (impl_->DraftDocumentHasChanges()) {
+        if (impl_->draft_document_index_revision != impl_->draft_document_view_revision ||
+            impl_->draft_document_index_case_revision != impl_->draft_document_view_case_revision) {
+            impl_->draft_document_index = core::drafts::ChangeIndexFromDiff(impl_->draft_document_changes);
+            impl_->draft_document_index_revision = impl_->draft_document_view_revision;
+            impl_->draft_document_index_case_revision = impl_->draft_document_view_case_revision;
+        }
+        return impl_->draft_document_index;
+    }
     const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
     if (workspace == nullptr || !workspace->has_active_groups() || !impl_->app_state.loaded_case.has_value()) {
         return kEmpty;

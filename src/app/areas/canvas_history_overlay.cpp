@@ -444,9 +444,114 @@ void DraftViewModeButton(ui::UiState& ui_state, ui::DraftViewMode mode, const st
         ImGui::PopStyleColor(3);
 }
 
+// The banner for a draft that is a SACM document (ADR 0016).
+//
+// Everything it says is read from the comparison against the accepted argument,
+// so it cannot claim unaccepted work that is not there, or miss work that is.
+// The operation-based banner below it counted staged groups, which is a
+// different question -- an empty group is not a change, and a change made
+// directly to the document belongs to no group at all.
+void RenderDraftDocumentBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
+    // Read out by value rather than held as a reference across the buttons
+    // below. Accept and Discard both fire from inside this function and both
+    // recompute the comparison, so a reference bound here would describe a draft
+    // that had already been consumed by the time the rest of the banner used it.
+    const core::drafts::DraftDocumentDiff& current = state.DraftDocumentChanges();
+    const int added = current.added_count;
+    const int modified = current.modified_count;
+    const int removed = current.removed_count;
+    const int changed = added + modified + removed;
+
+    ui::UiState& ui_state = ui::GetUiState();
+    const ui::Theme& theme = ui::GetTheme();
+    const ImU32 banner_bg = ui::LerpColor(theme.surface_1, theme.accent, 0.18f);
+    const ImU32 banner_ink = ui::InkOn(banner_bg);
+
+    // Stamped against the draft's own revision, so a refusal expires the moment
+    // the draft moves -- the reason it gave is about a draft that no longer
+    // exists.
+    const std::string reason = ui::DraftAcceptError(ui_state, state.draft_document.revision());
+    const std::string accept_error =
+        reason.empty() ? std::string{} : ui::i18n::trf("The last accept did not happen: {0}", reason);
+
+    float banner_height = ImGui::GetTextLineHeightWithSpacing() * 4.2f;
+    if (!accept_error.empty()) {
+        const float wrap_width =
+            std::max(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().WindowPadding.x * 2.0f, 1.0f);
+        banner_height +=
+            ImGui::CalcTextSize(accept_error.c_str(), nullptr, false, wrap_width).y + ImGui::GetStyle().ItemSpacing.y;
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(banner_bg));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(banner_ink));
+    ImGui::BeginChild("##working_draft_banner", ImVec2(0.0f, banner_height), true);
+
+    // In words, not implied by a tint. This is the line that stops a draft being
+    // read as the accepted safety argument.
+    ImGui::TextColored(
+        ImGui::ColorConvertU32ToFloat4(banner_ink),
+        "%s",
+        ui::i18n::trnf(
+            "WORKING DRAFT — {0} unaccepted change", "WORKING DRAFT — {0} unaccepted changes", changed, changed)
+            .c_str());
+    ImGui::TextWrapped("%s",
+                       ui::i18n::trf("{0} added, {1} changed, {2} removed.",
+                                     std::to_string(added),
+                                     std::to_string(modified),
+                                     std::to_string(removed))
+                           .c_str());
+
+    if (!accept_error.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        ImGui::TextWrapped("%s", accept_error.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    DraftViewModeButton(ui_state, ui::DraftViewMode::WorkingDraft, AF_TR("Working draft"), "##draft_view_working");
+    ImGui::SameLine();
+    DraftViewModeButton(
+        ui_state, ui::DraftViewMode::AcceptedBaseline, AF_TR("Accepted baseline"), "##draft_view_accepted");
+    ImGui::SameLine();
+    DraftViewModeButton(ui_state, ui::DraftViewMode::ChangesOnly, AF_TR("Changes only"), "##draft_view_changes");
+
+    ImGui::SameLine();
+    ImGui::Dummy(ImVec2(ImGui::GetFontSize(), 0.0f));
+    ImGui::SameLine();
+
+    // Never disabled, and there is no state in which it could be. Accept writes
+    // a document that has already been produced in full; nothing about the draft
+    // can make it refuse part-way, which is why this button carries no
+    // "cannot be accepted because..." tooltip for the user to be stuck behind.
+    if (ImGui::Button((AF_TR("Accept draft") + "##draft_accept_all").c_str())) {
+        if (callbacks.promote_working_draft)
+            callbacks.promote_working_draft();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button((AF_TR("Review changes") + "##draft_review_changes").c_str()))
+        state.workbench.focus_draft_changes_tab = true;
+
+    ImGui::SameLine();
+    // Available here without condition, as ADR 0016 requires: no state may leave
+    // a user unable to accept, unable to edit and unable to discard.
+    if (ImGui::Button((AF_TR("Discard draft") + "##draft_discard").c_str())) {
+        if (callbacks.discard_working_draft)
+            callbacks.discard_working_draft();
+    }
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor(2);
+    ImGui::Spacing();
+}
+
 } // namespace
 
 void RenderWorkingDraftBanner(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
+    if (state.draft_document.active() && state.DraftDocumentHasChanges()) {
+        RenderDraftDocumentBanner(state, callbacks);
+        return;
+    }
+
     const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
     if (workspace == nullptr)
         return;

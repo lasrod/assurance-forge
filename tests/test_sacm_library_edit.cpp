@@ -1787,3 +1787,82 @@ TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewMatchesWhatApplyDoes) {
     EXPECT_EQ(predicted_gone, actually_gone)
         << "the preview promised a different set of deletions than the apply performed";
 }
+
+// The attach half of `apply_add_child`, for an element that already exists.
+//
+// A patch vocabulary creates an element and attaches it in two operations, so
+// the attach has to reach the same wiring the one-shot create does. When it did
+// not, a GSN Strategy was wired as an END of an inference (it is the reasoning
+// of one) and a GSN Solution was attached by inference rather than evidence --
+// which, because Solution and Context are the same SACM type and differ only in
+// how they attach, made the Solution render with Context notation.
+TEST(SacmLibraryEdit, SACM23_INT_001_AttachChildWiresEachKindLikeAddChildDoes) {
+    sacm_adapter::LoadOutcome loaded = load_fixture();
+    ASSERT_NE(loaded.document, nullptr);
+
+    // A Strategy: no relationship at all, only the strategyTarget tag. An
+    // inference whose sole end is `reasoning` has no source, which SACM's
+    // source [1..*] forbids (clause 11.13).
+    const sacm_adapter::AddChildOutcome strategy_created = sacm_adapter::apply_create_element(
+        *loaded.document,
+        sacm_adapter::resolve_argument_package_id(*loaded.document, "G1"),
+        sacm_adapter::NewElementKind::ArgumentReasoning,
+        sacm_adapter::CreateElementFields{.element_id = "STRAT2", .text = "Argue over hazards"});
+    ASSERT_TRUE(strategy_created.applied)
+        << (strategy_created.diagnostics.empty() ? "" : strategy_created.diagnostics.front().message);
+    const sacm_adapter::AddChildOutcome strategy_attached =
+        sacm_adapter::apply_attach_child(*loaded.document, "G1", "STRAT2", "RSTRAT2");
+    ASSERT_TRUE(strategy_attached.supported);
+    ASSERT_TRUE(strategy_attached.applied)
+        << (strategy_attached.diagnostics.empty() ? "" : strategy_attached.diagnostics.front().message);
+    EXPECT_TRUE(strategy_attached.new_relationship_id.empty()) << "no inference until the first sub-goal";
+
+    // A Solution: AssertedEvidence, which is the only thing that distinguishes
+    // it from a Context in the saved document.
+    const sacm_adapter::AddChildOutcome solution_created = sacm_adapter::apply_create_element(
+        *loaded.document,
+        sacm_adapter::resolve_argument_package_id(*loaded.document, "G1"),
+        sacm_adapter::NewElementKind::ArtifactReference,
+        sacm_adapter::CreateElementFields{.element_id = "SOL2", .name = "Test report"});
+    ASSERT_TRUE(solution_created.applied);
+    const sacm_adapter::AddChildOutcome solution_attached =
+        sacm_adapter::apply_attach_child(*loaded.document, "G1", "SOL2", "RSOL2");
+    ASSERT_TRUE(solution_attached.applied)
+        << (solution_attached.diagnostics.empty() ? "" : solution_attached.diagnostics.front().message);
+
+    core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* evidence = find_element(after, solution_attached.new_relationship_id);
+    ASSERT_NE(evidence, nullptr);
+    EXPECT_EQ(evidence->type, "assertedevidence")
+        << "a solution attached by anything else is indistinguishable from a context";
+
+    // A sub-goal under the strategy materializes the strategy's inference:
+    // {source = sub-goal, target = the goal the strategy supports, reasoning =
+    // the strategy}. The strategy is never an end of it.
+    const sacm_adapter::AddChildOutcome subgoal_created = sacm_adapter::apply_create_element(
+        *loaded.document,
+        sacm_adapter::resolve_argument_package_id(*loaded.document, "G1"),
+        sacm_adapter::NewElementKind::Claim,
+        sacm_adapter::CreateElementFields{.element_id = "SUB2", .text = "Blade hazards are controlled"});
+    ASSERT_TRUE(subgoal_created.applied);
+    const sacm_adapter::AddChildOutcome subgoal_attached =
+        sacm_adapter::apply_attach_child(*loaded.document, "STRAT2", "SUB2", "RSUB2");
+    ASSERT_TRUE(subgoal_attached.applied)
+        << (subgoal_attached.diagnostics.empty() ? "" : subgoal_attached.diagnostics.front().message);
+    ASSERT_FALSE(subgoal_attached.new_relationship_id.empty());
+
+    after = sacm_adapter::project_case(*loaded.document);
+    const core::SacmElement* inference = find_element(after, subgoal_attached.new_relationship_id);
+    ASSERT_NE(inference, nullptr);
+    EXPECT_EQ(inference->type, "assertedinference");
+    EXPECT_NE(std::find(inference->source_refs.begin(), inference->source_refs.end(), "SUB2"),
+              inference->source_refs.end());
+    EXPECT_NE(std::find(inference->target_refs.begin(), inference->target_refs.end(), "G1"),
+              inference->target_refs.end());
+    EXPECT_EQ(std::find(inference->source_refs.begin(), inference->source_refs.end(), "STRAT2"),
+              inference->source_refs.end())
+        << "a strategy is the reasoning of its inference, never one of its ends";
+    EXPECT_EQ(std::find(inference->target_refs.begin(), inference->target_refs.end(), "STRAT2"),
+              inference->target_refs.end())
+        << "a strategy is the reasoning of its inference, never one of its ends";
+}

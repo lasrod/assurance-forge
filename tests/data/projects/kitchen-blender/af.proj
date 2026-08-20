@@ -1,0 +1,51 @@
+{
+  "format": "assurance-forge-project",
+  "formatVersion": "0.1.0",
+  "project": {
+    "id": "example-kitchen-blender",
+    "name": "Kitchen Blender",
+    "description": "Demonstration safety case for a domestic kitchen blender.",
+    "createdUtc": "2026-07-29T00:00:00Z",
+    "modifiedUtc": "2026-08-02T00:00:00Z"
+  },
+  "tool": {
+    "createdWith": "Assurance Forge",
+    "lastOpenedWith": "Assurance Forge"
+  },
+  "files": [
+    {
+      "id": "example-kitchen-blender-argument",
+      "path": "arguments/main.sacm",
+      "role": "sacm.argument",
+      "state": "clean",
+      "hashAlgorithm": "sha256",
+      "rawHash": "8be670f7ec47eccbb94ab3ec056f13bda769766ddf3799905d9eb3c49d528ee1",
+      "semanticHash": "",
+      "elementIndexHash": "",
+      "relationshipGraphHash": "",
+      "sacm": {
+        "parseStatus": "parsed"
+      }
+    },
+    {
+      "id": "example-kitchen-blender-reviews",
+      "path": "reviews/review-items.af.json",
+      "role": "af.reviewItems",
+      "state": "clean",
+      "hashAlgorithm": "sha256",
+      "rawHash": "b86d568cc587940051d1ae885d5bdff56eb7a47619b8a869f009c12ea039d0e9",
+      "semanticHash": "",
+      "elementIndexHash": "",
+      "relationshipGraphHash": "",
+      "sacm": {
+        "parseStatus": "notParsed"
+      }
+    }
+  ],
+  "dependencies": [],
+  "baselines": [],
+  "settings": {
+    "defaultLanguage": "en",
+    "validationMode": "permissive"
+  }
+}
