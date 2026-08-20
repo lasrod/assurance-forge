@@ -256,6 +256,18 @@ bool Applier::ApplyCreateTerm(const PatchOperation& operation, std::string& erro
         error = "A term's value is a single string and cannot be translated. Translate its definition instead.";
         return false;
     }
+    // A term is a word paired with what it means. Without the definition it is
+    // the word alone, and the glossary then shows the reader a term that looks
+    // defined and is not -- which is worse for a safety argument than no
+    // glossary entry. Twice reported from real sessions: an agent staged a whole
+    // glossary, set the category and the external reference the guidance names,
+    // and left every definition empty, because nothing here asked for one.
+    if (operation.new_value.empty()) {
+        error = "CreateTerm for " + operation.create_ref.value() + " has no definition. Put what \"" + operation.text +
+                "\" means in \"new_value\": a term with no definition reads as defined and "
+                "is not. Revise it later with UpdateTerm field \"definition\".";
+        return false;
+    }
 
     std::string terminology_package;
     if (!TerminologyPackage(terminology_package, error))

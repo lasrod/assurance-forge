@@ -883,3 +883,64 @@ TEST(AgentRequestHandler, StagingATermWhoseDefinitionUsesAnUnreadKeyIsRefused) {
     ASSERT_TRUE(described.ok);
     EXPECT_EQ(described.result.value("operation_count", -1), 0) << described.result.dump();
 }
+
+// A term is matched against element text by its value, so a value that appears
+// nowhere bounds nothing. Reported from a real session: an agent staged
+// `EPB (Electronic Parking Brake)` for text that says `EPB`, and the glossary
+// looked right while resolving for no occurrence in the argument.
+TEST(AgentRequestHandler, ListTermsReportsATermWhoseValueAppearsNowhere) {
+    TempDir workspace{UniqueTempPath("term-matches-nothing")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 71;
+    context.source_session_id = "stable-mcp-session-71";
+    context.current_argument_view = [&] {
+        const core::drafts::DraftWorkspace* draft = drafts.workspace();
+        if (draft == nullptr || !draft->has_active_groups())
+            return app::AgentArgumentView{&state.loaded_case.value(), nullptr};
+        const core::drafts::DraftMaterializationResult& materialized =
+            drafts.Materialize(state.loaded_case.value(), state.case_revision);
+        return app::AgentArgumentView{&materialized.working_model, draft, true};
+    };
+
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_group",
+                    {{"title", "Define the abbreviations"},
+                     {"rationale", "The claims lean on abbreviations that are nowhere bounded."},
+                     {"expected_working_revision", 0}}),
+        context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+    const std::uint64_t begun_revision = begun.result["working_revision"].get<std::uint64_t>();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest("stage_operations",
+                    {{"group_id", group_id},
+                     {"expected_working_revision", begun_revision},
+                     {"operations",
+                      nlohmann::json::array({{{"type", "CreateTerm"},
+                                              {"create_ref", "$epb"},
+                                              {"text", "EPB (Electronic Parking Brake)"},
+                                              {"new_value", "The electrically actuated parking brake."}}})}}),
+        context);
+    ASSERT_TRUE(staged.ok);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+
+    const bridge::Response listed = app::HandleAgentRequest(MakeRequest("list_terms"), context);
+    ASSERT_FALSE(listed.result.value("isError", true)) << listed.result.dump();
+    ASSERT_EQ(listed.result["count"], 1);
+    EXPECT_TRUE(listed.result["terms"][0].value("matches_no_text", false))
+        << "a value that appears nowhere in the argument must be reported: " << listed.result.dump();
+    ASSERT_TRUE(listed.result.contains("note")) << listed.result.dump();
+    const std::string note = listed.result["note"].get<std::string>();
+    EXPECT_NE(note.find("appears nowhere"), std::string::npos) << note;
+    EXPECT_NE(note.find("expansion"), std::string::npos) << "the note must say where the expansion goes: " << note;
+}

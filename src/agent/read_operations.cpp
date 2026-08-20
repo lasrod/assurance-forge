@@ -417,6 +417,23 @@ Result ListTerms(const ReadContext& context) {
         categories.push_back(std::move(category));
     }
 
+    // The text a term has to match to be of any use. Built from the argument
+    // rather than the glossary, and deliberately excluding terminology elements:
+    // a term's value always appears in its own record, so including it would
+    // report every term as used.
+    std::string argument_text;
+    for (const parser::SacmElement& element : context.argument()->elements) {
+        if (element.type == "term" || element.type == "category")
+            continue;
+        argument_text += element.content;
+        argument_text += '\n';
+        argument_text += element.description;
+        argument_text += '\n';
+        argument_text += element.name;
+        argument_text += '\n';
+    }
+
+    int terms_matching_no_text = 0;
     nlohmann::json terms = nlohmann::json::array();
     for (const parser::SacmElement& element : context.argument()->elements) {
         if (element.type != "term") {
@@ -459,11 +476,24 @@ Result ListTerms(const ReadContext& context) {
         if (!definition_translations.empty()) {
             term["definition_translations"] = std::move(definition_translations);
         }
+        // A term is matched against element text by its value, so a value that
+        // appears nowhere bounds nothing. It is how `EPB (Electronic Parking
+        // Brake)` was staged for text that says `EPB`: the term looked right in
+        // the glossary and resolved for no occurrence in the argument.
+        if (!element.content.empty() && argument_text.find(element.content) == std::string::npos) {
+            term["matches_no_text"] = true;
+            ++terms_matching_no_text;
+        }
         terms.push_back(std::move(term));
     }
 
     const int count = static_cast<int>(terms.size());
     const int category_count = static_cast<int>(categories.size());
+    int undefined_terms = 0;
+    for (const nlohmann::json& term : terms) {
+        if (term.value("definition", "").empty())
+            ++undefined_terms;
+    }
     nlohmann::json payload{{"terms", std::move(terms)},
                            {"count", count},
                            {"categories", std::move(categories)},
@@ -471,6 +501,23 @@ Result ListTerms(const ReadContext& context) {
     if (count == 0) {
         payload["note"] = "This case defines no terminology yet. Terms bound the words a safety argument "
                           "relies on; stage a CreateTerm operation to define one.";
+    } else if (terms_matching_no_text > 0) {
+        payload["note"] =
+            std::to_string(terms_matching_no_text) +
+            " term(s) have a value that appears nowhere in this case's text, so they bound nothing. A term's "
+            "value must be the string as it is written in the argument -- \"EPB\", not \"EPB (Electronic "
+            "Parking Brake)\"; the expansion belongs in the definition. Correct one with an UpdateTerm "
+            "operation whose field is \"value\".";
+    } else if (undefined_terms > 0) {
+        // Said here because this is where an agent looks at the glossary it is
+        // about to add to, and a term with no definition carries no `definition`
+        // key at all -- an absence is easy to read past in a list where most
+        // entries have one. Staging refuses to create another such term; these
+        // already exist.
+        payload["note"] = std::to_string(undefined_terms) +
+                          " term(s) in this case have no definition, so the "
+                          "glossary shows a word with nothing beside it. Supply each with an UpdateTerm "
+                          "operation whose field is \"definition\".";
     } else if (category_count == 0) {
         // Said once here rather than left to be discovered per term: the
         // terminology check reports every uncategorized term, and the fix for
