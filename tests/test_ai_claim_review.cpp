@@ -479,3 +479,34 @@ TEST(AiClaimReviewTest, NamesWhyEachAbsentPackageIsAbsent) {
     ASSERT_NE(links, nullptr);
     EXPECT_EQ(links->absence, review::DataPackageAbsence::NotImplemented);
 }
+
+// A challenge standing against the parent claim is part of this review's
+// history: the parent is in the request, so its findings belong with it. The
+// collector scopes by what the packages carry, and a caller that pre-filtered
+// to the selected element would hide exactly the findings SU.11 is about.
+TEST(AiClaimReviewTest, IncludesHistoryForInScopeElementsBeyondTheSelectedOne) {
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeElement("G1", "claim", "Top goal", "System is safe."));
+    assurance_case.elements.push_back(MakeElement("G2", "claim", "Sub goal", "Braking is safe."));
+    assurance_case.elements.push_back(MakeRelationship("INF1", "assertedinference", {"G2"}, {"G1"}));
+
+    review::AiReviewCaseContext context;
+    core::reviews::ReviewItem on_parent;
+    on_parent.id = "item-parent";
+    on_parent.element_id = "G1";
+    on_parent.title = "SU.11 challenge left unresolved on the parent";
+    on_parent.guideline_ids = {"SU.11"};
+    context.review_items.push_back(std::move(on_parent));
+
+    const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    review::AiReviewDataPackageBundle packages;
+    std::string error;
+    ASSERT_TRUE(review::CollectAiReviewDataPackages(assurance_case, tree, "G2", nullptr, packages, error, &context))
+        << error;
+
+    ASSERT_TRUE(HasPackage(packages, "CHANGE_HISTORY"));
+    for (const review::AiReviewDataPackage& package : packages.available) {
+        if (package.id == "CHANGE_HISTORY")
+            EXPECT_NE(package.json.find("SU.11 challenge left unresolved"), std::string::npos) << package.json;
+    }
+}

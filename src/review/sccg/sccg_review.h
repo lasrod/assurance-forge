@@ -64,6 +64,11 @@ struct AiReviewUnavailableDataPackage {
 // from where that state happens to be.
 struct AiReviewCaseContext {
     std::vector<core::reviews::ReviewItem> review_items;
+    // What the reviewer said they were worried about. **No surface supplies
+    // this yet** -- there is no field on the review action for it -- so in a
+    // real run `USER_REVIEW_INTENT` is reported empty rather than carried. The
+    // contract holds it because the package is published and a caller that has
+    // an intent should be able to pass one without a schema change.
     std::string user_review_intent;
 };
 
