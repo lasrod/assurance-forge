@@ -193,6 +193,28 @@ std::string StringArgument(const nlohmann::json& arguments, const char* key) {
     return found->get<std::string>();
 }
 
+// A scalar field, refused when it is present with the wrong type.
+//
+// `StringArgument` returns an empty string for anything that is not a string, so
+// `"new_value": 123` reached the applier as "no value" and the operation applied
+// nothing while reporting success -- the same silent drop as a key the parser
+// does not read, arriving through a key it does. Absent and null still mean
+// absent: the operation type decides what it needs.
+bool RequireStringField(const nlohmann::json& source, const char* key, std::string& out, std::string& error) {
+    const nlohmann::json::const_iterator found = source.find(key);
+    if (found == source.end() || found->is_null()) {
+        out.clear();
+        return true;
+    }
+    if (!found->is_string()) {
+        error = std::string("\"") + key + "\" must be a string, not " + found->type_name() +
+                ". The value would otherwise be dropped and the operation would apply nothing.";
+        return false;
+    }
+    out = found->get<std::string>();
+    return true;
+}
+
 bool ParseElementRef(const nlohmann::json& source,
                      const char* field,
                      std::optional<ElementRef>& out,
@@ -326,7 +348,10 @@ bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& o
         error = "Each operation must be an object.";
         return false;
     }
-    const std::string type = StringArgument(source, "type");
+    std::string type;
+    if (!RequireStringField(source, "type", type, error)) {
+        return false;
+    }
     if (type.empty()) {
         error = "Each operation needs a \"type\".";
         return false;
@@ -346,14 +371,19 @@ bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& o
         return false;
     }
 
-    const std::string create_ref = StringArgument(source, "create_ref");
+    std::string create_ref;
+    if (!RequireStringField(source, "create_ref", create_ref, error)) {
+        return false;
+    }
     if (!create_ref.empty()) {
         out.create_ref = create_ref;
     }
-    out.field = StringArgument(source, "field");
-    out.old_value = StringArgument(source, "old_value");
-    out.new_value = StringArgument(source, "new_value");
-    out.text = StringArgument(source, "text");
+    if (!RequireStringField(source, "field", out.field, error) ||
+        !RequireStringField(source, "old_value", out.old_value, error) ||
+        !RequireStringField(source, "new_value", out.new_value, error) ||
+        !RequireStringField(source, "text", out.text, error)) {
+        return false;
+    }
     if (!ParseTranslations(source, out.translations, error)) {
         return false;
     }

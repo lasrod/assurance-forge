@@ -85,3 +85,48 @@ TEST(PatchOperationParsingTest, ADefinitionInNewValueParsesAsTheTermsDefinition)
     EXPECT_EQ(operation.text, "ALARP");
     EXPECT_EQ(operation.new_value, "As low as reasonably practicable.");
 }
+
+// The same drop, arriving through a key the parser does read. `StringArgument`
+// returned an empty string for any non-string, so a definition sent as a number
+// reached the applier as "no definition" and the operation reported success.
+TEST(PatchOperationParsingTest, ADefinitionOfTheWrongTypeIsRefusedRatherThanEmptied) {
+    core::reviews::PatchOperation operation;
+    std::string error;
+
+    const nlohmann::json source{
+        {"type", "CreateTerm"}, {"create_ref", "$term"}, {"text", "ALARP"}, {"new_value", 12345}};
+
+    ASSERT_FALSE(core::reviews::ParsePatchOperationJson(source, operation, error))
+        << "a number cannot be a definition, and silently becoming an empty one is the defect";
+    EXPECT_NE(error.find("new_value"), std::string::npos) << error;
+    EXPECT_NE(error.find("string"), std::string::npos) << error;
+}
+
+TEST(PatchOperationParsingTest, EveryScalarFieldRefusesAWrongType) {
+    for (const char* field : {"type", "create_ref", "field", "old_value", "new_value", "text"}) {
+        nlohmann::json source{{"type", "UpdateElementText"}, {"element", {{"id", "G1"}}}, {"new_value", "text"}};
+        source[field] = nlohmann::json::array({"not", "a", "string"});
+
+        core::reviews::PatchOperation operation;
+        std::string error;
+        EXPECT_FALSE(core::reviews::ParsePatchOperationJson(source, operation, error))
+            << "\"" << field << "\" accepted an array";
+        EXPECT_NE(error.find(field), std::string::npos) << "the refusal must name the field: " << error;
+    }
+}
+
+// Absent and null keep meaning absent -- the operation type decides what it
+// needs, and a null is how a client says "nothing here".
+TEST(PatchOperationParsingTest, ANullScalarIsTreatedAsAbsent) {
+    core::reviews::PatchOperation operation;
+    std::string error;
+
+    const nlohmann::json source{{"type", "UpdateElementText"},
+                                {"element", {{"id", "G1"}}},
+                                {"new_value", "The revised claim."},
+                                {"old_value", nullptr}};
+
+    ASSERT_TRUE(core::reviews::ParsePatchOperationJson(source, operation, error)) << error;
+    EXPECT_EQ(operation.old_value, "");
+    EXPECT_EQ(operation.new_value, "The revised claim.");
+}
