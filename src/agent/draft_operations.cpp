@@ -210,18 +210,54 @@ void AddWorkspaceEnvelope(const DraftContext& context, nlohmann::json& payload) 
     payload["note"] = kNotAcceptedNote;
 }
 
+// One SCCG finding as an agent reads it.
+//
+// `statement` is the guideline's own wording and `guideline_uri` the resource
+// carrying the rest of it. Without them an agent holds the tool's paraphrase of
+// a rule with no way to reach the rule itself -- a position no reviewer is
+// asked to accept, and an agent proposing changes to a safety argument should
+// not be either.
+nlohmann::json SccgFindingJson(const core::sccg::StagedFinding& finding) {
+    return nlohmann::json{{"kind", "sccg"},
+                          {"guideline_id", finding.guideline_id},
+                          // The catalog's stable name for the rule, so an agent can
+                          // deduplicate findings across staging calls instead of
+                          // re-reading the sentence each time.
+                          {"check_id", finding.check_id},
+                          {"statement", finding.statement},
+                          {"guideline_uri", "sccg://guideline/" + finding.guideline_id},
+                          {"element_id", finding.element_id},
+                          {"message", finding.detail},
+                          {"severity", core::sccg::FindingSeverityToString(finding.severity)}};
+}
+
+// What the tool actually decided, so an empty `findings` array cannot be read
+// as conformance.
+//
+// The mechanical set is a small fraction of SCCG, and always will be: most of
+// the guidance is prose only a reader can judge -- whether a decomposition is
+// complete, whether evidence is relevant, whether a claim is sufficiently
+// justified. An agent that sees no findings and concludes its argument passes
+// SCCG has drawn exactly the wrong conclusion, and nothing in the result told
+// it otherwise.
+nlohmann::json CheckedJson() {
+    nlohmann::json checks = nlohmann::json::array();
+    for (const std::string& check_id : core::sccg::ImplementedCheckIds()) {
+        checks.push_back(check_id);
+    }
+    return nlohmann::json{
+        {"mechanical_checks", checks},
+        {"note",
+         "These are the checks this tool can decide mechanically. They are a small part of SCCG; most of it "
+         "is prose only a reader can judge. No findings means these checks found nothing -- it does not mean "
+         "the argument conforms to SCCG. Read sccg://guidelines, and expect a human review."},
+    };
+}
+
 nlohmann::json FindingsJson(const core::drafts::DraftMaterializationResult& materialized) {
     nlohmann::json findings = nlohmann::json::array();
     for (const core::sccg::StagedFinding& finding : materialized.sccg_findings) {
-        findings.push_back(nlohmann::json{{"kind", "sccg"},
-                                          {"guideline_id", finding.guideline_id},
-                                          // The catalog's stable name for the rule, so an agent can
-                                          // deduplicate findings across staging calls instead of
-                                          // re-reading the sentence each time.
-                                          {"check_id", finding.check_id},
-                                          {"element_id", finding.element_id},
-                                          {"message", finding.detail},
-                                          {"severity", core::sccg::FindingSeverityToString(finding.severity)}});
+        findings.push_back(SccgFindingJson(finding));
     }
     for (const core::GsnFinding& finding : materialized.gsn_findings) {
         findings.push_back(nlohmann::json{{"kind", "gsn"},
@@ -246,10 +282,12 @@ Result DescribeGroupResult(const DraftContext& context, const core::drafts::Draf
         const core::drafts::DraftMaterializationResult& materialized =
             context.store.Materialize(context.state.loaded_case.value(), context.state.case_revision);
         payload["materializes"] = materialized.success;
-        if (materialized.success)
+        if (materialized.success) {
             payload["findings"] = FindingsJson(materialized);
-        else
+            payload["checked"] = CheckedJson();
+        } else {
             payload["problem"] = materialized.error;
+        }
     }
     return Result::Ok(std::move(payload));
 }
@@ -341,6 +379,7 @@ Result StageDraftOperations(const DraftContext& context, const nlohmann::json& a
     nlohmann::json payload = GroupJson(*group, true);
     payload["staged"] = static_cast<int>(operations.size());
     payload["findings"] = FindingsJson(materialized);
+    payload["checked"] = CheckedJson();
     AddWorkspaceEnvelope(context, payload);
     return Result::Ok(std::move(payload));
 }
@@ -392,10 +431,12 @@ Result CheckDraftOperations(const DraftContext& context, const nlohmann::json& a
     nlohmann::json payload;
     payload["materializes"] = materialized.success;
     payload["checked_operation_count"] = static_cast<int>(operations.size());
-    if (materialized.success)
+    if (materialized.success) {
         payload["findings"] = FindingsJson(materialized);
-    else
+        payload["checked"] = CheckedJson();
+    } else {
         payload["problem"] = materialized.error;
+    }
     // Ids allocated during the rehearsal die with it, and returning them would
     // invite an agent to refer to an element that will get a different id when
     // the operations are really staged.
@@ -464,7 +505,7 @@ Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& ar
 // results. Advisory findings are deliberately absent: they are the reviewer's
 // judgement call, and gating on them would train agents to acknowledge
 // reflexively -- which would spend the one gate this surface has.
-std::vector<std::string> StandingProblemFindings(const DraftContext& context, const std::string& group_id) {
+static std::vector<std::string> StandingProblemFindings(const DraftContext& context, const std::string& group_id) {
     std::vector<std::string> problems;
     if (!context.state.loaded_case.has_value())
         return problems;
@@ -544,6 +585,7 @@ Result DescribeWorkingDraft(const DraftContext& context) {
     payload["materializes"] = materialized.success;
     payload["element_count"] = static_cast<int>(materialized.working_model.elements.size());
     payload["findings"] = FindingsJson(materialized);
+    payload["checked"] = CheckedJson();
     if (!materialized.success) {
         payload["problem"] = materialized.error;
         payload["failing_group_id"] = materialized.failing_group_id;

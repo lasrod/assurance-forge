@@ -1,5 +1,7 @@
 #include "mcp/server.h"
 
+#include "core/guideline_catalog.h"
+
 #include "mcp/guidance.h"
 #include "mcp/session.h"
 #include "mcp/tools.h"
@@ -698,4 +700,103 @@ TEST(McpServer, PreWriteReadsCarryTheDoctrineAndLoopedReadsDoNot) {
     const ToolCall element = CallTool(server, "get_element", {{"id", id}});
     ASSERT_FALSE(element.is_error) << element.payload.dump();
     EXPECT_FALSE(element.payload.contains("authoring_guidance")) << element.payload.dump();
+}
+
+// The drift this replaces: the guidelines an agent was given when it WROTE a
+// claim were a separately maintained list from the ones applied when the same
+// claim was REVIEWED. An agent could satisfy the prompt and still fail the
+// review, and every SCCG revision widened the gap with nothing to notice.
+TEST(McpServer, EachAuthoringPromptCarriesEveryGuidelineItsReviewWillApply) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    for (const mcp::PromptDefinition& prompt : mcp::BuiltinPrompts()) {
+        const std::vector<std::string> profiles = mcp::ReviewProfilesForPrompt(prompt.name);
+        if (profiles.empty()) {
+            continue; // translate_case is deliberately narrower than any profile.
+        }
+
+        const std::optional<nlohmann::json> got = server.HandleMessage(
+            Request("prompts/get",
+                    {{"name", prompt.name},
+                     {"arguments", {{"standard", "a standard"}, {"topic", "a topic"}, {"categories", "some"}}}},
+                    9));
+        ASSERT_TRUE(got.has_value()) << prompt.name;
+        ASSERT_TRUE(got->contains("result")) << got->dump();
+        const std::string text = (*got)["result"]["messages"][0]["content"]["text"].get<std::string>();
+
+        for (const std::string& profile_id : profiles) {
+            const parser::ReviewProfile* profile = catalog.document.FindReviewProfileById(profile_id);
+            ASSERT_NE(profile, nullptr) << prompt.name
+                                        << " names a profile the catalog does not publish: " << profile_id;
+            for (const std::string& guideline_id : profile->guideline_ids) {
+                EXPECT_NE(text.find(guideline_id), std::string::npos)
+                    << prompt.name << " does not carry " << guideline_id << ", which " << profile_id
+                    << " applies to what it writes";
+            }
+        }
+    }
+}
+
+// A profile this tool cannot resolve must not silently yield an empty guidance
+// block that reads like "no rules apply here".
+TEST(McpServer, SaysSoWhenNoNamedReviewProfileResolves) {
+    std::unique_ptr<mcp::Session> session = OpenConsentingSession();
+    ASSERT_NE(session, nullptr);
+    mcp::Server server(*session);
+    Initialize(server);
+
+    for (const mcp::PromptDefinition& prompt : mcp::BuiltinPrompts()) {
+        if (mcp::ReviewProfilesForPrompt(prompt.name).empty()) {
+            continue;
+        }
+        const std::optional<nlohmann::json> got = server.HandleMessage(
+            Request("prompts/get",
+                    {{"name", prompt.name},
+                     {"arguments", {{"standard", "a standard"}, {"topic", "a topic"}, {"categories", "some"}}}},
+                    9));
+        ASSERT_TRUE(got.has_value());
+        const std::string text = (*got)["result"]["messages"][0]["content"]["text"].get<std::string>();
+        EXPECT_EQ(text.find("could not be resolved"), std::string::npos)
+            << prompt.name << " fell back to the unresolved-profile message";
+    }
+}
+
+// The test above holds each prompt against the profiles it declares, which
+// cannot catch the declaration itself being narrowed. This one does: every
+// profile SCCG publishes is either carried by some authoring prompt, or named
+// here as deliberately out of scope with a reason.
+TEST(McpServer, EveryPublishedReviewProfileIsCarriedBySomePromptOrExcludedOnPurpose) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+    ASSERT_FALSE(catalog.document.review_profiles.empty());
+
+    // `challenge_review` judges counter claims and defeaters. No authoring
+    // prompt writes one: raising a challenge is a reviewer's act, and an agent
+    // manufacturing defeaters against its own argument would be theatre.
+    const std::vector<std::string> deliberately_absent{"challenge_review"};
+
+    std::vector<std::string> carried;
+    for (const mcp::PromptDefinition& prompt : mcp::BuiltinPrompts()) {
+        for (const std::string& profile_id : mcp::ReviewProfilesForPrompt(prompt.name)) {
+            carried.push_back(profile_id);
+        }
+    }
+
+    for (const parser::ReviewProfile& profile : catalog.document.review_profiles) {
+        const bool is_carried = std::find(carried.begin(), carried.end(), profile.id) != carried.end();
+        const bool is_excluded =
+            std::find(deliberately_absent.begin(), deliberately_absent.end(), profile.id) != deliberately_absent.end();
+        EXPECT_TRUE(is_carried || is_excluded)
+            << profile.id << " is published by SCCG but no authoring prompt carries it, and it is not "
+            << "listed as deliberately out of scope. An agent writing that element kind is given "
+            << "criteria its review will not apply.";
+    }
 }

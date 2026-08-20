@@ -463,17 +463,22 @@ canvas draws it, and a human accepts it through the ordinary audited path.
 
 ### S6 — MCP parity
 
+**Status: partly done.** The three items that do not need a review-over-MCP
+tool have landed. Executor provenance and self-review flagging (5.6) wait for
+phase C1 of the sibling plan, because until `prepare_sccg_review` /
+`submit_sccg_review_result` exist there is no MCP review to attribute.
+
 *Depends on: S5 and sibling plan C1.*
 
 Scoped to what remains after #406 phases 1–3, which already add `check_id` to
 the MCP payload and widen the prompt-quoted guideline sets.
 
-- [ ] Serialize `StagedFinding::statement` and an `sccg://guideline/<id>`
+- [x] Serialize `StagedFinding::statement` and an `sccg://guideline/<id>`
       pointer. `check_id` alone still gives an agent the tool's paraphrase
       without the rule.
-- [ ] Carry `review_profile_id` and an explicit "checked / not checked"
+- [x] Carry an explicit "checked / not checked" statement. (No `review_profile_id`: staging is not a review, so what the result can honestly name is the checks that ran, not a profile that did not.)
       statement on findings, so an empty array cannot be read as conformance.
-- [ ] Derive prompt guideline sets from the **profile registry** (5.5), with
+- [x] Derive prompt guideline sets from the **profile registry** (5.5), with
       the drift test. #406 widens the hand-picked lists; it does not remove the
       hand-picking, so the divergence returns on the next SCCG revision.
 - [ ] Executor provenance and self-review flagging (5.6).

@@ -757,3 +757,64 @@ TEST(AgentRequestHandler, SubmitRefusesStandingProblemFindingsUntilAcknowledged)
     }
     EXPECT_TRUE(acknowledged_role_misuse) << submitted.result.dump();
 }
+
+// An agent was given the tool's paraphrase of a rule and no way to reach the
+// rule. A reviewer is never asked to accept that, and an agent proposing
+// changes to a safety argument should not be either.
+TEST(AgentRequestHandler, EverySccgFindingCarriesTheRuleAndAPointerToIt) {
+    TempDir workspace{UniqueTempPath("finding-rule")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 71;
+    context.source_session_id = "stable-mcp-session-71";
+
+    const bridge::Response claims =
+        app::HandleAgentRequest(MakeRequest("find_elements", {{"type", "claim"}, {"limit", 1}}), context);
+    ASSERT_FALSE(claims.result["matches"].empty());
+    const std::string top_goal = claims.result["matches"][0]["id"].get<std::string>();
+
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_group", {{"title", "Empty strategy"}, {"expected_working_revision", 0}}), context);
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest(
+            "stage_operations",
+            {{"group_id", group_id},
+             {"expected_working_revision", begun.result["working_revision"].get<std::uint64_t>()},
+             {"operations",
+              nlohmann::json::array(
+                  {{{"type", "CreateStrategy"}, {"create_ref", "$s"}, {"text", "Argue over hazards"}},
+                   {{"type", "AddSupportedBy"}, {"source", {{"ref", "$s"}}}, {"target", {{"id", top_goal}}}}})}}),
+        context);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    ASSERT_TRUE(staged.result.contains("findings")) << staged.result.dump();
+
+    bool saw_sccg = false;
+    for (const nlohmann::json& finding : staged.result["findings"]) {
+        if (finding.value("kind", "") != "sccg")
+            continue;
+        saw_sccg = true;
+        EXPECT_FALSE(finding.value("statement", "").empty()) << "the guideline's own wording is missing";
+        EXPECT_EQ(finding.value("guideline_uri", ""),
+                  "sccg://guideline/" + finding.value("guideline_id", std::string{}));
+    }
+    EXPECT_TRUE(saw_sccg) << staged.result.dump();
+
+    // An empty findings array said nothing about how much of SCCG was examined,
+    // so an agent reading one could conclude its argument conformed. It does not.
+    ASSERT_TRUE(staged.result.contains("checked")) << staged.result.dump();
+    const nlohmann::json& checked = staged.result["checked"];
+    ASSERT_TRUE(checked.contains("mechanical_checks"));
+    EXPECT_FALSE(checked["mechanical_checks"].empty());
+    EXPECT_NE(checked.value("note", "").find("does not mean"), std::string::npos)
+        << "the result must say plainly that no findings is not conformance";
+}

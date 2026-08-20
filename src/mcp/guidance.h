@@ -65,6 +65,15 @@ const std::vector<ResourceDefinition>& BuiltinResources();
 const std::vector<ResourceTemplateDefinition>& BuiltinResourceTemplates();
 const std::vector<PromptDefinition>& BuiltinPrompts();
 
+// Which SCCG review profiles a prompt's output will be judged under, and
+// therefore which guidelines it must carry. Exposed so a test can hold the
+// prompt against the catalog: a hand-maintained list drifts the moment SCCG
+// revises a profile, and the drift is invisible until an agent satisfies the
+// prompt and fails the review.
+//
+// Empty for a prompt whose guidance is deliberately narrower than any profile.
+std::vector<std::string> ReviewProfilesForPrompt(const std::string& name);
+
 // The authoring doctrine: the rules an agent most needs while its hands are on
 // the keyboard, one line per guideline, condensed from the catalog. The prompts
 // and resources above reach only an agent whose user asked for them; this text
