@@ -293,12 +293,17 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
 
     review::AiReviewDataPackageBundle data_packages;
     std::string data_package_error;
+    // What the tool knows beyond the argument: prior findings on this element,
+    // which is what SU.4, SU.5 and SU.11 turn on.
+    review::AiReviewCaseContext case_context;
+    case_context.review_items = review_controller_.ItemsForElement(selected_element_id);
     if (!review::CollectAiReviewDataPackages(*assurance_case,
                                              current_tree,
                                              selected_element_id,
                                              guideline_selection.review_profile,
                                              data_packages,
-                                             data_package_error)) {
+                                             data_package_error,
+                                             &case_context)) {
         ReplaceAiReviewWithSingleItem(
             review_controller_,
             selected_element_id,

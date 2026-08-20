@@ -2,6 +2,7 @@
 
 #include "core/assurance_tree.h"
 #include "core/problems/problem_item.h"
+#include "core/reviews/review_item.h"
 #include "core/reviews/review_proposal.h"
 #include "parser/guidelines_parser.h"
 #include "review/sccg/sccg_prechecks.h"
@@ -33,10 +34,37 @@ struct AiReviewDataPackage {
     std::string json;
 };
 
+// Why a package is not in the request. Three states rather than two, because a
+// review told nothing assumes the data does not exist and may report a
+// sufficiency finding that is purely an artifact of what it was not shown.
+enum class DataPackageAbsence {
+    // The tool has no source for this package at all.
+    NotImplemented,
+    // The source exists and this case has nothing in it.
+    Empty,
+    // It exists and was deliberately not shared. Reserved for the per-item
+    // consent decision that arrives with linked evidence; nothing sets it yet,
+    // and the contract carries it now so adding that later is not a schema
+    // break.
+    Withheld,
+};
+
+const char* DataPackageAbsenceToString(DataPackageAbsence absence);
+
 struct AiReviewUnavailableDataPackage {
     std::string id;
     std::string reason;
     bool required = false;
+    DataPackageAbsence absence = DataPackageAbsence::NotImplemented;
+};
+
+// What the tool knows beyond the argument itself. Supplied by the caller rather
+// than reached for: review items and the user's own words live in application
+// state, and a review method that went looking for them would only be usable
+// from where that state happens to be.
+struct AiReviewCaseContext {
+    std::vector<core::reviews::ReviewItem> review_items;
+    std::string user_review_intent;
 };
 
 struct AiReviewDataPackageBundle {
@@ -101,7 +129,8 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                                  const std::string& selected_element_id,
                                  const parser::ReviewProfile* review_profile,
                                  AiReviewDataPackageBundle& out_packages,
-                                 std::string& out_error);
+                                 std::string& out_error,
+                                 const AiReviewCaseContext* case_context = nullptr);
 
 AiReviewRequestArtifacts
 BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,

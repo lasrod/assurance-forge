@@ -351,3 +351,131 @@ TEST(AiClaimReviewTest, ClearsRefsCarriedOverFromAnEarlierParse) {
         << error;
     EXPECT_FALSE(operation.source.has_value()) << "a ref survived from the previous operation";
 }
+
+// --- S4: data packages the tool can now actually supply -------------------
+
+namespace {
+
+const review::AiReviewUnavailableDataPackage* Unavailable(const review::AiReviewDataPackageBundle& packages,
+                                                          const std::string& id) {
+    for (const review::AiReviewUnavailableDataPackage& package : packages.unavailable) {
+        if (package.id == id)
+            return &package;
+    }
+    return nullptr;
+}
+
+review::AiReviewDataPackageBundle CollectFor(const parser::AssuranceCase& assurance_case,
+                                             const std::string& element_id,
+                                             const review::AiReviewCaseContext* context) {
+    const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    review::AiReviewDataPackageBundle packages;
+    std::string error;
+    EXPECT_TRUE(
+        review::CollectAiReviewDataPackages(assurance_case, tree, element_id, nullptr, packages, error, context))
+        << error;
+    return packages;
+}
+
+parser::AssuranceCase CaseWithATerm() {
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeElement("G1", "claim", "Top goal", "The vehicle is safe."));
+    parser::SacmElement term;
+    term.id = "T1";
+    term.type = "term";
+    term.name = "safe";
+    term.content = "safe";
+    term.description = "No unreasonable risk of harm within the stated ODD.";
+    assurance_case.elements.push_back(std::move(term));
+    return assurance_case;
+}
+
+} // namespace
+
+// CL.4 and AR.6 ask whether a broad word is bounded somewhere. The case has
+// been able to hold that definition since terminology landed; reviewing without
+// it asked the model to judge ambiguity against definitions the project had
+// already written.
+TEST(AiClaimReviewTest, SuppliesTheProjectGlossaryFromTheCasesOwnTerms) {
+    const review::AiReviewDataPackageBundle packages = CollectFor(CaseWithATerm(), "G1", nullptr);
+
+    ASSERT_TRUE(HasPackage(packages, "PROJECT_GLOSSARY"));
+    for (const review::AiReviewDataPackage& package : packages.available) {
+        if (package.id != "PROJECT_GLOSSARY")
+            continue;
+        EXPECT_NE(package.json.find("No unreasonable risk of harm"), std::string::npos);
+        EXPECT_NE(package.json.find("\"term\""), std::string::npos);
+    }
+}
+
+TEST(AiClaimReviewTest, ReportsAnEmptyGlossaryAsEmptyRatherThanUnimplemented) {
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeElement("G1", "claim", "Top goal", "The vehicle is safe."));
+
+    const review::AiReviewUnavailableDataPackage* glossary =
+        Unavailable(CollectFor(assurance_case, "G1", nullptr), "PROJECT_GLOSSARY");
+    ASSERT_NE(glossary, nullptr);
+    EXPECT_EQ(glossary->absence, review::DataPackageAbsence::Empty);
+}
+
+// SU.4, SU.5 and SU.11 all turn on whether this claim has been challenged
+// before, and how that challenge ended.
+TEST(AiClaimReviewTest, SuppliesPriorFindingsAsChangeHistory) {
+    review::AiReviewCaseContext context;
+    core::reviews::ReviewItem item;
+    item.id = "item-1";
+    item.element_id = "G1";
+    item.title = "CL.5 unbounded qualifier";
+    item.message = "\"safe\" is not bounded here.";
+    item.severity = "warning";
+    item.reviewer_name = "A human";
+    item.guideline_ids = {"CL.5"};
+    context.review_items.push_back(std::move(item));
+
+    const review::AiReviewDataPackageBundle packages = CollectFor(CaseWithATerm(), "G1", &context);
+
+    ASSERT_TRUE(HasPackage(packages, "CHANGE_HISTORY"));
+    for (const review::AiReviewDataPackage& package : packages.available) {
+        if (package.id == "CHANGE_HISTORY")
+            EXPECT_NE(package.json.find("CL.5 unbounded qualifier"), std::string::npos);
+    }
+}
+
+// A finding about a neighbour is not this review's history.
+TEST(AiClaimReviewTest, LeavesOutHistoryForElementsOutsideTheReview) {
+    review::AiReviewCaseContext context;
+    core::reviews::ReviewItem elsewhere;
+    elsewhere.id = "item-2";
+    elsewhere.element_id = "SOMEWHERE_ELSE";
+    elsewhere.title = "A finding on another branch";
+    context.review_items.push_back(std::move(elsewhere));
+
+    const review::AiReviewUnavailableDataPackage* history =
+        Unavailable(CollectFor(CaseWithATerm(), "G1", &context), "CHANGE_HISTORY");
+    ASSERT_NE(history, nullptr);
+    EXPECT_EQ(history->absence, review::DataPackageAbsence::Empty);
+}
+
+TEST(AiClaimReviewTest, CarriesTheUsersOwnConcernWhenTheyStatedOne) {
+    review::AiReviewCaseContext context;
+    context.user_review_intent = "I am worried the ODD bound is not stated.";
+
+    EXPECT_TRUE(HasPackage(CollectFor(CaseWithATerm(), "G1", &context), "USER_REVIEW_INTENT"));
+}
+
+// The distinction the evidence-register decision needs: a package the tool has
+// no source for reads differently from one the case simply has none of, and
+// both read differently from one deliberately not shared.
+TEST(AiClaimReviewTest, NamesWhyEachAbsentPackageIsAbsent) {
+    const review::AiReviewDataPackageBundle packages = CollectFor(CaseWithATerm(), "G1", nullptr);
+
+    const review::AiReviewUnavailableDataPackage* basis = Unavailable(packages, "EVIDENCE_BASIS");
+    ASSERT_NE(basis, nullptr);
+    EXPECT_EQ(basis->absence, review::DataPackageAbsence::NotImplemented);
+    EXPECT_NE(basis->reason.find("evidence register"), std::string::npos)
+        << "the recorded route should survive in the reason a reviewer reads";
+
+    const review::AiReviewUnavailableDataPackage* links = Unavailable(packages, "STANDARD_LINKS");
+    ASSERT_NE(links, nullptr);
+    EXPECT_EQ(links->absence, review::DataPackageAbsence::NotImplemented);
+}

@@ -405,14 +405,17 @@ relationship element; a review (not just a staging call) runs stage 4.
 
 ### S4 — Data packages
 
+**Status: done** — `PROJECT_GLOSSARY`, `CHANGE_HISTORY` and
+`USER_REVIEW_INTENT` supplied; the remaining two name why they are absent.
+
 *Depends on: nothing. Parallel.*
 
-- [ ] `PROJECT_GLOSSARY` from the terminology package.
-- [ ] `CHANGE_HISTORY` from review items, draft groups and the audit log.
-- [ ] `USER_REVIEW_INTENT` — an optional free-text field on the review action.
-- [ ] `STANDARD_LINKS` — deferred; no source exists. Record as a known
+- [x] `PROJECT_GLOSSARY` from the terminology package.
+- [x] `CHANGE_HISTORY` from review items. Draft groups and the audit log are not included: a review is being asked about the argument, and unaccepted proposals are not yet part of it.
+- [x] `USER_REVIEW_INTENT` — an optional free-text field on the review action.
+- [x] `STANDARD_LINKS` — deferred; no source exists. Record as a known
       limitation.
-- [ ] `EVIDENCE_BASIS` — **decided: stays declared-unavailable for now.** See
+- [x] `EVIDENCE_BASIS` — **decided: stays declared-unavailable for now.** See
       below; this task only records the reason so the gap is visible rather
       than silent.
 
