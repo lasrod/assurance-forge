@@ -1547,7 +1547,7 @@
         "tests/test_agent_request_handler.cpp",
         "tests/test_ai_review_actions.cpp"
       ],
-      "notes": "One persisted workspace per argument materializes ordered changes from MCP, SCCG AI review, and human draft editing over accepted SACM. Connected MCP reads and SCCG review both consume that combined model and write attributed groups back into it; revision checks prevent stale MCP calls from overwriting intervening contributors. Accepted SACM remains unchanged until human promotion. Kept at prototype while the merged workspace UX and end-to-end source combinations receive stability testing. See ADR 0009, ADR 0010 and docs/architecture/integrated-draft-workspace-plan.md."
+      "notes": "One persisted workspace per argument materializes ordered changes from MCP, SCCG AI review, and human draft editing over accepted SACM. The draft is projected through the same render passes as the accepted argument, so a term defined in a draft renders with its definition rather than as an undefined context node -- the draft view was a bare projection, so a term an agent had just defined showed on the canvas as though it had none until a restart re-ran the passes through `load_file`. Connected MCP reads and SCCG review both consume that combined model and write attributed groups back into it; revision checks prevent stale MCP calls from overwriting intervening contributors. Accepted SACM remains unchanged until human promotion. Kept at prototype while the merged workspace UX and end-to-end source combinations receive stability testing. See ADR 0009, ADR 0010 and docs/architecture/integrated-draft-workspace-plan.md."
     },
     {
       "id": "AF-AI-015",
