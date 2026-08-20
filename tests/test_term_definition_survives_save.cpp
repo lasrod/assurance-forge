@@ -16,24 +16,23 @@
 
 namespace {
 
+// The repository as the build knows it, the way every other fixture-reading
+// test finds it. Walking up from the working directory would make the answer
+// depend on where CTest happened to start the binary, and a wrong turn there
+// reads as "fixture missing" and skips -- a test that skips on a bad guess is a
+// test that stops covering the thing it was written for.
 std::filesystem::path RepoRoot() {
-    std::filesystem::path directory = std::filesystem::current_path();
-    for (int depth = 0; depth < 8; ++depth) {
-        if (std::filesystem::exists(directory / "tests" / "data" / "fixture_terminology_parity.sacm.xml"))
-            return directory;
-        if (!directory.has_parent_path() || directory.parent_path() == directory)
-            break;
-        directory = directory.parent_path();
-    }
-    return {};
+    return std::filesystem::path(AF_REPO_ROOT);
 }
 
 } // namespace
 
 TEST(TermDefinitionSurvivesSave, ADefinitionIsInTheSerializedDocument) {
     const std::filesystem::path root = RepoRoot();
-    if (root.empty())
-        GTEST_SKIP() << "fixture not found from " << std::filesystem::current_path();
+    // Present or the checkout is broken. Skipping here would quietly stop
+    // covering the serialization this test exists for.
+    ASSERT_TRUE(std::filesystem::exists(root / "tests" / "data" / "fixture_terminology_parity.sacm.xml"))
+        << "fixture missing under " << root;
 
     sacm_adapter::LoadOutcome loaded =
         sacm_adapter::load_document(root / "tests" / "data" / "fixture_terminology_parity.sacm.xml");
@@ -59,8 +58,10 @@ TEST(TermDefinitionSurvivesSave, ADefinitionIsInTheSerializedDocument) {
 // create's `fields.description`, so it is a different path to the same place.
 TEST(TermDefinitionSurvivesSave, ADefinitionSetByUpdateTermIsInTheSerializedDocument) {
     const std::filesystem::path root = RepoRoot();
-    if (root.empty())
-        GTEST_SKIP() << "fixture not found from " << std::filesystem::current_path();
+    // Present or the checkout is broken. Skipping here would quietly stop
+    // covering the serialization this test exists for.
+    ASSERT_TRUE(std::filesystem::exists(root / "tests" / "data" / "fixture_terminology_parity.sacm.xml"))
+        << "fixture missing under " << root;
 
     sacm_adapter::LoadOutcome loaded =
         sacm_adapter::load_document(root / "tests" / "data" / "fixture_terminology_parity.sacm.xml");

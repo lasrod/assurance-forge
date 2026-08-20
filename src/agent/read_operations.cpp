@@ -510,9 +510,10 @@ Result ListTerms(const ReadContext& context) {
             "operation whose field is \"value\".";
     } else if (undefined_terms > 0) {
         // Said here because this is where an agent looks at the glossary it is
-        // about to add to, and a term whose definition is empty is invisible in
-        // a list that carries a `definition` field for every term. Staging
-        // refuses to create another one; these already exist.
+        // about to add to, and a term with no definition carries no `definition`
+        // key at all -- an absence is easy to read past in a list where most
+        // entries have one. Staging refuses to create another such term; these
+        // already exist.
         payload["note"] = std::to_string(undefined_terms) +
                           " term(s) in this case have no definition, so the "
                           "glossary shows a word with nothing beside it. Supply each with an UpdateTerm "
