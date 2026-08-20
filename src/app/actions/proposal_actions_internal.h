@@ -20,18 +20,12 @@ struct AppRuntimeState;
 
 namespace app::actions::detail {
 
-struct ElementTextTarget {
-    std::string field;
-    std::string current_text;
-};
-
 inline void SetStatus(AppRuntimeState& state, const std::string& message) {
     state.events.Emit(StatusMessageEvent{message});
 }
 
 core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind);
 bool IsContextLike(core::NewElementKind kind);
-ElementTextTarget TextTargetFor(const parser::SacmElement& element);
 const char* RemoveModeField(core::RemoveMode mode);
 
 std::string GenerateCreateRef(const core::reviews::ReviewProposal& proposal, core::NewElementKind kind);

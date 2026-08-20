@@ -54,6 +54,8 @@ nlohmann::json GroupToJson(const DraftChangeGroup& group) {
     object["guideline_ids"] = group.guideline_ids;
     object["review_item_ids"] = group.review_item_ids;
     object["depends_on_group_ids"] = group.depends_on_group_ids;
+    if (!group.acknowledged_findings.empty())
+        object["acknowledged_findings"] = group.acknowledged_findings;
     return object;
 }
 
@@ -109,6 +111,10 @@ bool GroupFromJson(const nlohmann::json& object, DraftChangeGroup& group, std::s
     for (const auto& value : object.value("depends_on_group_ids", nlohmann::json::array())) {
         if (value.is_string())
             group.depends_on_group_ids.push_back(value.get<std::string>());
+    }
+    for (const auto& value : object.value("acknowledged_findings", nlohmann::json::array())) {
+        if (value.is_string())
+            group.acknowledged_findings.push_back(value.get<std::string>());
     }
     return true;
 }

@@ -1,5 +1,6 @@
 #include "mcp/tools.h"
 
+#include "mcp/guidance.h"
 #include "mcp/session.h"
 
 #include "agent/operations.h"
@@ -19,6 +20,18 @@ ToolResult Run(Session& session, const char* op, const nlohmann::json& arguments
     return ToolResult{result.payload, result.is_error};
 }
 
+// The reads an agent makes before writing carry the authoring doctrine, so the
+// house rules arrive at the moment they are about to matter -- an agent whose
+// user typed a casual prompt still reads the case before touching it. Only the
+// pre-write reads: get_element and find_elements run in loops, and guidance
+// repeated fifty times a conversation is noise a model learns to skip.
+ToolResult WithAuthoringGuidance(ToolResult result) {
+    if (!result.is_error && result.payload.is_object()) {
+        result.payload["authoring_guidance"] = AuthoringDoctrine();
+    }
+    return result;
+}
+
 ToolResult GetConnectionStatus(Session& session, const nlohmann::json& arguments) {
     return Run(session, "get_connection_status", arguments);
 }
@@ -28,7 +41,7 @@ ToolResult RequestProjectAccess(Session& session, const nlohmann::json& argument
 }
 
 ToolResult GetCaseOverview(Session& session, const nlohmann::json& arguments) {
-    return Run(session, "get_case_overview", arguments);
+    return WithAuthoringGuidance(Run(session, "get_case_overview", arguments));
 }
 
 ToolResult FindElements(Session& session, const nlohmann::json& arguments) {
@@ -48,7 +61,7 @@ ToolResult ListTerms(Session& session, const nlohmann::json& arguments) {
 }
 
 ToolResult GetArgumentTree(Session& session, const nlohmann::json& arguments) {
-    return Run(session, "get_argument_tree", arguments);
+    return WithAuthoringGuidance(Run(session, "get_argument_tree", arguments));
 }
 
 ToolResult ListCaseFiles(Session& session, const nlohmann::json& arguments) {
@@ -60,11 +73,11 @@ ToolResult OpenCaseFile(Session& session, const nlohmann::json& arguments) {
 }
 
 ToolResult SuggestPlacement(Session& session, const nlohmann::json& arguments) {
-    return Run(session, "suggest_placement", arguments);
+    return WithAuthoringGuidance(Run(session, "suggest_placement", arguments));
 }
 
 ToolResult GetDraftStatus(Session& session, const nlohmann::json& arguments) {
-    return Run(session, "get_draft_status", arguments);
+    return WithAuthoringGuidance(Run(session, "get_draft_status", arguments));
 }
 
 ToolResult BeginChangeGroup(Session& session, const nlohmann::json& arguments) {
@@ -105,6 +118,10 @@ ToolResult BeginChangeSet(Session& session, const nlohmann::json& arguments) {
 
 ToolResult StageOperations(Session& session, const nlohmann::json& arguments) {
     return Run(session, "stage_operations", arguments);
+}
+
+ToolResult CheckOperations(Session& session, const nlohmann::json& arguments) {
+    return Run(session, "check_operations", arguments);
 }
 
 ToolResult UnstageOperations(Session& session, const nlohmann::json& arguments) {
@@ -195,11 +212,17 @@ nlohmann::json OperationsSchema() {
             {"new_value",
              {{"type", "string"},
               {"description", "The replacement text for an Update* operation; for CreateTerm, the definition."}}},
+            // This description is in the model's context at the exact moment
+            // it generates the words that become a claim, which makes it the
+            // best-placed sentence on the whole surface (SCCG CL.1-CL.6).
             {"text",
              {{"type", "string"},
               {"description",
-               "Initial text for a Create* operation. For CreateTerm this is the term itself -- the "
-               "word or phrase being defined."}}},
+               "Initial text for a Create* operation. For a claim: one short proposition a reviewer "
+               "could judge true or false -- no bundled properties (\"safe and secure\" is two "
+               "claims), no \"because\"/\"therefore\" (decomposition is separate elements, not "
+               "sentence syntax), and no unbounded qualifier. For CreateTerm this is the term "
+               "itself -- the word or phrase being defined."}}},
             // A safety case read by reviewers in two languages has to be
             // written in both, and one operation carrying both is what makes
             // that atomic: the reviewer accepts a bilingual claim or none of
@@ -411,7 +434,9 @@ std::vector<ToolDefinition> BuildTools() {
     tools.push_back(ToolDefinition{
         "begin_change_group",
         "Start one coherent contribution to the shared working draft. Human edits, SCCG review, and other MCP "
-        "groups may already be present. Nothing is accepted until a human promotes it in Assurance Forge.",
+        "groups may already be present. Nothing is accepted until a human promotes it in Assurance Forge. "
+        "Write to the SCCG authoring rules carried in this session's instructions and in the "
+        "authoring_guidance field of the pre-write reads.",
         nlohmann::json{
             {"type", "object"},
             {"properties",
@@ -469,12 +494,20 @@ std::vector<ToolDefinition> BuildTools() {
     tools.push_back(ToolDefinition{
         "submit_change_group",
         "Mark one of this MCP session's groups ready for human review. This does not accept or apply it; only the "
-        "user can promote draft work in Assurance Forge.",
+        "user can promote draft work in Assurance Forge. Refused while problem-severity findings stand against the "
+        "group -- fix them, or acknowledge them explicitly to hand the group over anyway.",
         nlohmann::json{{"type", "object"},
                        {"properties",
                         [&] {
                             nlohmann::json properties = DraftGroupIdSchema();
                             properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            properties["acknowledge_findings"] = nlohmann::json{
+                                {"type", "boolean"},
+                                {"description",
+                                 "Submit despite standing problem-severity findings. The acknowledged findings are "
+                                 "recorded on the group, so the reviewer sees the shape was flagged and the author "
+                                 "chose to proceed. Do not pass this on the first attempt: read the refusal's "
+                                 "problem_findings and fix what can be fixed."}};
                             return properties;
                         }()},
                        {"required", nlohmann::json::array({"expected_working_revision"})}},
@@ -553,7 +586,8 @@ std::vector<ToolDefinition> BuildTools() {
         "stage_operations",
         "Append operations to a draft change group. They are checked against the complete integrated working draft "
         "and refused together if they would not materialize. Returns stable ids for created elements. This does not "
-        "change accepted SACM.",
+        "change accepted SACM. To iterate on unfinished work without drawing it on the user's canvas, rehearse with "
+        "check_operations first.",
         nlohmann::json{{"type", "object"},
                        {"properties",
                         [&] {
@@ -565,6 +599,26 @@ std::vector<ToolDefinition> BuildTools() {
                        {"required", nlohmann::json::array({"operations", "expected_working_revision"})}},
         true,
         &StageOperations,
+    });
+
+    tools.push_back(ToolDefinition{
+        "check_operations",
+        "Rehearse operations against the integrated working draft without staging them: the same validation and "
+        "findings stage_operations would return, computed on a copy. Nothing is stored, no element ids are "
+        "allocated, and nothing appears on the user's canvas -- iterate here until the findings are clean, then "
+        "stage once. With group_id (or this session's open group) the rehearsal appends to that group, exactly as "
+        "staging would; with no group it rehearses the operations as a group of their own. Also works offline, "
+        "against the accepted case.",
+        nlohmann::json{{"type", "object"},
+                       {"properties",
+                        [&] {
+                            nlohmann::json properties = DraftGroupIdSchema();
+                            properties["operations"] = OperationsSchema();
+                            return properties;
+                        }()},
+                       {"required", nlohmann::json::array({"operations"})}},
+        true,
+        &CheckOperations,
     });
 
     tools.push_back(ToolDefinition{
@@ -605,6 +659,13 @@ std::vector<ToolDefinition> BuildTools() {
                         [&] {
                             nlohmann::json properties = DraftGroupIdSchema();
                             properties["expected_working_revision"] = ExpectedRevisionSchema();
+                            // The submit gate applies to the alias too -- it is
+                            // the same operation underneath.
+                            properties["acknowledge_findings"] = nlohmann::json{
+                                {"type", "boolean"},
+                                {"description",
+                                 "Submit despite standing problem-severity findings; they are recorded on the "
+                                 "group for the reviewer."}};
                             return properties;
                         }()},
                        {"required", nlohmann::json::array({"expected_working_revision"})}},

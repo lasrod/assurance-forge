@@ -1,6 +1,7 @@
 #include "app/areas/review_panel_area.h"
 
 #include "app/app_runtime_state.h"
+#include "app/areas/staged_finding_text.h"
 #include "app/controllers/review_controller.h"
 #include "bridge/protocol.h"
 #include "core/guideline_catalog.h"
@@ -317,7 +318,7 @@ std::vector<std::string> DescribeStagedSccgFindings(const core::changesets::Chan
         if (!finding.element_id.empty()) {
             line += " " + finding.element_id;
         }
-        described.push_back(line + ": " + finding.detail);
+        described.push_back(line + ": " + StagedFindingText(finding));
     }
     return described;
 }

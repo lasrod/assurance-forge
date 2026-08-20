@@ -1,5 +1,6 @@
 #include "core/drafts/draft_document_store.h"
 
+#include "core/derived_views.h"
 #include "core/drafts/draft_document_diff.h"
 #include "core/project_file_io.h"
 #include "sacm_adapter/case_projection.h"
@@ -363,4 +364,69 @@ TEST(DraftDocumentStoreTest, AcceptingADraftThatChangedNothingIsHarmless) {
     sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(argument);
     EXPECT_TRUE(reloaded.ok) << "the accepted argument must still load after an empty accept";
     EXPECT_FALSE(store.active());
+}
+
+// The draft is drawn on the same canvas as the accepted argument, by the same
+// code, so it has to be projected the same way.
+//
+// It was not: `Projection()` returned a bare `project_case` while the accepted
+// view went through `RebuildDerivedViewsFromLibrary`. The render passes that
+// turn a term into an inline chip carrying its definition never ran on the
+// draft, so a term the user had just asked an agent to define showed on their
+// canvas as though it had none -- and stayed that way until a restart re-ran
+// the passes through `load_file`.
+TEST(DraftDocumentStoreTest, TheDraftIsProjectedTheSameWayTheAcceptedArgumentIs) {
+    const TempDir root = MakeTempDir("render_passes");
+    const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
+    const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
+    ASSERT_NE(accepted, nullptr);
+
+    // A term with a definition: the case that showed the defect.
+    const sacm_adapter::TerminologyCreateOutcome package =
+        sacm_adapter::apply_create_terminology_package(*accepted, "Terminology", "");
+    ASSERT_TRUE(package.supported && package.applied) << package.diagnostics.size();
+    sacm_adapter::TerminologyTermFields fields;
+    fields.value = "safe";
+    fields.name = "safe";
+    fields.description = "No unreasonable risk of harm within the stated ODD.";
+    const sacm_adapter::TerminologyCreateOutcome term =
+        sacm_adapter::apply_create_terminology_term(*accepted, package.element_id, fields, {}, {});
+    ASSERT_TRUE(term.supported && term.applied);
+
+    // Associated with a claim, because that is what creates the ArtifactReference
+    // and AssertedContext the render passes act on. A term defined but attached
+    // to nothing is drawn nowhere, so it cannot show the defect.
+    const std::string claim_id = FirstClaimId(sacm_adapter::project_case(*accepted));
+    ASSERT_FALSE(claim_id.empty());
+    const sacm_adapter::TerminologyContextOutcome association =
+        sacm_adapter::apply_associate_terminology_term(*accepted, claim_id, term.element_id);
+    ASSERT_TRUE(association.supported && association.applied);
+
+    core::drafts::DraftDocumentStore store;
+    std::string error;
+    ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+
+    // What the accepted view renders, built the way the application builds it.
+    core::AssuranceCase accepted_view;
+    sacm::AssuranceCasePackage accepted_package;
+    core::RebuildDerivedViewsFromLibrary(*accepted, accepted_view, accepted_package);
+
+    const core::AssuranceCase draft_view = store.Projection();
+
+    // An unedited draft is a copy of the accepted argument, so the two views
+    // must agree element for element -- including which terminology references
+    // are hidden and what the visible ones display.
+    ASSERT_EQ(draft_view.elements.size(), accepted_view.elements.size())
+        << "the draft and accepted views disagree about which elements are drawn";
+    for (const core::SacmElement& expected : accepted_view.elements) {
+        const core::SacmElement* actual = nullptr;
+        for (const core::SacmElement& candidate : draft_view.elements) {
+            if (candidate.id == expected.id)
+                actual = &candidate;
+        }
+        ASSERT_NE(actual, nullptr) << expected.id << " is drawn in the accepted view and missing from the draft";
+        EXPECT_EQ(actual->name, expected.name) << expected.id;
+        EXPECT_EQ(actual->content, expected.content) << expected.id;
+        EXPECT_EQ(actual->description, expected.description) << expected.id;
+    }
 }

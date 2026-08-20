@@ -2,6 +2,7 @@
 
 #include "core/guideline_catalog.h"
 
+#include <algorithm>
 #include <sstream>
 #include <string>
 
@@ -55,9 +56,59 @@ void AppendGuideline(std::ostringstream& out, const parser::Guideline& guideline
     }
 }
 
-// The guidance that belongs with a particular job. Quoting the catalog rather
-// than paraphrasing it keeps the prompt and the published guideline the same
-// text, so one cannot drift from the other.
+// The guidelines a review of this output will actually apply.
+//
+// These sets used to be written by hand, which made the criteria an agent was
+// given when it *wrote* a claim a different, separately maintained set from the
+// ones applied when the same claim was *reviewed*. An agent could satisfy the
+// prompt and still fail the review, and the two would drift further apart every
+// time SCCG revised a profile, with nothing to notice.
+//
+// Naming the profiles instead means the catalog decides. A guideline added to
+// `claim_review` upstream reaches the agent that writes claims, in the same
+// release, without anybody remembering to copy an id.
+std::vector<std::string> GuidelineIdsForProfiles(const core::GuidelineCatalog& catalog,
+                                                 const std::vector<std::string>& profile_ids) {
+    std::vector<std::string> ids;
+    for (const std::string& profile_id : profile_ids) {
+        const parser::ReviewProfile* profile = catalog.document.FindReviewProfileById(profile_id);
+        if (profile == nullptr) {
+            continue;
+        }
+        for (const std::string& guideline_id : profile->guideline_ids) {
+            if (std::find(ids.begin(), ids.end(), guideline_id) == ids.end()) {
+                ids.push_back(guideline_id);
+            }
+        }
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+std::string GuidelinesForProfiles(const std::vector<std::string>& profile_ids) {
+    std::string error;
+    const core::GuidelineCatalog* catalog = Catalog(error);
+    if (catalog == nullptr) {
+        return "(The SCCG catalog is unavailable: " + error + ")";
+    }
+    const std::vector<std::string> ids = GuidelineIdsForProfiles(*catalog, profile_ids);
+    if (ids.empty()) {
+        return "(No SCCG review profile in this catalog matched: the guidelines below could not be resolved.)";
+    }
+
+    std::ostringstream out;
+    for (const std::string& id : ids) {
+        const parser::Guideline* guideline = catalog->document.FindGuidelineById(id);
+        if (guideline != nullptr) {
+            AppendGuideline(out, *guideline);
+        }
+    }
+    return out.str();
+}
+
+// A named set, for the one job whose guidance is deliberately narrower than any
+// review profile. Quoting the catalog rather than paraphrasing it keeps the
+// prompt and the published guideline the same text.
 std::string GuidelinesFor(const std::vector<std::string>& ids) {
     std::string error;
     const core::GuidelineCatalog* catalog = Catalog(error);
@@ -95,7 +146,9 @@ constexpr const char* kWorkflow =
     "3. `stage_operations` in small steps, always carrying the latest revision. Each call returns "
     "stable ids, the next revision and findings against the combined draft -- act on those before "
     "continuing. If a revision is stale, reread because a user, SCCG review or another client changed "
-    "the shared draft.\n"
+    "the shared draft. To polish unfinished operations without drawing them on the user's canvas, "
+    "rehearse them with `check_operations` first; submitting is refused while problem-severity "
+    "findings stand, so fix them as you go rather than at the end.\n"
     "4. Use `replace_change_group` when feedback changes the proposal, rather than layering a "
     "contradictory second version over it.\n"
     "5. `submit_change_group` when finished, then tell the user it is waiting for them in Assurance "
@@ -119,7 +172,70 @@ constexpr const char* kLanguages =
     "use for the same concept. Say plainly which languages you wrote, and that a human still has to "
     "check the translation.\n";
 
+// One rule per line, each carrying the id of the guideline it condenses. The
+// pairing is the contract: a line without an id would be our rule rather than
+// SCCG's, and an id without a line in the catalog is caught by the tests that
+// resolve every id below against the loaded catalog.
+struct DoctrineLine {
+    const char* guideline_id;
+    const char* rule;
+};
+
+// Chosen for the mistakes a model actually makes when a user types "add an
+// argument that X is safe": bundled properties, essays in one goal, inference
+// smuggled into claim text, invented evidence. Every SCCG family is
+// represented so none is invisible to a client that reads nothing else.
+constexpr DoctrineLine kDoctrineLines[] = {
+    {"CL.1", "State each claim as a short proposition a reviewer could judge true or false"},
+    {"CL.2", "Put one claim in one goal -- \"safe and secure\" is two goals, needing different evidence"},
+    {"CL.3", "Keep goal text short: scope belongs in context, reasoning in a strategy, topics in sub-claims"},
+    {"CL.5",
+     "Bound every broad or universal qualifier -- safe, all, normal -- in the claim, its context, or a "
+     "defined term"},
+    {"CL.6",
+     "Keep inference out of claim text: \"because\" and \"therefore\" signal a decomposition the "
+     "structure should be making"},
+    {"AR.1",
+     "Let structure carry the argument: a goal asserts, a strategy states the reasoning, a solution is "
+     "a leaf naming evidence"},
+    {"AR.2",
+     "State the inference step explicitly rather than making the reviewer infer the decomposition rule "
+     "from wording"},
+    {"EV.1", "Give every claim a path to evidence, or mark it undeveloped deliberately; never invent evidence"},
+    {"EV.3", "Make a solution claim the fact the evidence establishes, not the name of the document holding it"},
+    {"EV.4", "Cite precise evidence locations -- section, clause, table, test id -- not a whole annex"},
+    {"EV.8", "Cite evidence at a fixed version, never a live \"latest\""},
+    {"SU.2", "Make assumptions explicit and justify why each is reasonable"},
+    {"LF.3", "Do not argue from absence -- \"no failures observed\" is not evidence of safety"},
+    {"RD.1", "Signpost each element's role in its wording, so no reader has to guess what job the text does"},
+    {"RD.4", "Use no promotional language: the argument persuades by structure and evidence, not adjectives"},
+};
+
 } // namespace
+
+const std::string& AuthoringDoctrine() {
+    static const std::string doctrine = [] {
+        std::ostringstream out;
+        out << "Writing assurance argument here follows the Safety Case Core Guidelines (SCCG):\n";
+        for (const DoctrineLine& line : kDoctrineLines) {
+            out << "- " << line.rule << " (" << line.guideline_id << ").\n";
+        }
+        out << "The full catalog is the resource sccg://guidelines; one rule is sccg://guideline/<id>.";
+        return out.str();
+    }();
+    return doctrine;
+}
+
+const std::vector<std::string>& AuthoringDoctrineGuidelineIds() {
+    static const std::vector<std::string> ids = [] {
+        std::vector<std::string> collected;
+        for (const DoctrineLine& line : kDoctrineLines) {
+            collected.emplace_back(line.guideline_id);
+        }
+        return collected;
+    }();
+    return ids;
+}
 
 const std::vector<ResourceDefinition>& BuiltinResources() {
     static const std::vector<ResourceDefinition> resources{
@@ -218,6 +334,26 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
     return {};
 }
 
+std::vector<std::string> ReviewProfilesForPrompt(const std::string& name) {
+    if (name == "draft_argument_from_standard") {
+        return {"claim_review",
+                "strategy_review",
+                "assumption_review",
+                "context_review",
+                "evidence_review",
+                "justification_review"};
+    }
+    if (name == "add_argumentation") {
+        return {"claim_review", "strategy_review", "context_review"};
+    }
+    if (name == "restructure_case") {
+        return {"claim_review", "strategy_review"};
+    }
+    // `translate_case` deliberately carries one guideline, not a profile: a
+    // translation that needed the rest has stopped being a translation.
+    return {};
+}
+
 std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments) {
     std::ostringstream out;
 
@@ -235,12 +371,23 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "citation field yet, so that text is the trace.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines, which are what this project's reviews apply:\n\n"
-            << GuidelinesFor({"CL.1", "CL.2", "CL.5", "CL.6", "AR.1", "AR.2", "AR.4", "EV.1"});
+            // CL.3, SU.2, LF.3 and RD.1 joined the set when the doctrine work
+            // found the SU, LF and RD families quoted in no prompt at all --
+            // drafting from a standard is exactly where assumptions, arguing
+            // from absence, and role signposting go wrong.
+            // Drafting a structure produces claims, strategies, assumptions,
+            // context and evidence stubs, and each is reviewed under its own
+            // profile. Naming them all is what makes the criteria the agent
+            // writes to the criteria it will be judged by.
+            << GuidelinesForProfiles(ReviewProfilesForPrompt(name));
         return out.str();
     }
 
     if (name == "add_argumentation") {
         const std::string topic = Argument(arguments, "topic", "the topic the user named");
+        // CL.2, CL.3 and LF.1 joined with the doctrine work: new argument
+        // added mid-case is where bundled claims and support that quietly
+        // restates its parent most often appear.
         out << "Add argument establishing " << topic << " to this safety case.\n\n"
             << "Find where it belongs before writing anything. Read the argument tree, look for "
                "claims already covering nearby ground, and attach to the branch whose scope this "
@@ -250,7 +397,9 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "addition to it.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
-            << GuidelinesFor({"CL.1", "CL.5", "AR.2", "AR.5", "AR.6", "EV.1"});
+            // Adding argument writes claims and the reasoning that connects
+            // them, and usually the context that bounds them.
+            << GuidelinesForProfiles(ReviewProfilesForPrompt(name));
         return out.str();
     }
 
@@ -270,7 +419,9 @@ std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments
                "diff.\n\n"
             << kWorkflow << kLanguages << "\n"
             << "Follow these guidelines:\n\n"
-            << GuidelinesFor({"AR.1", "AR.2", "AR.4", "AR.5", "CL.2"});
+            // RD.1 joined with the doctrine work: moving argument is where an
+            // element's wording and its new place most easily fall out of step.
+            << GuidelinesForProfiles(ReviewProfilesForPrompt(name));
         return out.str();
     }
 

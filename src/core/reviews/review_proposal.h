@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include "parser/xml_parser.h"
 
 #include <filesystem>
@@ -126,6 +128,15 @@ struct ReviewProposalSummary {
 const char* PatchOperationTypeToString(PatchOperationType type);
 bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& type);
 
+// Reads one operation from the JSON an AI writes. One parser rather than one
+// per caller: an external client staging over MCP and a SCCG review proposing a
+// repair describe the same edit, and two readers of one wire vocabulary are how
+// the two surfaces come to accept different things.
+//
+// `error` is worded for the model that produced the JSON, since it is what has
+// to correct it.
+bool ParsePatchOperationJson(const nlohmann::json& source, PatchOperation& out, std::string& error);
+
 // Whether this operation brings a new element into being and therefore needs a
 // patch-local create_ref and a pinned identity. One definition, used by the
 // validity gate, the patch service and the draft materializer alike: three
@@ -137,6 +148,15 @@ std::string SerializeReviewProposal(const ReviewProposal& proposal);
 bool DeserializeReviewProposal(const std::string& content, ReviewProposal& proposal, std::string& error);
 
 std::string ComputeModelSemanticHash(const parser::AssuranceCase& model);
+// The same hash over only the elements named, for asking whether the part of a
+// model somebody actually read has changed. A review is stale when its own
+// scope moved; hashing the whole model instead makes an edit anywhere -- by the
+// user, or by another contributor to the same draft -- discard a completed
+// review of an untouched branch (ADR 0013).
+//
+// Ids naming nothing are folded in as absent, so an element disappearing from
+// the model changes the hash rather than being silently skipped.
+std::string ComputeScopeSemanticHash(const parser::AssuranceCase& model, const std::vector<std::string>& element_ids);
 std::string ComputeElementSemanticHash(const parser::SacmElement& element);
 ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& proposal,
                                                       const parser::AssuranceCase& current_model);

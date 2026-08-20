@@ -229,6 +229,19 @@ TEST(AgentRequestHandler, McpDraftGroupsAreRevisionCheckedAndVisibleToSubsequent
     const std::uint64_t staged_revision = staged.result["working_revision"].get<std::uint64_t>();
     EXPECT_GT(staged_revision, begun_revision);
 
+    // The unsupported claim just staged is reported with the catalog's stable
+    // check id on the wire, the key an agent deduplicates findings on across
+    // staging calls rather than re-reading the sentence each time.
+    ASSERT_TRUE(staged.result.contains("findings")) << staged.result.dump();
+    bool unsupported_claim_reported = false;
+    for (const nlohmann::json& finding : staged.result["findings"]) {
+        if (finding.value("guideline_id", "") == "EV.1" && finding.value("element_id", "") == created_id) {
+            unsupported_claim_reported = true;
+            EXPECT_EQ(finding.value("check_id", ""), "check-evidence-trace") << finding.dump();
+        }
+    }
+    EXPECT_TRUE(unsupported_claim_reported) << staged.result.dump();
+
     const bridge::Response developed = app::HandleAgentRequest(
         MakeRequest(
             "stage_operations",
@@ -618,4 +631,190 @@ TEST(AgentRequestHandler, RefusesAnOperationWhoseTranslationsAreNotAMapOfText) {
     // Dropping the malformed field instead would tell the client its bilingual
     // claim was staged, and the Japanese would simply not be there.
     EXPECT_TRUE(staged.result.value("isError", false)) << staged.result.dump();
+}
+
+// Phase 3 of docs/features/mcp-authoring-quality-plan.md: rehearsal without
+// staging. The findings are the ones staging would return; the store, the
+// revision and the user's canvas are untouched.
+TEST(AgentRequestHandler, CheckOperationsRehearsesWithoutStoringAnything) {
+    TempDir workspace{UniqueTempPath("check-ops")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 44;
+    context.source_session_id = "stable-mcp-session-44";
+
+    // An unsupported claim: the rehearsal must report EV.1 exactly as staging
+    // would, with the catalog check id on the wire.
+    const bridge::Response checked = app::HandleAgentRequest(
+        MakeRequest(
+            "check_operations",
+            {{"operations",
+              nlohmann::json::array(
+                  {{{"type", "CreateClaim"}, {"create_ref", "$rehearsed"}, {"text", "Rehearsed and unsupported"}}})}}),
+        context);
+    ASSERT_TRUE(checked.ok) << checked.error_message;
+    ASSERT_FALSE(checked.result.value("isError", true)) << checked.result.dump();
+    EXPECT_TRUE(checked.result.value("materializes", false));
+    EXPECT_TRUE(checked.result.contains("rehearsal"));
+    EXPECT_FALSE(checked.result.contains("created_element_ids")) << checked.result.dump();
+    bool unsupported_reported = false;
+    for (const nlohmann::json& finding : checked.result["findings"]) {
+        if (finding.value("check_id", "") == "check-evidence-trace")
+            unsupported_reported = true;
+    }
+    EXPECT_TRUE(unsupported_reported) << checked.result.dump();
+
+    // Nothing was stored: no workspace was created and the revision never moved.
+    EXPECT_EQ(drafts.workspace(), nullptr);
+    EXPECT_EQ(drafts.revision(), 0u);
+
+    // And the store is still perfectly willing to stage for real afterwards.
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_group", {{"title", "For real"}, {"expected_working_revision", 0}}), context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+}
+
+// The submit gate: a group with standing problem-severity findings is refused
+// until its author fixes them or explicitly acknowledges them, and the
+// acknowledgment is recorded on the group for the reviewer.
+TEST(AgentRequestHandler, SubmitRefusesStandingProblemFindingsUntilAcknowledged) {
+    TempDir workspace{UniqueTempPath("submit-gate")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 45;
+    context.source_session_id = "stable-mcp-session-45";
+
+    const bridge::Response claims =
+        app::HandleAgentRequest(MakeRequest("find_elements", {{"type", "claim"}, {"limit", 1}}), context);
+    ASSERT_FALSE(claims.result.value("isError", true)) << claims.result.dump();
+    ASSERT_FALSE(claims.result["matches"].empty());
+    const std::string top_goal = claims.result["matches"][0]["id"].get<std::string>();
+
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_group", {{"title", "Empty strategy"}, {"expected_working_revision", 0}}), context);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+
+    // A strategy that develops into nothing: AR.1 role misuse, Problem severity.
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest(
+            "stage_operations",
+            {{"group_id", group_id},
+             {"expected_working_revision", begun.result["working_revision"].get<std::uint64_t>()},
+             {"operations",
+              nlohmann::json::array(
+                  {{{"type", "CreateStrategy"}, {"create_ref", "$s"}, {"text", "Argue over hazards"}},
+                   {{"type", "AddSupportedBy"}, {"source", {{"ref", "$s"}}}, {"target", {{"id", top_goal}}}}})}}),
+        context);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    const std::uint64_t staged_revision = staged.result["working_revision"].get<std::uint64_t>();
+
+    // Submit is refused, the refusal names the findings, and nothing moved.
+    const bridge::Response refused = app::HandleAgentRequest(
+        MakeRequest("submit_change_group", {{"group_id", group_id}, {"expected_working_revision", staged_revision}}),
+        context);
+    ASSERT_TRUE(refused.result.value("isError", false)) << refused.result.dump();
+    ASSERT_TRUE(refused.result.contains("problem_findings")) << refused.result.dump();
+    EXPECT_FALSE(refused.result["problem_findings"].empty());
+    EXPECT_NE(refused.result.value("error", std::string()).find("acknowledge_findings"), std::string::npos);
+    EXPECT_EQ(drafts.revision(), staged_revision);
+
+    const bridge::Response still_building =
+        app::HandleAgentRequest(MakeRequest("describe_change_group", {{"group_id", group_id}}), context);
+    EXPECT_EQ(still_building.result.value("state", ""), "building") << still_building.result.dump();
+
+    // Acknowledged: the group goes ready and carries the record.
+    const bridge::Response submitted = app::HandleAgentRequest(
+        MakeRequest(
+            "submit_change_group",
+            {{"group_id", group_id}, {"expected_working_revision", staged_revision}, {"acknowledge_findings", true}}),
+        context);
+    ASSERT_FALSE(submitted.result.value("isError", true)) << submitted.result.dump();
+    EXPECT_EQ(submitted.result.value("state", ""), "ready");
+    ASSERT_TRUE(submitted.result.contains("acknowledged_findings")) << submitted.result.dump();
+    // The empty strategy is AR.1 role misuse: the element is not doing the job
+    // its role names. AR.2's check is on a decomposition with no reasoning step.
+    bool acknowledged_role_misuse = false;
+    for (const nlohmann::json& entry : submitted.result["acknowledged_findings"]) {
+        if (entry.get<std::string>().find("AR.1") != std::string::npos)
+            acknowledged_role_misuse = true;
+    }
+    EXPECT_TRUE(acknowledged_role_misuse) << submitted.result.dump();
+}
+
+// An agent was given the tool's paraphrase of a rule and no way to reach the
+// rule. A reviewer is never asked to accept that, and an agent proposing
+// changes to a safety argument should not be either.
+TEST(AgentRequestHandler, EverySccgFindingCarriesTheRuleAndAPointerToIt) {
+    TempDir workspace{UniqueTempPath("finding-rule")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 71;
+    context.source_session_id = "stable-mcp-session-71";
+
+    const bridge::Response claims =
+        app::HandleAgentRequest(MakeRequest("find_elements", {{"type", "claim"}, {"limit", 1}}), context);
+    ASSERT_FALSE(claims.result["matches"].empty());
+    const std::string top_goal = claims.result["matches"][0]["id"].get<std::string>();
+
+    const bridge::Response begun = app::HandleAgentRequest(
+        MakeRequest("begin_change_group", {{"title", "Empty strategy"}, {"expected_working_revision", 0}}), context);
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest(
+            "stage_operations",
+            {{"group_id", group_id},
+             {"expected_working_revision", begun.result["working_revision"].get<std::uint64_t>()},
+             {"operations",
+              nlohmann::json::array(
+                  {{{"type", "CreateStrategy"}, {"create_ref", "$s"}, {"text", "Argue over hazards"}},
+                   {{"type", "AddSupportedBy"}, {"source", {{"ref", "$s"}}}, {"target", {{"id", top_goal}}}}})}}),
+        context);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    ASSERT_TRUE(staged.result.contains("findings")) << staged.result.dump();
+
+    bool saw_sccg = false;
+    for (const nlohmann::json& finding : staged.result["findings"]) {
+        if (finding.value("kind", "") != "sccg")
+            continue;
+        saw_sccg = true;
+        EXPECT_FALSE(finding.value("statement", "").empty()) << "the guideline's own wording is missing";
+        EXPECT_EQ(finding.value("guideline_uri", ""),
+                  "sccg://guideline/" + finding.value("guideline_id", std::string{}));
+    }
+    EXPECT_TRUE(saw_sccg) << staged.result.dump();
+
+    // An empty findings array said nothing about how much of SCCG was examined,
+    // so an agent reading one could conclude its argument conformed. It does not.
+    ASSERT_TRUE(staged.result.contains("checked")) << staged.result.dump();
+    const nlohmann::json& checked = staged.result["checked"];
+    ASSERT_TRUE(checked.contains("mechanical_checks"));
+    EXPECT_FALSE(checked["mechanical_checks"].empty());
+    EXPECT_NE(checked.value("note", "").find("does not mean"), std::string::npos)
+        << "the result must say plainly that no findings is not conformance";
 }

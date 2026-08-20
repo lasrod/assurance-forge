@@ -128,6 +128,14 @@ struct DraftChangeGroup {
     std::vector<std::string> guideline_ids;
     std::vector<std::string> review_item_ids;
 
+    // Problem-severity findings that stood against this group when its author
+    // submitted it, acknowledged rather than resolved. Submission refuses such
+    // a group unless the author explicitly acknowledges, and the acknowledgment
+    // is provenance: the reviewer sees that the shape was flagged and the
+    // author chose to hand it over anyway. English, like every other stored
+    // provenance string; cleared when the group's operations change.
+    std::vector<std::string> acknowledged_findings;
+
     // Groups this one cannot be promoted without. Inferred during
     // materialization and stored, so the UI can explain a closure rather than
     // assert one.

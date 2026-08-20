@@ -41,6 +41,7 @@
 // groups this session authored remain its own across an application restart.
 
 #include "core/app_state.h"
+#include "core/drafts/draft_workspace_store.h"
 
 #include "bridge/instance_registry.h"
 #include "bridge/protocol.h"
@@ -205,6 +206,10 @@ private:
     // looking at, and a silently stale answer is worse than an error that says
     // to start the application.
     bool offline_loaded_ = false;
+    // Never Opened and never written: check_operations offline rehearses on a
+    // copy built from this empty store plus the accepted model, which is what
+    // keeps the one offline "draft" operation a pure read. See RunOffline.
+    core::drafts::DraftWorkspaceStore rehearsal_store_;
     std::string client_label_;
     std::string session_id_;
 };

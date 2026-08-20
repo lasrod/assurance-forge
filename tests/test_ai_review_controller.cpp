@@ -419,8 +419,12 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_EQ(harness.proposal_suggestion_events[0].review_profile_id, "claim_review");
     EXPECT_EQ(harness.proposal_suggestion_events[0].review_profile_name, "Claim review");
     EXPECT_FALSE(harness.proposal_suggestion_events[0].review_run_id.empty());
-    EXPECT_EQ(harness.proposal_suggestion_events[0].reviewed_model_hash,
-              core::reviews::ComputeModelSemanticHash(assurance_case));
+    // The scope, not the whole model: an edit outside what this review read must
+    // not invalidate it.
+    EXPECT_FALSE(harness.proposal_suggestion_events[0].reviewed_element_ids.empty());
+    EXPECT_EQ(harness.proposal_suggestion_events[0].reviewed_scope_hash,
+              core::reviews::ComputeScopeSemanticHash(assurance_case,
+                                                      harness.proposal_suggestion_events[0].reviewed_element_ids));
     ASSERT_EQ(harness.proposal_suggestion_events[0].suggestions.size(), 1u);
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].review_item_id, comments[0].id);
     EXPECT_EQ(harness.proposal_suggestion_events[0].suggestions[0].element_id, "claim-1");

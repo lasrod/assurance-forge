@@ -430,6 +430,8 @@ add_executable(tests
     tests/test_confidence_problem_sync.cpp
     tests/test_ai_review_controller.cpp
     tests/test_ai_review_actions.cpp
+    tests/test_review_suggestion_mapping.cpp
+    tests/test_sccg_prechecks.cpp
     tests/test_review_problem_sync.cpp
     tests/test_review_controller.cpp
     tests/test_review_external_reload.cpp
@@ -502,6 +504,7 @@ add_executable(tests
     tests/test_agent_change_canvas.cpp
     tests/test_change_set_acceptance.cpp
     tests/test_sccg_staged_checks.cpp
+    tests/test_staged_finding_text.cpp
     tests/test_mcp_jsonrpc.cpp
     tests/test_mcp_server.cpp
     tests/test_mcp_modes.cpp

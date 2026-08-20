@@ -40,11 +40,21 @@ struct StagedFinding {
     // The SCCG guideline this serves, e.g. "AR-02". Carried so a reviewer can
     // look up the rule rather than take the tool's word for it.
     std::string guideline_id;
+    // The catalog's own check id for this rule (`tool.suggested_checks` /
+    // `prechecks`), e.g. "check-bounded-qualifiers". A stable key: agents
+    // deduplicate on it, and the panels translate by it -- `detail` below stays
+    // English because this layer cannot include ui/i18n, so a display surface
+    // maps check_id (plus `params`) to a translated template instead of showing
+    // the English sentence raw.
+    std::string check_id;
     // The guideline's own wording, so the finding is readable without the
     // catalog to hand.
     std::string statement;
-    // What is wrong with this particular element.
+    // What is wrong with this particular element. English; see check_id.
     std::string detail;
+    // What `detail` interpolated, in template order -- e.g. the offending term
+    // for check-bounded-qualifiers. Empty for checks whose sentence is fixed.
+    std::vector<std::string> params;
     std::string element_id;
     FindingSeverity severity = FindingSeverity::Advisory;
 };
@@ -57,6 +67,13 @@ struct StagedFinding {
 // `changed_element_ids` limits reporting to what this change set touched: an
 // agent should not be handed findings about parts of the argument it did not
 // write, which are the user's business and not the agent's to fix.
+// Every check `CheckStagedArgument` can decide, by its catalog id. Published so
+// a result can state what was actually examined: an agent reading an empty
+// findings array otherwise has no way to tell "these checks found nothing" from
+// "this argument conforms to SCCG", and those are very different claims about a
+// safety case.
+const std::vector<std::string>& ImplementedCheckIds();
+
 std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& preview,
                                                const std::vector<std::string>& changed_element_ids);
 

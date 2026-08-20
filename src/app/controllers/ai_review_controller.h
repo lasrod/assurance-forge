@@ -67,7 +67,10 @@ private:
     std::unordered_set<std::string> pending_review_scope_element_ids_;
     std::vector<std::string> pending_guideline_ids_;
     std::string pending_review_run_id_;
-    std::string pending_review_model_hash_;
+    // The elements the pending review read, and their hash. A result is stale
+    // when its own scope moved -- not when the model moved somewhere else.
+    std::vector<std::string> pending_review_scope_element_id_list_;
+    std::string pending_review_scope_hash_;
     std::string last_raw_response_;
     std::string last_parse_error_;
     bool show_debug_modal_ = false;

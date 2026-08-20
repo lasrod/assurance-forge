@@ -1770,7 +1770,11 @@ flowchart LR
 ### Phase A1 — Extract the review layer
 
 **Status: complete** — merged in
-[#391](https://github.com/lasrod/assurance-forge/pull/391).
+[#391](https://github.com/lasrod/assurance-forge/pull/391), except suggestion
+mapping, which stayed in `app` and was finished separately as phase S1 of the
+[SCCG conformance plan](sccg-conformance-plan.md). Until that landed, `agent`
+could not reach the mapper, so phase C1 could not have met its own exit
+criterion that built-in and MCP review use the same validator.
 
 #### Tasks
 
@@ -1782,7 +1786,7 @@ flowchart LR
 - [ ] Move prompt construction.
 - [ ] Move response schema construction.
 - [ ] Move response parsing and semantic validation.
-- [ ] Move suggestion mapping.
+- [x] Move suggestion mapping. (Landed later, as S1 of the SCCG conformance plan.)
 - [ ] Update includes and namespace names.
 - [ ] Update the layer gate (both directions: `review` ↛ `ai`, `ai` ↛
       `review`), its negative test, and the layers-and-ownership page.

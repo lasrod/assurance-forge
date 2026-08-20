@@ -9,6 +9,7 @@
 #include <cctype>
 #include <chrono>
 #include <thread>
+#include <unordered_set>
 
 namespace mcp {
 namespace {
@@ -45,11 +46,13 @@ bool LooksLikeAssuranceCaseFile(const std::filesystem::path& path) {
 
 // Reads only. The offline copy never opens the application's integrated draft,
 // because it cannot show unaccepted changes to a human or serialize concurrent
-// contributors through the workspace revision.
+// contributors through the workspace revision. `check_operations` qualifies
+// despite its draft vocabulary: it rehearses on a copy and stores nothing, so
+// offline it is a read against the accepted case.
 bool IsOfflineOperation(const std::string& op) {
     return op == "get_case_overview" || op == "find_elements" || op == "get_element" || op == "get_argument_tree" ||
            op == "list_case_files" || op == "open_case_file" || op == "suggest_placement" ||
-           op == "list_assurance_claim_points" || op == "list_terms";
+           op == "list_assurance_claim_points" || op == "list_terms" || op == "check_operations";
 }
 
 } // namespace
@@ -476,6 +479,21 @@ Session::OperationResult Session::RunOffline(const std::string& op, const nlohma
     }
     if (op == "suggest_placement") {
         const agent::Result value = agent::SuggestPlacement(context, args);
+        return OperationResult{value.payload, value.is_error, false};
+    }
+    if (op == "check_operations") {
+        // A rehearsal against the accepted case: the store below is empty and
+        // is never written, so the only workspace involved is the copy the
+        // rehearsal builds and discards. Offline knows no other contributors'
+        // ids, so the rehearsal avoids only the ids the loaded model uses.
+        std::unordered_set<std::string> identities;
+        if (state_.loaded_case.has_value()) {
+            for (const parser::SacmElement& element : state_.loaded_case->elements)
+                identities.insert(element.id);
+        }
+        rehearsal_store_.SetAuthoritativeIdentities(std::move(identities));
+        const agent::DraftContext draft{state_, rehearsal_store_, 0, client_label_, session_id_};
+        const agent::Result value = agent::CheckDraftOperations(draft, args);
         return OperationResult{value.payload, value.is_error, false};
     }
 
