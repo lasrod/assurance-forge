@@ -585,8 +585,12 @@ Result DescribeWorkingDraft(const DraftContext& context) {
     payload["materializes"] = materialized.success;
     payload["element_count"] = static_cast<int>(materialized.working_model.elements.size());
     payload["findings"] = FindingsJson(materialized);
-    payload["checked"] = CheckedJson();
-    if (!materialized.success) {
+    if (materialized.success) {
+        // Only where the checks actually ran. A coverage statement beside a
+        // result that could not be computed would read as "these checks found
+        // nothing", when the truth is that nothing was checked at all.
+        payload["checked"] = CheckedJson();
+    } else {
         payload["problem"] = materialized.error;
         payload["failing_group_id"] = materialized.failing_group_id;
     }
