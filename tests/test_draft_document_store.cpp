@@ -405,6 +405,9 @@ TEST(DraftDocumentStoreTest, TheDraftIsProjectedTheSameWayTheAcceptedArgumentIs)
     core::drafts::DraftDocumentStore store;
     std::string error;
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    // Opening an argument no longer creates a draft, so this makes the one the
+    // comparison is about. Unedited, it is a copy of the accepted argument.
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
 
     // What the accepted view renders, built the way the application builds it.
     core::AssuranceCase accepted_view;

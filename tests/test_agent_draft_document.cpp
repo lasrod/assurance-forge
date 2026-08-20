@@ -105,6 +105,8 @@ struct ConnectedProject {
             // Mirrors the runtime: the draft is the working argument whenever it
             // differs from the accepted one, and the label follows the content
             // rather than the existence of a change group.
+            if (!document.active())
+                return app::AgentArgumentView{&state.loaded_case.value(), drafts.workspace(), false};
             view_projection = document.Projection();
             const bool differs =
                 core::drafts::DiffAcceptedAgainstDraft(state.loaded_case.value(), view_projection).touches_anything();
@@ -384,4 +386,51 @@ TEST(AgentDraftDocument, AcceptingWritesWhatTheClientStagedIntoTheAcceptedArgume
     core::drafts::DraftDocumentStore reopened;
     ASSERT_TRUE(reopened.Open(project.workspace.path, accepted_path, *project.state.library_document, error)) << error;
     EXPECT_FALSE(reopened.active()) << "the accept consumed the draft; nothing should remain to reopen";
+}
+
+// Reported by a connected client: it opened a group straight after its previous
+// group had been accepted, staged nothing, and was told the fourteen elements it
+// had contributed were all being removed. Accepting discards the draft, so there
+// was no draft document to project -- and an absent draft projected as an empty
+// case, which the comparison read as a draft that had deleted the argument.
+//
+// A draft that does not exist removes nothing.
+TEST(AgentDraftDocument, AGroupOpenedBeforeAnyEditReportsNothingRemoved) {
+    ConnectedProject project;
+    ASSERT_TRUE(project.Open("no-draft-no-removals"));
+    ASSERT_FALSE(project.document.active()) << "opening an argument must not create a draft";
+    const std::size_t accepted_elements = project.state.loaded_case.value().elements.size();
+    ASSERT_GT(accepted_elements, 0u) << "the seeded argument must have something to lose";
+
+    app::AgentRequestContext context = project.Context();
+    // Read the revision the way a client does, rather than reaching for a
+    // counter: with no draft yet, the one that counts is not the document's.
+    const bridge::Response status = app::HandleAgentRequest(MakeRequest("get_draft_status"), context);
+    ASSERT_TRUE(status.ok);
+    ASSERT_TRUE(status.result.contains("working_revision")) << status.result.dump();
+    const std::uint64_t revision = status.result["working_revision"].get<std::uint64_t>();
+
+    const bridge::Response begun =
+        app::HandleAgentRequest(MakeRequest("begin_change_group",
+                                            {{"title", "Define the terms the claims lean on"},
+                                             {"rationale", "The argument uses terms of art it never defines."},
+                                             {"expected_working_revision", revision}}),
+                                context);
+    ASSERT_TRUE(begun.ok);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+
+    const bridge::Response described = app::HandleAgentRequest(MakeRequest("describe_working_draft"), context);
+    ASSERT_TRUE(described.ok);
+    ASSERT_FALSE(described.result.value("isError", true)) << described.result.dump();
+
+    EXPECT_EQ(described.result.value("removed", -1), 0)
+        << "an untouched argument cannot be reported as removed: " << described.result.dump();
+    EXPECT_EQ(described.result.value("added", -1), 0) << described.result.dump();
+    EXPECT_EQ(described.result.value("modified", -1), 0) << described.result.dump();
+    ASSERT_TRUE(described.result.contains("changes")) << described.result.dump();
+    EXPECT_TRUE(described.result["changes"].empty()) << described.result.dump();
+    // The draft view of an undrafted argument is the argument, so a client that
+    // reads before editing sees the case rather than an empty one.
+    EXPECT_EQ(described.result.value("element_count", 0), static_cast<int>(accepted_elements))
+        << described.result.dump();
 }

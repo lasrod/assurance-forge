@@ -214,7 +214,15 @@ DraftDocumentSnapshot SnapshotDraftDocument(const DraftContext& context) {
     DraftDocumentSnapshot snapshot;
     if (!context.document_backed() || !context.state.loaded_case.has_value())
         return snapshot;
-    snapshot.projection = context.document->Projection();
+    // An argument nobody has drafted against has no draft document, and its
+    // draft view is the accepted argument itself. `document_backed()` is true
+    // before the first edit and again after an accept discards the draft, so
+    // projecting the absent document here yielded an empty case -- and the
+    // comparison below then reported every accepted element as one this draft
+    // removes. An agent that opened a group after its previous group was
+    // accepted was told its untouched case had been emptied.
+    snapshot.projection =
+        context.document->active() ? context.document->Projection() : context.state.loaded_case.value();
     snapshot.diff = core::drafts::DiffAcceptedAgainstDraft(context.state.loaded_case.value(), snapshot.projection);
     snapshot.available = true;
     return snapshot;
