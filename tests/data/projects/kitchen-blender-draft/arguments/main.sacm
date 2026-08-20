@@ -1,0 +1,909 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="ACP_BLENDER">
+  <name content="Kitchen Blender Safety Case" />
+  <argumentPackage xmi:id="AP_MAIN">
+    <name content="Kitchen Blender Main Argument" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1" gid="8caff1e3-c25a-4216-a8ba-000069957cc7">
+      <name content="The kitchen blender is acceptably safe" />
+      <description xmi:id="generated_10">
+        <content>
+          <value content="The kitchen blender is acceptably safe for domestic food preparation sometimes" />
+        </content>
+      </description>
+      <description xmi:id="generated_9">
+        <content>
+          <value lang="en" content="The kitchen blender is acceptably safe for domestic food preparation sometimes" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C1">
+      <name content="Intended use" />
+      <description xmi:id="generated_12">
+        <content>
+          <value content="The blender is intended for indoor household food and drink preparation." />
+        </content>
+      </description>
+      <description xmi:id="generated_11">
+        <content>
+          <value lang="en" content="The blender is intended for indoor household food and drink preparation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C2">
+      <name content="System boundary" />
+      <description xmi:id="generated_14">
+        <content>
+          <value content="The safety case covers the blender base, motor, blade assembly, jar, lid, controls, power cord, and user instructions." />
+        </content>
+      </description>
+      <description xmi:id="generated_13">
+        <content>
+          <value lang="en" content="The safety case covers the blender base, motor, blade assembly, jar, lid, controls, power cord, and user instructions." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C3">
+      <name content="Excluded use" />
+      <description xmi:id="generated_16">
+        <content>
+          <value content="The case does not cover commercial kitchen use, outdoor use, operation by children, repair by unqualified users, or use with non-food materials." />
+        </content>
+      </description>
+      <description xmi:id="generated_15">
+        <content>
+          <value lang="en" content="The case does not cover commercial kitchen use, outdoor use, operation by children, repair by unqualified users, or use with non-food materials." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="A1" assertionDeclaration="assumed">
+      <name content="User follows basic instructions" />
+      <description xmi:id="generated_18">
+        <content>
+          <value content="The user reads and follows the supplied safety instructions, including not placing hands or utensils into the jar during operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_17">
+        <content>
+          <value lang="en" content="The user reads and follows the supplied safety instructions, including not placing hands or utensils into the jar during operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2">
+      <name content="Blade contact hazards are adequately controlled." />
+      <description xmi:id="generated_20">
+        <content>
+          <value content="Blade contact hazards are adequately controlled." />
+        </content>
+      </description>
+      <description xmi:id="generated_19">
+        <content>
+          <value lang="en" content="Blade contact hazards are adequately controlled." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G3">
+      <name content="Electrical and thermal hazards are adequately controlled." />
+      <description xmi:id="generated_22">
+        <content>
+          <value content="Electrical and thermal hazards are adequately controlled." />
+        </content>
+      </description>
+      <description xmi:id="generated_21">
+        <content>
+          <value lang="en" content="Electrical and thermal hazards are adequately controlled." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G4" gid="28366e80-cb73-4a3c-a917-0000deb389c4">
+      <name content="Mechanical stability and containment hazards are adequately controlled." />
+      <description xmi:id="generated_24">
+        <content>
+          <value content="Mechanical stability and containment hazards are adequately controlled." />
+        </content>
+      </description>
+      <description xmi:id="generated_23">
+        <content>
+          <value lang="en" content="Mechanical stability and containment hazards are adequately controlled." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G5">
+      <name content="Residual risks are communicated to the user." />
+      <description xmi:id="generated_26">
+        <content>
+          <value content="Residual risks are communicated to the user." />
+        </content>
+      </description>
+      <description xmi:id="generated_25">
+        <content>
+          <value lang="en" content="Residual risks are communicated to the user." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G6">
+      <name content="Production units conform to the verified safe design." />
+      <description xmi:id="generated_28">
+        <content>
+          <value content="Production units conform to the verified safe design." />
+        </content>
+      </description>
+      <description xmi:id="generated_27">
+        <content>
+          <value lang="en" content="Production units conform to the verified safe design." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C4">
+      <name content="Blade hazard" />
+      <description xmi:id="generated_30">
+        <content>
+          <value content="The primary mechanical hazard is user contact with rotating or sharp stationary blades." />
+        </content>
+      </description>
+      <description xmi:id="generated_29">
+        <content>
+          <value lang="en" content="The primary mechanical hazard is user contact with rotating or sharp stationary blades." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C5">
+      <name content="Electrical hazard" />
+      <description xmi:id="generated_32">
+        <content>
+          <value content="The blender is powered from household mains electricity." />
+        </content>
+      </description>
+      <description xmi:id="generated_31">
+        <content>
+          <value lang="en" content="The blender is powered from household mains electricity." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C6">
+      <name content="Thermal hazard" />
+      <description xmi:id="generated_34">
+        <content>
+          <value content="The motor and internal components can heat during prolonged or abnormal operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_33">
+        <content>
+          <value lang="en" content="The motor and internal components can heat during prolonged or abnormal operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C7">
+      <name content="Stability hazard" />
+      <description xmi:id="generated_36">
+        <content>
+          <value content="The blender may vibrate or move during operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_35">
+        <content>
+          <value lang="en" content="The blender may vibrate or move during operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C8">
+      <name content="Containment hazard" />
+      <description xmi:id="generated_38">
+        <content>
+          <value content="Hot, sharp, or fast-moving contents may escape if the lid or jar fails to contain them." />
+        </content>
+      </description>
+      <description xmi:id="generated_37">
+        <content>
+          <value lang="en" content="Hot, sharp, or fast-moving contents may escape if the lid or jar fails to contain them." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C9">
+      <name content="Residual risks" />
+      <description xmi:id="generated_40">
+        <content>
+          <value content="Some risks remain after design controls, including sharp blade handling, hot-liquid blending, overfilling, and misuse." />
+        </content>
+      </description>
+      <description xmi:id="generated_39">
+        <content>
+          <value lang="en" content="Some risks remain after design controls, including sharp blade handling, hot-liquid blending, overfilling, and misuse." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="C10">
+      <name content="Safety depends on production consistency" />
+      <description xmi:id="generated_42">
+        <content>
+          <value content="The safety argument only holds if manufactured units match the verified design." />
+        </content>
+      </description>
+      <description xmi:id="generated_41">
+        <content>
+          <value lang="en" content="The safety argument only holds if manufactured units match the verified design." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2_1">
+      <name content="The user cannot normally contact rotating blades during operation." />
+      <description xmi:id="generated_44">
+        <content>
+          <value content="The user cannot normally contact rotating blades during operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_43">
+        <content>
+          <value lang="en" content="The user cannot normally contact rotating blades during operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2_2">
+      <name content="The blender cannot operate unless the jar is correctly seated." />
+      <description xmi:id="generated_46">
+        <content>
+          <value content="The blender cannot operate unless the jar is correctly seated." />
+        </content>
+      </description>
+      <description xmi:id="generated_45">
+        <content>
+          <value lang="en" content="The blender cannot operate unless the jar is correctly seated." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G2_3">
+      <name content="Blade cleaning risk is reduced through design and instructions." />
+      <description xmi:id="generated_48">
+        <content>
+          <value content="Blade cleaning risk is reduced through design and instructions." />
+        </content>
+      </description>
+      <description xmi:id="generated_47">
+        <content>
+          <value lang="en" content="Blade cleaning risk is reduced through design and instructions." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G3_1">
+      <name content="Live electrical parts are not accessible during normal use." />
+      <description xmi:id="generated_56">
+        <content>
+          <value content="Live electrical parts are not accessible during normal use." />
+        </content>
+      </description>
+      <description xmi:id="generated_55">
+        <content>
+          <value lang="en" content="Live electrical parts are not accessible during normal use." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G3_2">
+      <name content="The blender does not overheat during intended use." />
+      <description xmi:id="generated_58">
+        <content>
+          <value content="The blender does not overheat during intended use." />
+        </content>
+      </description>
+      <description xmi:id="generated_57">
+        <content>
+          <value lang="en" content="The blender does not overheat during intended use." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G3_3">
+      <name content="The blender enters a safe state under credible overload conditions." />
+      <description xmi:id="generated_60">
+        <content>
+          <value content="The blender enters a safe state under credible overload conditions." />
+        </content>
+      </description>
+      <description xmi:id="generated_59">
+        <content>
+          <value lang="en" content="The blender enters a safe state under credible overload conditions." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G4_1">
+      <name content="The blender remains stable during intended operation." />
+      <description xmi:id="generated_62">
+        <content>
+          <value content="The blender remains stable during intended operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_61">
+        <content>
+          <value lang="en" content="The blender remains stable during intended operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G4_2">
+      <name content="The jar remains attached during operation." />
+      <description xmi:id="generated_64">
+        <content>
+          <value content="The jar remains attached during operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_63">
+        <content>
+          <value lang="en" content="The jar remains attached during operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G4_3">
+      <name content="Contents are adequately contained during intended use." />
+      <description xmi:id="generated_66">
+        <content>
+          <value content="Contents are adequately contained during intended use." />
+        </content>
+      </description>
+      <description xmi:id="generated_65">
+        <content>
+          <value lang="en" content="Contents are adequately contained during intended use." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G5_1">
+      <name content="The user manual explains safe operation." />
+      <description xmi:id="generated_68">
+        <content>
+          <value content="The user manual explains safe operation." />
+        </content>
+      </description>
+      <description xmi:id="generated_67">
+        <content>
+          <value lang="en" content="The user manual explains safe operation." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G5_3">
+      <name content="The product provides visible warnings where immediate user attention is needed." />
+      <description xmi:id="generated_70">
+        <content>
+          <value content="The product provides visible warnings where immediate user attention is needed." />
+        </content>
+      </description>
+      <description xmi:id="generated_69">
+        <content>
+          <value lang="en" content="The product provides visible warnings where immediate user attention is needed." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G6_1">
+      <name content="Safety-critical components are controlled in production." />
+      <description xmi:id="generated_72">
+        <content>
+          <value content="Safety-critical components are controlled in production." />
+        </content>
+      </description>
+      <description xmi:id="generated_71">
+        <content>
+          <value lang="en" content="Safety-critical components are controlled in production." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G6_2">
+      <name content="Each unit is inspected before release." />
+      <description xmi:id="generated_74">
+        <content>
+          <value content="Each unit is inspected before release." />
+        </content>
+      </description>
+      <description xmi:id="generated_73">
+        <content>
+          <value lang="en" content="Each unit is inspected before release." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G6_3">
+      <name content="Nonconforming units are prevented from release." />
+      <description xmi:id="generated_76">
+        <content>
+          <value content="Nonconforming units are prevented from release." />
+        </content>
+      </description>
+      <description xmi:id="generated_75">
+        <content>
+          <value lang="en" content="Nonconforming units are prevented from release." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G9">
+      <name content="Analysis on nonconforming is performed" />
+      <description xmi:id="generated_78">
+        <content>
+          <value content="Nonconforming units are assessed against defined release criteria before release." />
+        </content>
+      </description>
+      <description xmi:id="generated_77">
+        <content>
+          <value lang="en" content="Nonconforming units are assessed against defined release criteria before release." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G10">
+      <name content="What is this?" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S1" gid="4027d5c1-e71a-4634-a199-00002b3407a5">
+      <name content="Argument by credible hazard control and verification" />
+      <description xmi:id="generated_80">
+        <content>
+          <value content="Argument by showing that the identified credible blender safety concerns are addressed through controls for blade contact, electrical and thermal hazards, mechanical stability and containment, communication of residual risks, and conformance of production units to the verified safe design." />
+        </content>
+      </description>
+      <description xmi:id="generated_79">
+        <content>
+          <value lang="en" content="Argument by showing that the identified credible blender safety concerns are addressed through controls for blade contact, electrical and thermal hazards, mechanical stability and containment, communication of residual risks, and conformance of production units to the verified safe design." />
+        </content>
+      </description>
+      <taggedValue xmi:id="S1__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G1" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S2">
+      <name content="Argument by blade access prevention and cleaning risk reduction" />
+      <description xmi:id="generated_82">
+        <content>
+          <value content="Argument by prevention of blade access during operation and reduction of residual cleaning risk." />
+        </content>
+      </description>
+      <description xmi:id="generated_81">
+        <content>
+          <value lang="en" content="Argument by prevention of blade access during operation and reduction of residual cleaning risk." />
+        </content>
+      </description>
+      <taggedValue xmi:id="S2__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G2" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S3">
+      <name content="Argument by electrical insulation, thermal protection, and testing" />
+      <description xmi:id="generated_84">
+        <content>
+          <value content="Argument by insulation, protection against abnormal operation, and verification testing." />
+        </content>
+      </description>
+      <description xmi:id="generated_83">
+        <content>
+          <value lang="en" content="Argument by insulation, protection against abnormal operation, and verification testing." />
+        </content>
+      </description>
+      <taggedValue xmi:id="S3__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G3" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S4">
+      <name content="Argument by stability, retention, containment, and testing" />
+      <description xmi:id="generated_86">
+        <content>
+          <value content="Argument by stable physical design, jar retention, lid containment, and verification testing." />
+        </content>
+      </description>
+      <description xmi:id="generated_85">
+        <content>
+          <value lang="en" content="Argument by stable physical design, jar retention, lid containment, and verification testing." />
+        </content>
+      </description>
+      <taggedValue xmi:id="S4__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G4" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S5">
+      <name content="Argument by instructions, warnings, and maintenance guidance" />
+      <description xmi:id="generated_88">
+        <content>
+          <value content="Argument by clear warnings, correct-use instructions, and maintenance guidance." />
+        </content>
+      </description>
+      <description xmi:id="generated_87">
+        <content>
+          <value lang="en" content="Argument by clear warnings, correct-use instructions, and maintenance guidance." />
+        </content>
+      </description>
+      <taggedValue xmi:id="S5__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G5" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S6">
+      <name content="Argument by controlled production and release testing" />
+      <description xmi:id="generated_90">
+        <content>
+          <value content="Argument by controlled production, inspection, and release testing." />
+        </content>
+      </description>
+      <description xmi:id="generated_89">
+        <content>
+          <value lang="en" content="Argument by controlled production, inspection, and release testing." />
+        </content>
+      </description>
+      <taggedValue xmi:id="S6__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G6" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="S7">
+      <name content="Ensure by checking conformance type" />
+      <taggedValue xmi:id="S7__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="G9" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn1">
+      <name content="Lid and jar geometry design review" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn2">
+      <name content="Operating access test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn3">
+      <name content="Jar presence / seating interlock test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn4">
+      <name content="Cleaning procedure review" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn5">
+      <name content="User manual safety warnings" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn6">
+      <name content="Electrical insulation design review" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn7">
+      <name content="Dielectric / insulation resistance test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn8">
+      <name content="Normal operation thermal test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn9">
+      <name content="Overload and stall test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn10">
+      <name content="Vibration and stability test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn11">
+      <name content="Jar retention test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn12">
+      <name content="Lid containment and splash test report" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn13">
+      <name content="User manual review checklist" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn15">
+      <name content="Product label inspection record" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn16">
+      <name content="Bill of materials and supplier control records" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn17">
+      <name content="End-of-line inspection procedure" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn18">
+      <name content="Nonconformance handling procedure" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="Sn20">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="AR1" gid="gid-AR1" referencedArtifactElement="T2">
+      <name content="GOD: Good old days" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="AR2" gid="gid-AR2" referencedArtifactElement="T3">
+      <name content="GOD: Goo Or Die" />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R58" source="G9" target="G6_3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R1" reasoning="S1" source="G2 G3 G4 G5 G6" target="G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R2" reasoning="S2" source="G2_2 G2_3 G2_1" target="G2">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R3" reasoning="S3" source="G3_1 G3_2 G3_3" target="G3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R4" reasoning="S4" source="G4_1 G4_2 G4_3" target="G4">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R5" reasoning="S5" source="G5_1 G5_3" target="G5">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R6" reasoning="S6" source="G6_1 G6_2 G6_3" target="G6">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R59" reasoning="S7" source="G10" target="G9">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R27" source="C1" target="G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R28" source="C2" target="G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R29" source="C3" target="G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R30" source="A1" target="G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R32" source="C4" target="G2">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R33" source="C5" target="G3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R34" source="C6" target="G3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R35" source="C7" target="G4">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R36" source="C8" target="G4">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R37" source="C9" target="G5">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R38" source="C10" target="G6">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R44" source="Sn6" target="G3_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R45" source="Sn7" target="G3_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R43" source="Sn5" target="G2_3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R42" source="Sn4" target="G2_3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R39" source="Sn1" target="G2_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R40" source="Sn2" target="G2_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R46" source="Sn8" target="G3_2">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R47" source="Sn9" target="G3_3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R48" source="Sn10" target="G4_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R49" source="Sn11" target="G4_2">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R50" source="Sn12" target="G4_3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R51" source="Sn13" target="G5_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R53" source="Sn15" target="G5_3">
+      <name />
+      <taggedValue xmi:id="ACP1">
+        <key>
+          <value content="assuranceForge.acp" />
+        </key>
+        <content>
+          <value content="ACP1" />
+        </content>
+      </taggedValue>
+      <taggedValue xmi:id="generated_49">
+        <key>
+          <value content="assuranceForge.acp.ACP1.name" />
+        </key>
+        <content>
+          <value content="ACP1" />
+        </content>
+      </taggedValue>
+      <taggedValue xmi:id="generated_50">
+        <key>
+          <value content="assuranceForge.acp.ACP1.resolutionKind" />
+        </key>
+        <content>
+          <value content="topGoalReference" />
+        </content>
+      </taggedValue>
+      <taggedValue xmi:id="generated_51">
+        <key>
+          <value content="assuranceForge.acp.ACP1.text" />
+        </key>
+        <content>
+          <value content="saysdf" />
+        </content>
+      </taggedValue>
+      <taggedValue xmi:id="generated_52">
+        <key>
+          <value content="assuranceForge.acp.ACP1.argumentPackageId" />
+        </key>
+        <content>
+          <value content="ACP1_AP" />
+        </content>
+      </taggedValue>
+      <taggedValue xmi:id="generated_53">
+        <key>
+          <value content="assuranceForge.acp.ACP1.topGoalId" />
+        </key>
+        <content>
+          <value content="ACP1_G1" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R54" source="Sn16" target="G6_1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R55" source="Sn17" target="G6_2">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R56" source="Sn18" target="G6_3">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R41" source="Sn3" target="G2_2">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="R63" source="Sn20" target="G10">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="CG1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="R7" isCounter="true" source="CG1" target="S1">
+      <name />
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ACP1_AP">
+    <name />
+    <taggedValue xmi:id="generated_54">
+      <key>
+        <value content="assuranceForge.argumentPackage.purpose" />
+      </key>
+      <content>
+        <value content="confidence" />
+      </content>
+    </taggedValue>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="ACP1_G1">
+      <name />
+      <description xmi:id="generated_92">
+        <content>
+          <value content="Confidence in Evidential support G5_3 -> Sn15 is sufficient." />
+        </content>
+      </description>
+      <description xmi:id="generated_91">
+        <content>
+          <value lang="en" content="Confidence in Evidential support G5_3 -> Sn15 is sufficient." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:Claim" xmi:id="ACP1_G2">
+      <name content="BBB is ok" />
+      <description xmi:id="generated_94">
+        <content>
+          <value content="BBB is ok" />
+        </content>
+      </description>
+      <description xmi:id="generated_93">
+        <content>
+          <value lang="en" content="BBB is ok" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArgumentReasoning" xmi:id="ACP1_S1">
+      <name />
+      <taggedValue xmi:id="ACP1_S1__strategyTarget">
+        <key>
+          <value content="assuranceForge.gsn.strategyTarget" />
+        </key>
+        <content>
+          <value content="ACP1_G1" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="ACP1_Sn1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedInference" xmi:id="ACP1_R1" reasoning="ACP1_S1" source="ACP1_G2" target="ACP1_G1">
+      <name />
+    </argumentElement>
+    <argumentElement xsi:type="sacm:AssertedEvidence" xmi:id="ACP1_R2" source="ACP1_Sn1" target="ACP1_S1">
+      <name />
+    </argumentElement>
+  </argumentPackage>
+  <terminologyPackage xmi:id="TP1" gid="gid-TP1">
+    <name content="Terminology Package" />
+    <description xmi:id="generated_1">
+      <content>
+        <value lang="en" content="This contains the terms used for the kitchen blender safety case" />
+      </content>
+    </description>
+    <terminologyElement xsi:type="sacm:Category" xmi:id="CAT1" gid="gid-CAT1">
+      <name content="Test category" />
+      <description xmi:id="generated_2">
+        <content>
+          <value lang="en" content="Just for testing terms" />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" gid="gid-T1" value="TERM" category="CAT1" externalReference="www.example.com">
+      <name content="The Erm Rum Mur" />
+      <description xmi:id="generated_3">
+        <content>
+          <value lang="en" content="Just testing the term functionality" />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T2" gid="gid-T2" value="GOD" category="CAT1" externalReference="www.example.com">
+      <name content="Good old days" />
+      <description xmi:id="generated_4">
+        <content>
+          <value lang="en" content="Just the very good old days you know." />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T3" gid="gid-T3" value="GOD" category="CAT1" externalReference="www.example.com">
+      <name content="Goo Or Die" />
+      <description xmi:id="generated_5">
+        <content>
+          <value lang="en" content="Same abbrevetation but different meaning" />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T4" gid="gid-T4" value="kitchen" category="CAT1" externalReference="www.example.com">
+      <name content="kitchen" />
+      <description xmi:id="generated_6">
+        <content>
+          <value lang="en" content="A place to cook and use blenders" />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T5" gid="gid-T5" value="ALARP" category="CAT1" externalReference="www.example.com">
+      <name content="As Low As Resonably Possible" />
+      <description xmi:id="generated_7">
+        <content>
+          <value lang="en" content="A method to define the safety as safe as reasonable." />
+        </content>
+      </description>
+    </terminologyElement>
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T6" gid="gid-T6" value="blender" category="CAT1" externalReference="www.example.com">
+      <name content="blender" />
+      <description xmi:id="generated_8">
+        <content>
+          <value lang="en" content="A device that blends food" />
+        </content>
+      </description>
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>

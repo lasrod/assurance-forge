@@ -14,7 +14,7 @@
 #include <filesystem>
 #include <string>
 
-// The shipped example project that carries a working draft.
+// The example project that carries a working draft.
 //
 // It exists so the draft workspace can be looked at in the running application
 // before MCP and SCCG review write draft groups themselves. Nothing else creates
@@ -25,15 +25,25 @@
 // and the draft opens in `NeedsRebase` -- correct behaviour, and exactly what a
 // demo must not silently do. So this asserts it opens active, materializes, and
 // still marks what it claims to mark.
+//
+// **The fixture lives here, not in the `examples` submodule.** That submodule is
+// a place people open projects and try things; opening one writes an autosave, a
+// refreshed file hash, a review item. Tests that read it therefore failed
+// whenever somebody had used the examples for what they are for -- reporting a
+// broken baseline that was really just a colleague's afternoon. Tests own their
+// inputs, and `examples/` goes back to being examples.
+//
+// Each test works on a **copy in a temp directory**, because opening a project
+// writes to it. A fixture a test can mutate is a fixture that passes once.
 
 namespace {
 
-std::filesystem::path ExampleProjectsRoot() {
-    // Walk up from the test binary until the repository's examples directory
-    // appears, so this works from the build tree and from a source checkout.
+std::filesystem::path FixtureProjectsSource() {
+    // Walk up from the test binary until the repository's test data appears, so
+    // this works from the build tree and from a source checkout.
     std::filesystem::path directory = std::filesystem::current_path();
     for (int depth = 0; depth < 8; ++depth) {
-        const std::filesystem::path candidate = directory / "examples" / "projects";
+        const std::filesystem::path candidate = directory / "tests" / "data" / "projects";
         if (std::filesystem::exists(candidate / "kitchen-blender" / "af.proj"))
             return candidate;
         if (!directory.has_parent_path() || directory.parent_path() == directory)
@@ -43,18 +53,78 @@ std::filesystem::path ExampleProjectsRoot() {
     return {};
 }
 
-std::filesystem::path ExampleProjectRoot(const std::string& name = "kitchen-blender-draft") {
-    const std::filesystem::path projects = ExampleProjectsRoot();
-    return projects.empty() ? std::filesystem::path{} : projects / name;
-}
+// A throwaway copy of the fixture projects. Opening a project writes to it --
+// an autosave, a refreshed file hash, a review item -- so a test that opened
+// the checked-in copy would dirty the working tree and make the next run
+// disagree with the last.
+//
+// The directory is claimed by creating it rather than by picking a name and
+// clearing it. CTest runs each case in its own process, so a name derived only
+// from the fixture source is the same name in all of them, and clearing it would
+// delete the copy another process is in the middle of reading -- reintroducing,
+// under `ctest -j`, exactly the shared-state interference this fixture removes.
+struct FixtureProjects {
+    std::filesystem::path path;
+    // Why there is no copy. Absent fixtures are a reason to skip; fixtures that
+    // are present and could not be copied are a broken test environment, and
+    // skipping on that would report "not found" about files that are right there.
+    bool source_found = false;
+    std::string error;
+
+    FixtureProjects() {
+        const std::filesystem::path source = FixtureProjectsSource();
+        if (source.empty())
+            return;
+        source_found = true;
+        const std::string stem = "af_fixture_projects_" + std::to_string(std::filesystem::hash_value(source)) + "_";
+        for (int attempt = 0; attempt < 64; ++attempt) {
+            const std::filesystem::path candidate =
+                std::filesystem::temp_directory_path() / (stem + std::to_string(attempt));
+            std::error_code ec;
+            if (!std::filesystem::create_directory(candidate, ec) || ec)
+                continue; // Taken by another test, or by a run that crashed before cleaning up.
+            std::filesystem::copy(source, candidate, std::filesystem::copy_options::recursive, ec);
+            if (ec) {
+                error = "the fixture projects in " + source.string() + " could not be copied to " + candidate.string() +
+                        ": " + ec.message();
+                std::filesystem::remove_all(candidate, ec);
+                return;
+            }
+            path = candidate;
+            return;
+        }
+        error = "no free temp directory for a copy of " + source.string() + " after 64 attempts";
+    }
+
+    ~FixtureProjects() {
+        if (path.empty())
+            return;
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+
+    bool empty() const {
+        return path.empty();
+    }
+    bool source_missing() const {
+        return !source_found;
+    }
+    std::filesystem::path project(const std::string& name) const {
+        return path / name;
+    }
+};
 
 } // namespace
 
 TEST(DraftExampleProject, OpensActiveAndMaterializesWhatItAdvertises) {
-    const std::filesystem::path root = ExampleProjectRoot();
-    if (root.empty()) {
-        GTEST_SKIP() << "examples/projects/kitchen-blender-draft not found from " << std::filesystem::current_path();
+    const FixtureProjects fixture;
+    if (fixture.source_missing()) {
+        GTEST_SKIP() << "tests/data/projects not found from " << std::filesystem::current_path();
     }
+    // Present but uncopyable is a broken environment, not a reason to skip: a
+    // skip here would say "not found" about files that are right there.
+    ASSERT_FALSE(fixture.empty()) << fixture.error;
+    const std::filesystem::path root = fixture.project("kitchen-blender-draft");
 
     core::AppState state;
     const std::filesystem::path argument = root / "arguments" / "main.sacm";
@@ -115,10 +185,14 @@ TEST(DraftExampleProject, OpensActiveAndMaterializesWhatItAdvertises) {
 }
 
 TEST(DraftExampleProject, EveryScenarioKeepsTheAcceptedBlenderBaselineByteIdentical) {
-    const std::filesystem::path projects = ExampleProjectsRoot();
-    if (projects.empty()) {
-        GTEST_SKIP() << "examples/projects not found";
+    const FixtureProjects fixture;
+    if (fixture.source_missing()) {
+        GTEST_SKIP() << "tests/data/projects not found from " << std::filesystem::current_path();
     }
+    // Present but uncopyable is a broken environment, not a reason to skip: a
+    // skip here would say "not found" about files that are right there.
+    ASSERT_FALSE(fixture.empty()) << fixture.error;
+    const std::filesystem::path projects = fixture.path;
 
     const std::expected<std::string, std::string> baseline =
         core::ReadTextFile(projects / "kitchen-blender" / "arguments" / "main.sacm");
@@ -134,10 +208,14 @@ TEST(DraftExampleProject, EveryScenarioKeepsTheAcceptedBlenderBaselineByteIdenti
 }
 
 TEST(DraftExampleProject, EveryBlenderManifestOpensWithoutProjectHealthWarnings) {
-    const std::filesystem::path projects = ExampleProjectsRoot();
-    if (projects.empty()) {
-        GTEST_SKIP() << "examples/projects not found";
+    const FixtureProjects fixture;
+    if (fixture.source_missing()) {
+        GTEST_SKIP() << "tests/data/projects not found from " << std::filesystem::current_path();
     }
+    // Present but uncopyable is a broken environment, not a reason to skip: a
+    // skip here would say "not found" about files that are right there.
+    ASSERT_FALSE(fixture.empty()) << fixture.error;
+    const std::filesystem::path projects = fixture.path;
 
     for (const std::string name : {"kitchen-blender", "kitchen-blender-draft", "kitchen-blender-deletion-draft"}) {
         core::AssuranceProject project;
@@ -153,10 +231,14 @@ TEST(DraftExampleProject, EveryBlenderManifestOpensWithoutProjectHealthWarnings)
 }
 
 TEST(DraftExampleProject, DeletionScenarioMarksTheElementWithoutChangingTheAcceptedBaseline) {
-    const std::filesystem::path root = ExampleProjectRoot("kitchen-blender-deletion-draft");
-    if (root.empty() || !std::filesystem::exists(root / "af.proj")) {
-        GTEST_SKIP() << "examples/projects/kitchen-blender-deletion-draft not found";
+    const FixtureProjects fixture;
+    if (fixture.source_missing()) {
+        GTEST_SKIP() << "tests/data/projects not found from " << std::filesystem::current_path();
     }
+    // Present but uncopyable is a broken environment, not a reason to skip: a
+    // skip here would say "not found" about files that are right there.
+    ASSERT_FALSE(fixture.empty()) << fixture.error;
+    const std::filesystem::path root = fixture.project("kitchen-blender-deletion-draft");
 
     core::AppState state;
     const std::filesystem::path argument = root / "arguments" / "main.sacm";
@@ -188,10 +270,14 @@ TEST(DraftExampleProject, DeletionScenarioMarksTheElementWithoutChangingTheAccep
 }
 
 TEST(DraftExampleProject, LeavesTheAcceptedArgumentUntouched) {
-    const std::filesystem::path root = ExampleProjectRoot();
-    if (root.empty()) {
-        GTEST_SKIP() << "examples/projects/kitchen-blender-draft not found";
+    const FixtureProjects fixture;
+    if (fixture.source_missing()) {
+        GTEST_SKIP() << "tests/data/projects not found from " << std::filesystem::current_path();
     }
+    // Present but uncopyable is a broken environment, not a reason to skip: a
+    // skip here would say "not found" about files that are right there.
+    ASSERT_FALSE(fixture.empty()) << fixture.error;
+    const std::filesystem::path root = fixture.project("kitchen-blender-draft");
     const std::filesystem::path argument = root / "arguments" / "main.sacm";
 
     core::AppState state;
@@ -219,10 +305,14 @@ TEST(DraftExampleProject, LeavesTheAcceptedArgumentUntouched) {
 // `loaded_case` when the derived-view rebuild raises. Losing the argument from
 // the screen is the worst failure this feature can have, so it is pinned here.
 TEST(DraftExampleProject, PromotingTheWholeDraftKeepsTheArgument) {
-    const std::filesystem::path root = ExampleProjectRoot();
-    if (root.empty()) {
-        GTEST_SKIP() << "examples/projects/kitchen-blender-draft not found";
+    const FixtureProjects fixture;
+    if (fixture.source_missing()) {
+        GTEST_SKIP() << "tests/data/projects not found from " << std::filesystem::current_path();
     }
+    // Present but uncopyable is a broken environment, not a reason to skip: a
+    // skip here would say "not found" about files that are right there.
+    ASSERT_FALSE(fixture.empty()) << fixture.error;
+    const std::filesystem::path root = fixture.project("kitchen-blender-draft");
     const std::filesystem::path argument = root / "arguments" / "main.sacm";
 
     core::AppState state;
