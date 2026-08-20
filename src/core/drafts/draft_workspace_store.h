@@ -107,6 +107,23 @@ public:
                          const core::AssuranceCase& accepted,
                          std::string& error);
 
+    // Records operations the DRAFT DOCUMENT has already accepted (ADR 0016).
+    //
+    // No rehearsal, and that is the whole difference from `StageOperations`.
+    // Under ADR 0016 the document decides, in the call that made the change, so
+    // rehearsing the flat model afterwards could only do one of two things:
+    // agree, or refuse something the real model has already taken -- which is
+    // the two-models-disagreeing defect this design exists to remove, merely
+    // pointed the other way.
+    //
+    // What survives here is the ledger: which contributor staged what, so
+    // `describe_change_group` and the Draft Changes panel can still answer it.
+    // It goes away with the rest of this store once the MCP surface is
+    // simplified to match the ADR.
+    bool RecordAppliedOperations(const std::string& group_id,
+                                 const std::vector<reviews::PatchOperation>& operations,
+                                 std::string& error);
+
     // Replaces a group's operations wholesale, so an author can respond to "not
     // there" without abandoning the group and losing its rationale and links.
     bool ReplaceOperations(const std::string& group_id,

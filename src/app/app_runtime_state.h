@@ -8,6 +8,7 @@
 #include "app/app_events.h"
 #include "app/controllers/agent_bridge_controller.h"
 #include "core/changesets/change_set_store.h"
+#include "core/drafts/draft_document_diff.h"
 #include "core/drafts/draft_document_store.h"
 #include "core/drafts/draft_workspace_store.h"
 #include "app/controllers/ai_review_controller.h"
@@ -249,14 +250,62 @@ struct AppRuntimeState {
     // between. The two never both hold changes for one argument -- staging goes
     // to this one.
     core::drafts::DraftDocumentStore draft_document;
-    // The draft document's projection, and whether it differs from the accepted
-    // argument, cached against the store's revision. `CurrentArgumentView` is
-    // asked several times a frame by the canvas, the navigator and the
-    // inspector, and projecting a document per call would put a full re-parse of
-    // the argument into the interactive loop.
+    // The draft document's projection and what it changes about the accepted
+    // argument, cached against both revisions. `CurrentArgumentView` is asked
+    // several times a frame by the canvas, the navigator and the inspector, and
+    // projecting a document per call would put a full re-parse of the argument
+    // into the interactive loop.
+    //
+    // Keyed on the accepted case revision as well as the draft's, because the
+    // comparison has two sides: an accept replaces the accepted argument without
+    // the draft moving at all, and a cache that watched only the draft would go
+    // on reporting the changes of a draft that no longer exists.
     parser::AssuranceCase draft_document_view;
+    core::drafts::DraftDocumentDiff draft_document_changes;
     std::uint64_t draft_document_view_revision = ~std::uint64_t{0};
+    std::uint64_t draft_document_view_case_revision = ~std::uint64_t{0};
     bool draft_document_view_differs = false;
+
+    // An accept has replaced the accepted argument on disk and the application
+    // has not re-read it yet.
+    //
+    // Deferred to the next frame boundary rather than done in the accept,
+    // because the accept is reached from a button rendered mid-frame and
+    // re-reading the file replaces `loaded_case`, `sacm_package` and
+    // `library_document` wholesale -- the containers the canvas is still
+    // rendering from. This is the same deferred-to-next-frame remedy
+    // `rederive_views_from_library` and `pending_reconcile_audit_store` use for
+    // the identical hazard.
+    bool pending_accepted_argument_reload = false;
+
+    // The comparison expressed as the change index the canvas consumes, cached
+    // on the same two revisions as the comparison it is built from.
+    core::drafts::DraftChangeIndex draft_document_index;
+    std::uint64_t draft_document_index_revision = ~std::uint64_t{0};
+    std::uint64_t draft_document_index_case_revision = ~std::uint64_t{0};
+
+    // How far the working draft has moved, whichever half of it moved.
+    //
+    // The document moves on every change to the argument -- MCP, SCCG and the
+    // user's own edits all go into it -- and the change-group ledger moves when a
+    // group is opened, submitted or rejected. A cache watching only the ledger
+    // stopped rebuilding the moment the draft became a document, and went on
+    // showing content the edit had already replaced. Summed to detect movement
+    // only; nothing may read this as an identity.
+    std::uint64_t DraftRevision() const {
+        return draft_workspace.revision() + draft_document.revision();
+    }
+
+    // Recomputes the two cached values above when either side has moved.
+    void RefreshDraftDocumentView();
+
+    // What the draft document changes about the accepted argument (ADR 0016).
+    // Empty when there is no draft, which is the same answer as a draft that has
+    // changed nothing -- and deliberately so: the two are indistinguishable, and
+    // every surface that asks "is there unaccepted work here" wants the
+    // comparison rather than the store's existence.
+    const core::drafts::DraftDocumentDiff& DraftDocumentChanges();
+    bool DraftDocumentHasChanges();
     // What `draft_workspace` was last opened for. A draft belongs to one
     // argument file -- element ids repeat across a project's arguments, so a
     // draft written against one must never decorate another's identically-named

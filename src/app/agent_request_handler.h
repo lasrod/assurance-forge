@@ -15,6 +15,7 @@
 
 #include "bridge/protocol.h"
 #include "core/app_state.h"
+#include "core/drafts/draft_document_store.h"
 #include "core/drafts/draft_workspace.h"
 #include "core/drafts/draft_workspace_store.h"
 
@@ -63,6 +64,12 @@ struct AgentRequestContext {
     // The one integrated workspace for the argument currently open. Null for a
     // standalone SACM file, where MCP remains read-only.
     core::drafts::DraftWorkspaceStore* draft_workspace = nullptr;
+
+    // The draft document for the argument currently open (ADR 0016) -- what a
+    // contributor's operations are applied to, and what accept writes over the
+    // argument. Null for a standalone SACM file, and for an argument the SACM
+    // library could not load, where there is no document to copy a draft from.
+    core::drafts::DraftDocumentStore* draft_document = nullptr;
 
     // Re-evaluated for every request, and again after open_case_file. This keeps
     // a switch from returning the previous file's draft and lets the runtime

@@ -54,23 +54,42 @@ bool DraftDocumentStore::Open(const std::filesystem::path& project_root,
                               const sacm_adapter::LibraryDocument& accepted,
                               std::string& error) {
     error.clear();
+    (void)accepted;
     const std::filesystem::path draft_path = DraftDocumentPath(project_root, argument_path);
 
+    // Recorded whether or not a draft is found, so `EnsureDraft` knows where to
+    // put one without being told the argument a second time.
+    impl_->document.reset();
+    impl_->path = draft_path;
+    ++impl_->revision;
+
     std::error_code exists_error;
-    if (std::filesystem::exists(draft_path, exists_error) && !exists_error) {
-        // Loaded as it was left. Re-deriving from the accepted document would be
-        // simpler and would silently destroy every unaccepted change, which is
-        // the one thing a recovery file exists to prevent.
-        sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(draft_path);
-        if (!loaded.ok || loaded.document == nullptr) {
-            error =
-                "The working draft could not be read: " + sacm_adapter::summarize_load_diagnostics(loaded.diagnostics);
-            return false;
-        }
-        impl_->document = std::move(loaded.document);
-        impl_->path = draft_path;
-        ++impl_->revision;
+    if (!std::filesystem::exists(draft_path, exists_error) || exists_error) {
+        // No draft, which is the ordinary state of an argument. Not an error, and
+        // deliberately not a reason to make one: see the header.
         return true;
+    }
+
+    // Loaded as it was left. Re-deriving from the accepted document would be
+    // simpler and would silently destroy every unaccepted change, which is the
+    // one thing a recovery file exists to prevent.
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(draft_path);
+    if (!loaded.ok || loaded.document == nullptr) {
+        error = "The working draft could not be read: " + sacm_adapter::summarize_load_diagnostics(loaded.diagnostics);
+        return false;
+    }
+    impl_->document = std::move(loaded.document);
+    ++impl_->revision;
+    return true;
+}
+
+bool DraftDocumentStore::EnsureDraft(const sacm_adapter::LibraryDocument& accepted, std::string& error) {
+    error.clear();
+    if (impl_->document != nullptr)
+        return true;
+    if (impl_->path.empty()) {
+        error = "There is no argument open to draft against.";
+        return false;
     }
 
     // Cloned by serializing the accepted document and reading it back, which is
@@ -90,7 +109,6 @@ bool DraftDocumentStore::Open(const std::filesystem::path& project_root,
         return false;
     }
     impl_->document = std::move(clone);
-    impl_->path = draft_path;
     ++impl_->revision;
     return true;
 }

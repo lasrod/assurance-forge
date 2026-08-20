@@ -1,5 +1,8 @@
 #include "agent/operations.h"
 
+#include "core/drafts/draft_document_diff.h"
+#include "core/drafts/draft_operation_apply.h"
+#include "core/problems/argument_cycles.h"
 #include "core/problems/gsn_wellformedness.h"
 #include "core/reviews/review_proposal.h"
 #include "core/sccg/staged_checks.h"
@@ -8,6 +11,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace agent {
@@ -42,14 +46,14 @@ bool CheckExpectedContextGeneration(const DraftContext& context, const nlohmann:
     if (supplied == arguments.end() || !supplied->is_number_integer() || supplied->get<std::int64_t>() < 0) {
         refusal = DraftError("Argument \"expected_context_generation\" is required. Read get_draft_status or any "
                              "case-content result, then retry with the context_generation it reports.",
-                             context.store.revision());
+                             context.working_revision());
         return false;
     }
     if (supplied->get<std::uint64_t>() != context.context_generation) {
         refusal = DraftError("The session's context changed after you read it -- the project was switched, or "
                              "access was re-granted. Re-read the working draft before deciding whether this "
                              "operation still applies.",
-                             context.store.revision());
+                             context.working_revision());
         return false;
     }
     return true;
@@ -62,12 +66,12 @@ bool CheckExpectedRevision(const DraftContext& context, const nlohmann::json& ar
     if (supplied == arguments.end() || !supplied->is_number_integer() || supplied->get<std::int64_t>() < 0) {
         refusal = DraftError("Argument \"expected_working_revision\" is required. Read get_draft_status or any "
                              "case-content result, then retry with the revision it reports.",
-                             context.store.revision());
+                             context.working_revision());
         return false;
     }
 
     const std::uint64_t expected = supplied->get<std::uint64_t>();
-    const std::uint64_t current = context.store.revision();
+    const std::uint64_t current = context.working_revision();
     if (expected != current) {
         refusal = DraftError("The integrated draft changed after you read it. Re-read the working draft and decide "
                              "whether your operation still means the same thing before retrying.",
@@ -126,13 +130,13 @@ FindOwnedGroup(const DraftContext& context, const std::string& group_id, Result&
     const core::drafts::DraftWorkspace* workspace = context.store.workspace();
     const core::drafts::DraftChangeGroup* group = workspace != nullptr ? workspace->FindGroup(group_id) : nullptr;
     if (group == nullptr) {
-        refusal = DraftError("No draft change group has the id \"" + group_id + "\".", context.store.revision());
+        refusal = DraftError("No draft change group has the id \"" + group_id + "\".", context.working_revision());
         return nullptr;
     }
     if (group->source != core::drafts::DraftSource::Mcp || group->source_session_id != SessionId(context)) {
         refusal = DraftError("That draft group belongs to another contributor. You may inspect the combined "
                              "working draft, but you may modify only groups created by this MCP session.",
-                             context.store.revision());
+                             context.working_revision());
         return nullptr;
     }
     return group;
@@ -196,13 +200,46 @@ nlohmann::json GroupJson(const core::drafts::DraftChangeGroup& group, bool inclu
     return payload;
 }
 
+// The draft document as it now stands, and what it changes about the accepted
+// argument (ADR 0016). Both are derived: the projection from the document, the
+// difference from the two projections. Nothing is inferred from an operation
+// log, so this cannot disagree with what the user is looking at.
+struct DraftDocumentSnapshot {
+    core::AssuranceCase projection;
+    core::drafts::DraftDocumentDiff diff;
+    bool available = false;
+};
+
+DraftDocumentSnapshot SnapshotDraftDocument(const DraftContext& context) {
+    DraftDocumentSnapshot snapshot;
+    if (!context.document_backed() || !context.state.loaded_case.has_value())
+        return snapshot;
+    // An argument nobody has drafted against has no draft document, and its
+    // draft view is the accepted argument itself. `document_backed()` is true
+    // before the first edit and again after an accept discards the draft, so
+    // projecting the absent document here yielded an empty case -- and the
+    // comparison below then reported every accepted element as one this draft
+    // removes. An agent that opened a group after its previous group was
+    // accepted was told its untouched case had been emptied.
+    snapshot.projection =
+        context.document->active() ? context.document->Projection() : context.state.loaded_case.value();
+    snapshot.diff = core::drafts::DiffAcceptedAgainstDraft(context.state.loaded_case.value(), snapshot.projection);
+    snapshot.available = true;
+    return snapshot;
+}
+
 void AddWorkspaceEnvelope(const DraftContext& context, nlohmann::json& payload) {
     const core::drafts::DraftWorkspace* workspace = context.store.workspace();
     payload["argument_file"] = ArgumentFile(context);
-    payload["working_revision"] = context.store.revision();
+    payload["working_revision"] = context.working_revision();
     if (context.context_generation > 0)
         payload["context_generation"] = context.context_generation;
-    payload["view"] = workspace != nullptr && workspace->has_active_groups() ? "working_draft" : "accepted";
+    // Whether the argument text a client reads is accepted or unaccepted, taken
+    // from the bytes the application is actually rendering rather than from the
+    // existence of a change group. A document-backed draft that has changed
+    // nothing is indistinguishable from no draft at all, and an empty group is
+    // not an unaccepted change.
+    payload["view"] = context.working_draft_active ? "working_draft" : "accepted";
     if (workspace != nullptr) {
         payload["workspace_id"] = workspace->id;
         payload["workspace_state"] = core::drafts::DraftWorkspaceStateToString(workspace->state);
@@ -254,6 +291,60 @@ nlohmann::json CheckedJson() {
     };
 }
 
+nlohmann::json ChangesJson(const core::drafts::DraftDocumentDiff& diff) {
+    nlohmann::json changes = nlohmann::json::array();
+    for (const core::drafts::DraftDocumentChange& change : diff.changes) {
+        nlohmann::json entry{{"element_id", change.element_id},
+                             {"change", core::drafts::DraftElementChangeToString(change.change)}};
+        if (!change.fields.empty())
+            entry["fields"] = change.fields;
+        changes.push_back(std::move(entry));
+    }
+    return changes;
+}
+
+bool TouchesAnyChangedElement(const std::vector<std::string>& ids, const std::unordered_set<std::string>& changed) {
+    return std::any_of(
+        ids.begin(), ids.end(), [&changed](const std::string& id) { return !id.empty() && changed.count(id) > 0; });
+}
+
+// The same findings the materializer produced, over the draft document instead.
+// Scoped to what the draft touched for the same reason: an agent handed defects
+// in parts of the argument it never wrote cannot tell which are its to fix.
+nlohmann::json DocumentFindingsJson(const DraftDocumentSnapshot& snapshot) {
+    nlohmann::json findings = nlohmann::json::array();
+    std::vector<std::string> changed_ids;
+    for (const core::drafts::DraftDocumentChange& change : snapshot.diff.changes) {
+        if (change.change != core::drafts::DraftElementChange::Unchanged)
+            changed_ids.push_back(change.element_id);
+    }
+    if (changed_ids.empty())
+        return findings;
+    const std::unordered_set<std::string> changed(changed_ids.begin(), changed_ids.end());
+
+    for (const core::sccg::StagedFinding& finding : core::sccg::CheckStagedArgument(snapshot.projection, changed_ids)) {
+        findings.push_back(SccgFindingJson(finding));
+    }
+    for (const core::GsnFinding& finding : core::CheckGsnWellFormedness(snapshot.projection)) {
+        if (!TouchesAnyChangedElement({finding.element_id, finding.related_id, finding.relationship_id}, changed))
+            continue;
+        findings.push_back(nlohmann::json{{"kind", "gsn"},
+                                          {"requirement_id", core::GsnRequirementId(finding.rule)},
+                                          {"rule", core::GsnRuleName(finding.rule)},
+                                          {"element_id", finding.element_id},
+                                          {"relationship_id", finding.relationship_id},
+                                          {"detail", finding.detail},
+                                          {"severity", "problem"}});
+    }
+    for (const core::ArgumentCycle& cycle : core::FindSupportCycles(snapshot.projection)) {
+        if (!TouchesAnyChangedElement(cycle.element_ids, changed))
+            continue;
+        findings.push_back(
+            nlohmann::json{{"kind", "support_cycle"}, {"element_ids", cycle.element_ids}, {"severity", "problem"}});
+    }
+    return findings;
+}
+
 nlohmann::json FindingsJson(const core::drafts::DraftMaterializationResult& materialized) {
     nlohmann::json findings = nlohmann::json::array();
     for (const core::sccg::StagedFinding& finding : materialized.sccg_findings) {
@@ -278,6 +369,20 @@ nlohmann::json FindingsJson(const core::drafts::DraftMaterializationResult& mate
 Result DescribeGroupResult(const DraftContext& context, const core::drafts::DraftChangeGroup& group) {
     nlohmann::json payload = GroupJson(group, true);
     AddWorkspaceEnvelope(context, payload);
+    if (context.document_backed()) {
+        // No `materializes` key, and that absence is the point: a document-backed
+        // draft cannot fail to materialize, because there is nothing to
+        // materialize. What it changes is a comparison against the accepted
+        // argument, which is derived from the draft and so cannot disagree with
+        // what the user is looking at.
+        const DraftDocumentSnapshot snapshot = SnapshotDraftDocument(context);
+        payload["changes"] = ChangesJson(snapshot.diff);
+        payload["added"] = snapshot.diff.added_count;
+        payload["modified"] = snapshot.diff.modified_count;
+        payload["removed"] = snapshot.diff.removed_count;
+        payload["findings"] = DocumentFindingsJson(snapshot);
+        return Result::Ok(std::move(payload));
+    }
     if (context.state.loaded_case.has_value()) {
         const core::drafts::DraftMaterializationResult& materialized =
             context.store.Materialize(context.state.loaded_case.value(), context.state.case_revision);
@@ -295,7 +400,7 @@ Result DescribeGroupResult(const DraftContext& context, const core::drafts::Draf
 Result MissingGroup(const DraftContext& context) {
     return DraftError("Argument \"group_id\" is required. Begin a change group first, or provide the id of one "
                       "created by this MCP session.",
-                      context.store.revision());
+                      context.working_revision());
 }
 
 } // namespace
@@ -327,7 +432,7 @@ Result BeginChangeGroup(const DraftContext& context, const nlohmann::json& argum
     const std::string title = StringArgument(arguments, "title");
     if (title.empty())
         return DraftError("Argument \"title\" is required. It is the change-group title shown to the reviewer.",
-                          context.store.revision());
+                          context.working_revision());
 
     core::drafts::DraftGroupRequest request;
     request.title = title;
@@ -343,9 +448,108 @@ Result BeginChangeGroup(const DraftContext& context, const nlohmann::json& argum
     const std::string group_id = context.store.BeginGroup(request, context.state.loaded_case.value(), error);
     if (group_id.empty())
         return DraftError(error.empty() ? "The draft change group could not be created." : error,
-                          context.store.revision());
+                          context.working_revision());
     return DescribeChangeGroup(context, nlohmann::json{{"group_id", group_id}});
 }
+
+namespace {
+
+// Which ArgumentPackage newly created elements are filed in.
+//
+// Taken from the first existing element the batch names, because that is the
+// part of the argument the contributor is working on. A flat model recorded no
+// package at all, so the choice was deferred to promotion, and guessing there
+// put a proposed claim in the wrong package of a multi-package case.
+std::string AnchorForOperations(const nlohmann::json& arguments,
+                                const std::vector<core::reviews::PatchOperation>& operations) {
+    // Not const: it is returned, and constness would turn the return into a copy.
+    std::string supplied = StringArgument(arguments, "anchor_element_id");
+    if (!supplied.empty())
+        return supplied;
+    for (const core::reviews::PatchOperation& operation : operations) {
+        for (const std::optional<core::reviews::ElementRef>* candidate :
+             {&operation.element, &operation.source, &operation.target}) {
+            if (candidate->has_value() && candidate->value().existing_id.has_value() &&
+                !candidate->value().existing_id.value().empty()) {
+                return candidate->value().existing_id.value();
+            }
+        }
+    }
+    return {};
+}
+
+// Applies a batch to the draft document (ADR 0016).
+//
+// The document is the only thing that decides here. A refusal comes from the
+// model that would have held the change, in the call that made it, which is the
+// whole reason this path exists: the operation-staging path rehearsed a flat
+// model that accepted fourteen shapes the document later refused -- at accept,
+// naming neither the field to correct nor the group to reject.
+Result StageOntoDraftDocument(const DraftContext& context,
+                              const std::string& group_id,
+                              const std::vector<core::reviews::PatchOperation>& operations,
+                              const nlohmann::json& arguments) {
+    core::drafts::DraftDocumentStore& document = *context.document;
+    // The first unaccepted change to this argument is what brings the draft into
+    // existence, copied from the argument as it stands right now -- not as it
+    // stood when someone opened the file.
+    if (!document.active()) {
+        std::string create_error;
+        if (context.accepted_document == nullptr || !document.EnsureDraft(*context.accepted_document, create_error)) {
+            return DraftError(create_error.empty() ? "A working draft could not be created for this argument."
+                                                   : create_error,
+                              context.working_revision());
+        }
+    }
+    const core::drafts::DraftOperationResult applied = core::drafts::ApplyOperationsToDraftDocument(
+        *document.document(), operations, AnchorForOperations(arguments, operations));
+    if (!applied.applied) {
+        // Positioned, because a client staging ten operations has to be told
+        // which one to fix rather than re-send the batch blind. The batch is
+        // atomic, so nothing landed and there is nothing to undo first.
+        std::string message = applied.error;
+        if (applied.failed_operation > 0) {
+            message = "Operation " + std::to_string(applied.failed_operation) + " of " +
+                      std::to_string(operations.size()) + " was refused: " + applied.error;
+        }
+        return DraftError(std::move(message), context.working_revision());
+    }
+    document.MarkChanged();
+
+    // Everything below has already happened to the draft. A failure here is
+    // reported as a warning rather than as a refusal, because telling a client
+    // its batch was rejected while the draft is holding it invites a retry that
+    // would apply the same change twice.
+    nlohmann::json warnings = nlohmann::json::array();
+    std::string save_error;
+    if (!document.Save(save_error))
+        warnings.push_back("The draft is updated but could not be written to disk: " + save_error);
+    std::string ledger_error;
+    if (!context.store.RecordAppliedOperations(group_id, operations, ledger_error))
+        warnings.push_back("The draft is updated but the change group's record of it is incomplete: " + ledger_error);
+
+    const DraftDocumentSnapshot snapshot = SnapshotDraftDocument(context);
+    const core::drafts::DraftWorkspace* workspace = context.store.workspace();
+    const core::drafts::DraftChangeGroup* group = workspace != nullptr ? workspace->FindGroup(group_id) : nullptr;
+    nlohmann::json payload = group != nullptr ? GroupJson(*group, true) : nlohmann::json::object();
+    payload["staged"] = static_cast<int>(operations.size());
+    // The same key the operation-staging path answers with, holding real ids
+    // this time: the document allocated them when it created the element, and
+    // there is no later materialization that could allocate a different one. A
+    // client may address what it just made immediately.
+    payload["created_element_ids"] = applied.created_ids;
+    payload["changes"] = ChangesJson(snapshot.diff);
+    payload["added"] = snapshot.diff.added_count;
+    payload["modified"] = snapshot.diff.modified_count;
+    payload["removed"] = snapshot.diff.removed_count;
+    payload["findings"] = DocumentFindingsJson(snapshot);
+    if (!warnings.empty())
+        payload["warnings"] = std::move(warnings);
+    AddWorkspaceEnvelope(context, payload);
+    return Result::Ok(std::move(payload));
+}
+
+} // namespace
 
 Result StageDraftOperations(const DraftContext& context, const nlohmann::json& arguments) {
     if (!context.state.loaded_case.has_value())
@@ -365,15 +569,22 @@ Result StageDraftOperations(const DraftContext& context, const nlohmann::json& a
     const nlohmann::json::const_iterator supplied = arguments.find("operations");
     if (supplied == arguments.end() || !ParsePatchOperations(*supplied, operations, error))
         return DraftError(error.empty() ? "\"operations\" must be a non-empty array." : error,
-                          context.store.revision());
+                          context.working_revision());
+
+    if (context.document_backed())
+        return StageOntoDraftDocument(context, group_id, operations, arguments);
+
+    // No draft document to edit -- an argument the SACM library could not load.
+    // The operation-staging path remains for it, expressibility gap included,
+    // until that store is retired.
     if (!context.store.StageOperations(group_id, operations, context.state.loaded_case.value(), error))
         return DraftError("These operations would not materialize in the integrated draft: " + error,
-                          context.store.revision());
+                          context.working_revision());
 
     const core::drafts::DraftMaterializationResult& materialized =
         context.store.Materialize(context.state.loaded_case.value(), context.state.case_revision);
     if (!materialized.success)
-        return DraftError(materialized.error, context.store.revision());
+        return DraftError(materialized.error, context.working_revision());
 
     const core::drafts::DraftChangeGroup* group = context.store.workspace()->FindGroup(group_id);
     nlohmann::json payload = GroupJson(*group, true);
@@ -446,12 +657,32 @@ Result CheckDraftOperations(const DraftContext& context, const nlohmann::json& a
     return Result::Ok(std::move(payload));
 }
 
+// A gesture that only means something against an operation log.
+//
+// Refused rather than half-honoured. Withdrawing operations from the ledger
+// while the draft document keeps the change would report success over an edit
+// that is still there -- the silent-drop shape ADR 0016 exists to remove, merely
+// moved to a different call.
+namespace {
+
+Result NotAvailableAgainstDraftDocument(const DraftContext& context, const char* gesture) {
+    return DraftError(std::string("The working draft is a SACM document rather than a list of operations, so ") +
+                          gesture +
+                          " no longer means anything. Reverse the change by editing the draft -- set the text back, "
+                          "or remove the element you added -- or ask the user to discard the whole draft.",
+                      context.working_revision());
+}
+
+} // namespace
+
 Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arguments) {
     if (!context.state.loaded_case.has_value())
         return Result::Error("No assurance case is loaded, so there is nothing to draft against.");
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
+    if (context.document_backed())
+        return NotAvailableAgainstDraftDocument(context, "replacing a change group's operations");
 
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
@@ -464,10 +695,10 @@ Result ReplaceChangeGroup(const DraftContext& context, const nlohmann::json& arg
     const nlohmann::json::const_iterator supplied = arguments.find("operations");
     if (supplied == arguments.end() || !ParsePatchOperations(*supplied, operations, error))
         return DraftError(error.empty() ? "\"operations\" must be a non-empty array." : error,
-                          context.store.revision());
+                          context.working_revision());
     if (!context.store.ReplaceOperations(group_id, operations, context.state.loaded_case.value(), error))
         return DraftError("These replacement operations would not materialize in the integrated draft: " + error,
-                          context.store.revision());
+                          context.working_revision());
     return DescribeChangeGroup(context, nlohmann::json{{"group_id", group_id}});
 }
 
@@ -475,6 +706,8 @@ Result RemoveChangeGroup(const DraftContext& context, const nlohmann::json& argu
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
+    if (context.document_backed())
+        return NotAvailableAgainstDraftDocument(context, "rejecting a change group");
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
         return MissingGroup(context);
@@ -483,7 +716,7 @@ Result RemoveChangeGroup(const DraftContext& context, const nlohmann::json& argu
 
     std::string error;
     if (!context.store.RejectGroup(group_id, error))
-        return DraftError(error, context.store.revision());
+        return DraftError(error, context.working_revision());
     nlohmann::json payload{{"group_id", group_id}, {"change_set_id", group_id}, {"state", "rejected"}};
     AddWorkspaceEnvelope(context, payload);
     return Result::Ok(std::move(payload));
@@ -496,7 +729,7 @@ Result DescribeChangeGroup(const DraftContext& context, const nlohmann::json& ar
     const core::drafts::DraftWorkspace* workspace = context.store.workspace();
     const core::drafts::DraftChangeGroup* group = workspace != nullptr ? workspace->FindGroup(group_id) : nullptr;
     if (group == nullptr)
-        return DraftError("No draft change group has the id \"" + group_id + "\".", context.store.revision());
+        return DraftError("No draft change group has the id \"" + group_id + "\".", context.working_revision());
     return DescribeGroupResult(context, *group);
 }
 
@@ -571,7 +804,7 @@ Result SubmitChangeGroup(const DraftContext& context, const nlohmann::json& argu
 
     std::string error;
     if (!context.store.MarkGroupReady(group_id, error, acknowledged ? standing_problems : std::vector<std::string>{}))
-        return DraftError(error, context.store.revision());
+        return DraftError(error, context.working_revision());
     return DescribeChangeGroup(context, nlohmann::json{{"group_id", group_id}});
 }
 
@@ -580,6 +813,17 @@ Result DescribeWorkingDraft(const DraftContext& context) {
         return Result::Error("No assurance case is loaded.");
 
     nlohmann::json payload;
+    if (context.document_backed()) {
+        const DraftDocumentSnapshot snapshot = SnapshotDraftDocument(context);
+        payload["element_count"] = static_cast<int>(snapshot.projection.elements.size());
+        payload["changes"] = ChangesJson(snapshot.diff);
+        payload["added"] = snapshot.diff.added_count;
+        payload["modified"] = snapshot.diff.modified_count;
+        payload["removed"] = snapshot.diff.removed_count;
+        payload["findings"] = DocumentFindingsJson(snapshot);
+        AddWorkspaceEnvelope(context, payload);
+        return Result::Ok(std::move(payload));
+    }
     const core::drafts::DraftMaterializationResult& materialized =
         context.store.Materialize(context.state.loaded_case.value(), context.state.case_revision);
     payload["materializes"] = materialized.success;
@@ -632,6 +876,8 @@ Result UnstageDraftOperations(const DraftContext& context, const nlohmann::json&
     Result refusal;
     if (!CheckExpectedRevision(context, arguments, refusal))
         return refusal;
+    if (context.document_backed())
+        return NotAvailableAgainstDraftDocument(context, "unstaging operations");
     const std::string group_id = GroupIdArgument(context, arguments);
     if (group_id.empty())
         return MissingGroup(context);
@@ -644,13 +890,13 @@ Result UnstageDraftOperations(const DraftContext& context, const nlohmann::json&
                                   ? static_cast<std::size_t>(supplied->get<int>())
                                   : 1;
     if (count > group->operations.size())
-        return DraftError("Cannot remove more operations than the group contains.", context.store.revision());
+        return DraftError("Cannot remove more operations than the group contains.", context.working_revision());
 
     std::vector<core::reviews::PatchOperation> remaining = group->operations;
     remaining.resize(remaining.size() - count);
     std::string error;
     if (!context.store.ReplaceOperations(group_id, remaining, context.state.loaded_case.value(), error))
-        return DraftError(error, context.store.revision());
+        return DraftError(error, context.working_revision());
     return DescribeChangeGroup(context, nlohmann::json{{"group_id", group_id}});
 }
 

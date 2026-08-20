@@ -64,6 +64,19 @@ struct DraftDocumentDiff {
 // document.
 DraftDocumentDiff DiffAcceptedAgainstDraft(const core::AssuranceCase& accepted, const core::AssuranceCase& draft);
 
+// The comparison, expressed as the change index the canvas already consumes.
+//
+// A bridge, not a second representation: the canvas decorations, the "changes
+// only" view and the tombstone reinsertion were all written against
+// `DraftChangeIndex` when a draft was a list of operations, and they ask it only
+// what changed and what was removed -- both of which the comparison answers.
+//
+// The per-group `contributions` are empty, and cannot be otherwise: a document
+// records what it holds, not who put it there. Provenance travels with the
+// element as tagged values (ADR 0016) and is read from the element, not from
+// here.
+DraftChangeIndex ChangeIndexFromDiff(const DraftDocumentDiff& diff);
+
 // The POD fields that differ between two projections of the same element,
 // sorted. Empty when they are equivalent.
 //
