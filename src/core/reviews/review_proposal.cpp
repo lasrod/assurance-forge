@@ -263,6 +263,64 @@ bool ParseTranslations(const nlohmann::json& source, std::map<std::string, std::
     return true;
 }
 
+// Every key an operation may carry.
+//
+// An operation is a change to a safety argument, and a key this parser does not
+// know is a change the caller believes it asked for and will not get. A
+// CreateTerm carrying {"definition": "..."} instead of "new_value" parsed
+// cleanly, reported success, and produced a term with no definition -- the
+// glossary then showed the word with an empty Definition column, and nothing
+// anywhere said the definition had been dropped. Silence is the wrong answer
+// here: refusing costs a retry, accepting costs a definition nobody knows is
+// missing.
+bool RejectUnknownOperationKeys(const nlohmann::json& source, std::string& error) {
+    static const std::set<std::string> kAcceptedKeys = {
+        "create_ref",
+        "element",
+        "field",
+        "new_value",
+        "old_value",
+        "source",
+        "target",
+        "text",
+        "translations",
+        "type",
+    };
+    // Where the value the caller supplied actually belongs. Only for keys that
+    // name something real -- a typo gets the list and nothing more.
+    static const std::unordered_map<std::string, std::string> kRedirects = {
+        {"definition",
+         "A term's definition goes in \"new_value\" on CreateTerm, or in an UpdateTerm with \"field\": "
+         "\"definition\"."},
+        {"description",
+         "An element's description is its text: use \"text\" on a create, or \"new_value\" on "
+         "UpdateElementText."},
+        {"value", "A term's value is its \"text\" on CreateTerm."},
+        {"name", "A name goes in \"new_value\" on UpdateElementName, or \"text\" on CreateCategory."},
+        {"id", "Name an element as \"element\": {\"id\": \"G1\"}, not by a bare \"id\"."},
+    };
+
+    for (nlohmann::json::const_iterator it = source.begin(); it != source.end(); ++it) {
+        if (kAcceptedKeys.count(it.key()) > 0)
+            continue;
+
+        error = "Unknown key \"" + it.key() + "\" in an operation. Accepted keys: ";
+        bool first = true;
+        for (const std::string& key : kAcceptedKeys) {
+            if (!first)
+                error += ", ";
+            error += key;
+            first = false;
+        }
+        error += ".";
+        const std::unordered_map<std::string, std::string>::const_iterator redirect = kRedirects.find(it.key());
+        if (redirect != kRedirects.end())
+            error += " " + redirect->second;
+        return false;
+    }
+    return true;
+}
+
 bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& out, std::string& error) {
     if (!source.is_object()) {
         error = "Each operation must be an object.";
@@ -275,6 +333,10 @@ bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& o
     }
     if (!PatchOperationTypeFromString(type, out.type)) {
         error = "Unknown operation type \"" + type + "\".";
+        return false;
+    }
+
+    if (!RejectUnknownOperationKeys(source, error)) {
         return false;
     }
 
