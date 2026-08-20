@@ -404,9 +404,11 @@ std::vector<TerminologySpanHitRegion> BuildAndDrawTerminologySpans(ImDrawList* d
     const std::vector<core::TermOccurrence>* occurrences_ptr = nullptr;
     std::vector<core::TermOccurrence> fresh_occurrences;
     if (occurrence_cache) {
-        if (occurrence_cache->package_ptr != package_ptr) {
+        const std::uint64_t content_stamp = terminology_service->ContentStamp();
+        if (occurrence_cache->package_ptr != package_ptr || occurrence_cache->content_stamp != content_stamp) {
             occurrence_cache->entries.clear();
             occurrence_cache->package_ptr = package_ptr;
+            occurrence_cache->content_stamp = content_stamp;
         }
         auto it = occurrence_cache->entries.find(node.id);
         if (it != occurrence_cache->entries.end() && it->second.text == detail_text) {

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -101,6 +102,21 @@ public:
                                                   const std::string& text,
                                                   const TerminologyDetectionOptions& options = {}) const;
 
+    // A stamp over the terminology content this service resolves against.
+    //
+    // Callers cache detection results across frames and need to know when a
+    // cached result has gone stale. The package POINTER cannot tell them: a
+    // term edited in place leaves the package at the same address, so a canvas
+    // keyed on the pointer alone kept drawing the old resolution until the
+    // project was reloaded -- a term corrected in the editor stayed wrong on
+    // the canvas until the application restarted.
+    //
+    // Computed once, when the service is built. Callers rebuild the service per
+    // frame, so this is per frame rather than per element.
+    std::uint64_t ContentStamp() const {
+        return content_stamp_;
+    }
+
     // Returns the package this service operates on. The pointer is stable
     // for the lifetime of the service and can be used as a cache
     // invalidation key by callers that rebuild a service each frame.
@@ -110,6 +126,7 @@ public:
 
 private:
     const sacm::AssuranceCasePackage& package_;
+    std::uint64_t content_stamp_ = 0;
 };
 
 bool LooksImportantUndefinedTerm(const std::string& text);

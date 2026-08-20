@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -29,15 +30,20 @@ struct TerminologySpanHitRegion {
 };
 
 // Per-canvas cache for `TerminologyService::DetectTermsInText` results,
-// keyed by element id and verified by the source text. The disk-side
-// terminology package is identified by pointer; if it changes between
-// frames the entire cache is dropped.
+// keyed by element id and verified by the source text. Dropped whole when the
+// package changes identity, and also when its terminology content changes.
+//
+// The pointer alone was not enough: editing a term mutates the package in
+// place, so the address stays the same and every cached occurrence survived a
+// correction. A term fixed in the editor kept drawing as it was until the
+// project was reloaded, which read as the edit not having worked.
 struct TerminologyOccurrenceCache {
     struct Entry {
         std::string text;
         std::vector<core::TermOccurrence> occurrences;
     };
     const sacm::AssuranceCasePackage* package_ptr = nullptr;
+    std::uint64_t content_stamp = 0;
     std::unordered_map<std::string, Entry> entries;
 };
 
