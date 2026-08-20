@@ -71,6 +71,22 @@ nlohmann::json ReviewDataPackagesToJson(const AiReviewDataPackageBundle* data_pa
     return packages;
 }
 
+} // namespace
+
+const char* DataPackageAbsenceToString(DataPackageAbsence absence) {
+    switch (absence) {
+    case DataPackageAbsence::NotImplemented:
+        return "not_implemented";
+    case DataPackageAbsence::Empty:
+        return "empty";
+    case DataPackageAbsence::Withheld:
+        return "withheld";
+    }
+    return "not_implemented";
+}
+
+namespace {
+
 nlohmann::json UnavailableDataPackagesToJson(const AiReviewDataPackageBundle* data_packages) {
     nlohmann::json packages = nlohmann::json::array();
     if (!data_packages)
@@ -80,6 +96,7 @@ nlohmann::json UnavailableDataPackagesToJson(const AiReviewDataPackageBundle* da
             {"id", data_package.id},
             {"required", data_package.required},
             {"reason", data_package.reason},
+            {"absence", DataPackageAbsenceToString(data_package.absence)},
         });
     }
     return packages;
@@ -229,8 +246,16 @@ void AddPackage(AiReviewDataPackageBundle& packages, const std::string& id, cons
 void AddUnavailable(AiReviewDataPackageBundle& packages,
                     const std::string& id,
                     const std::string& reason,
-                    bool required) {
-    packages.unavailable.push_back(AiReviewUnavailableDataPackage{id, reason, required});
+                    bool required,
+                    DataPackageAbsence absence) {
+    packages.unavailable.push_back(AiReviewUnavailableDataPackage{id, reason, required, absence});
+}
+
+bool HasUnavailable(const AiReviewDataPackageBundle& packages, const std::string& id) {
+    return std::find_if(packages.unavailable.begin(),
+                        packages.unavailable.end(),
+                        [&](const AiReviewUnavailableDataPackage& package) { return package.id == id; }) !=
+           packages.unavailable.end();
 }
 
 bool HasPackage(const AiReviewDataPackageBundle& packages, const std::string& id) {
@@ -467,12 +492,77 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
     return true;
 }
 
+namespace {
+
+void CollectElementIdsFrom(const nlohmann::json& value, std::vector<std::string>& out) {
+    if (value.is_object()) {
+        for (const auto& item : value.items()) {
+            if ((item.key() == "element_id" || item.key() == "ancestor_id") && item.value().is_string()) {
+                const std::string id = item.value().get<std::string>();
+                if (std::find(out.begin(), out.end(), id) == out.end())
+                    out.push_back(id);
+            }
+            CollectElementIdsFrom(item.value(), out);
+        }
+        return;
+    }
+    if (value.is_array()) {
+        for (const nlohmann::json& child : value)
+            CollectElementIdsFrom(child, out);
+    }
+}
+
+// PROJECT_GLOSSARY. The terms a case defines are exactly what CL.4 and AR.6 ask
+// about -- whether a broad word is bounded somewhere -- and the case has been
+// able to hold them since terminology landed. Reviewing without them asks the
+// model to judge ambiguity against definitions the project already wrote.
+nlohmann::json ProjectGlossaryJson(const parser::AssuranceCase& assurance_case) {
+    nlohmann::json terms = nlohmann::json::array();
+    for (const parser::SacmElement& element : assurance_case.elements) {
+        if (element.type != "term")
+            continue;
+        terms.push_back({
+            {"element_id", element.id},
+            {"term", element.content},
+            {"definition", element.description},
+            {"name", element.name},
+        });
+    }
+    return terms;
+}
+
+// CHANGE_HISTORY. Prior findings on the elements under review: whether this
+// claim has been challenged before, and whether the challenge was resolved or
+// dismissed. SU.4, SU.5 and SU.11 all turn on it.
+nlohmann::json ChangeHistoryJson(const std::vector<core::reviews::ReviewItem>& review_items,
+                                 const std::vector<std::string>& scope_element_ids) {
+    nlohmann::json entries = nlohmann::json::array();
+    for (const core::reviews::ReviewItem& item : review_items) {
+        if (std::find(scope_element_ids.begin(), scope_element_ids.end(), item.element_id) == scope_element_ids.end())
+            continue;
+        entries.push_back({
+            {"element_id", item.element_id},
+            {"title", item.title},
+            {"message", item.message},
+            {"severity", item.severity},
+            {"reviewer", item.reviewer_name},
+            {"status", core::reviews::ReviewItemStatusToString(item.status)},
+            {"guideline_ids", StringVectorToJson(item.guideline_ids)},
+            {"created_utc", item.created_utc},
+        });
+    }
+    return entries;
+}
+
+} // namespace
+
 bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                                  const core::AssuranceTree& tree,
                                  const std::string& selected_element_id,
                                  const parser::ReviewProfile* review_profile,
                                  AiReviewDataPackageBundle& out_packages,
-                                 std::string& out_error) {
+                                 std::string& out_error,
+                                 const AiReviewCaseContext* case_context) {
     out_packages = {};
     const parser::SacmElement* selected = FindSacmElement(assurance_case, selected_element_id);
     if (!selected) {
@@ -582,15 +672,75 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                 out_packages, "EVIDENCE_PATH", {{"path_elements", path_elements}, {"evidence_items", evidence_items}});
     }
 
+    const nlohmann::json glossary = ProjectGlossaryJson(assurance_case);
+    if (!glossary.empty()) {
+        AddPackage(out_packages, "PROJECT_GLOSSARY", {{"terms", glossary}});
+    } else {
+        AddUnavailable(
+            out_packages, "PROJECT_GLOSSARY", "This case defines no terms yet.", false, DataPackageAbsence::Empty);
+    }
+
+    if (case_context != nullptr) {
+        // Scoped to the elements the packages carry, so a review is shown the
+        // history of what it is reading and not of the whole case.
+        std::vector<std::string> scope_ids{selected_element_id};
+        for (const AiReviewDataPackage& package : out_packages.available) {
+            const nlohmann::json parsed = nlohmann::json::parse(package.json, nullptr, false);
+            if (!parsed.is_discarded())
+                CollectElementIdsFrom(parsed, scope_ids);
+        }
+        const nlohmann::json history = ChangeHistoryJson(case_context->review_items, scope_ids);
+        if (!history.empty()) {
+            AddPackage(out_packages, "CHANGE_HISTORY", {{"review_items", history}});
+        } else {
+            AddUnavailable(out_packages,
+                           "CHANGE_HISTORY",
+                           "Nothing under review has been reviewed before.",
+                           false,
+                           DataPackageAbsence::Empty);
+        }
+
+        if (!case_context->user_review_intent.empty()) {
+            AddPackage(out_packages, "USER_REVIEW_INTENT", {{"intent", case_context->user_review_intent}});
+        }
+    }
+
+    if (!HasPackage(out_packages, "USER_REVIEW_INTENT")) {
+        AddUnavailable(out_packages,
+                       "USER_REVIEW_INTENT",
+                       "The reviewer did not state a particular concern for this run.",
+                       false,
+                       DataPackageAbsence::Empty);
+    }
+
+    // The two with no source in the tool at all, named so their absence is a
+    // stated limitation rather than a silent one.
+    AddUnavailable(out_packages,
+                   "EVIDENCE_BASIS",
+                   "Assurance Forge does not hold the coverage, thresholds, scenarios or limitations "
+                   "behind an evidence item. The route is the evidence register, once it links the "
+                   "artifact itself; sharing a linked item with a review will then be a per-item "
+                   "decision, so this package will often be partly withheld rather than absent.",
+                   true,
+                   DataPackageAbsence::NotImplemented);
+    AddUnavailable(out_packages,
+                   "STANDARD_LINKS",
+                   "Assurance Forge does not model links to external standard requirements.",
+                   false,
+                   DataPackageAbsence::NotImplemented);
+
     if (review_profile) {
         auto mark_missing = [&](const std::vector<std::string>& package_ids, bool required) {
             for (const std::string& package_id : package_ids) {
                 if (HasPackage(out_packages, package_id))
                     continue;
+                if (HasUnavailable(out_packages, package_id))
+                    continue;
                 AddUnavailable(out_packages,
                                package_id,
                                "Assurance Forge does not have this data package available yet.",
-                               required);
+                               required,
+                               DataPackageAbsence::NotImplemented);
             }
         };
         mark_missing(review_profile->required_data, true);
@@ -646,6 +796,10 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         "one's stated interpretation: a candidate still needs your judgement, and a check reported not_run "
         "was never performed, which is not the same as passing.\n"
         "Treat unavailable data packages as unavailable; do not assume their contents.\n"
+        "An unavailable package says why: not_implemented means this tool has no source for it, empty means "
+        "the case holds none, and withheld means it exists and was deliberately not shared. Withheld is not "
+        "absent -- say so when a judgement is bounded by what you were not shown, rather than concluding the "
+        "data does not exist.\n"
         "Do not claim that a rule is violated unless the provided data supports that finding.\n"
         "If there is no clear violation, return an empty findings array.\n"
         "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"

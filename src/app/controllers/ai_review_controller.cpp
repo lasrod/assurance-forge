@@ -293,12 +293,20 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
 
     review::AiReviewDataPackageBundle data_packages;
     std::string data_package_error;
+    // What the tool knows beyond the argument: prior findings, which is what
+    // SU.4, SU.5 and SU.11 turn on. Every item rather than the selected
+    // element's, because the collector scopes them to what the data packages
+    // actually carry -- a challenge standing against the parent claim is part of
+    // this review's history, and filtering here would hide it.
+    review::AiReviewCaseContext case_context;
+    case_context.review_items = review_controller_.Items();
     if (!review::CollectAiReviewDataPackages(*assurance_case,
                                              current_tree,
                                              selected_element_id,
                                              guideline_selection.review_profile,
                                              data_packages,
-                                             data_package_error)) {
+                                             data_package_error,
+                                             &case_context)) {
         ReplaceAiReviewWithSingleItem(
             review_controller_,
             selected_element_id,
