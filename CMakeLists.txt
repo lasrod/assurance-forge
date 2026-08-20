@@ -443,6 +443,7 @@ add_executable(tests
     tests/test_ai_service.cpp
     tests/test_secret_store.cpp
     tests/test_ai_claim_review.cpp
+    tests/test_patch_operation_parsing.cpp
     tests/test_openai_provider.cpp
     tests/test_ai_task_runner.cpp
     tests/test_guidelines_parser.cpp

@@ -818,3 +818,68 @@ TEST(AgentRequestHandler, EverySccgFindingCarriesTheRuleAndAPointerToIt) {
     EXPECT_NE(checked.value("note", "").find("does not mean"), std::string::npos)
         << "the result must say plainly that no findings is not conformance";
 }
+
+// Reported from a real session: an agent asked to build a glossary staged six
+// terms, every call succeeded, and the accepted argument came out with six
+// terms carrying a word and no definition. The definitions had been sent under
+// a key the parser does not read, and staging reported success over the drop.
+// The batch is refused now, and the refusal says where a definition belongs.
+TEST(AgentRequestHandler, StagingATermWhoseDefinitionUsesAnUnreadKeyIsRefused) {
+    TempDir workspace{UniqueTempPath("term-definition-key")};
+    core::AppState state;
+    ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
+
+    core::drafts::DraftWorkspaceStore drafts;
+    drafts.SetProjectRoot(workspace.path);
+    std::string error;
+    ASSERT_TRUE(drafts.Open(state.loaded_file_path, state.loaded_case.value(), error)) << error;
+
+    app::AgentRequestContext context{state, workspace.path.string(), "MCP test client", {}};
+    context.draft_workspace = &drafts;
+    context.connection_id = 63;
+    context.source_session_id = "stable-mcp-session-63";
+    context.current_argument_view = [&] {
+        const core::drafts::DraftWorkspace* draft = drafts.workspace();
+        if (draft == nullptr || !draft->has_active_groups())
+            return app::AgentArgumentView{&state.loaded_case.value(), nullptr};
+        const core::drafts::DraftMaterializationResult& materialized =
+            drafts.Materialize(state.loaded_case.value(), state.case_revision);
+        return app::AgentArgumentView{&materialized.working_model, draft, true};
+    };
+
+    const bridge::Response begun =
+        app::HandleAgentRequest(MakeRequest("begin_change_group",
+                                            {{"title", "Define the terms the argument leans on"},
+                                             {"rationale", "The claims use terms of art that are nowhere defined."},
+                                             {"expected_working_revision", 0}}),
+                                context);
+    ASSERT_TRUE(begun.ok);
+    ASSERT_FALSE(begun.result.value("isError", true)) << begun.result.dump();
+    const std::string group_id = begun.result["group_id"].get<std::string>();
+    const std::uint64_t begun_revision = begun.result["working_revision"].get<std::uint64_t>();
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest("stage_operations",
+                    {{"group_id", group_id},
+                     {"expected_working_revision", begun_revision},
+                     {"operations",
+                      nlohmann::json::array({{{"type", "CreateTerm"},
+                                              {"create_ref", "$alarp"},
+                                              {"text", "ALARP"},
+                                              {"definition", "As low as reasonably practicable."}}})}}),
+        context);
+
+    ASSERT_TRUE(staged.ok);
+    EXPECT_TRUE(staged.result.value("isError", false))
+        << "a definition the tool will not store must not be reported as staged: " << staged.result.dump();
+    const std::string message = staged.result.dump();
+    EXPECT_NE(message.find("definition"), std::string::npos) << message;
+    EXPECT_NE(message.find("new_value"), std::string::npos)
+        << "the refusal must say where the definition belongs: " << message;
+
+    // Nothing staged, so nothing to accept: the group is exactly as it was.
+    const bridge::Response described =
+        app::HandleAgentRequest(MakeRequest("describe_change_group", {{"group_id", group_id}}), context);
+    ASSERT_TRUE(described.ok);
+    EXPECT_EQ(described.result.value("operation_count", -1), 0) << described.result.dump();
+}

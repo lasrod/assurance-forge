@@ -185,12 +185,26 @@ const char* PatchOperationTypeToString(PatchOperationType type) {
 
 namespace {
 
-std::string StringArgument(const nlohmann::json& arguments, const char* key) {
-    const nlohmann::json::const_iterator found = arguments.find(key);
-    if (found == arguments.end() || !found->is_string()) {
-        return {};
+// A scalar field, refused when it is present with the wrong type.
+//
+// It replaces a reader that returned an empty string for anything that was not a
+// string, so `"new_value": 123` reached the applier as "no value" and the
+// operation applied nothing while reporting success -- the same silent drop as a
+// key the parser does not read, arriving through a key it does. Absent and null
+// still mean absent: the operation type decides what it needs.
+bool RequireStringField(const nlohmann::json& source, const char* key, std::string& out, std::string& error) {
+    const nlohmann::json::const_iterator found = source.find(key);
+    if (found == source.end() || found->is_null()) {
+        out.clear();
+        return true;
     }
-    return found->get<std::string>();
+    if (!found->is_string()) {
+        error = std::string("\"") + key + "\" must be a string, not " + found->type_name() +
+                ". The value would otherwise be dropped and the operation would apply nothing.";
+        return false;
+    }
+    out = found->get<std::string>();
+    return true;
 }
 
 bool ParseElementRef(const nlohmann::json& source,
@@ -263,12 +277,73 @@ bool ParseTranslations(const nlohmann::json& source, std::map<std::string, std::
     return true;
 }
 
+// Every key an operation may carry.
+//
+// An operation is a change to a safety argument, and a key this parser does not
+// know is a change the caller believes it asked for and will not get. A
+// CreateTerm carrying {"definition": "..."} instead of "new_value" parsed
+// cleanly, reported success, and produced a term with no definition -- the
+// glossary then showed the word with an empty Definition column, and nothing
+// anywhere said the definition had been dropped. Silence is the wrong answer
+// here: refusing costs a retry, accepting costs a definition nobody knows is
+// missing.
+bool RejectUnknownOperationKeys(const nlohmann::json& source, std::string& error) {
+    static const std::set<std::string> kAcceptedKeys = {
+        "create_ref",
+        "element",
+        "field",
+        "new_value",
+        "old_value",
+        "source",
+        "target",
+        "text",
+        "translations",
+        "type",
+    };
+    // Where the value the caller supplied actually belongs. Only for keys that
+    // name something real -- a typo gets the list and nothing more.
+    static const std::unordered_map<std::string, std::string> kRedirects = {
+        {"definition",
+         "A term's definition goes in \"new_value\" on CreateTerm, or in an UpdateTerm with \"field\": "
+         "\"definition\"."},
+        {"description",
+         "An element's description is its text: use \"text\" on a create, or \"new_value\" on "
+         "UpdateElementText."},
+        {"value", "A term's value is its \"text\" on CreateTerm."},
+        {"name", "A name goes in \"new_value\" on UpdateElementName, or \"text\" on CreateCategory."},
+        {"id", "Name an element as \"element\": {\"id\": \"G1\"}, not by a bare \"id\"."},
+    };
+
+    for (nlohmann::json::const_iterator it = source.begin(); it != source.end(); ++it) {
+        if (kAcceptedKeys.count(it.key()) > 0)
+            continue;
+
+        error = "Unknown key \"" + it.key() + "\" in an operation. Accepted keys: ";
+        bool first = true;
+        for (const std::string& key : kAcceptedKeys) {
+            if (!first)
+                error += ", ";
+            error += key;
+            first = false;
+        }
+        error += ".";
+        const std::unordered_map<std::string, std::string>::const_iterator redirect = kRedirects.find(it.key());
+        if (redirect != kRedirects.end())
+            error += " " + redirect->second;
+        return false;
+    }
+    return true;
+}
+
 bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& out, std::string& error) {
     if (!source.is_object()) {
         error = "Each operation must be an object.";
         return false;
     }
-    const std::string type = StringArgument(source, "type");
+    std::string type;
+    if (!RequireStringField(source, "type", type, error)) {
+        return false;
+    }
     if (type.empty()) {
         error = "Each operation needs a \"type\".";
         return false;
@@ -278,20 +353,29 @@ bool ParsePatchOperationJsonImpl(const nlohmann::json& source, PatchOperation& o
         return false;
     }
 
+    if (!RejectUnknownOperationKeys(source, error)) {
+        return false;
+    }
+
     if (!ParseElementRef(source, "element", out.element, error) ||
         !ParseElementRef(source, "source", out.source, error) ||
         !ParseElementRef(source, "target", out.target, error)) {
         return false;
     }
 
-    const std::string create_ref = StringArgument(source, "create_ref");
+    std::string create_ref;
+    if (!RequireStringField(source, "create_ref", create_ref, error)) {
+        return false;
+    }
     if (!create_ref.empty()) {
         out.create_ref = create_ref;
     }
-    out.field = StringArgument(source, "field");
-    out.old_value = StringArgument(source, "old_value");
-    out.new_value = StringArgument(source, "new_value");
-    out.text = StringArgument(source, "text");
+    if (!RequireStringField(source, "field", out.field, error) ||
+        !RequireStringField(source, "old_value", out.old_value, error) ||
+        !RequireStringField(source, "new_value", out.new_value, error) ||
+        !RequireStringField(source, "text", out.text, error)) {
+        return false;
+    }
     if (!ParseTranslations(source, out.translations, error)) {
         return false;
     }
