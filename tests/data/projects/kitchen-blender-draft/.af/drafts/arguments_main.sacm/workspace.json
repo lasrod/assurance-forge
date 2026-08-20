@@ -1,0 +1,98 @@
+{
+  "schema": "assurance-forge.draft-workspace.v2",
+  "id": "example-kitchen-blender-active-draft",
+  "argument_file": "",
+  "base_model_hash": "sha256:c3020c1917e29a28de0ca6d520537fac75263ce8d80cd5a12c22ca1d619bffc2",
+  "working_revision": 6,
+  "next_sequence": 4,
+  "state": "active",
+  "groups": [
+    {
+      "id": "mcp-thermal-cutout",
+      "sequence": 1,
+      "title": "Add thermal cut-out claim",
+      "summary": "Add an explicit thermal protection sub-claim under G5.",
+      "rationale": "Make the thermal protection mechanism reviewable in the argument.",
+      "source": "mcp",
+      "source_label": "Claude Code",
+      "source_session_id": "example-mcp-session",
+      "created_utc": "2026-08-02T00:00:00Z",
+      "updated_utc": "2026-08-02T00:01:00Z",
+      "state": "ready",
+      "operations": [
+        {
+          "type": "CreateClaim",
+          "create_ref": "$thermal_cutout",
+          "text": "A thermal cut-out interrupts motor power before the winding reaches its rated temperature."
+        },
+        {
+          "type": "AddSupportedBy",
+          "source_ref": "$thermal_cutout",
+          "target_id": "G5"
+        }
+      ],
+      "generated_ids": {
+        "$thermal_cutout": "G7"
+      },
+      "guideline_ids": [],
+      "review_item_ids": [],
+      "depends_on_group_ids": []
+    },
+    {
+      "id": "sccg-top-goal-clarification",
+      "sequence": 2,
+      "title": "Clarify the top-level safety claim",
+      "summary": "Make the scope of the top goal explicit.",
+      "rationale": "The original wording leaves intended use and foreseeable misuse implicit.",
+      "source": "sccg_ai_review",
+      "source_label": "SCCG AI Review",
+      "source_session_id": "example-sccg-review",
+      "created_utc": "2026-08-02T00:02:00Z",
+      "updated_utc": "2026-08-02T00:03:00Z",
+      "state": "ready",
+      "operations": [
+        {
+          "type": "UpdateElementText",
+          "element_id": "G1",
+          "field": "content",
+          "new_value": "The kitchen blender is acceptably safe throughout intended use and reasonably foreseeable misuse."
+        }
+      ],
+      "generated_ids": {},
+      "guideline_ids": ["CL.2"],
+      "review_item_ids": [],
+      "depends_on_group_ids": []
+    },
+    {
+      "id": "human-scope-adjustment",
+      "sequence": 3,
+      "title": "Adjust scope and operating context",
+      "summary": "Refine the AI wording and clarify the household context.",
+      "rationale": "Record the reviewer’s preferred scope before promotion.",
+      "source": "human",
+      "source_label": "Jesper",
+      "source_session_id": "example-human-session",
+      "created_utc": "2026-08-02T00:04:00Z",
+      "updated_utc": "2026-08-02T00:05:00Z",
+      "state": "ready",
+      "operations": [
+        {
+          "type": "UpdateElementText",
+          "element_id": "G1",
+          "field": "content",
+          "new_value": "The kitchen blender is acceptably safe for household use throughout its intended service life."
+        },
+        {
+          "type": "UpdateElementText",
+          "element_id": "C1",
+          "field": "content",
+          "new_value": "Household countertop blender used by adults in accordance with the supplied instructions."
+        }
+      ],
+      "generated_ids": {},
+      "guideline_ids": [],
+      "review_item_ids": [],
+      "depends_on_group_ids": []
+    }
+  ]
+}

@@ -5,3 +5,11 @@
 .githooks/** text eol=lf
 # SACM XMI fixtures are byte-compared against writer output (LF).
 *.xmi text eol=lf
+
+# The project fixtures record a sha256 over their own bytes -- `rawHash` in
+# `af.proj`, `base_model_hash` in the draft workspace. A CRLF checkout changes
+# those bytes, so project health reports a file modified outside the tool and the
+# byte-identical baseline stops holding, on Windows only. The `examples`
+# submodule carries these rules and that is why the fixtures are LF today;
+# moving them here must not leave the rules behind.
+tests/data/projects/** text eol=lf
