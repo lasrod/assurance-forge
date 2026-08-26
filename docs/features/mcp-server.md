@@ -229,10 +229,20 @@ badged `draft`, with the fields that differ, under a notice counting the
 unaccepted glossary changes; a glossary the draft itself created is shown even
 though the accepted case has none. A term is deliberately not a GSN node, so
 unlike an argument change there is no canvas rendering to read it from — the
-tab is where it is read. While a draft document exists the tab's editing
-controls are disabled and every in-application glossary edit is refused with a
-reason: those edits write to the accepted document, which the draft no longer
-descends from, and accepting the draft would silently undo them.
+tab is where it is read. While a draft document exists, the terms and
+categories the user adds, changes or deletes in that tab go **into the draft**,
+expressed as the same `CreateTerm` / `UpdateTerm` / `RemoveTerm` /
+`CreateCategory` / `UpdateCategory` operations a client sends and applied
+through the same seams — one operation per field that changed, so a human's
+edit is accepted or refused by the model that will hold it, exactly as a
+client's is, and the tab says so above its controls. What that vocabulary
+cannot express — a terminology package's own name and description, deleting a
+package or a category, linking a term to an element as context — writes to the
+accepted document, which the draft no longer descends from, and is refused with
+a reason until the draft is accepted or discarded, because accepting the draft
+would silently undo it. A new term or category made in the tab lands in the
+case's first glossary, the rule `CreateTerm` follows; with another glossary
+selected the tab says so rather than filing the term somewhere unchosen.
 
 When the case has no `terminologyPackage`, accepting the first `CreateTerm`
 creates one under the root assurance case package rather than refusing — a case

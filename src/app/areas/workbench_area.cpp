@@ -420,14 +420,18 @@ ui::panels::TerminologyPackagePanelModel BuildTerminologyPackagePanelModel(AppRu
         model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
     }
 
-    // The same rule the actions enforce, stated on the tab so the user learns it
-    // from a disabled button rather than from a refused click.
+    // The same rules the actions enforce, stated on the tab so the user learns
+    // them before the first click rather than from a refused one: term and
+    // category edits go into the draft; the package's own fields and a category
+    // delete wait for the draft to be accepted or discarded.
     std::string locked_reason;
-    if (actions::detail::GlossaryEditsBlockedByDraft(state, locked_reason)) {
-        model.editing_locked = true;
+    if (actions::detail::AcceptedGlossaryEditBlockedByDraft(
+            state, AF_TR("Editing the package or deleting a category"), locked_reason)) {
+        model.draft_edit_notice = actions::detail::GlossaryDraftEditNotice();
+        model.package_edits_locked = true;
         // The helper's wording, already translated: one sentence for the tab and
         // the status line, so the two cannot drift apart.
-        model.editing_locked_reason = locked_reason;
+        model.package_edits_locked_reason = locked_reason;
     }
     CollectGlossaryDraftMarks(state, model);
     return model;

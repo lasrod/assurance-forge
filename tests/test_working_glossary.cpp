@@ -3,12 +3,14 @@
 #include "app/actions/terminology_actions.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "core/audit/audit_store.h"
 #include "core/commands/command_bus.h"
 #include "core/drafts/draft_change_index.h"
 #include "core/drafts/draft_operation_apply.h"
 #include "core/reviews/review_proposal.h"
 #include "core/terminology_package_service.h"
+#include "ui/imgui_buffer_utils.h"
 #include "ui/panels/terminology_package_panel.h"
 
 #include <gtest/gtest.h>
@@ -34,8 +36,11 @@
 // divergence banner over the accept itself.
 //
 // The property under test: the terminology tab describes the same argument the
-// canvas draws, says when what it shows is a draft, and cannot be used to edit
-// the accepted document out from under that draft.
+// canvas draws, says when what it shows is a draft, and the user's own glossary
+// edits go INTO that draft -- through the operations an MCP client sends --
+// rather than into the accepted document out from under it. What the draft
+// cannot express (packages, category deletion, term-as-context links) is
+// refused with a reason until the draft is accepted or discarded.
 
 namespace {
 
@@ -202,6 +207,52 @@ const ui::panels::TerminologyDraftMark* FindMark(const ui::panels::TerminologyPa
 }
 
 const core::TerminologyPackageRef kGlossaryRef{"TP1", "gid-TP1"};
+const core::TerminologyTermRef kAlarpRef{"T1", "gid-T1"};
+
+void SetBuffer(char* buffer, std::size_t size, const std::string& value) {
+    ui::CopyToBuffer(buffer, size, value);
+}
+
+// The term editor filled the way a user fills it.
+void FillTermEditor(app::AppRuntimeState& state,
+                    const std::string& value,
+                    const std::string& definition,
+                    const std::string& external_reference = {}) {
+    SetBuffer(state.terminology.term_value_buf, sizeof(state.terminology.term_value_buf), value);
+    SetBuffer(state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), definition);
+    SetBuffer(state.terminology.term_external_reference_buf,
+              sizeof(state.terminology.term_external_reference_buf),
+              external_reference);
+}
+
+const sacm::TerminologyPackage* AcceptedGlossary(app::AppRuntimeState& state) {
+    return core::FindTerminologyPackage(state.app_state.projected_package(), kGlossaryRef);
+}
+
+// The draft's glossary as the tab shows it, refreshed for the draft's revision.
+const sacm::TerminologyPackage* DraftGlossary(app::AppRuntimeState& state) {
+    return app::areas::BuildTerminologyPackagePanelModel(state).package;
+}
+
+struct StatusLog {
+    std::vector<std::string> messages;
+    app::AppEvents::SubscriptionId subscription;
+    app::AppRuntimeState& state;
+
+    explicit StatusLog(app::AppRuntimeState& runtime_state) : state(runtime_state) {
+        subscription = state.events.Subscribe<app::StatusMessageEvent>(
+            [this](const app::StatusMessageEvent& event) { messages.push_back(event.message); });
+    }
+    ~StatusLog() {
+        state.events.Unsubscribe(subscription);
+    }
+
+    bool AllMention(std::string_view needle) const {
+        return !messages.empty() && std::all_of(messages.begin(), messages.end(), [needle](const std::string& m) {
+            return m.find(needle) != std::string::npos;
+        });
+    }
+};
 
 } // namespace
 
@@ -233,8 +284,9 @@ TEST(WorkingGlossary, TheTabShowsTheDraftsDefinitionMarkedAsDraft) {
     EXPECT_EQ(mark->change, core::drafts::DraftElementChange::Modified);
     EXPECT_NE(std::find(mark->fields.begin(), mark->fields.end(), "description"), mark->fields.end());
     EXPECT_FALSE(model.working_draft_notice.empty());
-    EXPECT_TRUE(model.editing_locked);
-    EXPECT_FALSE(model.editing_locked_reason.empty());
+    EXPECT_FALSE(model.draft_edit_notice.empty()) << "the tab says where an edit goes before the first click";
+    EXPECT_TRUE(model.package_edits_locked);
+    EXPECT_FALSE(model.package_edits_locked_reason.empty());
 }
 
 TEST(WorkingGlossary, WithoutADraftTheTabShowsTheAcceptedGlossaryUnlocked) {
@@ -251,13 +303,14 @@ TEST(WorkingGlossary, WithoutADraftTheTabShowsTheAcceptedGlossaryUnlocked) {
     EXPECT_EQ(FindTerm(*model.package, "T1")->description, kAcceptedDefinition);
     EXPECT_TRUE(model.draft_marks.empty());
     EXPECT_TRUE(model.working_draft_notice.empty());
-    EXPECT_FALSE(model.editing_locked);
+    EXPECT_TRUE(model.draft_edit_notice.empty());
+    EXPECT_FALSE(model.package_edits_locked);
 }
 
 // A draft that has changed nothing is indistinguishable from no draft for what
-// is SHOWN -- but it still exists, so editing the accepted glossary would still
-// be undone by accepting it.
-TEST(WorkingGlossary, AnUnchangedDraftShowsTheAcceptedGlossaryButStillLocksEditing) {
+// is SHOWN -- but it still exists, so an edit still belongs in it: made to the
+// accepted glossary instead, it would be undone by accepting the draft.
+TEST(WorkingGlossary, AnUnchangedDraftShowsTheAcceptedGlossaryButStillTakesTheEdits) {
     std::unique_ptr<GlossaryFixture> fixture = MakeFixture("unchanged", kGlossarySacm);
     app::AppRuntimeState state;
     OpenProject(state, *fixture);
@@ -268,7 +321,8 @@ TEST(WorkingGlossary, AnUnchangedDraftShowsTheAcceptedGlossaryButStillLocksEditi
     const ui::panels::TerminologyPackagePanelModel model = app::areas::BuildTerminologyPackagePanelModel(state);
     EXPECT_TRUE(model.draft_marks.empty());
     EXPECT_TRUE(model.working_draft_notice.empty());
-    EXPECT_TRUE(model.editing_locked);
+    EXPECT_FALSE(model.draft_edit_notice.empty());
+    EXPECT_TRUE(model.package_edits_locked);
 }
 
 // A case with no glossary grows its first one in the draft. Nothing in the
@@ -290,71 +344,228 @@ TEST(WorkingGlossary, AGlossaryTheDraftCreatesIsShownWithoutAnAcceptedCounterpar
     EXPECT_EQ(mark->change, core::drafts::DraftElementChange::Added);
 }
 
-// The other half of showing the draft: the glossary actions still write to the
-// accepted document, and while a draft exists that document is not what the
-// user is looking at. An edit made to it would be silently undone by the
-// accept, so every glossary write is refused with a reason, and no editor
-// opens onto it.
-TEST(WorkingGlossary, GlossaryEditsAreRefusedWhileADraftIsOpen) {
+// The other half of showing the draft: the user's own glossary edits go into
+// it. A term added in the tab while a draft is open lands in the draft
+// document -- and in its recovery file on disk -- while the accepted glossary
+// and its audit log stay exactly as they were, the same way an MCP client's
+// CreateTerm does.
+TEST(WorkingGlossary, ATermAddedInTheTabGoesIntoTheDraftNotTheAcceptedGlossary) {
+    std::unique_ptr<GlossaryFixture> fixture = MakeFixture("add_term", kGlossarySacm);
+    app::AppRuntimeState state;
+    OpenProject(state, *fixture);
+    OpenDraft(state, *fixture);
+    state.terminology.selected_package_ref = kGlossaryRef;
+    StatusLog statuses(state);
+
+    app::actions::TerminologyActions actions(state);
+    actions.BeginAddTerm();
+    ASSERT_TRUE(state.terminology.show_term_editor_modal) << "the editor opens: the edit can be made";
+    FillTermEditor(state, "hazard", "A system state that could lead to harm.", "ISO 26262-1:2018, 3.75");
+    ASSERT_TRUE(actions.ConfirmTermEdit());
+    EXPECT_FALSE(state.terminology.show_term_editor_modal);
+    EXPECT_TRUE(statuses.AllMention("working draft")) << "the status says where the term went";
+
+    // In the draft, with every field the editor carried.
+    const sacm::TerminologyPackage* draft = DraftGlossary(state);
+    ASSERT_NE(draft, nullptr);
+    ASSERT_EQ(draft->terms.size(), 2u);
+    const sacm::Term* added = FindTerm(*draft, state.terminology.selected_term_ref.id);
+    ASSERT_NE(added, nullptr) << "the new term is selected";
+    EXPECT_EQ(added->value, "hazard");
+    EXPECT_EQ(added->description, "A system state that could lead to harm.");
+    EXPECT_EQ(added->externalReference, "ISO 26262-1:2018, 3.75");
+    const ui::panels::TerminologyPackagePanelModel model = app::areas::BuildTerminologyPackagePanelModel(state);
+    const ui::panels::TerminologyDraftMark* mark = FindMark(model, added->id);
+    ASSERT_NE(mark, nullptr);
+    EXPECT_EQ(mark->change, core::drafts::DraftElementChange::Added);
+
+    // Not in the accepted glossary, not in the audit log, and the recovery
+    // copy of the draft is on disk.
+    ASSERT_NE(AcceptedGlossary(state), nullptr);
+    EXPECT_EQ(AcceptedGlossary(state)->terms.size(), 1u);
+    EXPECT_TRUE(state.command_bus->Store().Transactions().empty());
+    EXPECT_TRUE(std::filesystem::exists(state.draft_document.path()));
+}
+
+// Editing sends one operation per field that changed, so revising a definition
+// leaves the external reference and the category exactly as the seams hold
+// them -- and the editor opens on the DRAFT's text, not the accepted one.
+TEST(WorkingGlossary, EditingATermInTheDraftRevisesOnlyTheChangedFields) {
+    std::unique_ptr<GlossaryFixture> fixture = MakeFixture("edit_term", kGlossarySacm);
+    app::AppRuntimeState state;
+    OpenProject(state, *fixture);
+    OpenDraft(state, *fixture);
+    StageIntoDraft(state, {RedefineTerm("T1", kDraftDefinition)});
+    state.terminology.selected_package_ref = kGlossaryRef;
+
+    app::actions::TerminologyActions actions(state);
+    ASSERT_TRUE(actions.BeginEditTerm(kAlarpRef));
+    ASSERT_TRUE(state.terminology.show_term_editor_modal);
+    EXPECT_STREQ(state.terminology.term_definition_buf, kDraftDefinition) << "the editor shows the draft's text";
+
+    const std::string revised = std::string(kDraftDefinition) + " Applies to residual risk.";
+    SetBuffer(state.terminology.term_definition_buf, sizeof(state.terminology.term_definition_buf), revised);
+    ASSERT_TRUE(actions.ConfirmTermEdit());
+
+    const sacm::TerminologyPackage* draft = DraftGlossary(state);
+    ASSERT_NE(draft, nullptr);
+    const sacm::Term* term = FindTerm(*draft, "T1");
+    ASSERT_NE(term, nullptr);
+    EXPECT_EQ(term->description, revised);
+    EXPECT_EQ(term->externalReference, "HSE R2P2, 2001");
+    ASSERT_EQ(term->category_refs.size(), 1u);
+    EXPECT_EQ(term->category_refs.front(), "CAT1");
+    EXPECT_EQ(FindTerm(*AcceptedGlossary(state), "T1")->description, kAcceptedDefinition);
+    EXPECT_TRUE(state.command_bus->Store().Transactions().empty());
+}
+
+TEST(WorkingGlossary, DeletingATermInTheDraftRemovesItFromTheDraftOnly) {
+    std::unique_ptr<GlossaryFixture> fixture = MakeFixture("delete_term", kGlossarySacm);
+    app::AppRuntimeState state;
+    OpenProject(state, *fixture);
+    OpenDraft(state, *fixture);
+    state.terminology.selected_package_ref = kGlossaryRef;
+
+    app::actions::TerminologyActions actions(state);
+    actions.BeginDeleteTerm(kAlarpRef);
+    ASSERT_TRUE(state.terminology.show_delete_term_modal);
+    EXPECT_TRUE(state.terminology.pending_delete_term_blockers.empty()) << "nothing references the term";
+    ASSERT_TRUE(actions.ConfirmDeleteTerm());
+    EXPECT_FALSE(state.terminology.show_delete_term_modal);
+
+    const sacm::TerminologyPackage* draft = DraftGlossary(state);
+    ASSERT_NE(draft, nullptr);
+    EXPECT_TRUE(draft->terms.empty());
+    EXPECT_EQ(AcceptedGlossary(state)->terms.size(), 1u);
+    EXPECT_TRUE(state.command_bus->Store().Transactions().empty());
+}
+
+TEST(WorkingGlossary, CategoriesAddedInTheTabGoIntoTheDraft) {
+    std::unique_ptr<GlossaryFixture> fixture = MakeFixture("add_category", kGlossarySacm);
+    app::AppRuntimeState state;
+    OpenProject(state, *fixture);
+    OpenDraft(state, *fixture);
+    state.terminology.selected_package_ref = kGlossaryRef;
+
+    app::actions::TerminologyActions actions(state);
+    actions.BeginAddCategory();
+    ASSERT_TRUE(state.terminology.show_category_editor_modal);
+    SetBuffer(state.terminology.category_name_buf, sizeof(state.terminology.category_name_buf), "Hazard / Risk");
+    actions.ConfirmCategoryEdit();
+    EXPECT_FALSE(state.terminology.show_category_editor_modal);
+
+    const sacm::TerminologyPackage* draft = DraftGlossary(state);
+    ASSERT_NE(draft, nullptr);
+    ASSERT_EQ(draft->categories.size(), 2u);
+    EXPECT_FALSE(state.terminology.selected_category_ref.id.empty()) << "the new category is selected";
+    EXPECT_EQ(AcceptedGlossary(state)->categories.size(), 1u);
+
+    // The recommended set lands as one batch, skipping the one that exists.
+    actions.SeedRecommendedCategories();
+    draft = DraftGlossary(state);
+    ASSERT_NE(draft, nullptr);
+    EXPECT_EQ(draft->categories.size(), 9u);
+    EXPECT_EQ(AcceptedGlossary(state)->categories.size(), 1u);
+    EXPECT_TRUE(state.command_bus->Store().Transactions().empty());
+}
+
+// What the draft's vocabulary cannot express stays refused: the package's own
+// fields, deleting the package or a category, and linking a term to an element
+// as context all write to the accepted document, which the draft no longer
+// descends from. Each refusal names the draft, and nothing reaches the accepted
+// document or its log.
+TEST(WorkingGlossary, PackageEditsAndCategoryDeletionAreRefusedWhileADraftIsOpen) {
     std::unique_ptr<GlossaryFixture> fixture = MakeFixture("refused", kGlossarySacm);
     app::AppRuntimeState state;
     OpenProject(state, *fixture);
     OpenDraft(state, *fixture);
     StageIntoDraft(state, {RedefineTerm("T1", kDraftDefinition)});
     state.terminology.selected_package_ref = kGlossaryRef;
-
-    std::vector<std::string> statuses;
-    const app::AppEvents::SubscriptionId subscription = state.events.Subscribe<app::StatusMessageEvent>(
-        [&statuses](const app::StatusMessageEvent& event) { statuses.push_back(event.message); });
+    StatusLog statuses(state);
 
     app::actions::TerminologyActions actions(state);
-    actions.BeginAddTerm();
-    EXPECT_FALSE(state.terminology.show_term_editor_modal);
-    EXPECT_FALSE(actions.BeginEditTerm(core::TerminologyTermRef{"T1", "gid-T1"}));
-    EXPECT_FALSE(state.terminology.show_term_editor_modal);
-    EXPECT_FALSE(actions.ConfirmTermEdit());
-    actions.BeginAddCategory();
-    EXPECT_FALSE(state.terminology.show_category_editor_modal);
-    actions.SeedRecommendedCategories();
-    actions.BeginDeleteTerm(core::TerminologyTermRef{"T1", "gid-T1"});
-    EXPECT_FALSE(state.terminology.show_delete_term_modal);
+    EXPECT_FALSE(actions.ApplyPackageEdits());
+    actions.BeginDeletePackage();
+    EXPECT_FALSE(state.terminology.show_delete_package_modal);
+    actions.BeginDeleteCategory(core::TerminologyCategoryRef{"CAT1", "gid-CAT1"});
+    EXPECT_FALSE(state.terminology.show_delete_category_modal);
+    EXPECT_FALSE(actions.AddVisibleTermContextFromCanvas("G1", kGlossaryRef, kAlarpRef));
+    EXPECT_FALSE(actions.AddTermAsContextFromCanvas("G1", kGlossaryRef, kAlarpRef));
+    EXPECT_TRUE(statuses.AllMention("working draft"));
+    EXPECT_EQ(statuses.messages.size(), 5u);
 
-    ASSERT_FALSE(statuses.empty());
-    for (const std::string& status : statuses)
-        EXPECT_NE(status.find("working draft"), std::string::npos) << status;
-
-    // Nothing reached the accepted document or its audit log.
     EXPECT_TRUE(state.command_bus->Store().Transactions().empty());
-    const sacm::TerminologyPackage* accepted =
-        core::FindTerminologyPackage(state.app_state.projected_package(), kGlossaryRef);
-    ASSERT_NE(accepted, nullptr);
-    EXPECT_EQ(accepted->categories.size(), 1u);
-    EXPECT_EQ(accepted->terms.size(), 1u);
+    ASSERT_NE(AcceptedGlossary(state), nullptr);
+    EXPECT_EQ(AcceptedGlossary(state)->categories.size(), 1u);
+    EXPECT_EQ(AcceptedGlossary(state)->terms.size(), 1u);
+
+    const ui::panels::TerminologyPackagePanelModel model = app::areas::BuildTerminologyPackagePanelModel(state);
+    EXPECT_TRUE(model.package_edits_locked);
+    EXPECT_NE(model.package_edits_locked_reason.find("working draft"), std::string::npos);
 
     // Reading is not editing: a term the canvas points at still opens.
-    EXPECT_TRUE(actions.OpenTermFromCanvas(kGlossaryRef, core::TerminologyTermRef{"T1", "gid-T1"}));
-    state.events.Unsubscribe(subscription);
+    EXPECT_TRUE(actions.OpenTermFromCanvas(kGlossaryRef, kAlarpRef));
 }
 
-// Once the draft is gone, the lock goes with it.
-TEST(WorkingGlossary, DiscardingTheDraftUnlocksEditing) {
+// A draft with no glossary grows its first one when the user defines a term
+// from the canvas, the way it does for an MCP client -- not in the accepted
+// document underneath the draft.
+TEST(WorkingGlossary, QuickDefiningATermInADraftWithNoGlossaryCreatesTheGlossaryInTheDraft) {
+    std::unique_ptr<GlossaryFixture> fixture = MakeFixture("quick_define", kNoGlossarySacm);
+    app::AppRuntimeState state;
+    OpenProject(state, *fixture);
+    OpenDraft(state, *fixture);
+
+    app::actions::TerminologyActions actions(state);
+    actions.BeginQuickDefineTerm("G1", "hazard");
+    ASSERT_TRUE(state.terminology.show_quick_define_term_modal);
+    EXPECT_TRUE(state.terminology.quick_define_target_package_ref.id.empty()) << "no glossary exists yet";
+    EXPECT_TRUE(state.app_state.projected_package().terminologyPackages.empty())
+        << "nothing was created in the accepted document";
+
+    SetBuffer(state.terminology.term_definition_buf,
+              sizeof(state.terminology.term_definition_buf),
+              "A system state that could lead to harm.");
+    ASSERT_TRUE(actions.ConfirmQuickDefineTerm(false));
+    EXPECT_FALSE(state.terminology.show_quick_define_term_modal);
+
+    const sacm::TerminologyPackage* draft = DraftGlossary(state);
+    ASSERT_NE(draft, nullptr) << "the draft's new glossary is what the tab shows";
+    ASSERT_EQ(draft->terms.size(), 1u);
+    EXPECT_EQ(draft->terms.front().value, "hazard");
+    EXPECT_EQ(state.terminology.selected_package_ref.id, draft->id);
+    EXPECT_EQ(state.terminology.selected_term_ref.id, draft->terms.front().id);
+    EXPECT_TRUE(state.app_state.projected_package().terminologyPackages.empty());
+    EXPECT_TRUE(state.command_bus->Store().Transactions().empty());
+}
+
+// Once the draft is gone, edits go to the accepted glossary again, through the
+// audited commands, and the package-level lock goes with it.
+TEST(WorkingGlossary, DiscardingTheDraftReturnsEditsToTheAcceptedGlossary) {
     std::unique_ptr<GlossaryFixture> fixture = MakeFixture("unlock", kGlossarySacm);
     app::AppRuntimeState state;
     OpenProject(state, *fixture);
     OpenDraft(state, *fixture);
     StageIntoDraft(state, {RedefineTerm("T1", kDraftDefinition)});
     state.terminology.selected_package_ref = kGlossaryRef;
-    ASSERT_TRUE(app::areas::BuildTerminologyPackagePanelModel(state).editing_locked);
+    ASSERT_TRUE(app::areas::BuildTerminologyPackagePanelModel(state).package_edits_locked);
 
     std::string warning;
     state.draft_document.Discard(warning);
 
     const ui::panels::TerminologyPackagePanelModel model = app::areas::BuildTerminologyPackagePanelModel(state);
-    EXPECT_FALSE(model.editing_locked);
+    EXPECT_FALSE(model.package_edits_locked);
+    EXPECT_TRUE(model.draft_edit_notice.empty());
     ASSERT_NE(model.package, nullptr);
     EXPECT_EQ(FindTerm(*model.package, "T1")->description, kAcceptedDefinition);
 
     app::actions::TerminologyActions actions(state);
     actions.BeginAddTerm();
-    EXPECT_TRUE(state.terminology.show_term_editor_modal);
+    ASSERT_TRUE(state.terminology.show_term_editor_modal);
+    FillTermEditor(state, "hazard", "A system state that could lead to harm.");
+    ASSERT_TRUE(actions.ConfirmTermEdit());
+    // The audited path re-derives the views at the next frame boundary.
+    app::commands::ApplyPendingLibraryRederive(state);
+    EXPECT_EQ(AcceptedGlossary(state)->terms.size(), 2u);
+    EXPECT_FALSE(state.command_bus->Store().Transactions().empty()) << "an accepted-glossary edit is audited";
 }

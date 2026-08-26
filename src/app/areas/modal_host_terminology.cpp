@@ -1,6 +1,7 @@
 #include "app/areas/modal_host_internal.h"
 
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "imgui.h"
@@ -39,16 +40,22 @@ bool SameTerminologyPackageRef(const core::TerminologyPackageRef& left, const co
     return false;
 }
 
-bool TermDefinitionHasDuplicate(const AppRuntimeState& state,
+// Every lookup below reads the WORKING package (ADR 0016): while a draft
+// differs from the accepted argument the editors act on the draft's glossary,
+// and a duplicate check or category list read from the accepted one would
+// describe a glossary the edit is not going to.
+bool TermDefinitionHasDuplicate(AppRuntimeState& state,
                                 const core::TerminologyPackageRef& package_ref,
                                 const std::string& value,
                                 const std::string& description,
                                 bool editing_existing_term,
                                 const core::TerminologyTermRef& selected_term_ref) {
-    if (value.empty() || description.empty() || !state.app_state.has_projected_package())
+    if (value.empty() || description.empty())
         return false;
-    const sacm::TerminologyPackage* package =
-        core::FindTerminologyPackage(state.app_state.projected_package(), package_ref);
+    const sacm::AssuranceCasePackage* working_package = state.WorkingPackage();
+    if (working_package == nullptr)
+        return false;
+    const sacm::TerminologyPackage* package = core::FindTerminologyPackage(*working_package, package_ref);
     if (!package)
         return false;
     for (const auto& term : package->terms) {
@@ -60,7 +67,7 @@ bool TermDefinitionHasDuplicate(const AppRuntimeState& state,
     return false;
 }
 
-bool CurrentTermDefinitionHasDuplicate(const AppRuntimeState& state,
+bool CurrentTermDefinitionHasDuplicate(AppRuntimeState& state,
                                        const std::string& value,
                                        const std::string& description) {
     return TermDefinitionHasDuplicate(state,
@@ -95,8 +102,8 @@ void SetCategoryChecked(AppRuntimeState& state, const sacm::Category& category, 
 
 void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::TerminologyPackageRef& package_ref) {
     const sacm::TerminologyPackage* package = nullptr;
-    if (state.app_state.has_projected_package()) {
-        package = core::FindTerminologyPackage(state.app_state.projected_package(), package_ref);
+    if (const sacm::AssuranceCasePackage* working_package = state.WorkingPackage()) {
+        package = core::FindTerminologyPackage(*working_package, package_ref);
     }
 
     ImGui::TextUnformatted(AF_TR("Categories").c_str());
@@ -179,12 +186,13 @@ std::string PackageDisplayLabel(const sacm::TerminologyPackage& package, const s
     return scope_label.empty() ? name : scope_label + ": " + name;
 }
 
-std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(const AppRuntimeState& state) {
+std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(AppRuntimeState& state) {
     std::vector<TerminologyPackageChoice> choices;
-    if (!state.app_state.has_projected_package())
+    const sacm::AssuranceCasePackage* working_package = state.WorkingPackage();
+    if (working_package == nullptr)
         return choices;
 
-    const sacm::AssuranceCasePackage& package = state.app_state.projected_package();
+    const sacm::AssuranceCasePackage& package = *working_package;
     for (const auto& terminology_package : package.terminologyPackages) {
         choices.push_back({TerminologyPackageRefFor(terminology_package),
                            PackageDisplayLabel(terminology_package, AF_TR("Assurance case"))});
@@ -349,8 +357,15 @@ void ModalHost::RenderQuickDefineTermModal() {
             (AF_TR("Create Term") + "###quick_define_term").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         RenderTermTextFields(state_);
 
+        // A draft with no glossary grows its first one when the term is created,
+        // the way it does for an MCP client -- so no glossary is not a blocker
+        // there, and saying "none available" would send the user to make one in
+        // the accepted document under the draft.
+        const bool draft_creates_glossary = package_choices.empty() && app::commands::DraftDocumentTakesEdits(state_);
         ImGui::TextUnformatted(AF_TR("Store in").c_str());
-        if (package_choices.empty()) {
+        if (draft_creates_glossary) {
+            ImGui::TextDisabled("%s", AF_TR("A glossary will be created in the working draft.").c_str());
+        } else if (package_choices.empty()) {
             ImGui::TextColored(ui::GetErrorColor(), "%s", AF_TR("No TerminologyPackage is available.").c_str());
         } else {
             const char* preview = package_choices[static_cast<std::size_t>(selected_package_index)].label.c_str();
@@ -377,11 +392,12 @@ void ModalHost::RenderQuickDefineTermModal() {
 
         const std::string value = TrimWhitespace(state_.terminology.term_value_buf);
         const std::string description = TrimWhitespace(state_.terminology.term_definition_buf);
+        const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
         const bool has_target_package =
-            HasTerminologyPackageRef(state_.terminology.quick_define_target_package_ref) &&
-            state_.app_state.has_projected_package() &&
-            core::FindTerminologyPackage(state_.app_state.projected_package(),
-                                         state_.terminology.quick_define_target_package_ref);
+            draft_creates_glossary ||
+            (HasTerminologyPackageRef(state_.terminology.quick_define_target_package_ref) &&
+             working_package != nullptr &&
+             core::FindTerminologyPackage(*working_package, state_.terminology.quick_define_target_package_ref));
         const bool can_create = !value.empty() && has_target_package;
         RenderTerminologyTermValidationMessages(
             value.empty(),

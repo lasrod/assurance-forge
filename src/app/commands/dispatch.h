@@ -2,9 +2,12 @@
 
 #include "app/app_runtime_state.h"
 #include "core/commands/command_bus.h"
+#include "core/reviews/review_proposal.h"
 
 #include <cstdint>
+#include <map>
 #include <string>
+#include <vector>
 
 // Bridges the app-actions layer to `core::commands::CommandBus`. Every
 // model mutation triggered by a menu action / button click should flow
@@ -56,5 +59,33 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
                                        core::commands::ICommand& command,
                                        const std::string& author = {},
                                        const core::audit::DraftPromotionRecord& draft_promotion = {});
+
+struct DraftEditOutcome {
+    bool success = false;
+    std::string error;
+    // `create_ref` -> the id the draft document allocated, for everything the
+    // batch created, so the caller can select what the user just made.
+    std::map<std::string, std::string> created_ids;
+};
+
+// True while the user's own edits belong in the working draft document rather
+// than the accepted argument (ADR 0016): a draft document exists, and an edit
+// made to the accepted document while it exists would be silently undone by
+// the accept -- the draft is a copy taken before the edit, and accepting it
+// replaces the file with that copy.
+bool DraftDocumentTakesEdits(const AppRuntimeState& state);
+
+// The draft-document counterpart of `DispatchAuditedCommand`: applies one
+// batch of the user's operations to the working draft through the same seams an
+// MCP client's operations go through, so a hand edit is accepted or refused by
+// the model that will hold it, in the gesture that made it. The batch is
+// all-or-nothing. On success the draft is saved to disk (a save failure is
+// reported on the status line, not as a refusal: the edit landed, only its
+// recovery copy did not) and the derived views are flagged for rebuild.
+//
+// Does NOT touch the accepted document, its audit log, or the dirty flag: an
+// unaccepted change is the draft's to carry until a human accepts it.
+DraftEditOutcome DispatchDraftDocumentEdit(AppRuntimeState& state,
+                                           const std::vector<core::reviews::PatchOperation>& operations);
 
 } // namespace app::commands

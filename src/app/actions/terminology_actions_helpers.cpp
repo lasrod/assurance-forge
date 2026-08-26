@@ -162,8 +162,12 @@ core::TerminologyPackageRef ResolveQuickDefineTargetPackage(const AppRuntimeStat
                                                             const std::string& element_id) {
     if (!state.app_state.has_projected_package())
         return {};
+    return ResolveQuickDefineTargetPackageIn(state, state.app_state.projected_package(), element_id);
+}
 
-    const sacm::AssuranceCasePackage& package = state.app_state.projected_package();
+core::TerminologyPackageRef ResolveQuickDefineTargetPackageIn(const AppRuntimeState& state,
+                                                              const sacm::AssuranceCasePackage& package,
+                                                              const std::string& element_id) {
     const sacm::ArgumentPackage* containing_argument_package = FindContainingArgumentPackage(package, element_id);
     if (HasTerminologyPackageRef(state.terminology.selected_package_ref) &&
         core::FindTerminologyPackage(package, state.terminology.selected_package_ref)) {
@@ -221,15 +225,23 @@ void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesyste
     state.sacm_package_tree_cache.erase(relative_path.generic_string());
 }
 
-bool GlossaryEditsBlockedByDraft(const AppRuntimeState& state, std::string& out_reason) {
+bool AcceptedGlossaryEditBlockedByDraft(const AppRuntimeState& state,
+                                        const std::string& gesture,
+                                        std::string& out_reason) {
     out_reason.clear();
-    if (!state.draft_document.active())
+    if (!app::commands::DraftDocumentTakesEdits(state))
         return false;
     // Translated here, once: the status line and the Terminology tab both show
     // this sentence, and a second copy of the literal is how they drift apart.
-    out_reason = AF_TR("Glossary editing is paused while a working draft is open. Accept or discard the draft from "
-                       "the argument canvas first.");
+    out_reason = ui::i18n::trf("{0} changes the accepted argument, which a working draft is open against. Accept or "
+                               "discard the draft from the argument canvas first.",
+                               gesture);
     return true;
+}
+
+std::string GlossaryDraftEditNotice() {
+    return AF_TR("Terms and categories you add, change or delete here go into the working draft until it is "
+                 "accepted.");
 }
 
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {

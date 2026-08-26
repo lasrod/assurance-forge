@@ -3,7 +3,9 @@
 #include "app/app_events.h"
 #include "core/audit/audit_event.h"
 #include "core/derived_views.h"
+#include "core/drafts/draft_operation_apply.h"
 #include "parser/xml_parser.h"
+#include "ui/i18n/localization.h"
 
 namespace app::commands {
 
@@ -143,6 +145,46 @@ DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
         state.app_state.refresh_tracked_file_hashes(state.app_state.loaded_file_path);
     }
     return {true, {}, result.sacm_written, result.transaction_sequence};
+}
+
+bool DraftDocumentTakesEdits(const AppRuntimeState& state) {
+    return state.draft_document.active() && state.app_state.library_document != nullptr;
+}
+
+DraftEditOutcome DispatchDraftDocumentEdit(AppRuntimeState& state,
+                                           const std::vector<core::reviews::PatchOperation>& operations) {
+    DraftEditOutcome outcome;
+    // Translated here: these reach the status line as the reason a term or
+    // category edit was refused, unlike the audited path's strings, which
+    // predate the catalog (#252).
+    if (!DraftDocumentTakesEdits(state)) {
+        outcome.error = AF_TR("There is no working draft to edit.");
+        return outcome;
+    }
+    if (IsActiveCanvasInHistoricalPreview(state)) {
+        outcome.error = AF_TR("Cannot edit while viewing history. Return to Latest to make changes.");
+        return outcome;
+    }
+
+    const core::drafts::DraftOperationResult applied =
+        core::drafts::ApplyOperationsToDraftDocument(*state.draft_document.document(), operations);
+    if (!applied.applied) {
+        outcome.error = applied.error;
+        return outcome;
+    }
+    state.draft_document.MarkChanged();
+    std::string save_error;
+    if (!state.draft_document.Save(save_error)) {
+        // The edit is in the draft; only the recovery copy of it is not. Said
+        // plainly rather than reported as a refusal, which would invite the
+        // user to repeat an edit that already landed.
+        state.events.Emit(StatusMessageEvent{
+            ui::i18n::trf("The edit was made, but the draft could not be written to disk: {0}", save_error)});
+    }
+    state.tree_needs_rebuild = true;
+    outcome.success = true;
+    outcome.created_ids = applied.created_ids;
+    return outcome;
 }
 
 void ApplyPendingLibraryRederive(AppRuntimeState& state) {

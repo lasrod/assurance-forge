@@ -76,6 +76,9 @@ msgstr "この変更が前提としていた変更が却下されたため、適
 msgid "A full editor for this SACM package type will be added in a later workflow."
 msgstr "この SACM パッケージ種別の完全なエディターは後のワークフローで追加されます。"
 
+msgid "A glossary will be created in the working draft."
+msgstr "用語集は作業ドラフトに作成されます。"
+
 msgid "A project named \"{0}\" is already in this folder. Choose another name."
 msgstr "このフォルダーには「{0}」という名前のプロジェクトが既にあります。別の名前を選んでください。"
 
@@ -256,6 +259,24 @@ msgstr "固定信頼度を追加"
 msgid "Added by the working draft; not yet accepted."
 msgstr "作業ドラフトで追加されました。まだ受理されていません。"
 
+msgid "Added category {0} to the working draft."
+msgstr "カテゴリ {0} を作業ドラフトに追加しました。"
+
+msgid "Added recommended terminology categories to the working draft."
+msgstr "推奨用語カテゴリを作業ドラフトに追加しました。"
+
+msgid "Added term {0} to the working draft."
+msgstr "用語 {0} を作業ドラフトに追加しました。"
+
+msgid "Added term {0} to the working draft. Adding it as context changes the accepted argument, so do that once the draft is accepted."
+msgstr "用語 {0} を作業ドラフトに追加しました。コンテキストとしての追加は受理済みの論証を変更するため、ドラフトの受理後に行ってください。"
+
+msgid "Adding a term as context"
+msgstr "用語をコンテキストとして追加すること"
+
+msgid "Adding a terminology package"
+msgstr "用語パッケージの追加"
+
 msgid "Advanced"
 msgstr "詳細"
 
@@ -417,6 +438,9 @@ msgstr "CSE 行"
 
 msgid "Cancel"
 msgstr "キャンセル"
+
+msgid "Cannot edit while viewing history. Return to Latest to make changes."
+msgstr "履歴の表示中は編集できません。変更するには「最新」に戻ってください。"
 
 msgid "Cannot reconcile audit log: active SACM file is no longer listed in the project."
 msgstr "監査ログを整合できません: 有効な SACM ファイルがプロジェクトに登録されていません。"
@@ -751,6 +775,15 @@ msgstr "この用語を削除しますか?"
 msgid "Delete this terminology package?"
 msgstr "この用語パッケージを削除しますか?"
 
+msgid "Deleted term {0} in the working draft."
+msgstr "作業ドラフトの用語 {0} を削除しました。"
+
+msgid "Deleting a category"
+msgstr "カテゴリの削除"
+
+msgid "Deleting a terminology package"
+msgstr "用語パッケージの削除"
+
 msgid "Deny"
 msgstr "拒否"
 
@@ -852,6 +885,12 @@ msgstr "編集可能な CAE 登録簿の内容は後のワークフローで実�
 
 msgid "Editable evidence register content will be implemented in a later workflow."
 msgstr "編集可能なエビデンス登録簿の内容は後のワークフローで実装されます。"
+
+msgid "Editing a terminology package"
+msgstr "用語パッケージの編集"
+
+msgid "Editing the package or deleting a category"
+msgstr "パッケージの編集またはカテゴリの削除"
 
 msgid "Edits are recorded in the proposal draft only."
 msgstr "編集は提案ドラフトにのみ記録されます。"
@@ -1033,9 +1072,6 @@ msgstr "生成済みレポート: {0}"
 msgid "Get started with Assurance Forge"
 msgstr "Assurance Forge の開始ガイド"
 
-msgid "Glossary editing is paused while a working draft is open. Accept or discard the draft from the argument canvas first."
-msgstr "作業ドラフトが開いている間、用語集の編集は一時停止されます。先に論証キャンバスでドラフトを受理または破棄してください。"
-
 msgid "Glossary:"
 msgstr "用語集:"
 
@@ -1158,6 +1194,9 @@ msgstr "選択した信頼度論証ツリーをリンク"
 
 msgid "Linked:"
 msgstr "リンク済み:"
+
+msgid "Linking a term to an element"
+msgstr "用語と要素の関連付け"
 
 msgid "Live"
 msgstr "ライブ"
@@ -2152,6 +2191,9 @@ msgstr "用語の提案"
 msgid "Terms"
 msgstr "用語"
 
+msgid "Terms and categories you add, change or delete here go into the working draft until it is accepted."
+msgstr "ここで追加・変更・削除した用語とカテゴリは、受理されるまで作業ドラフトに入ります。"
+
 msgid "Test Connection"
 msgstr "接続をテスト"
 
@@ -2232,6 +2274,9 @@ msgstr "作業ドラフトはこの要素を変更しません。NEW、EDIT、MU
 
 msgid "Theme"
 msgstr "テーマ"
+
+msgid "There is no working draft to edit."
+msgstr "編集できる作業ドラフトがありません。"
 
 msgid "There is nothing to reject."
 msgstr "却下できるものがありません。"
@@ -2404,6 +2449,12 @@ msgstr "無題の変更 ({0})"
 msgid "Update Key"
 msgstr "キーを更新"
 
+msgid "Updated category {0} in the working draft."
+msgstr "作業ドラフトのカテゴリ {0} を更新しました。"
+
+msgid "Updated term {0} in the working draft."
+msgstr "作業ドラフトの用語 {0} を更新しました。"
+
 msgid "Usage count: {0}"
 msgstr "使用回数: {0}"
 
@@ -2460,6 +2511,9 @@ msgstr "ようこそ!"
 
 msgid "When this is on, an AI client you launch yourself (such as Claude Desktop) can read the open project's safety case and save proposed changes for you to review. Proposals never change the case until you accept them. While this is off, nothing is shared."
 msgstr "これを有効にすると、自分で起動した AI クライアント（Claude Desktop など）が開いているプロジェクトのセーフティケースを読み取り、変更提案を保存できます。提案は承認するまでケースを変更しません。無効の間は何も共有されません。"
+
+msgid "While a working draft is open, new terms and categories go into the case's first glossary ({0}). Select it, or accept or discard the draft first."
+msgstr "作業ドラフトが開いている間、新しい用語とカテゴリはケースの最初の用語集（{0}）に入ります。それを選択するか、先にドラフトを受理または破棄してください。"
 
 msgid "Why: {0}"
 msgstr "理由: {0}"
@@ -2650,6 +2704,9 @@ msgstr "{0} 件破損"
 msgid "{0} change proposals no longer apply cleanly"
 msgstr "{0} 件の変更提案を正常に適用できません"
 
+msgid "{0} changes the accepted argument, which a working draft is open against. Accept or discard the draft from the argument canvas first."
+msgstr "{0}は、作業ドラフトの元になっている受理済みの論証を変更します。先に論証キャンバスでドラフトを受理または破棄してください。"
+
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
@@ -2740,6 +2797,10 @@ msgstr[0] "用語と、それを参照していた {0} 個の要素を削除し�
 msgid "Deleting it also removes {0} element that references it:"
 msgid_plural "Deleting it also removes {0} elements that reference it:"
 msgstr[0] "削除すると、この用語を参照する {0} 個の要素も削除されます:"
+
+msgid "Deleting it would also remove {0} element that references it, which the working draft cannot do. Remove that reference first, or accept or discard the draft."
+msgid_plural "Deleting it would also remove {0} elements that reference it, which the working draft cannot do. Remove those references first, or accept or discard the draft."
+msgstr[0] "削除すると、それを参照している {0} 個の要素も削除されますが、作業ドラフトではできません。先にその参照を削除するか、ドラフトを受理または破棄してください。"
 
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"

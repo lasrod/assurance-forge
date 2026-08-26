@@ -7,6 +7,7 @@
 #include "core/commands/package_commands.h"
 #include "core/commands/terminology_commands.h"
 #include "core/ignored_terminology_store.h"
+#include "core/reviews/review_proposal.h"
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "sacm_adapter/document_edit.h"
@@ -55,11 +56,118 @@ using detail::TerminologyTermQuickFixPayload;
 using detail::TermStatusLabel;
 using ui::CopyToBuffer;
 
+namespace {
+
+// The editor's result as the operations an MCP client would send (ADR 0016):
+// one `UpdateTerm` per field that changed, so classifying a term cannot rewrite
+// its definition or drop the translations of it -- the same guarantee the seams
+// give a client -- and a term whose editor was opened and saved unchanged sends
+// nothing.
+
+core::reviews::ElementRef ExistingRef(const std::string& id) {
+    core::reviews::ElementRef ref;
+    ref.existing_id = id;
+    return ref;
+}
+
+core::reviews::ElementRef CreatedRef(const std::string& create_ref) {
+    core::reviews::ElementRef ref;
+    ref.create_ref = create_ref;
+    return ref;
+}
+
+// Space separated: the idref-list convention `UpdateTerm` field "category"
+// reads, distinct from the comma-separated form the editor buffer shows.
+std::string JoinCategoryIds(const std::vector<std::string>& refs) {
+    std::string joined;
+    for (const std::string& ref : refs) {
+        if (ref.empty())
+            continue;
+        if (!joined.empty())
+            joined += ' ';
+        joined += ref;
+    }
+    return joined;
+}
+
+core::reviews::PatchOperation
+UpdateTermField(const core::reviews::ElementRef& term, const char* field, const std::string& value) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::UpdateTerm;
+    operation.element = term;
+    operation.field = field;
+    operation.new_value = value;
+    return operation;
+}
+
+void AppendTermFieldUpdates(std::vector<core::reviews::PatchOperation>& operations,
+                            const core::reviews::ElementRef& term,
+                            const sacm::Term& current,
+                            const core::TerminologyTermDraft& draft) {
+    if (draft.value != current.value)
+        operations.push_back(UpdateTermField(term, core::reviews::kTermFieldValue, draft.value));
+    if (draft.description != current.description)
+        operations.push_back(UpdateTermField(term, core::reviews::kTermFieldDefinition, draft.description));
+    if (draft.name != current.name)
+        operations.push_back(UpdateTermField(term, core::reviews::kTermFieldName, draft.name));
+    if (draft.category_refs != current.category_refs)
+        operations.push_back(
+            UpdateTermField(term, core::reviews::kTermFieldCategory, JoinCategoryIds(draft.category_refs)));
+    if (draft.externalReference != current.externalReference)
+        operations.push_back(
+            UpdateTermField(term, core::reviews::kTermFieldExternalReference, draft.externalReference));
+    if (draft.origin != current.origin)
+        operations.push_back(UpdateTermField(term, core::reviews::kTermFieldOrigin, draft.origin));
+}
+
+// A create carries the value and the definition; every other field follows as
+// an update against the created reference, in the same batch.
+void AppendCreateTerm(std::vector<core::reviews::PatchOperation>& operations,
+                      const std::string& create_ref,
+                      const core::TerminologyTermDraft& draft) {
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateTerm;
+    create.create_ref = create_ref;
+    create.text = draft.value;
+    create.new_value = draft.description;
+    operations.push_back(create);
+
+    sacm::Term created;
+    created.value = draft.value;
+    created.description = draft.description;
+    AppendTermFieldUpdates(operations, CreatedRef(create_ref), created, draft);
+}
+
+core::reviews::PatchOperation
+UpdateCategoryField(const core::reviews::ElementRef& category, const char* field, const std::string& value) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::UpdateCategory;
+    operation.element = category;
+    operation.field = field;
+    operation.new_value = value;
+    return operation;
+}
+
+core::reviews::PatchOperation CreateCategoryOperation(const std::string& create_ref,
+                                                      const core::TerminologyCategoryDraft& draft) {
+    core::reviews::PatchOperation create;
+    create.type = core::reviews::PatchOperationType::CreateCategory;
+    create.create_ref = create_ref;
+    create.text = draft.name;
+    create.new_value = draft.description;
+    return create;
+}
+
+constexpr const char* kCreatedTermRef = "$term";
+constexpr const char* kCreatedCategoryRef = "$category";
+
+} // namespace
+
 TerminologyActions::TerminologyActions(AppRuntimeState& state) : state_(state) {}
 
 void TerminologyActions::BeginAddPackage(const core::ProjectFileEntry& entry,
                                          const sacm::SacmPackageTreeNode& parent_node) {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Adding a terminology package")))
         return;
     if (parent_node.type != sacm::SacmPackageNodeType::AssuranceCasePackage)
         return;
@@ -78,7 +186,7 @@ void TerminologyActions::BeginAddPackage(const core::ProjectFileEntry& entry,
 }
 
 bool TerminologyActions::ConfirmAddPackage() {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Adding a terminology package")))
         return false;
     if (!state_.terminology.pending_package_parent_entry.has_value()) {
         state_.terminology.show_create_package_modal = false;
@@ -127,7 +235,7 @@ bool TerminologyActions::ConfirmAddPackage() {
 }
 
 bool TerminologyActions::ApplyPackageEdits() {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Editing a terminology package")))
         return false;
     if (!state_.app_state.has_projected_package())
         return false;
@@ -150,13 +258,13 @@ bool TerminologyActions::ApplyPackageEdits() {
 }
 
 void TerminologyActions::BeginDeletePackage() {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Deleting a terminology package")))
         return;
     state_.terminology.show_delete_package_modal = true;
 }
 
 bool TerminologyActions::ConfirmDeletePackage() {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Deleting a terminology package")))
         return false;
     // Route the delete through the command bus instead of mutating `sacm_package`
     // directly. With a project audit bus this makes it a recorded, replayable,
@@ -229,11 +337,7 @@ bool TerminologyActions::EditTermFromCanvas(const core::TerminologyPackageRef& p
                                             const core::TerminologyTermRef& term_ref) {
     if (!OpenTermFromCanvas(package_ref, term_ref))
         return false;
-    if (GlossaryEditRefused())
-        return false;
-    if (!state_.app_state.has_projected_package())
-        return false;
-    const sacm::Term* term = core::FindTerminologyTerm(state_.app_state.projected_package(), package_ref, term_ref);
+    const sacm::Term* term = WorkingTerm(package_ref, term_ref);
     if (!term)
         return false;
     state_.terminology.selected_term_ref = term_ref;
@@ -246,7 +350,7 @@ bool TerminologyActions::EditTermFromCanvas(const core::TerminologyPackageRef& p
 bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_id,
                                                     const core::TerminologyPackageRef& package_ref,
                                                     const core::TerminologyTermRef& term_ref) {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Linking a term to an element")))
         return false;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before associating terminology.");
@@ -278,7 +382,7 @@ bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_i
 bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& element_id,
                                                          const core::TerminologyPackageRef& package_ref,
                                                          const core::TerminologyTermRef& term_ref) {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Adding a term as context")))
         return false;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before adding terminology context.");
@@ -319,24 +423,19 @@ void TerminologyActions::SelectTerm(const core::TerminologyTermRef& term_ref) {
 }
 
 void TerminologyActions::BeginAddTerm() {
-    if (GlossaryEditRefused())
-        return;
-    if (!state_.app_state.has_projected_package()) {
+    if (state_.WorkingPackage() == nullptr) {
         SetStatus(state_, "Open a terminology package before adding terms.");
         return;
     }
+    if (DraftTakesGlossaryEdits() && DraftCreateTargetRefused(state_.terminology.selected_package_ref))
+        return;
     ClearTermEditorBuffers(state_);
     state_.terminology.editing_existing_term = false;
     state_.terminology.show_term_editor_modal = true;
 }
 
 bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref) {
-    if (GlossaryEditRefused())
-        return false;
-    if (!state_.app_state.has_projected_package())
-        return false;
-    const sacm::Term* term = core::FindTerminologyTerm(
-        state_.app_state.projected_package(), state_.terminology.selected_package_ref, term_ref);
+    const sacm::Term* term = WorkingTerm(state_.terminology.selected_package_ref, term_ref);
     if (!term) {
         SetStatus(state_, "Term not found.");
         return false;
@@ -349,12 +448,12 @@ bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref)
 }
 
 bool TerminologyActions::ConfirmTermEdit() {
-    if (GlossaryEditRefused())
-        return false;
-    if (!state_.app_state.has_projected_package())
+    if (state_.WorkingPackage() == nullptr)
         return false;
 
     const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
+    if (DraftTakesGlossaryEdits())
+        return ConfirmTermEditInDraft(draft);
     if (state_.terminology.editing_existing_term) {
         core::commands::UpdateTerminologyTermCommand command(
             state_.terminology.selected_package_ref, state_.terminology.selected_term_ref, draft);
@@ -382,36 +481,112 @@ bool TerminologyActions::ConfirmTermEdit() {
     return true;
 }
 
-// Asks the SACM library what deleting `term_ref` would take with it. A glossary
-// term that has been added as a visible context is referenced by an
-// ArtifactReference/AssertedContext pair living in an ArgumentPackage, and
-// removing those is a cascade across a package boundary that the library will
-// not perform unless the caller opts in -- so the user has to be shown the list
-// and asked. An empty result means the plain delete is enough.
-bool TerminologyActions::GlossaryEditRefused() {
+bool TerminologyActions::DraftTakesGlossaryEdits() const {
+    return app::commands::DraftDocumentTakesEdits(state_);
+}
+
+bool TerminologyActions::AcceptedEditRefused(const std::string& gesture) {
     std::string reason;
-    if (!detail::GlossaryEditsBlockedByDraft(state_, reason))
+    if (!detail::AcceptedGlossaryEditBlockedByDraft(state_, gesture, reason))
         return false;
     SetStatus(state_, reason);
     return true;
 }
 
-void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTermRef& term_ref) {
+bool TerminologyActions::DraftCreateTargetRefused(const core::TerminologyPackageRef& package_ref) {
+    if (!DraftTakesGlossaryEdits() || !HasTerminologyPackageRef(package_ref))
+        return false;
+    const std::string target = sacm_adapter::resolve_terminology_package_id(*state_.draft_document.document());
+    if (target.empty())
+        return false;
+    const sacm::TerminologyPackage* chosen = WorkingTerminologyPackage(package_ref);
+    if (chosen != nullptr && chosen->id == target)
+        return false;
+    SetStatus(state_,
+              ui::i18n::trf("While a working draft is open, new terms and categories go into the case's first "
+                            "glossary ({0}). Select it, or accept or discard the draft first.",
+                            target));
+    return true;
+}
+
+const sacm::TerminologyPackage*
+TerminologyActions::WorkingTerminologyPackage(const core::TerminologyPackageRef& package_ref) {
+    const sacm::AssuranceCasePackage* package = state_.WorkingPackage();
+    return package != nullptr ? core::FindTerminologyPackage(*package, package_ref) : nullptr;
+}
+
+const sacm::Term* TerminologyActions::WorkingTerm(const core::TerminologyPackageRef& package_ref,
+                                                  const core::TerminologyTermRef& term_ref) {
+    const sacm::TerminologyPackage* package = WorkingTerminologyPackage(package_ref);
+    return package != nullptr ? core::FindTerminologyTerm(*package, term_ref) : nullptr;
+}
+
+const sacm::Category* TerminologyActions::WorkingCategory(const core::TerminologyPackageRef& package_ref,
+                                                          const core::TerminologyCategoryRef& category_ref) {
+    const sacm::TerminologyPackage* package = WorkingTerminologyPackage(package_ref);
+    return package != nullptr ? core::FindTerminologyCategory(*package, category_ref) : nullptr;
+}
+
+bool TerminologyActions::ConfirmTermEditInDraft(const core::TerminologyTermDraft& draft) {
+    std::vector<core::reviews::PatchOperation> operations;
+    const bool editing = state_.terminology.editing_existing_term;
+    if (editing) {
+        const sacm::Term* current =
+            WorkingTerm(state_.terminology.selected_package_ref, state_.terminology.selected_term_ref);
+        if (current == nullptr) {
+            SetStatus(state_, "Term not found.");
+            return false;
+        }
+        AppendTermFieldUpdates(operations, ExistingRef(current->id), *current, draft);
+        if (operations.empty()) {
+            state_.terminology.show_term_editor_modal = false;
+            return true;
+        }
+    } else {
+        if (DraftCreateTargetRefused(state_.terminology.selected_package_ref))
+            return false;
+        AppendCreateTerm(operations, kCreatedTermRef, draft);
+    }
+
+    const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
+    if (!outcome.success) {
+        SetStatus(state_, (editing ? "Term update failed: " : "Term create failed: ") + outcome.error);
+        return false;
+    }
+    if (!editing) {
+        const auto created = outcome.created_ids.find(kCreatedTermRef);
+        state_.terminology.selected_term_ref =
+            core::TerminologyTermRef{created != outcome.created_ids.end() ? created->second : std::string{}, {}};
+    }
+    state_.terminology.show_term_editor_modal = false;
+    SetStatus(state_,
+              editing ? ui::i18n::trf("Updated term {0} in the working draft.", draft.value)
+                      : ui::i18n::trf("Added term {0} to the working draft.", draft.value));
+    return true;
+}
+
+// Asks the SACM library what deleting `term_id` from `document` would take with
+// it. A glossary term that has been added as a visible context is referenced
+// by an ArtifactReference/AssertedContext pair living in an ArgumentPackage,
+// and removing those is a cascade across a package boundary that the library
+// will not perform unless the caller opts in -- so the user has to be shown
+// the list and asked. An empty result means the plain delete is enough.
+void TerminologyActions::PreviewTermDeleteReferences(const sacm_adapter::LibraryDocument& document,
+                                                     const std::string& term_id) {
     state_.terminology.pending_delete_term_references.clear();
     state_.terminology.pending_delete_term_blockers.clear();
     state_.terminology.pending_delete_term_preview_available = false;
-    if (state_.app_state.library_document == nullptr || term_ref.id.empty())
+    if (term_id.empty())
         return;
     // Only offer the cascade where the delete can actually honour it. Without a
     // command bus -- a SACM file opened outside a project -- the dispatch hands
     // the command no library document (the tracked #347 exception), so it takes
     // the legacy path, which has no cascade. Previewing anyway would ask the user
     // to confirm removals and then refuse them.
-    if (state_.command_bus == nullptr)
+    if (state_.command_bus == nullptr && !DraftTakesGlossaryEdits())
         return;
 
-    const sacm_adapter::DeletePreview preview =
-        sacm_adapter::preview_delete_terminology_element(*state_.app_state.library_document, term_ref.id);
+    const sacm_adapter::DeletePreview preview = sacm_adapter::preview_delete_terminology_element(document, term_id);
     if (!preview.supported)
         return;
 
@@ -423,6 +598,22 @@ void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTerm
     if (!preview.can_apply) {
         for (const sacm_adapter::LoadDiagnostic& diagnostic : preview.diagnostics)
             state_.terminology.pending_delete_term_blockers.push_back(diagnostic.code + ": " + diagnostic.message);
+        return;
+    }
+
+    // The draft's `RemoveTerm` has no cascade: removing what an argument package
+    // references crosses a package boundary the library refuses by default, and
+    // the draft surface offers no consent for it. Listing the references as a
+    // cascade the confirm would perform, and then refusing, would collect
+    // consent for something that cannot happen -- so they are a blocker here.
+    if (DraftTakesGlossaryEdits() && !preview.consequential.empty()) {
+        state_.terminology.pending_delete_term_blockers.push_back(
+            ui::i18n::trnf("Deleting it would also remove {0} element that references it, which the working draft "
+                           "cannot do. Remove that reference first, or accept or discard the draft.",
+                           "Deleting it would also remove {0} elements that reference it, which the working draft "
+                           "cannot do. Remove those references first, or accept or discard the draft.",
+                           static_cast<int>(preview.consequential.size()),
+                           static_cast<int>(preview.consequential.size())));
         return;
     }
 
@@ -440,28 +631,59 @@ void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTerm
 }
 
 void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_ref) {
-    if (GlossaryEditRefused())
+    const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
+    if (working_package == nullptr)
         return;
-    if (!state_.app_state.has_projected_package())
-        return;
-    const sacm::Term* term = core::FindTerminologyTerm(
-        state_.app_state.projected_package(), state_.terminology.selected_package_ref, term_ref);
+    const sacm::Term* term = WorkingTerm(state_.terminology.selected_package_ref, term_ref);
     if (!term) {
         SetStatus(state_, "Term not found.");
         return;
     }
     state_.terminology.selected_term_ref = term_ref;
-    state_.terminology.pending_delete_term_usage_count =
-        core::CountTerminologyTermUsage(state_.app_state.projected_package(), *term);
-    PreviewTermDeleteReferences(term_ref);
+    state_.terminology.pending_delete_term_usage_count = core::CountTerminologyTermUsage(*working_package, *term);
+    if (DraftTakesGlossaryEdits()) {
+        PreviewTermDeleteReferences(*state_.draft_document.document(), term->id);
+    } else if (state_.app_state.library_document != nullptr) {
+        PreviewTermDeleteReferences(*state_.app_state.library_document, term->id);
+    } else {
+        state_.terminology.pending_delete_term_references.clear();
+        state_.terminology.pending_delete_term_blockers.clear();
+        state_.terminology.pending_delete_term_preview_available = false;
+    }
     state_.terminology.show_delete_term_modal = true;
 }
 
+bool TerminologyActions::ConfirmDeleteTermInDraft() {
+    const sacm::Term* current =
+        WorkingTerm(state_.terminology.selected_package_ref, state_.terminology.selected_term_ref);
+    if (current == nullptr) {
+        SetStatus(state_, "Term not found.");
+        return false;
+    }
+    core::reviews::PatchOperation remove;
+    remove.type = core::reviews::PatchOperationType::RemoveTerm;
+    remove.element = ExistingRef(current->id);
+    const std::string value = current->value;
+
+    const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, {remove});
+    if (!outcome.success) {
+        SetStatus(state_, "Term delete failed: " + outcome.error);
+        return false;
+    }
+    state_.terminology.selected_term_ref = core::TerminologyTermRef{};
+    state_.terminology.pending_delete_term_references.clear();
+    state_.terminology.pending_delete_term_blockers.clear();
+    state_.terminology.pending_delete_term_preview_available = false;
+    state_.terminology.show_delete_term_modal = false;
+    SetStatus(state_, ui::i18n::trf("Deleted term {0} in the working draft.", value));
+    return true;
+}
+
 bool TerminologyActions::ConfirmDeleteTerm() {
-    if (GlossaryEditRefused())
+    if (state_.WorkingPackage() == nullptr)
         return false;
-    if (!state_.app_state.has_projected_package())
-        return false;
+    if (DraftTakesGlossaryEdits())
+        return ConfirmDeleteTermInDraft();
 
     // Confirming the modal IS the consent to remove what the preview listed, so
     // the cascade is opted into exactly when something was listed. With nothing
@@ -505,24 +727,19 @@ void TerminologyActions::SetCategoryFilter(const std::string& category_filter) {
 }
 
 void TerminologyActions::BeginAddCategory() {
-    if (GlossaryEditRefused())
-        return;
-    if (!state_.app_state.has_projected_package()) {
+    if (state_.WorkingPackage() == nullptr) {
         SetStatus(state_, "Open a terminology package before adding categories.");
         return;
     }
+    if (DraftTakesGlossaryEdits() && DraftCreateTargetRefused(state_.terminology.selected_package_ref))
+        return;
     ClearCategoryEditorBuffers(state_);
     state_.terminology.editing_existing_category = false;
     state_.terminology.show_category_editor_modal = true;
 }
 
 bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& category_ref) {
-    if (GlossaryEditRefused())
-        return false;
-    if (!state_.app_state.has_projected_package())
-        return false;
-    const sacm::Category* category = core::FindTerminologyCategory(
-        state_.app_state.projected_package(), state_.terminology.selected_package_ref, category_ref);
+    const sacm::Category* category = WorkingCategory(state_.terminology.selected_package_ref, category_ref);
     if (!category) {
         SetStatus(state_, "Category not found.");
         return false;
@@ -535,13 +752,57 @@ bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& c
     return true;
 }
 
+bool TerminologyActions::ConfirmCategoryEditInDraft(const core::TerminologyCategoryDraft& draft) {
+    std::vector<core::reviews::PatchOperation> operations;
+    const bool editing = state_.terminology.editing_existing_category;
+    if (editing) {
+        const sacm::Category* current =
+            WorkingCategory(state_.terminology.selected_package_ref, state_.terminology.selected_category_ref);
+        if (current == nullptr) {
+            SetStatus(state_, "Category not found.");
+            return false;
+        }
+        const core::reviews::ElementRef ref = ExistingRef(current->id);
+        if (draft.name != current->name)
+            operations.push_back(UpdateCategoryField(ref, core::reviews::kCategoryFieldName, draft.name));
+        if (draft.description != current->description)
+            operations.push_back(UpdateCategoryField(ref, core::reviews::kCategoryFieldDescription, draft.description));
+        if (operations.empty()) {
+            state_.terminology.show_category_editor_modal = false;
+            return true;
+        }
+    } else {
+        if (DraftCreateTargetRefused(state_.terminology.selected_package_ref))
+            return false;
+        operations.push_back(CreateCategoryOperation(kCreatedCategoryRef, draft));
+    }
+
+    const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
+    if (!outcome.success) {
+        SetStatus(state_, (editing ? "Category update failed: " : "Category create failed: ") + outcome.error);
+        return false;
+    }
+    if (!editing) {
+        const auto created = outcome.created_ids.find(kCreatedCategoryRef);
+        state_.terminology.selected_category_ref =
+            core::TerminologyCategoryRef{created != outcome.created_ids.end() ? created->second : std::string{}, {}};
+    }
+    state_.terminology.show_category_editor_modal = false;
+    SetStatus(state_,
+              editing ? ui::i18n::trf("Updated category {0} in the working draft.", draft.name)
+                      : ui::i18n::trf("Added category {0} to the working draft.", draft.name));
+    return true;
+}
+
 void TerminologyActions::ConfirmCategoryEdit() {
-    if (GlossaryEditRefused())
-        return;
-    if (!state_.app_state.has_projected_package())
+    if (state_.WorkingPackage() == nullptr)
         return;
 
     const core::TerminologyCategoryDraft draft = CategoryDraftFromEditor(state_);
+    if (DraftTakesGlossaryEdits()) {
+        ConfirmCategoryEditInDraft(draft);
+        return;
+    }
     if (state_.terminology.editing_existing_category) {
         core::commands::UpdateTerminologyCategoryCommand command(
             state_.terminology.selected_package_ref, state_.terminology.selected_category_ref, draft);
@@ -567,7 +828,7 @@ void TerminologyActions::ConfirmCategoryEdit() {
 }
 
 void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef& category_ref) {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Deleting a category")))
         return;
     if (!state_.app_state.has_projected_package())
         return;
@@ -590,7 +851,7 @@ void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef&
 }
 
 void TerminologyActions::ConfirmDeleteCategory() {
-    if (GlossaryEditRefused())
+    if (AcceptedEditRefused(AF_TR("Deleting a category")))
         return;
     if (!state_.app_state.has_projected_package())
         return;
@@ -610,14 +871,33 @@ void TerminologyActions::ConfirmDeleteCategory() {
     SetStatus(state_, "Deleted category.");
 }
 
-void TerminologyActions::SeedRecommendedCategories() {
-    if (GlossaryEditRefused())
+void TerminologyActions::SeedRecommendedCategoriesInDraft(const sacm::TerminologyPackage& terminology_package,
+                                                          const std::vector<std::string>& missing_names) {
+    if (missing_names.empty()) {
+        SetStatus(state_, "Recommended terminology categories already exist.");
         return;
-    if (!state_.app_state.has_projected_package())
+    }
+    if (DraftCreateTargetRefused(detail::TerminologyPackageRefFor(terminology_package)))
         return;
+    // One batch, so the glossary gains all of them or none: the same
+    // all-or-nothing an MCP client's batch gets.
+    std::vector<core::reviews::PatchOperation> operations;
+    for (std::size_t index = 0; index < missing_names.size(); ++index) {
+        core::TerminologyCategoryDraft draft;
+        draft.name = missing_names[index];
+        operations.push_back(CreateCategoryOperation("$category" + std::to_string(index), draft));
+    }
+    const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
+    if (!outcome.success) {
+        SetStatus(state_, "Category create failed: " + outcome.error);
+        return;
+    }
+    SetStatus(state_, AF_TR("Added recommended terminology categories to the working draft."));
+}
 
+void TerminologyActions::SeedRecommendedCategories() {
     const sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(state_.app_state.projected_package(), state_.terminology.selected_package_ref);
+        WorkingTerminologyPackage(state_.terminology.selected_package_ref);
     if (!terminology_package) {
         SetStatus(state_, "Terminology package not found.");
         return;
@@ -631,6 +911,15 @@ void TerminologyActions::SeedRecommendedCategories() {
                                  "Standard",
                                  "Project Specific",
                                  "Deprecated"};
+    if (DraftTakesGlossaryEdits()) {
+        std::vector<std::string> missing_names;
+        for (const char* name : recommended) {
+            if (!CategoryNameExists(*terminology_package, name))
+                missing_names.push_back(name);
+        }
+        SeedRecommendedCategoriesInDraft(*terminology_package, missing_names);
+        return;
+    }
     int added = 0;
     for (const char* name : recommended) {
         if (CategoryNameExists(*terminology_package, name))
@@ -711,15 +1000,24 @@ void TerminologyActions::ChangeMeaningFromCanvas(const std::string& element_id, 
 }
 
 void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, const std::string& term_value) {
-    if (GlossaryEditRefused())
-        return;
-    if (!state_.app_state.has_projected_package()) {
+    const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
+    if (working_package == nullptr) {
         SetStatus(state_, "Open a SACM model before defining terms.");
         return;
     }
 
-    const QuickDefineTargetPackageResult target = EnsureQuickDefineTargetPackage(state_, element_id);
-    if (!HasTerminologyPackageRef(target.package_ref)) {
+    QuickDefineTargetPackageResult target;
+    if (DraftTakesGlossaryEdits()) {
+        // The draft's glossary, or none: a draft with no glossary grows its
+        // first one when the term is created, the way it does for an MCP
+        // client, rather than creating one in the accepted document now.
+        target.package_ref = detail::ResolveQuickDefineTargetPackageIn(state_, *working_package, element_id);
+        if (DraftCreateTargetRefused(target.package_ref))
+            return;
+    } else {
+        target = EnsureQuickDefineTargetPackage(state_, element_id);
+    }
+    if (!HasTerminologyPackageRef(target.package_ref) && !DraftTakesGlossaryEdits()) {
         SetStatus(state_,
                   target.error.empty() ? "Could not create a TerminologyPackage for the new term."
                                        : "Terminology package create failed: " + target.error);
@@ -767,11 +1065,53 @@ void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, co
                   ". Select a term to link when occurrence binding is available.");
 }
 
+bool TerminologyActions::ConfirmQuickDefineTermInDraft(bool add_as_context) {
+    if (DraftCreateTargetRefused(state_.terminology.quick_define_target_package_ref))
+        return false;
+    const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
+    std::vector<core::reviews::PatchOperation> operations;
+    AppendCreateTerm(operations, kCreatedTermRef, draft);
+    const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
+    if (!outcome.success) {
+        SetStatus(state_, "Term create failed: " + outcome.error);
+        return false;
+    }
+    const auto created = outcome.created_ids.find(kCreatedTermRef);
+    const core::TerminologyTermRef new_term_ref{created != outcome.created_ids.end() ? created->second : std::string{},
+                                                {}};
+
+    // The glossary the term went to, which may be one the draft has just
+    // created and the accepted case has never had.
+    core::TerminologyPackageRef package_ref;
+    package_ref.id = sacm_adapter::resolve_terminology_package_id(*state_.draft_document.document());
+    state_.terminology.selected_package_ref = package_ref;
+    state_.terminology.selected_term_ref = new_term_ref;
+    state_.terminology.selected_category_ref = core::TerminologyCategoryRef{};
+    CopyToBuffer(state_.terminology.filter_buf, sizeof(state_.terminology.filter_buf), draft.value);
+    CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
+    state_.terminology.selected_package_file_path = state_.app_state.active_project_file_path;
+    if (const sacm::TerminologyPackage* package = WorkingTerminologyPackage(package_ref))
+        CopyTerminologyPackageToEditor(state_, *package);
+
+    state_.terminology.show_quick_define_term_modal = false;
+    state_.terminology.quick_define_element_id.clear();
+    state_.terminology.quick_define_source_text.clear();
+    // Linking the term to the element as context writes to the accepted
+    // argument (the draft's vocabulary has no operation for it), so the term is
+    // defined and the link is what is left to do once the draft is accepted.
+    SetStatus(state_,
+              add_as_context ? ui::i18n::trf("Added term {0} to the working draft. Adding it as context changes the "
+                                             "accepted argument, so do that once the draft is accepted.",
+                                             draft.value)
+                             : ui::i18n::trf("Added term {0} to the working draft.", draft.value));
+    return true;
+}
+
 bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
-    if (GlossaryEditRefused())
+    if (state_.WorkingPackage() == nullptr)
         return false;
-    if (!state_.app_state.has_projected_package())
-        return false;
+    if (DraftTakesGlossaryEdits())
+        return ConfirmQuickDefineTermInDraft(add_as_context);
 
     const core::TerminologyTermDraft draft = TermDraftFromEditor(state_);
     core::commands::CreateTerminologyTermCommand command(state_.terminology.quick_define_target_package_ref, draft);
