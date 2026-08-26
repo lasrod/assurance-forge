@@ -10,6 +10,7 @@
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -224,8 +225,10 @@ bool GlossaryEditsBlockedByDraft(const AppRuntimeState& state, std::string& out_
     out_reason.clear();
     if (!state.draft_document.active())
         return false;
-    out_reason = "Glossary editing is paused while a working draft is open. Accept or discard the draft from the "
-                 "argument canvas first.";
+    // Translated here, once: the status line and the Terminology tab both show
+    // this sentence, and a second copy of the literal is how they drift apart.
+    out_reason = AF_TR("Glossary editing is paused while a working draft is open. Accept or discard the draft from "
+                       "the argument canvas first.");
     return true;
 }
 

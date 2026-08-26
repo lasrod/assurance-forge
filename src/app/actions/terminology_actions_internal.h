@@ -79,8 +79,9 @@ void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesyste
 // user is looking at, and an edit made to it would be silently undone by the
 // accept: the draft is a copy taken before the edit, and accepting it replaces
 // the file with that copy. So every glossary write is refused until the draft
-// is accepted or discarded. Returns true when refused, with the status line to
-// show in `out_reason`.
+// is accepted or discarded. Returns true when refused, with the reason to show
+// in `out_reason` -- translated, and the single source of that sentence for the
+// status line and the Terminology tab alike.
 bool GlossaryEditsBlockedByDraft(const AppRuntimeState& state, std::string& out_reason);
 
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry);

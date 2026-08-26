@@ -325,19 +325,28 @@ void CollectGlossaryDraftMarks(AppRuntimeState& state, ui::panels::TerminologyPa
     if (!state.DraftDocumentHasChanges())
         return;
     const core::drafts::DraftDocumentDiff& diff = state.DraftDocumentChanges();
+    // Indexed once: the draft view is the whole argument, and this runs on every
+    // frame the tab is open. Removed elements are absent from the draft view and
+    // live in the (small) removed list, which is searched as it is.
+    std::unordered_map<std::string, const core::SacmElement*> draft_elements_by_id;
+    draft_elements_by_id.reserve(state.draft_document_view.elements.size());
+    for (const core::SacmElement& element : state.draft_document_view.elements)
+        draft_elements_by_id.emplace(element.id, &element);
     int added = 0;
     int changed = 0;
     int removed = 0;
     for (const core::drafts::DraftDocumentChange& change : diff.changes) {
-        const std::vector<core::SacmElement>& elements = change.change == core::drafts::DraftElementChange::Removed
-                                                             ? diff.removed
-                                                             : state.draft_document_view.elements;
         const core::SacmElement* element = nullptr;
-        for (const core::SacmElement& candidate : elements) {
-            if (candidate.id == change.element_id) {
-                element = &candidate;
-                break;
+        if (change.change == core::drafts::DraftElementChange::Removed) {
+            for (const core::SacmElement& candidate : diff.removed) {
+                if (candidate.id == change.element_id) {
+                    element = &candidate;
+                    break;
+                }
             }
+        } else if (const auto found = draft_elements_by_id.find(change.element_id);
+                   found != draft_elements_by_id.end()) {
+            element = found->second;
         }
         if (element == nullptr || (element->type != "term" && element->type != "category"))
             continue;
@@ -416,8 +425,9 @@ ui::panels::TerminologyPackagePanelModel BuildTerminologyPackagePanelModel(AppRu
     std::string locked_reason;
     if (actions::detail::GlossaryEditsBlockedByDraft(state, locked_reason)) {
         model.editing_locked = true;
-        model.editing_locked_reason = AF_TR("Glossary editing is paused while a working draft is open. Accept or "
-                                            "discard the draft from the argument canvas first.");
+        // The helper's wording, already translated: one sentence for the tab and
+        // the status line, so the two cannot drift apart.
+        model.editing_locked_reason = locked_reason;
     }
     CollectGlossaryDraftMarks(state, model);
     return model;
