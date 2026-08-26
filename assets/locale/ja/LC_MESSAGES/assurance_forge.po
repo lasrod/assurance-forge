@@ -253,6 +253,9 @@ msgstr "コンテキストとして追加"
 msgid "Add fixed confidence"
 msgstr "固定信頼度を追加"
 
+msgid "Added by the working draft; not yet accepted."
+msgstr "作業ドラフトで追加されました。まだ受理されていません。"
+
 msgid "Advanced"
 msgstr "詳細"
 
@@ -480,6 +483,9 @@ msgstr "変更を却下できませんでした: {0}"
 
 msgid "Change rejected."
 msgstr "変更を却下しました。"
+
+msgid "Changed by the working draft ({0}); not yet accepted."
+msgstr "作業ドラフトで変更されました（{0}）。まだ受理されていません。"
 
 msgid "Changed since baseline"
 msgstr "ベースライン以降に変更"
@@ -1026,6 +1032,9 @@ msgstr "生成済みレポート: {0}"
 
 msgid "Get started with Assurance Forge"
 msgstr "Assurance Forge の開始ガイド"
+
+msgid "Glossary editing is paused while a working draft is open. Accept or discard the draft from the argument canvas first."
+msgstr "作業ドラフトが開いている間、用語集の編集は一時停止されます。先に論証キャンバスでドラフトを受理または破棄してください。"
 
 msgid "Glossary:"
 msgstr "用語集:"
@@ -2200,6 +2209,9 @@ msgstr "ドラフトは受理され書き込まれましたが、議論を再読
 msgid "The draft was accepted, but its change record could not be cleared: {0}"
 msgstr "ドラフトは受理されましたが、その変更記録を消去できませんでした: {0}"
 
+msgid "The draft was accepted, but the audit log could not record it: {0}"
+msgstr "ドラフトは受理されましたが、監査ログに記録できませんでした: {0}"
+
 msgid "The edit was made, but the draft could not be written to disk: {0}"
 msgstr "編集は適用されましたが、ドラフトをディスクに書き込めませんでした: {0}"
 
@@ -2464,6 +2476,9 @@ msgstr "関係を取り消します。両方の要素は保持され、親がな
 msgid "Working draft"
 msgstr "作業ドラフト"
 
+msgid "Working draft: {0} added, {1} changed, {2} removed in this glossary. Accept the draft on the argument canvas to make them part of the case."
+msgstr "作業ドラフト: この用語集で {0} 件追加、{1} 件変更、{2} 件削除。ケースに反映するには論証キャンバスでドラフトを受理してください。"
+
 msgid "XML File:"
 msgstr "XML ファイル:"
 
@@ -2500,14 +2515,26 @@ msgstr "作成者"
 msgid "being written"
 msgstr "作成中"
 
+msgid "categories"
+msgstr "カテゴリ"
+
+msgid "definition"
+msgstr "定義"
+
 msgid "disabled"
 msgstr "無効"
+
+msgid "draft"
+msgstr "ドラフト"
 
 msgid "elements"
 msgstr "要素"
 
 msgid "error"
 msgstr "エラー"
+
+msgid "external reference"
+msgstr "外部参照"
 
 msgid "frame interval (colored by FPS)"
 msgstr "フレーム間隔 (FPS で色分け)"
@@ -2524,6 +2551,9 @@ msgstr "情報"
 msgid "items"
 msgstr "項目"
 
+msgid "name"
+msgstr "名前"
+
 msgid "needs attention"
 msgstr "要対応"
 
@@ -2535,6 +2565,9 @@ msgstr "受理できる変更がありません -- 作成中 {0} 件、要確認
 
 msgid "open"
 msgstr "未解決"
+
+msgid "origin"
+msgstr "出典"
 
 msgid "person"
 msgstr "人"
@@ -2556,6 +2589,9 @@ msgstr "再生={0}  ディスク={1}"
 
 msgid "session {0}"
 msgstr "セッション {0}"
+
+msgid "term"
+msgstr "用語"
 
 msgid "terminology package"
 msgstr "用語パッケージ"

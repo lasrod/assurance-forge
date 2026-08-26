@@ -10,6 +10,7 @@
 #include "core/terminology_text_utils.h"
 #include "parser/model_utils.h"
 #include "parser/xml_parser.h"
+#include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -218,6 +219,17 @@ QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& s
 
 void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesystem::path& relative_path) {
     state.sacm_package_tree_cache.erase(relative_path.generic_string());
+}
+
+bool GlossaryEditsBlockedByDraft(const AppRuntimeState& state, std::string& out_reason) {
+    out_reason.clear();
+    if (!state.draft_document.active())
+        return false;
+    // Translated here, once: the status line and the Terminology tab both show
+    // this sentence, and a second copy of the literal is how they drift apart.
+    out_reason = AF_TR("Glossary editing is paused while a working draft is open. Accept or discard the draft from "
+                       "the argument canvas first.");
+    return true;
 }
 
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {

@@ -132,18 +132,28 @@ const sacm_adapter::LibraryDocument* DraftDocumentStore::document() const {
 }
 
 core::AssuranceCase DraftDocumentStore::Projection() const {
+    core::AssuranceCase model;
+    sacm::AssuranceCasePackage package;
+    ProjectViews(model, package);
+    return model;
+}
+
+void DraftDocumentStore::ProjectViews(core::AssuranceCase& out_model, sacm::AssuranceCasePackage& out_package) const {
+    out_model = core::AssuranceCase{};
+    out_package = sacm::AssuranceCasePackage{};
     if (impl_->document == nullptr)
-        return core::AssuranceCase{};
+        return;
     // The same render passes the accepted view gets, because this is drawn on
     // the same canvas by the same code. A bare `project_case` renders a term as
     // a drawn context node with unrefreshed display fields -- so a term the user
     // had just defined showed on their canvas as though it had no definition,
     // and stayed that way until a restart re-ran the passes through load_file.
     // A bare strategy loses its placement the same way.
-    core::AssuranceCase model;
-    sacm::AssuranceCasePackage package;
-    core::RebuildDerivedViewsFromLibrary(*impl_->document, model, package);
-    return model;
+    //
+    // The package comes out of the same pass. It is what the terminology tab
+    // and the canvas's term detection read the glossary from, and a draft's
+    // terms exist in no other package until the draft is accepted.
+    core::RebuildDerivedViewsFromLibrary(*impl_->document, out_model, out_package);
 }
 
 const std::filesystem::path& DraftDocumentStore::path() const {

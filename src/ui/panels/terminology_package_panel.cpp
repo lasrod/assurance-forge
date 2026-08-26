@@ -164,6 +164,63 @@ void RenderIssueMarker(const std::vector<core::TerminologyTermIssue>& issues) {
     }
 }
 
+const TerminologyDraftMark* DraftMarkFor(const std::string& element_id,
+                                         const std::vector<TerminologyDraftMark>& marks) {
+    for (const TerminologyDraftMark& mark : marks) {
+        if (!element_id.empty() && mark.element_id == element_id)
+            return &mark;
+    }
+    return nullptr;
+}
+
+// The comparison names projected fields; the reader of a glossary knows them by
+// the column they are shown in.
+std::string DraftFieldLabel(const std::string& field) {
+    if (field == "content")
+        return AF_TR("term");
+    if (field == "description")
+        return AF_TR("definition");
+    if (field == "name")
+        return AF_TR("name");
+    if (field == "category_refs")
+        return AF_TR("categories");
+    if (field == "external_reference")
+        return AF_TR("external reference");
+    if (field == "origin_ref")
+        return AF_TR("origin");
+    return field;
+}
+
+std::string JoinDraftFieldLabels(const std::vector<std::string>& fields) {
+    std::string result;
+    for (const std::string& field : fields) {
+        if (!result.empty())
+            result += ", ";
+        result += DraftFieldLabel(field);
+    }
+    return result;
+}
+
+// A badge beside a row the working draft added or changed, so a reader can
+// tell a definition an AI client proposed from one the case already holds.
+void RenderDraftMark(const TerminologyDraftMark* mark) {
+    if (mark == nullptr || mark->change == core::drafts::DraftElementChange::Unchanged)
+        return;
+    ImGui::SameLine();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent), "%s", AF_TR("draft").c_str());
+    if (!ImGui::IsItemHovered())
+        return;
+    ImGui::BeginTooltip();
+    if (mark->change == core::drafts::DraftElementChange::Added) {
+        ImGui::TextUnformatted(AF_TR("Added by the working draft; not yet accepted.").c_str());
+    } else {
+        ImGui::TextUnformatted(
+            ui::i18n::trf("Changed by the working draft ({0}); not yet accepted.", JoinDraftFieldLabels(mark->fields))
+                .c_str());
+    }
+    ImGui::EndTooltip();
+}
+
 void RenderTermsTable(const TerminologyPackagePanelModel& model, const TerminologyPackagePanelCallbacks& callbacks) {
     if (!ImGui::BeginTable(
             "##terms_table", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
@@ -202,9 +259,11 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             callbacks.select_term) {
             callbacks.select_term(ref);
         }
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_term) {
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_term &&
+            !model.editing_locked) {
             callbacks.edit_term(ref);
         }
+        RenderDraftMark(DraftMarkFor(term.id, model.draft_marks));
         RenderIssueMarker(issues);
         ImGui::TableSetColumnIndex(1);
         ImGui::TextUnformatted(term.name.c_str());
@@ -296,8 +355,10 @@ void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
         ImGui::PushID(id.c_str());
         if (ImGui::Selectable(id.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns) && callbacks.select_category)
             callbacks.select_category(ref);
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_category)
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_category &&
+            !model.editing_locked)
             callbacks.edit_category(ref);
+        RenderDraftMark(DraftMarkFor(category.id, model.draft_marks));
         ImGui::PopID();
         ImGui::TableSetColumnIndex(1);
         ImGui::TextUnformatted(category.name.c_str());
@@ -337,10 +398,27 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Separator();
     ImGui::Spacing();
 
+    // Said in words above the rows, not implied by a badge: a glossary drawn
+    // from a working draft is not the accepted safety case's glossary, and a
+    // reader has to be able to tell before they quote a definition from it.
+    if (!model.working_draft_notice.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::GetTheme().accent));
+        ImGui::TextWrapped("%s", model.working_draft_notice.c_str());
+        ImGui::PopStyleColor();
+    }
+    const bool locked = model.editing_locked;
+    if (locked && !model.editing_locked_reason.empty())
+        ImGui::TextDisabled("%s", model.editing_locked_reason.c_str());
+    if (!model.working_draft_notice.empty() || locked)
+        ImGui::Spacing();
+
+    const ImGuiInputTextFlags text_flags = locked ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_None;
     ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputText(
-            (AF_TR("Package name") + "##package_name").c_str(), model.name_buffer, model.name_buffer_size) &&
-        callbacks.apply_changes) {
+    if (ImGui::InputText((AF_TR("Package name") + "##package_name").c_str(),
+                         model.name_buffer,
+                         model.name_buffer_size,
+                         text_flags) &&
+        callbacks.apply_changes && !locked) {
         callbacks.apply_changes();
     }
 
@@ -348,17 +426,19 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (ImGui::InputTextMultiline((AF_TR("Package description") + "##package_description").c_str(),
                                   model.description_buffer,
                                   model.description_buffer_size,
-                                  ImVec2(-1.0f, 96.0f)) &&
-        callbacks.apply_changes) {
+                                  ImVec2(-1.0f, 96.0f),
+                                  text_flags) &&
+        callbacks.apply_changes && !locked) {
         callbacks.apply_changes();
     }
 
     ImGui::Spacing();
-    if (!model.can_delete)
+    const bool delete_disabled = !model.can_delete || locked;
+    if (delete_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Package").c_str()) && callbacks.delete_package)
         callbacks.delete_package();
-    if (!model.can_delete)
+    if (delete_disabled)
         ImGui::EndDisabled();
     if (!model.can_delete && !model.delete_block_reason.empty()) {
         ImGui::SameLine();
@@ -367,32 +447,43 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
 
     ImGui::Spacing();
     ImGui::SeparatorText(AF_TR("Terms").c_str());
+    const bool no_term_selected = model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty();
+    if (locked)
+        ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Add Term").c_str()) && callbacks.add_term)
         callbacks.add_term();
+    if (locked)
+        ImGui::EndDisabled();
     ImGui::SameLine();
-    if (callbacks.edit_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+    const bool edit_term_disabled = locked || (callbacks.edit_term && no_term_selected);
+    if (edit_term_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Edit Term").c_str()) && callbacks.edit_term)
         callbacks.edit_term(model.selected_term_ref);
-    if (callbacks.edit_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+    if (edit_term_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+    const bool delete_term_disabled = locked || (callbacks.delete_term && no_term_selected);
+    if (delete_term_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Term").c_str()) && callbacks.delete_term)
         callbacks.delete_term(model.selected_term_ref);
-    if (callbacks.delete_term && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+    if (delete_term_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (callbacks.find_term_usages && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+    if (callbacks.find_term_usages && no_term_selected)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Find Usages").c_str()) && callbacks.find_term_usages)
         callbacks.find_term_usages(model.selected_term_ref);
-    if (callbacks.find_term_usages && (model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty()))
+    if (callbacks.find_term_usages && no_term_selected)
         ImGui::EndDisabled();
     ImGui::SameLine();
+    if (locked)
+        ImGui::BeginDisabled();
     if (ImGui::Button((AF_TR("Add Category") + "##terms_add_category").c_str()) && callbacks.add_category)
         callbacks.add_category();
+    if (locked)
+        ImGui::EndDisabled();
     ImGui::SameLine();
     RenderCategoryFilter(model, callbacks);
     ImGui::SetNextItemWidth(-1.0f);
@@ -412,28 +503,37 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
 
     ImGui::Spacing();
     ImGui::SeparatorText(AF_TR("Categories").c_str());
+    if (locked)
+        ImGui::BeginDisabled();
     if (ImGui::Button((AF_TR("Add Category") + "##categories_add_category").c_str()) && callbacks.add_category)
         callbacks.add_category();
+    if (locked)
+        ImGui::EndDisabled();
     ImGui::SameLine();
     const bool has_selected_category =
         !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
-    if (!has_selected_category)
+    const bool category_edit_disabled = locked || !has_selected_category;
+    if (category_edit_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Edit Category").c_str()) && callbacks.edit_category)
         callbacks.edit_category(model.selected_category_ref);
-    if (!has_selected_category)
+    if (category_edit_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (!has_selected_category)
+    if (category_edit_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Category").c_str()) && callbacks.delete_category)
         callbacks.delete_category(model.selected_category_ref);
-    if (!has_selected_category)
+    if (category_edit_disabled)
         ImGui::EndDisabled();
     if (model.package->categories.empty() && callbacks.seed_recommended_categories) {
         ImGui::SameLine();
+        if (locked)
+            ImGui::BeginDisabled();
         if (ImGui::Button(AF_TR("Add Recommended").c_str()))
             callbacks.seed_recommended_categories();
+        if (locked)
+            ImGui::EndDisabled();
     }
     ImGui::Spacing();
     RenderCategoriesTable(model, callbacks);

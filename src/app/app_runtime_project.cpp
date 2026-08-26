@@ -80,14 +80,57 @@ bool IsLoadedProjectSacmFile(const core::AppState& app_state, const core::Projec
     return app_state.loaded_file_path == ProjectFilePath(app_state, entry);
 }
 
-sacm::SacmPackageTreeResult BuildLoadedSacmPackageTree(const core::AppState& app_state,
+// The explorer's tree for the loaded argument is built from the WORKING package
+// (ADR 0016) rather than from the accepted one, so a glossary a draft created
+// is listed and can be opened; the cache entry is dropped by every derived-view
+// rebuild, which the draft's revision triggers.
+sacm::SacmPackageTreeResult BuildLoadedSacmPackageTree(const sacm::AssuranceCasePackage& package,
                                                        const core::AssuranceProject& project,
                                                        const core::ProjectFileEntry& entry) {
     sacm::SacmPackageTreeResult result = sacm::build_sacm_package_tree_from_string(
-        sacm::serialize_sacm(app_state.projected_package()), entry.relativePath.filename().generic_string());
+        sacm::serialize_sacm(package), entry.relativePath.filename().generic_string());
     result.source_path = project.rootPath / entry.relativePath;
     result.root.id = result.source_path.generic_string();
     return result;
+}
+
+// The machine-readable half of a promotion's attribution (see
+// `core::audit::DraftPromotionRecord`): which groups, the sources that wrote
+// them, the guidelines they served, the review items they answered, and each
+// author's reasoning. Collected before an accept consumes the groups, because
+// afterwards nothing else holds it. `source_labels` is taken as given when the
+// caller already compiled it; otherwise it is derived from the groups that
+// contributed operations.
+core::audit::DraftPromotionRecord DraftPromotionAttribution(const core::drafts::DraftWorkspace& workspace,
+                                                            const std::vector<std::string>& group_ids,
+                                                            std::vector<std::string> source_labels) {
+    core::audit::DraftPromotionRecord attribution;
+    attribution.group_ids = group_ids;
+    const bool derive_sources = source_labels.empty();
+    attribution.source_labels = std::move(source_labels);
+    const auto add_unique = [](std::vector<std::string>& values, const std::string& value) {
+        if (std::find(values.begin(), values.end(), value) == values.end())
+            values.push_back(value);
+    };
+    for (const std::string& group_id : group_ids) {
+        const core::drafts::DraftChangeGroup* group = workspace.FindGroup(group_id);
+        if (group == nullptr)
+            continue;
+        if (derive_sources && !group->operations.empty()) {
+            add_unique(attribution.source_labels,
+                       group->source_label.empty() ? std::string(core::drafts::DraftSourceToString(group->source))
+                                                   : group->source_label);
+        }
+        for (const std::string& guideline_id : group->guideline_ids)
+            add_unique(attribution.guideline_ids, guideline_id);
+        for (const std::string& review_item_id : group->review_item_ids)
+            add_unique(attribution.review_item_ids, review_item_id);
+        if (!group->rationale.empty()) {
+            const std::string title = group->title.empty() ? group->id : group->title;
+            attribution.rationales.push_back(title + ": " + group->rationale);
+        }
+    }
+    return attribution;
 }
 
 std::string ArgumentPackageCanvasKey(const std::filesystem::path& source_file_path,
@@ -487,8 +530,11 @@ void AppRuntime::OpenProjectPackageNode(const core::ProjectFileEntry& entry, con
         }
 
         core::TerminologyPackageRef package_ref{node.id, node.gid};
+        // The tree the user clicked was built from the working package, so the
+        // package is looked up there: a glossary only the draft holds is opened
+        // in the tab (read-only until accepted) rather than reported missing.
         const sacm::TerminologyPackage* terminology_package =
-            core::FindTerminologyPackage(impl_->app_state.projected_package(), package_ref);
+            core::FindTerminologyPackage(*impl_->WorkingPackage(), package_ref);
         if (!terminology_package) {
             SetStatus(AF_TR("Terminology package was not found in the editable model."));
             return;
@@ -1042,8 +1088,9 @@ void AppRuntime::RefreshSacmPackageTreeCache() {
         live_paths.insert(relative);
         if (impl_->sacm_package_tree_cache.find(relative) != impl_->sacm_package_tree_cache.end())
             continue;
-        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->app_state.has_projected_package()) {
-            impl_->sacm_package_tree_cache[relative] = BuildLoadedSacmPackageTree(impl_->app_state, project, entry);
+        if (IsLoadedProjectSacmFile(impl_->app_state, entry) && impl_->WorkingPackage() != nullptr) {
+            impl_->sacm_package_tree_cache[relative] =
+                BuildLoadedSacmPackageTree(*impl_->WorkingPackage(), project, entry);
             continue;
         }
         impl_->sacm_package_tree_cache[relative] = sacm::build_sacm_package_tree(project.rootPath / entry.relativePath);
@@ -1355,9 +1402,43 @@ bool AppRuntime::AcceptDraftDocument(std::string& summary, std::string& error) {
     const int removed = diff.removed_count;
 
     const std::filesystem::path accepted_path = impl_->app_state.loaded_file_path;
+
+    // Who wrote what, collected before the accept consumes the change groups:
+    // they are the only record of the draft's contributors, and the audit
+    // transaction below is where that record has to survive.
+    const core::drafts::DraftWorkspace* workspace = impl_->draft_workspace.workspace();
+    std::vector<std::string> group_ids;
+    if (workspace != nullptr) {
+        for (const core::drafts::DraftChangeGroup& group : workspace->groups)
+            group_ids.push_back(group.id);
+    }
+    const std::string approver = impl_->reviewer_name.empty() ? std::string("Working draft") : impl_->reviewer_name;
+    const std::string author =
+        workspace != nullptr ? core::drafts::DraftPromotionAuthor(*workspace, group_ids, approver) : approver;
+    const core::audit::DraftPromotionRecord attribution = workspace != nullptr
+                                                              ? DraftPromotionAttribution(*workspace, group_ids, {})
+                                                              : core::audit::DraftPromotionRecord{};
+
     if (!impl_->draft_document.AcceptInto(accepted_path, error)) {
         RecordDraftAcceptOutcome(false, error);
         return false;
+    }
+
+    // The accepted file is in place; now the log says so (ADR 0016, #409): one
+    // transaction carrying the accepted document and the attribution, and a
+    // trusted-root snapshot, so the replay verifier reproduces the file on the
+    // next open instead of reporting a change a human approved as a divergence.
+    // Not a failure of the accept if it cannot be recorded -- the safety case is
+    // correct on disk -- but the gap is said rather than hidden.
+    if (impl_->command_bus != nullptr) {
+        core::audit::RecordAcceptedDocumentResult recorded;
+        std::string audit_error;
+        if (!impl_->command_bus->RecordAcceptedDocument(author, attribution, recorded, audit_error)) {
+            impl_->app_state.status_message =
+                ui::i18n::trf("The draft was accepted, but the audit log could not record it: {0}", audit_error);
+        } else if (!recorded.warning.empty()) {
+            impl_->app_state.status_message = recorded.warning;
+        }
     }
 
     // The change groups described work that is now accepted. Left standing they
@@ -1451,13 +1532,9 @@ bool AppRuntime::ReloadAcceptedArgumentAfterAccept(std::string& error) {
     // a user who approved it.
     impl_->app_state.refresh_tracked_file_hashes(accepted_path);
 
-    // NOTE (#409): the audit log does not yet record this accept. ADR 0016 says
-    // it should remain one audited transaction carrying the approver and the
-    // resulting document, but a file-replacement accept has no command in the
-    // audit vocabulary to be, and inventing one here would be a decision made in
-    // passing. Until it exists, an accept is a change to the `.sacm` that the
-    // recorded history cannot reproduce, and the replay verifier says so on the
-    // next project open.
+    // The accept itself was recorded by `AcceptDraftDocument` as one audited
+    // transaction carrying the approver and the accepted document (#409), so
+    // nothing here is a write the recorded history cannot reproduce.
     impl_->document_dirty = false;
     impl_->app_state.has_unsaved_changes = false;
     impl_->problems_dirty.MarkAll();
@@ -1962,30 +2039,8 @@ bool AppRuntime::PromoteDraftGroupsUnrecorded(const std::vector<std::string>& gr
     // The draft is consumed by the act of accepting it, so whatever the log does
     // not record here is not recoverable from anywhere else. `author` names the
     // approver and the contributing sources; this is the rest of the trace.
-    core::audit::DraftPromotionRecord attribution;
-    attribution.group_ids = plan.closure;
-    attribution.source_labels = plan.compiled.source_labels;
-    for (const std::string& group_id : plan.closure) {
-        const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id);
-        if (group == nullptr)
-            continue;
-        for (const std::string& guideline_id : group->guideline_ids) {
-            if (std::find(attribution.guideline_ids.begin(), attribution.guideline_ids.end(), guideline_id) ==
-                attribution.guideline_ids.end()) {
-                attribution.guideline_ids.push_back(guideline_id);
-            }
-        }
-        for (const std::string& review_item_id : group->review_item_ids) {
-            if (std::find(attribution.review_item_ids.begin(), attribution.review_item_ids.end(), review_item_id) ==
-                attribution.review_item_ids.end()) {
-                attribution.review_item_ids.push_back(review_item_id);
-            }
-        }
-        if (!group->rationale.empty()) {
-            const std::string title = group->title.empty() ? group->id : group->title;
-            attribution.rationales.push_back(title + ": " + group->rationale);
-        }
-    }
+    const core::audit::DraftPromotionRecord attribution =
+        DraftPromotionAttribution(*workspace, plan.closure, plan.compiled.source_labels);
 
     core::commands::ApplyProposalCommand command(plan.compiled.proposal, plan.compiled.identities);
     const app::commands::DispatchOutcome outcome =

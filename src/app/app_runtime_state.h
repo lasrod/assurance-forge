@@ -265,6 +265,13 @@ struct AppRuntimeState {
     std::uint64_t draft_document_view_revision = ~std::uint64_t{0};
     std::uint64_t draft_document_view_case_revision = ~std::uint64_t{0};
     bool draft_document_view_differs = false;
+    // The draft document's SACM package, projected beside `draft_document_view`
+    // from the same pass on the same revisions. The terminology surfaces read
+    // an argument's glossary from its package rather than from the flat model,
+    // and while a draft differs from the accepted argument the glossary they
+    // show has to be the draft's: a term an AI client defined lives here and
+    // nowhere else until the draft is accepted.
+    sacm::AssuranceCasePackage draft_document_package;
 
     // An accept has replaced the accepted argument on disk and the application
     // has not re-read it yet.
@@ -306,6 +313,19 @@ struct AppRuntimeState {
     // comparison rather than the store's existence.
     const core::drafts::DraftDocumentDiff& DraftDocumentChanges();
     bool DraftDocumentHasChanges();
+
+    // The SACM package of the working argument: the draft document's while the
+    // draft differs from the accepted argument, the accepted one otherwise, and
+    // null when no argument is open. The package counterpart of
+    // `AppRuntime::CurrentArgumentView`, for the surfaces that read glossary
+    // content -- the terminology tab, the canvas's term detection, the
+    // terminology checks -- so they describe the argument the canvas draws
+    // rather than the one it drew before the draft existed.
+    //
+    // Read-only by construction: glossary EDITS still go to the accepted
+    // document through audited commands, which is why they are refused while a
+    // draft document exists (see `actions::detail::GlossaryEditsBlockedByDraft`).
+    const sacm::AssuranceCasePackage* WorkingPackage();
     // What `draft_workspace` was last opened for. A draft belongs to one
     // argument file -- element ids repeat across a project's arguments, so a
     // draft written against one must never decorate another's identically-named

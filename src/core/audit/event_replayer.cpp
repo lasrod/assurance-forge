@@ -2,6 +2,7 @@
 
 #include "core/acp/acp_editing.h"
 #include "core/assurance_tree.h"
+#include "core/audit/audit_accept.h"
 #include "core/audit/undo_resolver.h"
 #include "core/commands/acp_commands.h"
 #include "core/commands/element_commands.h"
@@ -552,6 +553,27 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
         // by the time we reach an Undo event the model is already in the
         // post-undo state. The marker remains in the log for audit and
         // history-viewer rendering only.
+        return true;
+    }
+
+    if (type == kWorkingDraftAcceptedEventType) {
+        // A working draft accepted as one document (ADR 0016). The event carries
+        // the accepted document in full, so the state is replaced by it rather
+        // than edited towards it: there was no edit sequence, only the write.
+        const std::string xml = AcceptedDocumentFromEvent(event);
+        if (xml.empty()) {
+            out_error =
+                "WorkingDraftAccepted carries no document at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        sacm_adapter::LibraryDocument accepted;
+        if (!sacm_adapter::reload_document(accepted, xml)) {
+            out_error =
+                "The accepted document could not be read at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        state.model = sacm_adapter::project_case(accepted);
+        state.package = core::project_library_package_with_tags(accepted);
         return true;
     }
 
@@ -2203,6 +2225,24 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                     model, &package, acp_id, argument_package_id, top_goal_id);
             },
             out_error);
+    }
+
+    if (type == kWorkingDraftAcceptedEventType) {
+        // The same replacement as `ApplyEvent`, on the document itself: the
+        // accepted bytes become the document, and later events apply on top of
+        // exactly what the user accepted.
+        const std::string xml = AcceptedDocumentFromEvent(event);
+        if (xml.empty()) {
+            out_error =
+                "WorkingDraftAccepted carries no document at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        if (!sacm_adapter::reload_document(document, xml)) {
+            out_error =
+                "The accepted document could not be read at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        return true;
     }
 
     if (type == "Undo" || type == "SacmRestoredFromAudit") {

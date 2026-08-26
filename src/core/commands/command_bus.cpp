@@ -236,4 +236,12 @@ CommandResult CommandBus::Execute(ICommand& command,
     return result;
 }
 
+bool CommandBus::RecordAcceptedDocument(const std::string& author,
+                                        const audit::DraftPromotionRecord& provenance,
+                                        audit::RecordAcceptedDocumentResult& out_result,
+                                        std::string& error) {
+    return audit::RecordAcceptedDocument(
+        project_.rootPath, sacm_path_, *store_, manifest_, author, provenance, out_result, error);
+}
+
 } // namespace core::commands

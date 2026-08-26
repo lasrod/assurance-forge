@@ -59,6 +59,8 @@ TerminologyActions::TerminologyActions(AppRuntimeState& state) : state_(state) {
 
 void TerminologyActions::BeginAddPackage(const core::ProjectFileEntry& entry,
                                          const sacm::SacmPackageTreeNode& parent_node) {
+    if (GlossaryEditRefused())
+        return;
     if (parent_node.type != sacm::SacmPackageNodeType::AssuranceCasePackage)
         return;
     if (!CanSwitchProjectSacmFile(state_.app_state, entry)) {
@@ -76,6 +78,8 @@ void TerminologyActions::BeginAddPackage(const core::ProjectFileEntry& entry,
 }
 
 bool TerminologyActions::ConfirmAddPackage() {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.terminology.pending_package_parent_entry.has_value()) {
         state_.terminology.show_create_package_modal = false;
         return false;
@@ -123,6 +127,8 @@ bool TerminologyActions::ConfirmAddPackage() {
 }
 
 bool TerminologyActions::ApplyPackageEdits() {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
 
@@ -144,10 +150,14 @@ bool TerminologyActions::ApplyPackageEdits() {
 }
 
 void TerminologyActions::BeginDeletePackage() {
+    if (GlossaryEditRefused())
+        return;
     state_.terminology.show_delete_package_modal = true;
 }
 
 bool TerminologyActions::ConfirmDeletePackage() {
+    if (GlossaryEditRefused())
+        return false;
     // Route the delete through the command bus instead of mutating `sacm_package`
     // directly. With a project audit bus this makes it a recorded, replayable,
     // library-primary transaction; opened outside a project it falls back to the
@@ -181,13 +191,16 @@ bool TerminologyActions::ConfirmDeletePackage() {
 
 bool TerminologyActions::OpenTermFromCanvas(const core::TerminologyPackageRef& package_ref,
                                             const core::TerminologyTermRef& term_ref) {
-    if (!state_.app_state.has_projected_package()) {
+    // The working glossary (ADR 0016): the canvas detects terms against it, so
+    // a chip it drew may name a term only the draft holds yet. Opening is a
+    // read; the tab it opens says whether what it shows is accepted.
+    const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
+    if (working_package == nullptr) {
         SetStatus(state_, "Open a SACM model before opening terminology terms.");
         return false;
     }
 
-    const sacm::TerminologyPackage* terminology_package =
-        core::FindTerminologyPackage(state_.app_state.projected_package(), package_ref);
+    const sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(*working_package, package_ref);
     if (!terminology_package) {
         SetStatus(state_, "Terminology package not found.");
         return false;
@@ -216,6 +229,8 @@ bool TerminologyActions::EditTermFromCanvas(const core::TerminologyPackageRef& p
                                             const core::TerminologyTermRef& term_ref) {
     if (!OpenTermFromCanvas(package_ref, term_ref))
         return false;
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
     const sacm::Term* term = core::FindTerminologyTerm(state_.app_state.projected_package(), package_ref, term_ref);
@@ -231,6 +246,8 @@ bool TerminologyActions::EditTermFromCanvas(const core::TerminologyPackageRef& p
 bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_id,
                                                     const core::TerminologyPackageRef& package_ref,
                                                     const core::TerminologyTermRef& term_ref) {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before associating terminology.");
         return false;
@@ -261,6 +278,8 @@ bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_i
 bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& element_id,
                                                          const core::TerminologyPackageRef& package_ref,
                                                          const core::TerminologyTermRef& term_ref) {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before adding terminology context.");
         return false;
@@ -300,6 +319,8 @@ void TerminologyActions::SelectTerm(const core::TerminologyTermRef& term_ref) {
 }
 
 void TerminologyActions::BeginAddTerm() {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a terminology package before adding terms.");
         return;
@@ -310,6 +331,8 @@ void TerminologyActions::BeginAddTerm() {
 }
 
 bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref) {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
     const sacm::Term* term = core::FindTerminologyTerm(
@@ -326,6 +349,8 @@ bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref)
 }
 
 bool TerminologyActions::ConfirmTermEdit() {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
 
@@ -363,6 +388,14 @@ bool TerminologyActions::ConfirmTermEdit() {
 // removing those is a cascade across a package boundary that the library will
 // not perform unless the caller opts in -- so the user has to be shown the list
 // and asked. An empty result means the plain delete is enough.
+bool TerminologyActions::GlossaryEditRefused() {
+    std::string reason;
+    if (!detail::GlossaryEditsBlockedByDraft(state_, reason))
+        return false;
+    SetStatus(state_, reason);
+    return true;
+}
+
 void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTermRef& term_ref) {
     state_.terminology.pending_delete_term_references.clear();
     state_.terminology.pending_delete_term_blockers.clear();
@@ -407,6 +440,8 @@ void TerminologyActions::PreviewTermDeleteReferences(const core::TerminologyTerm
 }
 
 void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_ref) {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package())
         return;
     const sacm::Term* term = core::FindTerminologyTerm(
@@ -423,6 +458,8 @@ void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_re
 }
 
 bool TerminologyActions::ConfirmDeleteTerm() {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
 
@@ -468,6 +505,8 @@ void TerminologyActions::SetCategoryFilter(const std::string& category_filter) {
 }
 
 void TerminologyActions::BeginAddCategory() {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a terminology package before adding categories.");
         return;
@@ -478,6 +517,8 @@ void TerminologyActions::BeginAddCategory() {
 }
 
 bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& category_ref) {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
     const sacm::Category* category = core::FindTerminologyCategory(
@@ -495,6 +536,8 @@ bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& c
 }
 
 void TerminologyActions::ConfirmCategoryEdit() {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package())
         return;
 
@@ -524,6 +567,8 @@ void TerminologyActions::ConfirmCategoryEdit() {
 }
 
 void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef& category_ref) {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package())
         return;
     const sacm::TerminologyPackage* terminology_package =
@@ -545,6 +590,8 @@ void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef&
 }
 
 void TerminologyActions::ConfirmDeleteCategory() {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package())
         return;
 
@@ -564,6 +611,8 @@ void TerminologyActions::ConfirmDeleteCategory() {
 }
 
 void TerminologyActions::SeedRecommendedCategories() {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package())
         return;
 
@@ -662,6 +711,8 @@ void TerminologyActions::ChangeMeaningFromCanvas(const std::string& element_id, 
 }
 
 void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, const std::string& term_value) {
+    if (GlossaryEditRefused())
+        return;
     if (!state_.app_state.has_projected_package()) {
         SetStatus(state_, "Open a SACM model before defining terms.");
         return;
@@ -695,12 +746,12 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
 }
 
 void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, const std::string& term_value) {
-    if (state_.app_state.has_projected_package()) {
+    if (const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage()) {
         const core::TerminologyPackageRef target_package_ref = ResolveQuickDefineTargetPackage(state_, element_id);
         if (HasTerminologyPackageRef(target_package_ref)) {
             state_.terminology.selected_package_ref = target_package_ref;
             if (const sacm::TerminologyPackage* package =
-                    core::FindTerminologyPackage(state_.app_state.projected_package(), target_package_ref)) {
+                    core::FindTerminologyPackage(*working_package, target_package_ref)) {
                 CopyTerminologyPackageToEditor(state_, *package);
             }
         }
@@ -717,6 +768,8 @@ void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, co
 }
 
 bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
+    if (GlossaryEditRefused())
+        return false;
     if (!state_.app_state.has_projected_package())
         return false;
 

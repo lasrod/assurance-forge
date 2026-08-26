@@ -17,6 +17,7 @@
 // Ownership follows ADR 0008 unchanged: only the running application writes here.
 
 #include "core/sacm_model.h"
+#include "legacy_sacm/sacm_model.h"
 #include "sacm_adapter/library_load.h"
 
 #include <cstdint>
@@ -93,6 +94,12 @@ public:
     // The draft as the application's flat projection, rebuilt on demand. This is
     // what reads, the canvas and the comparison consume.
     core::AssuranceCase Projection() const;
+
+    // Both derived views at once: the flat projection above and the SACM
+    // package the terminology surfaces read the glossary from. Rebuilt in one
+    // pass so the two cannot describe different drafts. Both come back empty
+    // when no draft is active.
+    void ProjectViews(core::AssuranceCase& out_model, sacm::AssuranceCasePackage& out_package) const;
 
     // Persists the draft atomically. Call after any batch of edits; the file is
     // recovery state, so losing the last few seconds of it costs a redo rather

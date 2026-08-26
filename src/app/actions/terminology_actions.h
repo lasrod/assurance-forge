@@ -72,6 +72,13 @@ private:
     // the delete, so the confirmation can list what a cascade would remove.
     void PreviewTermDeleteReferences(const core::TerminologyTermRef& term_ref);
 
+    // True, with the reason on the status line, when a glossary write has to be
+    // refused because a working draft document is open (see
+    // `detail::GlossaryEditsBlockedByDraft`). Checked at the gesture that would
+    // open an editor as well as at the confirm, so a modal never opens onto an
+    // edit that cannot be made.
+    bool GlossaryEditRefused();
+
     AppRuntimeState& state_;
 };
 
