@@ -16,6 +16,18 @@ from pathlib import Path
 # English source strings (msgid). Values are JA (msgstr). Empty value means
 # "untranslated — fall back to English".
 TRANSLATIONS = {
+    "draft": "ドラフト",
+    "term": "用語",
+    "definition": "定義",
+    "name": "名前",
+    "categories": "カテゴリ",
+    "external reference": "外部参照",
+    "origin": "出典",
+    "Added by the working draft; not yet accepted.": "作業ドラフトで追加されました。まだ受理されていません。",
+    "Changed by the working draft ({0}); not yet accepted.": "作業ドラフトで変更されました（{0}）。まだ受理されていません。",
+    "Glossary editing is paused while a working draft is open. Accept or discard the draft from the argument canvas first.": "作業ドラフトが開いている間、用語集の編集は一時停止されます。先に論証キャンバスでドラフトを受理または破棄してください。",
+    "Working draft: {0} added, {1} changed, {2} removed in this glossary. Accept the draft on the argument canvas to make them part of the case.": "作業ドラフト: この用語集で {0} 件追加、{1} 件変更、{2} 件削除。ケースに反映するには論証キャンバスでドラフトを受理してください。",
+    "The draft was accepted, but the audit log could not record it: {0}": "ドラフトは受理されましたが、監査ログに記録できませんでした: {0}",
     # ===== Already in catalog (kept for completeness / consistency) =====
     "File": "ファイル",
     "Create Empty Assurance Project": "空の保証プロジェクトを作成",

@@ -23,6 +23,7 @@ void AppRuntimeState::RefreshDraftDocumentView() {
         if (draft_document_view_revision == ~std::uint64_t{0})
             return;
         draft_document_view = parser::AssuranceCase{};
+        draft_document_package = sacm::AssuranceCasePackage{};
         draft_document_changes = core::drafts::DraftDocumentDiff{};
         draft_document_view_differs = false;
         // Reset to the sentinel, not to the current revisions: leaving the
@@ -36,11 +37,17 @@ void AppRuntimeState::RefreshDraftDocumentView() {
     if (revision == draft_document_view_revision && app_state.case_revision == draft_document_view_case_revision)
         return;
 
-    draft_document_view = draft_document.Projection();
+    draft_document.ProjectViews(draft_document_view, draft_document_package);
     draft_document_changes = core::drafts::DiffAcceptedAgainstDraft(app_state.loaded_case.value(), draft_document_view);
     draft_document_view_differs = draft_document_changes.touches_anything();
     draft_document_view_revision = revision;
     draft_document_view_case_revision = app_state.case_revision;
+}
+
+const sacm::AssuranceCasePackage* AppRuntimeState::WorkingPackage() {
+    if (DraftDocumentHasChanges())
+        return &draft_document_package;
+    return app_state.has_projected_package() ? &app_state.projected_package() : nullptr;
 }
 
 const core::drafts::DraftDocumentDiff& AppRuntimeState::DraftDocumentChanges() {

@@ -189,6 +189,15 @@ contributing source labels drawn from the provenance tags, and the resulting
 document. Undo of an accept restores the previous accepted document from the
 audit store's snapshot.
 
+Implemented (#409) as an `AcceptWorkingDraft` transaction whose single
+`WorkingDraftAccepted` event carries the accepted document in full, so the
+replayer reproduces the accept without the draft it consumed and history
+reconstruction works across it. The accept also takes a snapshot at its own
+sequence and names it the manifest's trusted replay root, so verification of
+later work starts from the bytes a human approved. That snapshot is the undo
+boundary: Ctrl+Z stops at the accept, and the previous accepted document is
+reached through restore-from-history rather than through the command stack.
+
 Draft editing records no audit transaction and triggers no accepted-file write,
 exactly as in ADR 0010, so the accepted file stays byte-stable while a draft is
 being built and a discarded draft leaves it byte-identical.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/audit/audit_accept.h"
 #include "core/audit/audit_event.h"
 #include "core/audit/audit_manifest.h"
 #include "core/audit/event_store.h"
@@ -115,6 +116,17 @@ public:
                           CommandContext& ctx,
                           const std::string& author,
                           const audit::DraftPromotionRecord& draft_promotion = {});
+
+    // Records a whole-document accept (ADR 0016) on this bus's log and manifest,
+    // after the accepted file has been written. Not a command: nothing is
+    // applied here, the file already holds the accepted draft. Routed through
+    // the bus so the hash chain it continues afterwards is the one the accept
+    // was appended to -- a second `EventStore` opened on the same log would
+    // leave this one appending with a stale previous-transaction hash.
+    bool RecordAcceptedDocument(const std::string& author,
+                                const audit::DraftPromotionRecord& provenance,
+                                audit::RecordAcceptedDocumentResult& out_result,
+                                std::string& error);
 
     const audit::AuditManifest& Manifest() const {
         return manifest_;

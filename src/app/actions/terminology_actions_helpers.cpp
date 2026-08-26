@@ -220,6 +220,15 @@ void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesyste
     state.sacm_package_tree_cache.erase(relative_path.generic_string());
 }
 
+bool GlossaryEditsBlockedByDraft(const AppRuntimeState& state, std::string& out_reason) {
+    out_reason.clear();
+    if (!state.draft_document.active())
+        return false;
+    out_reason = "Glossary editing is paused while a working draft is open. Accept or discard the draft from the "
+                 "argument canvas first.";
+    return true;
+}
+
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
     if (!app_state.current_project.has_value() || !app_state.has_unsaved_changes)
         return true;

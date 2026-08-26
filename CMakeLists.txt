@@ -479,6 +479,7 @@ add_executable(tests
     tests/test_history_reconstruction.cpp
     tests/test_reconcile_audit_store.cpp
     tests/test_audit_recovery.cpp
+    tests/test_audit_accept.cpp
     tests/test_argument_package_projection.cpp
     tests/test_canvas_history_overlay.cpp
     tests/test_audit_baseline.cpp
@@ -499,6 +500,7 @@ add_executable(tests
     tests/test_draft_document_diff.cpp
     tests/test_draft_document_lifecycle.cpp
     tests/test_draft_document_store.cpp
+    tests/test_working_glossary.cpp
     tests/test_draft_operation_apply.cpp
     tests/test_draft_workspace.cpp
     tests/test_draft_materialization_cost.cpp

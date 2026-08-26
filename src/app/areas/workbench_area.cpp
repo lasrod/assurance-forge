@@ -1,5 +1,6 @@
 #include "app/areas/workbench_area.h"
 
+#include "app/actions/terminology_actions_internal.h"
 #include "app/app_runtime_state.h"
 #include "app/areas/canvas_history_overlay.h"
 #include "app/frame/app_layout_regions.h"
@@ -171,8 +172,9 @@ void RenderGsnCanvasTab(AppRuntimeState& state, ui::UiState& ui_state, const Wor
     const parser::AssuranceCase* visible_case =
         state.IsProposalCanvasActive() ? &state.proposal_controller->preview_model : accepted_or_working;
     ui_state.proposal_canvas_active = state.IsProposalCanvasActive();
-    const sacm::AssuranceCasePackage* terminology_package =
-        state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
+    // The working argument's glossary (ADR 0016): the canvas draws the draft,
+    // so the terms it detects in the draft's claims have to be the draft's.
+    const sacm::AssuranceCasePackage* terminology_package = state.WorkingPackage();
     ui::gsn::ShowGsnCanvasContent(ui_state, visible_case, actions, terminology_package);
 }
 
@@ -307,17 +309,82 @@ void RenderArgumentPackageCanvasTab(AppRuntimeState& state,
         renderer.RequestFocusOnIds({}, /*fit_all_fallback=*/true);
     }
 
-    const sacm::AssuranceCasePackage* terminology_package =
-        state.app_state.has_projected_package() ? &state.app_state.projected_package() : nullptr;
+    // The working argument's glossary (ADR 0016): the canvas draws the draft,
+    // so the terms it detects in the draft's claims have to be the draft's.
+    const sacm::AssuranceCasePackage* terminology_package = state.WorkingPackage();
     RenderArgumentPackageCanvasWithTimeline(
         state, ui_state, callbacks, tab, *argument_package, cache.visible_case, renderer, actions, terminology_package);
 }
 
-void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
-    const sacm::TerminologyPackage* terminology_package = nullptr;
-    if (state.app_state.has_projected_package()) {
-        terminology_package =
-            core::FindTerminologyPackage(state.app_state.projected_package(), state.terminology.selected_package_ref);
+// The glossary rows the working draft added or changed, read off the same
+// comparison the banner and the canvas decorations use, so the tab cannot claim
+// a draft change the banner does not count. Only terms and categories: the tab
+// has rows for nothing else. A removed row has no row to badge and is counted
+// in the notice.
+void CollectGlossaryDraftMarks(AppRuntimeState& state, ui::panels::TerminologyPackagePanelModel& model) {
+    if (!state.DraftDocumentHasChanges())
+        return;
+    const core::drafts::DraftDocumentDiff& diff = state.DraftDocumentChanges();
+    int added = 0;
+    int changed = 0;
+    int removed = 0;
+    for (const core::drafts::DraftDocumentChange& change : diff.changes) {
+        const std::vector<core::SacmElement>& elements = change.change == core::drafts::DraftElementChange::Removed
+                                                             ? diff.removed
+                                                             : state.draft_document_view.elements;
+        const core::SacmElement* element = nullptr;
+        for (const core::SacmElement& candidate : elements) {
+            if (candidate.id == change.element_id) {
+                element = &candidate;
+                break;
+            }
+        }
+        if (element == nullptr || (element->type != "term" && element->type != "category"))
+            continue;
+        switch (change.change) {
+        case core::drafts::DraftElementChange::Added:
+            ++added;
+            break;
+        case core::drafts::DraftElementChange::Modified:
+            ++changed;
+            break;
+        case core::drafts::DraftElementChange::Removed:
+            ++removed;
+            break;
+        case core::drafts::DraftElementChange::Unchanged:
+            break;
+        }
+        if (change.change != core::drafts::DraftElementChange::Removed)
+            model.draft_marks.push_back(
+                ui::panels::TerminologyDraftMark{change.element_id, change.change, change.fields});
+    }
+    if (added + changed + removed == 0)
+        return;
+    model.working_draft_notice =
+        ui::i18n::trf("Working draft: {0} added, {1} changed, {2} removed in this glossary. Accept the draft on the "
+                      "argument canvas to make them part of the case.",
+                      std::to_string(added),
+                      std::to_string(changed),
+                      std::to_string(removed));
+}
+
+} // namespace
+
+ui::panels::TerminologyPackagePanelModel BuildTerminologyPackagePanelModel(AppRuntimeState& state) {
+    // The working argument's package (ADR 0016): the draft's glossary while a
+    // draft differs from the accepted argument. A term an AI client has just
+    // defined is in no other package, and this tab is where a human reads the
+    // definition before deciding whether to accept it -- reading the accepted
+    // package here left the tab showing the glossary from before the draft,
+    // which looked like the client's change had not happened.
+    const sacm::AssuranceCasePackage* package = state.WorkingPackage();
+    const sacm::TerminologyPackage* terminology_package =
+        package != nullptr ? core::FindTerminologyPackage(*package, state.terminology.selected_package_ref) : nullptr;
+    // A glossary the draft itself created has no accepted counterpart for the
+    // explorer to have selected, so the draft's only glossary stands in.
+    if (terminology_package == nullptr && package != nullptr && state.DraftDocumentHasChanges() &&
+        package->terminologyPackages.size() == 1u) {
+        terminology_package = &package->terminologyPackages.front();
     }
     std::string delete_block_reason;
     const bool can_delete =
@@ -340,10 +407,26 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
     model.category_filter_buffer_size = sizeof(state.terminology.category_filter_buf);
     if (terminology_package) {
         model.term_issues = core::ValidateTerminologyTerms(*terminology_package);
-        model.term_usage_summaries =
-            core::BuildTerminologyTermUsageSummaries(state.app_state.projected_package(), *terminology_package);
+        model.term_usage_summaries = core::BuildTerminologyTermUsageSummaries(*package, *terminology_package);
         model.category_usage_summaries = core::BuildTerminologyCategoryUsageSummaries(*terminology_package);
     }
+
+    // The same rule the actions enforce, stated on the tab so the user learns it
+    // from a disabled button rather than from a refused click.
+    std::string locked_reason;
+    if (actions::detail::GlossaryEditsBlockedByDraft(state, locked_reason)) {
+        model.editing_locked = true;
+        model.editing_locked_reason = AF_TR("Glossary editing is paused while a working draft is open. Accept or "
+                                            "discard the draft from the argument canvas first.");
+    }
+    CollectGlossaryDraftMarks(state, model);
+    return model;
+}
+
+namespace {
+
+void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCallbacks& callbacks) {
+    const ui::panels::TerminologyPackagePanelModel model = BuildTerminologyPackagePanelModel(state);
 
     ui::panels::TerminologyPackagePanelCallbacks package_callbacks;
     package_callbacks.apply_changes = callbacks.apply_terminology_package_edits;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/drafts/draft_change_index.h"
 #include "core/terminology_package_service.h"
 #include "legacy_sacm/sacm_model.h"
 
@@ -10,6 +11,17 @@
 #include <vector>
 
 namespace ui::panels {
+
+// How the working draft changed one glossary row (a term or a category), so
+// the panel can badge it. A removed row has no row to badge; it is counted in
+// the notice instead.
+struct TerminologyDraftMark {
+    std::string element_id;
+    core::drafts::DraftElementChange change = core::drafts::DraftElementChange::Unchanged;
+    // For a changed row, the projected fields that differ ("description",
+    // "category_refs", ...), as the comparison names them.
+    std::vector<std::string> fields;
+};
 
 struct TerminologyPackagePanelModel {
     const sacm::TerminologyPackage* package = nullptr;
@@ -29,6 +41,19 @@ struct TerminologyPackagePanelModel {
     std::vector<core::TerminologyTermIssue> term_issues;
     std::vector<core::TerminologyTermUsageSummary> term_usage_summaries;
     std::vector<core::TerminologyCategoryUsageSummary> category_usage_summaries;
+
+    // Set while the glossary shown is the working draft's rather than the
+    // accepted one (ADR 0016): the line that says so, and how each row differs
+    // from the accepted glossary. Both empty when the accepted glossary is shown.
+    std::string working_draft_notice;
+    std::vector<TerminologyDraftMark> draft_marks;
+
+    // Glossary edits are refused while a draft document exists -- they would go
+    // to the accepted document, which the draft no longer descends from, and be
+    // undone by the accept. The panel disables every editing control and shows
+    // the reason; reading, searching and finding usages stay available.
+    bool editing_locked = false;
+    std::string editing_locked_reason;
 };
 
 // A persisted terminology-ignore decision shown in the panel's "Ignored terms"

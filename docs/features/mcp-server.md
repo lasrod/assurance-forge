@@ -220,13 +220,19 @@ Each field is written by its own seam, so classifying a term cannot disturb its
 definition — routing the whole term through the library's replace-everything
 update would rewrite the definition in one language and drop its translations.
 
-A staged glossary is reviewable on its Draft Changes row, which lists each
-term with its definition, categories and source in full — a term is
-deliberately not a GSN node, so unlike an argument change there is no canvas
-rendering beside the row to read it from. Clicking such a row therefore does
-not jump to the canvas: it opens the terminology view for a term already in the
-accepted glossary, and stays on the row for one this draft created, which that
-view cannot show until it is promoted.
+A staged glossary is read in the Terminology Package tab, which shows the
+**working** glossary (ADR 0016): while the draft differs from the accepted
+argument, the tab, the canvas's term detection and the terminology checks all
+read the draft document's package, so a definition a client wrote or revised
+is visible the moment it is staged. Every row the draft added or changed is
+badged `draft`, with the fields that differ, under a notice counting the
+unaccepted glossary changes; a glossary the draft itself created is shown even
+though the accepted case has none. A term is deliberately not a GSN node, so
+unlike an argument change there is no canvas rendering to read it from — the
+tab is where it is read. While a draft document exists the tab's editing
+controls are disabled and every in-application glossary edit is refused with a
+reason: those edits write to the accepted document, which the draft no longer
+descends from, and accepting the draft would silently undo them.
 
 When the case has no `terminologyPackage`, accepting the first `CreateTerm`
 creates one under the root assurance case package rather than refusing — a case
@@ -250,9 +256,17 @@ generated ids, dependencies and events. It performs no SACM write, no command
 and no audit transaction. Restarting Assurance Forge restores the same graph and
 revision.
 
-Promotion remains an ordinary audited `ApplyProposalCommand`, undoable and
-replayable, and is exposed only in Assurance Forge. There is deliberately no
+Accepting a draft is exposed only in Assurance Forge. There is deliberately no
 MCP `apply`, `accept` or `promote` tool; a registry-wide test enforces this.
+Accepting a draft document writes it over the argument in one atomic replace
+and records one `AcceptWorkingDraft` transaction whose event carries the
+accepted document and the draft's provenance — groups, sources, guidelines and
+rationales — so the audit log can reproduce the accepted argument without the
+draft it consumed, the history slider reconstructs the states on either side of
+the accept, and the next project open verifies instead of reporting the accept
+as a divergence. The accept becomes the trusted replay root and an undo
+boundary; the operation-staging fallback still promotes through the audited
+`ApplyProposalCommand`.
 
 For one migration release, `begin_change_set`, `describe_change_set` and
 `submit_change_set` are aliases for the group operations and results include

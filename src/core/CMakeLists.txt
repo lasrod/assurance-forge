@@ -20,6 +20,7 @@ add_library(af_core OBJECT
     argument_package_projection.cpp
     assurance_tree.cpp
     derived_views.cpp
+    audit/audit_accept.cpp
     audit/audit_baseline.cpp
     audit/audit_event.cpp
     audit/audit_diff.cpp

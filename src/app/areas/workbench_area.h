@@ -79,6 +79,13 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 // set showed eighty staged elements and the other showed none -- and unit tests
 // of both halves passed throughout, because each half worked. Choosing the model
 // and choosing the projection are one decision and are tested as one.
+// The model the Terminology Package tab renders, built from the WORKING
+// package (ADR 0016): the draft's glossary while a draft differs from the
+// accepted argument, badged row by row with what the draft changed, and with
+// editing locked while a draft document exists. Exposed so the tab's claims
+// can be tested without ImGui.
+ui::panels::TerminologyPackagePanelModel BuildTerminologyPackagePanelModel(AppRuntimeState& state);
+
 parser::AssuranceCase BuildArgumentPackageCanvasCase(const parser::AssuranceCase& committed,
                                                      const std::optional<parser::AssuranceCase>& agent_preview,
                                                      const std::vector<std::string>& agent_preview_added_ids,
