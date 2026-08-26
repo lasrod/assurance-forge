@@ -488,6 +488,7 @@ add_executable(tests
     tests/test_undo_command.cpp
     tests/test_dialectic_challenge.cpp
     tests/test_projection_coverage.cpp
+    tests/test_project_semantic_hashes.cpp
     tests/test_bridge_protocol.cpp
     tests/test_instance_registry.cpp
     tests/test_bridge_transport.cpp

@@ -17,7 +17,6 @@
 #include "bridge/instance_registry.h"
 #include "core/translation_review_store.h"
 #include "core/drafts/draft_dependency_graph.h"
-#include "core/drafts/draft_operation_apply.h"
 #include "core/drafts/draft_promotion_service.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
@@ -1737,23 +1736,11 @@ bool AppRuntime::StageHumanDraftOperations(const std::string& title,
     // contributed what; the document is the argument. Recording a contribution
     // the document refused would leave the ledger describing an edit that never
     // happened.
-    if (impl_->draft_document.active() && impl_->app_state.library_document != nullptr) {
-        const core::drafts::DraftOperationResult applied =
-            core::drafts::ApplyOperationsToDraftDocument(*impl_->draft_document.document(), operations);
-        if (!applied.applied) {
+    if (app::commands::DraftDocumentTakesEdits(*impl_)) {
+        const app::commands::DraftEditOutcome applied = app::commands::DispatchDraftDocumentEdit(*impl_, operations);
+        if (!applied.success)
             error = applied.error;
-            return false;
-        }
-        impl_->draft_document.MarkChanged();
-        std::string save_error;
-        if (!impl_->draft_document.Save(save_error)) {
-            // The edit is in the draft; only the recovery copy of it is not. Said
-            // plainly rather than reported as a refusal, which would invite the
-            // user to repeat an edit that already landed.
-            SetStatus(ui::i18n::trf("The edit was made, but the draft could not be written to disk: {0}", save_error));
-        }
-        impl_->tree_needs_rebuild = true;
-        return true;
+        return applied.success;
     }
 
     // One group for the session's hand edits rather than one per click: a

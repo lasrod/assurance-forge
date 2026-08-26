@@ -259,8 +259,7 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             callbacks.select_term) {
             callbacks.select_term(ref);
         }
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_term &&
-            !model.editing_locked) {
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_term) {
             callbacks.edit_term(ref);
         }
         RenderDraftMark(DraftMarkFor(term.id, model.draft_marks));
@@ -355,8 +354,7 @@ void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
         ImGui::PushID(id.c_str());
         if (ImGui::Selectable(id.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns) && callbacks.select_category)
             callbacks.select_category(ref);
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_category &&
-            !model.editing_locked)
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.edit_category)
             callbacks.edit_category(ref);
         RenderDraftMark(DraftMarkFor(category.id, model.draft_marks));
         ImGui::PopID();
@@ -406,10 +404,14 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
         ImGui::TextWrapped("%s", model.working_draft_notice.c_str());
         ImGui::PopStyleColor();
     }
-    const bool locked = model.editing_locked;
-    if (locked && !model.editing_locked_reason.empty())
-        ImGui::TextDisabled("%s", model.editing_locked_reason.c_str());
-    if (!model.working_draft_notice.empty() || locked)
+    if (!model.draft_edit_notice.empty())
+        ImGui::TextWrapped("%s", model.draft_edit_notice.c_str());
+    // Only the package-level controls lock: the draft takes term and category
+    // edits, so disabling those would hide an edit the user can make.
+    const bool locked = model.package_edits_locked;
+    if (locked && !model.package_edits_locked_reason.empty())
+        ImGui::TextDisabled("%s", model.package_edits_locked_reason.c_str());
+    if (!model.working_draft_notice.empty() || !model.draft_edit_notice.empty() || locked)
         ImGui::Spacing();
 
     const ImGuiInputTextFlags text_flags = locked ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_None;
@@ -448,14 +450,10 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::Spacing();
     ImGui::SeparatorText(AF_TR("Terms").c_str());
     const bool no_term_selected = model.selected_term_ref.id.empty() && model.selected_term_ref.gid.empty();
-    if (locked)
-        ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Add Term").c_str()) && callbacks.add_term)
         callbacks.add_term();
-    if (locked)
-        ImGui::EndDisabled();
     ImGui::SameLine();
-    const bool edit_term_disabled = locked || (callbacks.edit_term && no_term_selected);
+    const bool edit_term_disabled = callbacks.edit_term && no_term_selected;
     if (edit_term_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Edit Term").c_str()) && callbacks.edit_term)
@@ -463,7 +461,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (edit_term_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    const bool delete_term_disabled = locked || (callbacks.delete_term && no_term_selected);
+    const bool delete_term_disabled = callbacks.delete_term && no_term_selected;
     if (delete_term_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Term").c_str()) && callbacks.delete_term)
@@ -478,12 +476,8 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (callbacks.find_term_usages && no_term_selected)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (locked)
-        ImGui::BeginDisabled();
     if (ImGui::Button((AF_TR("Add Category") + "##terms_add_category").c_str()) && callbacks.add_category)
         callbacks.add_category();
-    if (locked)
-        ImGui::EndDisabled();
     ImGui::SameLine();
     RenderCategoryFilter(model, callbacks);
     ImGui::SetNextItemWidth(-1.0f);
@@ -503,16 +497,12 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
 
     ImGui::Spacing();
     ImGui::SeparatorText(AF_TR("Categories").c_str());
-    if (locked)
-        ImGui::BeginDisabled();
     if (ImGui::Button((AF_TR("Add Category") + "##categories_add_category").c_str()) && callbacks.add_category)
         callbacks.add_category();
-    if (locked)
-        ImGui::EndDisabled();
     ImGui::SameLine();
     const bool has_selected_category =
         !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
-    const bool category_edit_disabled = locked || !has_selected_category;
+    const bool category_edit_disabled = !has_selected_category;
     if (category_edit_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Edit Category").c_str()) && callbacks.edit_category)
@@ -520,20 +510,19 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (category_edit_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (category_edit_disabled)
+    // A category delete cascades into the terms that carry it, which the draft
+    // cannot express -- so this one stays with the package-level lock.
+    const bool category_delete_disabled = locked || !has_selected_category;
+    if (category_delete_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Category").c_str()) && callbacks.delete_category)
         callbacks.delete_category(model.selected_category_ref);
-    if (category_edit_disabled)
+    if (category_delete_disabled)
         ImGui::EndDisabled();
     if (model.package->categories.empty() && callbacks.seed_recommended_categories) {
         ImGui::SameLine();
-        if (locked)
-            ImGui::BeginDisabled();
         if (ImGui::Button(AF_TR("Add Recommended").c_str()))
             callbacks.seed_recommended_categories();
-        if (locked)
-            ImGui::EndDisabled();
     }
     ImGui::Spacing();
     RenderCategoriesTable(model, callbacks);

@@ -63,6 +63,11 @@ bool IsArgumentTerminologyPackage(const sacm::ArgumentPackage& argument_package,
 
 core::TerminologyPackageRef ResolveQuickDefineTargetPackage(const AppRuntimeState& state,
                                                             const std::string& element_id);
+// The same choice made in `package` -- the working package while a draft takes
+// the edits -- rather than in the accepted one.
+core::TerminologyPackageRef ResolveQuickDefineTargetPackageIn(const AppRuntimeState& state,
+                                                              const sacm::AssuranceCasePackage& package,
+                                                              const std::string& element_id);
 
 struct QuickDefineTargetPackageResult {
     core::TerminologyPackageRef package_ref;
@@ -74,15 +79,27 @@ QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& s
 
 void InvalidateSacmPackageTreeCache(AppRuntimeState& state, const std::filesystem::path& relative_path);
 
-// Glossary edits go to the ACCEPTED document through audited commands. While a
-// draft document exists (ADR 0016), the accepted document is no longer what the
-// user is looking at, and an edit made to it would be silently undone by the
-// accept: the draft is a copy taken before the edit, and accepting it replaces
-// the file with that copy. So every glossary write is refused until the draft
-// is accepted or discarded. Returns true when refused, with the reason to show
-// in `out_reason` -- translated, and the single source of that sentence for the
-// status line and the Terminology tab alike.
-bool GlossaryEditsBlockedByDraft(const AppRuntimeState& state, std::string& out_reason);
+// While a draft document exists (ADR 0016) the user's glossary edits go into
+// it, the way their argument edits already do (`app::commands::
+// DraftDocumentTakesEdits`). What cannot go into the draft is what its operation
+// vocabulary cannot express: terminology packages, category deletion, and
+// linking a term to an element as context. Those write to the ACCEPTED
+// document, which the draft no longer descends from, and an edit made to it
+// would be silently undone by the accept -- the draft is a copy taken before
+// the edit, and accepting it replaces the file with that copy. So they are
+// refused until the draft is accepted or discarded.
+//
+// Returns true when refused, with the reason in `out_reason`: translated, with
+// `gesture` (already translated, e.g. "Deleting a category") naming the edit.
+// One sentence for the status line and the Terminology tab alike, so the two
+// cannot drift apart.
+bool AcceptedGlossaryEditBlockedByDraft(const AppRuntimeState& state,
+                                        const std::string& gesture,
+                                        std::string& out_reason);
+
+// What the Terminology tab says above its controls while the draft takes the
+// edits, so the user learns where a change goes before making it.
+std::string GlossaryDraftEditNotice();
 
 bool CanSwitchProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry);
 bool IsActiveProjectSacmFile(const core::AppState& app_state, const core::ProjectFileEntry& entry);

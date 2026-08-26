@@ -322,9 +322,12 @@ struct AppRuntimeState {
     // terminology checks -- so they describe the argument the canvas draws
     // rather than the one it drew before the draft existed.
     //
-    // Read-only by construction: glossary EDITS still go to the accepted
-    // document through audited commands, which is why they are refused while a
-    // draft document exists (see `actions::detail::GlossaryEditsBlockedByDraft`).
+    // A view, not an editing surface: while a draft document exists the user's
+    // term and category edits go INTO the draft through the same operations an
+    // MCP client sends (`app::commands::DispatchDraftDocumentEdit`), and what
+    // the draft cannot express -- packages, category deletion, term-as-context
+    // links -- is refused until the draft is accepted or discarded (see
+    // `actions::detail::AcceptedGlossaryEditBlockedByDraft`).
     const sacm::AssuranceCasePackage* WorkingPackage();
     // What `draft_workspace` was last opened for. A draft belongs to one
     // argument file -- element ids repeat across a project's arguments, so a

@@ -2,6 +2,8 @@
 
 #include "core/sha256.h"
 #include "parser/xml_parser.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 
 #include <algorithm>
 #include <fstream>
@@ -198,8 +200,35 @@ bool IsSafeRelativePath(const std::filesystem::path& path) {
     return true;
 }
 
+namespace {
+
+// The elements the manifest's semantic hashes are computed over.
+//
+// Read through the SACM library, which is what the application itself loads an
+// argument with, and only then through the legacy tag-dialect parser. The
+// legacy parser recognises elements by tag name (`<claim>`, `<assertedInference>`)
+// and sees NOTHING in the XMI dialect every current project is written in
+// (`<argumentElement xsi:type="sacm:Claim">`), so hashing its result gave every
+// such argument the digest of an empty element list -- three identical
+// SHA-256s of the empty string in `af.proj`, and a load report saying the
+// semantic hashes were recalculated. Reported from a saved example project.
+std::expected<core::AssuranceCase, std::string> LoadCaseForHashing(const std::filesystem::path& absolute_path) {
+    const sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(absolute_path);
+    if (outcome.ok && outcome.document != nullptr)
+        return sacm_adapter::project_case(*outcome.document);
+
+    std::expected<core::AssuranceCase, std::string> legacy = parser::parse_sacm_xml(absolute_path.string());
+    if (legacy)
+        return legacy;
+
+    const std::string library_reason = sacm_adapter::summarize_load_diagnostics(outcome.diagnostics);
+    return std::unexpected(library_reason.empty() ? legacy.error() : library_reason);
+}
+
+} // namespace
+
 void ComputeSacmHashes(ProjectFileEntry& entry, const std::filesystem::path& absolute_path) {
-    auto result = parser::parse_sacm_xml(absolute_path.string());
+    std::expected<core::AssuranceCase, std::string> result = LoadCaseForHashing(absolute_path);
     if (!result) {
         entry.parseStatus = "parseError";
         entry.state = ProjectFileState::ParseError;

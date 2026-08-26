@@ -48,12 +48,18 @@ struct TerminologyPackagePanelModel {
     std::string working_draft_notice;
     std::vector<TerminologyDraftMark> draft_marks;
 
-    // Glossary edits are refused while a draft document exists -- they would go
-    // to the accepted document, which the draft no longer descends from, and be
-    // undone by the accept. The panel disables every editing control and shows
-    // the reason; reading, searching and finding usages stay available.
-    bool editing_locked = false;
-    std::string editing_locked_reason;
+    // Set while a draft document exists (ADR 0016): terms and categories the
+    // user adds, changes or deletes go into the working draft, and the panel
+    // says so above its controls before the first click.
+    std::string draft_edit_notice;
+
+    // What the draft cannot take -- the package's own name and description,
+    // deleting the package, deleting a category -- writes to the accepted
+    // document, which the draft no longer descends from, and would be undone by
+    // the accept. Those controls are disabled with the reason; term and
+    // category editing, reading, searching and finding usages stay available.
+    bool package_edits_locked = false;
+    std::string package_edits_locked_reason;
 };
 
 // A persisted terminology-ignore decision shown in the panel's "Ignored terms"
