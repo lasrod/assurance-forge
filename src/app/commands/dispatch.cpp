@@ -154,12 +154,15 @@ bool DraftDocumentTakesEdits(const AppRuntimeState& state) {
 DraftEditOutcome DispatchDraftDocumentEdit(AppRuntimeState& state,
                                            const std::vector<core::reviews::PatchOperation>& operations) {
     DraftEditOutcome outcome;
+    // Translated here: these reach the status line as the reason a term or
+    // category edit was refused, unlike the audited path's strings, which
+    // predate the catalog (#252).
     if (!DraftDocumentTakesEdits(state)) {
-        outcome.error = "There is no working draft to edit.";
+        outcome.error = AF_TR("There is no working draft to edit.");
         return outcome;
     }
     if (IsActiveCanvasInHistoricalPreview(state)) {
-        outcome.error = "Cannot edit while viewing history. Return to Latest to make changes.";
+        outcome.error = AF_TR("Cannot edit while viewing history. Return to Latest to make changes.");
         return outcome;
     }
 

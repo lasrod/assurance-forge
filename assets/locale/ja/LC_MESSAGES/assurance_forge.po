@@ -439,6 +439,9 @@ msgstr "CSE 行"
 msgid "Cancel"
 msgstr "キャンセル"
 
+msgid "Cannot edit while viewing history. Return to Latest to make changes."
+msgstr "履歴の表示中は編集できません。変更するには「最新」に戻ってください。"
+
 msgid "Cannot reconcile audit log: active SACM file is no longer listed in the project."
 msgstr "監査ログを整合できません: 有効な SACM ファイルがプロジェクトに登録されていません。"
 
@@ -2271,6 +2274,9 @@ msgstr "作業ドラフトはこの要素を変更しません。NEW、EDIT、MU
 
 msgid "Theme"
 msgstr "テーマ"
+
+msgid "There is no working draft to edit."
+msgstr "編集できる作業ドラフトがありません。"
 
 msgid "There is nothing to reject."
 msgstr "却下できるものがありません。"

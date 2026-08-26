@@ -453,7 +453,9 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (ImGui::Button(AF_TR("Add Term").c_str()) && callbacks.add_term)
         callbacks.add_term();
     ImGui::SameLine();
-    const bool edit_term_disabled = callbacks.edit_term && no_term_selected;
+    // A control whose callback is unset is disabled, not merely inert: an
+    // enabled button that does nothing is an affordance that lies.
+    const bool edit_term_disabled = !callbacks.edit_term || no_term_selected;
     if (edit_term_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Edit Term").c_str()) && callbacks.edit_term)
@@ -461,7 +463,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (edit_term_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    const bool delete_term_disabled = callbacks.delete_term && no_term_selected;
+    const bool delete_term_disabled = !callbacks.delete_term || no_term_selected;
     if (delete_term_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Term").c_str()) && callbacks.delete_term)
@@ -469,11 +471,12 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (delete_term_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
-    if (callbacks.find_term_usages && no_term_selected)
+    const bool find_usages_disabled = !callbacks.find_term_usages || no_term_selected;
+    if (find_usages_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Find Usages").c_str()) && callbacks.find_term_usages)
         callbacks.find_term_usages(model.selected_term_ref);
-    if (callbacks.find_term_usages && no_term_selected)
+    if (find_usages_disabled)
         ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button((AF_TR("Add Category") + "##terms_add_category").c_str()) && callbacks.add_category)
@@ -502,7 +505,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::SameLine();
     const bool has_selected_category =
         !model.selected_category_ref.id.empty() || !model.selected_category_ref.gid.empty();
-    const bool category_edit_disabled = !has_selected_category;
+    const bool category_edit_disabled = !callbacks.edit_category || !has_selected_category;
     if (category_edit_disabled)
         ImGui::BeginDisabled();
     if (ImGui::Button(AF_TR("Edit Category").c_str()) && callbacks.edit_category)
@@ -512,7 +515,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     ImGui::SameLine();
     // A category delete cascades into the terms that carry it, which the draft
     // cannot express -- so this one stays with the package-level lock.
-    const bool category_delete_disabled = locked || !has_selected_category;
+    const bool category_delete_disabled = locked || !callbacks.delete_category || !has_selected_category;
     if (category_delete_disabled)
         ImGui::BeginDisabled();
     if (ui::widgets::DangerButton(AF_TR("Delete Category").c_str()) && callbacks.delete_category)

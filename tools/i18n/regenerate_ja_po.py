@@ -43,6 +43,8 @@ TRANSLATIONS = {
     "Added recommended terminology categories to the working draft.": "推奨用語カテゴリを作業ドラフトに追加しました。",
     "Added term {0} to the working draft. Adding it as context changes the accepted argument, so do that once the draft is accepted.": "用語 {0} を作業ドラフトに追加しました。コンテキストとしての追加は受理済みの論証を変更するため、ドラフトの受理後に行ってください。",
     "A glossary will be created in the working draft.": "用語集は作業ドラフトに作成されます。",
+    "There is no working draft to edit.": "編集できる作業ドラフトがありません。",
+    "Cannot edit while viewing history. Return to Latest to make changes.": "履歴の表示中は編集できません。変更するには「最新」に戻ってください。",
     "Working draft: {0} added, {1} changed, {2} removed in this glossary. Accept the draft on the argument canvas to make them part of the case.": "作業ドラフト: この用語集で {0} 件追加、{1} 件変更、{2} 件削除。ケースに反映するには論証キャンバスでドラフトを受理してください。",
     "The draft was accepted, but the audit log could not record it: {0}": "ドラフトは受理されましたが、監査ログに記録できませんでした: {0}",
     # ===== Already in catalog (kept for completeness / consistency) =====
