@@ -177,6 +177,36 @@ private:
     bool was_no_op_ = false;
 };
 
+// Record where a piece of evidence is: the location of the Resource an
+// ArtifactReference cites, creating the Resource when the reference cites none
+// (see `sacm_adapter::apply_set_evidence_location`). Library-only: the legacy
+// models have no field for a Resource's location, so without a document the
+// command refuses rather than recording an event replay could not reproduce.
+// The previous location is captured so the history can show the change.
+class SetEvidenceLocationCommand final : public ICommand {
+public:
+    SetEvidenceLocationCommand(std::string element_id, std::string location)
+        : element_id_(std::move(element_id)), location_(std::move(location)) {}
+
+    std::string Name() const override {
+        return "SetEvidenceLocation";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& OldLocation() const {
+        return old_location_;
+    }
+    bool WasNoOp() const {
+        return was_no_op_;
+    }
+
+private:
+    std::string element_id_;
+    std::string location_;
+    std::string old_location_;
+    bool was_no_op_ = false;
+};
+
 // Remove one relationship, leaving both endpoints in place. Distinct from
 // `RemoveElementCommand`, whose plan is node-shaped: it walks the GSN tree,
 // excludes relationship ids and reparents structural children, none of which is

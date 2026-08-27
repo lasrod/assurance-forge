@@ -64,6 +64,11 @@ struct WorkbenchAreaCallbacks {
     // route to it that does not pass through a person clicking here.
     std::function<void()> promote_working_draft;
     std::function<void()> discard_working_draft;
+    // The evidence register's actions (see AppRuntime for what each does).
+    std::function<void(const std::string& element_id)> locate_element;
+    std::function<void(const std::string& evidence_id)> remove_evidence;
+    std::function<void(const std::string& evidence_id, const std::string& location)> set_evidence_location;
+    std::function<void(const std::string& location)> open_evidence_location;
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,

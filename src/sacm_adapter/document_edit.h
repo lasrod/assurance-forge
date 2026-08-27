@@ -740,6 +740,19 @@ EditOutcome apply_set_term_external_reference(LibraryDocument& document,
                                               const std::string& external_reference);
 EditOutcome apply_set_term_origin(LibraryDocument& document, const std::string& term_id, const std::string& origin_id);
 
+// Record where a piece of evidence is. `element_id` must be an ArtifactReference
+// (a GSN Solution); anything else is refused with SACM-CMD-002. The location is
+// written to the Resource the reference cites (clause 12.12 `location`, in the
+// language that entry already carries, "en" for a new one). A reference that
+// cites no Resource gains one: created in the case's first ArtifactPackage --
+// created too when the case has none -- named after the reference, and cited
+// ALONGSIDE whatever the reference already cited, so an Artifact recording what
+// the evidence is stays cited next to the Resource recording where it is. An
+// empty `location` clears the cited Resource's location, and is a no-op on a
+// reference that cites none: nothing is created to hold nothing.
+EditOutcome
+apply_set_evidence_location(LibraryDocument& document, const std::string& element_id, const std::string& location);
+
 // (7) Delete a terminology package, category, or term, mirroring the primitive
 // the legacy delete mutators compose: `DeleteElement` with the
 // DeleteReferencingRelationships policy so no relationship is left dangling. This

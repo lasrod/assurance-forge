@@ -395,6 +395,7 @@ add_executable(tests
     tests/test_gsn_repair.cpp
     tests/test_gsn_repair_fixture.cpp
     tests/test_register_model.cpp
+    tests/test_evidence_location.cpp
     tests/test_assurance_tree.cpp
     tests/test_layout.cpp
     tests/test_problem_attention.cpp

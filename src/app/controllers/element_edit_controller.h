@@ -50,6 +50,9 @@ public:
     bool
     MoveStrategyToReasoning(AppRuntimeState& state, const std::string& relationship_id, const std::string& strategy_id);
     bool SetElementUndeveloped(AppRuntimeState& state, const std::string& element_id, bool undeveloped);
+    // Records where a piece of evidence is (the cited Resource's location) as
+    // an audited edit; an empty location clears it.
+    bool SetEvidenceLocation(AppRuntimeState& state, const std::string& element_id, const std::string& location);
     // Give `element_id` the next identifier free under its own prefix, the
     // repair for two nodes answering to the same one.
     bool RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id);

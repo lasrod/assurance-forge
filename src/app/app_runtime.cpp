@@ -21,6 +21,7 @@
 #include "app/confidence_problem_sync.h"
 #include "app/frame/app_menu_bar.h"
 #include "app/frame/app_shell.h"
+#include "app/native_file_dialogs.h"
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
@@ -44,6 +45,7 @@
 #include "core/time_utils.h"
 #include "imgui.h"
 #include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/document_edit.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_canvas.h"
@@ -370,6 +372,99 @@ void AppRuntime::RemoveSelected(core::RemoveMode mode) {
     if (RemoveSelectedAsDraft(mode))
         return;
     actions::ElementActions(*impl_).RemoveSelected(mode);
+}
+
+void AppRuntime::LocateElementOnCanvas(const std::string& element_id) {
+    if (element_id.empty())
+        return;
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.selected_element_id = element_id;
+    ui_state.selected_acp_id.clear();
+    ui_state.selected_relationship_id.clear();
+    ui_state.selected_relationship_edge_key.clear();
+
+    // The canvas tabs are per argument package, so the element's own package
+    // is opened (or brought forward) with the element focused. The working
+    // document is asked first: an element that exists only in the draft is
+    // not in the accepted one.
+    const sacm_adapter::LibraryDocument* document = nullptr;
+    if (DraftEditingActive())
+        document = impl_->draft_document.document();
+    if (document == nullptr)
+        document = impl_->app_state.library_document.get();
+    std::string package_id;
+    if (document != nullptr)
+        package_id = sacm_adapter::resolve_argument_package_id(*document, element_id);
+
+    std::string package_gid;
+    std::string title;
+    if (!package_id.empty() && impl_->app_state.has_projected_package()) {
+        for (const sacm::ArgumentPackage& package : impl_->app_state.projected_package().argumentPackages) {
+            if (package.id != package_id)
+                continue;
+            package_gid = package.gid;
+            title = package.name.empty() ? package.id : package.name;
+            break;
+        }
+    }
+    if (!package_id.empty()) {
+        OpenArgumentPackageCanvas(package_id, package_gid, title, element_id);
+        return;
+    }
+    // No package could be resolved (a legacy-parsed file): select and centre in
+    // whatever canvas is showing, which is all the canvas can do for it.
+    impl_->workbench.show_gsn_tab = true;
+    ui_state.center_view = ui::CenterView::GsnCanvas;
+    ui_state.center_on_selection = true;
+    impl_->workbench.force_center_tab_selection = true;
+}
+
+void AppRuntime::RemoveEvidence(const std::string& evidence_id) {
+    if (evidence_id.empty())
+        return;
+    // Both removal paths read the selection, and selecting it first also means
+    // the canvas shows what went when the user looks.
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.selected_element_id = evidence_id;
+    ui_state.selected_acp_id.clear();
+    ui_state.selected_relationship_id.clear();
+    ui_state.selected_relationship_edge_key.clear();
+    // A Solution has no descendants, so NodeOnly and NodeAndDescendants remove
+    // the same thing; NodeOnly is the mode whose plan a leaf node needs.
+    RemoveSelected(core::RemoveMode::NodeOnly);
+}
+
+bool AppRuntime::SetEvidenceLocation(const std::string& evidence_id, const std::string& location) {
+    if (evidence_id.empty())
+        return false;
+    if (DraftEditingActive()) {
+        core::reviews::PatchOperation set;
+        set.type = core::reviews::PatchOperationType::SetEvidenceLocation;
+        core::reviews::ElementRef element;
+        element.existing_id = evidence_id;
+        set.element = element;
+        set.new_value = location;
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), {set}, error)) {
+            SetStatus(ui::i18n::trf("Could not record the location in the draft: {0}", error));
+            return false;
+        }
+        return true;
+    }
+    return impl_->element_edit_controller->SetEvidenceLocation(*impl_, evidence_id, location);
+}
+
+void AppRuntime::OpenEvidenceLocation(const std::string& location) {
+    std::string target = location;
+    const bool is_url = target.find("://") != std::string::npos;
+    if (!is_url && impl_->app_state.current_project.has_value()) {
+        const std::filesystem::path path = core::PathFromUtf8(target);
+        if (path.is_relative())
+            target = core::PathToUtf8(impl_->app_state.current_project->rootPath / path);
+    }
+    std::string error;
+    if (!dialogs::OpenPathOrUrl(target, error))
+        SetStatus(ui::i18n::trf("Could not open the evidence location: {0}", error));
 }
 
 bool AppRuntime::RemoveRelationship(const std::string& relationship_id) {
@@ -1176,6 +1271,12 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
                 SetStatus(ui::i18n::trf("Could not discard the working draft: {0}", error));
             }
         },
+        [this](const std::string& element_id) { LocateElementOnCanvas(element_id); },
+        [this](const std::string& evidence_id) { RemoveEvidence(evidence_id); },
+        [this](const std::string& evidence_id, const std::string& location) {
+            SetEvidenceLocation(evidence_id, location);
+        },
+        [this](const std::string& location) { OpenEvidenceLocation(location); },
     };
 }
 

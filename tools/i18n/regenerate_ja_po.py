@@ -1241,12 +1241,27 @@ TRANSLATIONS = {
         "セキュアストレージを利用できません: このビルドにはキーリング対応が含まれていません。",
     "Secure storage is unavailable: no keyring service is running.":
         "セキュアストレージを利用できません: キーリングサービスが実行されていません。",
+    # Evidence register actions.
+    "Actions": "操作",
+    "Location": "場所",
+    "Show in argument": "アーギュメントで表示",
+    "Remove evidence": "エビデンスを削除",
+    "Remove Evidence": "エビデンスの削除",
+    "Open the file or URL": "ファイルまたは URL を開く",
+    "Path or URL": "パスまたは URL",
+    "Remove evidence {0}?": "エビデンス {0} を削除しますか?",
+    "No claim rests on this evidence.": "このエビデンスに依拠するクレームはありません。",
+    "Could not record the location in the draft: {0}": "ドラフトに場所を記録できませんでした: {0}",
+    "Could not open the evidence location: {0}": "エビデンスの場所を開けませんでした: {0}",
 }
 
 
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
+    ('{0} claim rests on this evidence; the link will be removed too.',
+     '{0} claims rest on this evidence; the links will be removed too.'):
+        ['{0} 件のクレームがこのエビデンスに依拠しています。リンクも削除されます。'],
     ('Rejected {0} change.',
      'Rejected {0} changes.'):
         ['変更 {0} 件を却下しました。'],

@@ -11,10 +11,14 @@
 
 namespace {
 
+using sacm::commands::CreateArgumentPackage;
 using sacm::commands::CreateArtifactAsset;
 using sacm::commands::CreateArtifactAssetRelationship;
 using sacm::commands::CreateArtifactPackage;
+using sacm::commands::CreateArtifactReference;
 using sacm::commands::CreateAssuranceCasePackage;
+using sacm::commands::SetArtifactReferenceElements;
+using sacm::commands::SetResourceLocation;
 using sacm::io::LoadOptions;
 using sacm::io::LoadResult;
 using sacm::io::Mode;
@@ -171,6 +175,120 @@ TEST(Sacm23Artifact, SACM23_ART_001_ResourceLocationRoundTrips) {
     const LoadResult second = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
     ASSERT_TRUE(second.ok);
     EXPECT_TRUE(sacm::compare::semantic_compare(*first.document, *second.document).empty());
+}
+
+// A Resource's location is the one thing it says, and until now a document
+// could only carry one it was loaded with. Setting, replacing and clearing it
+// by command, and the change surviving strict save, is what lets a tool record
+// where a piece of evidence actually lives.
+TEST(Sacm23Artifact, SACM23_ART_001_ResourceLocationIsSetAndClearedByCommand) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArtifactPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
+                                               .kind = ElementKind::Resource,
+                                               .id = ElementId{"res_1"},
+                                               .name = "Test report"})
+                    .applied);
+
+    const auto set = document.apply(SetResourceLocation{
+        .element = ElementId{"res_1"}, .location = "https://example.org/report.pdf", .language = "en"});
+    ASSERT_TRUE(set.applied) << (set.diagnostics.empty() ? "" : set.diagnostics.front().message);
+    const auto* resource = document.find_as<sacm::model::Resource>(ElementId{"res_1"});
+    ASSERT_NE(resource, nullptr);
+    EXPECT_EQ(resource->location().primary(), "https://example.org/report.pdf");
+
+    // Replacing overwrites the same language rather than accumulating entries.
+    ASSERT_TRUE(document
+                    .apply(SetResourceLocation{
+                        .element = ElementId{"res_1"}, .location = "file:///evidence/report-v2.pdf", .language = "en"})
+                    .applied);
+    ASSERT_EQ(resource->location().values.size(), 1u);
+    EXPECT_EQ(resource->location().primary(), "file:///evidence/report-v2.pdf");
+
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    EXPECT_NE(saved.xml.find("file:///evidence/report-v2.pdf"), std::string::npos) << saved.xml;
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+
+    // An empty location clears the entry; a cleared Resource is still a Resource.
+    ASSERT_TRUE(
+        document.apply(SetResourceLocation{.element = ElementId{"res_1"}, .location = "", .language = "en"}).applied);
+    EXPECT_TRUE(resource->location().empty());
+
+    // Only a Resource has a location: the operation is refused on an Artifact,
+    // rather than silently doing nothing.
+    ASSERT_TRUE(document
+                    .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
+                                               .kind = ElementKind::Artifact,
+                                               .id = ElementId{"artifact_1"},
+                                               .name = "Report"})
+                    .applied);
+    const auto refused = document.apply(
+        SetResourceLocation{.element = ElementId{"artifact_1"}, .location = "https://example.org", .language = "en"});
+    EXPECT_FALSE(refused.applied);
+    ASSERT_FALSE(refused.diagnostics.empty());
+    EXPECT_EQ(refused.diagnostics.front().code, sacm::validation::codes::kCmdTargetNotFound);
+}
+
+// An ArtifactReference created without a cited artifact -- every GSN Solution
+// imported from a diagram -- can be pointed at one later, and the citation
+// round-trips. Pointing it at something that is not an ArtifactElement is
+// refused, so a reference can never cite a Claim.
+TEST(Sacm23Artifact, SACM23_ARG_001_ArtifactReferenceCitationIsSetByCommand) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArtifactPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
+                                               .kind = ElementKind::Resource,
+                                               .id = ElementId{"res_1"},
+                                               .name = "Test report"})
+                    .applied);
+    ASSERT_TRUE(
+        document.apply(CreateArgumentPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"argpkg_1"}, .name = "Arg"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateArtifactReference{
+                        .parent = ElementId{"argpkg_1"}, .id = ElementId{"Sn1"}, .name = "Test report"})
+                    .applied);
+    const auto* reference = document.find_as<sacm::model::ArtifactReference>(ElementId{"Sn1"});
+    ASSERT_NE(reference, nullptr);
+    ASSERT_TRUE(reference->referenced_artifact_elements().empty());
+
+    const auto linked = document.apply(SetArtifactReferenceElements{
+        .element = ElementId{"Sn1"}, .referenced_artifact_elements = {ElementId{"res_1"}}});
+    ASSERT_TRUE(linked.applied) << (linked.diagnostics.empty() ? "" : linked.diagnostics.front().message);
+    ASSERT_EQ(reference->referenced_artifact_elements().size(), 1u);
+    EXPECT_EQ(reference->referenced_artifact_elements().front().value(), "res_1");
+
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+
+    // An id that resolves to nothing is refused, and a refused edit leaves the
+    // citation as it was. (Citing another argument element is legal -- an
+    // ArgumentationElement is an ArtifactElement, which is how modules are
+    // cited -- so the unresolved id is the refusal this test needs.)
+    const auto refused = document.apply(SetArtifactReferenceElements{
+        .element = ElementId{"Sn1"}, .referenced_artifact_elements = {ElementId{"res_missing"}}});
+    EXPECT_FALSE(refused.applied);
+    EXPECT_EQ(reference->referenced_artifact_elements().front().value(), "res_1") << "a refused edit changed the model";
+
+    // An empty list withdraws the citation.
+    ASSERT_TRUE(
+        document.apply(SetArtifactReferenceElements{.element = ElementId{"Sn1"}, .referenced_artifact_elements = {}})
+            .applied);
+    EXPECT_TRUE(reference->referenced_artifact_elements().empty());
 }
 
 } // namespace
