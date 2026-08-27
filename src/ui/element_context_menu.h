@@ -44,6 +44,9 @@ struct ElementContextActions {
     // highest-severity problem id and its element id; the runtime opens the
     // Problems panel and selects the matching row.
     std::function<void(const std::string& problem_id, const std::string& element_id)> focus_problem;
+    // Opens a piece of evidence's recorded location (a file or URL) from its
+    // node's link badge; the same action the register's Open button takes.
+    std::function<void(const std::string& location)> open_evidence_location;
 };
 
 // Renders the Add submenu for the selected element. Kinds the selection cannot

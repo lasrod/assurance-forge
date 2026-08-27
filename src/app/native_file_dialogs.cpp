@@ -127,6 +127,21 @@ BrowseForProjectManifest(const std::string& default_path, std::string& selected_
     return RunDialog(result, out_path, selected_path, error_message);
 }
 
+DialogResult
+BrowseForEvidenceFile(const std::string& default_path, std::string& selected_path, std::string& error_message) {
+    NfdSession session;
+    if (!session.ok()) {
+        error_message = session.error_message();
+        return DialogResult::Failed;
+    }
+    const std::string default_folder = ExistingFolderForDialog(default_path);
+    NFD::UniquePath out_path;
+    // No filter: evidence is whatever the project keeps -- a report, a log, a
+    // spreadsheet, a signed PDF.
+    const nfdresult_t result = NFD::OpenDialog(out_path, nullptr, 0, default_folder.c_str());
+    return RunDialog(result, out_path, selected_path, error_message);
+}
+
 bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& error_message) {
     std::error_code ec;
     if (path.empty() || !std::filesystem::exists(path, ec)) {

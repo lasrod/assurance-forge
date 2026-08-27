@@ -8,6 +8,7 @@
 #include "core/sacm_model.h"
 
 #include <array>
+#include <filesystem>
 #include <string>
 #include <string_view>
 
@@ -41,5 +42,12 @@ bool ParseEvidenceAttribute(std::string_view token, EvidenceAttribute& out);
 // The record field the attribute names.
 std::string& EvidenceRecordField(EvidenceRecord& record, EvidenceAttribute attribute);
 const std::string& EvidenceRecordField(const EvidenceRecord& record, EvidenceAttribute attribute);
+
+// The location to record for a file the user picked: relative to
+// `project_root` (generic separators) when the file is inside the project, so
+// the project stays movable; the absolute path otherwise. An empty root
+// records the absolute path.
+std::string EvidenceLocationForPickedFile(const std::filesystem::path& project_root,
+                                          const std::filesystem::path& picked);
 
 } // namespace core

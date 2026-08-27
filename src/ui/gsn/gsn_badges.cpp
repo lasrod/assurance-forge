@@ -1,11 +1,13 @@
 #include "ui/gsn/gsn_badges.h"
 
+#include "hello_imgui/icons_font_awesome_4.h"
 #include "ui/gsn/gsn_canvas.h" // for g_BoldFont
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <string>
 
@@ -174,6 +176,23 @@ void DrawAiSuccessBadge(ImDrawList* draw_list,
         if (!marker.review_profile_name.empty())
             tooltip += "\n" + ui::i18n::trf("Profile: {0}", marker.review_profile_name);
         ImGui::SetTooltip("%s", tooltip.c_str());
+    }
+}
+
+void DrawLinkBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom, const std::string& location) {
+    const Theme& theme = GetTheme();
+    DrawBadgeShell(draw_list, badge, theme.accent, zoom);
+    // The icon font is merged into the regular face, not the bold one the
+    // attention glyphs use, so the glyph is drawn with the regular face.
+    ImFont* font = ImGui::GetFont();
+    const float font_size = ImGui::GetFontSize() * zoom * 0.9f;
+    const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, ICON_FA_LINK);
+    const ImVec2 text_pos((badge.min.x + badge.max.x - text_size.x) * 0.5f,
+                          (badge.min.y + badge.max.y - text_size.y) * 0.5f);
+    draw_list->AddText(font, font_size, text_pos, IM_COL32_WHITE, ICON_FA_LINK);
+
+    if (IsMouseHoveringBadge(badge)) {
+        ImGui::SetTooltip("%s", (location + "\n" + AF_TR("Click to open the file or URL.")).c_str());
     }
 }
 

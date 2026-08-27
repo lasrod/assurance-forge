@@ -178,6 +178,9 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     actions.remove_relationship = [&runtime](const std::string& relationship_id) {
         runtime.RemoveRelationship(relationship_id);
     };
+    actions.open_evidence_location = [&runtime](const std::string& location) {
+        runtime.OpenEvidenceLocation(location);
+    };
     return actions;
 }
 
@@ -558,6 +561,29 @@ void AppRuntime::MigrateEvidenceAssessments() {
     const int count = static_cast<int>(migrated_ids.size());
     SetStatus(ui::i18n::trnf(
         "Moved {0} assessment into the SACM document.", "Moved {0} assessments into the SACM document.", count, count));
+}
+
+void AppRuntime::BrowseEvidenceLocation(const std::string& evidence_id) {
+    if (evidence_id.empty())
+        return;
+    std::string default_path;
+    if (impl_->app_state.current_project.has_value())
+        default_path = core::PathToUtf8(impl_->app_state.current_project->rootPath);
+    std::string selected;
+    std::string error;
+    const dialogs::DialogResult result = dialogs::BrowseForEvidenceFile(default_path, selected, error);
+    if (result == dialogs::DialogResult::Failed) {
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error));
+        return;
+    }
+    if (result != dialogs::DialogResult::Selected)
+        return;
+
+    const std::filesystem::path root = impl_->app_state.current_project.has_value()
+                                           ? impl_->app_state.current_project->rootPath
+                                           : std::filesystem::path{};
+    const std::string location = core::EvidenceLocationForPickedFile(root, core::PathFromUtf8(selected));
+    SetEvidenceLocation(evidence_id, location);
 }
 
 void AppRuntime::OpenEvidenceLocation(const std::string& location) {
@@ -1387,6 +1413,7 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
             SetEvidenceAttribute(evidence_id, attribute, value);
         },
         [this]() { MigrateEvidenceAssessments(); },
+        [this](const std::string& evidence_id) { BrowseEvidenceLocation(evidence_id); },
     };
 }
 

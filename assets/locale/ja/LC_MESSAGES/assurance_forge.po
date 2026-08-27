@@ -421,6 +421,9 @@ msgstr "SCCG ガイドラインを参照"
 msgid "Browse failed: {0}"
 msgstr "参照に失敗しました: {0}"
 
+msgid "Browse for a file"
+msgstr "ファイルを参照"
+
 msgid "Bucket"
 msgstr "バケット"
 
@@ -561,6 +564,9 @@ msgstr "装飾を解除"
 
 msgid "Click to open in the Problems panel."
 msgstr "クリックして問題パネルで開きます。"
+
+msgid "Click to open the file or URL."
+msgstr "クリックしてファイルまたは URL を開きます。"
 
 msgid "Client configuration"
 msgstr "クライアント設定"

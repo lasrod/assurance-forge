@@ -36,4 +36,9 @@ void DrawAiSpinnerBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoo
 // saved review state rather than the transient completion event.
 void DrawAiSuccessBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom, const AiReviewSuccessMarker& marker);
 
+// Draw the link badge of a piece of evidence whose location is recorded. The
+// tooltip names the location; the click target is the caller's, like the
+// problem badge's.
+void DrawLinkBadge(ImDrawList* draw_list, const BadgeRect& badge, float zoom, const std::string& location);
+
 } // namespace ui::gsn

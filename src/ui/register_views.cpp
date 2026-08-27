@@ -146,8 +146,9 @@ static void DrawEvidenceActionsCell(const EvidenceRegisterRow& row, const Eviden
 
 static void DrawLocationCell(const EvidenceRegisterRow& row, const EvidenceRegisterCallbacks& callbacks) {
     const std::string key = row.evidence_id + "/location";
-    const float open_button_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x;
-    ImGui::SetNextItemWidth(-open_button_width);
+    // Two buttons follow the field: browse for a file, open what is recorded.
+    const float buttons_width = 2.0f * (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x);
+    ImGui::SetNextItemWidth(-buttons_width);
     ImGui::BeginDisabled(!row.is_artifact_reference || !callbacks.set_location);
     std::string committed;
     if (CommitOnLeaveCell("##location", key, row.location, AF_TR("Path or URL"), committed) && callbacks.set_location)
@@ -155,11 +156,18 @@ static void DrawLocationCell(const EvidenceRegisterRow& row, const EvidenceRegis
     ImGui::EndDisabled();
 
     ImGui::SameLine();
+    // Browse is always offered: a location that is not set yet is exactly when
+    // a picker is wanted, and a folder icon that only ever opened read as one.
+    ImGui::BeginDisabled(!row.is_artifact_reference || !callbacks.browse_location);
+    if (IconButton("browse", ICON_FA_FOLDER_OPEN, AF_TR("Browse for a file")) && callbacks.browse_location)
+        callbacks.browse_location(row.evidence_id);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
     // Opens the RECORDED location. While the cell is being edited the text
     // shown is not yet the record, so the button waits for the commit rather
     // than opening whatever the row held before the user started typing.
     ImGui::BeginDisabled(IsEditingCell(key) || row.location.empty() || !callbacks.open_location);
-    if (IconButton("open", ICON_FA_FOLDER_OPEN, AF_TR("Open the file or URL")) && callbacks.open_location)
+    if (IconButton("open", ICON_FA_LINK, AF_TR("Open the file or URL")) && callbacks.open_location)
         callbacks.open_location(row.location);
     ImGui::EndDisabled();
 }
@@ -334,7 +342,7 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
         return false;
     }
 
-    ImGui::TableSetupScrollFreeze(2, 1);
+    ImGui::TableSetupScrollFreeze(0, 1);
     ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Claim ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
     ImGui::TableSetupColumn(AF_TR("Claim").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
@@ -424,7 +432,7 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
         return false;
     }
 
-    ImGui::TableSetupScrollFreeze(3, 1);
+    ImGui::TableSetupScrollFreeze(0, 1);
     ImGui::TableSetupColumn(AF_TR("Actions").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 4.5f);
     ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
     ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);

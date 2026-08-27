@@ -1253,6 +1253,8 @@ TRANSLATIONS = {
     "Version": "バージョン",
     "Date": "日付",
     "Move into SACM": "SACM に移動",
+    "Browse for a file": "ファイルを参照",
+    "Click to open the file or URL.": "クリックしてファイルまたは URL を開きます。",
     "Stored in the project file until moved into SACM.": "SACM に移動するまでプロジェクトファイルに保存されます。",
     "No project-file assessments match evidence in the argument.": "アーギュメント内のエビデンスに一致するプロジェクトファイルの評価はありません。",
     "Could not record the evidence attribute in the draft: {0}": "ドラフトにエビデンス属性を記録できませんでした: {0}",

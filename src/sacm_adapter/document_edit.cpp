@@ -2818,14 +2818,14 @@ sacm::commands::MutationResult cite_new_asset(sacm::model::Document& doc,
         failure.applied = false;
         return failure;
     }
-    const std::string reference_name = reference.name().content;
-    const sacm::model::ElementId reference_id = reference.id();
+    const std::string& reference_name = reference.name().content;
+    const sacm::model::ElementId& reference_id = reference.id();
     std::vector<sacm::model::ElementId> cited = reference.referenced_artifact_elements();
 
     std::optional<sacm::model::ElementId> created_package_id;
     const sacm::model::ArtifactPackage* package = first_artifact_package(*root);
     if (package == nullptr) {
-        const sacm::commands::MutationResult created =
+        sacm::commands::MutationResult created =
             doc.apply(sacm::commands::CreateArtifactPackage{.parent = root->id(), .name = "Artifacts"});
         if (!created.applied || created.created_ids().empty()) {
             return created;
@@ -2842,7 +2842,7 @@ sacm::commands::MutationResult cite_new_asset(sacm::model::Document& doc,
         }
     };
 
-    const sacm::commands::MutationResult asset =
+    sacm::commands::MutationResult asset =
         doc.apply(sacm::commands::CreateArtifactAsset{.parent = package_id, .kind = kind, .name = reference_name});
     if (!asset.applied || asset.created_ids().empty()) {
         rollback_all(std::nullopt);
@@ -2850,7 +2850,7 @@ sacm::commands::MutationResult cite_new_asset(sacm::model::Document& doc,
     }
     const sacm::model::ElementId asset_id = asset.created_ids().front();
     cited.push_back(asset_id);
-    const sacm::commands::MutationResult linked = doc.apply(
+    sacm::commands::MutationResult linked = doc.apply(
         sacm::commands::SetArtifactReferenceElements{.element = reference_id, .referenced_artifact_elements = cited});
     if (!linked.applied) {
         rollback_all(asset_id);
@@ -2909,6 +2909,10 @@ EditOutcome apply_set_evidence_attribute(LibraryDocument& document,
         if (trimmed.empty()) {
             // Nothing recorded and nothing to record: the document already says so.
             return EditOutcome{.supported = true, .applied = true, .diagnostics = {}};
+        }
+        if (root_case_package(doc) == nullptr) {
+            return refused_outcome("SACM-CMD-002",
+                                   "the document has no assurance case package to file the evidence in");
         }
         sacm::model::ElementId created;
         const sacm::commands::MutationResult cite =

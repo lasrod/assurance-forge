@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace core {
 
@@ -248,10 +249,26 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
     // whitelists them away; this is the same policy on the canvas side. (A
     // term participates in the drawn argument only through its
     // ArtifactReference, which the visible-term-context pass handles.)
+    std::unordered_set<std::string> cited_assets;
+    for (const auto& element : ac.elements) {
+        if (element.type != "artifactreference")
+            continue;
+        if (!element.referenced_artifact_id.empty())
+            cited_assets.insert(element.referenced_artifact_id);
+        if (!element.evidence.artifact_id.empty())
+            cited_assets.insert(element.evidence.artifact_id);
+    }
     for (const auto& element : ac.elements) {
         if (is_relationship(element.type))
             continue;
         if (element.type == "term" || element.type == "category")
+            continue;
+        // The Artifact and Resource an ArtifactReference cites are the record
+        // behind that evidence, not argument nodes. Drawn, they surfaced as
+        // orphans the moment a location or a register column was recorded. An
+        // artifact nothing cites is still a node: older files carry evidence
+        // as a bare artifact and draw it as a Solution.
+        if (cited_assets.count(element.id) > 0)
             continue;
 
         auto node = std::make_unique<TreeNode>();

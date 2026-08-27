@@ -74,6 +74,7 @@ struct WorkbenchAreaCallbacks {
     std::function<void(const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value)>
         set_evidence_attribute;
     std::function<void()> migrate_evidence_assessments;
+    std::function<void(const std::string& evidence_id)> browse_evidence_location;
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,

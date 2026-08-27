@@ -93,6 +93,10 @@ public:
     // Opens the recorded location: a URL in the browser, a file with its
     // application. A relative path is resolved against the project root.
     void OpenEvidenceLocation(const std::string& location);
+    // Picks a file and records it as the evidence's location -- relative to
+    // the project root when the file is inside the project, so the project
+    // stays movable; absolute otherwise.
+    void BrowseEvidenceLocation(const std::string& evidence_id);
 
     // Repairs for the defects the GSN v3 well-formedness checker reports. Each
     // is an ordinary audited edit, reachable from the Problems panel quick fix

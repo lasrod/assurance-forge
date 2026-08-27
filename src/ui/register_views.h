@@ -62,6 +62,7 @@ struct EvidenceRegisterCallbacks {
     std::function<void(const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value)>
         set_attribute;
     std::function<void()> migrate_assessments;
+    std::function<void(const std::string& evidence_id)> browse_location;
 };
 
 // Rejoins the rows derived from `ac` with the assessments held in `store`.

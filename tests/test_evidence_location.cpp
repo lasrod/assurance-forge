@@ -502,4 +502,26 @@ TEST(EvidenceRecord, DraftOperationRecordsAColumnOrRefusesAnUnknownOne) {
     std::filesystem::remove_all(root);
 }
 
+TEST(EvidenceRecord, APickedFileInsideTheProjectIsRecordedRelativeToIt) {
+    const std::filesystem::path root = MakeTempRoot("picked");
+    std::filesystem::create_directories(root / "evidence" / "reports");
+    WriteFile(root / "evidence" / "reports" / "ra-001.pdf", "pdf");
+    EXPECT_EQ(core::EvidenceLocationForPickedFile(root, root / "evidence" / "reports" / "ra-001.pdf"),
+              "evidence/reports/ra-001.pdf");
+
+    // Outside the project, the absolute path is kept: a relative one that
+    // climbs out would break as soon as the project moved.
+    const std::filesystem::path elsewhere = MakeTempRoot("picked_elsewhere");
+    WriteFile(elsewhere / "shared.pdf", "pdf");
+    const std::string outside = core::EvidenceLocationForPickedFile(root, elsewhere / "shared.pdf");
+    EXPECT_EQ(outside.rfind("..", 0), std::string::npos) << outside;
+    EXPECT_NE(outside.find("shared.pdf"), std::string::npos) << outside;
+    EXPECT_TRUE(std::filesystem::path(outside).is_absolute()) << outside;
+
+    // No project: absolute.
+    EXPECT_TRUE(std::filesystem::path(core::EvidenceLocationForPickedFile({}, elsewhere / "shared.pdf")).is_absolute());
+    std::filesystem::remove_all(root);
+    std::filesystem::remove_all(elsewhere);
+}
+
 } // namespace

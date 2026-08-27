@@ -3,6 +3,7 @@
 #include "core/perf/frame_profiler.h"
 #include "core/string_utils.h"
 #include "core/terminology_scope_service.h"
+#include "parser/model_utils.h"
 #include "ui/gsn/gsn_badges.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/gsn/gsn_dpi.h"
@@ -200,6 +201,15 @@ void DrawGsnNode(const GsnNode& node,
     const bool ai_review_succeeded = !ai_review_running && ai_success_it != ui_state.ai_review_success_markers.end();
     const bool in_review_scope = ui_state.ai_review_scope_element_ids.count(node.id) > 0;
     const bool primary_review_scope_node = in_review_scope && ui_state.ai_review_primary_element_id == node.id;
+    // Evidence with a recorded location gets a link badge that opens it. Read
+    // from the argument the canvas draws, so a location recorded in the
+    // working draft shows there too.
+    const std::string* evidence_location = nullptr;
+    if (active_case != nullptr) {
+        const parser::SacmElement* element = parser::FindElementById(*active_case, node.id);
+        if (element != nullptr && !element->artifact_location.empty())
+            evidence_location = &element->artifact_location;
+    }
 
     ImU32 fill_color = ColorForType(node.type);
     if (proposal_dimmed) {
@@ -378,8 +388,8 @@ void DrawGsnNode(const GsnNode& node,
     // problem (icon + colour match highest severity). A separate spinner
     // badge sits beside it while a review is running or after a successful run.
     {
-        const int badge_slot_count =
-            (has_attention ? 1 : 0) + (ai_review_running ? 1 : 0) + (ai_review_succeeded ? 1 : 0);
+        const int badge_slot_count = (has_attention ? 1 : 0) + (ai_review_running ? 1 : 0) +
+                                     (ai_review_succeeded ? 1 : 0) + (evidence_location != nullptr ? 1 : 0);
         int slot = 0;
         if (has_attention && badge_summary) {
             const BadgeRect badge = ComputeBadgeRect(top_left, bottom_right, zoom, slot++, badge_slot_count);
@@ -407,6 +417,23 @@ void DrawGsnNode(const GsnNode& node,
         if (ai_review_succeeded) {
             const BadgeRect badge = ComputeBadgeRect(top_left, bottom_right, zoom, slot++, badge_slot_count);
             DrawAiSuccessBadge(draw_list, badge, zoom, ai_success_it->second);
+        }
+        if (evidence_location != nullptr) {
+            const BadgeRect badge = ComputeBadgeRect(top_left, bottom_right, zoom, slot++, badge_slot_count);
+            DrawLinkBadge(draw_list, badge, zoom, *evidence_location);
+
+            // Same overlap trick as the problem badge: a click here opens the
+            // location and does not also select the node.
+            ImGui::SetCursorScreenPos(badge.min);
+            ImGui::SetNextItemAllowOverlap();
+            const ImVec2 badge_size(badge.max.x - badge.min.x, badge.max.y - badge.min.y);
+            ImGui::PushID(node.id.c_str());
+            const bool badge_clicked = ImGui::InvisibleButton("##location_badge", badge_size);
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::PopID();
+            if (badge_clicked && actions.open_evidence_location)
+                actions.open_evidence_location(*evidence_location);
         }
     }
 }
