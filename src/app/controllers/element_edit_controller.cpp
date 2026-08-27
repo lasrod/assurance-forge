@@ -306,6 +306,37 @@ bool ElementEditController::ImportEvidenceAssessments(AppRuntimeState& state,
     return true;
 }
 
+std::string
+ElementEditController::CreateEvidence(AppRuntimeState& state, const std::string& claim_id, const std::string& text) {
+    core::commands::CreateEvidenceCommand command(claim_id, text);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
+        return {};
+    }
+    const std::string new_id = command.GeneratedId();
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(SelectionChangedEvent{new_id, true});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    return new_id;
+}
+
+bool ElementEditController::LinkEvidence(AppRuntimeState& state,
+                                         const std::string& evidence_id,
+                                         const std::string& claim_id) {
+    core::commands::LinkEvidenceCommand command(claim_id, evidence_id);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Link failed: " + outcome.error});
+        return false;
+    }
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Linked " + evidence_id + " to " + claim_id});
+    return true;
+}
+
 bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id) {
     if (element_id.empty()) {
         events_.Emit(StatusMessageEvent{"No element selected."});

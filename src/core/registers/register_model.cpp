@@ -1,5 +1,7 @@
 #include "core/registers/register_model.h"
 
+#include "core/problems/gsn_wellformedness.h"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -145,6 +147,41 @@ std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model) {
 int CountCseUses(const std::vector<CseLink>& links, const std::string& evidence_id) {
     return static_cast<int>(std::count_if(
         links.begin(), links.end(), [&](const CseLink& link) { return link.evidence_id == evidence_id; }));
+}
+
+std::vector<EvidenceCitation> DeriveEvidenceCitations(const parser::AssuranceCase& model,
+                                                      const std::string& evidence_id) {
+    std::vector<EvidenceCitation> citations;
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (relationship.type != "assertedevidence")
+            continue;
+        const bool cites = std::find(relationship.source_refs.begin(), relationship.source_refs.end(), evidence_id) !=
+                           relationship.source_refs.end();
+        if (!cites)
+            continue;
+        for (const std::string& claim_id : relationship.target_refs) {
+            citations.push_back(EvidenceCitation{
+                .claim_id = claim_id,
+                .relationship_id = relationship.id,
+                .shared = relationship.source_refs.size() > 1,
+            });
+        }
+    }
+    std::sort(citations.begin(), citations.end(), [](const EvidenceCitation& a, const EvidenceCitation& b) {
+        return a.claim_id != b.claim_id ? a.claim_id < b.claim_id : a.relationship_id < b.relationship_id;
+    });
+    return citations;
+}
+
+std::vector<std::string> DeriveEvidenceSupportTargets(const parser::AssuranceCase& model) {
+    std::set<std::string> ids;
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.id.empty())
+            continue;
+        if (GsnCanBeSupported(GsnKindOf(element)))
+            ids.insert(element.id);
+    }
+    return std::vector<std::string>(ids.begin(), ids.end());
 }
 
 std::string SerializeRegisterStore(const RegisterStore& store) {

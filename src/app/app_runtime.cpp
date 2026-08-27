@@ -38,6 +38,7 @@
 #include "core/element_factory.h"
 #include "core/problems/problem_attention.h"
 #include "core/problems/problems_manager.h"
+#include "core/registers/register_model.h"
 #include "core/reviews/review_proposal_manager.h"
 #include "core/string_utils.h"
 #include "core/terminology_package_service.h"
@@ -584,6 +585,87 @@ void AppRuntime::BrowseEvidenceLocation(const std::string& evidence_id) {
                                            : std::filesystem::path{};
     const std::string location = core::EvidenceLocationForPickedFile(root, core::PathFromUtf8(selected));
     SetEvidenceLocation(evidence_id, location);
+}
+
+void AppRuntime::CreateEvidence(const std::string& text, const std::string& claim_id) {
+    if (DraftEditingActive()) {
+        core::reviews::PatchOperation create;
+        create.type = core::reviews::PatchOperationType::CreateSolution;
+        create.create_ref = "$new";
+        create.text = core::TrimWhitespace(text);
+        std::vector<core::reviews::PatchOperation> operations{create};
+        if (!claim_id.empty()) {
+            core::reviews::PatchOperation attach;
+            attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+            core::reviews::ElementRef source;
+            source.create_ref = "$new";
+            core::reviews::ElementRef target;
+            target.existing_id = claim_id;
+            attach.source = source;
+            attach.target = target;
+            operations.push_back(attach);
+        }
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), operations, error))
+            SetStatus(ui::i18n::trf("Could not add to the draft: {0}", error));
+        return;
+    }
+    impl_->element_edit_controller->CreateEvidence(*impl_, claim_id, text);
+}
+
+void AppRuntime::LinkEvidence(const std::string& evidence_id, const std::string& claim_id) {
+    if (evidence_id.empty() || claim_id.empty())
+        return;
+    if (DraftEditingActive()) {
+        core::reviews::PatchOperation attach;
+        attach.type = core::reviews::PatchOperationType::AddSupportedBy;
+        core::reviews::ElementRef source;
+        source.existing_id = evidence_id;
+        core::reviews::ElementRef target;
+        target.existing_id = claim_id;
+        attach.source = source;
+        attach.target = target;
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), {attach}, error))
+            SetStatus(ui::i18n::trf("Could not link in the draft: {0}", error));
+        return;
+    }
+    impl_->element_edit_controller->LinkEvidence(*impl_, evidence_id, claim_id);
+}
+
+void AppRuntime::UnlinkEvidence(const std::string& evidence_id, const std::string& claim_id) {
+    if (evidence_id.empty() || claim_id.empty())
+        return;
+    if (DraftEditingActive()) {
+        core::reviews::PatchOperation withdraw;
+        withdraw.type = core::reviews::PatchOperationType::RemoveSupportedBy;
+        core::reviews::ElementRef source;
+        source.existing_id = evidence_id;
+        core::reviews::ElementRef target;
+        target.existing_id = claim_id;
+        withdraw.source = source;
+        withdraw.target = target;
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), {withdraw}, error))
+            SetStatus(ui::i18n::trf("Could not unlink in the draft: {0}", error));
+        return;
+    }
+    // The relationship the register showed: one AssertedEvidence carrying this
+    // evidence to this claim. One that also carries other sources is more than
+    // this link, and withdrawing one end is the canvas's edge menu's business.
+    for (const core::registers::EvidenceCitation& citation :
+         core::registers::DeriveEvidenceCitations(CurrentArgumentView(), evidence_id)) {
+        if (citation.claim_id != claim_id)
+            continue;
+        if (citation.shared) {
+            SetStatus(AF_TR("That link is part of a relationship that also supports other elements; remove it "
+                            "from the canvas."));
+            return;
+        }
+        RemoveRelationship(citation.relationship_id);
+        return;
+    }
+    SetStatus(ui::i18n::trf("There is no link from {0} to {1}.", evidence_id, claim_id));
 }
 
 void AppRuntime::OpenEvidenceLocation(const std::string& location) {
@@ -1414,6 +1496,9 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         },
         [this]() { MigrateEvidenceAssessments(); },
         [this](const std::string& evidence_id) { BrowseEvidenceLocation(evidence_id); },
+        [this](const std::string& text, const std::string& claim_id) { CreateEvidence(text, claim_id); },
+        [this](const std::string& evidence_id, const std::string& claim_id) { LinkEvidence(evidence_id, claim_id); },
+        [this](const std::string& evidence_id, const std::string& claim_id) { UnlinkEvidence(evidence_id, claim_id); },
     };
 }
 

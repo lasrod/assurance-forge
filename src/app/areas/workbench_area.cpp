@@ -666,6 +666,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 register_callbacks.set_attribute = callbacks.set_evidence_attribute;
                 register_callbacks.migrate_assessments = callbacks.migrate_evidence_assessments;
                 register_callbacks.browse_location = callbacks.browse_evidence_location;
+                register_callbacks.create_evidence = callbacks.create_evidence;
+                register_callbacks.link_evidence = callbacks.link_evidence;
+                register_callbacks.unlink_evidence = callbacks.unlink_evidence;
                 RenderRegisterTable(state, [&register_callbacks](core::registers::RegisterStore& store) {
                     return ui::ShowEvidenceRegisterView(store, register_callbacks);
                 });

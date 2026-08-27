@@ -55,6 +55,9 @@ msgstr "(要素の変更なし)"
 msgid "(no message)"
 msgstr "(メッセージなし)"
 
+msgid "(none)"
+msgstr "(なし)"
+
 msgid "(unnamed)"
 msgstr "(名前なし)"
 
@@ -220,6 +223,9 @@ msgstr "反論を追加"
 msgid "Add Counter Evidence"
 msgstr "反証を追加"
 
+msgid "Add Evidence"
+msgstr "エビデンスの追加"
+
 msgid "Add Evidence Register"
 msgstr "エビデンス登録簿を追加"
 
@@ -255,6 +261,9 @@ msgstr "翻訳を追加"
 
 msgid "Add as context"
 msgstr "コンテキストとして追加"
+
+msgid "Add evidence"
+msgstr "エビデンスを追加"
 
 msgid "Add fixed confidence"
 msgstr "固定信頼度を追加"
@@ -535,6 +544,9 @@ msgstr "親フォルダーを選んでください。"
 msgid "Choose a target TerminologyPackage."
 msgstr "対象の TerminologyPackage を選択してください。"
 
+msgid "Choose an element…"
+msgstr "要素を選択…"
+
 msgid "Circular support: {0}. An argument that assumes its own conclusion establishes nothing."
 msgstr "循環した支持関係: {0}。自らの結論を前提とする議論は何も立証しません。"
 
@@ -652,6 +664,9 @@ msgstr "信頼度保存用の SACM gid を割り当てられませんでした�
 msgid "Could not discard the working draft: {0}"
 msgstr "作業ドラフトを破棄できませんでした: {0}"
 
+msgid "Could not link in the draft: {0}"
+msgstr "ドラフトでリンクできませんでした: {0}"
+
 msgid "Could not load an editable SACM package model."
 msgstr "編集可能な SACM パッケージモデルを読み込めませんでした。"
 
@@ -684,6 +699,9 @@ msgstr "提案編集のためのこのプレビュー要素を解決できませ
 
 msgid "Could not save the MCP setting: {0}"
 msgstr "MCP 設定を保存できませんでした: {0}"
+
+msgid "Could not unlink in the draft: {0}"
+msgstr "ドラフトでリンクを解除できませんでした: {0}"
 
 msgid "Could not update manual review status."
 msgstr "手動レビュー状態を更新できませんでした。"
@@ -1216,6 +1234,9 @@ msgstr "既存にリンク"
 msgid "Link selected confidence argument tree"
 msgstr "選択した信頼度論証ツリーをリンク"
 
+msgid "Link to"
+msgstr "リンク先"
+
 msgid "Linked:"
 msgstr "リンク済み:"
 
@@ -1368,6 +1389,9 @@ msgstr "分類なし"
 
 msgid "No categories are available in this terminology package."
 msgstr "この用語パッケージには利用可能な分類がありません。"
+
+msgid "No claim rests on this evidence."
+msgstr "このエビデンスに依拠するクレームはありません。"
 
 msgid "No confidence argument has been selected."
 msgstr "信頼度論証が選択されていません。"
@@ -1635,6 +1659,9 @@ msgstr "親の場所"
 
 msgid "Parse error: {0}"
 msgstr "パースエラー: {0}"
+
+msgid "Part of a relationship that also supports other elements; withdraw it from the canvas."
+msgstr "他の要素も支持する関係の一部です。キャンバスから解除してください。"
 
 msgid "Paste into your AI client's MCP settings."
 msgstr "AI クライアントの MCP 設定に貼り付けてください。"
@@ -2137,6 +2164,9 @@ msgstr "空の保証プロジェクトワークスペースから開始します
 msgid "State: {0}"
 msgstr "状態: {0}"
 
+msgid "Statement"
+msgstr "記述"
+
 msgid "Status"
 msgstr "ステータス"
 
@@ -2169,6 +2199,9 @@ msgstr "要約:"
 
 msgid "Support"
 msgstr "支持関係"
+
+msgid "Supports"
+msgstr "支持対象"
 
 msgid "Target element: {0}"
 msgstr "対象要素: {0}"
@@ -2263,6 +2296,9 @@ msgstr "テキスト信頼度論証"
 msgid "Text confidence argument is empty."
 msgstr "テキスト信頼度論証が空です。"
 
+msgid "That link is part of a relationship that also supports other elements; remove it from the canvas."
+msgstr "そのリンクは他の要素も支持する関係の一部です。キャンバスから削除してください。"
+
 msgid "That register assessment was already discarded."
 msgstr "その登録簿評価は既に破棄されています。"
 
@@ -2322,6 +2358,9 @@ msgstr "作業ドラフトはこの要素を変更しません。NEW、EDIT、MU
 
 msgid "Theme"
 msgstr "テーマ"
+
+msgid "There is no link from {0} to {1}."
+msgstr "{0} から {1} へのリンクはありません。"
 
 msgid "There is no working draft to edit."
 msgstr "編集できる作業ドラフトがありません。"
@@ -2518,6 +2557,9 @@ msgstr "CSE での使用回数"
 msgid "Used In"
 msgstr "使用先"
 
+msgid "Used by"
+msgstr "使用元"
+
 msgid "VSync"
 msgstr "VSync"
 
@@ -2559,6 +2601,9 @@ msgstr "ウェルカム画面"
 
 msgid "Welcome!"
 msgstr "ようこそ!"
+
+msgid "What this evidence supports"
+msgstr "このエビデンスが支持する対象"
 
 msgid "When this is on, an AI client you launch yourself (such as Claude Desktop) can read the open project's safety case and save proposed changes for you to review. Proposals never change the case until you accept them. While this is off, nothing is shared."
 msgstr "これを有効にすると、自分で起動した AI クライアント（Claude Desktop など）が開いているプロジェクトのセーフティケースを読み取り、変更提案を保存できます。提案は承認するまでケースを変更しません。無効の間は何も共有されません。"

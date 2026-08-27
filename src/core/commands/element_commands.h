@@ -243,6 +243,57 @@ private:
     std::size_t applied_count_ = 0;
 };
 
+// Create a piece of evidence from the register: a Solution under `claim_id`
+// (the same shape the canvas's Add Solution makes), or a bare ArtifactReference
+// in the first argument package when `claim_id` is empty -- evidence registered
+// before anything rests on it. `text` becomes its Description. Library-only.
+class CreateEvidenceCommand final : public ICommand {
+public:
+    CreateEvidenceCommand(std::string claim_id, std::string text)
+        : claim_id_(std::move(claim_id)), text_(std::move(text)) {}
+
+    std::string Name() const override {
+        return "CreateEvidence";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& GeneratedId() const {
+        return generated_id_;
+    }
+    const std::string& GeneratedRelationshipId() const {
+        return generated_relationship_id_;
+    }
+
+private:
+    std::string claim_id_;
+    std::string text_;
+    std::string generated_id_;
+    std::string generated_relationship_id_;
+};
+
+// Attach an EXISTING piece of evidence under a claim with a new AssertedEvidence
+// (the attach half of adding a Solution). Refused when the claim already rests
+// on it. Library-only.
+class LinkEvidenceCommand final : public ICommand {
+public:
+    LinkEvidenceCommand(std::string claim_id, std::string evidence_id)
+        : claim_id_(std::move(claim_id)), evidence_id_(std::move(evidence_id)) {}
+
+    std::string Name() const override {
+        return "LinkEvidence";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& GeneratedRelationshipId() const {
+        return generated_relationship_id_;
+    }
+
+private:
+    std::string claim_id_;
+    std::string evidence_id_;
+    std::string generated_relationship_id_;
+};
+
 class SetEvidenceLocationCommand final : public ICommand {
 public:
     SetEvidenceLocationCommand(std::string element_id, std::string location)

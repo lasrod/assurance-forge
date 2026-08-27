@@ -48,6 +48,15 @@ struct EvidenceRegisterRow {
     // fields above instead, until the user moves it into the document.
     core::EvidenceRecord record;
     bool stored_in_project_file = false;
+
+    // The claims resting on this evidence, and the relationship carrying each.
+    struct Citation {
+        std::string claim_id;
+        std::string claim_label;
+        std::string relationship_id;
+        bool shared = false; // the relationship also carries other sources
+    };
+    std::vector<Citation> citations;
 };
 
 // What the evidence register can ask the application to do. Each goes through
@@ -63,6 +72,11 @@ struct EvidenceRegisterCallbacks {
         set_attribute;
     std::function<void()> migrate_assessments;
     std::function<void(const std::string& evidence_id)> browse_location;
+    // Authoring: a new piece of evidence with a statement and an optional claim
+    // to support; a link or unlink between existing evidence and a claim.
+    std::function<void(const std::string& text, const std::string& claim_id)> create_evidence;
+    std::function<void(const std::string& evidence_id, const std::string& claim_id)> link_evidence;
+    std::function<void(const std::string& evidence_id, const std::string& claim_id)> unlink_evidence;
 };
 
 // Rejoins the rows derived from `ac` with the assessments held in `store`.

@@ -97,6 +97,13 @@ public:
     // the project root when the file is inside the project, so the project
     // stays movable; absolute otherwise.
     void BrowseEvidenceLocation(const std::string& evidence_id);
+    // Register authoring: creation takes the statement and an optional claim to
+    // support; linking and unlinking add or withdraw the AssertedEvidence
+    // between existing evidence and a claim. Draft edits when a working draft
+    // is active, audited commands otherwise, like every other edit.
+    void CreateEvidence(const std::string& text, const std::string& claim_id);
+    void LinkEvidence(const std::string& evidence_id, const std::string& claim_id);
+    void UnlinkEvidence(const std::string& evidence_id, const std::string& claim_id);
 
     // Repairs for the defects the GSN v3 well-formedness checker reports. Each
     // is an ordinary audited edit, reachable from the Problems panel quick fix

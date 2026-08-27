@@ -15,6 +15,7 @@
 #include "core/evidence_attributes.h"
 #include "core/drafts/draft_operation_apply.h"
 #include "core/project_model.h"
+#include "core/registers/register_model.h"
 #include "core/reviews/review_proposal.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
@@ -23,6 +24,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -522,6 +524,131 @@ TEST(EvidenceRecord, APickedFileInsideTheProjectIsRecordedRelativeToIt) {
     EXPECT_TRUE(std::filesystem::path(core::EvidenceLocationForPickedFile({}, elsewhere / "shared.pdf")).is_absolute());
     std::filesystem::remove_all(root);
     std::filesystem::remove_all(elsewhere);
+}
+
+// ---------------------------------------------------------------------------
+// Authoring from the register: create evidence (under a claim, or bare), link
+// existing evidence to a claim, and have the audit log replay all of it.
+
+const core::SacmElement*
+SupportLink(const core::AssuranceCase& model, const std::string& claim_id, const std::string& evidence_id) {
+    for (const core::SacmElement& element : model.elements) {
+        if (element.type != "assertedevidence")
+            continue;
+        const bool from =
+            std::find(element.source_refs.begin(), element.source_refs.end(), evidence_id) != element.source_refs.end();
+        const bool to =
+            std::find(element.target_refs.begin(), element.target_refs.end(), claim_id) != element.target_refs.end();
+        if (from && to)
+            return &element;
+    }
+    return nullptr;
+}
+
+TEST(EvidenceAuthoring, CreateAndLinkCommandsAuthorEvidenceAndReplay) {
+    std::unique_ptr<BusFixture> fixture = MakeBusFixture("author", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    ASSERT_NE(fixture->bus, nullptr);
+
+    // Under a claim: the element, its statement and the AssertedEvidence.
+    core::commands::CreateEvidenceCommand under("G1", "  Vibration test report, run 4. ");
+    const core::commands::CommandResult under_result = RunCommand(*fixture, under);
+    ASSERT_TRUE(under_result.success) << under_result.error;
+    ASSERT_FALSE(under.GeneratedId().empty());
+    ASSERT_FALSE(under.GeneratedRelationshipId().empty());
+    const core::SacmElement* created = Find(fixture->model, under.GeneratedId());
+    ASSERT_NE(created, nullptr);
+    EXPECT_EQ(created->type, "artifactreference");
+    EXPECT_EQ(created->description, "Vibration test report, run 4.") << "the statement was not recorded or trimmed";
+    const core::SacmElement* link = SupportLink(fixture->model, "G1", under.GeneratedId());
+    ASSERT_NE(link, nullptr) << "the new evidence does not support the claim";
+    EXPECT_EQ(link->id, under.GeneratedRelationshipId());
+
+    // Bare: registered before anything rests on it, so no relationship.
+    core::commands::CreateEvidenceCommand bare("", "Supplier audit record.");
+    ASSERT_TRUE(RunCommand(*fixture, bare).success);
+    ASSERT_FALSE(bare.GeneratedId().empty());
+    EXPECT_TRUE(bare.GeneratedRelationshipId().empty());
+    EXPECT_NE(bare.GeneratedId(), under.GeneratedId());
+    EXPECT_TRUE(core::registers::DeriveEvidenceCitations(fixture->model, bare.GeneratedId()).empty());
+    EXPECT_EQ(Find(fixture->model, bare.GeneratedId())->description, "Supplier audit record.");
+
+    // Linking the bare evidence to the claim creates the relationship...
+    core::commands::LinkEvidenceCommand linked("G1", bare.GeneratedId());
+    ASSERT_TRUE(RunCommand(*fixture, linked).success);
+    ASSERT_FALSE(linked.GeneratedRelationshipId().empty());
+    EXPECT_NE(SupportLink(fixture->model, "G1", bare.GeneratedId()), nullptr);
+
+    // ...and doing it again is refused rather than doubled.
+    core::commands::LinkEvidenceCommand again("G1", bare.GeneratedId());
+    const core::commands::CommandResult again_result = RunCommand(*fixture, again);
+    EXPECT_FALSE(again_result.success);
+    EXPECT_NE(again_result.error.find("already"), std::string::npos) << again_result.error;
+
+    // Linking a claim, or to something that is not a claim, is refused.
+    core::commands::LinkEvidenceCommand not_evidence("G1", "G1");
+    EXPECT_FALSE(RunCommand(*fixture, not_evidence).success);
+    core::commands::LinkEvidenceCommand not_a_claim("Sn1", bare.GeneratedId());
+    EXPECT_FALSE(RunCommand(*fixture, not_a_claim).success);
+
+    const core::audit::ReplayVerificationResult verification = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verification.ran);
+    EXPECT_TRUE(verification.success) << "snapshot " << verification.snapshot_canonical_hash << " replayed "
+                                      << verification.replayed_canonical_hash << " on disk "
+                                      << verification.on_disk_canonical_hash;
+
+    std::filesystem::remove_all(fixture->project.rootPath);
+}
+
+TEST(EvidenceAuthoring, CommandsRefuseWithoutALibraryDocument) {
+    std::unique_ptr<BusFixture> legacy = MakeBusFixture("author_legacy", /*library_backed=*/false);
+    ASSERT_NE(legacy->bus, nullptr);
+    core::commands::CreateEvidenceCommand create("G1", "x");
+    EXPECT_FALSE(RunCommand(*legacy, create).success);
+    core::commands::LinkEvidenceCommand link("G1", "Sn1");
+    EXPECT_FALSE(RunCommand(*legacy, link).success);
+    std::filesystem::remove_all(legacy->project.rootPath);
+}
+
+core::reviews::PatchOperation
+SupportOp(core::reviews::PatchOperationType type, const std::string& evidence_id, const std::string& claim_id) {
+    core::reviews::PatchOperation operation;
+    operation.type = type;
+    core::reviews::ElementRef source;
+    source.existing_id = evidence_id;
+    core::reviews::ElementRef target;
+    target.existing_id = claim_id;
+    operation.source = source;
+    operation.target = target;
+    return operation;
+}
+
+// A draft withdraws a solution's support the way it withdraws a claim's: the
+// register's unlink stages RemoveSupportedBy, which used to look only for an
+// AssertedInference and so could never find the AssertedEvidence a solution
+// attaches by.
+TEST(EvidenceAuthoring, DraftRemoveSupportedByWithdrawsEvidenceAndAddSupportedByRestoresIt) {
+    const std::filesystem::path root = MakeTempRoot("author_draft");
+    std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
+    ASSERT_NE(document, nullptr);
+    ASSERT_NE(SupportLink(sacm_adapter::project_case(*document), "G1", "Sn1"), nullptr);
+
+    const core::drafts::DraftOperationResult withdrawn = core::drafts::ApplyOperationsToDraftDocument(
+        *document, {SupportOp(core::reviews::PatchOperationType::RemoveSupportedBy, "Sn1", "G1")});
+    ASSERT_TRUE(withdrawn.applied) << withdrawn.error;
+    core::AssuranceCase projected = sacm_adapter::project_case(*document);
+    EXPECT_EQ(SupportLink(projected, "G1", "Sn1"), nullptr) << "the AssertedEvidence survived the withdrawal";
+    ASSERT_NE(Find(projected, "Sn1"), nullptr) << "the evidence itself must stay";
+
+    const core::drafts::DraftOperationResult restored = core::drafts::ApplyOperationsToDraftDocument(
+        *document, {SupportOp(core::reviews::PatchOperationType::AddSupportedBy, "Sn1", "G1")});
+    ASSERT_TRUE(restored.applied) << restored.error;
+    projected = sacm_adapter::project_case(*document);
+    const core::SacmElement* link = SupportLink(projected, "G1", "Sn1");
+    ASSERT_NE(link, nullptr);
+    EXPECT_EQ(link->type, "assertedevidence") << "a solution attaches by AssertedEvidence, not inference";
+
+    std::filesystem::remove_all(root);
 }
 
 } // namespace
