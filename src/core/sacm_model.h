@@ -34,6 +34,30 @@ inline constexpr char kArgumentPackagePurposeTagKey[] = "assuranceForge.argument
 inline constexpr char kArgumentPackagePurposeConfidence[] = "confidence";
 
 // Represents a SACM element (claim, strategy, evidence, etc.)
+// The evidence register's SACM-backed columns, read from the Artifact an
+// ArtifactReference cites (clause 12.7). `version` and `date` are the
+// Artifact's own provenance attributes and `notes` its Description; the rest
+// are TaggedValues under the keys below, because SACM's Property carries no
+// value and a tag is the standard key/value on any ModelElement. An empty
+// field is an absent record, not an empty string somebody wrote.
+struct EvidenceRecord {
+    std::string artifact_id; // the cited Artifact; empty until one is recorded
+    std::string owner;
+    std::string type;
+    std::string version;
+    std::string date;
+    std::string maturity;
+    std::string controlled_environment;
+    std::string notes;
+
+    friend bool operator==(const EvidenceRecord&, const EvidenceRecord&) = default;
+};
+
+inline constexpr char kEvidenceOwnerTagKey[] = "assuranceForge.evidence.owner";
+inline constexpr char kEvidenceTypeTagKey[] = "assuranceForge.evidence.type";
+inline constexpr char kEvidenceMaturityTagKey[] = "assuranceForge.evidence.maturity";
+inline constexpr char kEvidenceControlledEnvironmentTagKey[] = "assuranceForge.evidence.controlledEnvironment";
+
 struct SacmElement {
     std::string id;
     std::string gid;
@@ -80,6 +104,8 @@ struct SacmElement {
     // only change a field it carries.
     std::string referenced_artifact_id;
     std::string artifact_location;
+    // What the cited Artifact records about the evidence; see EvidenceRecord.
+    EvidenceRecord evidence;
 };
 
 struct AcpRecord {

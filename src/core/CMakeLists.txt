@@ -69,6 +69,7 @@ add_library(af_core OBJECT
     project_service.cpp
     project_summary.cpp
     registers/register_model.cpp
+    evidence_attributes.cpp
     reviews/review_item.cpp
     reviews/review_item_manager.cpp
     reviews/review_proposal.cpp

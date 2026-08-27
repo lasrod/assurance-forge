@@ -39,7 +39,18 @@ void AddAddedFromEvent(const AuditEvent& event, AuditChangeSet& out) {
         }
         return;
     }
-    if (type == "UpdateElementText" || type == "UpdateGsnIdentifier" || type == "SetEvidenceLocation") {
+    if (type == "ImportEvidenceAssessments") {
+        auto items_it = payload.find("items");
+        if (items_it != payload.end() && items_it->is_array()) {
+            for (const auto& item : *items_it) {
+                if (item.is_object() && item.contains("element_id") && item["element_id"].is_string())
+                    out.modified.insert(item["element_id"].get<std::string>());
+            }
+        }
+        return;
+    }
+    if (type == "UpdateElementText" || type == "UpdateGsnIdentifier" || type == "SetEvidenceLocation" ||
+        type == "SetEvidenceAttribute") {
         auto el_it = payload.find("element_id");
         if (el_it != payload.end() && el_it->is_string())
             out.modified.insert(el_it->get<std::string>());

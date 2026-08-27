@@ -36,6 +36,11 @@ enum class PatchOperationType {
     // ArtifactReference in `element` cites, carried in `new_value`. An empty
     // value clears it. See sacm_adapter::apply_set_evidence_location.
     SetEvidenceLocation,
+    // One of the evidence register's columns on the Artifact the reference in
+    // `element` cites: `field` names the column by its core::EvidenceAttribute
+    // token ("owner", "type", "version", "date", "maturity",
+    // "controlled_environment", "notes"), `new_value` the text; empty clears.
+    SetEvidenceAttribute,
     // Terminology (SACM clause 10). A term is an element of type "term" in the
     // flat model: its value (the word or phrase being defined) lives in
     // `content` and its definition in `description`, mirroring how

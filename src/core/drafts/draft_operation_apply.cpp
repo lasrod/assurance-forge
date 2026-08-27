@@ -1,5 +1,7 @@
 #include "core/drafts/draft_operation_apply.h"
 
+#include "core/evidence_attributes.h"
+
 #include "core/sacm_model.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
@@ -210,6 +212,7 @@ struct Applier {
     bool ApplyRemoveRelationship(const PatchOperation& operation, const std::string& type, std::string& error);
     bool ApplyRemoveElement(const PatchOperation& operation, std::string& error);
     bool ApplySetEvidenceLocation(const PatchOperation& operation, std::string& error);
+    bool ApplySetEvidenceAttribute(const PatchOperation& operation, std::string& error);
     bool Apply(const PatchOperation& operation, std::string& error);
 };
 
@@ -713,6 +716,30 @@ bool Applier::ApplySetEvidenceLocation(const PatchOperation& operation, std::str
     return true;
 }
 
+// One register column. The column is named by its token so a client can
+// discover the vocabulary from the schema; a token that names no column is
+// refused here, in the call that made it.
+bool Applier::ApplySetEvidenceAttribute(const PatchOperation& operation, std::string& error) {
+    std::string element_id;
+    if (!ResolveRef(operation.element, created, "element", element_id, error))
+        return false;
+    EvidenceAttribute attribute = EvidenceAttribute::Owner;
+    if (!ParseEvidenceAttribute(operation.field, attribute)) {
+        error = "SetEvidenceAttribute names no evidence column: \"" + operation.field +
+                "\". Use owner, type, version, date, maturity, controlled_environment or notes.";
+        return false;
+    }
+    const sacm_adapter::EditOutcome outcome =
+        sacm_adapter::apply_set_evidence_attribute(document, element_id, attribute, operation.new_value);
+    if (!outcome.supported || !outcome.applied) {
+        error = Describe(outcome,
+                         std::string("The ") + EvidenceAttributeToken(attribute) + " of " + element_id +
+                             " could not be recorded");
+        return false;
+    }
+    return true;
+}
+
 bool Applier::Apply(const PatchOperation& operation, std::string& error) {
     switch (operation.type) {
     case PatchOperationType::CreateClaim:
@@ -742,6 +769,8 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
         return ApplyRemoveElement(operation, error);
     case PatchOperationType::SetEvidenceLocation:
         return ApplySetEvidenceLocation(operation, error);
+    case PatchOperationType::SetEvidenceAttribute:
+        return ApplySetEvidenceAttribute(operation, error);
     case PatchOperationType::CreateTerm:
         return ApplyCreateTerm(operation, error);
     case PatchOperationType::UpdateTerm:

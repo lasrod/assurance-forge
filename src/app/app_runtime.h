@@ -4,6 +4,7 @@
 #include "core/drafts/draft_change_index.h"
 #include "core/drafts/draft_workspace.h"
 #include "core/element_factory.h"
+#include "core/evidence_attributes.h"
 #include "core/problems/problem_item.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
@@ -83,6 +84,12 @@ public:
     void LocateElementOnCanvas(const std::string& element_id);
     void RemoveEvidence(const std::string& evidence_id);
     bool SetEvidenceLocation(const std::string& evidence_id, const std::string& location);
+    bool
+    SetEvidenceAttribute(const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value);
+    // Moves the register's project-file assessments onto the cited Artifacts
+    // -- one audited transaction, or staged draft edits under a working draft
+    // -- and drops them from the project file once they are in the document.
+    void MigrateEvidenceAssessments();
     // Opens the recorded location: a URL in the browser, a file with its
     // application. A relative path is resolved against the project root.
     void OpenEvidenceLocation(const std::string& location);

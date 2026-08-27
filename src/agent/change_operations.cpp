@@ -164,11 +164,11 @@ constexpr const char* kNotAppliedNote =
 
 const std::vector<std::string>& PatchOperationTypeNames() {
     static const std::vector<std::string> names{
-        "CreateClaim",         "CreateStrategy",    "CreateSolution",    "CreateContext",     "CreateAssumption",
-        "CreateJustification", "UpdateElementText", "UpdateElementName", "SetUndeveloped",    "ClearUndeveloped",
-        "AddSupportedBy",      "RemoveSupportedBy", "AddInContextOf",    "RemoveInContextOf", "RemoveElement",
-        "CreateTerm",          "UpdateTerm",        "RemoveTerm",        "CreateCategory",    "UpdateCategory",
-        "SetEvidenceLocation"};
+        "CreateClaim",         "CreateStrategy",      "CreateSolution",    "CreateContext",     "CreateAssumption",
+        "CreateJustification", "UpdateElementText",   "UpdateElementName", "SetUndeveloped",    "ClearUndeveloped",
+        "AddSupportedBy",      "RemoveSupportedBy",   "AddInContextOf",    "RemoveInContextOf", "RemoveElement",
+        "CreateTerm",          "UpdateTerm",          "RemoveTerm",        "CreateCategory",    "UpdateCategory",
+        "SetEvidenceLocation", "SetEvidenceAttribute"};
     return names;
 }
 

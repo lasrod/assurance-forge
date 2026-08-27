@@ -1250,12 +1250,25 @@ TRANSLATIONS = {
     "Path or URL": "パスまたは URL",
     "Could not record the location in the draft: {0}": "ドラフトに場所を記録できませんでした: {0}",
     "Could not open the evidence location: {0}": "エビデンスの場所を開けませんでした: {0}",
+    "Version": "バージョン",
+    "Date": "日付",
+    "Move into SACM": "SACM に移動",
+    "Stored in the project file until moved into SACM.": "SACM に移動するまでプロジェクトファイルに保存されます。",
+    "No project-file assessments match evidence in the argument.": "アーギュメント内のエビデンスに一致するプロジェクトファイルの評価はありません。",
+    "Could not record the evidence attribute in the draft: {0}": "ドラフトにエビデンス属性を記録できませんでした: {0}",
+    "Could not move assessments into the draft: {0}": "評価をドラフトに移動できませんでした: {0}",
 }
 
 
 # Plural translations: (singular_msgid, plural_msgid) -> [japanese_form]
 # Japanese has nplurals=1, so we provide a single form.
 PLURAL_TRANSLATIONS = {
+    ('{0} assessment is stored in the project file rather than the SACM document.',
+     '{0} assessments are stored in the project file rather than the SACM document.'):
+        ['{0} 件の評価が SACM ドキュメントではなくプロジェクトファイルに保存されています。'],
+    ('Moved {0} assessment into the SACM document.',
+     'Moved {0} assessments into the SACM document.'):
+        ['{0} 件の評価を SACM ドキュメントに移動しました。'],
     ('Rejected {0} change.',
      'Rejected {0} changes.'):
         ['変更 {0} 件を却下しました。'],

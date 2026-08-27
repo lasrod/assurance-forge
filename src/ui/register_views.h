@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/evidence_attributes.h"
 #include "core/registers/register_model.h"
 #include "core/sacm_model.h"
 
@@ -41,6 +42,12 @@ struct EvidenceRegisterRow {
     // row can record one: only an ArtifactReference cites a Resource.
     std::string location;
     bool is_artifact_reference = false;
+
+    // The SACM-backed columns, from the Artifact the reference cites. A row
+    // whose assessment is still in the project file shows and edits the
+    // fields above instead, until the user moves it into the document.
+    core::EvidenceRecord record;
+    bool stored_in_project_file = false;
 };
 
 // What the evidence register can ask the application to do. Each goes through
@@ -52,6 +59,9 @@ struct EvidenceRegisterCallbacks {
     std::function<void(const std::string& evidence_id)> remove;
     std::function<void(const std::string& evidence_id, const std::string& location)> set_location;
     std::function<void(const std::string& location)> open_location;
+    std::function<void(const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value)>
+        set_attribute;
+    std::function<void()> migrate_assessments;
 };
 
 // Rejoins the rows derived from `ac` with the assessments held in `store`.

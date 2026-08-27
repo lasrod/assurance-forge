@@ -308,6 +308,16 @@ struct SetArtifactReferenceElements {
     std::vector<model::ElementId> referenced_artifact_elements;
 };
 
+// Set an Artifact's provenance (clause 12.7 `version` and `date`) wholesale;
+// an empty field clears it. Both together because they describe one state of
+// the artifact: a version without its date, or a date left over from an
+// earlier version, is exactly what a provenance edit replaces.
+struct SetArtifactProvenance {
+    model::ElementId element;
+    std::string version;
+    std::string date;
+};
+
 // Replace the set of Categories a Term or Expression belongs to (clause 10.8);
 // each id must resolve to a Category.
 struct SetExpressionCategories {
@@ -386,6 +396,7 @@ using Operation = std::variant<CreateAssuranceCasePackage,
                                SetTermOrigin,
                                SetResourceLocation,
                                SetArtifactReferenceElements,
+                               SetArtifactProvenance,
                                SetExpressionCategories,
                                AddTaggedValue,
                                DeleteElement>;

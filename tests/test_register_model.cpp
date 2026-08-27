@@ -253,3 +253,21 @@ TEST(RegisterModelTest, AnArtifactReferenceAttachedAsContextIsNotEvidence) {
     const std::vector<std::string> ids = core::registers::DeriveEvidenceIds(model);
     EXPECT_EQ(ids, (std::vector<std::string>{"Sn1", "Sn9"}));
 }
+
+// The Artifact an ArtifactReference cites carries the register's columns for
+// that evidence. Listing it too showed every recorded piece of evidence
+// twice: once as the reference, once as its own record.
+TEST(RegisterModelTest, AnArtifactCitedByAReferenceIsItsRecordNotMoreEvidence) {
+    parser::AssuranceCase model = TwoClaimsSharingEvidence();
+    parser::SacmElement& reference = model.elements[2];
+    ASSERT_EQ(reference.id, "Sn1");
+    reference.referenced_artifact_id = "resource_1";
+    reference.evidence.artifact_id = "artifact_1";
+    model.elements.push_back(Element("artifact_1", "artifact", "Sn1's record"));
+    model.elements.push_back(Element("resource_1", "resource", "where Sn1 is"));
+    // An Artifact nothing cites is still evidence in its own right.
+    model.elements.push_back(Element("artifact_9", "artifact", "Uncited record"));
+
+    const std::vector<std::string> ids = core::registers::DeriveEvidenceIds(model);
+    EXPECT_EQ(ids, (std::vector<std::string>{"Sn1", "artifact_9"}));
+}
