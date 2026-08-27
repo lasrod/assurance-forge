@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <system_error>
 #include <fstream>
 #include <vector>
 
@@ -683,8 +684,19 @@ TEST(ElementEditControllerTest, SACM23_INT_002_NodeOnlyOnALeafOffersThePreview) 
   </argumentPackage>
 </AssuranceCasePackage>)";
 
-    const fs::path path = fs::temp_directory_path() / "af_int002_nodeonly_leaf.sacm.xml";
+    const fs::path path =
+        fs::temp_directory_path() /
+        ("af_int002_nodeonly_leaf_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm.xml");
     { std::ofstream(path) << kChain; }
+    // Removed at every exit: a fixed name left behind collides with a
+    // concurrent run and pollutes the machine.
+    struct RemoveOnExit {
+        fs::path path;
+        ~RemoveOnExit() {
+            std::error_code ec;
+            fs::remove(path, ec);
+        }
+    } const remove_on_exit{path};
 
     app::AppRuntimeState state;
     ASSERT_TRUE(state.app_state.load_file(path.string())) << state.app_state.status_message;
@@ -720,8 +732,17 @@ TEST(ElementEditControllerTest, SACM23_INT_002_RemovalCanBeAskedToAlwaysConfirm)
   </argumentPackage>
 </AssuranceCasePackage>)";
 
-    const fs::path path = fs::temp_directory_path() / "af_int002_always_confirm.sacm.xml";
+    const fs::path path =
+        fs::temp_directory_path() /
+        ("af_int002_always_confirm_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm.xml");
     { std::ofstream(path) << kLone; }
+    struct RemoveOnExit {
+        fs::path path;
+        ~RemoveOnExit() {
+            std::error_code ec;
+            fs::remove(path, ec);
+        }
+    } const remove_on_exit{path};
 
     app::AppRuntimeState state;
     ASSERT_TRUE(state.app_state.load_file(path.string())) << state.app_state.status_message;
