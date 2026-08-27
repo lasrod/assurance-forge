@@ -167,7 +167,8 @@ const std::vector<std::string>& PatchOperationTypeNames() {
         "CreateClaim",         "CreateStrategy",    "CreateSolution",    "CreateContext",     "CreateAssumption",
         "CreateJustification", "UpdateElementText", "UpdateElementName", "SetUndeveloped",    "ClearUndeveloped",
         "AddSupportedBy",      "RemoveSupportedBy", "AddInContextOf",    "RemoveInContextOf", "RemoveElement",
-        "CreateTerm",          "UpdateTerm",        "RemoveTerm",        "CreateCategory",    "UpdateCategory"};
+        "CreateTerm",          "UpdateTerm",        "RemoveTerm",        "CreateCategory",    "UpdateCategory",
+        "SetEvidenceLocation"};
     return names;
 }
 

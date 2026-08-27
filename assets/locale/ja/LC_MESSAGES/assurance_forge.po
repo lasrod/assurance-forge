@@ -193,6 +193,9 @@ msgstr "これを受理すると次も受理されます:"
 msgid "Accepting this also accepts: {0}"
 msgstr "これを受理すると次も受理されます: {0}"
 
+msgid "Actions"
+msgstr "操作"
+
 msgid "Active"
 msgstr "アクティブ"
 
@@ -649,8 +652,14 @@ msgstr "編集可能な SACM パッケージモデルを読み込めませんで
 msgid "Could not open File Explorer: {0}"
 msgstr "エクスプローラーを開けませんでした: {0}"
 
+msgid "Could not open the evidence location: {0}"
+msgstr "エビデンスの場所を開けませんでした: {0}"
+
 msgid "Could not record the edit in the draft: {0}"
 msgstr "ドラフトに編集を記録できませんでした: {0}"
+
+msgid "Could not record the location in the draft: {0}"
+msgstr "ドラフトに場所を記録できませんでした: {0}"
 
 msgid "Could not reject this change: {0}"
 msgstr "この変更を却下できませんでした: {0}"
@@ -1210,6 +1219,9 @@ msgstr "読み込み"
 msgid "Load a SACM model before editing proposal drafts."
 msgstr "提案ドラフトを編集する前に SACM モデルを読み込んでください。"
 
+msgid "Location"
+msgstr "場所"
+
 msgid "Low culling"
 msgstr "低カリング"
 
@@ -1338,6 +1350,9 @@ msgstr "分類なし"
 
 msgid "No categories are available in this terminology package."
 msgstr "この用語パッケージには利用可能な分類がありません。"
+
+msgid "No claim rests on this evidence."
+msgstr "このエビデンスに依拠するクレームはありません。"
 
 msgid "No confidence argument has been selected."
 msgstr "信頼度論証が選択されていません。"
@@ -1534,6 +1549,9 @@ msgstr "用語を開く"
 msgid "Open the Problems panel"
 msgstr "問題パネルを開く"
 
+msgid "Open the file or URL"
+msgstr "ファイルまたは URL を開く"
+
 msgid "Opened SACM file, but no editable package model was available."
 msgstr "SACM ファイルを開きましたが、編集可能なパッケージモデルがありませんでした。"
 
@@ -1602,6 +1620,9 @@ msgstr "パースエラー: {0}"
 
 msgid "Paste into your AI client's MCP settings."
 msgstr "AI クライアントの MCP 設定に貼り付けてください。"
+
+msgid "Path or URL"
+msgstr "パスまたは URL"
 
 msgid "Pause"
 msgstr "一時停止"
@@ -1795,6 +1816,9 @@ msgstr "除去"
 msgid "Remove ACP"
 msgstr "ACP を除去"
 
+msgid "Remove Evidence"
+msgstr "エビデンスの削除"
+
 msgid "Remove Key"
 msgstr "キーを削除"
 
@@ -1803,6 +1827,12 @@ msgstr "サブツリーを除去"
 
 msgid "Remove challenge"
 msgstr "反証を削除"
+
+msgid "Remove evidence"
+msgstr "エビデンスを削除"
+
+msgid "Remove evidence {0}?"
+msgstr "エビデンス {0} を削除しますか?"
 
 msgid "Remove file failed: {0}"
 msgstr "ファイルの削除に失敗しました: {0}"
@@ -2049,6 +2079,9 @@ msgstr "重大度"
 
 msgid "Show cycle"
 msgstr "循環を表示"
+
+msgid "Show in argument"
+msgstr "アーギュメントで表示"
 
 msgid "Shown on the canvas as you watch it build."
 msgstr "作成の様子がキャンバスに表示されています。"
@@ -2841,6 +2874,10 @@ msgstr[0] "受理するには {0} 件の変更に対応が必要です。"
 msgid "{0} change still being written was left for its author."
 msgid_plural "{0} changes still being written were left for their authors."
 msgstr[0] "作成中の変更 {0} 件は作成者に委ねられました。"
+
+msgid "{0} claim rests on this evidence; the link will be removed too."
+msgid_plural "{0} claims rest on this evidence; the links will be removed too."
+msgstr[0] "{0} 件のクレームがこのエビデンスに依拠しています。リンクも削除されます。"
 
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."

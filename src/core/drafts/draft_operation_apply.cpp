@@ -209,6 +209,7 @@ struct Applier {
     bool ApplyAddRelationship(const PatchOperation& operation, sacm_adapter::RelationshipKind kind, std::string& error);
     bool ApplyRemoveRelationship(const PatchOperation& operation, const std::string& type, std::string& error);
     bool ApplyRemoveElement(const PatchOperation& operation, std::string& error);
+    bool ApplySetEvidenceLocation(const PatchOperation& operation, std::string& error);
     bool Apply(const PatchOperation& operation, std::string& error);
 };
 
@@ -695,6 +696,23 @@ bool Applier::ApplyRemoveElement(const PatchOperation& operation, std::string& e
     return true;
 }
 
+// Where a piece of evidence is. The seam decides what that means in SACM (the
+// cited Resource's location, created when the reference cites none), so a
+// batch that names a Claim here is refused by it rather than accepted into a
+// field the document does not have.
+bool Applier::ApplySetEvidenceLocation(const PatchOperation& operation, std::string& error) {
+    std::string element_id;
+    if (!ResolveRef(operation.element, created, "element", element_id, error))
+        return false;
+    const sacm_adapter::EditOutcome outcome =
+        sacm_adapter::apply_set_evidence_location(document, element_id, operation.new_value);
+    if (!outcome.supported || !outcome.applied) {
+        error = Describe(outcome, "The location of " + element_id + " could not be recorded");
+        return false;
+    }
+    return true;
+}
+
 bool Applier::Apply(const PatchOperation& operation, std::string& error) {
     switch (operation.type) {
     case PatchOperationType::CreateClaim:
@@ -722,6 +740,8 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
         return ApplyRemoveRelationship(operation, "assertedcontext", error);
     case PatchOperationType::RemoveElement:
         return ApplyRemoveElement(operation, error);
+    case PatchOperationType::SetEvidenceLocation:
+        return ApplySetEvidenceLocation(operation, error);
     case PatchOperationType::CreateTerm:
         return ApplyCreateTerm(operation, error);
     case PatchOperationType::UpdateTerm:

@@ -1152,12 +1152,16 @@
       "status": "prototype",
       "evidence": [
         "src/core/registers/register_model.cpp",
-        "src/ui/register_views.cpp"
+        "src/ui/register_views.cpp",
+        "src/sacm_adapter/document_edit.cpp",
+        "src/core/commands/element_commands.cpp",
+        "src/app/app_runtime.cpp"
       ],
       "tests": [
-        "tests/test_register_model.cpp"
+        "tests/test_register_model.cpp",
+        "tests/test_evidence_location.cpp"
       ],
-      "notes": "Row derivation is in core and tested; evidence nothing cites is listed rather than hidden. Assessments persist with the project (AF-ENG-016). Expected to migrate to a SACM Artifact-backed register; see docs/roadmap/public.md."
+      "notes": "Row derivation is in core and tested; evidence nothing cites is listed rather than hidden. Assessments persist with the project (AF-ENG-016). Each row can be **located** in the argument (its package's canvas opens with the element selected), **removed** after a confirmation that names how many claims rest on it (the AssertedEvidence links go with it; while a working draft is active the removal is staged like any other draft edit), and given a **location** -- a path or URL -- that opens with one click, a relative path resolving against the project root. The location is SACM data, not register metadata: it is written to the `location` of the Resource the ArtifactReference cites (clause 12.12), creating the Resource in the case's first ArtifactPackage when the reference cites none, through an audited command with a replay branch and, under a working draft, as the `SetEvidenceLocation` draft operation an MCP client can also send. The table scrolls horizontally: columns have real initial widths rather than collapsing to their header labels. Still prototype: owner, type, recency and maturity remain register metadata rather than SACM artifact properties; see docs/roadmap/public.md."
     },
     {
       "id": "AF-ENG-009",

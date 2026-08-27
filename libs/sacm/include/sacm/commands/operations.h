@@ -285,6 +285,29 @@ struct SetTermOrigin {
     std::optional<model::ElementId> origin;
 };
 
+// Set or clear a Resource's location (clause 12.12): the path or URL where the
+// resource can be found. One language per operation, like SetDescription; an
+// empty `location` removes that language's entry. The location is the only
+// payload a Resource carries, so this is how a document says where a piece of
+// evidence actually is.
+struct SetResourceLocation {
+    model::ElementId element;
+    std::string location;
+    std::string language; // may be empty for the primary entry
+};
+
+// Replace the ArtifactElements an ArtifactReference cites (clause 11.9
+// `referencedArtifactElement`) wholesale, the way SetMetaClaims replaces an
+// Assertion's meta-claims. `CreateArtifactReference` could only set them at
+// creation, so a reference imported without a cited artifact -- the ordinary
+// state of evidence drawn in a diagram -- could never gain one without being
+// recreated.
+// Every id must resolve to an ArtifactElement; an empty list clears them.
+struct SetArtifactReferenceElements {
+    model::ElementId element;
+    std::vector<model::ElementId> referenced_artifact_elements;
+};
+
 // Replace the set of Categories a Term or Expression belongs to (clause 10.8);
 // each id must resolve to a Category.
 struct SetExpressionCategories {
@@ -361,6 +384,8 @@ using Operation = std::variant<CreateAssuranceCasePackage,
                                SetExpressionValue,
                                SetTermExternalReference,
                                SetTermOrigin,
+                               SetResourceLocation,
+                               SetArtifactReferenceElements,
                                SetExpressionCategories,
                                AddTaggedValue,
                                DeleteElement>;

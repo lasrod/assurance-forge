@@ -27,7 +27,10 @@ bool DiffersMeaningfully(const parser::SacmElement& before, const parser::SacmEl
            // that only categorizes a term or cites its source reports the term
            // as unchanged, and the preview a reviewer accepts shows nothing.
            before.category_refs != after.category_refs || before.external_reference != after.external_reference ||
-           before.origin_ref != after.origin_ref;
+           before.origin_ref != after.origin_ref ||
+           // Where a piece of evidence is, and what it cites.
+           before.referenced_artifact_id != after.referenced_artifact_id ||
+           before.artifact_location != after.artifact_location;
 }
 
 std::map<std::string, const parser::SacmElement*> ById(const parser::AssuranceCase& model) {

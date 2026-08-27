@@ -654,6 +654,45 @@ bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx, audit::AuditEvent& o
     return true;
 }
 
+bool SetEvidenceLocationCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (element_id_.empty()) {
+        out_error = "SetEvidenceLocationCommand requires an element id";
+        return false;
+    }
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Recording where evidence is needs the SACM library document, and this file was loaded "
+                    "through the compatibility parser. The document is unchanged.";
+        return false;
+    }
+    const parser::SacmElement* element = parser::FindElementById(ctx.model, element_id_);
+    if (element == nullptr) {
+        out_error = "Element " + element_id_ + " was not found";
+        return false;
+    }
+    if (element->type != "artifactreference") {
+        out_error = "Element " + element_id_ + " is not evidence (an ArtifactReference)";
+        return false;
+    }
+    old_location_ = element->artifact_location;
+    was_no_op_ = old_location_ == location_;
+    if (!was_no_op_) {
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_evidence_location(*ctx.library_document, element_id_, location_);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection("the location of " + element_id_, outcome.diagnostics);
+            return false;
+        }
+        ctx.library_primary = true;
+    }
+
+    out_event.event_type = "SetEvidenceLocation";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["element_id"] = element_id_;
+    out_event.payload["old_location"] = old_location_;
+    out_event.payload["new_location"] = location_;
+    return true;
+}
+
 bool RemoveRelationshipCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (relationship_id_.empty()) {
         out_error = "RemoveRelationshipCommand requires a relationship id";

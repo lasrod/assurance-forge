@@ -74,6 +74,19 @@ public:
     // modal (with canvas highlight + fit-to-view) instead of removing.
     void RemoveSelected(core::RemoveMode mode);
 
+    // The evidence register's actions. Each is the ordinary edit path -- the
+    // working draft when one is active, the audited command otherwise -- so a
+    // register never has a way to change the argument the canvas does not have.
+    // `RemoveEvidence` removes the element and the AssertedEvidence links that
+    // rested on it; the register confirms first, since a table row is easier
+    // to hit by mistake than a selected node.
+    void LocateElementOnCanvas(const std::string& element_id);
+    void RemoveEvidence(const std::string& evidence_id);
+    bool SetEvidenceLocation(const std::string& evidence_id, const std::string& location);
+    // Opens the recorded location: a URL in the browser, a file with its
+    // application. A relative path is resolved against the project root.
+    void OpenEvidenceLocation(const std::string& location);
+
     // Repairs for the defects the GSN v3 well-formedness checker reports. Each
     // is an ordinary audited edit, reachable from the Problems panel quick fix
     // and (for removal) from the canvas edge menu and relationship inspector.

@@ -161,4 +161,42 @@ bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& er
 #endif
 }
 
+bool OpenPathOrUrl(const std::string& target, std::string& error_message) {
+    if (target.empty()) {
+        error_message = "No location is recorded.";
+        return false;
+    }
+    const bool is_url = target.find("://") != std::string::npos;
+    std::error_code ec;
+    if (!is_url && !std::filesystem::exists(core::PathFromUtf8(target), ec)) {
+        error_message = "File was not found: " + target;
+        return false;
+    }
+
+#ifdef _WIN32
+    // A URL goes to the shell as typed; a path is normalized so a project-relative
+    // location joined with forward slashes opens rather than confusing the shell.
+    std::wstring wide;
+    if (is_url) {
+        const int length = MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, nullptr, 0);
+        if (length > 0) {
+            wide.resize(static_cast<std::size_t>(length - 1));
+            MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, wide.data(), length);
+        }
+    } else {
+        wide = std::filesystem::path(core::PathFromUtf8(target)).make_preferred().wstring();
+    }
+    HINSTANCE result = ShellExecuteW(nullptr, L"open", wide.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    if (reinterpret_cast<intptr_t>(result) <= 32) {
+        error_message = "Could not open: " + target;
+        return false;
+    }
+    error_message.clear();
+    return true;
+#else
+    error_message = "Opening a location is not supported on this platform.";
+    return false;
+#endif
+}
+
 } // namespace app::dialogs

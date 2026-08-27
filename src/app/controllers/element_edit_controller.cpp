@@ -244,6 +244,28 @@ bool ElementEditController::SetElementUndeveloped(AppRuntimeState& state,
     return true;
 }
 
+bool ElementEditController::SetEvidenceLocation(AppRuntimeState& state,
+                                                const std::string& element_id,
+                                                const std::string& location) {
+    if (element_id.empty())
+        return false;
+    core::commands::SetEvidenceLocationCommand command(element_id, location);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Could not record the evidence location: " + outcome.error});
+        return false;
+    }
+    if (command.WasNoOp())
+        return true;
+    // The register rows are rebuilt with the tree; the location is read from
+    // the projected element, so the table shows what the document holds.
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{location.empty() ? "Cleared the location of " + element_id
+                                                     : "Recorded the location of " + element_id});
+    return true;
+}
+
 bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id) {
     if (element_id.empty()) {
         events_.Emit(StatusMessageEvent{"No element selected."});

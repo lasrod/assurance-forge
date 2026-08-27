@@ -9,6 +9,7 @@
 #include "sacm/io/xmi.h"
 #include "sacm/metadata/element_kind.h"
 #include "sacm/model/argumentation.h"
+#include "sacm/model/artifact.h"
 #include "sacm/model/assurance_case.h"
 #include "sacm/model/document.h"
 #include "sacm/model/element.h"
@@ -2687,6 +2688,106 @@ AcpOutcome apply_create_confidence_argument_package(LibraryDocument& document,
     AcpOutcome outcome;
     outcome.applied = true;
     return outcome;
+}
+
+namespace {
+
+// The first ArtifactPackage anywhere under `package`, the package itself
+// before nested case packages -- the same search first_terminology_package
+// makes, for the same reason: an evidence record filed in a nested package
+// must be found there rather than duplicated beside it.
+const sacm::model::ArtifactPackage* first_artifact_package(const sacm::model::AssuranceCasePackage& package) {
+    if (!package.artifact_packages().empty()) {
+        return package.artifact_packages().front().get();
+    }
+    for (const auto& nested : package.assurance_case_packages()) {
+        if (const sacm::model::ArtifactPackage* found = first_artifact_package(*nested)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+// The language an existing location entry is written in, so a rewrite replaces
+// it rather than leaving a second entry the projection would never show.
+std::string location_language(const sacm::model::Resource& resource) {
+    return resource.location().values.empty() ? std::string("en") : resource.location().values.front().lang;
+}
+
+} // namespace
+
+EditOutcome
+apply_set_evidence_location(LibraryDocument& document, const std::string& element_id, const std::string& location) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(element_id);
+    const auto* reference = doc.find_as<sacm::model::ArtifactReference>(id);
+    if (reference == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + element_id + "' is not an ArtifactReference");
+    }
+    const std::string trimmed = trim_whitespace(location);
+
+    // A Resource the reference already cites is the record to update.
+    for (const sacm::model::ElementId& cited : reference->referenced_artifact_elements()) {
+        if (const auto* resource = doc.find_as<sacm::model::Resource>(cited)) {
+            return applied_outcome(doc.apply(sacm::commands::SetResourceLocation{
+                .element = cited, .location = trimmed, .language = location_language(*resource)}));
+        }
+    }
+    if (trimmed.empty()) {
+        // Nothing cited and nothing to record: the document already says so.
+        return EditOutcome{.supported = true, .applied = true, .diagnostics = {}};
+    }
+
+    const sacm::model::AssuranceCasePackage* root = root_case_package(doc);
+    if (root == nullptr) {
+        return refused_outcome("SACM-CMD-002", "the document has no assurance case package to file the evidence in");
+    }
+    // Captured before anything is created: the reference object itself stays
+    // put (elements are heap-owned), but reading it after a failed step and a
+    // rollback is a habit worth not forming.
+    const std::string reference_name = reference->name().content;
+    std::vector<sacm::model::ElementId> cited = reference->referenced_artifact_elements();
+
+    std::optional<sacm::model::ElementId> created_package_id;
+    const sacm::model::ArtifactPackage* package = first_artifact_package(*root);
+    if (package == nullptr) {
+        const sacm::commands::MutationResult created =
+            doc.apply(sacm::commands::CreateArtifactPackage{.parent = root->id(), .name = "Artifacts"});
+        if (!created.applied || created.created_ids().empty()) {
+            return applied_outcome(created);
+        }
+        created_package_id = created.created_ids().front();
+    }
+    const sacm::model::ElementId package_id = package != nullptr ? package->id() : *created_package_id;
+    const auto rollback_all = [&](const std::optional<sacm::model::ElementId>& resource_id) {
+        if (resource_id.has_value()) {
+            rollback_element(doc, *resource_id);
+        }
+        if (created_package_id.has_value()) {
+            rollback_element(doc, *created_package_id);
+        }
+    };
+
+    const sacm::commands::MutationResult resource = doc.apply(sacm::commands::CreateArtifactAsset{
+        .parent = package_id, .kind = sacm::metadata::ElementKind::Resource, .name = reference_name});
+    if (!resource.applied || resource.created_ids().empty()) {
+        rollback_all(std::nullopt);
+        return applied_outcome(resource);
+    }
+    const sacm::model::ElementId resource_id = resource.created_ids().front();
+    const sacm::commands::MutationResult located =
+        doc.apply(sacm::commands::SetResourceLocation{.element = resource_id, .location = trimmed, .language = "en"});
+    if (!located.applied) {
+        rollback_all(resource_id);
+        return applied_outcome(located);
+    }
+    cited.push_back(resource_id);
+    const sacm::commands::MutationResult linked =
+        doc.apply(sacm::commands::SetArtifactReferenceElements{.element = id, .referenced_artifact_elements = cited});
+    if (!linked.applied) {
+        rollback_all(resource_id);
+    }
+    return applied_outcome(linked);
 }
 
 } // namespace sacm_adapter

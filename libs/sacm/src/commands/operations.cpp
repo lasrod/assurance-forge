@@ -44,6 +44,10 @@ std::string_view operation_name(const Operation& operation) {
                 return "SetTermExternalReference";
             } else if constexpr (std::is_same_v<T, SetTermOrigin>) {
                 return "SetTermOrigin";
+            } else if constexpr (std::is_same_v<T, SetResourceLocation>) {
+                return "SetResourceLocation";
+            } else if constexpr (std::is_same_v<T, SetArtifactReferenceElements>) {
+                return "SetArtifactReferenceElements";
             } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
                 return "SetExpressionCategories";
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {

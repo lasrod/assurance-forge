@@ -3,6 +3,7 @@
 #include "core/registers/register_model.h"
 #include "core/sacm_model.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,22 @@ struct EvidenceRegisterRow {
     std::string controlled_environment;
     int used_by_cse_count = 0;
     std::string notes;
+
+    // Where the evidence is (the cited Resource's location), and whether this
+    // row can record one: only an ArtifactReference cites a Resource.
+    std::string location;
+    bool is_artifact_reference = false;
+};
+
+// What the evidence register can ask the application to do. Each goes through
+// the ordinary edit path, so the register never gets a way to change the
+// argument the canvas does not have. An unset callback hides nothing: the
+// control is drawn disabled, so the table reads the same either way.
+struct EvidenceRegisterCallbacks {
+    std::function<void(const std::string& evidence_id)> locate;
+    std::function<void(const std::string& evidence_id)> remove;
+    std::function<void(const std::string& evidence_id, const std::string& location)> set_location;
+    std::function<void(const std::string& location)> open_location;
 };
 
 // Rejoins the rows derived from `ac` with the assessments held in `store`.
@@ -49,6 +66,6 @@ size_t GetEvidenceRegisterRowCount();
 // cue to mark the store dirty so it gets saved. Only edited rows are stored, so
 // a register nobody has assessed leaves no entries behind.
 bool ShowCseRegisterView(core::registers::RegisterStore& store);
-bool ShowEvidenceRegisterView(core::registers::RegisterStore& store);
+bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const EvidenceRegisterCallbacks& callbacks);
 
 } // namespace ui

@@ -15,4 +15,10 @@ BrowseForProjectManifest(const std::string& default_path, std::string& selected_
 
 bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& error_message);
 
+// Opens a file with its associated application, or a URL in the browser --
+// what a piece of evidence's recorded location points at. `target` is a URL
+// (has a scheme) or an absolute filesystem path; relative paths are the
+// caller's to resolve, because only the caller knows the project root.
+bool OpenPathOrUrl(const std::string& target, std::string& error_message);
+
 } // namespace app::dialogs

@@ -1050,6 +1050,91 @@ void perform_set_term_origin(model::Document& document, const SetTermOrigin& set
     Access::origin(*term) = set.origin;
 }
 
+CheckOutcome
+check_set_resource_location(const model::Document& document, const SetResourceLocation& set, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* resource = document.find_as<model::Resource>(set.element);
+    if (resource == nullptr) {
+        outcome.diagnostics.push_back(make_error(validation::codes::kCmdTargetNotFound,
+                                                 "SACM23-ART-001",
+                                                 op,
+                                                 {set.element},
+                                                 std::format("'{}' is not a Resource", set.element.value())));
+        return outcome;
+    }
+    const std::string* before = resource->location().find(set.language);
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = resource->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "location",
+                                           .before = before == nullptr ? std::string{} : *before,
+                                           .after = set.location});
+    return outcome;
+}
+
+void perform_set_resource_location(model::Document& document, const SetResourceLocation& set) {
+    auto* resource = const_cast<model::Resource*>(document.find_as<model::Resource>(set.element));
+    model::MultiLangString& location = Access::location(*resource);
+    if (set.location.empty()) {
+        std::erase_if(location.values, [&set](const model::LangString& entry) { return entry.lang == set.language; });
+        return;
+    }
+    location.set(set.language, set.location);
+}
+
+std::string join_ids(const std::vector<ElementId>& ids) {
+    std::string joined;
+    for (const ElementId& id : ids) {
+        if (!joined.empty()) {
+            joined += ",";
+        }
+        joined += id.value();
+    }
+    return joined;
+}
+
+CheckOutcome check_set_artifact_reference_elements(const model::Document& document,
+                                                   const SetArtifactReferenceElements& set,
+                                                   const Operation& op) {
+    CheckOutcome outcome;
+    const auto* reference = document.find_as<model::ArtifactReference>(set.element);
+    if (reference == nullptr) {
+        outcome.diagnostics.push_back(make_error(validation::codes::kCmdTargetNotFound,
+                                                 "SACM23-ARG-001",
+                                                 op,
+                                                 {set.element},
+                                                 std::format("'{}' is not an ArtifactReference", set.element.value())));
+        return outcome;
+    }
+    for (const ElementId& referenced : set.referenced_artifact_elements) {
+        if (!require_target(
+                document,
+                referenced,
+                "referencedArtifactElement",
+                [](const SACMElement& element) {
+                    return dynamic_cast<const model::ArtifactElement*>(&element) != nullptr;
+                },
+                op,
+                outcome)) {
+            return outcome;
+        }
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = reference->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "referencedArtifactElement",
+                                           .before = join_ids(reference->referenced_artifact_elements()),
+                                           .after = join_ids(set.referenced_artifact_elements)});
+    return outcome;
+}
+
+void perform_set_artifact_reference_elements(model::Document& document, const SetArtifactReferenceElements& set) {
+    auto* reference = const_cast<model::ArtifactReference*>(document.find_as<model::ArtifactReference>(set.element));
+    Access::referenced_artifact_elements(*reference) = set.referenced_artifact_elements;
+}
+
 CheckOutcome check_set_expression_categories(const model::Document& document,
                                              const SetExpressionCategories& set,
                                              const Operation& op) {
@@ -2148,6 +2233,10 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_term_external_reference(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetTermOrigin>) {
                 return check_set_term_origin(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetResourceLocation>) {
+                return check_set_resource_location(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetArtifactReferenceElements>) {
+                return check_set_artifact_reference_elements(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
                 return check_set_expression_categories(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
@@ -2243,6 +2332,10 @@ void perform(model::Document& document, const Operation& operation, const std::v
                 perform_set_term_external_reference(document, op);
             } else if constexpr (std::is_same_v<T, SetTermOrigin>) {
                 perform_set_term_origin(document, op);
+            } else if constexpr (std::is_same_v<T, SetResourceLocation>) {
+                perform_set_resource_location(document, op);
+            } else if constexpr (std::is_same_v<T, SetArtifactReferenceElements>) {
+                perform_set_artifact_reference_elements(document, op);
             } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
                 perform_set_expression_categories(document, op);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {

@@ -474,6 +474,31 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
         }
     });
 
+    // An ArtifactReference cites its evidence by id, and the location lives on
+    // the cited Resource rather than on the reference. Resolved here, once the
+    // whole document is projected, so the register can say where a piece of
+    // evidence is without every reader repeating the lookup. The first cited
+    // element is recorded as the citation; the location comes from the first
+    // cited Resource that has one, because a reference may cite an Artifact
+    // (what the evidence is) beside a Resource (where it is).
+    for (core::SacmElement& element : projected.elements) {
+        if (element.type != "artifactreference") {
+            continue;
+        }
+        const auto* reference = source.find_as<sacm::model::ArtifactReference>(sacm::model::ElementId(element.id));
+        if (reference == nullptr || reference->referenced_artifact_elements().empty()) {
+            continue;
+        }
+        element.referenced_artifact_id = reference->referenced_artifact_elements().front().value();
+        for (const sacm::model::ElementId& cited : reference->referenced_artifact_elements()) {
+            const auto* resource = source.find_as<sacm::model::Resource>(cited);
+            if (resource != nullptr && !resource->location().empty()) {
+                element.artifact_location = resource->location().primary();
+                break;
+            }
+        }
+    }
+
     return projected;
 }
 

@@ -1,11 +1,15 @@
 #include "ui/register_views.h"
 
 #include "core/registers/register_model.h"
+#include "hello_imgui/icons_font_awesome_4.h"
 #include "imgui.h"
 #include "ui/i18n/localization.h"
+#include "ui/widgets/danger_button.h"
 
 #include <algorithm>
+#include <array>
 #include <cfloat>
+#include <cstddef>
 #include <cstring>
 #include <map>
 #include <set>
@@ -76,6 +80,122 @@ static bool DrawAssessmentStatusCell(std::string& status) {
         ImGui::EndCombo();
     }
     return changed;
+}
+
+// The evidence whose removal is awaiting an answer. The label and use count
+// are copied out of the row: the popup outlives the frame, and the rows are
+// rebuilt whenever the argument changes.
+static std::string g_pending_remove_evidence_id;
+static std::string g_pending_remove_evidence_label;
+static int g_pending_remove_use_count = 0;
+static bool g_open_remove_evidence_modal = false;
+
+// The one location cell being edited. The assessment cells write per keystroke
+// into a JSON store, which costs nothing; a location is an audited SACM edit,
+// so it is committed once, when the field is left.
+static std::string g_location_edit_id;
+static std::string g_location_edit_text;
+
+static bool IconButton(const char* id, const char* icon, const std::string& tooltip) {
+    const bool clicked = ImGui::SmallButton((std::string(icon) + "##" + id).c_str());
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", tooltip.c_str());
+    return clicked;
+}
+
+static void DrawEvidenceActionsCell(const EvidenceRegisterRow& row, const EvidenceRegisterCallbacks& callbacks) {
+    ImGui::BeginDisabled(!callbacks.locate);
+    if (IconButton("locate", ICON_FA_CROSSHAIRS, AF_TR("Show in argument")) && callbacks.locate)
+        callbacks.locate(row.evidence_id);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!callbacks.remove);
+    if (IconButton("remove", ICON_FA_TRASH, AF_TR("Remove evidence"))) {
+        g_pending_remove_evidence_id = row.evidence_id;
+        g_pending_remove_evidence_label =
+            row.evidence.empty() ? row.evidence_id : row.evidence_id + " — " + row.evidence;
+        g_pending_remove_use_count = row.used_by_cse_count;
+        g_open_remove_evidence_modal = true;
+    }
+    ImGui::EndDisabled();
+}
+
+static void DrawLocationCell(const EvidenceRegisterRow& row, const EvidenceRegisterCallbacks& callbacks) {
+    const bool editing = g_location_edit_id == row.evidence_id;
+    const std::string& shown = editing ? g_location_edit_text : row.location;
+    std::array<char, 1024> buffer{};
+    const std::size_t length = std::min(shown.size(), buffer.size() - 1);
+    std::memcpy(buffer.data(), shown.data(), length);
+    buffer[length] = '\0';
+
+    const float open_button_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetNextItemWidth(-open_button_width);
+    ImGui::BeginDisabled(!row.is_artifact_reference || !callbacks.set_location);
+    ImGui::InputTextWithHint("##location", AF_TR("Path or URL").c_str(), buffer.data(), buffer.size());
+    if (ImGui::IsItemActivated()) {
+        g_location_edit_id = row.evidence_id;
+        g_location_edit_text = row.location;
+    }
+    if (ImGui::IsItemActive() && g_location_edit_id == row.evidence_id)
+        g_location_edit_text = buffer.data();
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        if (callbacks.set_location)
+            callbacks.set_location(row.evidence_id, buffer.data());
+        g_location_edit_id.clear();
+    } else if (ImGui::IsItemDeactivated()) {
+        g_location_edit_id.clear();
+    }
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(row.location.empty() || !callbacks.open_location);
+    if (IconButton("open", ICON_FA_FOLDER_OPEN, AF_TR("Open the file or URL")) && callbacks.open_location)
+        callbacks.open_location(row.location);
+    ImGui::EndDisabled();
+}
+
+// Confirmation for a removal started from the table. The canvas removes a
+// consequence-free leaf without asking, but a row's trash icon is easier to hit
+// by mistake than a selected node, and the claims that rest on the evidence are
+// not visible from here -- so the popup names them.
+static void RenderRemoveEvidenceModal(const EvidenceRegisterCallbacks& callbacks) {
+    const std::string title = AF_TR("Remove Evidence") + "###remove_evidence_modal";
+    if (g_open_remove_evidence_modal) {
+        ImGui::OpenPopup(title.c_str());
+        g_open_remove_evidence_modal = false;
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        return;
+
+    ImGui::TextUnformatted(ui::i18n::trf("Remove evidence {0}?", g_pending_remove_evidence_label).c_str());
+    if (g_pending_remove_use_count == 0) {
+        ImGui::TextUnformatted(AF_TR("No claim rests on this evidence.").c_str());
+    } else {
+        ImGui::TextUnformatted(ui::i18n::trnf("{0} claim rests on this evidence; the link will be removed too.",
+                                              "{0} claims rest on this evidence; the links will be removed too.",
+                                              g_pending_remove_use_count,
+                                              g_pending_remove_use_count)
+                                   .c_str());
+    }
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    const float button_width = ImGui::GetFontSize() * 7.0f;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width * 2.0f - spacing) * 0.5f);
+    if (ui::widgets::DangerButton(AF_TR("Remove").c_str(), ImVec2(button_width, 0.0f))) {
+        if (callbacks.remove)
+            callbacks.remove(g_pending_remove_evidence_id);
+        g_pending_remove_evidence_id.clear();
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine(0.0f, spacing);
+    if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f))) {
+        g_pending_remove_evidence_id.clear();
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
 }
 
 static void StoreCseRow(core::registers::RegisterStore& store, const CseRegisterRow& row) {
@@ -149,8 +269,11 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers
     for (const std::string& evidence_id : evidence_ids) {
         EvidenceRegisterRow row;
         row.evidence_id = evidence_id;
-        row.evidence = core::registers::DisplayTextFor(find_element(evidence_id));
+        const parser::SacmElement* element = find_element(evidence_id);
+        row.evidence = core::registers::DisplayTextFor(element);
         row.used_by_cse_count = core::registers::CountCseUses(links, evidence_id);
+        row.location = element != nullptr ? element->artifact_location : std::string{};
+        row.is_artifact_reference = element != nullptr && element->type == "artifactreference";
 
         const EvidenceMetadata& meta = StoredOrDefault(store.evidence, row.evidence_id);
         row.evidence_owner = meta.evidence_owner;
@@ -255,29 +378,36 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
     return edited;
 }
 
-bool ShowEvidenceRegisterView(core::registers::RegisterStore& store) {
+bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const EvidenceRegisterCallbacks& callbacks) {
     if (g_evidence_rows.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No evidence/work-product rows were derived from the model.").c_str());
         return false;
     }
 
-    ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+    // Fixed initial widths, so the table is as wide as its content rather than
+    // squeezed to the header labels. Under ScrollX the default sizing fits each
+    // column to its header, which left every text field a few characters wide
+    // and nothing to scroll; sized in font units so DPI scaling carries through.
+    const float unit = ImGui::GetFontSize();
+    const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+                                  ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
 
-    if (!ImGui::BeginTable("evidence_register_table", 9, flags)) {
+    if (!ImGui::BeginTable("evidence_register_table", 11, flags)) {
         return false;
     }
 
-    ImGui::TableSetupScrollFreeze(2, 1);
-    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str());
-    ImGui::TableSetupColumn(AF_TR("Evidence").c_str());
-    ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str());
-    ImGui::TableSetupColumn(AF_TR("Type").c_str());
-    ImGui::TableSetupColumn(AF_TR("Recency").c_str());
-    ImGui::TableSetupColumn(AF_TR("Maturity").c_str());
-    ImGui::TableSetupColumn(AF_TR("Controlled Environment").c_str());
-    ImGui::TableSetupColumn(AF_TR("Used By CSE Count").c_str());
-    ImGui::TableSetupColumn(AF_TR("Notes").c_str());
+    ImGui::TableSetupScrollFreeze(3, 1);
+    ImGui::TableSetupColumn(AF_TR("Actions").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 4.5f);
+    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
+    ImGui::TableSetupColumn(AF_TR("Location").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
+    ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
+    ImGui::TableSetupColumn(AF_TR("Recency").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
+    ImGui::TableSetupColumn(AF_TR("Maturity").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
+    ImGui::TableSetupColumn(AF_TR("Controlled Environment").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 12.0f);
+    ImGui::TableSetupColumn(AF_TR("Used By CSE Count").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 7.0f);
+    ImGui::TableSetupColumn(AF_TR("Notes").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
     ImGui::TableHeadersRow();
 
     bool edited = false;
@@ -288,30 +418,38 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store) {
         ImGui::TableNextRow();
 
         ImGui::TableSetColumnIndex(0);
-        ImGui::TextUnformatted(row.evidence_id.c_str());
+        DrawEvidenceActionsCell(row, callbacks);
 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(row.evidence.c_str());
+        ImGui::TextUnformatted(row.evidence_id.c_str());
 
         ImGui::TableSetColumnIndex(2);
-        row_edited |= EditCellText("##evidence_owner", row.evidence_owner);
+        ImGui::TextUnformatted(row.evidence.c_str());
+        if (ImGui::IsItemHovered() && !row.evidence.empty())
+            ImGui::SetTooltip("%s", row.evidence.c_str());
 
         ImGui::TableSetColumnIndex(3);
-        row_edited |= EditCellText("##type", row.type);
+        DrawLocationCell(row, callbacks);
 
         ImGui::TableSetColumnIndex(4);
-        row_edited |= EditCellText("##recency", row.recency);
+        row_edited |= EditCellText("##evidence_owner", row.evidence_owner);
 
         ImGui::TableSetColumnIndex(5);
-        row_edited |= EditCellText("##maturity", row.maturity);
+        row_edited |= EditCellText("##type", row.type);
 
         ImGui::TableSetColumnIndex(6);
-        row_edited |= EditCellText("##controlled_environment", row.controlled_environment);
+        row_edited |= EditCellText("##recency", row.recency);
 
         ImGui::TableSetColumnIndex(7);
-        ImGui::Text("%d", row.used_by_cse_count);
+        row_edited |= EditCellText("##maturity", row.maturity);
 
         ImGui::TableSetColumnIndex(8);
+        row_edited |= EditCellText("##controlled_environment", row.controlled_environment);
+
+        ImGui::TableSetColumnIndex(9);
+        ImGui::Text("%d", row.used_by_cse_count);
+
+        ImGui::TableSetColumnIndex(10);
         row_edited |= EditCellText("##notes", row.notes, 1024);
 
         if (row_edited) {
@@ -323,6 +461,7 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store) {
     }
 
     ImGui::EndTable();
+    RenderRemoveEvidenceModal(callbacks);
     return edited;
 }
 

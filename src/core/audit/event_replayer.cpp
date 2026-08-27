@@ -1108,6 +1108,13 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
         return true;
     }
 
+    if (type == "SetEvidenceLocation") {
+        // Library-only: the legacy models carry no Resource location, and the
+        // live command refused without a document, so a log holding one was
+        // written by a library-backed session.
+        return RefuseUnrepresentableReplay(FormatLocation(tx_seq, event.event_sequence, type), out_error);
+    }
+
     out_error = "Unknown event type '" + type + "' at " + FormatLocation(tx_seq, event.event_sequence, type);
     return false;
 }
@@ -2249,6 +2256,26 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         // No-op markers: the same rationale as `ApplyEvent`. Undo's cancelled
         // transactions are filtered before replay; SacmRestoredFromAudit is a
         // provenance marker that requires no mutation.
+        return true;
+    }
+
+    if (type == "SetEvidenceLocation") {
+        std::string element_id, new_location;
+        if (!require_string("element_id", element_id))
+            return false;
+        if (!require_string("new_location", new_location))
+            return false;
+        // Seam-mapped, matching the live command. The Resource a first location
+        // creates gets its id from the document's counter, which the replayed
+        // history has advanced exactly as the live one did, so the recorded and
+        // replayed documents agree without the id being in the payload.
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_evidence_location(document, element_id, new_location);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_evidence_location", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
         return true;
     }
 

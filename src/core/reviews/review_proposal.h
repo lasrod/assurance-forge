@@ -32,6 +32,10 @@ enum class PatchOperationType {
     AddInContextOf,
     RemoveInContextOf,
     RemoveElement,
+    // Where a piece of evidence is: the location of the Resource the
+    // ArtifactReference in `element` cites, carried in `new_value`. An empty
+    // value clears it. See sacm_adapter::apply_set_evidence_location.
+    SetEvidenceLocation,
     // Terminology (SACM clause 10). A term is an element of type "term" in the
     // flat model: its value (the word or phrase being defined) lives in
     // `content` and its definition in `description`, mirroring how

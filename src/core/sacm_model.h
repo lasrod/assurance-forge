@@ -71,6 +71,15 @@ struct SacmElement {
     std::vector<std::string> category_refs; // ids of the Categories classifying this term (10.8)
     std::string external_reference;         // citation string: a URL, standard clause, or document
     std::string origin_ref;                 // id of the element this term's definition comes from
+
+    // Evidence provenance, populated for `artifactreference` elements only: the
+    // first ArtifactElement the reference cites (clause 11.9) and, when the
+    // reference cites a Resource, that Resource's location (clause 12.12) --
+    // the path or URL where the evidence can be found. Here for the reason the
+    // term fields are: the register reads this POD, and a draft or proposal can
+    // only change a field it carries.
+    std::string referenced_artifact_id;
+    std::string artifact_location;
 };
 
 struct AcpRecord {

@@ -467,7 +467,8 @@ void RenderTerminologyPackageTab(AppRuntimeState& state, const WorkbenchAreaCall
 // A register file that failed to load disables editing instead of accepting
 // keystrokes: the controller refuses to save over a file it could not read, so
 // anything typed here would be discarded on close without a word.
-void RenderRegisterTable(AppRuntimeState& state, bool (*show_table)(core::registers::RegisterStore&)) {
+void RenderRegisterTable(AppRuntimeState& state,
+                         const std::function<bool(core::registers::RegisterStore&)>& show_table) {
     controllers::RegisterController& register_assessments = *state.register_controller;
     const bool storage_failed = register_assessments.HasStorageError();
     if (storage_failed) {
@@ -657,7 +658,14 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                         AF_TR("Editable evidence register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
                 }
-                RenderRegisterTable(state, ui::ShowEvidenceRegisterView);
+                ui::EvidenceRegisterCallbacks register_callbacks;
+                register_callbacks.locate = callbacks.locate_element;
+                register_callbacks.remove = callbacks.remove_evidence;
+                register_callbacks.set_location = callbacks.set_evidence_location;
+                register_callbacks.open_location = callbacks.open_evidence_location;
+                RenderRegisterTable(state, [&register_callbacks](core::registers::RegisterStore& store) {
+                    return ui::ShowEvidenceRegisterView(store, register_callbacks);
+                });
                 ImGui::EndTabItem();
             }
         }

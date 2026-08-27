@@ -556,6 +556,13 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
     case PatchOperationType::ClearUndeveloped:
         element->undeveloped = false;
         return true;
+    case PatchOperationType::SetEvidenceLocation:
+        if (element->type != "artifactreference") {
+            error = "SetEvidenceLocation targets " + element->id + ", which is not evidence (an ArtifactReference).";
+            return false;
+        }
+        element->artifact_location = operation.new_value;
+        return true;
     default:
         error = "Unsupported update operation.";
         return false;
@@ -760,6 +767,7 @@ bool ApplyOperation(const PatchOperation& operation,
     case PatchOperationType::UpdateElementName:
     case PatchOperationType::SetUndeveloped:
     case PatchOperationType::ClearUndeveloped:
+    case PatchOperationType::SetEvidenceLocation:
     case PatchOperationType::UpdateTerm:
     case PatchOperationType::UpdateCategory:
         return ApplyUpdateOperation(operation, model, generated_ids, error);
