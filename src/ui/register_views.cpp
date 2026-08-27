@@ -148,7 +148,10 @@ static void DrawLocationCell(const EvidenceRegisterRow& row, const EvidenceRegis
     ImGui::EndDisabled();
 
     ImGui::SameLine();
-    ImGui::BeginDisabled(row.location.empty() || !callbacks.open_location);
+    // Opens the RECORDED location. While the cell is being edited the text
+    // shown is not yet the record, so the button waits for the commit rather
+    // than opening whatever the row held before the user started typing.
+    ImGui::BeginDisabled(editing || row.location.empty() || !callbacks.open_location);
     if (IconButton("open", ICON_FA_FOLDER_OPEN, AF_TR("Open the file or URL")) && callbacks.open_location)
         callbacks.open_location(row.location);
     ImGui::EndDisabled();

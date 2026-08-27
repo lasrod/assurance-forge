@@ -178,10 +178,13 @@ bool OpenPathOrUrl(const std::string& target, std::string& error_message) {
     // location joined with forward slashes opens rather than confusing the shell.
     std::wstring wide;
     if (is_url) {
+        // `length` counts the terminating NUL, so the buffer is sized for it and
+        // trimmed back to the text afterwards.
         const int length = MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, nullptr, 0);
         if (length > 0) {
-            wide.resize(static_cast<std::size_t>(length - 1));
+            wide.resize(static_cast<std::size_t>(length));
             MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, wide.data(), length);
+            wide.resize(static_cast<std::size_t>(length - 1));
         }
     } else {
         wide = std::filesystem::path(core::PathFromUtf8(target)).make_preferred().wstring();

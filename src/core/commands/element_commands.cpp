@@ -3,6 +3,7 @@
 #include "core/commands/library_bridge.h"
 #include "core/derived_views.h"
 #include "core/relationship_editing.h"
+#include "core/string_utils.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/document_edit.h"
 
@@ -673,6 +674,10 @@ bool SetEvidenceLocationCommand::Apply(CommandContext& ctx, audit::AuditEvent& o
         out_error = "Element " + element_id_ + " is not evidence (an ArtifactReference)";
         return false;
     }
+    // The seam trims before writing, so compare and record what will actually be
+    // stored: a location that differs only by surrounding whitespace is not an
+    // edit, and recording it as one would dirty the document for nothing.
+    location_ = core::TrimWhitespace(location_);
     old_location_ = element->artifact_location;
     was_no_op_ = old_location_ == location_;
     if (!was_no_op_) {

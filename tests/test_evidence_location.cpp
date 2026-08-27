@@ -224,6 +224,11 @@ TEST(EvidenceLocation, CommandRecordsTheLocationAndTheAuditLogReplaysIt) {
     core::commands::SetEvidenceLocationCommand same("Sn1", "evidence/report-v2.pdf");
     ASSERT_TRUE(RunCommand(*fixture, same).success);
     EXPECT_TRUE(same.WasNoOp());
+    // ...and so is the same location with whitespace around it, since the seam
+    // trims before it writes and nothing on disk would change.
+    core::commands::SetEvidenceLocationCommand padded("Sn1", "  evidence/report-v2.pdf ");
+    ASSERT_TRUE(RunCommand(*fixture, padded).success);
+    EXPECT_TRUE(padded.WasNoOp());
 
     const core::audit::ReplayVerificationResult verification = core::audit::VerifyProject(fixture->project);
     EXPECT_TRUE(verification.ran);
