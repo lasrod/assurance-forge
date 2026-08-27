@@ -301,26 +301,30 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
         return false;
     }
 
-    ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+    // Sized like the evidence table: fixed initial widths in font units, so the
+    // table is as wide as its content and scrolls rather than squeezing every
+    // field to its header label.
+    const float unit = ImGui::GetFontSize();
+    const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+                                  ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
 
     if (!ImGui::BeginTable("cse_register_table", 12, flags)) {
         return false;
     }
 
     ImGui::TableSetupScrollFreeze(2, 1);
-    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str());
-    ImGui::TableSetupColumn(AF_TR("Claim ID").c_str());
-    ImGui::TableSetupColumn(AF_TR("Claim").c_str());
-    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str());
-    ImGui::TableSetupColumn(AF_TR("Evidence").c_str());
-    ImGui::TableSetupColumn(AF_TR("Claim Owner").c_str());
-    ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str());
-    ImGui::TableSetupColumn(AF_TR("Safety Case Owner").c_str());
-    ImGui::TableSetupColumn(AF_TR("Claim Criteria").c_str());
-    ImGui::TableSetupColumn(AF_TR("Evidence Criteria").c_str());
-    ImGui::TableSetupColumn(AF_TR("Assessment Status").c_str());
-    ImGui::TableSetupColumn(AF_TR("Notes").c_str());
+    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
+    ImGui::TableSetupColumn(AF_TR("Claim ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
+    ImGui::TableSetupColumn(AF_TR("Claim").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 16.0f);
+    ImGui::TableSetupColumn(AF_TR("Claim Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
+    ImGui::TableSetupColumn(AF_TR("Safety Case Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
+    ImGui::TableSetupColumn(AF_TR("Claim Criteria").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 14.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence Criteria").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 14.0f);
+    ImGui::TableSetupColumn(AF_TR("Assessment Status").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 13.0f);
+    ImGui::TableSetupColumn(AF_TR("Notes").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
     ImGui::TableHeadersRow();
 
     bool edited = false;
