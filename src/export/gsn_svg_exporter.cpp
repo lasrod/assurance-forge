@@ -88,6 +88,90 @@ std::filesystem::path MakeGsnSvgExportPath(const std::filesystem::path& exports_
     return candidate;
 }
 
+namespace {
+
+// The scheme of `value` if it names one ("https", "file", ...), lower-cased;
+// empty when it carries none. A Windows drive letter (`C:\...`) is a path, not
+// a one-letter scheme, so a single character never counts.
+std::string SchemeOf(const std::string& value) {
+    const std::size_t colon = value.find(':');
+    if (colon == std::string::npos || colon < 2)
+        return {};
+    std::string scheme = value.substr(0, colon);
+    for (char& c : scheme) {
+        if (c >= 'A' && c <= 'Z')
+            c = static_cast<char>(c - 'A' + 'a');
+        else if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.'))
+            return {};
+    }
+    return scheme;
+}
+
+bool IsSafeScheme(const std::string& scheme) {
+    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "mailto";
+}
+
+// Percent-encodes what a browser would otherwise read as URL syntax. Only the
+// characters that change the meaning of a path: a space ends an attribute-free
+// URL, and #/?/% start a fragment, a query and an escape.
+std::string PercentEncodePath(const std::string& path) {
+    std::string encoded;
+    encoded.reserve(path.size());
+    for (const unsigned char c : path) {
+        switch (c) {
+        case ' ':
+            encoded += "%20";
+            break;
+        case '#':
+            encoded += "%23";
+            break;
+        case '?':
+            encoded += "%3F";
+            break;
+        case '%':
+            encoded += "%25";
+            break;
+        default:
+            encoded += static_cast<char>(c);
+            break;
+        }
+    }
+    return encoded;
+}
+
+} // namespace
+
+std::string LinkTargetForExport(const std::string& location,
+                                const std::filesystem::path& project_root,
+                                const std::filesystem::path& exports_dir) {
+    if (location.empty())
+        return {};
+
+    const std::string scheme = SchemeOf(location);
+    if (!scheme.empty())
+        return IsSafeScheme(scheme) ? location : std::string{};
+
+    const std::filesystem::path recorded = core::PathFromUtf8(location);
+    std::error_code ec;
+    if (recorded.is_absolute()) {
+        const std::string generic = recorded.generic_string();
+        // file:///C:/... on Windows, file:///srv/... elsewhere: the leading
+        // slash of a POSIX path is the URL's own, not a second one.
+        return "file:///" + PercentEncodePath(generic.front() == '/' ? generic.substr(1) : generic);
+    }
+    if (project_root.empty() || exports_dir.empty())
+        return PercentEncodePath(recorded.generic_string());
+
+    const std::filesystem::path absolute = std::filesystem::weakly_canonical(project_root / recorded, ec);
+    const std::filesystem::path base = std::filesystem::weakly_canonical(exports_dir, ec);
+    if (ec)
+        return PercentEncodePath(recorded.generic_string());
+    const std::filesystem::path relative = absolute.lexically_relative(base);
+    if (relative.empty())
+        return PercentEncodePath(recorded.generic_string());
+    return PercentEncodePath(relative.generic_string());
+}
+
 GsnSvgExportResult ExportCurrentSafetyCaseToGsnSvg(const parser::AssuranceCase& model,
                                                    const std::filesystem::path& project_root,
                                                    const std::string& source_file_stem,
@@ -110,6 +194,19 @@ GsnSvgExportResult ExportCurrentSafetyCaseToGsnSvg(const parser::AssuranceCase& 
 
     GsnSvgLayoutResult layout = LayoutGsnSvgDiagram(projection.diagram);
     AppendWarnings(result.warnings, layout.warnings);
+
+    // The recorded location is what the register holds; what the SVG can follow
+    // depends on where the SVG is written, which only this function knows.
+    for (GsnNode& node : projection.diagram.nodes) {
+        if (node.location.empty())
+            continue;
+        const std::string target = LinkTargetForExport(node.location, project_root, exports_dir);
+        if (target.empty()) {
+            result.warnings.push_back("Node '" + node.id +
+                                      "' records a location the export will not link to: " + node.location);
+        }
+        node.location = target;
+    }
 
     const std::string svg = GenerateGsnSvg(projection.diagram);
     if (svg.empty()) {
