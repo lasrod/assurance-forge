@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/controllers/element_edit_controller.h"
+
 #include "core/element_factory.h"
 #include "core/tree_editing.h"
 
@@ -26,7 +28,9 @@ public:
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);
     bool RemoveAcp(const std::string& acp_id);
-    void RemoveSelected(core::RemoveMode mode);
+    void RemoveSelected(core::RemoveMode mode,
+                        controllers::ElementEditController::RemovalConfirmation confirmation =
+                            controllers::ElementEditController::RemovalConfirmation::WhenConsequential);
     core::TreeDropValidationResult
     ValidateTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode);
     bool PerformTreeDrop(const std::string& dragged_id, const std::string& target_id, core::TreeDropMode drop_mode);

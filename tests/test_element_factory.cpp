@@ -860,3 +860,48 @@ TEST(ElementIdentifierTest, GSN3_CORE_010_NotationIdentifiersMustBeNonEmptyAndUn
     EXPECT_NE(error.find("already used"), std::string::npos);
     EXPECT_EQ(mc.ac.elements.front().gsn_identifier, "G1");
 }
+
+// A glossary term cites the element its definition comes from. Removing that
+// element clears the citation and keeps the term, in both models, the way the
+// library's delete does -- a replayed removal and a live one must not differ by
+// a term.
+TEST(ElementFactoryRemove, RemovingAnElementClearsTheTermOriginsThatCiteIt) {
+    MiniCase mc = MakeRootGoalCase();
+    parser::SacmElement context;
+    context.id = "C1";
+    context.type = "artifactreference";
+    mc.ac.elements.push_back(context);
+    parser::SacmElement attach;
+    attach.id = "R1";
+    attach.type = "assertedcontext";
+    attach.source_refs = {"C1"};
+    attach.target_refs = {"G1"};
+    mc.ac.elements.push_back(attach);
+    parser::SacmElement term;
+    term.id = "T1";
+    term.type = "term";
+    term.content = "the System";
+    term.origin_ref = "C1";
+    mc.ac.elements.push_back(term);
+
+    sacm::TerminologyPackage glossary;
+    glossary.id = "TP1";
+    sacm::Term legacy_term;
+    legacy_term.id = "T1";
+    legacy_term.origin = "C1";
+    glossary.terms.push_back(legacy_term);
+    mc.pkg.terminologyPackages.push_back(glossary);
+    sacm::ArtifactReference legacy_context;
+    legacy_context.id = "C1";
+    mc.pkg.argumentPackages.front().artifactReferences.push_back(legacy_context);
+
+    std::string error;
+    ASSERT_TRUE(core::RemoveElement(mc.ac, &mc.pkg, "C1", core::RemoveMode::NodeOnly, error)) << error;
+
+    EXPECT_FALSE(ParserHasId(mc.ac, "C1"));
+    const parser::SacmElement* kept = FindParserElement(mc.ac, "T1");
+    ASSERT_NE(kept, nullptr) << "the term went with the element it cited";
+    EXPECT_TRUE(kept->origin_ref.empty());
+    ASSERT_EQ(mc.pkg.terminologyPackages.front().terms.size(), 1u);
+    EXPECT_TRUE(mc.pkg.terminologyPackages.front().terms.front().origin.empty());
+}

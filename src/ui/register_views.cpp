@@ -4,7 +4,6 @@
 #include "hello_imgui/icons_font_awesome_4.h"
 #include "imgui.h"
 #include "ui/i18n/localization.h"
-#include "ui/widgets/danger_button.h"
 
 #include <algorithm>
 #include <array>
@@ -82,14 +81,6 @@ static bool DrawAssessmentStatusCell(std::string& status) {
     return changed;
 }
 
-// The evidence whose removal is awaiting an answer. The label and use count
-// are copied out of the row: the popup outlives the frame, and the rows are
-// rebuilt whenever the argument changes.
-static std::string g_pending_remove_evidence_id;
-static std::string g_pending_remove_evidence_label;
-static int g_pending_remove_use_count = 0;
-static bool g_open_remove_evidence_modal = false;
-
 // The one location cell being edited. The assessment cells write per keystroke
 // into a JSON store, which costs nothing; a location is an audited SACM edit,
 // so it is committed once, when the field is left.
@@ -109,14 +100,11 @@ static void DrawEvidenceActionsCell(const EvidenceRegisterRow& row, const Eviden
         callbacks.locate(row.evidence_id);
     ImGui::EndDisabled();
     ImGui::SameLine();
+    // The application confirms, with the library's preview of what goes with
+    // the row (its links, a term citing it), so nothing is asked twice.
     ImGui::BeginDisabled(!callbacks.remove);
-    if (IconButton("remove", ICON_FA_TRASH, AF_TR("Remove evidence"))) {
-        g_pending_remove_evidence_id = row.evidence_id;
-        g_pending_remove_evidence_label =
-            row.evidence.empty() ? row.evidence_id : row.evidence_id + " — " + row.evidence;
-        g_pending_remove_use_count = row.used_by_cse_count;
-        g_open_remove_evidence_modal = true;
-    }
+    if (IconButton("remove", ICON_FA_TRASH, AF_TR("Remove evidence")) && callbacks.remove)
+        callbacks.remove(row.evidence_id);
     ImGui::EndDisabled();
 }
 
@@ -155,50 +143,6 @@ static void DrawLocationCell(const EvidenceRegisterRow& row, const EvidenceRegis
     if (IconButton("open", ICON_FA_FOLDER_OPEN, AF_TR("Open the file or URL")) && callbacks.open_location)
         callbacks.open_location(row.location);
     ImGui::EndDisabled();
-}
-
-// Confirmation for a removal started from the table. The canvas removes a
-// consequence-free leaf without asking, but a row's trash icon is easier to hit
-// by mistake than a selected node, and the claims that rest on the evidence are
-// not visible from here -- so the popup names them.
-static void RenderRemoveEvidenceModal(const EvidenceRegisterCallbacks& callbacks) {
-    const std::string title = AF_TR("Remove Evidence") + "###remove_evidence_modal";
-    if (g_open_remove_evidence_modal) {
-        ImGui::OpenPopup(title.c_str());
-        g_open_remove_evidence_modal = false;
-    }
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-        return;
-
-    ImGui::TextUnformatted(ui::i18n::trf("Remove evidence {0}?", g_pending_remove_evidence_label).c_str());
-    if (g_pending_remove_use_count == 0) {
-        ImGui::TextUnformatted(AF_TR("No claim rests on this evidence.").c_str());
-    } else {
-        ImGui::TextUnformatted(ui::i18n::trnf("{0} claim rests on this evidence; the link will be removed too.",
-                                              "{0} claims rest on this evidence; the links will be removed too.",
-                                              g_pending_remove_use_count,
-                                              g_pending_remove_use_count)
-                                   .c_str());
-    }
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    const float button_width = ImGui::GetFontSize() * 7.0f;
-    const float spacing = ImGui::GetStyle().ItemSpacing.x;
-    ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width * 2.0f - spacing) * 0.5f);
-    if (ui::widgets::DangerButton(AF_TR("Remove").c_str(), ImVec2(button_width, 0.0f))) {
-        if (callbacks.remove)
-            callbacks.remove(g_pending_remove_evidence_id);
-        g_pending_remove_evidence_id.clear();
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::SameLine(0.0f, spacing);
-    if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f))) {
-        g_pending_remove_evidence_id.clear();
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
 }
 
 static void StoreCseRow(core::registers::RegisterStore& store, const CseRegisterRow& row) {
@@ -468,7 +412,6 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
     }
 
     ImGui::EndTable();
-    RenderRemoveEvidenceModal(callbacks);
     return edited;
 }
 

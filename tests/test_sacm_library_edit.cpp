@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -1865,4 +1866,93 @@ TEST(SacmLibraryEdit, SACM23_INT_001_AttachChildWiresEachKindLikeAddChildDoes) {
     EXPECT_EQ(std::find(inference->target_refs.begin(), inference->target_refs.end(), "STRAT2"),
               inference->target_refs.end())
         << "a strategy is the reasoning of its inference, never one of its ends";
+}
+
+// A Context cited as a glossary term's origin lives in the ArgumentPackage; the
+// term lives in the TerminologyPackage. Deleting the context used to be refused
+// outright ("referenced (origin) from 'T1' in another package"), which left a
+// canvas node undeletable for a reason nothing on the canvas showed. The term
+// now loses the citation and stays, and the preview says so beforehand.
+constexpr const char* kContextCitedByTerm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0" xmi:id="ACP1">
+  <name content="Case" />
+  <argumentPackage xmi:id="AP1">
+    <name content="Main Argument" />
+    <argumentElement xsi:type="sacm:Claim" xmi:id="G1"><name content="Top goal" /></argumentElement>
+    <argumentElement xsi:type="sacm:ArtifactReference" xmi:id="C1"><name content="The System" /></argumentElement>
+    <argumentElement xsi:type="sacm:AssertedContext" xmi:id="R1" source="C1" target="G1" />
+  </argumentPackage>
+  <terminologyPackage xmi:id="TP1">
+    <name content="Terminology" />
+    <terminologyElement xsi:type="sacm:Term" xmi:id="T1" value="the System" origin="C1"><name content="the System" /></terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>
+)";
+
+std::filesystem::path write_context_cited_by_term_fixture() {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() /
+        ("af_context_cited_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm");
+    std::ofstream out(path, std::ios::binary);
+    out << kContextCitedByTerm;
+    return path;
+}
+
+TEST(SacmLibraryEdit, SACM23_INT_002_DeletePreviewReportsATermCitingTheElementAsModified) {
+    const std::filesystem::path path = write_context_cited_by_term_fixture();
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::DeletePreview preview = sacm_adapter::preview_delete_elements(*loaded.document, {"C1"});
+    ASSERT_TRUE(preview.supported);
+    EXPECT_TRUE(preview.can_apply) << "the preview still refuses the delete: "
+                                   << (preview.diagnostics.empty() ? "" : preview.diagnostics.front().message);
+    const sacm_adapter::DeleteEffect* term = find_effect(preview.consequential, "T1");
+    ASSERT_NE(term, nullptr) << "the preview did not mention the term that cites the element";
+    EXPECT_FALSE(term->deleted) << "the term survives with its citation cleared; it is not deleted";
+    EXPECT_EQ(term->kind, "Term");
+    const sacm_adapter::DeleteEffect* attach = find_effect(preview.consequential, "R1");
+    ASSERT_NE(attach, nullptr);
+    EXPECT_TRUE(attach->deleted);
+
+    // Previewing changed nothing.
+    const core::AssuranceCase untouched = sacm_adapter::project_case(*loaded.document);
+    ASSERT_NE(find_element(untouched, "C1"), nullptr);
+    EXPECT_EQ(find_element(untouched, "T1")->origin_ref, "C1");
+    std::filesystem::remove(path);
+}
+
+TEST(SacmLibraryEdit, SACM23_INT_001_DeleteClearsATermOriginInAnotherPackage) {
+    const std::filesystem::path path = write_context_cited_by_term_fixture();
+    sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(path);
+    ASSERT_TRUE(loaded.ok);
+    ASSERT_NE(loaded.document, nullptr);
+
+    const sacm_adapter::DeleteOutcome deleted = sacm_adapter::apply_delete_element(*loaded.document, "C1");
+    ASSERT_TRUE(deleted.supported);
+    ASSERT_TRUE(deleted.applied) << (deleted.diagnostics.empty() ? "" : deleted.diagnostics.front().message);
+
+    const core::AssuranceCase after = sacm_adapter::project_case(*loaded.document);
+    EXPECT_EQ(find_element(after, "C1"), nullptr);
+    EXPECT_EQ(find_element(after, "R1"), nullptr) << "the context relationship lost its only source";
+    const core::SacmElement* term = find_element(after, "T1");
+    ASSERT_NE(term, nullptr) << "the term went with the element it cited";
+    EXPECT_TRUE(term->origin_ref.empty());
+
+    // The legacy removal reaches the same state, so a replay through either
+    // path agrees with the live one. The fixture is XMI, which the legacy
+    // parser does not read, so the legacy views are derived from the library
+    // the way the application derives them.
+    sacm_adapter::LoadOutcome fresh = sacm_adapter::load_document(path);
+    ASSERT_TRUE(fresh.ok);
+    core::AssuranceCase legacy;
+    sacm::AssuranceCasePackage package;
+    core::RebuildDerivedViewsFromLibrary(*fresh.document, legacy, package);
+    ASSERT_NE(find_element(legacy, "C1"), nullptr);
+    std::string error;
+    ASSERT_TRUE(core::RemoveElement(legacy, &package, "C1", core::RemoveMode::NodeOnly, error)) << error;
+    EXPECT_EQ(sorted_element_ids(after), sorted_element_ids(legacy));
+    EXPECT_TRUE(find_element(legacy, "T1")->origin_ref.empty());
+    std::filesystem::remove(path);
 }

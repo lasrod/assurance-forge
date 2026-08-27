@@ -1351,9 +1351,6 @@ msgstr "分類なし"
 msgid "No categories are available in this terminology package."
 msgstr "この用語パッケージには利用可能な分類がありません。"
 
-msgid "No claim rests on this evidence."
-msgstr "このエビデンスに依拠するクレームはありません。"
-
 msgid "No confidence argument has been selected."
 msgstr "信頼度論証が選択されていません。"
 
@@ -1816,9 +1813,6 @@ msgstr "除去"
 msgid "Remove ACP"
 msgstr "ACP を除去"
 
-msgid "Remove Evidence"
-msgstr "エビデンスの削除"
-
 msgid "Remove Key"
 msgstr "キーを削除"
 
@@ -1830,9 +1824,6 @@ msgstr "反証を削除"
 
 msgid "Remove evidence"
 msgstr "エビデンスを削除"
-
-msgid "Remove evidence {0}?"
-msgstr "エビデンス {0} を削除しますか?"
 
 msgid "Remove file failed: {0}"
 msgstr "ファイルの削除に失敗しました: {0}"
@@ -2874,10 +2865,6 @@ msgstr[0] "受理するには {0} 件の変更に対応が必要です。"
 msgid "{0} change still being written was left for its author."
 msgid_plural "{0} changes still being written were left for their authors."
 msgstr[0] "作成中の変更 {0} 件は作成者に委ねられました。"
-
-msgid "{0} claim rests on this evidence; the link will be removed too."
-msgid_plural "{0} claims rest on this evidence; the links will be removed too."
-msgstr[0] "{0} 件のクレームがこのエビデンスに依拠しています。リンクも削除されます。"
 
 msgid "{0} confidence assessment was marked inactive because its target element changed."
 msgid_plural "{0} confidence assessments were marked inactive because their target elements changed."

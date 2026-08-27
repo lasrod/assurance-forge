@@ -103,9 +103,25 @@ std::vector<CseLink> DeriveCseLinks(const parser::AssuranceCase& model) {
 }
 
 std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model) {
+    // An ArtifactReference is what SACM offers for both a GSN Solution and a
+    // GSN Context; only how it is attached tells them apart. One reached by an
+    // AssertedContext is context, and listing it as evidence reported every
+    // context in the case as "evidence nothing cites" -- a finding about
+    // something that was never evidence. Both ends are read, as DeriveCseLinks
+    // does, because which end carries the reference varies with the dialect.
+    std::set<std::string> context_ids;
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (relationship.type != "assertedcontext")
+            continue;
+        for (const std::vector<std::string>* refs : {&relationship.source_refs, &relationship.target_refs}) {
+            for (const std::string& id : *refs)
+                context_ids.insert(id);
+        }
+    }
+
     std::set<std::string> ids;
     for (const parser::SacmElement& element : model.elements) {
-        if (IsEvidenceType(element.type) && !element.id.empty())
+        if (IsEvidenceType(element.type) && !element.id.empty() && context_ids.count(element.id) == 0)
             ids.insert(element.id);
     }
     return std::vector<std::string>(ids.begin(), ids.end());

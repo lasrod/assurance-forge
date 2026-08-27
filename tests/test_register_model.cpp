@@ -233,3 +233,23 @@ TEST(RegisterModelTest, FindingOrphansDoesNotRemoveThem) {
     EXPECT_EQ(store.cse.size(), 1u);
     EXPECT_EQ(store.cse.at("CSE:GONE->Sn1").notes, "hours of review");
 }
+
+// SACM has one class for a GSN Solution and a GSN Context; only the
+// relationship tells them apart. A reference reached by an AssertedContext is
+// context, and the register used to list every context in the case as evidence
+// nothing cites.
+TEST(RegisterModelTest, AnArtifactReferenceAttachedAsContextIsNotEvidence) {
+    parser::AssuranceCase model = TwoClaimsSharingEvidence();
+    model.elements.push_back(Element("C1", "artifactreference", "Operating environment"));
+    parser::SacmElement context;
+    context.id = "R3";
+    context.type = "assertedcontext";
+    context.source_refs = {"C1"};
+    context.target_refs = {"G1"};
+    model.elements.push_back(context);
+    // A reference nobody attaches at all is still evidence, and still unlinked.
+    model.elements.push_back(Element("Sn9", "artifactreference", "Orphaned report"));
+
+    const std::vector<std::string> ids = core::registers::DeriveEvidenceIds(model);
+    EXPECT_EQ(ids, (std::vector<std::string>{"Sn1", "Sn9"}));
+}

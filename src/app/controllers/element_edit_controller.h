@@ -31,7 +31,14 @@ public:
     // node so the user can immediately edit its text in the element panel.
     bool
     AddChallenge(AppRuntimeState& state, const core::ArgumentTarget& target, core::ChallengeSourceType source_type);
-    bool RemoveSelected(AppRuntimeState& state, const std::string& selected_id, core::RemoveMode mode);
+    // Whether a removal asks first. The canvas confirms only when the removal
+    // reaches past what the user picked; a register row is easier to hit by
+    // mistake than a selected node, so the register always asks.
+    enum class RemovalConfirmation { WhenConsequential, Always };
+    bool RemoveSelected(AppRuntimeState& state,
+                        const std::string& selected_id,
+                        core::RemoveMode mode,
+                        RemovalConfirmation confirmation = RemovalConfirmation::WhenConsequential);
     bool ConfirmPendingRemoval(AppRuntimeState& state);
     void CancelPendingRemoval();
 
@@ -123,8 +130,10 @@ private:
     // it in fact survives, retargeted. No preview is produced for NodeOnly
     // until the library can express the retarget; the modal says so rather than
     // showing a confident wrong answer.
-    void
-    BuildRemovalPreview(AppRuntimeState& state, const std::vector<std::string>& planned_ids, core::RemoveMode mode);
+    void BuildRemovalPreview(AppRuntimeState& state,
+                             const std::string& selected_id,
+                             const std::vector<std::string>& planned_ids,
+                             core::RemoveMode mode);
 
     // Adds the Assurance Claim Points that die with the elements already in the
     // preview. ACPs live in vendor TaggedValues, which the seam filters out as
