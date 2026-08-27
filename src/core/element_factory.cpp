@@ -976,6 +976,17 @@ void EraseByIdSet(std::vector<T>& vec, const std::unordered_set<std::string>& re
     std::erase_if(vec, [&](const T& item) { return removed_ids.count(item.id) > 0; });
 }
 
+// A glossary term cites the element its definition comes from (Term.origin,
+// clause 10.7). The element going means the citation goes; the term stays. The
+// library's delete does the same for a document it owns, and the two models
+// have to agree or a replayed removal and a live one would differ by a term.
+void ScrubTermOrigins(sacm::TerminologyPackage& package, const std::unordered_set<std::string>& removed_ids) {
+    for (sacm::Term& term : package.terms) {
+        if (!term.origin.empty() && removed_ids.count(term.origin) > 0)
+            term.origin.clear();
+    }
+}
+
 // Strip removed ids from the source/target vectors of a SACM relationship.
 void ScrubRelationshipRefs(sacm::AssertedRelationship& rel, const std::unordered_set<std::string>& removed_ids) {
     std::erase_if(rel.sources, [&](const std::string& r) { return removed_ids.count(r) > 0; });
@@ -1138,6 +1149,9 @@ bool RemoveElement(parser::AssuranceCase& ac,
         if (IsRelationshipType(e.type)) {
             ScrubParserRelationshipRefs(e, removed_ids);
         }
+        if (e.type == "term" && !e.origin_ref.empty() && removed_ids.count(e.origin_ref) > 0) {
+            e.origin_ref.clear();
+        }
     }
     std::erase_if(ac.elements, [&](const parser::SacmElement& e) {
         if (removed_ids.count(e.id))
@@ -1149,7 +1163,11 @@ bool RemoveElement(parser::AssuranceCase& ac,
 
     // ---- SACM model: scrub references then drop dead/empty relationships ---
     if (pkg) {
+        for (auto& tp : pkg->terminologyPackages)
+            ScrubTermOrigins(tp, removed_ids);
         for (auto& ap : pkg->argumentPackages) {
+            for (auto& tp : ap.terminologyPackages)
+                ScrubTermOrigins(tp, removed_ids);
             EraseByIdSet(ap.claims, removed_ids);
             EraseByIdSet(ap.argumentReasonings, removed_ids);
             EraseByIdSet(ap.artifactReferences, removed_ids);

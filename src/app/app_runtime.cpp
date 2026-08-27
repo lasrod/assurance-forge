@@ -430,8 +430,13 @@ void AppRuntime::RemoveEvidence(const std::string& evidence_id) {
     ui_state.selected_relationship_id.clear();
     ui_state.selected_relationship_edge_key.clear();
     // A Solution has no descendants, so NodeOnly and NodeAndDescendants remove
-    // the same thing; NodeOnly is the mode whose plan a leaf node needs.
-    RemoveSelected(core::RemoveMode::NodeOnly);
+    // the same thing; NodeOnly is the mode whose plan a leaf node needs. A draft
+    // removal is staged and reviewable, so it needs no confirmation; an audited
+    // one always asks, with the library's preview of what goes with the row.
+    if (RemoveSelectedAsDraft(core::RemoveMode::NodeOnly))
+        return;
+    actions::ElementActions(*impl_).RemoveSelected(core::RemoveMode::NodeOnly,
+                                                   controllers::ElementEditController::RemovalConfirmation::Always);
 }
 
 bool AppRuntime::SetEvidenceLocation(const std::string& evidence_id, const std::string& location) {

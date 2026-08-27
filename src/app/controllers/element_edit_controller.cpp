@@ -298,7 +298,8 @@ bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const 
 
 bool ElementEditController::RemoveSelected(AppRuntimeState& state,
                                            const std::string& selected_id,
-                                           core::RemoveMode mode) {
+                                           core::RemoveMode mode,
+                                           RemovalConfirmation confirmation) {
     if (selected_id.empty()) {
         events_.Emit(StatusMessageEvent{"No element selected."});
         return false;
@@ -317,14 +318,15 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
 
     std::vector<std::string> planned_ids(planned.begin(), planned.end());
     std::sort(planned_ids.begin(), planned_ids.end());
-    BuildRemovalPreview(state, planned_ids, mode);
+    BuildRemovalPreview(state, selected_id, planned_ids, mode);
 
     // Confirm whenever the removal reaches past what the user picked: several
     // planned elements, or the library reporting that something else goes with
     // them. A leaf with no consequences still deletes immediately — putting a
     // dialog in front of every single delete teaches the user to dismiss it
     // unread, which costs more than it protects.
-    if (planned.size() == 1 && pending_remove_consequences_.empty()) {
+    if (confirmation == RemovalConfirmation::WhenConsequential && planned.size() == 1 &&
+        pending_remove_consequences_.empty()) {
         CancelPendingRemoval();
         core::commands::RemoveElementCommand cmd(selected_id, mode);
         const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
@@ -347,6 +349,7 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
 }
 
 void ElementEditController::BuildRemovalPreview(AppRuntimeState& state,
+                                                const std::string& selected_id,
                                                 const std::vector<std::string>& planned_ids,
                                                 core::RemoveMode mode) {
     pending_remove_targets_.clear();
@@ -357,9 +360,14 @@ void ElementEditController::BuildRemovalPreview(AppRuntimeState& state,
     // See the header: NodeOnly reparents rather than deletes, and the library
     // cannot express a retarget. Previewing it as a set of deletes would report
     // a child's inference as removed when it survives. No preview is better
-    // than a wrong one.
-    if (mode == core::RemoveMode::NodeOnly)
+    // than a wrong one. A leaf has nothing to reparent, so for it the two
+    // modes coincide and the preview is exact -- which is what lets a removal
+    // of evidence or a context say what else goes (its links, a term citing
+    // it) before the user confirms.
+    if (mode == core::RemoveMode::NodeOnly && state.app_state.loaded_case.has_value() &&
+        core::CountDescendants(state.app_state.loaded_case.value(), selected_id) > 0) {
         return;
+    }
 
     // The library document is the source of truth for what a delete implies
     // (SACM23-INT-002). Without one there is nothing to ask, and the modal

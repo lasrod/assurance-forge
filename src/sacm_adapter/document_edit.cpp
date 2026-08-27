@@ -1062,6 +1062,15 @@ DeleteOutcome apply_delete_element(LibraryDocument& document, const std::string&
         // cascade. This keeps a strategy's shared inference alive when one of its
         // several sub-goals is removed (the cascade would detach the strategy).
         .reference_policy = sacm::commands::ReferenceDeletePolicy::ScrubReferences,
+        // A citation from another package is cleaned the way one from the same
+        // package is: a relationship is scrubbed (and dropped only once empty),
+        // and a non-relationship referrer -- a glossary Term naming the element
+        // as its origin -- loses the citation. Refusing instead left a Context
+        // undeletable because a term in the TerminologyPackage cited it, with a
+        // message the user had no way to act on from the canvas. The reference
+        // policy still decides what happens to a relationship; the cross-package
+        // policy only decides whether to look across the boundary at all.
+        .cross_package_policy = sacm::commands::CrossPackageReferencePolicy::DeleteExternalReferencingRelationships,
     });
 
     DeleteOutcome outcome;
@@ -1215,12 +1224,13 @@ DeletePreview preview_delete_sequence(const LibraryDocument& document,
 
 DeletePreview preview_delete_elements(const LibraryDocument& document, const std::vector<std::string>& element_ids) {
     // Same policies as `apply_delete_element`, or the preview would describe an
-    // operation the caller never performs: scrub-then-drop within the package,
-    // and reject rather than reach across a package boundary.
+    // operation the caller never performs: scrub-then-drop, across package
+    // boundaries too, so a glossary term that cites the element shows up here
+    // as modified rather than the delete being refused after the confirmation.
     return preview_delete_sequence(document,
                                    element_ids,
                                    sacm::commands::ReferenceDeletePolicy::ScrubReferences,
-                                   sacm::commands::CrossPackageReferencePolicy::RejectIfExternalReferencesExist);
+                                   sacm::commands::CrossPackageReferencePolicy::DeleteExternalReferencingRelationships);
 }
 
 DeleteOutcome apply_delete_package(LibraryDocument& document, const std::string& package_id) {

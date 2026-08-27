@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <system_error>
 #include <fstream>
 #include <vector>
 
@@ -664,4 +665,98 @@ TEST(ElementEditControllerTest, SetElementUndevelopedSurvivesSaveAndReload) {
 
     std::error_code ec;
     std::filesystem::remove_all(root, ec);
+}
+
+// A leaf has nothing to reparent, so for it NodeOnly and NodeAndDescendants
+// coincide and a delete-modelled preview is exact. That is what lets a removal
+// started from the evidence register -- always NodeOnly, always a leaf -- say
+// what goes with the row before the user confirms.
+TEST(ElementEditControllerTest, SACM23_INT_002_NodeOnlyOnALeafOffersThePreview) {
+    namespace fs = std::filesystem;
+    constexpr const char* kChain = R"(<?xml version="1.0" encoding="UTF-8"?>
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP1" name="Chain">
+  <argumentPackage id="AP1" name="Argument">
+    <claim id="G1" name="Top"/>
+    <claim id="G2" name="Middle"/>
+    <claim id="G3" name="Leaf"/>
+    <assertedInference id="R1" source="G2" target="G1"/>
+    <assertedInference id="R2" source="G3" target="G2"/>
+  </argumentPackage>
+</AssuranceCasePackage>)";
+
+    const fs::path path =
+        fs::temp_directory_path() /
+        ("af_int002_nodeonly_leaf_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm.xml");
+    { std::ofstream(path) << kChain; }
+    // Removed at every exit: a fixed name left behind collides with a
+    // concurrent run and pollutes the machine.
+    struct RemoveOnExit {
+        fs::path path;
+        ~RemoveOnExit() {
+            std::error_code ec;
+            fs::remove(path, ec);
+        }
+    } const remove_on_exit{path};
+
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(path.string())) << state.app_state.status_message;
+
+    // NodeOnly on the leaf: R2 loses its only source, and the preview says so
+    // before anything is removed.
+    ASSERT_TRUE(state.element_edit_controller->RemoveSelected(state, "G3", core::RemoveMode::NodeOnly));
+    EXPECT_TRUE(state.element_edit_controller->PendingRemovePreviewAvailable())
+        << "no preview for a leaf, where a delete-modelled preview is exact";
+    bool inference_reported = false;
+    for (const auto& effect : state.element_edit_controller->PendingRemoveConsequences()) {
+        if (effect.element_id == "R2" && effect.deleted)
+            inference_reported = true;
+    }
+    EXPECT_TRUE(inference_reported) << "the inference that goes with the leaf was not disclosed";
+    EXPECT_TRUE(state.element_edit_controller->ShouldShowRemoveConfirm())
+        << "a removal with a disclosed consequence must ask first";
+    EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "G3"), nullptr)
+        << "the leaf was removed before the user answered";
+    state.element_edit_controller->CancelPendingRemoval();
+}
+
+// The register asks every time, even for a leaf nothing else depends on: a
+// table row is easier to hit by mistake than a selected node, and the canvas
+// highlight that usually shows what is about to go is not on screen.
+TEST(ElementEditControllerTest, SACM23_INT_002_RemovalCanBeAskedToAlwaysConfirm) {
+    namespace fs = std::filesystem;
+    constexpr const char* kLone = R"(<?xml version="1.0" encoding="UTF-8"?>
+<AssuranceCasePackage xmlns="http://www.omg.org/spec/SACM/20220301" id="ACP1" name="Lone">
+  <argumentPackage id="AP1" name="Argument">
+    <claim id="G1" name="Top"/>
+    <artifactReference id="Sn1" name="Orphaned report"/>
+  </argumentPackage>
+</AssuranceCasePackage>)";
+
+    const fs::path path =
+        fs::temp_directory_path() /
+        ("af_int002_always_confirm_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + ".sacm.xml");
+    { std::ofstream(path) << kLone; }
+    struct RemoveOnExit {
+        fs::path path;
+        ~RemoveOnExit() {
+            std::error_code ec;
+            fs::remove(path, ec);
+        }
+    } const remove_on_exit{path};
+
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(path.string())) << state.app_state.status_message;
+
+    using Confirmation = app::controllers::ElementEditController::RemovalConfirmation;
+    ASSERT_TRUE(
+        state.element_edit_controller->RemoveSelected(state, "Sn1", core::RemoveMode::NodeOnly, Confirmation::Always));
+    EXPECT_TRUE(state.element_edit_controller->ShouldShowRemoveConfirm());
+    EXPECT_EQ(state.element_edit_controller->PendingRemoveId(), "Sn1");
+    EXPECT_NE(parser::FindElementById(state.app_state.loaded_case.value(), "Sn1"), nullptr)
+        << "the element was removed without the confirmation that was asked for";
+
+    // And the answer removes it.
+    ASSERT_TRUE(state.element_edit_controller->ConfirmPendingRemoval(state));
+    app::commands::ApplyPendingLibraryRederive(state);
+    EXPECT_EQ(parser::FindElementById(state.app_state.loaded_case.value(), "Sn1"), nullptr);
 }

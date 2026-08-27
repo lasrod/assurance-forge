@@ -91,13 +91,14 @@ bool ElementActions::RemoveAcp(const std::string& acp_id) {
     return state_.acp_controller->RemoveAcp(state_, acp_id);
 }
 
-void ElementActions::RemoveSelected(core::RemoveMode mode) {
+void ElementActions::RemoveSelected(core::RemoveMode mode,
+                                    controllers::ElementEditController::RemovalConfirmation confirmation) {
     if (!state_.app_state.loaded_case.has_value()) {
         SetStatus(state_, "No assurance case loaded.");
         return;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
-    if (!state_.element_edit_controller->RemoveSelected(state_, selected_id, mode))
+    if (!state_.element_edit_controller->RemoveSelected(state_, selected_id, mode, confirmation))
         return;
 
     if (state_.element_edit_controller->ShouldShowRemoveConfirm()) {
