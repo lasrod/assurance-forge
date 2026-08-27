@@ -691,13 +691,19 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         ImGui::EndTabBar();
-        state.workbench.force_center_tab_selection = false;
-        // ImGui switches to the selected tab on the next frame; until then the
-        // outgoing tab has written itself into `center_view`. Keep the request,
-        // so the explorer highlights the row that was clicked rather than
-        // flashing the old one for a frame.
-        if (select_requested)
+        // Only the request this frame acted on is consumed. A tab's own content
+        // can raise one -- the Project Overview's buttons and the evidence
+        // register's "Show in argument" run inside their tabs, after the tabs
+        // before them have rendered -- and that request has to survive to the
+        // next frame to be seen by every tab.
+        if (select_requested) {
+            state.workbench.force_center_tab_selection = false;
+            // ImGui switches to the selected tab on the next frame; until then the
+            // outgoing tab has written itself into `center_view`. Keep the request,
+            // so the explorer highlights the row that was clicked rather than
+            // flashing the old one for a frame.
             ui_state.center_view = requested_view;
+        }
     }
 
     ImGui::End();
