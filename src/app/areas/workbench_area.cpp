@@ -539,11 +539,22 @@ void RenderWorkbenchArea(AppRuntimeState& state,
     ui::UiState& ui_state = ui::GetUiState();
     frame::NormalizeCenterViewSelection(state, ui_state.center_view);
 
+    // The view the caller asked for, read once before any tab renders. The tab
+    // that is visible this frame writes its own view back into `center_view`
+    // while it renders, so reading the field per tab reports the current tab,
+    // not the requested one, and every tab later in the bar then concludes it
+    // was not asked for. That is how a register clicked in the explorer opened
+    // only while its tab did not exist yet: a new tab is picked up by
+    // AutoSelectNewTabs, an existing one needs the flag below.
+    const bool select_requested = state.workbench.force_center_tab_selection;
+    const ui::CenterView requested_view = ui_state.center_view;
+
     if (ImGui::BeginTabBar("##center_tabs", ImGuiTabBarFlags_AutoSelectNewTabs)) {
         // If a package canvas tab activation was requested, explicitly queue focus to it.
         // AutoSelectNewTabs handles the "tab just created" case; this handles the "tab already exists" case
         // (Open Confidence Argument Tree on an ACP whose tree tab is already open).
-        if (state.workbench.force_center_tab_selection && !state.workbench.active_argument_package_canvas_key.empty()) {
+        if (select_requested && requested_view == ui::CenterView::GsnCanvas &&
+            !state.workbench.active_argument_package_canvas_key.empty()) {
             const auto& tabs = state.workbench.argument_package_canvas_tabs;
             auto it = std::find_if(tabs.begin(), tabs.end(), [&](const auto& t) {
                 return t.key == state.workbench.active_argument_package_canvas_key;
@@ -558,9 +569,8 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         if (state.workbench.show_overview_tab) {
             const ImGuiTabItemFlags overview_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::ProjectOverview)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
+                (select_requested && requested_view == ui::CenterView::ProjectOverview) ? ImGuiTabItemFlags_SetSelected
+                                                                                        : 0;
             if (ImGui::BeginTabItem(
                     (AF_TR("Project Overview") + "###project_overview_tab").c_str(), nullptr, overview_flags)) {
                 ui_state.center_view = ui::CenterView::ProjectOverview;
@@ -572,9 +582,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         if (state.workbench.show_gsn_tab && state.IsProposalCanvasActive()) {
             ImGuiTabItemFlags gsn_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::GsnCanvas)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
+                (select_requested && requested_view == ui::CenterView::GsnCanvas) ? ImGuiTabItemFlags_SetSelected : 0;
             if (ImGui::BeginTabItem((AF_TR("GSN Canvas") + "###gsn_canvas_tab").c_str(), nullptr, gsn_flags)) {
                 state.workbench.active_argument_package_canvas_key.clear();
                 RenderGsnCanvasTab(state, ui_state, callbacks);
@@ -586,7 +594,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
             for (std::size_t index = 0; index < state.workbench.argument_package_canvas_tabs.size();) {
                 auto& tab = state.workbench.argument_package_canvas_tabs[index];
                 bool open = true;
-                const bool select_tab = state.workbench.force_center_tab_selection &&
+                const bool select_tab = select_requested && requested_view == ui::CenterView::GsnCanvas &&
                                         state.workbench.active_argument_package_canvas_key == tab.key;
                 const ImGuiTabItemFlags tab_flags = select_tab ? ImGuiTabItemFlags_SetSelected : 0;
                 const std::string tab_label =
@@ -615,9 +623,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         if (state.workbench.show_cse_tab) {
             ImGuiTabItemFlags cse_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::CseRegister)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
+                (select_requested && requested_view == ui::CenterView::CseRegister) ? ImGuiTabItemFlags_SetSelected : 0;
             if (ImGui::BeginTabItem((AF_TR("CSE Register") + "###cse_register_tab").c_str(), nullptr, cse_flags)) {
                 ui_state.center_view = ui::CenterView::CseRegister;
                 if (state.app_state.active_project_file_role == core::ProjectFileRole::J3377CaeRegister) {
@@ -635,10 +641,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         if (state.workbench.show_evidence_tab) {
-            ImGuiTabItemFlags evidence_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::EvidenceRegister)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
+            ImGuiTabItemFlags evidence_flags = (select_requested && requested_view == ui::CenterView::EvidenceRegister)
+                                                   ? ImGuiTabItemFlags_SetSelected
+                                                   : 0;
             if (ImGui::BeginTabItem(
                     (AF_TR("Evidence Register") + "###evidence_register_tab").c_str(), nullptr, evidence_flags)) {
                 ui_state.center_view = ui::CenterView::EvidenceRegister;
@@ -658,10 +663,9 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         if (state.workbench.show_package_details_tab) {
-            ImGuiTabItemFlags package_flags =
-                (state.workbench.force_center_tab_selection && ui_state.center_view == ui::CenterView::PackageDetails)
-                    ? ImGuiTabItemFlags_SetSelected
-                    : 0;
+            ImGuiTabItemFlags package_flags = (select_requested && requested_view == ui::CenterView::PackageDetails)
+                                                  ? ImGuiTabItemFlags_SetSelected
+                                                  : 0;
             if (ImGui::BeginTabItem(
                     (AF_TR("Package Details") + "###package_details_tab").c_str(), nullptr, package_flags)) {
                 ui_state.center_view = ui::CenterView::PackageDetails;
@@ -673,10 +677,10 @@ void RenderWorkbenchArea(AppRuntimeState& state,
         }
 
         if (state.workbench.show_terminology_package_tab) {
-            ImGuiTabItemFlags terminology_flags = (state.workbench.force_center_tab_selection &&
-                                                   ui_state.center_view == ui::CenterView::TerminologyPackage)
-                                                      ? ImGuiTabItemFlags_SetSelected
-                                                      : 0;
+            ImGuiTabItemFlags terminology_flags =
+                (select_requested && requested_view == ui::CenterView::TerminologyPackage)
+                    ? ImGuiTabItemFlags_SetSelected
+                    : 0;
             if (ImGui::BeginTabItem((AF_TR("Terminology Package") + "###terminology_package_tab").c_str(),
                                     nullptr,
                                     terminology_flags)) {
@@ -688,6 +692,12 @@ void RenderWorkbenchArea(AppRuntimeState& state,
 
         ImGui::EndTabBar();
         state.workbench.force_center_tab_selection = false;
+        // ImGui switches to the selected tab on the next frame; until then the
+        // outgoing tab has written itself into `center_view`. Keep the request,
+        // so the explorer highlights the row that was clicked rather than
+        // flashing the old one for a frame.
+        if (select_requested)
+            ui_state.center_view = requested_view;
     }
 
     ImGui::End();

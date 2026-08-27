@@ -176,6 +176,11 @@ void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& e
 }
 
 bool ProjectFileOpenWouldLeaveLoadedSacm(const core::AppState& app_state, const core::ProjectFileEntry& entry) {
+    // Only an argument file replaces the loaded document. A register or a
+    // proposal opens beside it, so an unsaved edit has nothing to fear and a
+    // save prompt would only stand between the click and the view.
+    if (entry.role != core::ProjectFileRole::SacmArgument)
+        return false;
     if (app_state.loaded_file_path.empty())
         return true;
     return app_state.loaded_file_path != ProjectFilePath(app_state, entry);
