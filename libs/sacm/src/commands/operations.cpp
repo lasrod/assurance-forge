@@ -48,6 +48,8 @@ std::string_view operation_name(const Operation& operation) {
                 return "SetResourceLocation";
             } else if constexpr (std::is_same_v<T, SetArtifactReferenceElements>) {
                 return "SetArtifactReferenceElements";
+            } else if constexpr (std::is_same_v<T, SetArtifactProvenance>) {
+                return "SetArtifactProvenance";
             } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
                 return "SetExpressionCategories";
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {

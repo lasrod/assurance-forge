@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/evidence_attributes.h"
+
 #include "core/element_factory.h"
 #include "core/sacm_model.h"
 #include "core/terminology_package_service.h"
@@ -69,6 +71,10 @@ struct WorkbenchAreaCallbacks {
     std::function<void(const std::string& evidence_id)> remove_evidence;
     std::function<void(const std::string& evidence_id, const std::string& location)> set_evidence_location;
     std::function<void(const std::string& location)> open_evidence_location;
+    std::function<void(const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value)>
+        set_evidence_attribute;
+    std::function<void()> migrate_evidence_assessments;
+    std::function<void(const std::string& evidence_id)> browse_evidence_location;
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,

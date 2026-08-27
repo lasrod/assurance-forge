@@ -4,6 +4,7 @@
 #include "core/drafts/draft_change_index.h"
 #include "core/drafts/draft_workspace.h"
 #include "core/element_factory.h"
+#include "core/evidence_attributes.h"
 #include "core/problems/problem_item.h"
 #include "core/project_model.h"
 #include "core/reviews/review_item.h"
@@ -83,9 +84,19 @@ public:
     void LocateElementOnCanvas(const std::string& element_id);
     void RemoveEvidence(const std::string& evidence_id);
     bool SetEvidenceLocation(const std::string& evidence_id, const std::string& location);
+    bool
+    SetEvidenceAttribute(const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value);
+    // Moves the register's project-file assessments onto the cited Artifacts
+    // -- one audited transaction, or staged draft edits under a working draft
+    // -- and drops them from the project file once they are in the document.
+    void MigrateEvidenceAssessments();
     // Opens the recorded location: a URL in the browser, a file with its
     // application. A relative path is resolved against the project root.
     void OpenEvidenceLocation(const std::string& location);
+    // Picks a file and records it as the evidence's location -- relative to
+    // the project root when the file is inside the project, so the project
+    // stays movable; absolute otherwise.
+    void BrowseEvidenceLocation(const std::string& evidence_id);
 
     // Repairs for the defects the GSN v3 well-formedness checker reports. Each
     // is an ordinary audited edit, reachable from the Problems panel quick fix

@@ -1130,6 +1130,41 @@ CheckOutcome check_set_artifact_reference_elements(const model::Document& docume
     return outcome;
 }
 
+CheckOutcome
+check_set_artifact_provenance(const model::Document& document, const SetArtifactProvenance& set, const Operation& op) {
+    CheckOutcome outcome;
+    const auto* artifact = document.find_as<model::Artifact>(set.element);
+    if (artifact == nullptr) {
+        outcome.diagnostics.push_back(make_error(validation::codes::kCmdTargetNotFound,
+                                                 "SACM23-ART-001",
+                                                 op,
+                                                 {set.element},
+                                                 std::format("'{}' is not an Artifact", set.element.value())));
+        return outcome;
+    }
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = artifact->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "version",
+                                           .before = artifact->version(),
+                                           .after = set.version});
+    outcome.effects.push_back(ChangeRecord{.id = set.element,
+                                           .kind = artifact->kind(),
+                                           .change = ChangeRecord::Change::Modified,
+                                           .parent = std::nullopt,
+                                           .property = "date",
+                                           .before = artifact->date(),
+                                           .after = set.date});
+    return outcome;
+}
+
+void perform_set_artifact_provenance(model::Document& document, const SetArtifactProvenance& set) {
+    auto* artifact = const_cast<model::Artifact*>(document.find_as<model::Artifact>(set.element));
+    Access::version(*artifact) = set.version;
+    Access::date(*artifact) = set.date;
+}
+
 void perform_set_artifact_reference_elements(model::Document& document, const SetArtifactReferenceElements& set) {
     auto* reference = const_cast<model::ArtifactReference*>(document.find_as<model::ArtifactReference>(set.element));
     Access::referenced_artifact_elements(*reference) = set.referenced_artifact_elements;
@@ -2237,6 +2272,8 @@ CheckOutcome check(const model::Document& document, const Operation& operation) 
                 return check_set_resource_location(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetArtifactReferenceElements>) {
                 return check_set_artifact_reference_elements(document, op, operation);
+            } else if constexpr (std::is_same_v<T, SetArtifactProvenance>) {
+                return check_set_artifact_provenance(document, op, operation);
             } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
                 return check_set_expression_categories(document, op, operation);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {
@@ -2336,6 +2373,8 @@ void perform(model::Document& document, const Operation& operation, const std::v
                 perform_set_resource_location(document, op);
             } else if constexpr (std::is_same_v<T, SetArtifactReferenceElements>) {
                 perform_set_artifact_reference_elements(document, op);
+            } else if constexpr (std::is_same_v<T, SetArtifactProvenance>) {
+                perform_set_artifact_provenance(document, op);
             } else if constexpr (std::is_same_v<T, SetExpressionCategories>) {
                 perform_set_expression_categories(document, op);
             } else if constexpr (std::is_same_v<T, CreateTerminologyPackage>) {

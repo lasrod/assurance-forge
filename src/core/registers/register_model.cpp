@@ -119,10 +119,25 @@ std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model) {
         }
     }
 
+    // An Artifact an ArtifactReference cites is that evidence's record -- what
+    // it is, its version and date -- not a second piece of evidence. Only an
+    // Artifact nothing cites stands on its own in the register.
+    std::set<std::string> cited_ids;
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type != "artifactreference")
+            continue;
+        if (!element.referenced_artifact_id.empty())
+            cited_ids.insert(element.referenced_artifact_id);
+        if (!element.evidence.artifact_id.empty())
+            cited_ids.insert(element.evidence.artifact_id);
+    }
+
     std::set<std::string> ids;
     for (const parser::SacmElement& element : model.elements) {
-        if (IsEvidenceType(element.type) && !element.id.empty() && context_ids.count(element.id) == 0)
+        if (IsEvidenceType(element.type) && !element.id.empty() && context_ids.count(element.id) == 0 &&
+            cited_ids.count(element.id) == 0) {
             ids.insert(element.id);
+        }
     }
     return std::vector<std::string>(ids.begin(), ids.end());
 }

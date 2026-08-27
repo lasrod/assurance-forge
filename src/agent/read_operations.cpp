@@ -1,5 +1,7 @@
 #include "agent/operations.h"
 
+#include "core/evidence_attributes.h"
+
 #include "core/acp/assurance_claim_point.h"
 #include "core/assurance_tree.h"
 #include "core/reviews/review_proposal.h"
@@ -152,6 +154,23 @@ nlohmann::json ElementDetail(const parser::SacmElement& element) {
     }
     if (!element.origin_ref.empty()) {
         detail["origin"] = element.origin_ref;
+    }
+    // What the cited Artifact records about a piece of evidence, under the
+    // column tokens SetEvidenceAttribute takes, plus where it is.
+    if (element.type == "artifactreference") {
+        nlohmann::json evidence = nlohmann::json::object();
+        if (!element.artifact_location.empty()) {
+            evidence["location"] = element.artifact_location;
+        }
+        for (const core::EvidenceAttribute attribute : core::kAllEvidenceAttributes) {
+            const std::string& value = core::EvidenceRecordField(element.evidence, attribute);
+            if (!value.empty()) {
+                evidence[core::EvidenceAttributeToken(attribute)] = value;
+            }
+        }
+        if (!evidence.empty()) {
+            detail["evidence"] = std::move(evidence);
+        }
     }
     // The secondary-language text itself, per field, so an agent revising a
     // translated claim can see what the other language currently says rather

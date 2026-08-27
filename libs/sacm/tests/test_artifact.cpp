@@ -17,6 +17,7 @@ using sacm::commands::CreateArtifactAssetRelationship;
 using sacm::commands::CreateArtifactPackage;
 using sacm::commands::CreateArtifactReference;
 using sacm::commands::CreateAssuranceCasePackage;
+using sacm::commands::SetArtifactProvenance;
 using sacm::commands::SetArtifactReferenceElements;
 using sacm::commands::SetResourceLocation;
 using sacm::io::LoadOptions;
@@ -289,6 +290,57 @@ TEST(Sacm23Artifact, SACM23_ARG_001_ArtifactReferenceCitationIsSetByCommand) {
         document.apply(SetArtifactReferenceElements{.element = ElementId{"Sn1"}, .referenced_artifact_elements = {}})
             .applied);
     EXPECT_TRUE(reference->referenced_artifact_elements().empty());
+}
+
+// An Artifact's version and date could only be given at creation. Setting,
+// replacing and clearing them by command, and the edit surviving strict save,
+// is what lets a tool keep an evidence record current.
+TEST(Sacm23Artifact, SACM23_ART_001_ArtifactProvenanceIsSetByCommand) {
+    Document document;
+    ASSERT_TRUE(document.apply(CreateAssuranceCasePackage{.id = ElementId{"acp_1"}, .name = "Case"}).applied);
+    ASSERT_TRUE(
+        document.apply(CreateArtifactPackage{.parent = ElementId{"acp_1"}, .id = ElementId{"artpkg_1"}, .name = "Ev"})
+            .applied);
+    ASSERT_TRUE(document
+                    .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
+                                               .kind = ElementKind::Artifact,
+                                               .id = ElementId{"artifact_1"},
+                                               .name = "Test report"})
+                    .applied);
+    const auto* artifact = document.find_as<sacm::model::Artifact>(ElementId{"artifact_1"});
+    ASSERT_NE(artifact, nullptr);
+    ASSERT_TRUE(artifact->version().empty());
+
+    const auto set = document.apply(
+        SetArtifactProvenance{.element = ElementId{"artifact_1"}, .version = "rev B", .date = "2026-06-01"});
+    ASSERT_TRUE(set.applied) << (set.diagnostics.empty() ? "" : set.diagnostics.front().message);
+    EXPECT_EQ(artifact->version(), "rev B");
+    EXPECT_EQ(artifact->date(), "2026-06-01");
+
+    const auto saved = sacm::io::save_xmi_string(document);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    const LoadResult reloaded = sacm::io::load_xmi_string(saved.xml, LoadOptions{.mode = Mode::Strict});
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_TRUE(sacm::compare::semantic_compare(document, *reloaded.document).empty());
+
+    // Cleared fields are absent, not empty strings that print.
+    ASSERT_TRUE(
+        document.apply(SetArtifactProvenance{.element = ElementId{"artifact_1"}, .version = "", .date = ""}).applied);
+    EXPECT_TRUE(artifact->version().empty());
+    EXPECT_TRUE(artifact->date().empty());
+
+    // Only an Artifact carries provenance: refused on a Resource.
+    ASSERT_TRUE(document
+                    .apply(CreateArtifactAsset{.parent = ElementId{"artpkg_1"},
+                                               .kind = ElementKind::Resource,
+                                               .id = ElementId{"res_1"},
+                                               .name = "Lab"})
+                    .applied);
+    const auto refused =
+        document.apply(SetArtifactProvenance{.element = ElementId{"res_1"}, .version = "1", .date = "2026"});
+    EXPECT_FALSE(refused.applied);
+    ASSERT_FALSE(refused.diagnostics.empty());
+    EXPECT_EQ(refused.diagnostics.front().code, sacm::validation::codes::kCmdTargetNotFound);
 }
 
 } // namespace

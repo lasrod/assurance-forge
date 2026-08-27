@@ -655,6 +655,109 @@ bool UpdateGsnIdentifierCommand::Apply(CommandContext& ctx, audit::AuditEvent& o
     return true;
 }
 
+namespace {
+
+// Shared by the single write and the import: the evidence the write names,
+// or why it cannot be written.
+const parser::SacmElement*
+EvidenceElementOrError(const CommandContext& ctx, const std::string& element_id, std::string& out_error) {
+    const parser::SacmElement* element = parser::FindElementById(ctx.model, element_id);
+    if (element == nullptr) {
+        out_error = "Element " + element_id + " was not found";
+        return nullptr;
+    }
+    if (element->type != "artifactreference") {
+        out_error = "Element " + element_id + " is not evidence (an ArtifactReference)";
+        return nullptr;
+    }
+    return element;
+}
+
+} // namespace
+
+bool SetEvidenceAttributeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (element_id_.empty()) {
+        out_error = "SetEvidenceAttributeCommand requires an element id";
+        return false;
+    }
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Recording an evidence attribute needs the SACM library document, and this file was loaded "
+                    "through the compatibility parser. The document is unchanged.";
+        return false;
+    }
+    const parser::SacmElement* element = EvidenceElementOrError(ctx, element_id_, out_error);
+    if (element == nullptr)
+        return false;
+    // The seam trims before writing; compare and record what will be stored.
+    value_ = core::TrimWhitespace(value_);
+    old_value_ = EvidenceRecordField(element->evidence, attribute_);
+    was_no_op_ = old_value_ == value_;
+    if (!was_no_op_) {
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_evidence_attribute(*ctx.library_document, element_id_, attribute_, value_);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection(
+                std::string("the ") + EvidenceAttributeToken(attribute_) + " of " + element_id_, outcome.diagnostics);
+            return false;
+        }
+        ctx.library_primary = true;
+    }
+
+    out_event.event_type = "SetEvidenceAttribute";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["element_id"] = element_id_;
+    out_event.payload["attribute"] = EvidenceAttributeToken(attribute_);
+    out_event.payload["old_value"] = old_value_;
+    out_event.payload["new_value"] = value_;
+    return true;
+}
+
+bool ImportEvidenceAssessmentsCommand::Apply(CommandContext& ctx,
+                                             audit::AuditEvent& out_event,
+                                             std::string& out_error) {
+    if (writes_.empty()) {
+        out_error = "ImportEvidenceAssessmentsCommand has nothing to import";
+        return false;
+    }
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Moving assessments into the SACM document needs the SACM library document, and this file was "
+                    "loaded through the compatibility parser. The document is unchanged.";
+        return false;
+    }
+    // Checked before the first write, so a stale entry fails the import while
+    // the document is still untouched rather than after half of it landed.
+    for (const EvidenceAttributeWrite& write : writes_) {
+        if (EvidenceElementOrError(ctx, write.element_id, out_error) == nullptr)
+            return false;
+    }
+    // Several writes; set before the first so a failure between them makes the
+    // bus re-derive the views from the library rather than leave them stale.
+    ctx.library_primary = true;
+    nlohmann::ordered_json items = nlohmann::ordered_json::array();
+    for (const EvidenceAttributeWrite& write : writes_) {
+        const std::string value = core::TrimWhitespace(write.value);
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_evidence_attribute(*ctx.library_document, write.element_id, write.attribute, value);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection(std::string("the ") + EvidenceAttributeToken(write.attribute) + " of " +
+                                             write.element_id,
+                                         outcome.diagnostics);
+            return false;
+        }
+        ++applied_count_;
+        nlohmann::ordered_json item = nlohmann::ordered_json::object();
+        item["element_id"] = write.element_id;
+        item["attribute"] = EvidenceAttributeToken(write.attribute);
+        item["value"] = value;
+        items.push_back(std::move(item));
+    }
+
+    out_event.event_type = "ImportEvidenceAssessments";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["items"] = std::move(items);
+    return true;
+}
+
 bool SetEvidenceLocationCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (element_id_.empty()) {
         out_error = "SetEvidenceLocationCommand requires an element id";

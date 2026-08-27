@@ -68,7 +68,9 @@ std::vector<CseLink> DeriveCseLinks(const parser::AssuranceCase& model);
 // Every evidence element, whether or not a claim currently rests on it. Sorted.
 // Unlinked evidence is included deliberately: evidence nobody uses is a finding,
 // not something to hide. An ArtifactReference attached by an AssertedContext is
-// a GSN Context, not evidence, and is left out.
+// a GSN Context, not evidence, and is left out; so is an Artifact that an
+// ArtifactReference cites, which is that evidence's record rather than more
+// evidence.
 std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model);
 
 // How many CSE rows cite this evidence.

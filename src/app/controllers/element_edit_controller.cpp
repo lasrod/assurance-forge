@@ -266,6 +266,46 @@ bool ElementEditController::SetEvidenceLocation(AppRuntimeState& state,
     return true;
 }
 
+bool ElementEditController::SetEvidenceAttribute(AppRuntimeState& state,
+                                                 const std::string& element_id,
+                                                 core::EvidenceAttribute attribute,
+                                                 const std::string& value) {
+    if (element_id.empty())
+        return false;
+    core::commands::SetEvidenceAttributeCommand command(element_id, attribute, value);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Could not record the evidence " +
+                                        std::string(core::EvidenceAttributeToken(attribute)) + ": " + outcome.error});
+        return false;
+    }
+    if (command.WasNoOp())
+        return true;
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Recorded the " + std::string(core::EvidenceAttributeToken(attribute)) + " of " +
+                                    element_id});
+    return true;
+}
+
+bool ElementEditController::ImportEvidenceAssessments(AppRuntimeState& state,
+                                                      const std::vector<core::commands::EvidenceAttributeWrite>& writes,
+                                                      std::size_t& out_applied) {
+    out_applied = 0;
+    if (writes.empty())
+        return false;
+    core::commands::ImportEvidenceAssessmentsCommand command(writes);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Could not move the assessments into the SACM document: " + outcome.error});
+        return false;
+    }
+    out_applied = command.AppliedCount();
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    return true;
+}
+
 bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id) {
     if (element_id.empty()) {
         events_.Emit(StatusMessageEvent{"No element selected."});

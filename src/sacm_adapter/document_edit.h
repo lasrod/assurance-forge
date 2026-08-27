@@ -35,6 +35,7 @@
 // Description, which SetDescription's front-only edit cannot target), and
 // Term/Expression `value`.
 
+#include "core/evidence_attributes.h"
 #include "sacm_adapter/library_load.h" // LibraryDocument, LoadDiagnostic
 
 #include <string>
@@ -752,6 +753,21 @@ EditOutcome apply_set_term_origin(LibraryDocument& document, const std::string& 
 // reference that cites none: nothing is created to hold nothing.
 EditOutcome
 apply_set_evidence_location(LibraryDocument& document, const std::string& element_id, const std::string& location);
+
+// Record one of the evidence register's columns (see core::EvidenceAttribute)
+// on the Artifact the ArtifactReference `element_id` cites: version and date
+// are the Artifact's provenance (clause 12.7), notes its Description, and the
+// rest TaggedValues under the keys in core/sacm_model.h. A reference citing no
+// Artifact gains one, created in the case's first ArtifactPackage (created too
+// when there is none), named after the reference and cited ALONGSIDE whatever
+// it already cited -- a Resource recording where the evidence is stays cited
+// next to the Artifact recording what it is. An empty value clears the field;
+// clearing on a reference that cites no Artifact creates nothing. Refused
+// (SACM-CMD-002) when the element is not an ArtifactReference.
+EditOutcome apply_set_evidence_attribute(LibraryDocument& document,
+                                         const std::string& element_id,
+                                         core::EvidenceAttribute attribute,
+                                         const std::string& value);
 
 // (7) Delete a terminology package, category, or term, mirroring the primitive
 // the legacy delete mutators compose: `DeleteElement` with the

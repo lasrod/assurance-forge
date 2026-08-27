@@ -2800,4 +2800,150 @@ apply_set_evidence_location(LibraryDocument& document, const std::string& elemen
     return applied_outcome(linked);
 }
 
+namespace {
+
+// Creates an asset of `kind` in the case's first ArtifactPackage (created too
+// when there is none), named after `reference`, and cites it from the
+// reference alongside what it already cites. Every step that succeeded is
+// rolled back when a later one fails, so a refusal leaves the document as it
+// was. Returns the failing result, or the citation result on success with
+// `out_id` set.
+sacm::commands::MutationResult cite_new_asset(sacm::model::Document& doc,
+                                              const sacm::model::ArtifactReference& reference,
+                                              sacm::metadata::ElementKind kind,
+                                              sacm::model::ElementId& out_id) {
+    const sacm::model::AssuranceCasePackage* root = root_case_package(doc);
+    if (root == nullptr) {
+        sacm::commands::MutationResult failure;
+        failure.applied = false;
+        return failure;
+    }
+    const std::string& reference_name = reference.name().content;
+    const sacm::model::ElementId& reference_id = reference.id();
+    std::vector<sacm::model::ElementId> cited = reference.referenced_artifact_elements();
+
+    std::optional<sacm::model::ElementId> created_package_id;
+    const sacm::model::ArtifactPackage* package = first_artifact_package(*root);
+    if (package == nullptr) {
+        sacm::commands::MutationResult created =
+            doc.apply(sacm::commands::CreateArtifactPackage{.parent = root->id(), .name = "Artifacts"});
+        if (!created.applied || created.created_ids().empty()) {
+            return created;
+        }
+        created_package_id = created.created_ids().front();
+    }
+    const sacm::model::ElementId package_id = package != nullptr ? package->id() : *created_package_id;
+    const auto rollback_all = [&](const std::optional<sacm::model::ElementId>& asset_id) {
+        if (asset_id.has_value()) {
+            rollback_element(doc, *asset_id);
+        }
+        if (created_package_id.has_value()) {
+            rollback_element(doc, *created_package_id);
+        }
+    };
+
+    sacm::commands::MutationResult asset =
+        doc.apply(sacm::commands::CreateArtifactAsset{.parent = package_id, .kind = kind, .name = reference_name});
+    if (!asset.applied || asset.created_ids().empty()) {
+        rollback_all(std::nullopt);
+        return asset;
+    }
+    const sacm::model::ElementId asset_id = asset.created_ids().front();
+    cited.push_back(asset_id);
+    sacm::commands::MutationResult linked = doc.apply(
+        sacm::commands::SetArtifactReferenceElements{.element = reference_id, .referenced_artifact_elements = cited});
+    if (!linked.applied) {
+        rollback_all(asset_id);
+        return linked;
+    }
+    out_id = asset_id;
+    return linked;
+}
+
+// The language an Artifact's description is written in, so a rewrite replaces
+// it rather than adding an entry the projection never shows.
+std::string description_language(const sacm::model::Artifact& artifact) {
+    if (artifact.descriptions().empty() || artifact.descriptions().front()->content().values.empty()) {
+        return "en";
+    }
+    return artifact.descriptions().front()->content().values.front().lang;
+}
+
+const char* evidence_tag_key(core::EvidenceAttribute attribute) {
+    switch (attribute) {
+    case core::EvidenceAttribute::Owner:
+        return core::kEvidenceOwnerTagKey;
+    case core::EvidenceAttribute::Type:
+        return core::kEvidenceTypeTagKey;
+    case core::EvidenceAttribute::Maturity:
+        return core::kEvidenceMaturityTagKey;
+    case core::EvidenceAttribute::ControlledEnvironment:
+        return core::kEvidenceControlledEnvironmentTagKey;
+    default:
+        return "";
+    }
+}
+
+} // namespace
+
+EditOutcome apply_set_evidence_attribute(LibraryDocument& document,
+                                         const std::string& element_id,
+                                         core::EvidenceAttribute attribute,
+                                         const std::string& value) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(element_id);
+    const auto* reference = doc.find_as<sacm::model::ArtifactReference>(id);
+    if (reference == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + element_id + "' is not an ArtifactReference");
+    }
+    const std::string trimmed = trim_whitespace(value);
+
+    std::optional<sacm::model::ElementId> artifact_id;
+    for (const sacm::model::ElementId& cited : reference->referenced_artifact_elements()) {
+        if (doc.find_as<sacm::model::Artifact>(cited) != nullptr) {
+            artifact_id = cited;
+            break;
+        }
+    }
+    if (!artifact_id.has_value()) {
+        if (trimmed.empty()) {
+            // Nothing recorded and nothing to record: the document already says so.
+            return EditOutcome{.supported = true, .applied = true, .diagnostics = {}};
+        }
+        if (root_case_package(doc) == nullptr) {
+            return refused_outcome("SACM-CMD-002",
+                                   "the document has no assurance case package to file the evidence in");
+        }
+        sacm::model::ElementId created;
+        const sacm::commands::MutationResult cite =
+            cite_new_asset(doc, *reference, sacm::metadata::ElementKind::Artifact, created);
+        if (!cite.applied) {
+            return applied_outcome(cite);
+        }
+        artifact_id = created;
+    }
+    const auto* artifact = doc.find_as<sacm::model::Artifact>(*artifact_id);
+
+    switch (attribute) {
+    case core::EvidenceAttribute::Version:
+        return applied_outcome(doc.apply(sacm::commands::SetArtifactProvenance{
+            .element = *artifact_id, .version = trimmed, .date = artifact->date()}));
+    case core::EvidenceAttribute::Date:
+        return applied_outcome(doc.apply(sacm::commands::SetArtifactProvenance{
+            .element = *artifact_id, .version = artifact->version(), .date = trimmed}));
+    case core::EvidenceAttribute::Notes:
+        return applied_outcome(doc.apply(sacm::commands::SetDescription{
+            .element = *artifact_id, .text = trimmed, .language = description_language(*artifact)}));
+    case core::EvidenceAttribute::Owner:
+    case core::EvidenceAttribute::Type:
+    case core::EvidenceAttribute::Maturity:
+    case core::EvidenceAttribute::ControlledEnvironment:
+        // An empty value removes the tag (SetTaggedValue's own rule), so a
+        // cleared column leaves no empty tag behind.
+        return applied_outcome(doc.apply(sacm::commands::SetTaggedValue{
+            .element = *artifact_id, .key = evidence_tag_key(attribute), .value = trimmed, .language = {}}));
+    }
+    return EditOutcome{.supported = false};
+}
+
 } // namespace sacm_adapter

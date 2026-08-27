@@ -21,4 +21,9 @@ bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& er
 // caller's to resolve, because only the caller knows the project root.
 bool OpenPathOrUrl(const std::string& target, std::string& error_message);
 
+// Picks any file, for recording where a piece of evidence is. `default_path`
+// is where the picker opens (a folder, or a file whose folder is used).
+DialogResult
+BrowseForEvidenceFile(const std::string& default_path, std::string& selected_path, std::string& error_message);
+
 } // namespace app::dialogs

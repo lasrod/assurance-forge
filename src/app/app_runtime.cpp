@@ -44,6 +44,7 @@
 #include "core/terminology_scope_service.h"
 #include "core/time_utils.h"
 #include "imgui.h"
+#include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "ui/gsn/gsn_adapter.h"
@@ -176,6 +177,9 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     };
     actions.remove_relationship = [&runtime](const std::string& relationship_id) {
         runtime.RemoveRelationship(relationship_id);
+    };
+    actions.open_evidence_location = [&runtime](const std::string& location) {
+        runtime.OpenEvidenceLocation(location);
     };
     return actions;
 }
@@ -457,6 +461,129 @@ bool AppRuntime::SetEvidenceLocation(const std::string& evidence_id, const std::
         return true;
     }
     return impl_->element_edit_controller->SetEvidenceLocation(*impl_, evidence_id, location);
+}
+
+bool AppRuntime::SetEvidenceAttribute(const std::string& evidence_id,
+                                      core::EvidenceAttribute attribute,
+                                      const std::string& value) {
+    if (evidence_id.empty())
+        return false;
+    if (DraftEditingActive()) {
+        core::reviews::PatchOperation set;
+        set.type = core::reviews::PatchOperationType::SetEvidenceAttribute;
+        core::reviews::ElementRef element;
+        element.existing_id = evidence_id;
+        set.element = element;
+        set.field = core::EvidenceAttributeToken(attribute);
+        set.new_value = value;
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), {set}, error)) {
+            SetStatus(ui::i18n::trf("Could not record the evidence attribute in the draft: {0}", error));
+            return false;
+        }
+        return true;
+    }
+    return impl_->element_edit_controller->SetEvidenceAttribute(*impl_, evidence_id, attribute, value);
+}
+
+namespace {
+
+// The project-file assessment fields, mapped onto the register's SACM-backed
+// columns. Recency was free text about when the evidence dates from; it
+// becomes the Artifact's date, which is what it was standing in for.
+std::vector<core::commands::EvidenceAttributeWrite>
+EvidenceWritesFromAssessment(const std::string& evidence_id, const core::registers::EvidenceMetadata& metadata) {
+    std::vector<core::commands::EvidenceAttributeWrite> writes;
+    const auto add = [&](core::EvidenceAttribute attribute, const std::string& value) {
+        if (!value.empty())
+            writes.push_back(core::commands::EvidenceAttributeWrite{evidence_id, attribute, value});
+    };
+    add(core::EvidenceAttribute::Owner, metadata.evidence_owner);
+    add(core::EvidenceAttribute::Type, metadata.type);
+    add(core::EvidenceAttribute::Date, metadata.recency);
+    add(core::EvidenceAttribute::Maturity, metadata.maturity);
+    add(core::EvidenceAttribute::ControlledEnvironment, metadata.controlled_environment);
+    add(core::EvidenceAttribute::Notes, metadata.notes);
+    return writes;
+}
+
+} // namespace
+
+void AppRuntime::MigrateEvidenceAssessments() {
+    const parser::AssuranceCase& argument = CurrentArgumentView();
+    std::vector<core::commands::EvidenceAttributeWrite> writes;
+    std::vector<std::string> migrated_ids;
+    for (const auto& [evidence_id, metadata] : impl_->register_controller->Store().evidence) {
+        const parser::SacmElement* element = parser::FindElementById(argument, evidence_id);
+        // An assessment whose subject is gone, or is not evidence, stays in the
+        // project file, where the Problems panel already reports it.
+        if (element == nullptr || element->type != "artifactreference")
+            continue;
+        std::vector<core::commands::EvidenceAttributeWrite> row = EvidenceWritesFromAssessment(evidence_id, metadata);
+        writes.insert(writes.end(), row.begin(), row.end());
+        migrated_ids.push_back(evidence_id);
+    }
+    if (writes.empty() && migrated_ids.empty()) {
+        SetStatus(AF_TR("No project-file assessments match evidence in the argument."));
+        return;
+    }
+
+    if (DraftEditingActive()) {
+        std::vector<core::reviews::PatchOperation> operations;
+        for (const core::commands::EvidenceAttributeWrite& write : writes) {
+            core::reviews::PatchOperation set;
+            set.type = core::reviews::PatchOperationType::SetEvidenceAttribute;
+            core::reviews::ElementRef element;
+            element.existing_id = write.element_id;
+            set.element = element;
+            set.field = core::EvidenceAttributeToken(write.attribute);
+            set.new_value = write.value;
+            operations.push_back(std::move(set));
+        }
+        std::string error;
+        if (!operations.empty() && !StageHumanDraftOperations(AF_TR("My edits"), operations, error)) {
+            SetStatus(ui::i18n::trf("Could not move assessments into the draft: {0}", error));
+            return;
+        }
+    } else {
+        std::size_t applied = 0;
+        if (!writes.empty() && !impl_->element_edit_controller->ImportEvidenceAssessments(*impl_, writes, applied))
+            return;
+    }
+
+    // Only once every write is in the document (or the draft) does the
+    // project-file copy go; the file is rewritten at the next project save.
+    for (const std::string& evidence_id : migrated_ids)
+        impl_->register_controller->DiscardEvidenceAssessment(evidence_id);
+    impl_->register_controller->MarkDirty();
+    impl_->problems_dirty.registers = true;
+    impl_->tree_needs_rebuild = true;
+    const int count = static_cast<int>(migrated_ids.size());
+    SetStatus(ui::i18n::trnf(
+        "Moved {0} assessment into the SACM document.", "Moved {0} assessments into the SACM document.", count, count));
+}
+
+void AppRuntime::BrowseEvidenceLocation(const std::string& evidence_id) {
+    if (evidence_id.empty())
+        return;
+    std::string default_path;
+    if (impl_->app_state.current_project.has_value())
+        default_path = core::PathToUtf8(impl_->app_state.current_project->rootPath);
+    std::string selected;
+    std::string error;
+    const dialogs::DialogResult result = dialogs::BrowseForEvidenceFile(default_path, selected, error);
+    if (result == dialogs::DialogResult::Failed) {
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error));
+        return;
+    }
+    if (result != dialogs::DialogResult::Selected)
+        return;
+
+    const std::filesystem::path root = impl_->app_state.current_project.has_value()
+                                           ? impl_->app_state.current_project->rootPath
+                                           : std::filesystem::path{};
+    const std::string location = core::EvidenceLocationForPickedFile(root, core::PathFromUtf8(selected));
+    SetEvidenceLocation(evidence_id, location);
 }
 
 void AppRuntime::OpenEvidenceLocation(const std::string& location) {
@@ -1282,6 +1409,11 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
             SetEvidenceLocation(evidence_id, location);
         },
         [this](const std::string& location) { OpenEvidenceLocation(location); },
+        [this](const std::string& evidence_id, core::EvidenceAttribute attribute, const std::string& value) {
+            SetEvidenceAttribute(evidence_id, attribute, value);
+        },
+        [this]() { MigrateEvidenceAssessments(); },
+        [this](const std::string& evidence_id) { BrowseEvidenceLocation(evidence_id); },
     };
 }
 

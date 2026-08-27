@@ -421,6 +421,9 @@ msgstr "SCCG ガイドラインを参照"
 msgid "Browse failed: {0}"
 msgstr "参照に失敗しました: {0}"
 
+msgid "Browse for a file"
+msgstr "ファイルを参照"
+
 msgid "Bucket"
 msgstr "バケット"
 
@@ -562,6 +565,9 @@ msgstr "装飾を解除"
 msgid "Click to open in the Problems panel."
 msgstr "クリックして問題パネルで開きます。"
 
+msgid "Click to open the file or URL."
+msgstr "クリックしてファイルまたは URL を開きます。"
+
 msgid "Client configuration"
 msgstr "クライアント設定"
 
@@ -649,6 +655,9 @@ msgstr "作業ドラフトを破棄できませんでした: {0}"
 msgid "Could not load an editable SACM package model."
 msgstr "編集可能な SACM パッケージモデルを読み込めませんでした。"
 
+msgid "Could not move assessments into the draft: {0}"
+msgstr "評価をドラフトに移動できませんでした: {0}"
+
 msgid "Could not open File Explorer: {0}"
 msgstr "エクスプローラーを開けませんでした: {0}"
 
@@ -657,6 +666,9 @@ msgstr "エビデンスの場所を開けませんでした: {0}"
 
 msgid "Could not record the edit in the draft: {0}"
 msgstr "ドラフトに編集を記録できませんでした: {0}"
+
+msgid "Could not record the evidence attribute in the draft: {0}"
+msgstr "ドラフトにエビデンス属性を記録できませんでした: {0}"
 
 msgid "Could not record the location in the draft: {0}"
 msgstr "ドラフトに場所を記録できませんでした: {0}"
@@ -732,6 +744,9 @@ msgstr "安全ケースの作成・確認・操作を行います"
 
 msgid "Dark"
 msgstr "ダーク"
+
+msgid "Date"
+msgstr "日付"
 
 msgid "Define"
 msgstr "定義"
@@ -1270,6 +1285,9 @@ msgstr "モード"
 msgid "Model"
 msgstr "モデル"
 
+msgid "Move into SACM"
+msgstr "SACM に移動"
+
 msgid "Move to reasoning"
 msgstr "理由付けへ移動"
 
@@ -1392,6 +1410,9 @@ msgstr "プロジェクトが開かれていません"
 
 msgid "No project open."
 msgstr "プロジェクトが開かれていません。"
+
+msgid "No project-file assessments match evidence in the argument."
+msgstr "アーギュメント内のエビデンスに一致するプロジェクトファイルの評価はありません。"
 
 msgid "No proposal for resolved comment."
 msgstr "解決済みコメントに対する提案はありません。"
@@ -2125,6 +2146,9 @@ msgstr "ステータス: {0}"
 msgid "Store in"
 msgstr "保存先"
 
+msgid "Stored in the project file until moved into SACM."
+msgstr "SACM に移動するまでプロジェクトファイルに保存されます。"
+
 msgid "Strategies"
 msgstr "戦略"
 
@@ -2500,6 +2524,9 @@ msgstr "VSync"
 msgid "Validation"
 msgstr "検証"
 
+msgid "Version"
+msgstr "バージョン"
+
 msgid "View"
 msgstr "表示"
 
@@ -2826,6 +2853,10 @@ msgid "Deleting it would also remove {0} element that references it, which the w
 msgid_plural "Deleting it would also remove {0} elements that reference it, which the working draft cannot do. Remove those references first, or accept or discard the draft."
 msgstr[0] "削除すると、それを参照している {0} 個の要素も削除されますが、作業ドラフトではできません。先にその参照を削除するか、ドラフトを受理または破棄してください。"
 
+msgid "Moved {0} assessment into the SACM document."
+msgid_plural "Moved {0} assessments into the SACM document."
+msgstr[0] "{0} 件の評価を SACM ドキュメントに移動しました。"
+
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
 msgstr[0] "提案ドラフト: {0} 件の操作"
@@ -2853,6 +2884,10 @@ msgstr[0] "作業ドラフト — 未受理の変更 {0} 件"
 msgid "{0} SCCG finding"
 msgid_plural "{0} SCCG findings"
 msgstr[0] "SCCG 指摘 {0} 件"
+
+msgid "{0} assessment is stored in the project file rather than the SACM document."
+msgid_plural "{0} assessments are stored in the project file rather than the SACM document."
+msgstr[0] "{0} 件の評価が SACM ドキュメントではなくプロジェクトファイルに保存されています。"
 
 msgid "{0} change needs your attention before it can be accepted."
 msgid_plural "{0} changes need your attention before they can be accepted."

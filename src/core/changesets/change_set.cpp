@@ -30,7 +30,7 @@ bool DiffersMeaningfully(const parser::SacmElement& before, const parser::SacmEl
            before.origin_ref != after.origin_ref ||
            // Where a piece of evidence is, and what it cites.
            before.referenced_artifact_id != after.referenced_artifact_id ||
-           before.artifact_location != after.artifact_location;
+           before.artifact_location != after.artifact_location || before.evidence != after.evidence;
 }
 
 std::map<std::string, const parser::SacmElement*> ById(const parser::AssuranceCase& model) {

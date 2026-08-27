@@ -497,6 +497,26 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
                 break;
             }
         }
+        // The register's columns live on the first cited Artifact: its own
+        // provenance, its Description as the notes, and the rest as tags.
+        for (const sacm::model::ElementId& cited : reference->referenced_artifact_elements()) {
+            const auto* artifact = source.find_as<sacm::model::Artifact>(cited);
+            if (artifact == nullptr) {
+                continue;
+            }
+            core::EvidenceRecord& record = element.evidence;
+            record.artifact_id = cited.value();
+            record.version = artifact->version();
+            record.date = artifact->date();
+            if (!artifact->descriptions().empty()) {
+                record.notes = artifact->descriptions().front()->content().primary();
+            }
+            record.owner = tagged_value_for(*artifact, core::kEvidenceOwnerTagKey);
+            record.type = tagged_value_for(*artifact, core::kEvidenceTypeTagKey);
+            record.maturity = tagged_value_for(*artifact, core::kEvidenceMaturityTagKey);
+            record.controlled_environment = tagged_value_for(*artifact, core::kEvidenceControlledEnvironmentTagKey);
+            break;
+        }
     }
 
     return projected;

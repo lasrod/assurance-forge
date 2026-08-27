@@ -1,5 +1,7 @@
 #include "core/reviews/review_proposal_patch_service.h"
 
+#include "core/evidence_attributes.h"
+
 #include "core/element_factory.h"
 
 #include <algorithm>
@@ -563,6 +565,20 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
         }
         element->artifact_location = operation.new_value;
         return true;
+    case PatchOperationType::SetEvidenceAttribute: {
+        if (element->type != "artifactreference") {
+            error = "SetEvidenceAttribute targets " + element->id + ", which is not evidence (an ArtifactReference).";
+            return false;
+        }
+        EvidenceAttribute attribute = EvidenceAttribute::Owner;
+        if (!ParseEvidenceAttribute(operation.field, attribute)) {
+            error = "SetEvidenceAttribute names no evidence column: \"" + operation.field +
+                    "\". Use owner, type, version, date, maturity, controlled_environment or notes.";
+            return false;
+        }
+        EvidenceRecordField(element->evidence, attribute) = operation.new_value;
+        return true;
+    }
     default:
         error = "Unsupported update operation.";
         return false;
@@ -768,6 +784,7 @@ bool ApplyOperation(const PatchOperation& operation,
     case PatchOperationType::SetUndeveloped:
     case PatchOperationType::ClearUndeveloped:
     case PatchOperationType::SetEvidenceLocation:
+    case PatchOperationType::SetEvidenceAttribute:
     case PatchOperationType::UpdateTerm:
     case PatchOperationType::UpdateCategory:
         return ApplyUpdateOperation(operation, model, generated_ids, error);

@@ -2,6 +2,7 @@
 
 #include "core/commands/command_bus.h"
 #include "core/element_factory.h"
+#include "core/evidence_attributes.h"
 
 #include <string>
 
@@ -183,6 +184,65 @@ private:
 // models have no field for a Resource's location, so without a document the
 // command refuses rather than recording an event replay could not reproduce.
 // The previous location is captured so the history can show the change.
+// One write to one of the evidence register's SACM-backed columns
+// (core::EvidenceAttribute), recorded on the Artifact the reference cites.
+struct EvidenceAttributeWrite {
+    std::string element_id;
+    EvidenceAttribute attribute = EvidenceAttribute::Owner;
+    std::string value;
+};
+
+// Record one register column for one piece of evidence. Library-only, like
+// SetEvidenceLocationCommand, and for the same reason. The previous value is
+// captured so the history can show the change.
+class SetEvidenceAttributeCommand final : public ICommand {
+public:
+    SetEvidenceAttributeCommand(std::string element_id, EvidenceAttribute attribute, std::string value)
+        : element_id_(std::move(element_id)), attribute_(attribute), value_(std::move(value)) {}
+
+    std::string Name() const override {
+        return "SetEvidenceAttribute";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& OldValue() const {
+        return old_value_;
+    }
+    bool WasNoOp() const {
+        return was_no_op_;
+    }
+
+private:
+    std::string element_id_;
+    EvidenceAttribute attribute_;
+    std::string value_;
+    std::string old_value_;
+    bool was_no_op_ = false;
+};
+
+// Move assessments the register held in the project file into the SACM
+// document, as one transaction: every write lands or none is recorded. A
+// write naming an element that is not evidence fails the whole import, so a
+// stale entry cannot be half-migrated.
+class ImportEvidenceAssessmentsCommand final : public ICommand {
+public:
+    explicit ImportEvidenceAssessmentsCommand(std::vector<EvidenceAttributeWrite> writes)
+        : writes_(std::move(writes)) {}
+
+    std::string Name() const override {
+        return "ImportEvidenceAssessments";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    std::size_t AppliedCount() const {
+        return applied_count_;
+    }
+
+private:
+    std::vector<EvidenceAttributeWrite> writes_;
+    std::size_t applied_count_ = 0;
+};
+
 class SetEvidenceLocationCommand final : public ICommand {
 public:
     SetEvidenceLocationCommand(std::string element_id, std::string location)

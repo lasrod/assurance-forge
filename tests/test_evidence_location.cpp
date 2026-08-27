@@ -12,6 +12,7 @@
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/derived_views.h"
+#include "core/evidence_attributes.h"
 #include "core/drafts/draft_operation_apply.h"
 #include "core/project_model.h"
 #include "core/reviews/review_proposal.h"
@@ -293,6 +294,234 @@ TEST(EvidenceLocation, DraftOperationRecordsTheLocationOrIsRefusedInTheCallThatM
     EXPECT_EQ(parsed, core::reviews::PatchOperationType::SetEvidenceLocation);
 
     std::filesystem::remove_all(root);
+}
+
+// ---------------------------------------------------------------------------
+// The register's other columns, recorded on the Artifact the reference cites.
+
+TEST(EvidenceRecord, AttributeTokensRoundTrip) {
+    for (const core::EvidenceAttribute attribute : core::kAllEvidenceAttributes) {
+        core::EvidenceAttribute parsed = core::EvidenceAttribute::Notes;
+        ASSERT_TRUE(core::ParseEvidenceAttribute(core::EvidenceAttributeToken(attribute), parsed))
+            << core::EvidenceAttributeToken(attribute);
+        EXPECT_EQ(parsed, attribute);
+    }
+    core::EvidenceAttribute unused = core::EvidenceAttribute::Owner;
+    EXPECT_FALSE(core::ParseEvidenceAttribute("recency", unused)) << "the project-file field name is not a column";
+}
+
+TEST(EvidenceRecord, SeamCreatesTheArtifactOnceAndRecordsEachColumn) {
+    const std::filesystem::path root = MakeTempRoot("record");
+    std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
+    ASSERT_NE(document, nullptr);
+
+    // The first write creates the Artifact, named after the reference.
+    const sacm_adapter::EditOutcome first = sacm_adapter::apply_set_evidence_attribute(
+        *document, "Sn1", core::EvidenceAttribute::Owner, "  Safety Engineering ");
+    ASSERT_TRUE(first.supported);
+    ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    core::AssuranceCase projected = sacm_adapter::project_case(*document);
+    const core::SacmElement* evidence = Find(projected, "Sn1");
+    ASSERT_NE(evidence, nullptr);
+    EXPECT_EQ(evidence->evidence.owner, "Safety Engineering") << "the value was not trimmed";
+    EXPECT_FALSE(evidence->evidence.artifact_id.empty());
+    EXPECT_EQ(CountElementsOfType(projected, "artifact"), 1);
+
+    // Every other column lands on the same Artifact.
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Type, "Test report")
+            .applied);
+    ASSERT_TRUE(sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Version, "rev B")
+                    .applied);
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Date, "2026-06-01")
+            .applied);
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Maturity, "Approved")
+            .applied);
+    ASSERT_TRUE(sacm_adapter::apply_set_evidence_attribute(
+                    *document, "Sn1", core::EvidenceAttribute::ControlledEnvironment, "Yes")
+                    .applied);
+    ASSERT_TRUE(sacm_adapter::apply_set_evidence_attribute(
+                    *document, "Sn1", core::EvidenceAttribute::Notes, "Superseded by RA-002 for H2.")
+                    .applied);
+    projected = sacm_adapter::project_case(*document);
+    const core::EvidenceRecord& record = Find(projected, "Sn1")->evidence;
+    EXPECT_EQ(record.type, "Test report");
+    EXPECT_EQ(record.version, "rev B");
+    EXPECT_EQ(record.date, "2026-06-01");
+    EXPECT_EQ(record.maturity, "Approved");
+    EXPECT_EQ(record.controlled_environment, "Yes");
+    EXPECT_EQ(record.notes, "Superseded by RA-002 for H2.");
+    EXPECT_EQ(CountElementsOfType(projected, "artifact"), 1) << "a column created a second Artifact";
+
+    // Setting the date keeps the version, and vice versa: provenance is one
+    // record even though it is written a column at a time.
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Date, "2026-07-01")
+            .applied);
+    projected = sacm_adapter::project_case(*document);
+    EXPECT_EQ(Find(projected, "Sn1")->evidence.version, "rev B");
+    EXPECT_EQ(Find(projected, "Sn1")->evidence.date, "2026-07-01");
+
+    // A location recorded afterwards cites its Resource beside the Artifact.
+    ASSERT_TRUE(sacm_adapter::apply_set_evidence_location(*document, "Sn1", "https://example.org/ra-001.pdf").applied);
+    projected = sacm_adapter::project_case(*document);
+    EXPECT_EQ(Find(projected, "Sn1")->artifact_location, "https://example.org/ra-001.pdf");
+    EXPECT_EQ(Find(projected, "Sn1")->evidence.owner, "Safety Engineering");
+
+    // The record survives a strict save.
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*document, /*tolerant=*/false);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    WriteFile(root / "saved.sacm", saved.xml);
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(root / "saved.sacm");
+    ASSERT_TRUE(reloaded.ok);
+    // Held in a local: a reference into the projection temporary would dangle.
+    const core::AssuranceCase reloaded_case = sacm_adapter::project_case(*reloaded.document);
+    const core::EvidenceRecord& after = Find(reloaded_case, "Sn1")->evidence;
+    EXPECT_EQ(after.owner, "Safety Engineering");
+    EXPECT_EQ(after.version, "rev B");
+    EXPECT_EQ(after.notes, "Superseded by RA-002 for H2.");
+
+    // Clearing a tagged column removes the tag; clearing provenance empties it.
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Owner, "").applied);
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Version, "  ").applied);
+    projected = sacm_adapter::project_case(*document);
+    EXPECT_TRUE(Find(projected, "Sn1")->evidence.owner.empty());
+    EXPECT_TRUE(Find(projected, "Sn1")->evidence.version.empty());
+    EXPECT_EQ(Find(projected, "Sn1")->evidence.date, "2026-07-01");
+
+    std::filesystem::remove_all(root);
+}
+
+TEST(EvidenceRecord, SeamRefusesNonEvidenceAndCreatesNothingForAClear) {
+    const std::filesystem::path root = MakeTempRoot("record_refuse");
+    std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
+    ASSERT_NE(document, nullptr);
+
+    const sacm_adapter::EditOutcome on_claim =
+        sacm_adapter::apply_set_evidence_attribute(*document, "G1", core::EvidenceAttribute::Owner, "x");
+    EXPECT_FALSE(on_claim.applied);
+    ASSERT_FALSE(on_claim.diagnostics.empty());
+    EXPECT_EQ(on_claim.diagnostics.front().code, "SACM-CMD-002");
+
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_evidence_attribute(*document, "Sn1", core::EvidenceAttribute::Notes, "").applied);
+    const core::AssuranceCase projected = sacm_adapter::project_case(*document);
+    EXPECT_EQ(CountElementsOfType(projected, "artifact"), 0) << "clearing nothing created an Artifact";
+    EXPECT_TRUE(Find(projected, "Sn1")->evidence.artifact_id.empty());
+    std::filesystem::remove_all(root);
+}
+
+TEST(EvidenceRecord, CommandsRecordColumnsAndTheAuditLogReplaysThem) {
+    std::unique_ptr<BusFixture> fixture = MakeBusFixture("record_bus", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    ASSERT_NE(fixture->bus, nullptr);
+
+    core::commands::SetEvidenceAttributeCommand owner("Sn1", core::EvidenceAttribute::Owner, "Safety Engineering");
+    const core::commands::CommandResult owner_result = RunCommand(*fixture, owner);
+    ASSERT_TRUE(owner_result.success) << owner_result.error;
+    EXPECT_TRUE(owner.OldValue().empty());
+    EXPECT_EQ(Find(fixture->model, "Sn1")->evidence.owner, "Safety Engineering");
+
+    // The same value again is a no-op transaction, whitespace included.
+    core::commands::SetEvidenceAttributeCommand same("Sn1", core::EvidenceAttribute::Owner, " Safety Engineering ");
+    ASSERT_TRUE(RunCommand(*fixture, same).success);
+    EXPECT_TRUE(same.WasNoOp());
+
+    // An import lands several columns as one transaction...
+    core::commands::ImportEvidenceAssessmentsCommand import({
+        {"Sn1", core::EvidenceAttribute::Type, "Test report"},
+        {"Sn1", core::EvidenceAttribute::Date, "2026-06-01"},
+        {"Sn1", core::EvidenceAttribute::Notes, "Imported from the project file."},
+    });
+    ASSERT_TRUE(RunCommand(*fixture, import).success);
+    EXPECT_EQ(import.AppliedCount(), 3u);
+    EXPECT_EQ(Find(fixture->model, "Sn1")->evidence.type, "Test report");
+    EXPECT_EQ(Find(fixture->model, "Sn1")->evidence.date, "2026-06-01");
+
+    // ...and refuses as a whole when one write names something that is not
+    // evidence, before anything is written.
+    core::commands::ImportEvidenceAssessmentsCommand mixed({
+        {"Sn1", core::EvidenceAttribute::Maturity, "Approved"},
+        {"G1", core::EvidenceAttribute::Owner, "nobody"},
+    });
+    const core::commands::CommandResult mixed_result = RunCommand(*fixture, mixed);
+    EXPECT_FALSE(mixed_result.success);
+    EXPECT_EQ(mixed.AppliedCount(), 0u);
+    EXPECT_TRUE(Find(fixture->model, "Sn1")->evidence.maturity.empty()) << "a refused import wrote half of itself";
+
+    core::commands::SetEvidenceAttributeCommand on_claim("G1", core::EvidenceAttribute::Owner, "x");
+    EXPECT_FALSE(RunCommand(*fixture, on_claim).success);
+
+    const core::audit::ReplayVerificationResult verification = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verification.ran);
+    EXPECT_TRUE(verification.success) << "snapshot " << verification.snapshot_canonical_hash << " replayed "
+                                      << verification.replayed_canonical_hash << " on disk "
+                                      << verification.on_disk_canonical_hash;
+
+    std::filesystem::remove_all(fixture->project.rootPath);
+}
+
+core::reviews::PatchOperation
+SetAttributeOp(const std::string& element_id, const std::string& column, const std::string& value) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::SetEvidenceAttribute;
+    core::reviews::ElementRef element;
+    element.existing_id = element_id;
+    operation.element = element;
+    operation.field = column;
+    operation.new_value = value;
+    return operation;
+}
+
+TEST(EvidenceRecord, DraftOperationRecordsAColumnOrRefusesAnUnknownOne) {
+    const std::filesystem::path root = MakeTempRoot("record_draft");
+    std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
+    ASSERT_NE(document, nullptr);
+
+    const core::drafts::DraftOperationResult applied = core::drafts::ApplyOperationsToDraftDocument(
+        *document, {SetAttributeOp("Sn1", "owner", "Safety Engineering"), SetAttributeOp("Sn1", "version", "rev B")});
+    ASSERT_TRUE(applied.applied) << applied.error;
+    const core::AssuranceCase drafted = sacm_adapter::project_case(*document);
+    const core::EvidenceRecord& record = Find(drafted, "Sn1")->evidence;
+    EXPECT_EQ(record.owner, "Safety Engineering");
+    EXPECT_EQ(record.version, "rev B");
+
+    const core::drafts::DraftOperationResult unknown =
+        core::drafts::ApplyOperationsToDraftDocument(*document, {SetAttributeOp("Sn1", "recency", "2026")});
+    EXPECT_FALSE(unknown.applied);
+    EXPECT_NE(unknown.error.find("recency"), std::string::npos) << unknown.error;
+    EXPECT_NE(unknown.error.find("controlled_environment"), std::string::npos)
+        << "the refusal does not list the columns that exist: " << unknown.error;
+
+    EXPECT_STREQ(core::reviews::PatchOperationTypeToString(core::reviews::PatchOperationType::SetEvidenceAttribute),
+                 "SetEvidenceAttribute");
+    std::filesystem::remove_all(root);
+}
+
+TEST(EvidenceRecord, APickedFileInsideTheProjectIsRecordedRelativeToIt) {
+    const std::filesystem::path root = MakeTempRoot("picked");
+    std::filesystem::create_directories(root / "evidence" / "reports");
+    WriteFile(root / "evidence" / "reports" / "ra-001.pdf", "pdf");
+    EXPECT_EQ(core::EvidenceLocationForPickedFile(root, root / "evidence" / "reports" / "ra-001.pdf"),
+              "evidence/reports/ra-001.pdf");
+
+    // Outside the project, the absolute path is kept: a relative one that
+    // climbs out would break as soon as the project moved.
+    const std::filesystem::path elsewhere = MakeTempRoot("picked_elsewhere");
+    WriteFile(elsewhere / "shared.pdf", "pdf");
+    const std::string outside = core::EvidenceLocationForPickedFile(root, elsewhere / "shared.pdf");
+    EXPECT_EQ(outside.rfind("..", 0), std::string::npos) << outside;
+    EXPECT_NE(outside.find("shared.pdf"), std::string::npos) << outside;
+    EXPECT_TRUE(std::filesystem::path(outside).is_absolute()) << outside;
+
+    // No project: absolute.
+    EXPECT_TRUE(std::filesystem::path(core::EvidenceLocationForPickedFile({}, elsewhere / "shared.pdf")).is_absolute());
+    std::filesystem::remove_all(root);
+    std::filesystem::remove_all(elsewhere);
 }
 
 } // namespace

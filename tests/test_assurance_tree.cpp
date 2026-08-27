@@ -451,3 +451,46 @@ TEST(AssuranceTreeTest, TerminologyElementsProduceNoNodesAndNoOrphans) {
     EXPECT_EQ(FindTreeNode(tree, "CAT1"), nullptr);
     EXPECT_TRUE(tree.orphans.empty());
 }
+
+// The Artifact and Resource an ArtifactReference cites are the record of that
+// evidence, not nodes of the argument. Building the tree from a projection
+// that carries them used to pack each one onto the canvas as an orphan the
+// moment a location or a register column was recorded.
+TEST(AssuranceTreeTest, ArtifactAssetsAreNotDrawnAsOrphans) {
+    parser::AssuranceCase ac;
+    parser::SacmElement goal;
+    goal.id = "G1";
+    goal.type = "claim";
+    ac.elements.push_back(goal);
+    parser::SacmElement evidence;
+    evidence.id = "Sn1";
+    evidence.type = "artifactreference";
+    evidence.referenced_artifact_id = "artifact_1";
+    ac.elements.push_back(evidence);
+    parser::SacmElement support;
+    support.id = "R1";
+    support.type = "assertedevidence";
+    support.source_refs = {"Sn1"};
+    support.target_refs = {"G1"};
+    ac.elements.push_back(support);
+    parser::SacmElement artifact;
+    artifact.id = "artifact_1";
+    artifact.type = "artifact";
+    ac.elements.push_back(artifact);
+    parser::SacmElement resource;
+    resource.id = "resource_1";
+    resource.type = "resource";
+    ac.elements.push_back(resource);
+    evidence.evidence.artifact_id = "artifact_1";
+    ac.elements[1] = evidence;
+    // An artifact nothing cites is how older files carry evidence: still a node.
+    parser::SacmElement bare;
+    bare.id = "artifact_legacy";
+    bare.type = "artifact";
+    ac.elements.push_back(bare);
+
+    const core::AssuranceTree tree = core::AssuranceTree::Build(ac, "");
+    ASSERT_EQ(tree.orphans.size(), 2u) << "expected only the uncited artifact and the uncited resource as orphans";
+    for (const core::TreeNode* orphan : tree.orphans)
+        EXPECT_NE(orphan->id, "artifact_1") << "the cited artifact was drawn as an orphan";
+}

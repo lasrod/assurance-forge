@@ -81,11 +81,47 @@ static bool DrawAssessmentStatusCell(std::string& status) {
     return changed;
 }
 
-// The one location cell being edited. The assessment cells write per keystroke
-// into a JSON store, which costs nothing; a location is an audited SACM edit,
-// so it is committed once, when the field is left.
-static std::string g_location_edit_id;
-static std::string g_location_edit_text;
+// The one SACM-backed cell being edited, keyed by row and column. The
+// project-file assessment cells write per keystroke into a JSON store, which
+// costs nothing; a SACM column is an audited edit, so it is committed once,
+// when the field is left.
+static std::string g_sacm_edit_key;
+static std::string g_sacm_edit_text;
+
+static bool IsEditingCell(const std::string& key) {
+    return g_sacm_edit_key == key;
+}
+
+// Draws a text field for `stored` and returns true, with the new text in
+// `committed`, on the frame the user leaves the field having changed it.
+static bool CommitOnLeaveCell(const char* id,
+                              const std::string& key,
+                              const std::string& stored,
+                              const std::string& hint,
+                              std::string& committed) {
+    const bool editing = IsEditingCell(key);
+    const std::string& shown = editing ? g_sacm_edit_text : stored;
+    std::array<char, 1024> buffer{};
+    const std::size_t length = std::min(shown.size(), buffer.size() - 1);
+    std::memcpy(buffer.data(), shown.data(), length);
+    buffer[length] = '\0';
+
+    ImGui::InputTextWithHint(id, hint.c_str(), buffer.data(), buffer.size());
+    if (ImGui::IsItemActivated()) {
+        g_sacm_edit_key = key;
+        g_sacm_edit_text = stored;
+    }
+    if (ImGui::IsItemActive() && IsEditingCell(key))
+        g_sacm_edit_text = buffer.data();
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        committed = buffer.data();
+        g_sacm_edit_key.clear();
+        return true;
+    }
+    if (ImGui::IsItemDeactivated())
+        g_sacm_edit_key.clear();
+    return false;
+}
 
 static bool IconButton(const char* id, const char* icon, const std::string& tooltip) {
     const bool clicked = ImGui::SmallButton((std::string(icon) + "##" + id).c_str());
@@ -109,40 +145,84 @@ static void DrawEvidenceActionsCell(const EvidenceRegisterRow& row, const Eviden
 }
 
 static void DrawLocationCell(const EvidenceRegisterRow& row, const EvidenceRegisterCallbacks& callbacks) {
-    const bool editing = g_location_edit_id == row.evidence_id;
-    const std::string& shown = editing ? g_location_edit_text : row.location;
-    std::array<char, 1024> buffer{};
-    const std::size_t length = std::min(shown.size(), buffer.size() - 1);
-    std::memcpy(buffer.data(), shown.data(), length);
-    buffer[length] = '\0';
-
-    const float open_button_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x;
-    ImGui::SetNextItemWidth(-open_button_width);
+    const std::string key = row.evidence_id + "/location";
+    // Two buttons follow the field: browse for a file, open what is recorded.
+    const float buttons_width = 2.0f * (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x);
+    ImGui::SetNextItemWidth(-buttons_width);
     ImGui::BeginDisabled(!row.is_artifact_reference || !callbacks.set_location);
-    ImGui::InputTextWithHint("##location", AF_TR("Path or URL").c_str(), buffer.data(), buffer.size());
-    if (ImGui::IsItemActivated()) {
-        g_location_edit_id = row.evidence_id;
-        g_location_edit_text = row.location;
-    }
-    if (ImGui::IsItemActive() && g_location_edit_id == row.evidence_id)
-        g_location_edit_text = buffer.data();
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        if (callbacks.set_location)
-            callbacks.set_location(row.evidence_id, buffer.data());
-        g_location_edit_id.clear();
-    } else if (ImGui::IsItemDeactivated()) {
-        g_location_edit_id.clear();
-    }
+    std::string committed;
+    if (CommitOnLeaveCell("##location", key, row.location, AF_TR("Path or URL"), committed) && callbacks.set_location)
+        callbacks.set_location(row.evidence_id, committed);
     ImGui::EndDisabled();
 
+    ImGui::SameLine();
+    // Browse is always offered: a location that is not set yet is exactly when
+    // a picker is wanted, and a folder icon that only ever opened read as one.
+    ImGui::BeginDisabled(!row.is_artifact_reference || !callbacks.browse_location);
+    if (IconButton("browse", ICON_FA_FOLDER_OPEN, AF_TR("Browse for a file")) && callbacks.browse_location)
+        callbacks.browse_location(row.evidence_id);
+    ImGui::EndDisabled();
     ImGui::SameLine();
     // Opens the RECORDED location. While the cell is being edited the text
     // shown is not yet the record, so the button waits for the commit rather
     // than opening whatever the row held before the user started typing.
-    ImGui::BeginDisabled(editing || row.location.empty() || !callbacks.open_location);
-    if (IconButton("open", ICON_FA_FOLDER_OPEN, AF_TR("Open the file or URL")) && callbacks.open_location)
+    ImGui::BeginDisabled(IsEditingCell(key) || row.location.empty() || !callbacks.open_location);
+    if (IconButton("open", ICON_FA_LINK, AF_TR("Open the file or URL")) && callbacks.open_location)
         callbacks.open_location(row.location);
     ImGui::EndDisabled();
+}
+
+// One register column. A row still assessed in the project file edits its
+// JSON field in place, as every cell did before the columns moved into SACM;
+// a row assessed in the document commits to the cited Artifact when the
+// field is left. Returns true when the JSON field changed this frame.
+static bool DrawAttributeCell(const char* id,
+                              EvidenceRegisterRow& row,
+                              core::EvidenceAttribute attribute,
+                              std::string& json_field,
+                              const EvidenceRegisterCallbacks& callbacks) {
+    if (row.stored_in_project_file) {
+        const bool changed = EditCellText(id, json_field);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", AF_TR("Stored in the project file until moved into SACM.").c_str());
+        return changed;
+    }
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::BeginDisabled(!row.is_artifact_reference || !callbacks.set_attribute);
+    std::string committed;
+    const std::string key = row.evidence_id + "/" + core::EvidenceAttributeToken(attribute);
+    if (CommitOnLeaveCell(id, key, core::EvidenceRecordField(row.record, attribute), std::string{}, committed) &&
+        static_cast<bool>(callbacks.set_attribute)) {
+        callbacks.set_attribute(row.evidence_id, attribute, committed);
+    }
+    ImGui::EndDisabled();
+    return false;
+}
+
+// Assessments the project file still holds for evidence in the argument, and
+// the one action that moves them into the document. Never automatic: the
+// SACM file is the safety argument, and rewriting it on open would be a
+// change nobody asked for.
+static void RenderProjectFileAssessmentsBanner(const EvidenceRegisterCallbacks& callbacks) {
+    int stored = 0;
+    for (const EvidenceRegisterRow& row : g_evidence_rows) {
+        if (row.stored_in_project_file && row.is_artifact_reference)
+            ++stored;
+    }
+    if (stored == 0)
+        return;
+    ImGui::TextWrapped("%s",
+                       ui::i18n::trnf("{0} assessment is stored in the project file rather than the SACM document.",
+                                      "{0} assessments are stored in the project file rather than the SACM document.",
+                                      stored,
+                                      stored)
+                           .c_str());
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!callbacks.migrate_assessments);
+    if (ImGui::SmallButton(AF_TR("Move into SACM").c_str()) && callbacks.migrate_assessments)
+        callbacks.migrate_assessments();
+    ImGui::EndDisabled();
+    ImGui::Spacing();
 }
 
 static void StoreCseRow(core::registers::RegisterStore& store, const CseRegisterRow& row) {
@@ -221,6 +301,9 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers
         row.used_by_cse_count = core::registers::CountCseUses(links, evidence_id);
         row.location = element != nullptr ? element->artifact_location : std::string{};
         row.is_artifact_reference = element != nullptr && element->type == "artifactreference";
+        if (element != nullptr)
+            row.record = element->evidence;
+        row.stored_in_project_file = store.evidence.count(evidence_id) > 0;
 
         const EvidenceMetadata& meta = StoredOrDefault(store.evidence, row.evidence_id);
         row.evidence_owner = meta.evidence_owner;
@@ -259,7 +342,7 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
         return false;
     }
 
-    ImGui::TableSetupScrollFreeze(2, 1);
+    ImGui::TableSetupScrollFreeze(0, 1);
     ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Claim ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
     ImGui::TableSetupColumn(AF_TR("Claim").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
@@ -335,6 +418,8 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
         return false;
     }
 
+    RenderProjectFileAssessmentsBanner(callbacks);
+
     // Fixed initial widths, so the table is as wide as its content rather than
     // squeezed to the header labels. Under ScrollX the default sizing fits each
     // column to its header, which left every text field a few characters wide
@@ -343,18 +428,19 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
     const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
                                   ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
 
-    if (!ImGui::BeginTable("evidence_register_table", 11, flags)) {
+    if (!ImGui::BeginTable("evidence_register_table", 12, flags)) {
         return false;
     }
 
-    ImGui::TableSetupScrollFreeze(3, 1);
+    ImGui::TableSetupScrollFreeze(0, 1);
     ImGui::TableSetupColumn(AF_TR("Actions").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 4.5f);
     ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
     ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
     ImGui::TableSetupColumn(AF_TR("Location").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
     ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
-    ImGui::TableSetupColumn(AF_TR("Recency").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
+    ImGui::TableSetupColumn(AF_TR("Version").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
+    ImGui::TableSetupColumn(AF_TR("Date").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
     ImGui::TableSetupColumn(AF_TR("Maturity").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
     ImGui::TableSetupColumn(AF_TR("Controlled Environment").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 12.0f);
     ImGui::TableSetupColumn(AF_TR("Used By CSE Count").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 7.0f);
@@ -383,25 +469,41 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
         DrawLocationCell(row, callbacks);
 
         ImGui::TableSetColumnIndex(4);
-        row_edited |= EditCellText("##evidence_owner", row.evidence_owner);
+        row_edited |=
+            DrawAttributeCell("##evidence_owner", row, core::EvidenceAttribute::Owner, row.evidence_owner, callbacks);
 
         ImGui::TableSetColumnIndex(5);
-        row_edited |= EditCellText("##type", row.type);
+        row_edited |= DrawAttributeCell("##type", row, core::EvidenceAttribute::Type, row.type, callbacks);
 
         ImGui::TableSetColumnIndex(6);
-        row_edited |= EditCellText("##recency", row.recency);
+        // The project file never held a version; the column waits for the move.
+        if (row.stored_in_project_file) {
+            ImGui::TextDisabled("%s", "—");
+        } else {
+            std::string unused;
+            row_edited |= DrawAttributeCell("##version", row, core::EvidenceAttribute::Version, unused, callbacks);
+        }
 
         ImGui::TableSetColumnIndex(7);
-        row_edited |= EditCellText("##maturity", row.maturity);
+        // Recency, the project file's free text about when the evidence dates
+        // from, is shown in the Date column it migrates into.
+        row_edited |= DrawAttributeCell("##date", row, core::EvidenceAttribute::Date, row.recency, callbacks);
 
         ImGui::TableSetColumnIndex(8);
-        row_edited |= EditCellText("##controlled_environment", row.controlled_environment);
+        row_edited |= DrawAttributeCell("##maturity", row, core::EvidenceAttribute::Maturity, row.maturity, callbacks);
 
         ImGui::TableSetColumnIndex(9);
-        ImGui::Text("%d", row.used_by_cse_count);
+        row_edited |= DrawAttributeCell("##controlled_environment",
+                                        row,
+                                        core::EvidenceAttribute::ControlledEnvironment,
+                                        row.controlled_environment,
+                                        callbacks);
 
         ImGui::TableSetColumnIndex(10);
-        row_edited |= EditCellText("##notes", row.notes, 1024);
+        ImGui::Text("%d", row.used_by_cse_count);
+
+        ImGui::TableSetColumnIndex(11);
+        row_edited |= DrawAttributeCell("##notes", row, core::EvidenceAttribute::Notes, row.notes, callbacks);
 
         if (row_edited) {
             StoreEvidenceRow(store, row);

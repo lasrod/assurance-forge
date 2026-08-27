@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/app_events.h"
+#include "core/commands/element_commands.h"
 #include "core/element_factory.h"
 #include "ui/text_edit_session.h"
 
@@ -60,6 +61,17 @@ public:
     // Records where a piece of evidence is (the cited Resource's location) as
     // an audited edit; an empty location clears it.
     bool SetEvidenceLocation(AppRuntimeState& state, const std::string& element_id, const std::string& location);
+    // Records one register column on the cited Artifact; empty clears it.
+    bool SetEvidenceAttribute(AppRuntimeState& state,
+                              const std::string& element_id,
+                              core::EvidenceAttribute attribute,
+                              const std::string& value);
+    // Moves assessments the register held in the project file into the SACM
+    // document, as one audited transaction. `out_applied` is how many writes
+    // landed; false when none did.
+    bool ImportEvidenceAssessments(AppRuntimeState& state,
+                                   const std::vector<core::commands::EvidenceAttributeWrite>& writes,
+                                   std::size_t& out_applied);
     // Give `element_id` the next identifier free under its own prefix, the
     // repair for two nodes answering to the same one.
     bool RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id);
