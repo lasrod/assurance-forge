@@ -152,7 +152,6 @@ std::string LinkTargetForExport(const std::string& location,
         return IsSafeScheme(scheme) ? location : std::string{};
 
     const std::filesystem::path recorded = core::PathFromUtf8(location);
-    std::error_code ec;
     if (recorded.is_absolute()) {
         const std::string generic = recorded.generic_string();
         // file:///C:/... on Windows, file:///srv/... elsewhere: the leading
@@ -162,9 +161,14 @@ std::string LinkTargetForExport(const std::string& location,
     if (project_root.empty() || exports_dir.empty())
         return PercentEncodePath(recorded.generic_string());
 
-    const std::filesystem::path absolute = std::filesystem::weakly_canonical(project_root / recorded, ec);
-    const std::filesystem::path base = std::filesystem::weakly_canonical(exports_dir, ec);
-    if (ec)
+    // One error_code per call: a shared one lets the second call clear the
+    // first's failure, and the rebase would then run on a path that was never
+    // resolved. Either failing means the recorded path is the honest answer.
+    std::error_code absolute_ec;
+    const std::filesystem::path absolute = std::filesystem::weakly_canonical(project_root / recorded, absolute_ec);
+    std::error_code base_ec;
+    const std::filesystem::path base = std::filesystem::weakly_canonical(exports_dir, base_ec);
+    if (absolute_ec || base_ec)
         return PercentEncodePath(recorded.generic_string());
     const std::filesystem::path relative = absolute.lexically_relative(base);
     if (relative.empty())

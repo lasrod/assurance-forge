@@ -837,6 +837,8 @@ TEST(GsnSvgExporterTest, EvidenceLocationBecomesALinkOnTheNode) {
         << "older readers follow xlink:href";
     EXPECT_NE(svg.find("xmlns:xlink="), std::string::npos) << "xlink:href without the namespace is not valid SVG";
     EXPECT_NE(svg.find("gsn-link"), std::string::npos) << "the link glyph is missing, so nothing shows it is clickable";
+    EXPECT_NE(svg.find("rel=\"noopener noreferrer\""), std::string::npos)
+        << "a target=_blank link without rel hands the opened page a handle on this document";
     // One anchor: the evidence without a location is not wrapped in one.
     EXPECT_EQ(svg.find("<a href"), svg.rfind("<a href"));
 }

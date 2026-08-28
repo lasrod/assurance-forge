@@ -263,8 +263,12 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
     // is the click target, and the title is what a reader sees on hover.
     const bool linked = !node.location.empty();
     if (linked) {
-        out << "  <a href=\"" << EscapeXml(node.location) << "\" xlink:href=\"" << EscapeXml(node.location)
-            << "\" target=\"_blank\">\n";
+        out << "  <a href=\"" << EscapeXml(node.location) << "\" xlink:href=\""
+            << EscapeXml(node.location)
+            // rel: a target="_blank" link hands the opened page a handle on the
+            // document that opened it unless this says otherwise, and an exported
+            // diagram is a file people open from wherever they were sent it.
+            << "\" target=\"_blank\" rel=\"noopener noreferrer\">\n";
         out << "    <title>" << EscapeXml(node.location) << "</title>\n";
     }
     out << "  <g id=\"" << EscapeXml(node.id) << "\" class=\"" << CssClassFor(node.kind) << "\">\n";
