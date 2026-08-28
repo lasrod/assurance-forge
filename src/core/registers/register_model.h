@@ -23,6 +23,12 @@ namespace core::registers {
 struct CseLink {
     std::string claim_id;
     std::string evidence_id;
+    // The AssertedEvidence that carries this pairing, and whether it carries
+    // more than one -- the assessment lives on the relationship, so rows that
+    // share one share their assessment. Empty/false for a link derived from a
+    // model that records neither (nothing but the register needs them).
+    std::string relationship_id;
+    bool shares_relationship = false;
 };
 
 bool operator==(const CseLink& a, const CseLink& b);
@@ -37,6 +43,11 @@ struct CseMetadata {
     std::string evidence_criteria;
     std::string assessment_status = "Not Assessed";
     std::string notes;
+
+    // Compared when moving assessments into the document: two register rows
+    // that share one support relationship must agree, or one would overwrite
+    // the other on the way in.
+    friend bool operator==(const CseMetadata&, const CseMetadata&) = default;
 };
 
 // Assessment fields for one evidence item.

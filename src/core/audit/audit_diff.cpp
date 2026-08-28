@@ -54,6 +54,22 @@ void AddAddedFromEvent(const AuditEvent& event, AuditChangeSet& out) {
         }
         return;
     }
+    if (type == "ImportCseAssessments") {
+        auto items_it = payload.find("items");
+        if (items_it != payload.end() && items_it->is_array()) {
+            for (const auto& item : *items_it) {
+                if (item.is_object() && item.contains("relationship_id") && item["relationship_id"].is_string())
+                    out.modified.insert(item["relationship_id"].get<std::string>());
+            }
+        }
+        return;
+    }
+    if (type == "SetCseAttribute") {
+        auto it = payload.find("relationship_id");
+        if (it != payload.end() && it->is_string())
+            out.modified.insert(it->get<std::string>());
+        return;
+    }
     if (type == "ImportEvidenceAssessments") {
         auto items_it = payload.find("items");
         if (items_it != payload.end() && items_it->is_array()) {

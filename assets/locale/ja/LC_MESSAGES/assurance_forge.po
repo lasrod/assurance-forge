@@ -673,11 +673,17 @@ msgstr "編集可能な SACM パッケージモデルを読み込めませんで
 msgid "Could not move assessments into the draft: {0}"
 msgstr "評価をドラフトに移動できませんでした: {0}"
 
+msgid "Could not move the assessments: {0}"
+msgstr "評価を移動できませんでした: {0}"
+
 msgid "Could not open File Explorer: {0}"
 msgstr "エクスプローラーを開けませんでした: {0}"
 
 msgid "Could not open the evidence location: {0}"
 msgstr "エビデンスの場所を開けませんでした: {0}"
+
+msgid "Could not record the assessment in the draft: {0}"
+msgstr "ドラフトに評価を記録できませんでした: {0}"
 
 msgid "Could not record the edit in the draft: {0}"
 msgstr "ドラフトに編集を記録できませんでした: {0}"
@@ -1437,6 +1443,9 @@ msgstr "プロジェクトが開かれていません。"
 
 msgid "No project-file assessments match evidence in the argument."
 msgstr "アーギュメント内のエビデンスに一致するプロジェクトファイルの評価はありません。"
+
+msgid "No project-file assessments match support in the argument."
+msgstr "アーギュメント内のサポートに一致するプロジェクトファイルの評価はありません。"
 
 msgid "No proposal for resolved comment."
 msgstr "解決済みコメントに対する提案はありません。"
@@ -2449,6 +2458,9 @@ msgstr "このプロジェクトにはまだ監査ストアがありません。
 msgid "This strategy develops into nothing. A decomposition step that produces no sub-claims states an inference the argument never makes."
 msgstr "この戦略は何にも展開されていません。サブ主張を生まない分解ステップは、議論が一度も行わない推論を宣言していることになります。"
 
+msgid "This support is carried by a relationship that also carries others; they share one assessment."
+msgstr "このサポートは他のサポートも担う関係に含まれており、評価は共有されます。"
+
 msgid "This text calls the work \"{0}\". Promotional language persuades nobody reviewing a safety argument; state what was shown, and under which assumptions."
 msgstr "このテキストは成果を「{0}」と称しています。宣伝的な言葉は安全性議論のレビューでは何の説得力も持ちません。何がどの前提の下で示されたのかを述べてください。"
 
@@ -2847,6 +2859,9 @@ msgstr "{0} 件の問題 · トップ {1}: {2}"
 
 msgid "{0} proposals"
 msgstr "{0} 件の提案"
+
+msgid "{0} rows share one support relationship but were assessed differently; resolve them in the register before moving them into SACM."
+msgstr "{0} 件の行が 1 つのサポート関係を共有していますが、評価が異なります。SACM に移動する前にレジスタで解決してください。"
 
 msgid "{0} undeveloped"
 msgstr "{0} 件未展開"

@@ -3,6 +3,7 @@
 #include "app/app_events.h"
 #include "core/drafts/draft_change_index.h"
 #include "core/drafts/draft_workspace.h"
+#include "core/cse_attributes.h"
 #include "core/element_factory.h"
 #include "core/evidence_attributes.h"
 #include "core/problems/problem_item.h"
@@ -101,6 +102,11 @@ public:
     // support; linking and unlinking add or withdraw the AssertedEvidence
     // between existing evidence and a claim. Draft edits when a working draft
     // is active, audited commands otherwise, like every other edit.
+    // The CSE register's columns: recorded on the AssertedEvidence carrying
+    // the support, staged in the working draft when one is active.
+    bool SetCseAttribute(const std::string& relationship_id, core::CseAttribute attribute, const std::string& value);
+    // Moves CSE assessments the project file still holds into the document.
+    void MigrateCseAssessments();
     void CreateEvidence(const std::string& text, const std::string& claim_id);
     void LinkEvidence(const std::string& evidence_id, const std::string& claim_id);
     void UnlinkEvidence(const std::string& evidence_id, const std::string& claim_id);

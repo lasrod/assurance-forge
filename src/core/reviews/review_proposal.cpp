@@ -173,6 +173,8 @@ const char* PatchOperationTypeToString(PatchOperationType type) {
         return "SetEvidenceLocation";
     case PatchOperationType::SetEvidenceAttribute:
         return "SetEvidenceAttribute";
+    case PatchOperationType::SetCseAttribute:
+        return "SetCseAttribute";
     case PatchOperationType::CreateTerm:
         return "CreateTerm";
     case PatchOperationType::UpdateTerm:
@@ -407,6 +409,7 @@ bool PatchOperationTypeFromString(const std::string& value, PatchOperationType& 
         {"RemoveElement", PatchOperationType::RemoveElement},
         {"SetEvidenceLocation", PatchOperationType::SetEvidenceLocation},
         {"SetEvidenceAttribute", PatchOperationType::SetEvidenceAttribute},
+        {"SetCseAttribute", PatchOperationType::SetCseAttribute},
         {"CreateTerm", PatchOperationType::CreateTerm},
         {"UpdateTerm", PatchOperationType::UpdateTerm},
         {"RemoveTerm", PatchOperationType::RemoveTerm},
@@ -720,6 +723,7 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
         case PatchOperationType::RemoveElement:
         case PatchOperationType::SetEvidenceLocation:
         case PatchOperationType::SetEvidenceAttribute:
+        case PatchOperationType::SetCseAttribute:
         case PatchOperationType::UpdateTerm:
         case PatchOperationType::RemoveTerm:
         case PatchOperationType::UpdateCategory:

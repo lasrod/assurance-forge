@@ -1,5 +1,6 @@
 #include "core/audit/event_replayer.h"
 
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 
 #include "core/acp/acp_editing.h"
@@ -1114,6 +1115,10 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
         // Library-only: the legacy models carry no Resource location, and the
         // live command refused without a document, so a log holding one was
         // written by a library-backed session.
+        return RefuseUnrepresentableReplay(FormatLocation(tx_seq, event.event_sequence, type), out_error);
+    }
+
+    if (type == "SetCseAttribute" || type == "ImportCseAssessments") {
         return RefuseUnrepresentableReplay(FormatLocation(tx_seq, event.event_sequence, type), out_error);
     }
 
@@ -2288,6 +2293,61 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
             out_error = FormatSeamFailure(
                 "apply_set_evidence_location", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
             return false;
+        }
+        return true;
+    }
+
+    if (type == "SetCseAttribute") {
+        std::string relationship_id, attribute_token, new_value;
+        if (!require_string("relationship_id", relationship_id))
+            return false;
+        if (!require_string("attribute", attribute_token))
+            return false;
+        if (!require_string("new_value", new_value))
+            return false;
+        core::CseAttribute attribute = core::CseAttribute::AssessmentStatus;
+        if (!core::ParseCseAttribute(attribute_token, attribute)) {
+            out_error = "Unknown CSE attribute '" + attribute_token + "' at " +
+                        FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_cse_attribute(document, relationship_id, attribute, new_value);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_cse_attribute", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
+    }
+
+    if (type == "ImportCseAssessments") {
+        const auto items = payload.find("items");
+        if (items == payload.end() || !items->is_array()) {
+            out_error =
+                "Missing or non-array payload field 'items' at " + FormatLocation(tx_seq, event.event_sequence, type);
+            return false;
+        }
+        for (const auto& item : *items) {
+            if (!item.is_object() || !item.contains("relationship_id") || !item.contains("attribute") ||
+                !item.contains("value")) {
+                out_error = "Malformed import item at " + FormatLocation(tx_seq, event.event_sequence, type);
+                return false;
+            }
+            core::CseAttribute attribute = core::CseAttribute::AssessmentStatus;
+            const std::string attribute_token = item["attribute"].get<std::string>();
+            if (!core::ParseCseAttribute(attribute_token, attribute)) {
+                out_error = "Unknown CSE attribute '" + attribute_token + "' at " +
+                            FormatLocation(tx_seq, event.event_sequence, type);
+                return false;
+            }
+            const sacm_adapter::EditOutcome outcome = sacm_adapter::apply_set_cse_attribute(
+                document, item["relationship_id"].get<std::string>(), attribute, item["value"].get<std::string>());
+            if (!outcome.supported || !outcome.applied) {
+                out_error = FormatSeamFailure(
+                    "apply_set_cse_attribute", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+                return false;
+            }
         }
         return true;
     }

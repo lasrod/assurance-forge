@@ -2,6 +2,7 @@
 
 #include "core/commands/command_bus.h"
 #include "core/element_factory.h"
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 
 #include <string>
@@ -292,6 +293,62 @@ private:
     std::string claim_id_;
     std::string evidence_id_;
     std::string generated_relationship_id_;
+};
+
+// One write to one of the CSE register's columns, recorded on the
+// AssertedEvidence that carries the support being assessed.
+struct CseAttributeWrite {
+    std::string relationship_id;
+    CseAttribute attribute = CseAttribute::AssessmentStatus;
+    std::string value;
+};
+
+// Record one CSE register column. Library-only, like the other register edits.
+class SetCseAttributeCommand final : public ICommand {
+public:
+    SetCseAttributeCommand(std::string relationship_id, CseAttribute attribute, std::string value)
+        : relationship_id_(std::move(relationship_id)), attribute_(attribute), value_(std::move(value)) {}
+
+    std::string Name() const override {
+        return "SetCseAttribute";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& OldValue() const {
+        return old_value_;
+    }
+    bool WasNoOp() const {
+        return was_no_op_;
+    }
+
+private:
+    std::string relationship_id_;
+    CseAttribute attribute_;
+    std::string value_;
+    std::string old_value_;
+    bool was_no_op_ = false;
+};
+
+// Move CSE assessments the register held in the project file into the SACM
+// document, as one transaction. A write naming something that is not an
+// AssertedEvidence fails the whole import, so a stale entry cannot be
+// half-migrated.
+class ImportCseAssessmentsCommand final : public ICommand {
+public:
+    explicit ImportCseAssessmentsCommand(std::vector<CseAttributeWrite> writes) : writes_(std::move(writes)) {}
+
+    std::string Name() const override {
+        return "ImportCseAssessments";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    std::size_t AppliedCount() const {
+        return applied_count_;
+    }
+
+private:
+    std::vector<CseAttributeWrite> writes_;
+    std::size_t applied_count_ = 0;
 };
 
 class SetEvidenceLocationCommand final : public ICommand {

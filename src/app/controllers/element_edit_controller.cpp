@@ -306,6 +306,25 @@ bool ElementEditController::ImportEvidenceAssessments(AppRuntimeState& state,
     return true;
 }
 
+bool ElementEditController::SetCseAttribute(AppRuntimeState& state,
+                                            const std::string& relationship_id,
+                                            core::CseAttribute attribute,
+                                            const std::string& value) {
+    if (relationship_id.empty())
+        return false;
+    core::commands::SetCseAttributeCommand command(relationship_id, attribute, value);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, command);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Could not record the assessment: " + outcome.error});
+        return false;
+    }
+    if (command.WasNoOp())
+        return true;
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(DocumentDirtyEvent{});
+    return true;
+}
+
 std::string
 ElementEditController::CreateEvidence(AppRuntimeState& state, const std::string& claim_id, const std::string& text) {
     core::commands::CreateEvidenceCommand command(claim_id, text);

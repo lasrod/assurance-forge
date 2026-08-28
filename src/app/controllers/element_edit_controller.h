@@ -2,6 +2,7 @@
 
 #include "app/app_events.h"
 #include "core/commands/element_commands.h"
+#include "core/cse_attributes.h"
 #include "core/element_factory.h"
 #include "ui/text_edit_session.h"
 
@@ -61,6 +62,11 @@ public:
     // Records where a piece of evidence is (the cited Resource's location) as
     // an audited edit; an empty location clears it.
     bool SetEvidenceLocation(AppRuntimeState& state, const std::string& element_id, const std::string& location);
+    // Records one CSE register column on the relationship carrying the support.
+    bool SetCseAttribute(AppRuntimeState& state,
+                         const std::string& relationship_id,
+                         core::CseAttribute attribute,
+                         const std::string& value);
     // Creates evidence from the register -- under `claim_id` when given, bare
     // otherwise -- with `text` as its statement. Returns the new id, or empty.
     std::string CreateEvidence(AppRuntimeState& state, const std::string& claim_id, const std::string& text);

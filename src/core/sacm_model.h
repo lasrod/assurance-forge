@@ -53,6 +53,41 @@ struct EvidenceRecord {
     friend bool operator==(const EvidenceRecord&, const EvidenceRecord&) = default;
 };
 
+// What a reviewer judged about one claim-evidence support: the CSE register's
+// columns. The subject is the SUPPORT, so this lives on the AssertedEvidence
+// relationship that carries it, as TaggedValues under the keys below -- SACM's
+// Note has no create command, and a relationship's Description is the
+// relationship's own text rather than a reviewer's remark about it.
+//
+// One AssertedEvidence can carry several claim/evidence pairings, and then
+// every register row derived from it shares this one assessment: in SACM those
+// sources jointly support the target, so there is one support to judge. The
+// register marks such rows rather than pretending they are independent.
+struct CseAssessmentRecord {
+    std::string claim_owner;
+    std::string evidence_owner;
+    std::string safety_case_owner;
+    std::string claim_criteria;
+    std::string evidence_criteria;
+    std::string assessment_status;
+    std::string notes;
+
+    bool empty() const {
+        return claim_owner.empty() && evidence_owner.empty() && safety_case_owner.empty() && claim_criteria.empty() &&
+               evidence_criteria.empty() && assessment_status.empty() && notes.empty();
+    }
+
+    friend bool operator==(const CseAssessmentRecord&, const CseAssessmentRecord&) = default;
+};
+
+inline constexpr char kCseClaimOwnerTagKey[] = "assuranceForge.cse.claimOwner";
+inline constexpr char kCseEvidenceOwnerTagKey[] = "assuranceForge.cse.evidenceOwner";
+inline constexpr char kCseSafetyCaseOwnerTagKey[] = "assuranceForge.cse.safetyCaseOwner";
+inline constexpr char kCseClaimCriteriaTagKey[] = "assuranceForge.cse.claimCriteria";
+inline constexpr char kCseEvidenceCriteriaTagKey[] = "assuranceForge.cse.evidenceCriteria";
+inline constexpr char kCseAssessmentStatusTagKey[] = "assuranceForge.cse.assessmentStatus";
+inline constexpr char kCseNotesTagKey[] = "assuranceForge.cse.notes";
+
 inline constexpr char kEvidenceOwnerTagKey[] = "assuranceForge.evidence.owner";
 inline constexpr char kEvidenceTypeTagKey[] = "assuranceForge.evidence.type";
 inline constexpr char kEvidenceMaturityTagKey[] = "assuranceForge.evidence.maturity";
@@ -106,6 +141,9 @@ struct SacmElement {
     std::string artifact_location;
     // What the cited Artifact records about the evidence; see EvidenceRecord.
     EvidenceRecord evidence;
+    // What a reviewer judged about this support, for an assertedevidence
+    // relationship; see CseAssessmentRecord.
+    CseAssessmentRecord cse_assessment;
 };
 
 struct AcpRecord {
