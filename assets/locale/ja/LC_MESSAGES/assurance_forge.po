@@ -556,9 +556,6 @@ msgstr "主張"
 msgid "Claim Criteria"
 msgstr "主張基準"
 
-msgid "Claim ID"
-msgstr "主張 ID"
-
 msgid "Claim Owner"
 msgstr "主張責任者"
 

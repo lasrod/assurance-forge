@@ -639,6 +639,7 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                 ui::CseRegisterCallbacks cse_callbacks;
                 cse_callbacks.set_attribute = callbacks.set_cse_attribute;
                 cse_callbacks.migrate_assessments = callbacks.migrate_cse_assessments;
+                cse_callbacks.locate = callbacks.locate_element;
                 RenderRegisterTable(state, [&cse_callbacks](core::registers::RegisterStore& store) {
                     return ui::ShowCseRegisterView(store, cse_callbacks);
                 });

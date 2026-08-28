@@ -44,6 +44,10 @@ struct CseRegisterCallbacks {
     std::function<void(const std::string& relationship_id, core::CseAttribute attribute, const std::string& value)>
         set_attribute;
     std::function<void()> migrate_assessments;
+    // Opens the argument at this support. Given the evidence rather than the
+    // claim: it is the specific end of the pairing, and the claim it supports
+    // sits directly above it once the canvas centres there.
+    std::function<void(const std::string& evidence_id)> locate;
 };
 
 struct EvidenceRegisterRow {

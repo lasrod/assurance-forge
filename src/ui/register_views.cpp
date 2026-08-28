@@ -573,16 +573,17 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store, const CseRegiste
     const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
                                   ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
 
-    if (!ImGui::BeginTable("cse_register_table", 12, flags)) {
+    if (!ImGui::BeginTable("cse_register_table", 10, flags)) {
         return false;
     }
 
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
-    ImGui::TableSetupColumn(AF_TR("Claim ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
+    // No Claim ID or Evidence ID column: the CSE id spells both out, and the
+    // button beside it goes to the argument, which is what those columns were
+    // read for.
+    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 13.0f);
     ImGui::TableSetupColumn(AF_TR("Claim").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
-    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
-    ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 16.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
     ImGui::TableSetupColumn(AF_TR("Claim Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Safety Case Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
@@ -600,6 +601,11 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store, const CseRegiste
         ImGui::TableNextRow();
 
         ImGui::TableSetColumnIndex(0);
+        ImGui::BeginDisabled(!callbacks.locate);
+        if (IconButton("locate", ICON_FA_CROSSHAIRS, AF_TR("Show in argument")) && callbacks.locate)
+            callbacks.locate(row.evidence_id);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
         ImGui::TextUnformatted(row.cse_id.c_str());
         if (row.shares_relationship) {
             ImGui::SameLine();
@@ -613,40 +619,38 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store, const CseRegiste
         }
 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(row.claim_id.c_str());
+        ImGui::TextUnformatted(row.claim.c_str());
+        if (ImGui::IsItemHovered() && !row.claim.empty())
+            ImGui::SetTooltip("%s", row.claim.c_str());
 
         ImGui::TableSetColumnIndex(2);
-        ImGui::TextUnformatted(row.claim.c_str());
+        ImGui::TextUnformatted(row.evidence.c_str());
+        if (ImGui::IsItemHovered() && !row.evidence.empty())
+            ImGui::SetTooltip("%s", row.evidence.c_str());
 
         ImGui::TableSetColumnIndex(3);
-        ImGui::TextUnformatted(row.evidence_id.c_str());
-
-        ImGui::TableSetColumnIndex(4);
-        ImGui::TextUnformatted(row.evidence.c_str());
-
-        ImGui::TableSetColumnIndex(5);
         row_edited |= DrawCseCell("##claim_owner", row, core::CseAttribute::ClaimOwner, row.claim_owner, callbacks);
 
-        ImGui::TableSetColumnIndex(6);
+        ImGui::TableSetColumnIndex(4);
         row_edited |=
             DrawCseCell("##evidence_owner", row, core::CseAttribute::EvidenceOwner, row.evidence_owner, callbacks);
 
-        ImGui::TableSetColumnIndex(7);
+        ImGui::TableSetColumnIndex(5);
         row_edited |= DrawCseCell(
             "##safety_case_owner", row, core::CseAttribute::SafetyCaseOwner, row.safety_case_owner, callbacks);
 
-        ImGui::TableSetColumnIndex(8);
+        ImGui::TableSetColumnIndex(6);
         row_edited |=
             DrawCseCell("##claim_criteria", row, core::CseAttribute::ClaimCriteria, row.claim_criteria, callbacks);
 
-        ImGui::TableSetColumnIndex(9);
+        ImGui::TableSetColumnIndex(7);
         row_edited |= DrawCseCell(
             "##evidence_criteria", row, core::CseAttribute::EvidenceCriteria, row.evidence_criteria, callbacks);
 
-        ImGui::TableSetColumnIndex(10);
+        ImGui::TableSetColumnIndex(8);
         row_edited |= DrawCseStatusCell(row, callbacks);
 
-        ImGui::TableSetColumnIndex(11);
+        ImGui::TableSetColumnIndex(9);
         row_edited |= DrawCseCell("##notes", row, core::CseAttribute::Notes, row.notes, callbacks);
 
         if (row_edited) {

@@ -784,7 +784,6 @@ TRANSLATIONS = {
     "No CSE rows were derived from direct claim-evidence relations.": "直接の主張–エビデンス関係から CSE 行が導出されませんでした。",
     "No evidence/work-product rows were derived from the model.": "モデルからエビデンス/作業成果物の行が導出されませんでした。",
     "CSE ID": "CSE ID",
-    "Claim ID": "主張 ID",
     "Claim Owner": "主張責任者",
     "Claim Criteria": "主張基準",
     "Evidence ID": "エビデンス ID",
