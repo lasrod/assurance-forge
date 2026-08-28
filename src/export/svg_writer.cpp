@@ -12,6 +12,9 @@ namespace export_gsn {
 namespace {
 
 constexpr double kCanvasPadding = 48.0;
+// The link glyph's colour: readable on white, and unmistakably not the black
+// the notation itself is drawn in.
+constexpr const char* kLinkColor = "#1a58c8";
 constexpr double kTextLineHeight = 18.0;
 constexpr double kFontSize = 13.0;
 
@@ -226,7 +229,48 @@ void WriteElementAcpBadge(std::ostringstream& out, const GsnNode& node) {
     WriteAcpBadge(out, cx, cy, node.acp_labels);
 }
 
+// The external-link glyph: the conventional square-with-an-arrow-leaving-it,
+// drawn as paths rather than a character so it renders wherever the SVG does.
+// Sits inside the node's top-right corner, clear of the text.
+void WriteLinkMarker(std::ostringstream& out, const GsnNode& node) {
+    if (node.location.empty())
+        return;
+    const double size = 11.0;
+    // A Solution is a circle: put the glyph where the circle actually is
+    // rather than in the corner of its bounding box, which is empty.
+    const bool circular = node.kind == GsnNodeKind::Solution;
+    const double inset = circular ? node.width * 0.18 : 8.0;
+    const double x = node.x + node.width - inset - size;
+    const double y = node.y + (circular ? node.height * 0.16 : 8.0);
+
+    out << "    <g class=\"gsn-link\" stroke=\"" << kLinkColor
+        << "\" stroke-width=\"1.3\" fill=\"none\" "
+           "stroke-linecap=\"round\">\n";
+    // The box, open at the corner the arrow leaves through.
+    out << "      <path d=\"M " << x + size * 0.55 << " " << y + size * 0.30 << " L " << x << " " << y + size * 0.30
+        << " L " << x << " " << y + size << " L " << x + size * 0.70 << " " << y + size << " L " << x + size * 0.70
+        << " " << y + size * 0.55 << "\"/>\n";
+    // The arrow leaving it.
+    out << "      <path d=\"M " << x + size * 0.42 << " " << y + size * 0.58 << " L " << x + size << " " << y
+        << "\"/>\n";
+    out << "      <path d=\"M " << x + size * 0.55 << " " << y << " L " << x + size << " " << y << " L " << x + size
+        << " " << y + size * 0.45 << "\"/>\n";
+    out << "    </g>\n";
+}
+
 void WriteNode(std::ostringstream& out, const GsnNode& node) {
+    // A node whose evidence has a recorded location is a link: the whole node
+    // is the click target, and the title is what a reader sees on hover.
+    const bool linked = !node.location.empty();
+    if (linked) {
+        out << "  <a href=\"" << EscapeXml(node.location) << "\" xlink:href=\""
+            << EscapeXml(node.location)
+            // rel: a target="_blank" link hands the opened page a handle on the
+            // document that opened it unless this says otherwise, and an exported
+            // diagram is a file people open from wherever they were sent it.
+            << "\" target=\"_blank\" rel=\"noopener noreferrer\">\n";
+        out << "    <title>" << EscapeXml(node.location) << "</title>\n";
+    }
     out << "  <g id=\"" << EscapeXml(node.id) << "\" class=\"" << CssClassFor(node.kind) << "\">\n";
     switch (node.kind) {
     case GsnNodeKind::Goal:
@@ -270,7 +314,10 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
     }
     WriteElementAbstractionMarker(out, node);
     WriteElementAcpBadge(out, node);
+    WriteLinkMarker(out, node);
     out << "  </g>\n";
+    if (linked)
+        out << "  </a>\n";
 }
 
 struct Point {
@@ -369,8 +416,10 @@ std::string GenerateGsnSvg(const GsnDiagram& diagram) {
     std::ostringstream out;
     out << std::fixed << std::setprecision(1);
     out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    out << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" << width << "\" height=\"" << height
-        << "\" viewBox=\"0 0 " << width << " " << height << "\">\n";
+    // xlink is declared for readers older than SVG 2; evidence links carry both
+    // spellings of href so either kind of reader can follow them.
+    out << "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"" << width
+        << "\" height=\"" << height << "\" viewBox=\"0 0 " << width << " " << height << "\">\n";
     out << "<defs>\n";
     out << "  <marker id=\"supportedByArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" "
            "orient=\"auto\" markerUnits=\"strokeWidth\">\n";

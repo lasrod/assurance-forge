@@ -485,6 +485,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
         node.text = TextFor(element, secondary_language);
         node.undeveloped = element.undeveloped;
         node.uninstantiated = element.is_abstract;
+        node.location = element.artifact_location;
         AttachAcpLabels(node.acp_labels, element_acp_labels, element.id, element.gid);
         if (node.title.empty() && node.text.empty()) {
             node.title = "(no title)";

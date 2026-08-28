@@ -5,6 +5,7 @@
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -806,4 +807,112 @@ TEST(GsnSvgExporterTest, GSN3_CORE_010_UsesNotationIdentifierWithoutRewritingRef
     const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
     EXPECT_NE(svg.find("G1: Goal"), std::string::npos);
     EXPECT_NE(svg.find("id=\"generated_3\""), std::string::npos);
+}
+
+// Evidence with a recorded location is a link in the exported diagram, the way
+// it is on the canvas. The canvas and the export are separate renderers, so
+// this is the export's own copy of that behaviour and its own test.
+TEST(GsnSvgExporterTest, EvidenceLocationBecomesALinkOnTheNode) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Element("G1", "claim", "Top goal", "The system is safe."));
+    parser::SacmElement evidence = Element("Sn1", "artifactreference", "Test report", "Report RA-001.");
+    evidence.artifact_location = "https://example.org/ra-001.pdf";
+    model.elements.push_back(evidence);
+    model.elements.push_back(Element("Sn2", "artifactreference", "Unlinked report", "No location recorded."));
+    model.elements.push_back(Relationship("R1", "assertedevidence", {"Sn1"}, {"G1"}));
+    model.elements.push_back(Relationship("R2", "assertedevidence", {"Sn2"}, {"G1"}));
+
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(model, {});
+    const export_gsn::GsnNode* linked = FindNode(projection.diagram, "Sn1");
+    const export_gsn::GsnNode* plain = FindNode(projection.diagram, "Sn2");
+    ASSERT_NE(linked, nullptr);
+    ASSERT_NE(plain, nullptr);
+    EXPECT_EQ(linked->location, "https://example.org/ra-001.pdf") << "the projection dropped the location";
+    EXPECT_TRUE(plain->location.empty());
+
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+    EXPECT_NE(svg.find("<a href=\"https://example.org/ra-001.pdf\""), std::string::npos) << svg;
+    EXPECT_NE(svg.find("xlink:href=\"https://example.org/ra-001.pdf\""), std::string::npos)
+        << "older readers follow xlink:href";
+    EXPECT_NE(svg.find("xmlns:xlink="), std::string::npos) << "xlink:href without the namespace is not valid SVG";
+    EXPECT_NE(svg.find("gsn-link"), std::string::npos) << "the link glyph is missing, so nothing shows it is clickable";
+    EXPECT_NE(svg.find("rel=\"noopener noreferrer\""), std::string::npos)
+        << "a target=_blank link without rel hands the opened page a handle on this document";
+    // One anchor: the evidence without a location is not wrapped in one.
+    EXPECT_EQ(svg.find("<a href"), svg.rfind("<a href"));
+}
+
+// A location that would be read as script must never reach an exported
+// diagram: the file is a document people open and pass on.
+TEST(GsnSvgExporterTest, ExportLinkTargetKeepsOnlySafeSchemes) {
+    const std::filesystem::path root = MakeTempDir();
+    const std::filesystem::path exports = root / "exports";
+
+    EXPECT_EQ(export_gsn::LinkTargetForExport("https://example.org/a.pdf", root, exports), "https://example.org/a.pdf");
+    EXPECT_EQ(export_gsn::LinkTargetForExport("mailto:safety@example.org", root, exports), "mailto:safety@example.org");
+    EXPECT_EQ(export_gsn::LinkTargetForExport("file:///srv/reports/a.pdf", root, exports), "file:///srv/reports/a.pdf");
+    EXPECT_TRUE(export_gsn::LinkTargetForExport("javascript:alert(1)", root, exports).empty());
+    EXPECT_TRUE(export_gsn::LinkTargetForExport("data:text/html;base64,PHNjcmlwdD4=", root, exports).empty());
+    EXPECT_TRUE(export_gsn::LinkTargetForExport("", root, exports).empty());
+
+    std::filesystem::remove_all(root);
+}
+
+// The SVG is written into exports/, and a browser resolves a relative href
+// against the document -- so a project-relative location has to climb out of
+// that folder or it points at nothing.
+TEST(GsnSvgExporterTest, ExportLinkTargetRebasesAProjectRelativePath) {
+    const std::filesystem::path root = MakeTempDir();
+    const std::filesystem::path exports = root / "exports";
+    std::filesystem::create_directories(exports);
+
+    EXPECT_EQ(export_gsn::LinkTargetForExport("evidence/reports/ra-001.pdf", root, exports),
+              "../evidence/reports/ra-001.pdf");
+    // A space would end the href without encoding.
+    EXPECT_EQ(export_gsn::LinkTargetForExport("evidence/test report.pdf", root, exports),
+              "../evidence/test%20report.pdf");
+
+    // An absolute path becomes a file: URL, which is what a browser follows.
+    const std::string absolute = export_gsn::LinkTargetForExport((root / "outside.pdf").string(), root, exports);
+    EXPECT_EQ(absolute.rfind("file:///", 0), 0u) << absolute;
+    EXPECT_NE(absolute.find("outside.pdf"), std::string::npos) << absolute;
+    EXPECT_EQ(absolute.find("file:////"), std::string::npos) << "a doubled slash after the scheme: " << absolute;
+
+    std::filesystem::remove_all(root);
+}
+
+// End to end: the exported file carries a link that resolves from where it was
+// written, and a location the export will not link to is reported rather than
+// silently dropped.
+TEST(GsnSvgExporterTest, ExportedFileLinksEvidenceAndWarnsAboutAnUnsafeLocation) {
+    const std::filesystem::path root = MakeTempDir();
+    parser::AssuranceCase model;
+    model.elements.push_back(Element("G1", "claim", "Top goal", "The system is safe."));
+    parser::SacmElement report = Element("Sn1", "artifactreference", "Test report", "Report RA-001.");
+    report.artifact_location = "evidence/ra-001.pdf";
+    model.elements.push_back(report);
+    parser::SacmElement script = Element("Sn2", "artifactreference", "Odd one", "Recorded by hand.");
+    script.artifact_location = "javascript:alert(1)";
+    model.elements.push_back(script);
+    model.elements.push_back(Relationship("R1", "assertedevidence", {"Sn1"}, {"G1"}));
+    model.elements.push_back(Relationship("R2", "assertedevidence", {"Sn2"}, {"G1"}));
+
+    const export_gsn::GsnSvgExportResult result = export_gsn::ExportCurrentSafetyCaseToGsnSvg(model, root, "main");
+    ASSERT_TRUE(result.success) << result.error_message;
+    std::string svg;
+    {
+        // Scoped: the stream must be closed before the directory is removed.
+        std::ifstream in(result.output_path);
+        svg.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    }
+    EXPECT_NE(svg.find("href=\"../evidence/ra-001.pdf\""), std::string::npos) << svg;
+    EXPECT_EQ(svg.find("javascript:"), std::string::npos) << "an unsafe location reached the exported file";
+
+    const bool warned = std::any_of(result.warnings.begin(), result.warnings.end(), [](const std::string& warning) {
+        return warning.find("will not link to") != std::string::npos;
+    });
+    EXPECT_TRUE(warned) << "the refused location was dropped without saying so";
+
+    std::filesystem::remove_all(root);
 }

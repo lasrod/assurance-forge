@@ -43,6 +43,12 @@ struct GsnNode {
     // Identifiers of Assurance Claim Points attached to this element.
     std::vector<std::string> acp_labels;
 
+    // Where the evidence this node stands for is: the location recorded on the
+    // Artifact/Resource the ArtifactReference cites. The projection copies it
+    // verbatim; the exporter rewrites it into something an SVG reader can
+    // follow from where the file is written (see LinkTargetForExport).
+    std::string location;
+
     double x = 0.0;
     double y = 0.0;
     double width = 0.0;
