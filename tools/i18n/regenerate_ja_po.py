@@ -1255,6 +1255,7 @@ TRANSLATIONS = {
     "Move into SACM": "SACM に移動",
     "Browse for a file": "ファイルを参照",
     "No project-file assessments match support in the argument.": "アーギュメント内のサポートに一致するプロジェクトファイルの評価はありません。",
+    "Could not record the assessment: {0}": "評価を記録できませんでした: {0}",
     "Could not record the assessment in the draft: {0}": "ドラフトに評価を記録できませんでした: {0}",
     "Could not move the assessments: {0}": "評価を移動できませんでした: {0}",
     "This support is carried by a relationship that also carries others; they share one assessment.": "このサポートは他のサポートも担う関係に含まれており、評価は共有されます。",

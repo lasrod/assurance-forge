@@ -236,12 +236,18 @@ static bool DrawCseCell(const char* id,
     if (row.stored_in_project_file || row.relationship_id.empty())
         return EditCellText(id, project_file_value, 1024);
 
+    // Disabled when nothing can record the edit, the way the evidence cells
+    // are: a field that takes text and drops it on commit is worse than one
+    // that plainly cannot be typed in.
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::BeginDisabled(!callbacks.set_attribute);
     const std::string key = row.cse_id + "/" + core::CseAttributeToken(attribute);
     std::string committed;
     if (CommitOnLeaveCell(id, key, core::CseRecordField(row.record, attribute), std::string{}, committed) &&
         static_cast<bool>(callbacks.set_attribute)) {
         callbacks.set_attribute(row.relationship_id, attribute, committed);
     }
+    ImGui::EndDisabled();
     return false;
 }
 
@@ -255,7 +261,11 @@ static bool DrawCseStatusCell(CseRegisterRow& row, const CseRegisterCallbacks& c
     if (status.empty())
         status = "Not Assessed";
     const std::string before = status;
+    // Same rule as the text cells: without a way to record the choice, the
+    // combo must not offer one.
+    ImGui::BeginDisabled(!callbacks.set_attribute);
     DrawAssessmentStatusCell(status);
+    ImGui::EndDisabled();
     if (status != before && callbacks.set_attribute)
         callbacks.set_attribute(row.relationship_id, core::CseAttribute::AssessmentStatus, status);
     return false;
