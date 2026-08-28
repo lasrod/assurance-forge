@@ -225,6 +225,78 @@ static bool DrawAttributeCell(const char* id,
 // the one action that moves them into the document. Never automatic: the
 // SACM file is the safety argument, and rewriting it on open would be a
 // change nobody asked for.
+// One CSE column. A row whose assessment is already in the document edits the
+// document, committing when the cell is left; a row the project file still
+// holds edits there, per keystroke, until the user moves it across.
+static bool DrawCseCell(const char* id,
+                        CseRegisterRow& row,
+                        core::CseAttribute attribute,
+                        std::string& project_file_value,
+                        const CseRegisterCallbacks& callbacks) {
+    if (row.stored_in_project_file || row.relationship_id.empty())
+        return EditCellText(id, project_file_value, 1024);
+
+    // Disabled when nothing can record the edit, the way the evidence cells
+    // are: a field that takes text and drops it on commit is worse than one
+    // that plainly cannot be typed in.
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::BeginDisabled(!callbacks.set_attribute);
+    const std::string key = row.cse_id + "/" + core::CseAttributeToken(attribute);
+    std::string committed;
+    if (CommitOnLeaveCell(id, key, core::CseRecordField(row.record, attribute), std::string{}, committed) &&
+        static_cast<bool>(callbacks.set_attribute)) {
+        callbacks.set_attribute(row.relationship_id, attribute, committed);
+    }
+    ImGui::EndDisabled();
+    return false;
+}
+
+// The assessment status is a fixed vocabulary, so it is a combo rather than a
+// text field wherever it is stored.
+static bool DrawCseStatusCell(CseRegisterRow& row, const CseRegisterCallbacks& callbacks) {
+    if (row.stored_in_project_file || row.relationship_id.empty())
+        return DrawAssessmentStatusCell(row.assessment_status);
+
+    std::string status = core::CseRecordField(row.record, core::CseAttribute::AssessmentStatus);
+    if (status.empty())
+        status = "Not Assessed";
+    const std::string before = status;
+    // Same rule as the text cells: without a way to record the choice, the
+    // combo must not offer one.
+    ImGui::BeginDisabled(!callbacks.set_attribute);
+    DrawAssessmentStatusCell(status);
+    ImGui::EndDisabled();
+    if (status != before && callbacks.set_attribute)
+        callbacks.set_attribute(row.relationship_id, core::CseAttribute::AssessmentStatus, status);
+    return false;
+}
+
+// The same offer the evidence register makes: assessments an older project
+// file holds stay where they are, shown and editable, until the user moves
+// them into the document.
+static void RenderCseProjectFileBanner(const CseRegisterCallbacks& callbacks) {
+    std::size_t stored = 0;
+    for (const CseRegisterRow& row : g_cse_rows) {
+        if (row.stored_in_project_file)
+            ++stored;
+    }
+    if (stored == 0)
+        return;
+
+    ImGui::TextUnformatted(ui::i18n::trnf("{0} assessment is stored in the project file rather than the SACM document.",
+                                          "{0} assessments are stored in the project file rather than the SACM "
+                                          "document.",
+                                          static_cast<int>(stored),
+                                          stored)
+                               .c_str());
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!callbacks.migrate_assessments);
+    if (ImGui::SmallButton(AF_TR("Move into SACM").c_str()) && callbacks.migrate_assessments)
+        callbacks.migrate_assessments();
+    ImGui::EndDisabled();
+    ImGui::Separator();
+}
+
 // The Add Evidence button and its dialog: a statement, and the claim the new
 // evidence supports -- or none, for evidence registered before anything rests
 // on it, which the register then lists as unlinked.
@@ -426,6 +498,11 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers
         row.claim = core::registers::DisplayTextFor(find_element(link.claim_id));
         row.evidence_id = link.evidence_id;
         row.evidence = core::registers::DisplayTextFor(find_element(link.evidence_id));
+        row.relationship_id = link.relationship_id;
+        row.shares_relationship = link.shares_relationship;
+        if (const parser::SacmElement* relationship = find_element(link.relationship_id))
+            row.record = relationship->cse_assessment;
+        row.stored_in_project_file = store.cse.count(row.cse_id) > 0;
 
         const CseMetadata& meta = StoredOrDefault(store.cse, row.cse_id);
         row.claim_owner = meta.claim_owner;
@@ -481,11 +558,13 @@ size_t GetEvidenceRegisterRowCount() {
     return g_evidence_rows.size();
 }
 
-bool ShowCseRegisterView(core::registers::RegisterStore& store) {
+bool ShowCseRegisterView(core::registers::RegisterStore& store, const CseRegisterCallbacks& callbacks) {
     if (g_cse_rows.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No CSE rows were derived from direct claim-evidence relations.").c_str());
         return false;
     }
+
+    RenderCseProjectFileBanner(callbacks);
 
     // Sized like the evidence table: fixed initial widths in font units, so the
     // table is as wide as its content and scrolls rather than squeezing every
@@ -494,16 +573,17 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
     const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
                                   ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
 
-    if (!ImGui::BeginTable("cse_register_table", 12, flags)) {
+    if (!ImGui::BeginTable("cse_register_table", 10, flags)) {
         return false;
     }
 
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
-    ImGui::TableSetupColumn(AF_TR("Claim ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
+    // No Claim ID or Evidence ID column: the CSE id spells both out, and the
+    // button beside it goes to the argument, which is what those columns were
+    // read for.
+    ImGui::TableSetupColumn(AF_TR("CSE ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 13.0f);
     ImGui::TableSetupColumn(AF_TR("Claim").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 20.0f);
-    ImGui::TableSetupColumn(AF_TR("Evidence ID").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
-    ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 16.0f);
+    ImGui::TableSetupColumn(AF_TR("Evidence").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
     ImGui::TableSetupColumn(AF_TR("Claim Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Evidence Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
     ImGui::TableSetupColumn(AF_TR("Safety Case Owner").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 10.0f);
@@ -521,40 +601,57 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
         ImGui::TableNextRow();
 
         ImGui::TableSetColumnIndex(0);
+        ImGui::BeginDisabled(!callbacks.locate);
+        if (IconButton("locate", ICON_FA_CROSSHAIRS, AF_TR("Show in argument")) && callbacks.locate)
+            callbacks.locate(row.evidence_id);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
         ImGui::TextUnformatted(row.cse_id.c_str());
+        if (row.shares_relationship) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", ICON_FA_LINK);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  AF_TR("This support is carried by a relationship that also carries others; they "
+                                        "share one assessment.")
+                                      .c_str());
+            }
+        }
 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(row.claim_id.c_str());
+        ImGui::TextUnformatted(row.claim.c_str());
+        if (ImGui::IsItemHovered() && !row.claim.empty())
+            ImGui::SetTooltip("%s", row.claim.c_str());
 
         ImGui::TableSetColumnIndex(2);
-        ImGui::TextUnformatted(row.claim.c_str());
+        ImGui::TextUnformatted(row.evidence.c_str());
+        if (ImGui::IsItemHovered() && !row.evidence.empty())
+            ImGui::SetTooltip("%s", row.evidence.c_str());
 
         ImGui::TableSetColumnIndex(3);
-        ImGui::TextUnformatted(row.evidence_id.c_str());
+        row_edited |= DrawCseCell("##claim_owner", row, core::CseAttribute::ClaimOwner, row.claim_owner, callbacks);
 
         ImGui::TableSetColumnIndex(4);
-        ImGui::TextUnformatted(row.evidence.c_str());
+        row_edited |=
+            DrawCseCell("##evidence_owner", row, core::CseAttribute::EvidenceOwner, row.evidence_owner, callbacks);
 
         ImGui::TableSetColumnIndex(5);
-        row_edited |= EditCellText("##claim_owner", row.claim_owner);
+        row_edited |= DrawCseCell(
+            "##safety_case_owner", row, core::CseAttribute::SafetyCaseOwner, row.safety_case_owner, callbacks);
 
         ImGui::TableSetColumnIndex(6);
-        row_edited |= EditCellText("##evidence_owner", row.evidence_owner);
+        row_edited |=
+            DrawCseCell("##claim_criteria", row, core::CseAttribute::ClaimCriteria, row.claim_criteria, callbacks);
 
         ImGui::TableSetColumnIndex(7);
-        row_edited |= EditCellText("##safety_case_owner", row.safety_case_owner);
+        row_edited |= DrawCseCell(
+            "##evidence_criteria", row, core::CseAttribute::EvidenceCriteria, row.evidence_criteria, callbacks);
 
         ImGui::TableSetColumnIndex(8);
-        row_edited |= EditCellText("##claim_criteria", row.claim_criteria, 1024);
+        row_edited |= DrawCseStatusCell(row, callbacks);
 
         ImGui::TableSetColumnIndex(9);
-        row_edited |= EditCellText("##evidence_criteria", row.evidence_criteria, 1024);
-
-        ImGui::TableSetColumnIndex(10);
-        row_edited |= DrawAssessmentStatusCell(row.assessment_status);
-
-        ImGui::TableSetColumnIndex(11);
-        row_edited |= EditCellText("##notes", row.notes, 1024);
+        row_edited |= DrawCseCell("##notes", row, core::CseAttribute::Notes, row.notes, callbacks);
 
         if (row_edited) {
             StoreCseRow(store, row);

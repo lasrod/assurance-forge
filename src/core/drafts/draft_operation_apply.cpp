@@ -1,5 +1,6 @@
 #include "core/drafts/draft_operation_apply.h"
 
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 
 #include "core/sacm_model.h"
@@ -214,6 +215,7 @@ struct Applier {
     bool ApplyRemoveElement(const PatchOperation& operation, std::string& error);
     bool ApplySetEvidenceLocation(const PatchOperation& operation, std::string& error);
     bool ApplySetEvidenceAttribute(const PatchOperation& operation, std::string& error);
+    bool ApplySetCseAttribute(const PatchOperation& operation, std::string& error);
     bool Apply(const PatchOperation& operation, std::string& error);
 };
 
@@ -743,6 +745,29 @@ bool Applier::ApplySetEvidenceAttribute(const PatchOperation& operation, std::st
     return true;
 }
 
+// One CSE register column, on the relationship that carries the support.
+bool Applier::ApplySetCseAttribute(const PatchOperation& operation, std::string& error) {
+    std::string relationship_id;
+    if (!ResolveRef(operation.element, created, "element", relationship_id, error))
+        return false;
+    CseAttribute attribute = CseAttribute::AssessmentStatus;
+    if (!ParseCseAttribute(operation.field, attribute)) {
+        error = "SetCseAttribute names no CSE column: \"" + operation.field +
+                "\". Use claim_owner, evidence_owner, safety_case_owner, claim_criteria, evidence_criteria, "
+                "assessment_status or notes.";
+        return false;
+    }
+    const sacm_adapter::EditOutcome outcome =
+        sacm_adapter::apply_set_cse_attribute(document, relationship_id, attribute, operation.new_value);
+    if (!outcome.supported || !outcome.applied) {
+        error = Describe(outcome,
+                         std::string("The ") + CseAttributeToken(attribute) + " of " + relationship_id +
+                             " could not be recorded");
+        return false;
+    }
+    return true;
+}
+
 bool Applier::Apply(const PatchOperation& operation, std::string& error) {
     switch (operation.type) {
     case PatchOperationType::CreateClaim:
@@ -777,6 +802,8 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
         return ApplySetEvidenceLocation(operation, error);
     case PatchOperationType::SetEvidenceAttribute:
         return ApplySetEvidenceAttribute(operation, error);
+    case PatchOperationType::SetCseAttribute:
+        return ApplySetCseAttribute(operation, error);
     case PatchOperationType::CreateTerm:
         return ApplyCreateTerm(operation, error);
     case PatchOperationType::UpdateTerm:

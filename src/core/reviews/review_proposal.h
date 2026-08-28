@@ -41,6 +41,10 @@ enum class PatchOperationType {
     // token ("owner", "type", "version", "date", "maturity",
     // "controlled_environment", "notes"), `new_value` the text; empty clears.
     SetEvidenceAttribute,
+    // One of the CSE register's columns on the AssertedEvidence in `element`:
+    // `field` names the column by its core::CseAttribute token ("claim_owner",
+    // "assessment_status", ...), `new_value` the text; empty clears.
+    SetCseAttribute,
     // Terminology (SACM clause 10). A term is an element of type "term" in the
     // flat model: its value (the word or phrase being defined) lives in
     // `content` and its definition in `description`, mirroring how

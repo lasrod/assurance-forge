@@ -339,3 +339,57 @@ TEST(RegisterModelTest, CitationsAreFoundWhicheverEndCarriesTheEvidence) {
     EXPECT_TRUE(shared[0].shared);
     EXPECT_TRUE(shared[1].shared);
 }
+
+// A CSE assessment lives on the AssertedEvidence carrying the support, so each
+// link has to say which relationship that is -- and whether that relationship
+// carries other pairings, whose assessment it would then share.
+TEST(RegisterModelTest, LinksCarryTheRelationshipThatSupportsThem) {
+    const std::vector<core::registers::CseLink> links = core::registers::DeriveCseLinks(TwoClaimsSharingEvidence());
+    ASSERT_EQ(links.size(), 2u);
+    EXPECT_EQ(links[0].relationship_id, "R1");
+    EXPECT_FALSE(links[0].shares_relationship);
+    EXPECT_EQ(links[1].relationship_id, "R2");
+    EXPECT_FALSE(links[1].shares_relationship);
+
+    // One relationship carrying two claims: both rows share its assessment.
+    parser::AssuranceCase model;
+    model.elements.push_back(Element("G1", "claim", "First goal"));
+    model.elements.push_back(Element("G2", "claim", "Second goal"));
+    model.elements.push_back(Element("Sn1", "artifactreference", "Test report"));
+    model.elements.push_back(EvidenceLink("R1", {"Sn1"}, {"G1", "G2"}));
+    const std::vector<core::registers::CseLink> shared = core::registers::DeriveCseLinks(model);
+    ASSERT_EQ(shared.size(), 2u);
+    for (const core::registers::CseLink& link : shared) {
+        EXPECT_EQ(link.relationship_id, "R1");
+        EXPECT_TRUE(link.shares_relationship);
+    }
+}
+
+// Two relationships carrying the same pairing is a malformed-but-loadable
+// document. The row that results stores its assessment ON the relationship it
+// names, so that name must not depend on which one the file happened to list
+// first -- a save, a reload or another dialect can reorder them, and the
+// assessment would then be read from, and written to, the other one.
+TEST(RegisterModelTest, ADuplicatedPairingAlwaysPicksTheSameRelationship) {
+    const auto links_for = [](bool reversed) {
+        parser::AssuranceCase model;
+        model.elements.push_back(Element("G1", "claim", "Top goal"));
+        model.elements.push_back(Element("Sn1", "artifactreference", "Test report"));
+        if (reversed) {
+            model.elements.push_back(EvidenceLink("R2", {"Sn1"}, {"G1"}));
+            model.elements.push_back(EvidenceLink("R1", {"Sn1"}, {"G1"}));
+        } else {
+            model.elements.push_back(EvidenceLink("R1", {"Sn1"}, {"G1"}));
+            model.elements.push_back(EvidenceLink("R2", {"Sn1"}, {"G1"}));
+        }
+        return core::registers::DeriveCseLinks(model);
+    };
+
+    const std::vector<core::registers::CseLink> in_order = links_for(false);
+    const std::vector<core::registers::CseLink> reversed = links_for(true);
+    ASSERT_EQ(in_order.size(), 1u) << "one pairing is one row however many relationships carry it";
+    ASSERT_EQ(reversed.size(), 1u);
+    EXPECT_EQ(in_order[0].relationship_id, "R1");
+    EXPECT_EQ(reversed[0].relationship_id, "R1") << "the chosen relationship followed document order";
+    EXPECT_EQ(in_order[0].shares_relationship, reversed[0].shares_relationship);
+}

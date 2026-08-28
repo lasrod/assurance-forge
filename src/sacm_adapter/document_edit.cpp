@@ -2946,4 +2946,24 @@ EditOutcome apply_set_evidence_attribute(LibraryDocument& document,
     return EditOutcome{.supported = false};
 }
 
+EditOutcome apply_set_cse_attribute(LibraryDocument& document,
+                                    const std::string& relationship_id,
+                                    core::CseAttribute attribute,
+                                    const std::string& value) {
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId id(relationship_id);
+    const auto* relationship = doc.find_as<sacm::model::AssertedEvidence>(id);
+    if (relationship == nullptr) {
+        return refused_outcome("SACM-CMD-002", "'" + relationship_id + "' is not an AssertedEvidence");
+    }
+    // SetTaggedValue removes the tag when the value is empty, so a cleared
+    // column leaves nothing behind.
+    return applied_outcome(doc.apply(sacm::commands::SetTaggedValue{
+        .element = id,
+        .key = core::CseAttributeTagKey(attribute),
+        .value = trim_whitespace(value),
+        .language = {},
+    }));
+}
+
 } // namespace sacm_adapter

@@ -12,6 +12,7 @@
 #include "core/commands/command_bus.h"
 #include "core/commands/element_commands.h"
 #include "core/derived_views.h"
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 #include "core/drafts/draft_operation_apply.h"
 #include "core/project_model.h"
@@ -648,6 +649,155 @@ TEST(EvidenceAuthoring, DraftRemoveSupportedByWithdrawsEvidenceAndAddSupportedBy
     ASSERT_NE(link, nullptr);
     EXPECT_EQ(link->type, "assertedevidence") << "a solution attaches by AssertedEvidence, not inference";
 
+    std::filesystem::remove_all(root);
+}
+
+// ---------------------------------------------------------------------------
+// The CSE register's columns. Their subject is the SUPPORT, so they live on
+// the AssertedEvidence that carries it.
+
+TEST(CseAssessment, AttributeTokensRoundTrip) {
+    for (const core::CseAttribute attribute : core::kAllCseAttributes) {
+        core::CseAttribute parsed = core::CseAttribute::Notes;
+        ASSERT_TRUE(core::ParseCseAttribute(core::CseAttributeToken(attribute), parsed))
+            << core::CseAttributeToken(attribute);
+        EXPECT_EQ(parsed, attribute);
+        EXPECT_NE(std::string(core::CseAttributeTagKey(attribute)), std::string());
+    }
+    core::CseAttribute unused = core::CseAttribute::Notes;
+    EXPECT_FALSE(core::ParseCseAttribute("owner", unused)) << "the evidence register's token is not a CSE column";
+}
+
+TEST(CseAssessment, SeamRecordsEachColumnOnTheSupportRelationship) {
+    const std::filesystem::path root = MakeTempRoot("cse_seam");
+    std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
+    ASSERT_NE(document, nullptr);
+
+    const sacm_adapter::EditOutcome first = sacm_adapter::apply_set_cse_attribute(
+        *document, "R1", core::CseAttribute::AssessmentStatus, "  Adequately Supported ");
+    ASSERT_TRUE(first.supported);
+    ASSERT_TRUE(first.applied) << (first.diagnostics.empty() ? "" : first.diagnostics.front().message);
+    core::AssuranceCase projected = sacm_adapter::project_case(*document);
+    ASSERT_NE(Find(projected, "R1"), nullptr);
+    EXPECT_EQ(Find(projected, "R1")->cse_assessment.assessment_status, "Adequately Supported")
+        << "the value was not trimmed";
+
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_cse_attribute(*document, "R1", core::CseAttribute::ClaimOwner, "Safety").applied);
+    ASSERT_TRUE(
+        sacm_adapter::apply_set_cse_attribute(*document, "R1", core::CseAttribute::Notes, "Reviewed 2026-06.").applied);
+    projected = sacm_adapter::project_case(*document);
+    const core::CseAssessmentRecord& record = Find(projected, "R1")->cse_assessment;
+    EXPECT_EQ(record.claim_owner, "Safety");
+    EXPECT_EQ(record.notes, "Reviewed 2026-06.");
+    EXPECT_EQ(record.assessment_status, "Adequately Supported");
+    // The evidence's own record is a different thing on a different element.
+    EXPECT_TRUE(Find(projected, "Sn1")->cse_assessment.empty());
+
+    // It survives a strict save, which is what makes it a record.
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(*document, /*tolerant=*/false);
+    ASSERT_TRUE(saved.ok) << (saved.diagnostics.empty() ? "" : saved.diagnostics.front().message);
+    WriteFile(root / "saved.sacm", saved.xml);
+    sacm_adapter::LoadOutcome reloaded = sacm_adapter::load_document(root / "saved.sacm");
+    ASSERT_TRUE(reloaded.ok);
+    EXPECT_EQ(Find(sacm_adapter::project_case(*reloaded.document), "R1")->cse_assessment.claim_owner, "Safety");
+
+    // Clearing removes the tag rather than leaving one that says nothing.
+    ASSERT_TRUE(sacm_adapter::apply_set_cse_attribute(*document, "R1", core::CseAttribute::ClaimOwner, "").applied);
+    EXPECT_TRUE(Find(sacm_adapter::project_case(*document), "R1")->cse_assessment.claim_owner.empty());
+
+    // Only an AssertedEvidence carries one.
+    const sacm_adapter::EditOutcome on_claim =
+        sacm_adapter::apply_set_cse_attribute(*document, "G1", core::CseAttribute::ClaimOwner, "x");
+    EXPECT_FALSE(on_claim.applied);
+    ASSERT_FALSE(on_claim.diagnostics.empty());
+    EXPECT_EQ(on_claim.diagnostics.front().code, "SACM-CMD-002");
+
+    std::filesystem::remove_all(root);
+}
+
+TEST(CseAssessment, CommandsRecordColumnsAndTheAuditLogReplaysThem) {
+    std::unique_ptr<BusFixture> fixture = MakeBusFixture("cse_bus", /*library_backed=*/true);
+    ASSERT_NE(fixture->document, nullptr);
+    ASSERT_NE(fixture->bus, nullptr);
+
+    core::commands::SetCseAttributeCommand status("R1", core::CseAttribute::AssessmentStatus, "Adequately Supported");
+    const core::commands::CommandResult result = RunCommand(*fixture, status);
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_TRUE(status.OldValue().empty());
+    EXPECT_EQ(Find(fixture->model, "R1")->cse_assessment.assessment_status, "Adequately Supported");
+
+    core::commands::SetCseAttributeCommand same("R1", core::CseAttribute::AssessmentStatus, " Adequately Supported ");
+    ASSERT_TRUE(RunCommand(*fixture, same).success);
+    EXPECT_TRUE(same.WasNoOp());
+
+    core::commands::ImportCseAssessmentsCommand import({
+        {"R1", core::CseAttribute::ClaimOwner, "Safety"},
+        {"R1", core::CseAttribute::Notes, "Imported from the project file."},
+    });
+    ASSERT_TRUE(RunCommand(*fixture, import).success);
+    EXPECT_EQ(import.AppliedCount(), 2u);
+    EXPECT_EQ(Find(fixture->model, "R1")->cse_assessment.claim_owner, "Safety");
+
+    // An import naming something that is not support refuses as a whole.
+    core::commands::ImportCseAssessmentsCommand mixed({
+        {"R1", core::CseAttribute::SafetyCaseOwner, "Assurance"},
+        {"G1", core::CseAttribute::ClaimOwner, "nobody"},
+    });
+    EXPECT_FALSE(RunCommand(*fixture, mixed).success);
+    EXPECT_EQ(mixed.AppliedCount(), 0u);
+    EXPECT_TRUE(Find(fixture->model, "R1")->cse_assessment.safety_case_owner.empty())
+        << "a refused import wrote half of itself";
+
+    core::commands::SetCseAttributeCommand on_claim("G1", core::CseAttribute::ClaimOwner, "x");
+    EXPECT_FALSE(RunCommand(*fixture, on_claim).success);
+
+    const core::audit::ReplayVerificationResult verification = core::audit::VerifyProject(fixture->project);
+    EXPECT_TRUE(verification.ran);
+    EXPECT_TRUE(verification.success) << "snapshot " << verification.snapshot_canonical_hash << " replayed "
+                                      << verification.replayed_canonical_hash << " on disk "
+                                      << verification.on_disk_canonical_hash;
+
+    std::filesystem::remove_all(fixture->project.rootPath);
+}
+
+core::reviews::PatchOperation
+SetCseOp(const std::string& relationship_id, const std::string& column, const std::string& value) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::SetCseAttribute;
+    core::reviews::ElementRef element;
+    element.existing_id = relationship_id;
+    operation.element = element;
+    operation.field = column;
+    operation.new_value = value;
+    return operation;
+}
+
+TEST(CseAssessment, DraftOperationRecordsAColumnOrRefusesAnUnknownOne) {
+    const std::filesystem::path root = MakeTempRoot("cse_draft");
+    std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
+    ASSERT_NE(document, nullptr);
+
+    const core::drafts::DraftOperationResult applied = core::drafts::ApplyOperationsToDraftDocument(
+        *document, {SetCseOp("R1", "claim_owner", "Safety"), SetCseOp("R1", "assessment_status", "Not Assessed")});
+    ASSERT_TRUE(applied.applied) << applied.error;
+    // The projection is held in a named local: a reference into the temporary
+    // `project_case` returns would dangle the moment the statement ended.
+    const core::AssuranceCase after_draft = sacm_adapter::project_case(*document);
+    ASSERT_NE(Find(after_draft, "R1"), nullptr);
+    const core::CseAssessmentRecord& record = Find(after_draft, "R1")->cse_assessment;
+    EXPECT_EQ(record.claim_owner, "Safety");
+    EXPECT_EQ(record.assessment_status, "Not Assessed");
+
+    const core::drafts::DraftOperationResult unknown =
+        core::drafts::ApplyOperationsToDraftDocument(*document, {SetCseOp("R1", "recency", "2026")});
+    EXPECT_FALSE(unknown.applied);
+    EXPECT_NE(unknown.error.find("recency"), std::string::npos) << unknown.error;
+    EXPECT_NE(unknown.error.find("safety_case_owner"), std::string::npos)
+        << "the refusal does not list the columns that exist: " << unknown.error;
+
+    EXPECT_STREQ(core::reviews::PatchOperationTypeToString(core::reviews::PatchOperationType::SetCseAttribute),
+                 "SetCseAttribute");
     std::filesystem::remove_all(root);
 }
 

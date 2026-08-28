@@ -870,6 +870,102 @@ bool LinkEvidenceCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_even
     return true;
 }
 
+namespace {
+
+// The AssertedEvidence the write names, or why it cannot be written.
+const parser::SacmElement*
+SupportRelationshipOrError(const CommandContext& ctx, const std::string& relationship_id, std::string& out_error) {
+    const parser::SacmElement* element = parser::FindElementById(ctx.model, relationship_id);
+    if (element == nullptr) {
+        out_error = "Relationship " + relationship_id + " was not found";
+        return nullptr;
+    }
+    if (element->type != "assertedevidence") {
+        out_error = "Relationship " + relationship_id + " does not carry claim-evidence support";
+        return nullptr;
+    }
+    return element;
+}
+
+} // namespace
+
+bool SetCseAttributeCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (relationship_id_.empty()) {
+        out_error = "SetCseAttributeCommand requires a relationship id";
+        return false;
+    }
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Recording a CSE assessment needs the SACM library document, and this file was loaded through "
+                    "the compatibility parser. The document is unchanged.";
+        return false;
+    }
+    const parser::SacmElement* relationship = SupportRelationshipOrError(ctx, relationship_id_, out_error);
+    if (relationship == nullptr)
+        return false;
+
+    value_ = core::TrimWhitespace(value_);
+    old_value_ = CseRecordField(relationship->cse_assessment, attribute_);
+    was_no_op_ = old_value_ == value_;
+    if (!was_no_op_) {
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_cse_attribute(*ctx.library_document, relationship_id_, attribute_, value_);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection(
+                std::string("the ") + CseAttributeToken(attribute_) + " of " + relationship_id_, outcome.diagnostics);
+            return false;
+        }
+        ctx.library_primary = true;
+    }
+
+    out_event.event_type = "SetCseAttribute";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["relationship_id"] = relationship_id_;
+    out_event.payload["attribute"] = CseAttributeToken(attribute_);
+    out_event.payload["old_value"] = old_value_;
+    out_event.payload["new_value"] = value_;
+    return true;
+}
+
+bool ImportCseAssessmentsCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (writes_.empty()) {
+        out_error = "ImportCseAssessmentsCommand has nothing to import";
+        return false;
+    }
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Moving CSE assessments into the SACM document needs the SACM library document, and this file "
+                    "was loaded through the compatibility parser. The document is unchanged.";
+        return false;
+    }
+    for (const CseAttributeWrite& write : writes_) {
+        if (SupportRelationshipOrError(ctx, write.relationship_id, out_error) == nullptr)
+            return false;
+    }
+    ctx.library_primary = true;
+    nlohmann::ordered_json items = nlohmann::ordered_json::array();
+    for (const CseAttributeWrite& write : writes_) {
+        const std::string value = core::TrimWhitespace(write.value);
+        const sacm_adapter::EditOutcome outcome =
+            sacm_adapter::apply_set_cse_attribute(*ctx.library_document, write.relationship_id, write.attribute, value);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection(std::string("the ") + CseAttributeToken(write.attribute) + " of " +
+                                             write.relationship_id,
+                                         outcome.diagnostics);
+            return false;
+        }
+        ++applied_count_;
+        nlohmann::ordered_json item = nlohmann::ordered_json::object();
+        item["relationship_id"] = write.relationship_id;
+        item["attribute"] = CseAttributeToken(write.attribute);
+        item["value"] = value;
+        items.push_back(std::move(item));
+    }
+
+    out_event.event_type = "ImportCseAssessments";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["items"] = std::move(items);
+    return true;
+}
+
 bool SetEvidenceLocationCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
     if (element_id_.empty()) {
         out_error = "SetEvidenceLocationCommand requires an element id";

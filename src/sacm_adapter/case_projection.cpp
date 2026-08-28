@@ -1,5 +1,7 @@
 #include "sacm_adapter/case_projection.h"
 
+#include "core/cse_attributes.h"
+
 #include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_document_access.h"
 
@@ -238,6 +240,18 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
         // GSN "undeveloped" is `needsSupport` in SACM terms; see
         // docs/sacm/sacm-gsn-mapping.md.
         projected.undeveloped = assertion->assertion_declaration() == sacm::model::AssertionDeclaration::NeedsSupport;
+    }
+
+    // What a reviewer judged about this support (the CSE register's columns),
+    // read from the relationship that carries it.
+    if (element.kind() == sacm::metadata::ElementKind::AssertedEvidence) {
+        if (const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
+            core::CseAssessmentRecord& record = projected.cse_assessment;
+            for (const core::CseAttribute attribute : core::kAllCseAttributes) {
+                core::CseRecordField(record, attribute) =
+                    tagged_value_for(*model_element, core::CseAttributeTagKey(attribute));
+            }
+        }
     }
 
     if (const auto* relationship = dynamic_cast<const sacm::model::AssertedRelationship*>(&element)) {

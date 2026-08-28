@@ -1,5 +1,6 @@
 #include "core/reviews/review_proposal_patch_service.h"
 
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 
 #include "core/element_factory.h"
@@ -565,6 +566,21 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
         }
         element->artifact_location = operation.new_value;
         return true;
+    case PatchOperationType::SetCseAttribute: {
+        if (element->type != "assertedevidence") {
+            error = "SetCseAttribute targets " + element->id + ", which does not carry claim-evidence support.";
+            return false;
+        }
+        CseAttribute cse_attribute = CseAttribute::AssessmentStatus;
+        if (!ParseCseAttribute(operation.field, cse_attribute)) {
+            error = "SetCseAttribute names no CSE column: \"" + operation.field +
+                    "\". Use claim_owner, evidence_owner, safety_case_owner, claim_criteria, evidence_criteria, "
+                    "assessment_status or notes.";
+            return false;
+        }
+        CseRecordField(element->cse_assessment, cse_attribute) = operation.new_value;
+        return true;
+    }
     case PatchOperationType::SetEvidenceAttribute: {
         if (element->type != "artifactreference") {
             error = "SetEvidenceAttribute targets " + element->id + ", which is not evidence (an ArtifactReference).";
@@ -785,6 +801,7 @@ bool ApplyOperation(const PatchOperation& operation,
     case PatchOperationType::ClearUndeveloped:
     case PatchOperationType::SetEvidenceLocation:
     case PatchOperationType::SetEvidenceAttribute:
+    case PatchOperationType::SetCseAttribute:
     case PatchOperationType::UpdateTerm:
     case PatchOperationType::UpdateCategory:
         return ApplyUpdateOperation(operation, model, generated_ids, error);
