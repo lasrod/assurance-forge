@@ -60,6 +60,8 @@ void CollectChangedFields(const core::SacmElement& accepted,
         note("artifact_location");
     if (accepted.evidence != draft.evidence)
         note("evidence");
+    if (accepted.cse_assessment != draft.cse_assessment)
+        note("cse_assessment");
     // `type` and `gid` are identity, not content. A change to either is a
     // different element wearing a familiar id, which this comparison cannot
     // express and the draft cannot produce: neither is editable through any

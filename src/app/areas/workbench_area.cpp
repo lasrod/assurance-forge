@@ -636,7 +636,12 @@ void RenderWorkbenchArea(AppRuntimeState& state,
                         "%s", AF_TR("Editable CAE register content will be implemented in a later workflow.").c_str());
                     ImGui::Separator();
                 }
-                RenderRegisterTable(state, ui::ShowCseRegisterView);
+                ui::CseRegisterCallbacks cse_callbacks;
+                cse_callbacks.set_attribute = callbacks.set_cse_attribute;
+                cse_callbacks.migrate_assessments = callbacks.migrate_cse_assessments;
+                RenderRegisterTable(state, [&cse_callbacks](core::registers::RegisterStore& store) {
+                    return ui::ShowCseRegisterView(store, cse_callbacks);
+                });
                 ImGui::EndTabItem();
             }
         }

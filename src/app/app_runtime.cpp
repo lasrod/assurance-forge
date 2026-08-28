@@ -587,6 +587,126 @@ void AppRuntime::BrowseEvidenceLocation(const std::string& evidence_id) {
     SetEvidenceLocation(evidence_id, location);
 }
 
+bool AppRuntime::SetCseAttribute(const std::string& relationship_id,
+                                 core::CseAttribute attribute,
+                                 const std::string& value) {
+    if (relationship_id.empty())
+        return false;
+    if (DraftEditingActive()) {
+        core::reviews::PatchOperation set;
+        set.type = core::reviews::PatchOperationType::SetCseAttribute;
+        core::reviews::ElementRef element;
+        element.existing_id = relationship_id;
+        set.element = element;
+        set.field = core::CseAttributeToken(attribute);
+        set.new_value = value;
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), {set}, error)) {
+            SetStatus(ui::i18n::trf("Could not record the assessment in the draft: {0}", error));
+            return false;
+        }
+        return true;
+    }
+    return impl_->element_edit_controller->SetCseAttribute(*impl_, relationship_id, attribute, value);
+}
+
+void AppRuntime::MigrateCseAssessments() {
+    const parser::AssuranceCase& model = CurrentArgumentView();
+    const core::registers::RegisterStore& store = impl_->register_controller->Store();
+    if (store.cse.empty()) {
+        SetStatus(AF_TR("No project-file assessments match support in the argument."));
+        return;
+    }
+
+    // A CSE assessment is stored per claim/evidence pairing, but its home in
+    // the document is the relationship carrying that pairing. Where two stored
+    // rows share a relationship and disagree, the import refuses rather than
+    // letting one silently overwrite the other -- a reviewer's judgement is
+    // exactly what must not be lost on the way into the document.
+    std::map<std::string, core::registers::CseMetadata> by_relationship;
+    std::vector<std::string> conflicts;
+    std::vector<std::string> imported_keys;
+    for (const core::registers::CseLink& link : core::registers::DeriveCseLinks(model)) {
+        const std::string key = core::registers::MakeCseId(link.claim_id, link.evidence_id);
+        const auto stored = store.cse.find(key);
+        if (stored == store.cse.end() || link.relationship_id.empty())
+            continue;
+        const auto existing = by_relationship.find(link.relationship_id);
+        if (existing != by_relationship.end() && !(existing->second == stored->second)) {
+            conflicts.push_back(key);
+            continue;
+        }
+        by_relationship.emplace(link.relationship_id, stored->second);
+        imported_keys.push_back(key);
+    }
+    if (!conflicts.empty()) {
+        SetStatus(ui::i18n::trf("{0} rows share one support relationship but were assessed differently; resolve "
+                                "them in the register before moving them into SACM.",
+                                conflicts.size()));
+        return;
+    }
+    if (by_relationship.empty()) {
+        SetStatus(AF_TR("No project-file assessments match support in the argument."));
+        return;
+    }
+
+    std::vector<core::commands::CseAttributeWrite> writes;
+    for (const auto& [relationship_id, metadata] : by_relationship) {
+        core::CseAssessmentRecord record;
+        record.claim_owner = metadata.claim_owner;
+        record.evidence_owner = metadata.evidence_owner;
+        record.safety_case_owner = metadata.safety_case_owner;
+        record.claim_criteria = metadata.claim_criteria;
+        record.evidence_criteria = metadata.evidence_criteria;
+        record.assessment_status = metadata.assessment_status;
+        record.notes = metadata.notes;
+        for (const core::CseAttribute attribute : core::kAllCseAttributes) {
+            const std::string& value = core::CseRecordField(record, attribute);
+            if (!value.empty())
+                writes.push_back(core::commands::CseAttributeWrite{relationship_id, attribute, value});
+        }
+    }
+    if (writes.empty()) {
+        SetStatus(AF_TR("No project-file assessments match support in the argument."));
+        return;
+    }
+
+    if (DraftEditingActive()) {
+        std::vector<core::reviews::PatchOperation> operations;
+        for (const core::commands::CseAttributeWrite& write : writes) {
+            core::reviews::PatchOperation set;
+            set.type = core::reviews::PatchOperationType::SetCseAttribute;
+            core::reviews::ElementRef element;
+            element.existing_id = write.relationship_id;
+            set.element = element;
+            set.field = core::CseAttributeToken(write.attribute);
+            set.new_value = write.value;
+            operations.push_back(std::move(set));
+        }
+        std::string error;
+        if (!StageHumanDraftOperations(AF_TR("My edits"), operations, error)) {
+            SetStatus(ui::i18n::trf("Could not move assessments into the draft: {0}", error));
+            return;
+        }
+    } else {
+        core::commands::ImportCseAssessmentsCommand command(writes);
+        const commands::DispatchOutcome outcome = commands::DispatchAuditedCommand(*impl_, command);
+        if (!outcome.success) {
+            SetStatus(ui::i18n::trf("Could not move the assessments: {0}", outcome.error));
+            return;
+        }
+    }
+
+    // Only once the document holds them does the project file let them go.
+    for (const std::string& key : imported_keys)
+        impl_->register_controller->DiscardCseAssessment(key);
+    impl_->tree_needs_rebuild = true;
+    SetStatus(ui::i18n::trnf("Moved {0} assessment into the SACM document.",
+                             "Moved {0} assessments into the SACM document.",
+                             static_cast<int>(imported_keys.size()),
+                             imported_keys.size()));
+}
+
 void AppRuntime::CreateEvidence(const std::string& text, const std::string& claim_id) {
     if (DraftEditingActive()) {
         core::reviews::PatchOperation create;
@@ -1499,6 +1619,10 @@ areas::WorkbenchAreaCallbacks AppRuntime::MakeWorkbenchAreaCallbacks() {
         [this](const std::string& text, const std::string& claim_id) { CreateEvidence(text, claim_id); },
         [this](const std::string& evidence_id, const std::string& claim_id) { LinkEvidence(evidence_id, claim_id); },
         [this](const std::string& evidence_id, const std::string& claim_id) { UnlinkEvidence(evidence_id, claim_id); },
+        [this](const std::string& relationship_id, core::CseAttribute attribute, const std::string& value) {
+            SetCseAttribute(relationship_id, attribute, value);
+        },
+        [this]() { MigrateCseAssessments(); },
     };
 }
 
