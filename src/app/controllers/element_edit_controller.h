@@ -61,6 +61,11 @@ public:
     // Records where a piece of evidence is (the cited Resource's location) as
     // an audited edit; an empty location clears it.
     bool SetEvidenceLocation(AppRuntimeState& state, const std::string& element_id, const std::string& location);
+    // Creates evidence from the register -- under `claim_id` when given, bare
+    // otherwise -- with `text` as its statement. Returns the new id, or empty.
+    std::string CreateEvidence(AppRuntimeState& state, const std::string& claim_id, const std::string& text);
+    // Attaches existing evidence under a claim with a new AssertedEvidence.
+    bool LinkEvidence(AppRuntimeState& state, const std::string& evidence_id, const std::string& claim_id);
     // Records one register column on the cited Artifact; empty clears it.
     bool SetEvidenceAttribute(AppRuntimeState& state,
                               const std::string& element_id,

@@ -1123,6 +1123,11 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
         return RefuseUnrepresentableReplay(FormatLocation(tx_seq, event.event_sequence, type), out_error);
     }
 
+    if (type == "CreateEvidence" || type == "LinkEvidence") {
+        // Library-only, like the other register edits.
+        return RefuseUnrepresentableReplay(FormatLocation(tx_seq, event.event_sequence, type), out_error);
+    }
+
     out_error = "Unknown event type '" + type + "' at " + FormatLocation(tx_seq, event.event_sequence, type);
     return false;
 }
@@ -2342,6 +2347,66 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                                               outcome.diagnostics);
                 return false;
             }
+        }
+        return true;
+    }
+
+    if (type == "CreateEvidence") {
+        std::string claim_id, text, element_id, relationship_id;
+        if (!require_string("claim_id", claim_id))
+            return false;
+        if (!require_string("text", text))
+            return false;
+        if (!require_string("generated_id", element_id))
+            return false;
+        if (!require_string("generated_relationship_id", relationship_id))
+            return false;
+        sacm_adapter::AddChildOutcome outcome;
+        // Named for the diagnostic below: the two shapes call different seams,
+        // and reporting the wrong one sends a reader of a failed replay to the
+        // wrong function.
+        const char* seam = claim_id.empty() ? "apply_create_element" : "apply_add_child";
+        if (!claim_id.empty()) {
+            outcome = sacm_adapter::apply_add_child(
+                document, claim_id, sacm_adapter::ChildKind::Solution, element_id, relationship_id);
+        } else {
+            sacm_adapter::CreateElementFields fields;
+            fields.element_id = element_id;
+            outcome = sacm_adapter::apply_create_element(document,
+                                                         sacm_adapter::resolve_argument_package_id(document, ""),
+                                                         sacm_adapter::NewElementKind::ArtifactReference,
+                                                         fields);
+        }
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(seam, tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        if (!text.empty()) {
+            const sacm_adapter::EditOutcome written =
+                sacm_adapter::apply_text_edit(document, element_id, sacm_adapter::TextField::Description, "en", text);
+            if (!written.supported || !written.applied) {
+                out_error = FormatSeamFailure(
+                    "apply_text_edit", tx_seq, event, written.supported, written.applied, written.diagnostics);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    if (type == "LinkEvidence") {
+        std::string claim_id, evidence_id, relationship_id;
+        if (!require_string("claim_id", claim_id))
+            return false;
+        if (!require_string("evidence_id", evidence_id))
+            return false;
+        if (!require_string("generated_relationship_id", relationship_id))
+            return false;
+        const sacm_adapter::AddChildOutcome outcome =
+            sacm_adapter::apply_attach_child(document, claim_id, evidence_id, relationship_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_attach_child", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
         }
         return true;
     }

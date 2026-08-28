@@ -23,6 +23,28 @@ using core::registers::EvidenceMetadata;
 static std::vector<CseRegisterRow> g_cse_rows;
 static std::vector<EvidenceRegisterRow> g_evidence_rows;
 
+// The claims evidence can be linked to, labelled for a picker.
+struct ClaimChoice {
+    std::string id;
+    std::string label;
+};
+static std::vector<ClaimChoice> g_claim_choices;
+
+// The Add Evidence dialog's state: the statement being typed and the chosen
+// claim (0 = none, otherwise 1 + index into g_claim_choices).
+static std::array<char, 2048> g_new_evidence_text{};
+static int g_new_evidence_claim = 0;
+static bool g_open_add_evidence = false;
+
+// A claim as the picker shows it: its id and the start of its text.
+static std::string ClaimLabel(const std::string& claim_id, const std::string& text) {
+    constexpr std::size_t kMaxText = 60;
+    if (text.empty() || text == claim_id)
+        return claim_id;
+    const std::string trimmed = text.size() > kMaxText ? text.substr(0, kMaxText) + "\u2026" : text;
+    return claim_id + ": " + trimmed;
+}
+
 // Reads an assessment without creating one. `store.cse[id]` would insert a
 // default entry for every derived row, which would then be written to the
 // project — turning "nobody has assessed this yet" into a stored row claiming
@@ -203,6 +225,125 @@ static bool DrawAttributeCell(const char* id,
 // the one action that moves them into the document. Never automatic: the
 // SACM file is the safety argument, and rewriting it on open would be a
 // change nobody asked for.
+// The Add Evidence button and its dialog: a statement, and the claim the new
+// evidence supports -- or none, for evidence registered before anything rests
+// on it, which the register then lists as unlinked.
+static void RenderAddEvidenceControls(const EvidenceRegisterCallbacks& callbacks) {
+    ImGui::BeginDisabled(!callbacks.create_evidence);
+    if (ImGui::Button((std::string(ICON_FA_PLUS) + "  " + AF_TR("Add evidence")).c_str())) {
+        g_new_evidence_text.fill('\0');
+        g_new_evidence_claim = 0;
+        g_open_add_evidence = true;
+    }
+    ImGui::EndDisabled();
+
+    const std::string title = AF_TR("Add Evidence") + "###add_evidence_modal";
+    if (g_open_add_evidence) {
+        ImGui::OpenPopup(title.c_str());
+        g_open_add_evidence = false;
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        return;
+
+    const float unit = ImGui::GetFontSize();
+    ImGui::TextUnformatted(AF_TR("Statement").c_str());
+    ImGui::InputTextMultiline(
+        "##statement", g_new_evidence_text.data(), g_new_evidence_text.size(), ImVec2(unit * 40.0f, unit * 6.0f));
+
+    ImGui::TextUnformatted(AF_TR("Supports").c_str());
+    const bool none_chosen =
+        g_new_evidence_claim <= 0 || g_new_evidence_claim > static_cast<int>(g_claim_choices.size());
+    const std::string preview = none_chosen ? AF_TR("(none)") : g_claim_choices[g_new_evidence_claim - 1].label;
+    ImGui::SetNextItemWidth(unit * 40.0f);
+    if (ImGui::BeginCombo("##supports_claim", preview.c_str())) {
+        if (ImGui::Selectable(AF_TR("(none)").c_str(), none_chosen))
+            g_new_evidence_claim = 0;
+        for (std::size_t index = 0; index < g_claim_choices.size(); ++index) {
+            const bool selected = g_new_evidence_claim == static_cast<int>(index) + 1;
+            if (ImGui::Selectable(g_claim_choices[index].label.c_str(), selected))
+                g_new_evidence_claim = static_cast<int>(index) + 1;
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::Spacing();
+
+    const std::string statement = g_new_evidence_text.data();
+    const bool statement_blank = statement.find_first_not_of(" \t\r\n") == std::string::npos;
+    const float button_width = unit * 7.0f;
+    ImGui::BeginDisabled(statement_blank);
+    if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(button_width, 0.0f))) {
+        if (callbacks.create_evidence)
+            callbacks.create_evidence(statement,
+                                      none_chosen ? std::string{} : g_claim_choices[g_new_evidence_claim - 1].id);
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f)))
+        ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+}
+
+// "Used by": the count opens the claims resting on this evidence, each with an
+// unlink, and a picker to link another. A link that is one end of a shared
+// relationship cannot be withdrawn here without withdrawing the others too, so
+// it says so instead of offering to.
+static void DrawUsedByCell(const EvidenceRegisterRow& row, const EvidenceRegisterCallbacks& callbacks) {
+    const std::string label = std::to_string(row.citations.size()) + " " + ICON_FA_CARET_DOWN + "##used_by";
+    if (ImGui::SmallButton(label.c_str()))
+        ImGui::OpenPopup("##used_by_popup");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", AF_TR("What this evidence supports").c_str());
+    if (!ImGui::BeginPopup("##used_by_popup"))
+        return;
+
+    if (row.citations.empty())
+        ImGui::TextDisabled("%s", AF_TR("No claim rests on this evidence.").c_str());
+    for (const EvidenceRegisterRow::Citation& citation : row.citations) {
+        ImGui::PushID(citation.relationship_id.c_str());
+        ImGui::BeginDisabled(citation.shared || !callbacks.unlink_evidence);
+        if (ImGui::SmallButton(ICON_FA_TIMES) && callbacks.unlink_evidence) {
+            callbacks.unlink_evidence(row.evidence_id, citation.claim_id);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        if (citation.shared && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            ImGui::SetTooltip(
+                "%s",
+                AF_TR("Part of a relationship that also supports other elements; withdraw it from the canvas.")
+                    .c_str());
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(citation.claim_label.c_str());
+        ImGui::PopID();
+    }
+
+    ImGui::Separator();
+    ImGui::TextUnformatted(AF_TR("Link to").c_str());
+    ImGui::BeginDisabled(!callbacks.link_evidence);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 24.0f);
+    if (ImGui::BeginCombo("##link_claim", AF_TR("Choose an element\u2026").c_str())) {
+        for (const ClaimChoice& choice : g_claim_choices) {
+            const bool already = std::any_of(
+                row.citations.begin(), row.citations.end(), [&](const EvidenceRegisterRow::Citation& citation) {
+                    return citation.claim_id == choice.id;
+                });
+            if (already)
+                continue;
+            if (ImGui::Selectable(choice.label.c_str(), false) && callbacks.link_evidence) {
+                callbacks.link_evidence(row.evidence_id, choice.id);
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::EndDisabled();
+    ImGui::EndPopup();
+}
+
 static void RenderProjectFileAssessmentsBanner(const EvidenceRegisterCallbacks& callbacks) {
     int stored = 0;
     for (const EvidenceRegisterRow& row : g_evidence_rows) {
@@ -251,6 +392,7 @@ static void StoreEvidenceRow(core::registers::RegisterStore& store, const Eviden
 void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers::RegisterStore& store) {
     g_cse_rows.clear();
     g_evidence_rows.clear();
+    g_claim_choices.clear();
 
     if (!ac) {
         return;
@@ -272,6 +414,10 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers
     // the table renderers below. Both collections arrive sorted.
     const std::vector<core::registers::CseLink> links = core::registers::DeriveCseLinks(*ac);
     const std::vector<std::string> evidence_ids = core::registers::DeriveEvidenceIds(*ac);
+    for (const std::string& claim_id : core::registers::DeriveEvidenceSupportTargets(*ac)) {
+        g_claim_choices.push_back(
+            ClaimChoice{claim_id, ClaimLabel(claim_id, core::registers::DisplayTextFor(find_element(claim_id)))});
+    }
 
     for (const core::registers::CseLink& link : links) {
         CseRegisterRow row;
@@ -304,6 +450,16 @@ void RebuildRegisterViews(const parser::AssuranceCase* ac, const core::registers
         if (element != nullptr)
             row.record = element->evidence;
         row.stored_in_project_file = store.evidence.count(evidence_id) > 0;
+        for (const core::registers::EvidenceCitation& citation :
+             core::registers::DeriveEvidenceCitations(*ac, evidence_id)) {
+            row.citations.push_back(EvidenceRegisterRow::Citation{
+                .claim_id = citation.claim_id,
+                .claim_label =
+                    ClaimLabel(citation.claim_id, core::registers::DisplayTextFor(find_element(citation.claim_id))),
+                .relationship_id = citation.relationship_id,
+                .shared = citation.shared,
+            });
+        }
 
         const EvidenceMetadata& meta = StoredOrDefault(store.evidence, row.evidence_id);
         row.evidence_owner = meta.evidence_owner;
@@ -413,6 +569,9 @@ bool ShowCseRegisterView(core::registers::RegisterStore& store) {
 }
 
 bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const EvidenceRegisterCallbacks& callbacks) {
+    // Offered before the empty check: an argument with no evidence yet is
+    // exactly where the first piece gets added.
+    RenderAddEvidenceControls(callbacks);
     if (g_evidence_rows.empty()) {
         ImGui::TextDisabled("%s", AF_TR("No evidence/work-product rows were derived from the model.").c_str());
         return false;
@@ -443,7 +602,7 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
     ImGui::TableSetupColumn(AF_TR("Date").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
     ImGui::TableSetupColumn(AF_TR("Maturity").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 8.0f);
     ImGui::TableSetupColumn(AF_TR("Controlled Environment").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 12.0f);
-    ImGui::TableSetupColumn(AF_TR("Used By CSE Count").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 7.0f);
+    ImGui::TableSetupColumn(AF_TR("Used by").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 6.0f);
     ImGui::TableSetupColumn(AF_TR("Notes").c_str(), ImGuiTableColumnFlags_WidthFixed, unit * 18.0f);
     ImGui::TableHeadersRow();
 
@@ -500,7 +659,7 @@ bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const Evide
                                         callbacks);
 
         ImGui::TableSetColumnIndex(10);
-        ImGui::Text("%d", row.used_by_cse_count);
+        DrawUsedByCell(row, callbacks);
 
         ImGui::TableSetColumnIndex(11);
         row_edited |= DrawAttributeCell("##notes", row, core::EvidenceAttribute::Notes, row.notes, callbacks);

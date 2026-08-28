@@ -39,6 +39,21 @@ void AddAddedFromEvent(const AuditEvent& event, AuditChangeSet& out) {
         }
         return;
     }
+    if (type == "CreateEvidence" || type == "LinkEvidence") {
+        for (const char* key : {"generated_id", "generated_relationship_id"}) {
+            auto it = payload.find(key);
+            if (it != payload.end() && it->is_string() && !it->get<std::string>().empty())
+                out.added.insert(it->get<std::string>());
+        }
+        if (type == "LinkEvidence") {
+            for (const char* key : {"claim_id", "evidence_id"}) {
+                auto it = payload.find(key);
+                if (it != payload.end() && it->is_string())
+                    out.modified.insert(it->get<std::string>());
+            }
+        }
+        return;
+    }
     if (type == "ImportEvidenceAssessments") {
         auto items_it = payload.find("items");
         if (items_it != payload.end() && items_it->is_array()) {

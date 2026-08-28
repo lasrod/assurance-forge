@@ -76,6 +76,25 @@ std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model);
 // How many CSE rows cite this evidence.
 int CountCseUses(const std::vector<CseLink>& links, const std::string& evidence_id);
 
+// A claim resting on a piece of evidence, with the AssertedEvidence that
+// carries it. `shared` when that relationship also carries other sources, so
+// removing it would withdraw more than this one link.
+struct EvidenceCitation {
+    std::string claim_id;
+    std::string relationship_id;
+    bool shared = false;
+};
+
+// The claims resting on `evidence_id`, sorted by claim id then relationship id.
+std::vector<EvidenceCitation> DeriveEvidenceCitations(const parser::AssuranceCase& model,
+                                                      const std::string& evidence_id);
+
+// What evidence can be attached under, sorted: the Goals and Strategies GSN
+// lets `SupportedBy` reach a Solution from. An Assumption and a Justification
+// are SACM Claims too but are leaves in GSN, so offering them would only earn
+// the refusal `core::CanAddChildElement` already gives.
+std::vector<std::string> DeriveEvidenceSupportTargets(const parser::AssuranceCase& model);
+
 // Display text for an element, falling back through name -> content ->
 // description -> id so a row is never blank.
 std::string DisplayTextFor(const parser::SacmElement* element);

@@ -209,7 +209,8 @@ struct Applier {
     bool ApplyUndeveloped(const PatchOperation& operation, bool undeveloped, std::string& error);
     bool ApplyAddSupport(const PatchOperation& operation, std::string& error);
     bool ApplyAddRelationship(const PatchOperation& operation, sacm_adapter::RelationshipKind kind, std::string& error);
-    bool ApplyRemoveRelationship(const PatchOperation& operation, const std::string& type, std::string& error);
+    bool
+    ApplyRemoveRelationship(const PatchOperation& operation, const std::vector<std::string>& types, std::string& error);
     bool ApplyRemoveElement(const PatchOperation& operation, std::string& error);
     bool ApplySetEvidenceLocation(const PatchOperation& operation, std::string& error);
     bool ApplySetEvidenceAttribute(const PatchOperation& operation, std::string& error);
@@ -639,7 +640,9 @@ bool Applier::ApplyAddRelationship(const PatchOperation& operation,
     return true;
 }
 
-bool Applier::ApplyRemoveRelationship(const PatchOperation& operation, const std::string& type, std::string& error) {
+bool Applier::ApplyRemoveRelationship(const PatchOperation& operation,
+                                      const std::vector<std::string>& types,
+                                      std::string& error) {
     std::string source_id;
     std::string target_id;
     if (!ResolveRef(operation.source, created, "source", source_id, error))
@@ -649,7 +652,7 @@ bool Applier::ApplyRemoveRelationship(const PatchOperation& operation, const std
 
     const core::AssuranceCase model = sacm_adapter::project_case(document);
     for (const core::SacmElement& element : model.elements) {
-        if (element.type != type)
+        if (std::find(types.begin(), types.end(), element.type) == types.end())
             continue;
         const bool has_source =
             std::find(element.source_refs.begin(), element.source_refs.end(), source_id) != element.source_refs.end();
@@ -762,9 +765,12 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
     case PatchOperationType::AddInContextOf:
         return ApplyAddRelationship(operation, sacm_adapter::RelationshipKind::AssertedContext, error);
     case PatchOperationType::RemoveSupportedBy:
-        return ApplyRemoveRelationship(operation, "assertedinference", error);
+        // Support is an AssertedInference for a claim or strategy and an
+        // AssertedEvidence for a solution -- the mapping apply_attach_child
+        // applies -- so withdrawing it looks for either.
+        return ApplyRemoveRelationship(operation, {"assertedinference", "assertedevidence"}, error);
     case PatchOperationType::RemoveInContextOf:
-        return ApplyRemoveRelationship(operation, "assertedcontext", error);
+        return ApplyRemoveRelationship(operation, {"assertedcontext"}, error);
     case PatchOperationType::RemoveElement:
         return ApplyRemoveElement(operation, error);
     case PatchOperationType::SetEvidenceLocation:

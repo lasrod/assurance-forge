@@ -1,6 +1,7 @@
 #include "core/commands/element_commands.h"
 
 #include "core/commands/library_bridge.h"
+#include "core/registers/register_model.h"
 #include "core/derived_views.h"
 #include "core/relationship_editing.h"
 #include "core/string_utils.h"
@@ -755,6 +756,117 @@ bool ImportEvidenceAssessmentsCommand::Apply(CommandContext& ctx,
     out_event.event_type = "ImportEvidenceAssessments";
     out_event.payload = nlohmann::ordered_json::object();
     out_event.payload["items"] = std::move(items);
+    return true;
+}
+
+namespace {
+
+// Whether `claim_id` already rests on `evidence_id`. Asked of the register's
+// own derivation rather than matched here, so the dialect tolerance lives in
+// one place: which end of an AssertedEvidence carries the claim varies with
+// the file, and a second copy of that rule is a second chance to get it wrong.
+bool AlreadySupports(const parser::AssuranceCase& model, const std::string& claim_id, const std::string& evidence_id) {
+    for (const registers::EvidenceCitation& citation : registers::DeriveEvidenceCitations(model, evidence_id)) {
+        if (citation.claim_id == claim_id)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+bool CreateEvidenceCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Creating evidence from the register needs the SACM library document, and this file was loaded "
+                    "through the compatibility parser. The document is unchanged.";
+        return false;
+    }
+    if (!core::PlanEvidenceIds(
+            ctx.model, &ctx.package, claim_id_, generated_id_, generated_relationship_id_, out_error))
+        return false;
+    text_ = core::TrimWhitespace(text_);
+
+    if (!claim_id_.empty()) {
+        const sacm_adapter::AddChildOutcome outcome =
+            sacm_adapter::apply_add_child(*ctx.library_document,
+                                          claim_id_,
+                                          ToAdapterChildKind(NewElementKind::Solution),
+                                          generated_id_,
+                                          generated_relationship_id_);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection("the new evidence under " + claim_id_, outcome.diagnostics);
+            return false;
+        }
+        generated_id_ = outcome.new_element_id;
+        generated_relationship_id_ = outcome.new_relationship_id;
+    } else {
+        const std::string package_id = sacm_adapter::resolve_argument_package_id(*ctx.library_document, "");
+        if (package_id.empty()) {
+            out_error = "The document has no argument package to create evidence in";
+            return false;
+        }
+        sacm_adapter::CreateElementFields fields;
+        fields.element_id = generated_id_;
+        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_create_element(
+            *ctx.library_document, package_id, sacm_adapter::NewElementKind::ArtifactReference, fields);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = LibraryRejection("the new evidence", outcome.diagnostics);
+            return false;
+        }
+        generated_id_ = outcome.new_element_id;
+        generated_relationship_id_.clear();
+    }
+    ctx.library_primary = true;
+
+    if (!text_.empty()) {
+        const sacm_adapter::EditOutcome written = sacm_adapter::apply_text_edit(
+            *ctx.library_document, generated_id_, sacm_adapter::TextField::Description, "en", text_);
+        if (!written.supported || !written.applied) {
+            // Leave the document as it was rather than with a blank element.
+            sacm_adapter::apply_delete_element(*ctx.library_document, generated_id_);
+            out_error = LibraryRejection("the statement of " + generated_id_, written.diagnostics);
+            return false;
+        }
+    }
+
+    out_event.event_type = "CreateEvidence";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["claim_id"] = claim_id_;
+    out_event.payload["text"] = text_;
+    out_event.payload["generated_id"] = generated_id_;
+    out_event.payload["generated_relationship_id"] = generated_relationship_id_;
+    return true;
+}
+
+bool LinkEvidenceCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    if (!CanApplyLibraryPrimary(ctx)) {
+        out_error = "Linking evidence needs the SACM library document, and this file was loaded through the "
+                    "compatibility parser. The document is unchanged.";
+        return false;
+    }
+    if (EvidenceElementOrError(ctx, evidence_id_, out_error) == nullptr)
+        return false;
+    if (AlreadySupports(ctx.model, claim_id_, evidence_id_)) {
+        out_error = "Claim " + claim_id_ + " already rests on " + evidence_id_;
+        return false;
+    }
+    if (!core::PlanSupportRelationshipId(ctx.model, &ctx.package, claim_id_, generated_relationship_id_, out_error))
+        return false;
+
+    const sacm_adapter::AddChildOutcome outcome =
+        sacm_adapter::apply_attach_child(*ctx.library_document, claim_id_, evidence_id_, generated_relationship_id_);
+    if (!outcome.supported || !outcome.applied) {
+        out_error = LibraryRejection("the link from " + evidence_id_ + " to " + claim_id_, outcome.diagnostics);
+        return false;
+    }
+    generated_relationship_id_ = outcome.new_relationship_id;
+    ctx.library_primary = true;
+
+    out_event.event_type = "LinkEvidence";
+    out_event.payload = nlohmann::ordered_json::object();
+    out_event.payload["claim_id"] = claim_id_;
+    out_event.payload["evidence_id"] = evidence_id_;
+    out_event.payload["generated_relationship_id"] = generated_relationship_id_;
     return true;
 }
 

@@ -1,5 +1,7 @@
 #include "core/registers/register_model.h"
 
+#include "core/problems/gsn_wellformedness.h"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -145,6 +147,67 @@ std::vector<std::string> DeriveEvidenceIds(const parser::AssuranceCase& model) {
 int CountCseUses(const std::vector<CseLink>& links, const std::string& evidence_id) {
     return static_cast<int>(std::count_if(
         links.begin(), links.end(), [&](const CseLink& link) { return link.evidence_id == evidence_id; }));
+}
+
+std::vector<EvidenceCitation> DeriveEvidenceCitations(const parser::AssuranceCase& model,
+                                                      const std::string& evidence_id) {
+    std::unordered_map<std::string, const parser::SacmElement*> by_id;
+    by_id.reserve(model.elements.size());
+    for (const parser::SacmElement& element : model.elements)
+        by_id[element.id] = &element;
+
+    std::vector<EvidenceCitation> citations;
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (relationship.type != "assertedevidence")
+            continue;
+
+        // Endpoints are read from both ends and told apart by the kind of
+        // element they name, exactly as DeriveCseLinks does: which side
+        // carries the claim and which the evidence varies with the dialect the
+        // file came from, and reading only `source` silently lost every link
+        // in a document written the other way round.
+        std::vector<std::string> claim_ids;
+        std::vector<std::string> evidence_ids;
+        for (const std::vector<std::string>* refs : {&relationship.source_refs, &relationship.target_refs}) {
+            for (const std::string& id : *refs) {
+                const auto found = by_id.find(id);
+                if (found == by_id.end() || !found->second)
+                    continue;
+                if (IsClaimType(found->second->type))
+                    claim_ids.push_back(id);
+                else if (IsEvidenceType(found->second->type))
+                    evidence_ids.push_back(id);
+            }
+        }
+        if (std::find(evidence_ids.begin(), evidence_ids.end(), evidence_id) == evidence_ids.end())
+            continue;
+
+        // One relationship can carry several claim/evidence pairings; deleting
+        // it withdraws all of them, which is what `shared` warns about.
+        const bool carries_more = claim_ids.size() * evidence_ids.size() > 1;
+        for (const std::string& claim_id : claim_ids) {
+            citations.push_back(EvidenceCitation{
+                .claim_id = claim_id,
+                .relationship_id = relationship.id,
+                .shared = carries_more,
+            });
+        }
+    }
+    std::sort(citations.begin(), citations.end(), [](const EvidenceCitation& a, const EvidenceCitation& b) {
+        return a.claim_id != b.claim_id ? a.claim_id < b.claim_id : a.relationship_id < b.relationship_id;
+    });
+    return citations;
+}
+
+std::vector<std::string> DeriveEvidenceSupportTargets(const parser::AssuranceCase& model) {
+    std::set<std::string> ids;
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.id.empty())
+            continue;
+        if (GsnCanBeSupported(GsnKindOf(element)))
+            ids.insert(element.id);
+    }
+    return std::vector<std::string>(ids.begin(), ids.end());
 }
 
 std::string SerializeRegisterStore(const RegisterStore& store) {

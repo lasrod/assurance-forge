@@ -90,6 +90,24 @@ bool PlanChildElementIds(const parser::AssuranceCase& ac,
                          std::string& out_relationship_id,
                          std::string& out_error);
 
+// Plans the ids for evidence created from the register: under `claim_id` the
+// same plan AddChildElement makes for a Solution; with an empty `claim_id` a
+// bare ArtifactReference in the first argument package and no relationship.
+bool PlanEvidenceIds(const parser::AssuranceCase& ac,
+                     const sacm::AssuranceCasePackage* pkg,
+                     const std::string& claim_id,
+                     std::string& out_element_id,
+                     std::string& out_relationship_id,
+                     std::string& out_error);
+
+// Plans the id of the relationship that attaches an EXISTING piece of evidence
+// under `claim_id`, with the same parent validation AddChildElement performs.
+bool PlanSupportRelationshipId(const parser::AssuranceCase& ac,
+                               const sacm::AssuranceCasePackage* pkg,
+                               const std::string& claim_id,
+                               std::string& out_relationship_id,
+                               std::string& out_error);
+
 // Plans the counter element + counter relationship ids for `AddChallenge`,
 // including the same target validation.
 bool PlanChallengeIds(const parser::AssuranceCase& ac,

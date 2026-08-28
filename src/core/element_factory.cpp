@@ -671,6 +671,46 @@ bool PlanChildElementIds(const parser::AssuranceCase& ac,
     return true;
 }
 
+bool PlanEvidenceIds(const parser::AssuranceCase& ac,
+                     const sacm::AssuranceCasePackage* pkg,
+                     const std::string& claim_id,
+                     std::string& out_element_id,
+                     std::string& out_relationship_id,
+                     std::string& out_error) {
+    if (!claim_id.empty()) {
+        return PlanChildElementIds(
+            ac, pkg, claim_id, NewElementKind::Solution, out_element_id, out_relationship_id, out_error);
+    }
+    out_element_id.clear();
+    out_relationship_id.clear();
+    out_error.clear();
+    const sacm::ArgumentPackage* ap =
+        (pkg != nullptr && !pkg->argumentPackages.empty()) ? &pkg->argumentPackages.front() : nullptr;
+    out_element_id = GenerateUniqueId(CollectIds(ac), ScopedPrefixFor(ap, NewElementKind::Solution));
+    return true;
+}
+
+bool PlanSupportRelationshipId(const parser::AssuranceCase& ac,
+                               const sacm::AssuranceCasePackage* pkg,
+                               const std::string& claim_id,
+                               std::string& out_relationship_id,
+                               std::string& out_error) {
+    out_relationship_id.clear();
+    out_error.clear();
+    // "Element", not "Claim": evidence attaches under a Goal or a Strategy, and
+    // a Strategy is an ArgumentReasoning.
+    const parser::SacmElement* parent = claim_id.empty() ? nullptr : FindElement(ac, claim_id);
+    if (!parent) {
+        out_error = "Support target not found in model.";
+        return false;
+    }
+    if (!CanAddChildElement(*parent, NewElementKind::Solution, out_error))
+        return false;
+    const sacm::ArgumentPackage* ap = FindOwningArgumentPackageConst(pkg, claim_id);
+    out_relationship_id = GenerateUniqueId(CollectIds(ac), ScopedRelationshipPrefixFor(ap));
+    return true;
+}
+
 bool PlanChallengeIds(const parser::AssuranceCase& ac,
                       const sacm::AssuranceCasePackage* pkg,
                       const ArgumentTarget& target,
