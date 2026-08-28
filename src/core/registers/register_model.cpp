@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <map>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -67,9 +68,11 @@ std::vector<CseLink> DeriveCseLinks(const parser::AssuranceCase& model) {
     for (const parser::SacmElement& element : model.elements)
         by_id[element.id] = &element;
 
-    // A set keyed on the pair both deduplicates and sorts, so two documents
-    // that differ only in element order produce the same register.
-    std::set<std::pair<std::string, std::string>> links;
+    // A map keyed on the pair both deduplicates and sorts, so two documents
+    // that differ only in element order produce the same register. The value is
+    // the relationship the pairing came from, and whether that relationship
+    // carries others besides it.
+    std::map<std::pair<std::string, std::string>, std::pair<std::string, bool>> links;
 
     for (const parser::SacmElement& relationship : model.elements) {
         if (relationship.type != "assertedevidence")
@@ -91,16 +94,23 @@ std::vector<CseLink> DeriveCseLinks(const parser::AssuranceCase& model) {
             }
         }
 
+        const bool carries_more = claim_ids.size() * evidence_ids.size() > 1;
         for (const std::string& claim_id : claim_ids) {
-            for (const std::string& evidence_id : evidence_ids)
-                links.insert({claim_id, evidence_id});
+            for (const std::string& evidence_id : evidence_ids) {
+                // First relationship wins where two carry the same pairing: the
+                // register shows one row per pairing, and picking the earlier
+                // one keeps that row stable as the document grows.
+                links.emplace(std::pair<std::string, std::string>{claim_id, evidence_id},
+                              std::pair<std::string, bool>{relationship.id, carries_more});
+            }
         }
     }
 
     std::vector<CseLink> result;
     result.reserve(links.size());
-    for (const auto& link : links)
-        result.push_back(CseLink{link.first, link.second});
+    for (const auto& link : links) {
+        result.push_back(CseLink{link.first.first, link.first.second, link.second.first, link.second.second});
+    }
     return result;
 }
 

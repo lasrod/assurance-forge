@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/evidence_attributes.h"
+#include "core/cse_attributes.h"
 #include "core/registers/register_model.h"
 #include "core/sacm_model.h"
 
@@ -17,6 +18,8 @@ struct CseRegisterRow {
     std::string evidence_id;
     std::string evidence;
 
+    // What the project file holds for this row, shown and edited there until
+    // the user moves it into the document.
     std::string claim_owner;
     std::string evidence_owner;
     std::string safety_case_owner;
@@ -24,6 +27,23 @@ struct CseRegisterRow {
     std::string evidence_criteria;
     std::string assessment_status;
     std::string notes;
+
+    // The AssertedEvidence carrying this support and what it records; the
+    // assessment lives there. `shares_relationship` marks a row whose
+    // relationship carries other pairings too, so its assessment is theirs as
+    // well.
+    std::string relationship_id;
+    bool shares_relationship = false;
+    core::CseAssessmentRecord record;
+    bool stored_in_project_file = false;
+};
+
+// What the CSE register can ask the application to do. An unset callback is
+// drawn disabled rather than hidden, so the table reads the same either way.
+struct CseRegisterCallbacks {
+    std::function<void(const std::string& relationship_id, core::CseAttribute attribute, const std::string& value)>
+        set_attribute;
+    std::function<void()> migrate_assessments;
 };
 
 struct EvidenceRegisterRow {
@@ -90,7 +110,7 @@ size_t GetEvidenceRegisterRowCount();
 // Return true when the user changed a cell this frame, which is the caller's
 // cue to mark the store dirty so it gets saved. Only edited rows are stored, so
 // a register nobody has assessed leaves no entries behind.
-bool ShowCseRegisterView(core::registers::RegisterStore& store);
+bool ShowCseRegisterView(core::registers::RegisterStore& store, const CseRegisterCallbacks& callbacks);
 bool ShowEvidenceRegisterView(core::registers::RegisterStore& store, const EvidenceRegisterCallbacks& callbacks);
 
 } // namespace ui

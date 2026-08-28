@@ -35,6 +35,7 @@
 // Description, which SetDescription's front-only edit cannot target), and
 // Term/Expression `value`.
 
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 #include "sacm_adapter/library_load.h" // LibraryDocument, LoadDiagnostic
 
@@ -768,6 +769,16 @@ EditOutcome apply_set_evidence_attribute(LibraryDocument& document,
                                          const std::string& element_id,
                                          core::EvidenceAttribute attribute,
                                          const std::string& value);
+
+// Record one of the CSE register's columns (see core::CseAttribute) on the
+// AssertedEvidence `relationship_id`, as a TaggedValue: the subject of the
+// assessment is the support, and the support is that relationship. An empty
+// value clears the tag rather than leaving one that carries nothing. Refused
+// (SACM-CMD-002) when the id is not an AssertedEvidence.
+EditOutcome apply_set_cse_attribute(LibraryDocument& document,
+                                    const std::string& relationship_id,
+                                    core::CseAttribute attribute,
+                                    const std::string& value);
 
 // (7) Delete a terminology package, category, or term, mirroring the primitive
 // the legacy delete mutators compose: `DeleteElement` with the

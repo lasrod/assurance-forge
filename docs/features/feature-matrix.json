@@ -1170,12 +1170,16 @@
       "status": "prototype",
       "evidence": [
         "src/core/registers/register_model.cpp",
-        "src/ui/register_views.cpp"
+        "src/ui/register_views.cpp",
+        "src/sacm_adapter/document_edit.cpp",
+        "src/core/commands/element_commands.cpp",
+        "src/app/app_runtime.cpp"
       ],
       "tests": [
-        "tests/test_register_model.cpp"
+        "tests/test_register_model.cpp",
+        "tests/test_evidence_location.cpp"
       ],
-      "notes": "Claim/evidence pairings are derived in core and tested, with a pinned CSE id format. Assessments persist with the project (AF-ENG-016). Format transition is expected to break backwards compatibility."
+      "notes": "Claim/evidence pairings are derived in core and tested, with a pinned CSE id format. The assessment columns are SACM-backed: owners, criteria, status and notes are `TaggedValue`s (`assuranceForge.cse.*`) on the `AssertedEvidence` that carries the support being judged, written through an audited command with a replay branch, a draft operation and MCP (`SetCseAttribute`), and read back by element reads. The subject is the SUPPORT, so where one AssertedEvidence carries several claim/evidence pairings those rows share one assessment and are marked as sharing it. Assessments an older project file holds stay there, shown and editable, until the register's **Move into SACM** action imports them as one audited transaction; two rows that share a relationship but disagree are refused rather than one silently overwriting the other. Still prototype: the register is not yet a SACM ArtifactPackage view in its own right, and the pinned CSE id format has not been revisited."
     },
     {
       "id": "AF-ENG-010",

@@ -1,5 +1,6 @@
 #include "agent/operations.h"
 
+#include "core/cse_attributes.h"
 #include "core/evidence_attributes.h"
 
 #include "core/acp/assurance_claim_point.h"
@@ -157,6 +158,16 @@ nlohmann::json ElementDetail(const parser::SacmElement& element) {
     }
     // What the cited Artifact records about a piece of evidence, under the
     // column tokens SetEvidenceAttribute takes, plus where it is.
+    if (element.type == "assertedevidence" && !element.cse_assessment.empty()) {
+        nlohmann::json assessment = nlohmann::json::object();
+        for (const core::CseAttribute attribute : core::kAllCseAttributes) {
+            const std::string& value = core::CseRecordField(element.cse_assessment, attribute);
+            if (!value.empty()) {
+                assessment[core::CseAttributeToken(attribute)] = value;
+            }
+        }
+        detail["cse_assessment"] = std::move(assessment);
+    }
     if (element.type == "artifactreference") {
         nlohmann::json evidence = nlohmann::json::object();
         if (!element.artifact_location.empty()) {

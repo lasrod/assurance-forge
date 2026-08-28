@@ -2,6 +2,7 @@
 
 #include "core/evidence_attributes.h"
 
+#include "core/cse_attributes.h"
 #include "core/element_factory.h"
 #include "core/sacm_model.h"
 #include "core/terminology_package_service.h"
@@ -78,6 +79,9 @@ struct WorkbenchAreaCallbacks {
     std::function<void(const std::string& text, const std::string& claim_id)> create_evidence;
     std::function<void(const std::string& evidence_id, const std::string& claim_id)> link_evidence;
     std::function<void(const std::string& evidence_id, const std::string& claim_id)> unlink_evidence;
+    std::function<void(const std::string& relationship_id, core::CseAttribute attribute, const std::string& value)>
+        set_cse_attribute;
+    std::function<void()> migrate_cse_assessments;
 };
 
 void RenderWorkbenchArea(AppRuntimeState& state,
