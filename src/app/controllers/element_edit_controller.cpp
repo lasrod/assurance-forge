@@ -6,6 +6,7 @@
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_model.h"
 #include "sacm_adapter/document_edit.h"
+#include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -315,7 +316,7 @@ bool ElementEditController::SetCseAttribute(AppRuntimeState& state,
     core::commands::SetCseAttributeCommand command(relationship_id, attribute, value);
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Could not record the assessment: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Could not record the assessment: {0}", outcome.error)});
         return false;
     }
     if (command.WasNoOp())

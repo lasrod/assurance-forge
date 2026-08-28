@@ -685,6 +685,9 @@ msgstr "エビデンスの場所を開けませんでした: {0}"
 msgid "Could not record the assessment in the draft: {0}"
 msgstr "ドラフトに評価を記録できませんでした: {0}"
 
+msgid "Could not record the assessment: {0}"
+msgstr "評価を記録できませんでした: {0}"
+
 msgid "Could not record the edit in the draft: {0}"
 msgstr "ドラフトに編集を記録できませんでした: {0}"
 
