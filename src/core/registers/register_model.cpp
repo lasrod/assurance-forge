@@ -151,19 +151,45 @@ int CountCseUses(const std::vector<CseLink>& links, const std::string& evidence_
 
 std::vector<EvidenceCitation> DeriveEvidenceCitations(const parser::AssuranceCase& model,
                                                       const std::string& evidence_id) {
+    std::unordered_map<std::string, const parser::SacmElement*> by_id;
+    by_id.reserve(model.elements.size());
+    for (const parser::SacmElement& element : model.elements)
+        by_id[element.id] = &element;
+
     std::vector<EvidenceCitation> citations;
     for (const parser::SacmElement& relationship : model.elements) {
         if (relationship.type != "assertedevidence")
             continue;
-        const bool cites = std::find(relationship.source_refs.begin(), relationship.source_refs.end(), evidence_id) !=
-                           relationship.source_refs.end();
-        if (!cites)
+
+        // Endpoints are read from both ends and told apart by the kind of
+        // element they name, exactly as DeriveCseLinks does: which side
+        // carries the claim and which the evidence varies with the dialect the
+        // file came from, and reading only `source` silently lost every link
+        // in a document written the other way round.
+        std::vector<std::string> claim_ids;
+        std::vector<std::string> evidence_ids;
+        for (const std::vector<std::string>* refs : {&relationship.source_refs, &relationship.target_refs}) {
+            for (const std::string& id : *refs) {
+                const auto found = by_id.find(id);
+                if (found == by_id.end() || !found->second)
+                    continue;
+                if (IsClaimType(found->second->type))
+                    claim_ids.push_back(id);
+                else if (IsEvidenceType(found->second->type))
+                    evidence_ids.push_back(id);
+            }
+        }
+        if (std::find(evidence_ids.begin(), evidence_ids.end(), evidence_id) == evidence_ids.end())
             continue;
-        for (const std::string& claim_id : relationship.target_refs) {
+
+        // One relationship can carry several claim/evidence pairings; deleting
+        // it withdraws all of them, which is what `shared` warns about.
+        const bool carries_more = claim_ids.size() * evidence_ids.size() > 1;
+        for (const std::string& claim_id : claim_ids) {
             citations.push_back(EvidenceCitation{
                 .claim_id = claim_id,
                 .relationship_id = relationship.id,
-                .shared = relationship.source_refs.size() > 1,
+                .shared = carries_more,
             });
         }
     }

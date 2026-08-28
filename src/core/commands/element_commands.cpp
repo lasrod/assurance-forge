@@ -1,6 +1,7 @@
 #include "core/commands/element_commands.h"
 
 #include "core/commands/library_bridge.h"
+#include "core/registers/register_model.h"
 #include "core/derived_views.h"
 #include "core/relationship_editing.h"
 #include "core/string_utils.h"
@@ -760,20 +761,16 @@ bool ImportEvidenceAssessmentsCommand::Apply(CommandContext& ctx,
 
 namespace {
 
-// The AssertedEvidence already carrying `evidence_id` to `claim_id`, if any.
-const parser::SacmElement*
-ExistingSupportLink(const parser::AssuranceCase& model, const std::string& claim_id, const std::string& evidence_id) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.type != "assertedevidence")
-            continue;
-        const bool from_evidence =
-            std::find(element.source_refs.begin(), element.source_refs.end(), evidence_id) != element.source_refs.end();
-        const bool to_claim =
-            std::find(element.target_refs.begin(), element.target_refs.end(), claim_id) != element.target_refs.end();
-        if (from_evidence && to_claim)
-            return &element;
+// Whether `claim_id` already rests on `evidence_id`. Asked of the register's
+// own derivation rather than matched here, so the dialect tolerance lives in
+// one place: which end of an AssertedEvidence carries the claim varies with
+// the file, and a second copy of that rule is a second chance to get it wrong.
+bool AlreadySupports(const parser::AssuranceCase& model, const std::string& claim_id, const std::string& evidence_id) {
+    for (const registers::EvidenceCitation& citation : registers::DeriveEvidenceCitations(model, evidence_id)) {
+        if (citation.claim_id == claim_id)
+            return true;
     }
-    return nullptr;
+    return false;
 }
 
 } // namespace
@@ -849,7 +846,7 @@ bool LinkEvidenceCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_even
     }
     if (EvidenceElementOrError(ctx, evidence_id_, out_error) == nullptr)
         return false;
-    if (ExistingSupportLink(ctx.model, claim_id_, evidence_id_) != nullptr) {
+    if (AlreadySupports(ctx.model, claim_id_, evidence_id_)) {
         out_error = "Claim " + claim_id_ + " already rests on " + evidence_id_;
         return false;
     }

@@ -2362,6 +2362,10 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("generated_relationship_id", relationship_id))
             return false;
         sacm_adapter::AddChildOutcome outcome;
+        // Named for the diagnostic below: the two shapes call different seams,
+        // and reporting the wrong one sends a reader of a failed replay to the
+        // wrong function.
+        const char* seam = claim_id.empty() ? "apply_create_element" : "apply_add_child";
         if (!claim_id.empty()) {
             outcome = sacm_adapter::apply_add_child(
                 document, claim_id, sacm_adapter::ChildKind::Solution, element_id, relationship_id);
@@ -2374,8 +2378,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
                                                          fields);
         }
         if (!outcome.supported || !outcome.applied) {
-            out_error = FormatSeamFailure(
-                "apply_add_child", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            out_error = FormatSeamFailure(seam, tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
             return false;
         }
         if (!text.empty()) {

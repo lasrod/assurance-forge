@@ -307,3 +307,35 @@ TEST(RegisterModelTest, DerivesTheClaimsRestingOnEvidenceWithTheirRelationships)
     model.elements.push_back(Element("S1", "argumentreasoning", "A strategy"));
     EXPECT_EQ(core::registers::DeriveEvidenceSupportTargets(model), (std::vector<std::string>{"G1", "G2", "G3", "S1"}));
 }
+
+// Which end of an AssertedEvidence carries the claim varies with the dialect a
+// file came from, which is why DeriveCseLinks reads both. Reading only
+// `source` lost every citation in a document written the other way round --
+// and with it the register's Used-by list and its unlink.
+TEST(RegisterModelTest, CitationsAreFoundWhicheverEndCarriesTheEvidence) {
+    parser::AssuranceCase model;
+    model.elements.push_back(Element("G1", "claim", "Top goal"));
+    model.elements.push_back(Element("Sn1", "artifactreference", "Test report"));
+    // Reversed: the claim is the source and the evidence the target.
+    model.elements.push_back(EvidenceLink("R1", {"G1"}, {"Sn1"}));
+
+    const std::vector<core::registers::EvidenceCitation> citations =
+        core::registers::DeriveEvidenceCitations(model, "Sn1");
+    ASSERT_EQ(citations.size(), 1u) << "the citation was missed because it was written the other way round";
+    EXPECT_EQ(citations[0].claim_id, "G1");
+    EXPECT_EQ(citations[0].relationship_id, "R1");
+    EXPECT_FALSE(citations[0].shared);
+
+    // A relationship carrying two claims withdraws both if it is deleted, so
+    // neither link may be unlinked from the register on its own.
+    parser::AssuranceCase shared_model;
+    shared_model.elements.push_back(Element("G1", "claim", "First goal"));
+    shared_model.elements.push_back(Element("G2", "claim", "Second goal"));
+    shared_model.elements.push_back(Element("Sn1", "artifactreference", "Test report"));
+    shared_model.elements.push_back(EvidenceLink("R1", {"Sn1"}, {"G1", "G2"}));
+    const std::vector<core::registers::EvidenceCitation> shared =
+        core::registers::DeriveEvidenceCitations(shared_model, "Sn1");
+    ASSERT_EQ(shared.size(), 2u);
+    EXPECT_TRUE(shared[0].shared);
+    EXPECT_TRUE(shared[1].shared);
+}

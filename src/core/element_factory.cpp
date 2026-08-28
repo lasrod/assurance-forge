@@ -697,9 +697,11 @@ bool PlanSupportRelationshipId(const parser::AssuranceCase& ac,
                                std::string& out_error) {
     out_relationship_id.clear();
     out_error.clear();
+    // "Element", not "Claim": evidence attaches under a Goal or a Strategy, and
+    // a Strategy is an ArgumentReasoning.
     const parser::SacmElement* parent = claim_id.empty() ? nullptr : FindElement(ac, claim_id);
     if (!parent) {
-        out_error = "Claim not found in model.";
+        out_error = "Support target not found in model.";
         return false;
     }
     if (!CanAddChildElement(*parent, NewElementKind::Solution, out_error))
