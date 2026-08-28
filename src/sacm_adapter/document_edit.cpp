@@ -1,7 +1,5 @@
 #include "sacm_adapter/document_edit.h"
 
-#include "core/cse_attributes.h"
-
 #include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_document_access.h"
 

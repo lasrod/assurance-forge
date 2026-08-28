@@ -97,11 +97,19 @@ std::vector<CseLink> DeriveCseLinks(const parser::AssuranceCase& model) {
         const bool carries_more = claim_ids.size() * evidence_ids.size() > 1;
         for (const std::string& claim_id : claim_ids) {
             for (const std::string& evidence_id : evidence_ids) {
-                // First relationship wins where two carry the same pairing: the
-                // register shows one row per pairing, and picking the earlier
-                // one keeps that row stable as the document grows.
-                links.emplace(std::pair<std::string, std::string>{claim_id, evidence_id},
-                              std::pair<std::string, bool>{relationship.id, carries_more});
+                // Where two relationships carry the same pairing, the row keeps
+                // the lexicographically smallest id rather than whichever came
+                // first in the file. The register shows one row per pairing and
+                // stores its assessment ON the chosen relationship, so a choice
+                // that follows document order would move a reviewer's
+                // assessment to a different relationship the first time a save,
+                // a reload or another dialect reordered the elements.
+                const std::pair<std::string, std::string> pairing{claim_id, evidence_id};
+                const auto inserted =
+                    links.emplace(pairing, std::pair<std::string, bool>{relationship.id, carries_more});
+                if (!inserted.second && relationship.id < inserted.first->second.first) {
+                    inserted.first->second = std::pair<std::string, bool>{relationship.id, carries_more};
+                }
             }
         }
     }
