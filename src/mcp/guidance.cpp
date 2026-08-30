@@ -341,6 +341,8 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
     return {};
 }
 
+namespace {
+
 // What each prompt actually produces, in SCCG's element-role vocabulary. This
 // much is our editorial judgement -- drafting from a standard writes claims,
 // reasoning, scope and evidence stubs; restructuring only moves claims and the
@@ -363,6 +365,24 @@ std::vector<std::string> ElementRolesForPrompt(const std::string& name) {
     return {};
 }
 
+// The profile that judges an element role. `authoring_guidance.element_rules`
+// says so directly, but that file is optional in a dist directory, and a dist
+// directory that predates it must not leave every authoring prompt quoting no
+// guidelines at all. The fallback derives the same answer from the profile and
+// package registries, which are never optional: the profile whose required
+// selected-element package carries this role. A test holds the two against each
+// other on the released catalog.
+std::string ReviewProfileForElementRole(const core::GuidelineCatalog& catalog, const std::string& element_role) {
+    const parser::AuthoringElementRule* rule = catalog.document.FindAuthoringElementRule(element_role);
+    if (rule != nullptr && !rule->review_profile_id.empty()) {
+        return rule->review_profile_id;
+    }
+    const parser::ReviewProfile* profile = catalog.document.FindReviewProfileForElementRole(element_role);
+    return profile == nullptr ? std::string() : profile->id;
+}
+
+} // namespace
+
 std::vector<std::string> ReviewProfilesForPrompt(const std::string& name) {
     const std::vector<std::string> element_roles = ElementRolesForPrompt(name);
     if (element_roles.empty()) {
@@ -376,12 +396,12 @@ std::vector<std::string> ReviewProfilesForPrompt(const std::string& name) {
 
     std::vector<std::string> profile_ids;
     for (const std::string& element_role : element_roles) {
-        const parser::AuthoringElementRule* rule = catalog->document.FindAuthoringElementRule(element_role);
-        if (rule == nullptr || rule->review_profile_id.empty()) {
+        const std::string profile_id = ReviewProfileForElementRole(*catalog, element_role);
+        if (profile_id.empty()) {
             continue;
         }
-        if (std::find(profile_ids.begin(), profile_ids.end(), rule->review_profile_id) == profile_ids.end()) {
-            profile_ids.push_back(rule->review_profile_id);
+        if (std::find(profile_ids.begin(), profile_ids.end(), profile_id) == profile_ids.end()) {
+            profile_ids.push_back(profile_id);
         }
     }
     return profile_ids;

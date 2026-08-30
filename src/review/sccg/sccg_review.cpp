@@ -98,8 +98,14 @@ nlohmann::json UnavailableDataPackagesToJson(const AiReviewDataPackageBundle* da
             {"reason", data_package.reason},
             {"absence", DataPackageAbsenceToString(data_package.absence)},
         };
+        // Emitted separately: a catalog that names the guidelines it cannot
+        // assess without saying what to do instead still has to reach the
+        // model with that list, and one that gives the instruction without a
+        // list is equally legitimate.
         if (!data_package.when_absent_statement.empty()) {
             entry["when_absent"] = data_package.when_absent_statement;
+        }
+        if (!data_package.unassessable_guideline_ids.empty()) {
             entry["unassessable_guideline_ids"] = StringVectorToJson(data_package.unassessable_guideline_ids);
         }
         packages.push_back(std::move(entry));

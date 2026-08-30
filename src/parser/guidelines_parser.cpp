@@ -642,6 +642,19 @@ const AuthoringElementRule* GuidelinesDocument::FindAuthoringElementRule(const s
     return found == rules.end() ? nullptr : &(*found);
 }
 
+const ReviewProfile* GuidelinesDocument::FindReviewProfileForElementRole(const std::string& element_role) const {
+    if (element_role.empty()) {
+        return nullptr;
+    }
+    for (const ReviewProfile& profile : review_profiles) {
+        const DataPackage* selected = FindSelectedElementPackage(profile);
+        if (selected != nullptr && selected->element_role == element_role) {
+            return &profile;
+        }
+    }
+    return nullptr;
+}
+
 const GuidelineCategory* GuidelinesDocument::FindCategoryById(const std::string& category_id) const {
     auto found = std::find_if(categories.begin(), categories.end(), [&](const GuidelineCategory& category) {
         return category.id == category_id;

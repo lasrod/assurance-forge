@@ -435,6 +435,22 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
     for (const parser::Precheck& precheck : result.value().prechecks) {
         EXPECT_FALSE(precheck.fires_when.empty()) << precheck.id;
     }
+
+    // Two routes from an element role to the profile that judges it: the
+    // published `element_rules`, and the profile whose required
+    // selected-element package carries that role. The second is what the MCP
+    // prompts fall back to when `authoring_guidance.json` is absent -- it is
+    // optional in a dist directory -- so the two must agree, or the fallback
+    // would quietly quote a different profile's guidelines.
+    ASSERT_FALSE(result.value().authoring_guidance.element_rules.empty());
+    for (const parser::AuthoringElementRule& rule : result.value().authoring_guidance.element_rules) {
+        SCOPED_TRACE(rule.element_role);
+        const parser::ReviewProfile* derived = result.value().FindReviewProfileForElementRole(rule.element_role);
+        ASSERT_NE(derived, nullptr);
+        EXPECT_EQ(derived->id, rule.review_profile_id);
+    }
+    EXPECT_EQ(result.value().FindReviewProfileForElementRole("nonesuch"), nullptr);
+    EXPECT_EQ(result.value().FindReviewProfileForElementRole(""), nullptr);
 }
 
 namespace {
@@ -444,7 +460,8 @@ namespace {
 // profile requires a supporting package and names no selected element at all.
 std::filesystem::path WriteDistFixture(const std::string& name,
                                        const std::vector<std::string>& required_data,
-                                       const std::vector<std::string>& package_roles) {
+                                       const std::vector<std::string>& package_roles,
+                                       bool selected_packages_carry_an_element_role = true) {
     const std::filesystem::path directory = std::filesystem::temp_directory_path() / ("af_sccg_dist_" + name);
     std::filesystem::remove_all(directory);
     std::filesystem::create_directories(directory);
@@ -456,7 +473,7 @@ std::filesystem::path WriteDistFixture(const std::string& name,
             {"display_name", required_data[index]},
             {"role", package_roles[index]},
         };
-        if (package_roles[index] == "selected_element") {
+        if (package_roles[index] == "selected_element" && selected_packages_carry_an_element_role) {
             package["element_role"] = "claim";
         }
         packages.push_back(std::move(package));
@@ -510,6 +527,23 @@ TEST(GuidelinesParserTest, RefusesAProfileThatNamesTwoSelectedElementPackages) {
 
     ASSERT_FALSE(result.has_value());
     EXPECT_NE(result.error().find("selected-element data packages"), std::string::npos) << result.error();
+    std::filesystem::remove_all(directory);
+}
+
+// The role, not the package id, is what everything downstream matches on. A
+// package carrying `role: selected_element` and no `element_role` would match
+// no element at all, so every review would fail with "no SCCG review profile
+// applies to the selected element type" -- a message about the argument, for a
+// defect in the catalog.
+TEST(GuidelinesParserTest, RefusesASelectedElementPackageWithNoElementRole) {
+    const std::filesystem::path directory = WriteDistFixture("no_element_role",
+                                                             {"SELECTED_CLAIM"},
+                                                             {"selected_element"},
+                                                             /*selected_packages_carry_an_element_role=*/false);
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_NE(result.error().find("no element_role"), std::string::npos) << result.error();
     std::filesystem::remove_all(directory);
 }
 

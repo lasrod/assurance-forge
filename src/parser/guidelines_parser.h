@@ -267,6 +267,11 @@ struct GuidelinesDocument {
     // "claim". Empty where the catalog does not publish the name.
     std::string ElementRoleForSelectableElement(const std::string& element_name) const;
     const AuthoringElementRule* FindAuthoringElementRule(const std::string& element_role) const;
+    // The profile that reviews this element role, found through the package it
+    // requires. `authoring_guidance.element_rules` publishes the same mapping
+    // and is the direct answer; this is the one derivable from the profile and
+    // package registries alone, which are never optional.
+    const ReviewProfile* FindReviewProfileForElementRole(const std::string& element_role) const;
 };
 
 using GuidelinesParseResult = std::expected<GuidelinesDocument, std::string>;

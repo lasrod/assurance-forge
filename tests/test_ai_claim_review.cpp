@@ -308,6 +308,34 @@ TEST(AiClaimReviewTest, EvidenceBasisAbsenceCarriesTheProfilesDeclaredDegradatio
         review::BuildAiReviewRequestArtifacts(payload, guidelines, profile, &packages);
     EXPECT_NE(artifacts.unavailableDataPackagesJson.find("when_absent"), std::string::npos)
         << artifacts.unavailableDataPackagesJson;
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("EV.5"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+}
+
+// The two halves of a `when_absent` entry are serialized independently. A
+// catalog that names the guidelines it cannot assess but leaves the instruction
+// empty still has to reach the model with that list -- dropping it would hide
+// exactly what the entry exists to declare.
+TEST(AiClaimReviewTest, AnUnassessableGuidelineListSurvivesAnEmptyWhenAbsentStatement) {
+    review::AiReviewDataPackageBundle packages;
+    review::AiReviewUnavailableDataPackage absent;
+    absent.id = "EVIDENCE_BASIS";
+    absent.reason = "No source for this package.";
+    absent.required = true;
+    absent.unassessable_guideline_ids = {"EV.5", "EV.6"};
+    packages.unavailable.push_back(std::move(absent));
+
+    const review::AiReviewPayload payload;
+    const std::vector<const parser::Guideline*> guidelines;
+    const review::AiReviewRequestArtifacts artifacts =
+        review::BuildAiReviewRequestArtifacts(payload, guidelines, nullptr, &packages);
+
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("unassessable_guideline_ids"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("EV.6"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+    EXPECT_EQ(artifacts.unavailableDataPackagesJson.find("when_absent"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
 }
 
 TEST(AiClaimReviewTest, BuildsPromptWithProvidedClaimGuidelinesAndPayload) {

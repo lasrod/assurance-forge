@@ -481,14 +481,27 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
         // running and quietly reported the profile's own selected-element
         // package as unavailable.
         std::size_t selected_element_packages = 0;
+        const DataPackage* selected_element_package = nullptr;
         for (const std::string& package_id : profile.required_data) {
             const DataPackage* package = document.FindDataPackageById(package_id);
-            if (package != nullptr && package->role == "selected_element")
+            if (package != nullptr && package->role == "selected_element") {
                 ++selected_element_packages;
+                selected_element_package = package;
+            }
         }
         if (selected_element_packages != 1) {
             error = "SCCG review profile '" + profile.id + "' requires " + std::to_string(selected_element_packages) +
                     " selected-element data packages; exactly one is required.";
+            return false;
+        }
+        // The role is what everything downstream matches on -- which profile
+        // applies to an element, and which package that element is sent in. A
+        // package carrying the role field but no value would match no element,
+        // so every review would fail with "no profile applies" rather than with
+        // the catalog defect that caused it.
+        if (selected_element_package->element_role.empty()) {
+            error = "SCCG review profile '" + profile.id + "' requires selected-element data package '" +
+                    selected_element_package->id + "', which carries no element_role.";
             return false;
         }
     }
