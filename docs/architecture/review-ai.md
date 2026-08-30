@@ -103,9 +103,14 @@ lives in `src/review` (`review::`), separated from the provider calls in
 [ADR 0013](decisions/0013-review-methods-independent-of-inference-providers.md).
 `AiReviewController` composes the two.
 
-The UI exposes one `AI Review` action. The controller maps the selected GSN role
-to exactly one SCCG 0.6 profile and refuses to run if the catalog has no match or
-an ambiguous match. A no-findings result is persisted in the element review state
+The UI exposes one `AI Review` action. The controller maps the selected SACM
+element to the SCCG **element role** it plays — claim, strategy, evidence,
+context, assumption, justification, challenge — and selects the one profile
+whose selected-element data package carries that role, refusing to run if the
+catalog has no match or an ambiguous match. `element_role` is the key SCCG
+publishes for a tool whose own model is neither GSN nor CAE, and the same key
+names the package the element travels in, so the profile chosen and the package
+sent cannot disagree. A no-findings result is persisted in the element review state
 and rendered as a green check badge on the GSN node, so completion remains visible
 after the spinner stops and after the project is reopened.
 

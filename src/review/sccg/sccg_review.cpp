@@ -92,12 +92,17 @@ nlohmann::json UnavailableDataPackagesToJson(const AiReviewDataPackageBundle* da
     if (!data_packages)
         return packages;
     for (const AiReviewUnavailableDataPackage& data_package : data_packages->unavailable) {
-        packages.push_back({
+        nlohmann::json entry{
             {"id", data_package.id},
             {"required", data_package.required},
             {"reason", data_package.reason},
             {"absence", DataPackageAbsenceToString(data_package.absence)},
-        });
+        };
+        if (!data_package.when_absent_statement.empty()) {
+            entry["when_absent"] = data_package.when_absent_statement;
+            entry["unassessable_guideline_ids"] = StringVectorToJson(data_package.unassessable_guideline_ids);
+        }
+        packages.push_back(std::move(entry));
     }
     return packages;
 }
@@ -186,11 +191,6 @@ bool IsAllowedGuidelineId(const std::string& guideline_id, const std::vector<std
            allowed_guideline_ids.end();
 }
 
-void AddMappedName(std::vector<std::string>& names, const std::string& name) {
-    if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end())
-        names.push_back(name);
-}
-
 std::string NodeRoleName(core::NodeRole role) {
     switch (role) {
     case core::NodeRole::Claim:
@@ -224,7 +224,7 @@ ElementDataToJson(const parser::SacmElement& element, const std::string& role, c
         {"role", role},
         {"element_id", element.id},
         {"element_type", AiReviewElementType(element, node)},
-        {"sccg_applies_to", StringVectorToJson(SccgAppliesToNamesForElement(element, node))},
+        {"sccg_element_role", SccgElementRoleForElement(element, node)},
         {"raw_type", element.type},
         {"name", element.name},
         {"text", ElementText(element)},
@@ -363,95 +363,83 @@ std::string AiReviewElementType(const parser::SacmElement& element, const core::
     return element.type.empty() ? "SACM Element" : "SACM " + element.type;
 }
 
-std::vector<std::string> SccgAppliesToNamesForElement(const parser::SacmElement& element, const core::TreeNode* node) {
-    std::vector<std::string> names;
-    if (node && node->is_counter_source) {
-        AddMappedName(names, "GSN Counter Claim");
-        AddMappedName(names, "CAE Defeater");
-        return names;
-    }
+std::string SccgElementRoleForElement(const parser::SacmElement& element, const core::TreeNode* node) {
+    // A counter source is a challenge whatever it is built from, so it is
+    // decided before the node role: the same SACM claim is a goal when it
+    // supports and a defeater when it challenges.
+    if (node && node->is_counter_source)
+        return "challenge";
     if (node) {
         switch (node->role) {
         case core::NodeRole::Claim:
-            AddMappedName(names, "GSN Goal");
-            AddMappedName(names, "SACM Claim");
-            AddMappedName(names, "CAE Claim");
-            return names;
+            return "claim";
         case core::NodeRole::Strategy:
-            AddMappedName(names, "GSN Strategy");
-            AddMappedName(names, "SACM ArgumentReasoning");
-            AddMappedName(names, "CAE Argument");
-            return names;
+            return "strategy";
         case core::NodeRole::Solution:
-            AddMappedName(names, "GSN Solution");
-            AddMappedName(names, "SACM ArtifactReference");
-            AddMappedName(names, "CAE Evidence");
-            return names;
+            return "evidence";
         case core::NodeRole::Context:
-            AddMappedName(names, "GSN Context");
-            AddMappedName(names, "SACM ArtifactReference");
-            AddMappedName(names, "CAE Context");
-            return names;
+            return "context";
         case core::NodeRole::Assumption:
-            AddMappedName(names, "GSN Assumption");
-            AddMappedName(names, "SACM Claim");
-            AddMappedName(names, "CAE Assumption");
-            return names;
+            return "assumption";
         case core::NodeRole::Justification:
-            AddMappedName(names, "GSN Justification");
-            AddMappedName(names, "SACM Claim");
-            AddMappedName(names, "CAE Warrant");
-            return names;
+            return "justification";
         case core::NodeRole::Other:
             break;
         }
     }
+    // No tree node, or a node the tree could not place: fall back to what the
+    // element itself declares. A review can be asked for from a register or a
+    // search result, where there is no canvas node to hand.
     if (element.type == "claim") {
-        if (element.assertion_declaration == "assumed" || (node && node->role == core::NodeRole::Assumption)) {
-            AddMappedName(names, "GSN Assumption");
-            AddMappedName(names, "SACM Claim");
-            AddMappedName(names, "CAE Assumption");
-            return names;
-        }
-        if (element.assertion_declaration == "justification" || (node && node->role == core::NodeRole::Justification)) {
-            AddMappedName(names, "GSN Justification");
-            AddMappedName(names, "SACM Claim");
-            AddMappedName(names, "CAE Warrant");
-            return names;
-        }
-        AddMappedName(names, "GSN Goal");
-        AddMappedName(names, "SACM Claim");
-        AddMappedName(names, "CAE Claim");
-        return names;
+        if (element.assertion_declaration == "assumed")
+            return "assumption";
+        if (element.assertion_declaration == "justification")
+            return "justification";
+        return "claim";
     }
-    if (element.type == "argumentreasoning") {
-        AddMappedName(names, "GSN Strategy");
-        AddMappedName(names, "SACM ArgumentReasoning");
-        AddMappedName(names, "CAE Argument");
-        return names;
-    }
-    if (element.type == "artifact" || element.type == "artifactreference" || element.type == "expression" ||
-        (node && node->role == core::NodeRole::Solution)) {
-        AddMappedName(names, "GSN Solution");
-        AddMappedName(names, "SACM ArtifactReference");
-        AddMappedName(names, "CAE Evidence");
-        return names;
-    }
-    return names;
+    if (element.type == "argumentreasoning")
+        return "strategy";
+    if (element.type == "artifact" || element.type == "artifactreference" || element.type == "expression")
+        return "evidence";
+    return {};
 }
 
-bool IsReviewProfileCompatibleWithElement(const parser::ReviewProfile& review_profile,
+bool IsReviewProfileCompatibleWithElement(const parser::GuidelinesDocument& catalog,
+                                          const parser::ReviewProfile& review_profile,
                                           const parser::SacmElement& element,
                                           const core::TreeNode* node) {
-    const std::vector<std::string> names = SccgAppliesToNamesForElement(element, node);
-    for (const std::string& name : names) {
-        if (std::find(review_profile.applies_to.begin(), review_profile.applies_to.end(), name) !=
-            review_profile.applies_to.end()) {
-            return true;
-        }
-    }
-    return false;
+    const std::string element_role = SccgElementRoleForElement(element, node);
+    if (element_role.empty())
+        return false;
+    const parser::DataPackage* selected_package = catalog.FindSelectedElementPackage(review_profile);
+    return selected_package != nullptr && selected_package->element_role == element_role;
 }
+
+namespace {
+
+// The package the selected element belongs in. From the profile when there is
+// one -- exactly one of its required packages has role `selected_element` --
+// and otherwise from the element's own role, which is the same answer by a
+// longer route and keeps a profile-less collection working.
+std::string SelectedElementPackageId(const parser::GuidelinesDocument& catalog,
+                                     const parser::ReviewProfile* review_profile,
+                                     const parser::SacmElement& element,
+                                     const core::TreeNode* node) {
+    if (review_profile != nullptr) {
+        if (const parser::DataPackage* package = catalog.FindSelectedElementPackage(*review_profile))
+            return package->id;
+    }
+    const std::string element_role = SccgElementRoleForElement(element, node);
+    if (element_role.empty())
+        return {};
+    for (const parser::DataPackage& package : catalog.data_packages) {
+        if (package.role == "selected_element" && package.element_role == element_role)
+            return package.id;
+    }
+    return {};
+}
+
+} // namespace
 
 bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
                           const core::AssuranceTree& tree,
@@ -559,6 +547,7 @@ nlohmann::json ChangeHistoryJson(const std::vector<core::reviews::ReviewItem>& r
 bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                                  const core::AssuranceTree& tree,
                                  const std::string& selected_element_id,
+                                 const parser::GuidelinesDocument& catalog,
                                  const parser::ReviewProfile* review_profile,
                                  AiReviewDataPackageBundle& out_packages,
                                  std::string& out_error,
@@ -571,7 +560,18 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
     }
 
     const core::TreeNode* selected_node = core::FindTreeNode(tree, selected_element_id);
-    AddPackage(out_packages, "SEL", ElementDataToJson(*selected, "selected", selected_node));
+    // Which package the selected element travels in is the profile's decision,
+    // read from the catalog rather than named here. SCCG 0.7.0 replaced the one
+    // generic `SEL` with one package per element role, and a tool that kept
+    // sending `SEL` would send a package no profile asks for while reporting
+    // the profile's own required package as unavailable -- a degraded review
+    // every time, with nothing failing to say so.
+    const std::string selected_package_id = SelectedElementPackageId(catalog, review_profile, *selected, selected_node);
+    if (selected_package_id.empty()) {
+        out_error = "The SCCG catalog names no selected-element data package for this element.";
+        return false;
+    }
+    AddPackage(out_packages, selected_package_id, ElementDataToJson(*selected, "selected", selected_node));
 
     if (selected_node && selected_node->parent) {
         if (const parser::SacmElement* parent = ElementForNode(assurance_case, selected_node->parent))
@@ -745,6 +745,21 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
         };
         mark_missing(review_profile->required_data, true);
         mark_missing(review_profile->optional_data, false);
+
+        // What the profile says a review missing this package should do
+        // instead. Attached to the absence rather than left to the model:
+        // `evidence_review` requires `EVIDENCE_BASIS`, this tool has no source
+        // for it, and without the statement the honest degradation -- report
+        // citation and control, say sufficiency was not assessed, do not report
+        // the absent basis as a finding -- is the model's guess to make.
+        for (const parser::DataPackageAbsenceStatement& statement : review_profile->when_absent) {
+            for (AiReviewUnavailableDataPackage& package : out_packages.unavailable) {
+                if (package.id != statement.id)
+                    continue;
+                package.when_absent_statement = statement.statement;
+                package.unassessable_guideline_ids = statement.unassessable_guideline_ids;
+            }
+        }
     }
 
     out_error.clear();
@@ -787,7 +802,9 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     artifacts.prompt = std::format(
         "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
         "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
-        "Use SCCG applies_to values and the selected element data to interpret the element.\n\n"
+        "Each element carries the SCCG element_role it maps onto -- claim, strategy, evidence, context, "
+        "assumption, justification, challenge -- which is the vocabulary the profile and the data packages "
+        "use. Interpret the element through its role and its data.\n\n"
         "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule "
         "IDs.\n\n"
         "Review only the selected element. Use related elements and data packages only as context.\n\n"
@@ -800,6 +817,9 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         "the case holds none, and withheld means it exists and was deliberately not shared. Withheld is not "
         "absent -- say so when a judgement is bounded by what you were not shown, rather than concluding the "
         "data does not exist.\n"
+        "Where an unavailable package carries a when_absent statement, follow it exactly: it is SCCG's own "
+        "instruction for reviewing without that package, and the guidelines it names as unassessable are not "
+        "to be reported against the argument.\n"
         "Do not claim that a rule is violated unless the provided data supports that finding.\n"
         "If there is no clear violation, return an empty findings array.\n"
         "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"

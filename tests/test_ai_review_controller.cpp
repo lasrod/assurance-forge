@@ -6,6 +6,7 @@
 #include "core/reviews/review_proposal.h"
 #include "review/sccg/sccg_profile_selector.h"
 
+#include <cctype>
 #include <chrono>
 #include <gtest/gtest.h>
 #include <map>
@@ -139,14 +140,34 @@ parser::Guideline MakeGuideline(std::string id, std::string category) {
     return guideline;
 }
 
+std::string SelectedElementPackageId(const std::string& element_role) {
+    std::string id = "SELECTED_" + element_role;
+    for (char& character : id) {
+        character = static_cast<char>(std::toupper(static_cast<unsigned char>(character)));
+    }
+    return id;
+}
+
+// A profile the way SCCG publishes one since 0.7.0: it names the element role it
+// reviews by requiring that role's selected-element data package, rather than by
+// listing notation element names.
 parser::ReviewProfile
-MakeReviewProfile(std::string id, std::string display_name, std::string applies_to, std::string guideline_id) {
+MakeReviewProfile(std::string id, std::string display_name, const std::string& element_role, std::string guideline_id) {
     parser::ReviewProfile profile;
     profile.id = std::move(id);
     profile.display_name = std::move(display_name);
-    profile.applies_to = {std::move(applies_to)};
     profile.guideline_ids = {std::move(guideline_id)};
+    profile.required_data = {SelectedElementPackageId(element_role)};
     return profile;
+}
+
+parser::DataPackage MakeSelectedElementPackage(const std::string& element_role) {
+    parser::DataPackage package;
+    package.id = SelectedElementPackageId(element_role);
+    package.display_name = package.id;
+    package.role = "selected_element";
+    package.element_role = element_role;
+    return package;
 }
 
 parser::GuidelinesDocument MakeElementReviewProfiles() {
@@ -161,14 +182,18 @@ parser::GuidelinesDocument MakeElementReviewProfiles() {
         MakeGuideline("SU.11", "SU"),
     };
     document.review_profiles = {
-        MakeReviewProfile("claim_review", "Claim review", "GSN Goal", "CL.1"),
-        MakeReviewProfile("strategy_review", "Strategy review", "GSN Strategy", "AR.1"),
-        MakeReviewProfile("evidence_review", "Evidence review", "GSN Solution", "EV.1"),
-        MakeReviewProfile("assumption_review", "Assumption review", "GSN Assumption", "SU.1"),
-        MakeReviewProfile("justification_review", "Justification review", "GSN Justification", "SU.2"),
-        MakeReviewProfile("context_review", "Context review", "GSN Context", "CL.3"),
-        MakeReviewProfile("challenge_review", "Challenge review", "GSN Counter Claim", "SU.11"),
+        MakeReviewProfile("claim_review", "Claim review", "claim", "CL.1"),
+        MakeReviewProfile("strategy_review", "Strategy review", "strategy", "AR.1"),
+        MakeReviewProfile("evidence_review", "Evidence review", "evidence", "EV.1"),
+        MakeReviewProfile("assumption_review", "Assumption review", "assumption", "SU.1"),
+        MakeReviewProfile("justification_review", "Justification review", "justification", "SU.2"),
+        MakeReviewProfile("context_review", "Context review", "context", "CL.3"),
+        MakeReviewProfile("challenge_review", "Challenge review", "challenge", "SU.11"),
     };
+    for (const char* element_role :
+         {"claim", "strategy", "evidence", "assumption", "justification", "context", "challenge"}) {
+        document.data_packages.push_back(MakeSelectedElementPackage(element_role));
+    }
     return document;
 }
 
@@ -303,7 +328,7 @@ TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnEle
     core::GuidelineCatalog catalog;
     std::string error;
     ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
-    ASSERT_EQ(catalog.document.sccg_version, "0.6.0");
+    ASSERT_EQ(catalog.document.sccg_version, "0.7.0");
 
     for (const ReviewProfileSelectionCase& selection_case : ReviewProfileSelectionCases()) {
         SCOPED_TRACE(selection_case.expected_profile_id);
@@ -327,7 +352,7 @@ TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnEle
 
 TEST(AiReviewControllerTest, RefusesAmbiguousElementReviewProfiles) {
     parser::GuidelinesDocument document = MakeElementReviewProfiles();
-    document.review_profiles.push_back(MakeReviewProfile("second_claim_review", "Other", "GSN Goal", "CL.1"));
+    document.review_profiles.push_back(MakeReviewProfile("second_claim_review", "Other", "claim", "CL.1"));
     core::GuidelineCatalog catalog = MakeCatalog(std::move(document));
     parser::SacmElement element = MakeCaseWithElement("G1", "claim").elements.front();
     core::TreeNode node;
