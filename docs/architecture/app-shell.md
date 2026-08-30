@@ -11,7 +11,7 @@ Assurance Forge uses a named application shell to keep the frame layout separate
 | `ArgumentNavigatorArea` | Argument tree navigation and tree editing commands. |
 | `WorkbenchArea` | Main editable/viewing surface, including the GSN canvas, register views, package details, and terminology package view. |
 | `InspectorArea` | Right-side details and selected element editing. |
-| `FeedbackDockArea` | Problems, terminology usages, review items, and AI debug feedback. |
+| `FeedbackDockArea` | Problems, term usages, review, and history; draft changes while a working draft exists; AI debug under developer tools. |
 | `ModalHost` | Modal dialogs and popup workflows. |
 
 Position-based names such as left panel, right panel, and bottom panel should be limited to temporary layout calculations. Long-lived code should use responsibility-based area names so the code remains meaningful if the layout changes later.
@@ -53,7 +53,10 @@ Low-level UI panels in `src/ui/panels` should remain reusable ImGui views. They 
 
 ## Extraction Guidance
 
-When extracting the current runtime code, prefer small behavior-preserving steps:
+The extraction this section planned has happened: the area renderers live in
+`src/app/areas/`, and the frame layer in `src/app/frame/` owns the menu bar,
+splitters and layout regions. The guidance is kept because it still applies to
+the next area that grows too large:
 
 1. Rename existing render functions to the named area vocabulary.
 2. Extract layout calculation and splitter handling into the frame layer.

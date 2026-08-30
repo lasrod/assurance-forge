@@ -29,10 +29,20 @@ flowchart TD
 | Case Explorer panel | `ui::panels::ShowProjectExplorerPanel` | `core::AssuranceProject`, `core::ProjectSummary`, SACM package trees | Workflow navigation, add/open file callbacks, and advanced package actions. |
 | Project overview panel | `ui::panels::ShowProjectOverviewPanel` | `core::ProjectSummary` | Navigation to arguments, evidence, reviews, and conformance. |
 | SACM viewer panel | `ui::panels::ShowSacmViewerPanel` | `core::AppState`, directory buffers, XML file list | Scan/load callbacks. Defined in the codebase, but not mounted in the current `RenderFrame()` layout. |
-| Preferences window | `ui::panels::ShowPreferencesWindow` | AI settings, language, FPS, reviewer name | Settings, API key, language, FPS callbacks. |
+| Relationship panel | `ui::panels::ShowRelationshipPanel` | The selected relationship | Relationship edit callbacks. |
+| ACP panel | `ui::panels::ShowAcpPanel` | Assurance claim points on the selection | ACP create/open/remove callbacks. |
+| Confidence panel | `ui::panels::ShowConfidencePanel` | The selected element's confidence assessment | Embedded in the element panel; assessment callbacks. |
+| Draft changes panel | `ui::panels::RenderDraftChangesPanel` | The working draft's unaccepted changes and their provenance | Accept, discard and navigate callbacks. |
+| History timeline panel | `ui::panels::ShowHistoryTimeline*` | Audit transactions, baselines, snapshots | Pin, preview and restore callbacks. |
+| Terminology usages panel | `ui::panels::ShowTerminologyUsagesPanelContent` | Detected term usages | Promote-to-context and navigation callbacks. |
+| Terminology package panel | `ui::panels::ShowTerminologyPackagePanel` | The selected SACM terminology package | Term and category edit callbacks. |
+| Package details panel | `ui::panels::ShowPackageDetailsPanel` | The selected SACM package-tree node | Package edit callbacks. |
+| Toolbar | `ui::panels::ShowToolbar` | Project dirty state, canvas state | `ToolbarAction` callbacks (open, save, undo, fit to view, export SVG, preferences). |
+| Status bar | `ui::panels::ShowStatusBar` | Project name, save state, problem counts | Problem-panel and document callbacks. |
+| Preferences window | `ui::panels::ShowPreferencesWindow` | AI settings, review settings, MCP server settings, language, FPS, reviewer name | Settings, API key, language, FPS callbacks. |
 | Welcome modal | `ui::panels::ShowWelcomeModal` | Recent project list | Create/open/import callbacks. |
-| CSE register | `ui::ShowCseRegisterView` | Register rows derived from parser model | None. |
-| Evidence register | `ui::ShowEvidenceRegisterView` | Register rows derived from parser model | None. |
+| CSE register | `ui::ShowCseRegisterView` | Register rows derived from parser model | Assessment column edits and *locate in argument*, through register callbacks into audited commands (or draft operations while a draft is open). |
+| Evidence register | `ui::ShowEvidenceRegisterView` | Register rows derived from parser model | Column edits, location browse/open, add evidence, link and unlink — through register callbacks into audited commands (or draft operations while a draft is open). |
 
 ## Area Mapping
 
@@ -41,8 +51,8 @@ flowchart TD
 | `ProjectExplorerArea` | Role-based Case Explorer; raw SACM package tree and files appear under Advanced. |
 | `ArgumentNavigatorArea` | Argument navigator tree view. |
 | `WorkbenchArea` | GSN canvas, CSE register, evidence register, package details, and terminology package tabs. |
-| `InspectorArea` | Element properties panel and proposal element editor. |
-| `FeedbackDockArea` | Problems, term usages, review, and AI debug tabs. |
+| `InspectorArea` | Element properties panel (with the embedded confidence panel), relationship panel, ACP panel, and proposal element editor. |
+| `FeedbackDockArea` | Problems, Term Usages, Review and History tabs; a Draft Changes tab only while a working draft exists; an AI Debug tab only when developer tools are switched on. |
 | `ModalHost` | Welcome, project, terminology, review confirmation, preferences, theme tweaks, and save-before-exit modals. |
 
 ## Shared UI State
@@ -113,7 +123,7 @@ The center area has these primary views:
 | View | Source |
 | --- | --- |
 | Project overview | Project, argument, evidence, review, proposal, problem, conformance, and report summary counts. |
-| GSN canvas | `core::AssuranceTree` pushed through `ui::gsn::SetCanvasTree`. |
+| GSN canvas | `core::AssuranceTree` pushed through `ui::gsn::SetCanvasTree`. One tab per open argument package, titled after the package. |
 | CSE register | Rows rebuilt from `parser::AssuranceCase`. |
 | Evidence register | Rows rebuilt from `parser::AssuranceCase`. |
 | Package details | The selected SACM package-tree node. |

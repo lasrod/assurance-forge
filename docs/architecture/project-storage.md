@@ -13,12 +13,20 @@ flowchart TD
     Reviews --> Proposals[proposals]
     Root --> Conformance[conformance]
     Root --> Exports[exports]
+    Root --> Analysis[analysis]
     Root --> Internal[.af]
-    Internal --> Cache[cache]
+    Internal --> Audit[audit: transactions.af.jsonl]
     Internal --> Backups[backups]
     Internal --> Snapshots[snapshots]
-    Internal --> History[history]
+    Internal --> Drafts[drafts: one draft.sacm per argument]
+    Internal --> Promotions[draft-promotions]
 ```
+
+`.af/` is runtime state, not assurance data: the audit log, backups, snapshots,
+and the working drafts (each a SACM document of its own —
+[ADR 0016](decisions/0016-the-draft-is-a-sacm-document.md)). The project service
+writes a `.gitignore` into it on open, so a project under version control does
+not carry it. Deleting `.af/` loses history, not argument.
 
 ## Manifest Model
 
@@ -40,7 +48,7 @@ flowchart TD
 | --- | --- |
 | `id` | Stable tracked-file id. |
 | `relativePath` | Path from the project root. |
-| `role` | SACM argument, evidence register, review items, review proposal, conformance sheet, exported report, or unknown. |
+| `role` | SACM argument, evidence register, J3377/CAE register, register assessments, review items, review proposal, confidence assessments, conformance sheet, exported report, or unknown. |
 | `state` | Clean, modified, missing, moved, parse error, unsupported version, or generated outdated. |
 | `rawHash` | SHA-256 of raw file bytes. |
 | `semanticHash` | Content hash independent of formatting where supported. |
@@ -82,24 +90,30 @@ sequenceDiagram
     participant UI as UI command
     participant AppState as core::AppState
     participant ProjectService as core::ProjectService
+    participant Library as sacm_adapter (libs/sacm)
     participant Parser as parser::parse_sacm_xml
-    participant Sacm as sacm::parse_sacm
-    participant Serializer as sacm::serialize_sacm_to_file
 
     UI->>AppState: open_project(path)
     AppState->>ProjectService: OpenProject(path)
     ProjectService-->>AppState: AssuranceProject + ProjectLoadReport
     UI->>AppState: open_project_file(entry)
-    AppState->>Parser: parse_sacm_xml(file)
-    AppState->>Sacm: parse_sacm(file)
+    AppState->>Library: load_document(file)
+    Library-->>AppState: library_document
+    AppState->>Parser: projection for the UI views
     Parser-->>AppState: loaded_case
-    Sacm-->>AppState: sacm_package
 
     UI->>AppState: save_project()
-    AppState->>Serializer: serialize_sacm_to_file(sacm_package, active file)
+    AppState->>Library: save_document(library_document)
     AppState->>ProjectService: RefreshFileStatus(project)
     AppState->>ProjectService: WriteManifestSafely(project)
 ```
+
+**The save writes the library document, not the projection.** The UI reads a
+projection of the SACM model, but nothing is written back from it — an edit the
+library has no seam for is refused with the file byte-unchanged rather than
+reconstructed from what the UI happened to be showing
+([ADR 0003](decisions/0003-sacm-xml-as-source-of-truth.md), `AF-STD-001`,
+`AF-STD-011`).
 
 ## File Roles
 
@@ -108,6 +122,8 @@ sequenceDiagram
 | `SacmArgument` | SACM XML argument model. |
 | `EvidenceRegister` | Evidence register data. |
 | `J3377CaeRegister` | J3377/CAE conformance register data. |
+| `RegisterAssessments` | The legacy project-wide store of register assessments, keyed by CSE / evidence id. New assessments are written into the SACM document instead; this is read, reported and migrated. |
+| `ConfidenceAssessments` | Confidence assessments (`analysis/confidence.af.json`), each carrying a fingerprint of the element it judges so a stale assessment is reported rather than trusted. |
 | `ReviewItems` | Review item JSON. |
 | `ReviewProposal` | Individual review proposal JSON. |
 | `ConformanceSheet` | Conformance artifacts. |
