@@ -250,6 +250,7 @@ set(AF_SCCG_REQUIRED_DIST_FILES
 )
 set(AF_SCCG_OPTIONAL_DIST_FILES
     prechecks.json
+    authoring_guidance.json
 )
 foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
     if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_DIST_FILE}")

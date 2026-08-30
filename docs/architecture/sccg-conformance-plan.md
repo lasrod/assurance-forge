@@ -172,8 +172,10 @@ check that never fires.
 
 ### G4 — Data-package coverage
 
-Built: `SEL`, `PARENT`, `CHILDREN`, `STRATEGY`, `DIRECT_CONTEXT`,
-`INHERITED_CONTEXT`, `EVIDENCE_PATH`, `EVIDENCE_ITEM`.
+Built: the profile's selected-element package, `PARENT`, `CHILDREN`,
+`STRATEGY`, `DIRECT_CONTEXT`, `INHERITED_CONTEXT`, `EVIDENCE_PATH`,
+`EVIDENCE_ITEM`. (This read `SEL` when the page was written; SCCG 0.7.0
+replaced that one generic package with one per element role — see §10.)
 Not built: `EVIDENCE_BASIS`, `PROJECT_GLOSSARY`, `STANDARD_LINKS`,
 `CHANGE_HISTORY`, `USER_REVIEW_INTENT`.
 
@@ -537,7 +539,47 @@ the same fields; an agent can distinguish "no findings" from "not checked".
 
 ---
 
-## 10. Tracking
+## 10. What SCCG 0.7.0 settled upstream
+
+Recorded 2026-08-30, on adopting the
+[AI/MCP tool contract](https://github.com/lasrod/safety-case-core-guidelines/pull/11)
+published as SCCG 0.7.0 (`schema_version` 2.0.0). Several gaps this page
+records as work to do here turned out to be gaps in the *contract*, and were
+closed there instead. Where an item below contradicts a phase above, this
+section is the later word.
+
+| This page said | SCCG 0.7.0 |
+|---|---|
+| G4: the tool builds `SEL` | `SEL` is gone. One selected-element package per element role, each carrying `role: selected_element` and its `element_role`; every profile requires exactly one. The tool looks the package up from the profile instead of naming it. |
+| G4 / S4: `EVIDENCE_BASIS` absence is an improvised degradation | `evidence_review` publishes `when_absent`: what the review should say instead, and the eight guidelines (EV.5, EV.6, SU.3, SU.6–8, LF.5, LF.7) that cannot be assessed without it. The statement travels with the absence into the request. |
+| S4: the contract needs three absence states of its own | `data_packages.json` publishes four `availability_states` — `available`, `not_implemented`, `empty`, `withheld`. `DataPackageAbsence` names the three that are absences, and a test holds them against the catalog. |
+| S3 / G3: `check-explicit-strategy` needed a local reading to fix its mislabelling | Every pre-check now publishes `fires_when`, stating the condition precisely enough that two tools implement the same check, and `expected_data` names exactly one selected-element package. The reading S3 settled locally is now the published condition. |
+| 5.5: authoring guidance derives from the profile registry | `authoring_guidance.json` publishes the writing-time subset directly: eighteen `core_rules` with a `short_rule` and a recorded reason, and `element_rules` naming the profile each element role is judged under. |
+| §4's "word lists derived by hand from statements and examples" | `tool.markers` publishes the terms for 27 guidelines with three effects (`candidate`, `suppress`, `expected`), and `tool.thresholds` the numbers for CL.3 and LF.6. The checks read the catalog; this repository holds no word list. |
+| AF-AI-024's deferral of CL.4 "for want of a lexical list" | CL.4 has one. It is implemented, as is CL.3 against the published `claim_word_count`. |
+| `SccgAppliesToNamesForElement` maps a SACM element to GSN/CAE names | `element_role` is the published key for a tool whose model is neither, and is the same vocabulary the selected-element packages and `tool.repair` use. The name mapping is gone. |
+
+Not adopted yet, and why:
+
+- **`tool.repair`** — published for all 48 guidelines in six notation-neutral
+  actions. S5's `proposed_operations` still comes from the model's own answer
+  rather than from the catalog. Seeding suggestions from `repair` is a
+  behavioural change to what a review proposes, and belongs with the
+  suggestion-mapping work, not with the version bump.
+- **LF.6's `significant_digits` threshold** — parsed and unused. The check needs
+  a definition of "a figure" in claim text that the threshold alone does not
+  give, and getting it wrong reports precision findings against correctly stated
+  numbers. Still deferred; the reason has changed from "no threshold" to "no
+  agreed way to find the number".
+- **CL.6's broader firing condition** — SCCG's check fires on "two or more
+  lifecycle step verbs within one claim". This tool still requires them joined
+  by a conjunction. That is a narrowing calibration, which SCCG permits, and it
+  is what lets the finding quote the chain it objected to. Recorded here so it
+  is a decision rather than an oversight.
+
+---
+
+## 11. Tracking
 
 - Tracking issue: [#414](https://github.com/lasrod/assurance-forge/issues/414), under parent epic
   [#388](https://github.com/lasrod/assurance-forge/issues/388), with S1–S6 as a

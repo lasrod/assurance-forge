@@ -1,6 +1,7 @@
 ﻿#include "review/sccg/sccg_review.h"
 
 #include "core/assurance_tree.h"
+#include "core/guideline_catalog.h"
 #include "core/reviews/review_proposal.h"
 
 #include <algorithm>
@@ -10,6 +11,20 @@
 #include <vector>
 
 namespace {
+
+// The real published catalog. The collector reads it to decide which
+// selected-element package the element travels in, so a hand-built stand-in
+// would prove the lookup against a registry SCCG does not publish -- which is
+// exactly the shape of the bug this replaced.
+const parser::GuidelinesDocument& Catalog() {
+    static const parser::GuidelinesDocument document = [] {
+        core::GuidelineCatalog catalog;
+        std::string error;
+        EXPECT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+        return catalog.document;
+    }();
+    return document;
+}
 
 parser::SacmElement MakeElement(const std::string& id,
                                 const std::string& type,
@@ -107,21 +122,83 @@ TEST(AiClaimReviewTest, CollectsSelectedParentChildrenAndContextDataPackages) {
     assurance_case.elements.push_back(MakeRelationship("CTXREL1", "assertedcontext", {"CTX1"}, {"G2"}));
 
     core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
-    parser::ReviewProfile profile;
-    profile.id = "decomposition_review";
-    profile.required_data = {"SEL", "PARENT", "CHILDREN", "DIRECT_CONTEXT", "EVIDENCE_PATH"};
-    profile.optional_data = {"PROJECT_GLOSSARY"};
+    const parser::ReviewProfile* profile = Catalog().FindReviewProfileById("claim_review");
+    ASSERT_NE(profile, nullptr);
 
     review::AiReviewDataPackageBundle packages;
     std::string error;
-    ASSERT_TRUE(review::CollectAiReviewDataPackages(assurance_case, tree, "G2", &profile, packages, error)) << error;
+    ASSERT_TRUE(review::CollectAiReviewDataPackages(assurance_case, tree, "G2", Catalog(), profile, packages, error))
+        << error;
 
-    EXPECT_TRUE(HasPackage(packages, "SEL"));
+    EXPECT_TRUE(HasPackage(packages, "SELECTED_CLAIM"));
     EXPECT_TRUE(HasPackage(packages, "PARENT"));
     EXPECT_TRUE(HasPackage(packages, "CHILDREN"));
     EXPECT_TRUE(HasPackage(packages, "DIRECT_CONTEXT"));
     EXPECT_TRUE(HasUnavailablePackage(packages, "EVIDENCE_PATH"));
     EXPECT_TRUE(HasUnavailablePackage(packages, "PROJECT_GLOSSARY"));
+    // The package SCCG 0.6.0 used for every element role, gone in 0.7.0. Sending
+    // it alongside the profile's real requirement was the silent degradation
+    // this test now pins closed.
+    EXPECT_FALSE(HasPackage(packages, "SEL"));
+}
+
+// Every profile in the released catalog reviews one element role and names one
+// package for it. The selected element has to land in *that* package: a claim in
+// SELECTED_CLAIM, a solution in SELECTED_EVIDENCE, a counter claim in
+// SELECTED_CHALLENGE. Nothing here names a package -- the profile does, and the
+// test reads the same catalog the collector does.
+TEST(AiClaimReviewTest, SelectedElementTravelsInThePackageItsProfileRequires) {
+    struct RoleCase {
+        const char* profile_id;
+        const char* raw_type;
+        core::NodeRole node_role;
+        bool counter_source;
+    };
+    const std::vector<RoleCase> role_cases{
+        {"claim_review", "claim", core::NodeRole::Claim, false},
+        {"strategy_review", "argumentreasoning", core::NodeRole::Strategy, false},
+        {"evidence_review", "artifactreference", core::NodeRole::Solution, false},
+        {"context_review", "artifact", core::NodeRole::Context, false},
+        {"assumption_review", "claim", core::NodeRole::Assumption, false},
+        {"justification_review", "claim", core::NodeRole::Justification, false},
+        {"challenge_review", "claim", core::NodeRole::Claim, true},
+    };
+
+    for (const RoleCase& role_case : role_cases) {
+        SCOPED_TRACE(role_case.profile_id);
+        const parser::ReviewProfile* profile = Catalog().FindReviewProfileById(role_case.profile_id);
+        ASSERT_NE(profile, nullptr);
+        const parser::DataPackage* expected = Catalog().FindSelectedElementPackage(*profile);
+        ASSERT_NE(expected, nullptr) << "The profile names no selected-element package.";
+
+        parser::AssuranceCase assurance_case;
+        assurance_case.elements.push_back(MakeElement("E1", role_case.raw_type, "Element", "Some text."));
+        core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+        review::AiReviewDataPackageBundle packages;
+        std::string error;
+        ASSERT_TRUE(
+            review::CollectAiReviewDataPackages(assurance_case, tree, "E1", Catalog(), profile, packages, error))
+            << error;
+        EXPECT_TRUE(HasPackage(packages, expected->id)) << expected->id;
+        EXPECT_FALSE(HasUnavailablePackage(packages, expected->id))
+            << expected->id << " was reported unavailable although the element was sent.";
+    }
+}
+
+// With no profile the element's own role decides, which is the same answer by a
+// longer route. A collection that could not name a package refuses rather than
+// sending an unidentifiable element.
+TEST(AiClaimReviewTest, WithoutAProfileTheElementRoleChoosesTheSelectedPackage) {
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeElement("S1", "argumentreasoning", "Strategy", "By decomposition."));
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    review::AiReviewDataPackageBundle packages;
+    std::string error;
+    ASSERT_TRUE(review::CollectAiReviewDataPackages(assurance_case, tree, "S1", Catalog(), nullptr, packages, error))
+        << error;
+    EXPECT_TRUE(HasPackage(packages, "SELECTED_STRATEGY"));
 }
 
 TEST(AiClaimReviewTest, RejectsUnsupportedElements) {
@@ -135,16 +212,130 @@ TEST(AiClaimReviewTest, RejectsUnsupportedElements) {
     EXPECT_EQ(error, "AI Review does not support the selected element type.");
 }
 
-TEST(AiClaimReviewTest, MapsStrategyAndEvidenceToSccgAppliesToNames) {
-    parser::SacmElement strategy = MakeElement("S1", "argumentreasoning", "Strategy", "By decomposition.");
-    std::vector<std::string> strategy_names = review::SccgAppliesToNamesForElement(strategy);
-    EXPECT_NE(std::find(strategy_names.begin(), strategy_names.end(), "GSN Strategy"), strategy_names.end());
-    EXPECT_NE(std::find(strategy_names.begin(), strategy_names.end(), "SACM ArgumentReasoning"), strategy_names.end());
+// The mapping this tool exists to make: a SACM element onto the
+// notation-neutral role SCCG publishes for tools whose model is neither GSN nor
+// CAE. Held against the catalog's own `selectable_elements`, so a role invented
+// here rather than published upstream fails.
+TEST(AiClaimReviewTest, MapsSacmElementsOntoPublishedSccgElementRoles) {
+    struct RoleCase {
+        const char* raw_type;
+        const char* assertion_declaration;
+        core::NodeRole node_role;
+        bool counter_source;
+        const char* expected_role;
+    };
+    const std::vector<RoleCase> role_cases{
+        {"claim", "", core::NodeRole::Claim, false, "claim"},
+        {"argumentreasoning", "", core::NodeRole::Strategy, false, "strategy"},
+        {"artifactreference", "", core::NodeRole::Solution, false, "evidence"},
+        {"artifact", "", core::NodeRole::Context, false, "context"},
+        {"claim", "assumed", core::NodeRole::Assumption, false, "assumption"},
+        {"claim", "justification", core::NodeRole::Justification, false, "justification"},
+        {"claim", "", core::NodeRole::Claim, true, "challenge"},
+    };
 
+    std::vector<std::string> published_roles;
+    for (const parser::SelectableElement& element : Catalog().selectable_elements) {
+        published_roles.push_back(element.element_role);
+    }
+    ASSERT_FALSE(published_roles.empty()) << "The catalog publishes no selectable elements.";
+
+    for (const RoleCase& role_case : role_cases) {
+        SCOPED_TRACE(role_case.expected_role);
+        parser::SacmElement element = MakeElement("E1", role_case.raw_type, "Element", "Some text.");
+        element.assertion_declaration = role_case.assertion_declaration;
+        core::TreeNode node;
+        node.id = element.id;
+        node.role = role_case.node_role;
+        node.is_counter_source = role_case.counter_source;
+
+        const std::string role = review::SccgElementRoleForElement(element, &node);
+        EXPECT_EQ(role, role_case.expected_role);
+        EXPECT_NE(std::find(published_roles.begin(), published_roles.end(), role), published_roles.end())
+            << role << " is not a role SCCG publishes.";
+    }
+
+    // And without a tree node, from the element alone.
+    parser::SacmElement strategy = MakeElement("S1", "argumentreasoning", "Strategy", "By decomposition.");
+    EXPECT_EQ(review::SccgElementRoleForElement(strategy), "strategy");
     parser::SacmElement evidence = MakeElement("E1", "artifactreference", "Evidence", {}, "Test report.");
-    std::vector<std::string> evidence_names = review::SccgAppliesToNamesForElement(evidence);
-    EXPECT_NE(std::find(evidence_names.begin(), evidence_names.end(), "GSN Solution"), evidence_names.end());
-    EXPECT_NE(std::find(evidence_names.begin(), evidence_names.end(), "SACM ArtifactReference"), evidence_names.end());
+    EXPECT_EQ(review::SccgElementRoleForElement(evidence), "evidence");
+}
+
+// The three absence states this method reports are SCCG's, minus `available`,
+// which is the present case. A state named here and not published would be a
+// vocabulary of our own wearing SCCG's clothes.
+TEST(AiClaimReviewTest, EveryAbsenceStateIsOnePublishedByTheCatalog) {
+    ASSERT_FALSE(Catalog().availability_states.empty());
+    for (const review::DataPackageAbsence absence : {review::DataPackageAbsence::NotImplemented,
+                                                     review::DataPackageAbsence::Empty,
+                                                     review::DataPackageAbsence::Withheld}) {
+        const std::string id = review::DataPackageAbsenceToString(absence);
+        EXPECT_NE(Catalog().FindAvailabilityStateById(id), nullptr) << id;
+    }
+    EXPECT_NE(Catalog().FindAvailabilityStateById("available"), nullptr);
+}
+
+// EVIDENCE_BASIS stays required and this tool still has no source for it. What
+// changed is that the catalog now says what a review missing it should do, so
+// the degradation is declared rather than improvised.
+TEST(AiClaimReviewTest, EvidenceBasisAbsenceCarriesTheProfilesDeclaredDegradation) {
+    parser::AssuranceCase assurance_case;
+    assurance_case.elements.push_back(MakeElement("SN1", "artifactreference", "Evidence", {}, "Test report."));
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    const parser::ReviewProfile* profile = Catalog().FindReviewProfileById("evidence_review");
+    ASSERT_NE(profile, nullptr);
+
+    review::AiReviewDataPackageBundle packages;
+    std::string error;
+    ASSERT_TRUE(review::CollectAiReviewDataPackages(assurance_case, tree, "SN1", Catalog(), profile, packages, error))
+        << error;
+
+    const review::AiReviewUnavailableDataPackage* basis = nullptr;
+    for (const review::AiReviewUnavailableDataPackage& package : packages.unavailable) {
+        if (package.id == "EVIDENCE_BASIS")
+            basis = &package;
+    }
+    ASSERT_NE(basis, nullptr);
+    EXPECT_TRUE(basis->required);
+    EXPECT_FALSE(basis->when_absent_statement.empty());
+    EXPECT_NE(std::find(basis->unassessable_guideline_ids.begin(), basis->unassessable_guideline_ids.end(), "EV.5"),
+              basis->unassessable_guideline_ids.end());
+    // And it reaches the model, not just the struct.
+    const review::AiReviewPayload payload;
+    const std::vector<const parser::Guideline*> guidelines;
+    const review::AiReviewRequestArtifacts artifacts =
+        review::BuildAiReviewRequestArtifacts(payload, guidelines, profile, &packages);
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("when_absent"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("EV.5"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+}
+
+// The two halves of a `when_absent` entry are serialized independently. A
+// catalog that names the guidelines it cannot assess but leaves the instruction
+// empty still has to reach the model with that list -- dropping it would hide
+// exactly what the entry exists to declare.
+TEST(AiClaimReviewTest, AnUnassessableGuidelineListSurvivesAnEmptyWhenAbsentStatement) {
+    review::AiReviewDataPackageBundle packages;
+    review::AiReviewUnavailableDataPackage absent;
+    absent.id = "EVIDENCE_BASIS";
+    absent.reason = "No source for this package.";
+    absent.required = true;
+    absent.unassessable_guideline_ids = {"EV.5", "EV.6"};
+    packages.unavailable.push_back(std::move(absent));
+
+    const review::AiReviewPayload payload;
+    const std::vector<const parser::Guideline*> guidelines;
+    const review::AiReviewRequestArtifacts artifacts =
+        review::BuildAiReviewRequestArtifacts(payload, guidelines, nullptr, &packages);
+
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("unassessable_guideline_ids"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("EV.6"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
+    EXPECT_EQ(artifacts.unavailableDataPackagesJson.find("when_absent"), std::string::npos)
+        << artifacts.unavailableDataPackagesJson;
 }
 
 TEST(AiClaimReviewTest, BuildsPromptWithProvidedClaimGuidelinesAndPayload) {
@@ -377,8 +568,8 @@ review::AiReviewDataPackageBundle CollectFor(const parser::AssuranceCase& assura
     const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
     review::AiReviewDataPackageBundle packages;
     std::string error;
-    EXPECT_TRUE(
-        review::CollectAiReviewDataPackages(assurance_case, tree, element_id, nullptr, packages, error, context))
+    EXPECT_TRUE(review::CollectAiReviewDataPackages(
+        assurance_case, tree, element_id, Catalog(), nullptr, packages, error, context))
         << error;
     return packages;
 }
@@ -508,7 +699,8 @@ TEST(AiClaimReviewTest, IncludesHistoryForInScopeElementsBeyondTheSelectedOne) {
     const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
     review::AiReviewDataPackageBundle packages;
     std::string error;
-    ASSERT_TRUE(review::CollectAiReviewDataPackages(assurance_case, tree, "G2", nullptr, packages, error, &context))
+    ASSERT_TRUE(
+        review::CollectAiReviewDataPackages(assurance_case, tree, "G2", Catalog(), nullptr, packages, error, &context))
         << error;
 
     ASSERT_TRUE(HasPackage(packages, "CHANGE_HISTORY"));

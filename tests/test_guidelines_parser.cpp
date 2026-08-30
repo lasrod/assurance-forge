@@ -61,24 +61,54 @@ review_profiles:
   - id: "claim_wording_review"
     display_name: "Claim wording review"
     description: "Reviews claim wording."
-    applies_to: ["GSN Goal", "SACM Claim"]
+    applies_to: ["GSN Goal", "CAE Claim"]
     guideline_ids: ["CL.1"]
-    required_data: ["SEL"]
+    required_data: ["SELECTED_CLAIM"]
     optional_data: ["PARENT"]
+    when_absent:
+      - id: "PARENT"
+        statement: "Without the parent, judge wording alone."
+        unassessable_guideline_ids: ["CL.1"]
+selectable_elements:
+  - element: "GSN Goal"
+    notation: "GSN"
+    element_role: "claim"
+    basis: "GSN Community Standard v3 core element (Goal)."
 data_packages:
-  - id: "SEL"
-    display_name: "Selected element"
-    description: "Selected element."
+  - id: "SELECTED_CLAIM"
+    display_name: "Selected claim"
+    description: "Selected claim."
+    role: "selected_element"
+    element_role: "claim"
     required_fields: ["element_id", "element_type", "text"]
     optional_fields: []
+availability_states:
+  - id: "withheld"
+    display_name: "Withheld"
+    meaning: "The data exists and was deliberately not shared."
 prechecks:
   - id: "check-claim-is-proposition"
     display_name: "Claim is proposition"
     related_guideline_ids: ["CL.1"]
-    expected_data: ["SEL"]
+    expected_data: ["SELECTED_CLAIM"]
     result_type: "boolean_candidate"
     description: "Detects non-proposition claim text."
+    fires_when: "The claim has no predicate asserting a property."
     interpretation: "Candidate finding only."
+authoring_guidance:
+  description: "The writing-time subset."
+  usage: "Render each rule from short_rule and cite its id."
+  core_rules:
+    - id: "CL.1"
+      category: "CL"
+      short_rule: "State each claim as a proposition."
+      statement: "State each claim as a sentence that can be shown true or false."
+      reason: "A topic label cannot be reviewed."
+  element_rules:
+    - element_role: "claim"
+      elements: ["GSN Goal", "CAE Claim"]
+      guideline_ids: ["CL.1"]
+      review_profile_id: "claim_wording_review"
 )yaml";
 
 std::filesystem::path RepositoryGuidelinesPath() {
@@ -160,9 +190,30 @@ TEST(GuidelinesParserTest, ParsesMinimalYamlAndFetchesGuidelines) {
     EXPECT_EQ(profile_matches[0]->id, "CL.1");
 
     ASSERT_EQ(result.value().data_packages.size(), 1u);
-    EXPECT_EQ(result.value().data_packages[0].id, "SEL");
+    EXPECT_EQ(result.value().data_packages[0].id, "SELECTED_CLAIM");
+    EXPECT_EQ(result.value().data_packages[0].role, "selected_element");
+    EXPECT_EQ(result.value().data_packages[0].element_role, "claim");
     ASSERT_EQ(result.value().prechecks.size(), 1u);
     EXPECT_EQ(result.value().prechecks[0].related_guideline_ids[0], "CL.1");
+    EXPECT_FALSE(result.value().prechecks[0].fires_when.empty());
+
+    // The lookup the review method uses in place of naming a package: the
+    // profile requires one package whose role is `selected_element`, and that
+    // package carries the element role the profile reviews.
+    const parser::DataPackage* selected = result.value().FindSelectedElementPackage(*profile);
+    ASSERT_NE(selected, nullptr);
+    EXPECT_EQ(selected->id, "SELECTED_CLAIM");
+    EXPECT_EQ(result.value().ElementRoleForSelectableElement("GSN Goal"), "claim");
+    EXPECT_TRUE(result.value().ElementRoleForSelectableElement("GSN Nonesuch").empty());
+    ASSERT_EQ(profile->when_absent.size(), 1u);
+    EXPECT_EQ(profile->when_absent[0].id, "PARENT");
+    ASSERT_NE(result.value().FindAvailabilityStateById("withheld"), nullptr);
+
+    const parser::AuthoringElementRule* element_rule = result.value().FindAuthoringElementRule("claim");
+    ASSERT_NE(element_rule, nullptr);
+    EXPECT_EQ(element_rule->review_profile_id, "claim_wording_review");
+    ASSERT_EQ(result.value().authoring_guidance.core_rules.size(), 1u);
+    EXPECT_EQ(result.value().authoring_guidance.core_rules[0].short_rule, "State each claim as a proposition.");
 }
 
 TEST(GuidelinesParserTest, ParsesOldGuidelineFieldNamesAsFallback) {
@@ -240,8 +291,8 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     auto result = parser::GuidelinesParser::ParseFile(RepositoryGuidelinesPath().string());
 
     ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
-    EXPECT_EQ(result.value().schema_version, "1.0.0");
-    EXPECT_EQ(result.value().sccg_version, "0.6.0");
+    EXPECT_EQ(result.value().schema_version, "2.0.0");
+    EXPECT_EQ(result.value().sccg_version, "0.7.0");
     EXPECT_EQ(result.value().metadata.title, "Safety Case Core Guidelines");
     EXPECT_FALSE(result.value().categories.empty());
     EXPECT_FALSE(result.value().reference_sources.empty());
@@ -285,8 +336,8 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
     auto result = parser::SccgDistParser::ParseDirectory(RepositorySccgDistPath());
 
     ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
-    EXPECT_EQ(result.value().schema_version, "1.0.0");
-    EXPECT_EQ(result.value().sccg_version, "0.6.0");
+    EXPECT_EQ(result.value().schema_version, "2.0.0");
+    EXPECT_EQ(result.value().sccg_version, "0.7.0");
     EXPECT_GT(result.value().guidelines.size(), 30u);
     EXPECT_FALSE(result.value().review_profiles.empty());
     EXPECT_FALSE(result.value().data_packages.empty());
@@ -314,6 +365,200 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
         EXPECT_TRUE(applies) << applicable_element;
     }
     EXPECT_EQ(result.value().review_profiles.size(), 7u);
+
+    // Every released profile names exactly one selected-element package, and its
+    // role is one the catalog publishes as selectable. The dist parser refuses a
+    // catalog where that is not true, so this is the positive half of that gate.
+    for (const parser::ReviewProfile& released_profile : result.value().review_profiles) {
+        SCOPED_TRACE(released_profile.id);
+        const parser::DataPackage* selected = result.value().FindSelectedElementPackage(released_profile);
+        ASSERT_NE(selected, nullptr);
+        EXPECT_FALSE(selected->element_role.empty());
+        bool role_is_selectable = false;
+        for (const parser::SelectableElement& element : result.value().selectable_elements) {
+            role_is_selectable = role_is_selectable || element.element_role == selected->element_role;
+        }
+        EXPECT_TRUE(role_is_selectable) << selected->element_role;
+    }
+
+    // The tool contract 0.7.0 publishes, read off the same files the runtime
+    // loads: word lists with an effect, numeric thresholds, notation-neutral
+    // repairs, the four availability states, the writing-time subset, and the
+    // document block that used to reach only the YAML fallback.
+    const parser::Guideline* cl5 = result.value().FindGuidelineById("CL.5");
+    ASSERT_NE(cl5, nullptr);
+    EXPECT_FALSE(cl5->short_rule.empty());
+    EXPECT_FALSE(cl5->tool.markers.empty());
+    EXPECT_FALSE(cl5->tool.repair.empty());
+    bool cl5_suppresses = false;
+    for (const parser::GuidelineMarker& marker : cl5->tool.markers) {
+        EXPECT_FALSE(marker.effect.empty());
+        cl5_suppresses = cl5_suppresses || marker.effect == "suppress";
+    }
+    EXPECT_TRUE(cl5_suppresses);
+
+    const parser::Guideline* cl3 = result.value().FindGuidelineById("CL.3");
+    ASSERT_NE(cl3, nullptr);
+    ASSERT_FALSE(cl3->tool.thresholds.empty());
+    EXPECT_EQ(cl3->tool.thresholds[0].id, "claim_word_count");
+    EXPECT_GT(cl3->tool.thresholds[0].value, 0.0);
+
+    const parser::Guideline* ar2 = result.value().FindGuidelineById("AR.2");
+    ASSERT_NE(ar2, nullptr);
+    ASSERT_FALSE(ar2->tool.repair.empty());
+    EXPECT_EQ(ar2->tool.repair[0].action, "add_element");
+    EXPECT_EQ(ar2->tool.repair[0].element_role, "strategy");
+    EXPECT_EQ(ar2->tool.repair[0].attach_to, "between_selected_and_children");
+
+    for (const char* state_id : {"available", "not_implemented", "empty", "withheld"}) {
+        EXPECT_NE(result.value().FindAvailabilityStateById(state_id), nullptr) << state_id;
+    }
+
+    const parser::ReviewProfile* evidence_profile = result.value().FindReviewProfileById("evidence_review");
+    ASSERT_NE(evidence_profile, nullptr);
+    ASSERT_FALSE(evidence_profile->when_absent.empty());
+    EXPECT_EQ(evidence_profile->when_absent[0].id, "EVIDENCE_BASIS");
+    EXPECT_FALSE(evidence_profile->when_absent[0].unassessable_guideline_ids.empty());
+
+    EXPECT_EQ(result.value().metadata.title, "Safety Case Core Guidelines");
+    EXPECT_FALSE(result.value().metadata.purpose.empty());
+    EXPECT_EQ(result.value().metadata.license.id, "CC-BY-4.0");
+
+    EXPECT_FALSE(result.value().authoring_guidance.core_rules.empty());
+    EXPECT_FALSE(result.value().authoring_guidance.usage.empty());
+    const parser::AuthoringElementRule* claim_rule = result.value().FindAuthoringElementRule("claim");
+    ASSERT_NE(claim_rule, nullptr);
+    EXPECT_EQ(claim_rule->review_profile_id, "claim_review");
+
+    // Every prechecks entry states its firing condition, so two tools implement
+    // the same check rather than each reading the description for itself.
+    for (const parser::Precheck& precheck : result.value().prechecks) {
+        EXPECT_FALSE(precheck.fires_when.empty()) << precheck.id;
+    }
+
+    // Two routes from an element role to the profile that judges it: the
+    // published `element_rules`, and the profile whose required
+    // selected-element package carries that role. The second is what the MCP
+    // prompts fall back to when `authoring_guidance.json` is absent -- it is
+    // optional in a dist directory -- so the two must agree, or the fallback
+    // would quietly quote a different profile's guidelines.
+    ASSERT_FALSE(result.value().authoring_guidance.element_rules.empty());
+    for (const parser::AuthoringElementRule& rule : result.value().authoring_guidance.element_rules) {
+        SCOPED_TRACE(rule.element_role);
+        const parser::ReviewProfile* derived = result.value().FindReviewProfileForElementRole(rule.element_role);
+        ASSERT_NE(derived, nullptr);
+        EXPECT_EQ(derived->id, rule.review_profile_id);
+    }
+    EXPECT_EQ(result.value().FindReviewProfileForElementRole("nonesuch"), nullptr);
+    EXPECT_EQ(result.value().FindReviewProfileForElementRole(""), nullptr);
+}
+
+namespace {
+
+// A minimal dist directory, so the consistency gate can be exercised on a
+// catalog shaped wrongly on purpose. `selected_element_role` empty means the
+// profile requires a supporting package and names no selected element at all.
+std::filesystem::path WriteDistFixture(const std::string& name,
+                                       const std::vector<std::string>& required_data,
+                                       const std::vector<std::string>& package_roles,
+                                       bool selected_packages_carry_an_element_role = true) {
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / ("af_sccg_dist_" + name);
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+
+    nlohmann::json packages = nlohmann::json::array();
+    for (std::size_t index = 0; index < required_data.size(); ++index) {
+        nlohmann::json package{
+            {"id", required_data[index]},
+            {"display_name", required_data[index]},
+            {"role", package_roles[index]},
+        };
+        if (package_roles[index] == "selected_element" && selected_packages_carry_an_element_role) {
+            package["element_role"] = "claim";
+        }
+        packages.push_back(std::move(package));
+    }
+
+    const nlohmann::json profiles{
+        {"schema_version", "2.0.0"},
+        {"sccg_version", "0.7.0"},
+        {"review_profiles",
+         nlohmann::json::array({nlohmann::json{{"id", "claim_review"},
+                                               {"display_name", "Claim review"},
+                                               {"applies_to", nlohmann::json::array({"GSN Goal"})},
+                                               {"guideline_ids", nlohmann::json::array({"CL.1"})},
+                                               {"required_data", required_data}}})},
+    };
+    std::ofstream(directory / "review_profiles.json") << profiles.dump(2);
+    std::ofstream(directory / "data_packages.json")
+        << nlohmann::json{{"schema_version", "2.0.0"}, {"sccg_version", "0.7.0"}, {"data_packages", packages}}.dump(2);
+    std::ofstream(directory / "ai_rule_export.jsonl") << nlohmann::json{{"id", "CL.1"},
+                                                                        {"title", "Write each claim"},
+                                                                        {"statement", "State each claim."},
+                                                                        {"rationale", "Because."},
+                                                                        {"category", "CL"},
+                                                                        {"schema_version", "2.0.0"},
+                                                                        {"sccg_version", "0.7.0"}}
+                                                             .dump()
+                                                      << "\n";
+    return directory;
+}
+
+} // namespace
+
+// The failure this gate exists for was silent: SCCG 0.6.0's one generic `SEL`
+// package became seven role-specific ones, and a tool that kept sending `SEL`
+// went on running -- reporting the profile's real requirement as an unavailable
+// *required* package on every review, with nothing failing to say so. A profile
+// whose selected element cannot be named is a catalog this parser refuses.
+TEST(GuidelinesParserTest, RefusesAProfileThatNamesNoSelectedElementPackage) {
+    const std::filesystem::path directory = WriteDistFixture("no_selected", {"PARENT"}, {"supporting"});
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_NE(result.error().find("selected-element data packages"), std::string::npos) << result.error();
+    std::filesystem::remove_all(directory);
+}
+
+TEST(GuidelinesParserTest, RefusesAProfileThatNamesTwoSelectedElementPackages) {
+    const std::filesystem::path directory = WriteDistFixture(
+        "two_selected", {"SELECTED_CLAIM", "SELECTED_STRATEGY"}, {"selected_element", "selected_element"});
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_NE(result.error().find("selected-element data packages"), std::string::npos) << result.error();
+    std::filesystem::remove_all(directory);
+}
+
+// The role, not the package id, is what everything downstream matches on. A
+// package carrying `role: selected_element` and no `element_role` would match
+// no element at all, so every review would fail with "no SCCG review profile
+// applies to the selected element type" -- a message about the argument, for a
+// defect in the catalog.
+TEST(GuidelinesParserTest, RefusesASelectedElementPackageWithNoElementRole) {
+    const std::filesystem::path directory = WriteDistFixture("no_element_role",
+                                                             {"SELECTED_CLAIM"},
+                                                             {"selected_element"},
+                                                             /*selected_packages_carry_an_element_role=*/false);
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_NE(result.error().find("no element_role"), std::string::npos) << result.error();
+    std::filesystem::remove_all(directory);
+}
+
+TEST(GuidelinesParserTest, AcceptsAProfileNamingExactlyOneSelectedElementPackage) {
+    const std::filesystem::path directory =
+        WriteDistFixture("one_selected", {"SELECTED_CLAIM", "PARENT"}, {"selected_element", "supporting"});
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const parser::ReviewProfile* profile = result.value().FindReviewProfileById("claim_review");
+    ASSERT_NE(profile, nullptr);
+    const parser::DataPackage* selected = result.value().FindSelectedElementPackage(*profile);
+    ASSERT_NE(selected, nullptr);
+    EXPECT_EQ(selected->id, "SELECTED_CLAIM");
+    std::filesystem::remove_all(directory);
 }
 
 TEST(GuidelinesParserTest, SccgSchemaContractsArePresentAndReadable) {

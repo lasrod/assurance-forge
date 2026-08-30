@@ -1,6 +1,7 @@
 #include "core/sccg/staged_checks.h"
 
 #include "core/assurance_tree.h"
+#include "core/guideline_catalog.h"
 #include "core/problems/argument_cycles.h"
 
 #include <algorithm>
@@ -64,6 +65,19 @@ constexpr Guideline kSingleProperty{"CL.2",
                                     "check-single-property",
                                     "Do not bundle multiple distinct properties, conclusions, or obligations into "
                                     "one goal."};
+// CL.3 and CL.4 were both deferred for want of a published number and a
+// published word list. SCCG 0.7.0 supplies each: `claim_word_count` under CL.3's
+// `tool.thresholds`, and CL.4's `ambiguous_qualifier` and `hedging_adverb`
+// markers.
+constexpr Guideline kClaimLength{
+    "CL.3",
+    "check-claim-length-and-role-mixing",
+    "Do not pack argument structure, scope, decomposition topics, and caveats into a single claim. Keep the "
+    "claim short, and express the rest through context, strategy, assumptions, and sub-claims."};
+constexpr Guideline kClaimAmbiguity{"CL.4",
+                                    "check-claim-ambiguity",
+                                    "Write claims so that their meaning is clear enough that competent reviewers "
+                                    "are likely to understand them in the same way."};
 // The catalog's CL.6 statement carries no trailing period; the drift test
 // compares byte for byte, so neither does this quote.
 constexpr Guideline kStepMixing{
@@ -102,100 +116,73 @@ constexpr Guideline kArguingFromAbsence{
     "check-completeness-vs-absence",
     "Do not treat lack of discovered evidence against a claim as positive evidence for the claim."};
 
-// The terms CL.5 names. Taken from the guideline text rather than invented, so
-// the check cannot drift from what SCCG actually asks for.
-const std::vector<std::string>& UnboundedQualifiers() {
-    static const std::vector<std::string> terms{
-        "safe", "timely", "effective", "normal", "robust", "all", "every", "never"};
+// The word lists these checks match on used to be written out here, each
+// derived by hand from a guideline's statement, detection hints or examples.
+// SCCG 0.7.0 publishes them: `tool.markers` gives 27 guidelines their terms and
+// says what a hit means, and `tool.thresholds` gives CL.3 and LF.6 their
+// numbers. Two tools matching different words are not running the same check,
+// so the lists come from the catalog now and this file holds none.
+//
+// Loaded lazily here rather than passed in: `CheckStagedArgument` is called
+// from four layers with no catalog of their own, and the catalog does not
+// change while the process runs. A catalog that cannot be loaded yields empty
+// lists, and `ImplementedCheckIds` then stops naming the checks that depend on
+// them -- an empty findings array must never stand for a check that never ran.
+const parser::GuidelinesDocument* CatalogDocument() {
+    static core::GuidelineCatalog catalog;
+    static const bool loaded = [] {
+        std::string error;
+        return core::LoadGuidelineCatalog(catalog, error);
+    }();
+    return loaded ? &catalog.document : nullptr;
+}
+
+// The terms published for one guideline under one marker kind. `effect` is not
+// filtered here: each caller knows whether it is looking for a candidate marker,
+// a suppressing one, or an expected one whose *absence* is the signal.
+const std::vector<std::string>& MarkerTerms(const char* guideline_id, const char* kind) {
+    static const std::vector<std::string> none;
+    const parser::GuidelinesDocument* document = CatalogDocument();
+    if (document == nullptr) {
+        return none;
+    }
+    const parser::Guideline* guideline = document->FindGuidelineById(guideline_id);
+    if (guideline == nullptr) {
+        return none;
+    }
+    for (const parser::GuidelineMarker& marker : guideline->tool.markers) {
+        if (marker.kind == kind) {
+            return marker.terms;
+        }
+    }
+    return none;
+}
+
+// A published threshold, or zero when the catalog does not supply it. Zero is
+// the "cannot run" signal for the one check that uses one, the same way an
+// empty marker list is.
+double Threshold(const char* guideline_id, const char* threshold_id) {
+    const parser::GuidelinesDocument* document = CatalogDocument();
+    if (document == nullptr) {
+        return 0.0;
+    }
+    const parser::Guideline* guideline = document->FindGuidelineById(guideline_id);
+    if (guideline == nullptr) {
+        return 0.0;
+    }
+    for (const parser::GuidelineThreshold& threshold : guideline->tool.thresholds) {
+        if (threshold.id == threshold_id) {
+            return threshold.value;
+        }
+    }
+    return 0.0;
+}
+
+std::vector<std::string> ConcatenatedTerms(const std::vector<std::string>& first,
+                                           const std::vector<std::string>& second) {
+    std::vector<std::string> terms = first;
+    terms.insert(terms.end(), second.begin(), second.end());
     return terms;
-}
-
-// The property words CL.2's conjunction check pairs. CL.2's own detection
-// hints name "safe and secure" and "complete and correct"; the rest are the
-// evaluative terms CL.5's statement lists, which are the properties a bundled
-// goal most often bundles. A generic "and" would fire on every legitimate
-// compound noun, and a check that cries wolf gets ignored.
-const std::vector<std::string>& PropertyWords() {
-    static const std::vector<std::string> words{
-        "safe", "secure", "complete", "correct", "timely", "effective", "normal", "robust"};
-    return words;
-}
-
-// The lifecycle-step verbs CL.6 forbids chaining. From the statement's own
-// step names (identification, implementation, validation) plus the verb its
-// bad example chains ("mitigated and validated").
-const std::vector<std::string>& StepVerbs() {
-    static const std::vector<std::string> verbs{"identified", "implemented", "validated", "mitigated", "verified"};
-    return verbs;
-}
-
-// RD.1: reasoning smuggled into claim text. "Because" is the connective the
-// guideline's own bad example uses; "therefore" is the same defect running the
-// other direction. "Since" is deliberately absent -- it is temporal more often
-// than inferential, and a wolf-crying check gets ignored.
-const std::vector<std::string>& ReasoningConnectives() {
-    static const std::vector<std::string> connectives{"because", "therefore"};
-    return connectives;
-}
-
-// The promotional adjectives RD.4's detection hints name.
-const std::vector<std::string>& PromotionalWords() {
-    static const std::vector<std::string> words{"world-class", "cutting-edge", "outstanding", "best-in-class"};
-    return words;
-}
-
-// EV.4: any of these reads as a citation pointing inside an artifact rather
-// than at the whole of it. Taken from the guideline's statement ("section,
-// figure, table, dataset, or artifact portion") and the words its own good
-// example uses to do the pointing.
-const std::vector<std::string>& CitationLocators() {
-    static const std::vector<std::string> locators{"section",
-                                                   "figure",
-                                                   "table",
-                                                   "dataset",
-                                                   "clause",
-                                                   "appendix",
-                                                   "chapter",
-                                                   "annex",
-                                                   "page",
-                                                   "scenario",
-                                                   "scenarios",
-                                                   "test",
-                                                   "case",
-                                                   "req"};
-    return locators;
-}
-
-// EV.7: any of these reads as the evidence being under document control. The
-// attribute names come from the guideline's statement; "rev" and "approved"
-// are how its own good example writes two of them.
-const std::vector<std::string>& ControlMarkers() {
-    static const std::vector<std::string> markers{
-        "owner", "version", "rev", "revision", "date", "status", "approved", "baseline"};
-    return markers;
-}
-
-// EV.8: words that read as live mutable content. "Wiki" and the shared-doc
-// platforms are from the guideline's detection hints and bad example;
-// "latest" is the mutable reference in prose form.
-const std::vector<std::string>& MutableSourceWords() {
-    static const std::vector<std::string> words{"wiki", "confluence", "sharepoint", "latest"};
-    return words;
-}
-
-// EV.8: any of these fixes the cited state, which is exactly what its good
-// examples add to an otherwise mutable reference.
-const std::vector<std::string>& FixedStateMarkers() {
-    static const std::vector<std::string> markers{
-        "version", "rev", "revision", "snapshot", "archived", "approved", "captured"};
-    return markers;
-}
-
-// LF.3: absence-of-finding verbs. Fires only together with a whole-word "no",
-// which is the shape of its bad example ("no further hazards were found").
-const std::vector<std::string>& AbsenceVerbs() {
-    static const std::vector<std::string> verbs{"found", "observed", "identified", "detected", "reported"};
-    return verbs;
 }
 
 std::string Lowercased(const std::string& text) {
@@ -242,11 +229,14 @@ std::string FirstWordIn(const std::string& haystack_lower, const std::vector<std
     return {};
 }
 
-// A "<first> and <second>" pair with both words from `words`, whole-word. The
-// shape of CL.2's "safe and secure" and CL.6's "mitigated and validated": the
-// conjunction is what bundles two judgements into one sentence.
+// A "<first> <conjunction> <second>" pair with both words from `words`,
+// whole-word. The shape CL.2's published check describes -- "two or more
+// distinct property terms joined by a conjunction within one claim; one property
+// term alone is not a signal" -- with the conjunctions themselves published as
+// CL.2's `conjunction` marker rather than the bare " and " this used to assume.
 bool FindConjunctionPair(const std::string& haystack_lower,
                          const std::vector<std::string>& words,
+                         const std::vector<std::string>& conjunctions,
                          std::string& first,
                          std::string& second) {
     for (const std::string& left : words) {
@@ -254,14 +244,35 @@ bool FindConjunctionPair(const std::string& haystack_lower,
             if (left == right) {
                 continue;
             }
-            if (ContainsWord(haystack_lower, std::format("{} and {}", left, right))) {
-                first = left;
-                second = right;
-                return true;
+            for (const std::string& conjunction : conjunctions) {
+                if (ContainsWord(haystack_lower, std::format("{} {} {}", left, conjunction, right))) {
+                    first = left;
+                    second = right;
+                    return true;
+                }
             }
         }
     }
     return false;
+}
+
+// Words in a stretch of text, counted the way CL.3's `claim_word_count`
+// threshold means them: runs separated by whitespace.
+std::size_t WordCount(const std::string& text) {
+    std::size_t words = 0;
+    bool in_word = false;
+    for (const char character : text) {
+        const bool is_space = std::isspace(static_cast<unsigned char>(character)) != 0;
+        if (is_space) {
+            in_word = false;
+            continue;
+        }
+        if (!in_word) {
+            ++words;
+            in_word = true;
+        }
+    }
+    return words;
 }
 
 // A four-digit year with non-digit boundaries. EV.7's good example carries its
@@ -363,21 +374,49 @@ const std::vector<std::string>& ImplementedCheckIds() {
     // Written out rather than derived from a run: a check that happens not to
     // fire on one argument is still implemented, and a list built from findings
     // would shrink to whatever the last case tripped.
-    static const std::vector<std::string> ids{
-        "check-evidence-trace",
-        "check-explicit-strategy",
-        "check-element-role-misuse",
-        "check-circular-support",
-        "check-bounded-qualifiers",
-        "check-single-property",
-        "check-claim-step-mixing",
-        "check-element-signposting",
-        "check-promotional-language",
-        "check-completeness-vs-absence",
-        "check-evidence-citation-precision",
-        "check-evidence-control-attributes",
-        "check-evidence-state-fixed",
-    };
+    //
+    // The lexical checks are conditional on the catalog, because their word
+    // lists and thresholds come from it. Naming one the catalog could not
+    // supply would be the exact claim this list exists to prevent: an agent
+    // reading an empty findings array has no way to tell "this check found
+    // nothing" from "this check never ran".
+    static const std::vector<std::string> ids = [] {
+        std::vector<std::string> collected{
+            // Structural. Decided from the argument graph, so they run whether
+            // or not the catalog loaded.
+            "check-evidence-trace",
+            "check-explicit-strategy",
+            "check-element-role-misuse",
+            "check-circular-support",
+        };
+        struct LexicalCheck {
+            const char* check_id;
+            const char* guideline_id;
+            const char* required_marker_kind;
+        };
+        static constexpr LexicalCheck kLexicalChecks[] = {
+            {"check-bounded-qualifiers", "CL.5", "unbounded_evaluative_term"},
+            {"check-single-property", "CL.2", "property_term"},
+            {"check-claim-length-and-role-mixing", "CL.3", nullptr},
+            {"check-claim-ambiguity", "CL.4", "ambiguous_qualifier"},
+            {"check-claim-step-mixing", "CL.6", "lifecycle_step_verb"},
+            {"check-element-signposting", "RD.1", "inference_connective"},
+            {"check-promotional-language", "RD.4", "promotional_term"},
+            {"check-completeness-vs-absence", "LF.3", "absence_phrase"},
+            {"check-evidence-citation-precision", "EV.4", "citation_precision_marker"},
+            {"check-evidence-control-attributes", "EV.7", "control_attribute_marker"},
+            {"check-evidence-state-fixed", "EV.8", "mutable_source_marker"},
+        };
+        for (const LexicalCheck& check : kLexicalChecks) {
+            const bool available = check.required_marker_kind == nullptr
+                                       ? Threshold(check.guideline_id, "claim_word_count") > 0.0
+                                       : !MarkerTerms(check.guideline_id, check.required_marker_kind).empty();
+            if (available) {
+                collected.emplace_back(check.check_id);
+            }
+        }
+        return collected;
+    }();
     return ids;
 }
 
@@ -501,30 +540,87 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
         const std::string text = Lowercased(ElementText(*element));
 
         if (node->role == NodeRole::Claim) {
-            // CL.5: an unbounded evaluative or universal qualifier.
-            for (const std::string& term : UnboundedQualifiers()) {
-                if (!ContainsWord(text, term)) {
-                    continue;
-                }
+            // CL.5: an unbounded evaluative or universal qualifier, unless the
+            // claim already carries a bounding marker. The suppression is
+            // published as CL.5's `bounding_marker` and is new here: a claim
+            // saying "safe as defined in the acceptance criterion" was reported
+            // for the word "safe" while stating exactly the bound the guideline
+            // asks for.
+            const bool bounded = !FirstWordIn(text, MarkerTerms("CL.5", "bounding_marker")).empty();
+            const std::string unbounded_term =
+                bounded ? std::string()
+                        : FirstWordIn(text,
+                                      ConcatenatedTerms(MarkerTerms("CL.5", "unbounded_evaluative_term"),
+                                                        MarkerTerms("CL.5", "universal_qualifier")));
+            if (!unbounded_term.empty()) {
                 Add(findings,
                     kBoundQualifiers,
-                    "This claim uses \"" + term +
+                    "This claim uses \"" + unbounded_term +
                         "\", which SCCG names as a term needing bounds. Say what it means here -- "
                         "against which hazards, in which operating conditions, to what standard -- "
                         "in the claim or in attached context.",
                     id,
                     FindingSeverity::Advisory,
-                    {term});
-                break;
+                    {unbounded_term});
+            }
+
+            // CL.4: a qualifier or hedge that leaves two competent reviewers
+            // reading the claim differently. Skipped where CL.5 already
+            // objected to the same word -- "adequate" and "appropriate" appear
+            // in both lists, and two advisories quoting one word read as two
+            // problems.
+            const std::string ambiguous_term = FirstWordIn(
+                text,
+                ConcatenatedTerms(MarkerTerms("CL.4", "ambiguous_qualifier"), MarkerTerms("CL.4", "hedging_adverb")));
+            if (!ambiguous_term.empty() && ambiguous_term != unbounded_term) {
+                Add(findings,
+                    kClaimAmbiguity,
+                    "This claim uses \"" + ambiguous_term +
+                        "\", which two competent reviewers can read differently. Say what the claim "
+                        "asserts and of what, in terms a reviewer could check.",
+                    id,
+                    FindingSeverity::Advisory,
+                    {ambiguous_term});
+            }
+
+            // CL.3, both halves of the condition the catalog publishes: a claim
+            // past the word count, or one whose enumeration marker introduces a
+            // list of topics. Reporting only the first under this check id would
+            // let an agent deduplicating on the id read a silent result as the
+            // whole check having run.
+            const double word_limit = Threshold("CL.3", "claim_word_count");
+            const std::size_t words = WordCount(text);
+            const std::string enumeration = FirstWordIn(text, MarkerTerms("CL.3", "enumeration_marker"));
+            if (word_limit > 0.0 && static_cast<double>(words) > word_limit) {
+                Add(findings,
+                    kClaimLength,
+                    std::format("This claim runs to {} words, past the {} SCCG publishes as the point "
+                                "where a claim is carrying more than a claim. Move scope into context, "
+                                "reasoning into a strategy, and listed topics into sub-claims.",
+                                words,
+                                static_cast<long long>(word_limit)),
+                    id,
+                    FindingSeverity::Advisory,
+                    {std::to_string(words), std::to_string(static_cast<long long>(word_limit))});
+            } else if (!enumeration.empty()) {
+                Add(findings,
+                    kClaimLength,
+                    "This claim uses \"" + enumeration +
+                        "\" to introduce a list of topics, which is a decomposition written as prose. "
+                        "Make each listed topic a sub-claim, so the structure carries the breakdown.",
+                    id,
+                    FindingSeverity::Advisory,
+                    {enumeration});
             }
 
             // CL.2: two distinct properties bundled by a conjunction.
+            const std::vector<std::string> conjunctions = MarkerTerms("CL.2", "conjunction");
             std::string first;
             std::string second;
-            if (FindConjunctionPair(text, PropertyWords(), first, second)) {
+            if (FindConjunctionPair(text, MarkerTerms("CL.2", "property_term"), conjunctions, first, second)) {
                 Add(findings,
                     kSingleProperty,
-                    std::format("This claim joins \"{} and {}\" -- two distinct properties needing "
+                    std::format("This claim joins \"{}\" and \"{}\" -- two distinct properties needing "
                                 "different evidence and review. Give each its own goal, so one can "
                                 "fail without hiding the other.",
                                 first,
@@ -534,11 +630,16 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
                     {first, second});
             }
 
-            // CL.6: lifecycle steps chained into one judgement.
-            if (FindConjunctionPair(text, StepVerbs(), first, second)) {
+            // CL.6: lifecycle steps chained into one judgement. SCCG's own
+            // check fires on "two or more lifecycle step verbs within one
+            // claim"; requiring the conjunction is a narrowing calibration --
+            // the shape of the guideline's own bad example, and what lets the
+            // finding quote the chain it objected to rather than two words that
+            // happen to share a sentence.
+            if (FindConjunctionPair(text, MarkerTerms("CL.6", "lifecycle_step_verb"), conjunctions, first, second)) {
                 Add(findings,
                     kStepMixing,
-                    std::format("This claim chains \"{} and {}\" -- different logical steps answering "
+                    std::format("This claim chains \"{}\" and \"{}\" -- different logical steps answering "
                                 "different review questions. Give each step its own claim, and let "
                                 "the structure show the decomposition.",
                                 first,
@@ -549,7 +650,7 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             }
 
             // RD.1: reasoning smuggled into the claim sentence.
-            const std::string connective = FirstWordIn(text, ReasoningConnectives());
+            const std::string connective = FirstWordIn(text, MarkerTerms("RD.1", "inference_connective"));
             if (!connective.empty()) {
                 Add(findings,
                     kSignposting,
@@ -566,7 +667,11 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
         // LF.3: absence of discovered evidence offered as support. Claims and
         // justifications, because that is where its bad example writes it.
         if (node->role == NodeRole::Claim || node->role == NodeRole::Justification) {
-            if (ContainsWord(text, "no") && !FirstWordIn(text, AbsenceVerbs()).empty()) {
+            // The published `absence_phrase` markers are whole phrases -- "no
+            // failures observed", "no known" -- rather than the "no" plus a
+            // verb this matched before, so a sentence that merely contains both
+            // words no longer fires.
+            if (!FirstWordIn(text, MarkerTerms("LF.3", "absence_phrase")).empty()) {
                 Add(findings,
                     kArguingFromAbsence,
                     "This text treats the absence of discovered evidence as support. Not finding "
@@ -579,7 +684,7 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
 
         // RD.4: promotional language, anywhere argument text lives.
         if (node->role == NodeRole::Claim || node->role == NodeRole::Strategy || node->role == NodeRole::Solution) {
-            const std::string promotional = FirstWordIn(text, PromotionalWords());
+            const std::string promotional = FirstWordIn(text, MarkerTerms("RD.4", "promotional_term"));
             if (!promotional.empty()) {
                 Add(findings,
                     kPromotionalLanguage,
@@ -594,7 +699,13 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
 
         if (node->role == NodeRole::Solution) {
             // EV.7: nothing on this evidence reads as document control.
-            const bool has_control_marker = !FirstWordIn(text, ControlMarkers()).empty() || ContainsYear(text);
+            // A four-digit year still counts as a control marker although
+            // SCCG's list says "dated": its own good example writes the date as
+            // "approved 2026-03-14", and complaining about a reference that
+            // carries one is the false positive that teaches a reviewer to stop
+            // reading findings.
+            const bool has_control_marker =
+                !FirstWordIn(text, MarkerTerms("EV.7", "control_attribute_marker")).empty() || ContainsYear(text);
             if (!has_control_marker) {
                 Add(findings,
                     kEvidenceControl,
@@ -609,7 +720,8 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             // Deliberately silent when the reference carries a section number in
             // any form -- "6.3", "§6" -- because the guideline asks for the
             // portion to be identified, not for a particular word to appear.
-            if (FirstWordIn(text, CitationLocators()).empty() && !ContainsSectionNumber(text)) {
+            if (FirstWordIn(text, MarkerTerms("EV.4", "citation_precision_marker")).empty() &&
+                !ContainsSectionNumber(text)) {
                 Add(findings,
                     kEvidenceCitationPrecision,
                     "This evidence names an artifact but no part of it, so a reviewer cannot find "
@@ -620,8 +732,9 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
             }
 
             // EV.8: a mutable source cited without anything fixing its state.
-            const std::string mutable_word = FirstWordIn(text, MutableSourceWords());
-            const bool state_fixed = !FirstWordIn(text, FixedStateMarkers()).empty() || ContainsYear(text);
+            const std::string mutable_word = FirstWordIn(text, MarkerTerms("EV.8", "mutable_source_marker"));
+            const bool state_fixed =
+                !FirstWordIn(text, MarkerTerms("EV.8", "fixing_marker")).empty() || ContainsYear(text);
             if (!mutable_word.empty() && !state_fixed) {
                 Add(findings,
                     kEvidenceFixed,

@@ -922,13 +922,26 @@ TRANSLATIONS = {
         "この主張は「{0}」を使用しており、SCCG はこれを境界付けが必要な用語として挙げています。どのハザード"
         "に対して、どの運用条件で、どの基準に照らしてなのか、その意味を主張内または付属するコンテキストで"
         "明示してください。",
-    "This claim joins \"{0} and {1}\" -- two distinct properties needing different evidence and "
-    "review. Give each its own goal, so one can fail without hiding the other.":
-        "この主張は「{0} と {1}」を結合しており、これらは異なるエビデンスと審査を必要とする別個の性質です。"
+    "This claim uses \"{0}\", which two competent reviewers can read differently. Say what the "
+    "claim asserts and of what, in terms a reviewer could check.":
+        "この主張は「{0}」を使用しており、有能なレビュー担当者の間で解釈が分かれます。何について何を主張するのかを、"
+        "レビュー担当者が検証できる語で述べてください。",
+    "This claim uses \"{0}\" to introduce a list of topics, which is a decomposition written as "
+    "prose. Make each listed topic a sub-claim, so the structure carries the breakdown.":
+        "この主張は「{0}」で主題の列挙を導入しており、これは散文で書かれた分解です。列挙された各主題を"
+        "サブ主張にして、分解を構造で表してください。",
+    "This claim runs to {0} words, past the {1} SCCG publishes as the point where a claim is "
+    "carrying more than a claim. Move scope into context, reasoning into a strategy, and listed "
+    "topics into sub-claims.":
+        "この主張は {0} 語あり、主張が主張以上のものを抱えている目安として SCCG が公開する {1} 語を"
+        "超えています。範囲はコンテキストへ、推論は戦略へ、列挙された主題はサブ主張へ移してください。",
+    "This claim joins \"{0}\" and \"{1}\" -- two distinct properties needing different evidence "
+    "and review. Give each its own goal, so one can fail without hiding the other.":
+        "この主張は「{0}」と「{1}」を結合しており、これらは異なるエビデンスと審査を必要とする別個の性質です。"
         "それぞれを独立したゴールにして、一方の不成立がもう一方を隠さないようにしてください。",
-    "This claim chains \"{0} and {1}\" -- different logical steps answering different review "
+    "This claim chains \"{0}\" and \"{1}\" -- different logical steps answering different review "
     "questions. Give each step its own claim, and let the structure show the decomposition.":
-        "この主張は「{0} と {1}」を連結しており、これらは異なる審査上の問いに答える別個の論理ステップです。"
+        "この主張は「{0}」と「{1}」を連結しており、これらは異なる審査上の問いに答える別個の論理ステップです。"
         "各ステップを独立した主張にして、分解は構造で示してください。",
     "This claim carries its own reasoning (\"{0}\"), so a reviewer cannot tell the claim from the "
     "argument for it. State the claim alone; the reasoning belongs in a strategy and the evidence "

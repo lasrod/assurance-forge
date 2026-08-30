@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <set>
 #include <string>
 
 namespace {
@@ -667,6 +668,41 @@ TEST(McpServer, EveryDoctrineGuidelineIdResolvesInTheCatalog) {
         const std::string text = (*read)["result"]["contents"][0]["text"].get<std::string>();
         EXPECT_NE(text.find(id), std::string::npos) << text.substr(0, 200);
     }
+}
+
+// The doctrine used to be fifteen lines written out in guidance.cpp, including
+// the "every SCCG family is represented" property that comment asserted on its
+// own authority. SCCG 0.7.0 publishes the subset, and its `usage` says how to
+// render it: from `short_rule`, citing the id, without paraphrase. This holds
+// the rendered text to that -- a line reworded here rather than upstream fails.
+TEST(McpServer, TheDoctrineRendersThePublishedAuthoringSubsetWithoutParaphrase) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+
+    const std::vector<parser::AuthoringCoreRule>& core_rules = catalog.document.authoring_guidance.core_rules;
+    ASSERT_FALSE(core_rules.empty()) << "The catalog publishes no authoring subset.";
+    EXPECT_EQ(mcp::AuthoringDoctrineGuidelineIds().size(), core_rules.size());
+
+    const std::string doctrine = mcp::AuthoringDoctrine();
+    std::set<std::string> families;
+    for (const parser::AuthoringCoreRule& rule : core_rules) {
+        // The trailing full stop moves to after the id; nothing else may change.
+        std::string rule_text = rule.short_rule;
+        if (!rule_text.empty() && rule_text.back() == '.') {
+            rule_text.pop_back();
+        }
+        EXPECT_NE(doctrine.find(rule_text + " (" + rule.id + ")."), std::string::npos)
+            << rule.id << " is not rendered from its published short_rule.";
+        families.insert(rule.category);
+    }
+    // The property the old hand-maintained list asserted about itself, now a
+    // property of the published subset that this can actually check.
+    for (const char* family : {"CL", "AR", "EV", "SU", "LF", "RD"}) {
+        EXPECT_TRUE(families.count(family) > 0) << family << " is in no doctrine line.";
+    }
+    // And it does not present the subset as the whole standard.
+    EXPECT_NE(doctrine.find("not a reduced standard"), std::string::npos) << doctrine;
 }
 
 // The doctrine rides the reads an agent makes before writing, so the rules

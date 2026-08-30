@@ -27,7 +27,7 @@ AiReviewGuidelineSelection SelectReviewProfileForElement(const core::GuidelineCa
                                                          const core::TreeNode* node) {
     const parser::ReviewProfile* match = nullptr;
     for (const parser::ReviewProfile& profile : guideline_catalog.document.review_profiles) {
-        if (!IsReviewProfileCompatibleWithElement(profile, element, node))
+        if (!IsReviewProfileCompatibleWithElement(guideline_catalog.document, profile, element, node))
             continue;
         if (match != nullptr) {
             AiReviewGuidelineSelection selection;

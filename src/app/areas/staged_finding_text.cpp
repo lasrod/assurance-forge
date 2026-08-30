@@ -43,15 +43,33 @@ std::string StagedFindingText(const core::sccg::StagedFinding& finding) {
                              "what standard -- in the claim or in attached context.",
                              finding.params[0]);
     }
+    if (finding.check_id == "check-claim-ambiguity" && !finding.params.empty()) {
+        return ui::i18n::trf("This claim uses \"{0}\", which two competent reviewers can read differently. Say "
+                             "what the claim asserts and of what, in terms a reviewer could check.",
+                             finding.params[0]);
+    }
+    if (finding.check_id == "check-claim-length-and-role-mixing" && finding.params.size() == 1) {
+        return ui::i18n::trf("This claim uses \"{0}\" to introduce a list of topics, which is a decomposition "
+                             "written as prose. Make each listed topic a sub-claim, so the structure carries "
+                             "the breakdown.",
+                             finding.params[0]);
+    }
+    if (finding.check_id == "check-claim-length-and-role-mixing" && finding.params.size() == 2) {
+        return ui::i18n::trf("This claim runs to {0} words, past the {1} SCCG publishes as the point where a "
+                             "claim is carrying more than a claim. Move scope into context, reasoning into a "
+                             "strategy, and listed topics into sub-claims.",
+                             finding.params[0],
+                             finding.params[1]);
+    }
     if (finding.check_id == "check-single-property" && finding.params.size() == 2) {
-        return ui::i18n::trf("This claim joins \"{0} and {1}\" -- two distinct properties needing different "
-                             "evidence and review. Give each its own goal, so one can fail without hiding "
-                             "the other.",
+        return ui::i18n::trf("This claim joins \"{0}\" and \"{1}\" -- two distinct properties needing "
+                             "different evidence and review. Give each its own goal, so one can fail without "
+                             "hiding the other.",
                              finding.params[0],
                              finding.params[1]);
     }
     if (finding.check_id == "check-claim-step-mixing" && finding.params.size() == 2) {
-        return ui::i18n::trf("This claim chains \"{0} and {1}\" -- different logical steps answering "
+        return ui::i18n::trf("This claim chains \"{0}\" and \"{1}\" -- different logical steps answering "
                              "different review questions. Give each step its own claim, and let the "
                              "structure show the decomposition.",
                              finding.params[0],

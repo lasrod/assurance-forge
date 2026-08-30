@@ -108,15 +108,21 @@ endforeach()
 # run in both consent modes deliberately: SCCG is the public guideline corpus,
 # not case content, and an agent should be able to read the house rules before
 # the user has flipped the sharing switch.
-#   - The heading pins the dist-path metadata fallback (the dist files carry no
-#     document title, so an empty heading here was the observable defect).
+#   - The heading pins the document block. It used to pin a hardcoded fallback,
+#     because only the YAML carried document metadata and the dist path opened
+#     with an empty heading; since SCCG 0.7.0 every dist file carries a
+#     `document` block, so this now proves the shipped binary read it.
 #   - CL.1 proves real guideline text came back, not a placeholder.
 #   - CL.5 proves the translate prompt carries the qualifier rule it cites.
-#   - "is two goals" is a phrase unique to the authoring doctrine, so it proves
-#     the initialize instructions carried the doctrine through the shipped
-#     binary -- in both consent modes, because the doctrine is the public house
-#     rules, not case content.
-foreach(_needle "# Safety Case Core Guidelines" "CL.1" "CL.5" "is two goals")
+#   - The CL.2 phrase is quoted from the published authoring subset's own
+#     `short_rule`, so it proves the initialize instructions carried the
+#     doctrine through the shipped binary *and* that the doctrine was rendered
+#     from the catalog rather than written out here -- in both consent modes,
+#     because the doctrine is the public house rules, not case content.
+#   - "not a reduced standard" is SCCG's own caveat on that subset, which a
+#     tool must not drop when it delivers a subset of the standard.
+foreach(_needle "# Safety Case Core Guidelines" "CL.1" "CL.5"
+                "separate properties that need different evidence" "not a reduced standard")
     string(FIND "${_stdout}" "${_needle}" _found)
     if(_found EQUAL -1)
         message(FATAL_ERROR "SCCG surface did not contain ${_needle}\nstdout:\n${_stdout}")

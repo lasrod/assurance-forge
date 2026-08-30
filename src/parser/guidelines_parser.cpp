@@ -43,6 +43,17 @@ std::string ReadStringKeyFallback(const YAML::Node& node, const char* primary_ke
     return value.empty() ? ReadStringKey(node, fallback_key) : value;
 }
 
+double ReadDoubleKey(const YAML::Node& node, const char* key) {
+    const YAML::Node value = ReadMapValue(node, key);
+    if (!IsDefinedNode(value) || !value.IsScalar())
+        return 0.0;
+    try {
+        return value.as<double>();
+    } catch (const YAML::Exception&) {
+        return 0.0;
+    }
+}
+
 std::vector<std::string> ReadStringSequence(const YAML::Node& node) {
     std::vector<std::string> values;
     if (!IsDefinedNode(node) || !node.IsSequence())
@@ -198,6 +209,44 @@ GuidelineTool ParseTool(const YAML::Node& node) {
         }
     }
 
+    const YAML::Node markers_node = ReadMapValue(node, "markers");
+    if (IsDefinedNode(markers_node) && markers_node.IsSequence()) {
+        for (const auto& marker_node : markers_node) {
+            GuidelineMarker marker;
+            marker.kind = ReadStringKey(marker_node, "kind");
+            marker.effect = ReadStringKey(marker_node, "effect");
+            marker.terms = ReadStringSequence(ReadMapValue(marker_node, "terms"));
+            if (!marker.terms.empty())
+                tool.markers.push_back(std::move(marker));
+        }
+    }
+
+    const YAML::Node thresholds_node = ReadMapValue(node, "thresholds");
+    if (IsDefinedNode(thresholds_node) && thresholds_node.IsSequence()) {
+        for (const auto& threshold_node : thresholds_node) {
+            GuidelineThreshold threshold;
+            threshold.id = ReadStringKey(threshold_node, "id");
+            threshold.value = ReadDoubleKey(threshold_node, "value");
+            threshold.unit = ReadStringKey(threshold_node, "unit");
+            threshold.note = ReadStringKey(threshold_node, "note");
+            if (!threshold.id.empty())
+                tool.thresholds.push_back(std::move(threshold));
+        }
+    }
+
+    const YAML::Node repair_node = ReadMapValue(node, "repair");
+    if (IsDefinedNode(repair_node) && repair_node.IsSequence()) {
+        for (const auto& entry_node : repair_node) {
+            GuidelineRepair repair;
+            repair.action = ReadStringKey(entry_node, "action");
+            repair.element_role = ReadStringKey(entry_node, "element_role");
+            repair.attach_to = ReadStringKey(entry_node, "attach_to");
+            repair.statement = ReadStringKey(entry_node, "statement");
+            if (!repair.action.empty())
+                tool.repair.push_back(std::move(repair));
+        }
+    }
+
     return tool;
 }
 
@@ -230,6 +279,7 @@ std::vector<Guideline> ParseGuidelines(const YAML::Node& node, std::string& erro
         guideline.category_id = ReadStringKey(guideline_node, "category_id");
         guideline.title = ReadStringKey(guideline_node, "title");
         guideline.statement = ReadStringKeyFallback(guideline_node, "statement", "guideline");
+        guideline.short_rule = ReadStringKey(guideline_node, "short_rule");
         guideline.rationale = ReadStringKeyFallback(guideline_node, "rationale", "why");
         guideline.review_prompts = ReadStringSequence(ReadMapValue(guideline_node, "review_prompts"));
         guideline.reference_source_ids = ReadStringSequence(ReadMapValue(guideline_node, "reference_source_ids"));
@@ -284,6 +334,18 @@ std::vector<ReviewProfile> ParseReviewProfiles(const YAML::Node& node) {
         profile.guideline_ids = ReadStringSequence(ReadMapValue(profile_node, "guideline_ids"));
         profile.required_data = ReadStringSequence(ReadMapValue(profile_node, "required_data"));
         profile.optional_data = ReadStringSequence(ReadMapValue(profile_node, "optional_data"));
+        const YAML::Node when_absent_node = ReadMapValue(profile_node, "when_absent");
+        if (IsDefinedNode(when_absent_node) && when_absent_node.IsSequence()) {
+            for (const auto& entry_node : when_absent_node) {
+                DataPackageAbsenceStatement statement;
+                statement.id = ReadStringKey(entry_node, "id");
+                statement.statement = ReadStringKey(entry_node, "statement");
+                statement.unassessable_guideline_ids =
+                    ReadStringSequence(ReadMapValue(entry_node, "unassessable_guideline_ids"));
+                if (!statement.id.empty())
+                    profile.when_absent.push_back(std::move(statement));
+            }
+        }
         profile.schema_version = ReadStringKey(profile_node, "schema_version");
         profile.sccg_version = ReadStringKey(profile_node, "sccg_version");
         if (!profile.id.empty())
@@ -303,6 +365,8 @@ std::vector<DataPackage> ParseDataPackages(const YAML::Node& node) {
         data_package.id = ReadStringKey(package_node, "id");
         data_package.display_name = ReadStringKey(package_node, "display_name");
         data_package.description = ReadStringKey(package_node, "description");
+        data_package.role = ReadStringKey(package_node, "role");
+        data_package.element_role = ReadStringKey(package_node, "element_role");
         data_package.required_fields = ReadStringSequence(ReadMapValue(package_node, "required_fields"));
         data_package.optional_fields = ReadStringSequence(ReadMapValue(package_node, "optional_fields"));
         data_package.schema_version = ReadStringKey(package_node, "schema_version");
@@ -327,6 +391,7 @@ std::vector<Precheck> ParsePrechecks(const YAML::Node& node) {
         precheck.expected_data = ReadStringSequence(ReadMapValue(precheck_node, "expected_data"));
         precheck.result_type = ReadStringKey(precheck_node, "result_type");
         precheck.description = ReadStringKey(precheck_node, "description");
+        precheck.fires_when = ReadStringKey(precheck_node, "fires_when");
         precheck.interpretation = ReadStringKey(precheck_node, "interpretation");
         precheck.schema_version = ReadStringKey(precheck_node, "schema_version");
         precheck.sccg_version = ReadStringKey(precheck_node, "sccg_version");
@@ -335,6 +400,79 @@ std::vector<Precheck> ParsePrechecks(const YAML::Node& node) {
     }
 
     return prechecks;
+}
+
+std::vector<SelectableElement> ParseSelectableElements(const YAML::Node& node) {
+    std::vector<SelectableElement> elements;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return elements;
+
+    for (const auto& element_node : node) {
+        SelectableElement element;
+        element.element = ReadStringKey(element_node, "element");
+        element.notation = ReadStringKey(element_node, "notation");
+        element.element_role = ReadStringKey(element_node, "element_role");
+        element.basis = ReadStringKey(element_node, "basis");
+        if (!element.element.empty())
+            elements.push_back(std::move(element));
+    }
+
+    return elements;
+}
+
+std::vector<AvailabilityState> ParseAvailabilityStates(const YAML::Node& node) {
+    std::vector<AvailabilityState> states;
+    if (!IsDefinedNode(node) || !node.IsSequence())
+        return states;
+
+    for (const auto& state_node : node) {
+        AvailabilityState state;
+        state.id = ReadStringKey(state_node, "id");
+        state.display_name = ReadStringKey(state_node, "display_name");
+        state.meaning = ReadStringKey(state_node, "meaning");
+        if (!state.id.empty())
+            states.push_back(std::move(state));
+    }
+
+    return states;
+}
+
+AuthoringGuidance ParseAuthoringGuidance(const YAML::Node& node) {
+    AuthoringGuidance guidance;
+    if (!IsDefinedNode(node) || !node.IsMap())
+        return guidance;
+
+    guidance.description = ReadStringKey(node, "description");
+    guidance.usage = ReadStringKey(node, "usage");
+
+    const YAML::Node core_rules_node = ReadMapValue(node, "core_rules");
+    if (IsDefinedNode(core_rules_node) && core_rules_node.IsSequence()) {
+        for (const auto& rule_node : core_rules_node) {
+            AuthoringCoreRule rule;
+            rule.id = ReadStringKey(rule_node, "id");
+            rule.category = ReadStringKey(rule_node, "category");
+            rule.short_rule = ReadStringKey(rule_node, "short_rule");
+            rule.statement = ReadStringKey(rule_node, "statement");
+            rule.reason = ReadStringKey(rule_node, "reason");
+            if (!rule.id.empty())
+                guidance.core_rules.push_back(std::move(rule));
+        }
+    }
+
+    const YAML::Node element_rules_node = ReadMapValue(node, "element_rules");
+    if (IsDefinedNode(element_rules_node) && element_rules_node.IsSequence()) {
+        for (const auto& rule_node : element_rules_node) {
+            AuthoringElementRule rule;
+            rule.element_role = ReadStringKey(rule_node, "element_role");
+            rule.elements = ReadStringSequence(ReadMapValue(rule_node, "elements"));
+            rule.guideline_ids = ReadStringSequence(ReadMapValue(rule_node, "guideline_ids"));
+            rule.review_profile_id = ReadStringKey(rule_node, "review_profile_id");
+            if (!rule.element_role.empty())
+                guidance.element_rules.push_back(std::move(rule));
+        }
+    }
+
+    return guidance;
 }
 
 GuidelinesParseResult ParseRoot(const YAML::Node& root) {
@@ -372,6 +510,12 @@ GuidelinesParseResult ParseRoot(const YAML::Node& root) {
     document.review_profiles = ParseReviewProfiles(ReadSectionFallback(root, "review_profiles", "review_profiles"));
     document.data_packages = ParseDataPackages(ReadSectionFallback(root, "data_packages", "data_packages"));
     document.prechecks = ParsePrechecks(ReadSectionFallback(root, "prechecks", "prechecks"));
+    document.selectable_elements =
+        ParseSelectableElements(ReadSectionFallback(root, "selectable_elements", "selectable_elements"));
+    document.availability_states =
+        ParseAvailabilityStates(ReadSectionFallback(root, "availability_states", "availability_states"));
+    document.authoring_guidance =
+        ParseAuthoringGuidance(ReadSectionFallback(root, "authoring_guidance", "authoring_guidance"));
 
     return document;
 }
@@ -454,6 +598,61 @@ const ReferenceSource* GuidelinesDocument::FindReferenceSourceById(const std::st
         return source.id == source_id;
     });
     return found == reference_sources.end() ? nullptr : &(*found);
+}
+
+const DataPackage* GuidelinesDocument::FindDataPackageById(const std::string& id) const {
+    auto found = std::find_if(
+        data_packages.begin(), data_packages.end(), [&](const DataPackage& package) { return package.id == id; });
+    return found == data_packages.end() ? nullptr : &(*found);
+}
+
+const Precheck* GuidelinesDocument::FindPrecheckById(const std::string& id) const {
+    auto found =
+        std::find_if(prechecks.begin(), prechecks.end(), [&](const Precheck& precheck) { return precheck.id == id; });
+    return found == prechecks.end() ? nullptr : &(*found);
+}
+
+const AvailabilityState* GuidelinesDocument::FindAvailabilityStateById(const std::string& id) const {
+    auto found = std::find_if(
+        availability_states.begin(), availability_states.end(), [&](const AvailabilityState& s) { return s.id == id; });
+    return found == availability_states.end() ? nullptr : &(*found);
+}
+
+const DataPackage* GuidelinesDocument::FindSelectedElementPackage(const ReviewProfile& profile) const {
+    for (const std::string& package_id : profile.required_data) {
+        const DataPackage* package = FindDataPackageById(package_id);
+        if (package != nullptr && package->role == "selected_element")
+            return package;
+    }
+    return nullptr;
+}
+
+std::string GuidelinesDocument::ElementRoleForSelectableElement(const std::string& element_name) const {
+    auto found = std::find_if(selectable_elements.begin(), selectable_elements.end(), [&](const SelectableElement& e) {
+        return e.element == element_name;
+    });
+    return found == selectable_elements.end() ? std::string() : found->element_role;
+}
+
+const AuthoringElementRule* GuidelinesDocument::FindAuthoringElementRule(const std::string& element_role) const {
+    const std::vector<AuthoringElementRule>& rules = authoring_guidance.element_rules;
+    auto found = std::find_if(rules.begin(), rules.end(), [&](const AuthoringElementRule& rule) {
+        return rule.element_role == element_role;
+    });
+    return found == rules.end() ? nullptr : &(*found);
+}
+
+const ReviewProfile* GuidelinesDocument::FindReviewProfileForElementRole(const std::string& element_role) const {
+    if (element_role.empty()) {
+        return nullptr;
+    }
+    for (const ReviewProfile& profile : review_profiles) {
+        const DataPackage* selected = FindSelectedElementPackage(profile);
+        if (selected != nullptr && selected->element_role == element_role) {
+            return &profile;
+        }
+    }
+    return nullptr;
 }
 
 const GuidelineCategory* GuidelinesDocument::FindCategoryById(const std::string& category_id) const {

@@ -563,9 +563,15 @@ TEST(SccgStagedChecks, EveryLexicalCheckSeparatesTheCatalogsOwnExamples) {
         const char* check_id;
         bool solution_role; // the evidence checks judge Solution text
     };
+    // CL.3 is deliberately absent: its `good` example is a whole structure --
+    // a claim, its context, its reasoning and six sub-claims -- and feeding
+    // that blob in as one claim's text makes it long by construction. The
+    // check is right and the corpus shape is wrong for it, so CL.3 gets its own
+    // tests below instead of a false failure here.
     const std::vector<CorpusEntry> corpus{
         {"CL.5", "check-bounded-qualifiers", false},
         {"CL.2", "check-single-property", false},
+        {"CL.4", "check-claim-ambiguity", false},
         {"CL.6", "check-claim-step-mixing", false},
         {"RD.1", "check-element-signposting", false},
         {"RD.4", "check-promotional-language", false},
@@ -595,6 +601,140 @@ TEST(SccgStagedChecks, EveryLexicalCheckSeparatesTheCatalogsOwnExamples) {
     }
 }
 
+// CL.4 -- ambiguity. Deferred until SCCG published a list to derive from;
+// 0.7.0's `ambiguous_qualifier` and `hedging_adverb` markers are that list.
+TEST(SccgStagedChecks, CL4_FlagsAHedgedClaimAndQuotesTheTerm) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("Software requirements development is acceptably complete");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-claim-ambiguity", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "CL.4");
+    EXPECT_EQ(finding->severity, core::sccg::FindingSeverity::Advisory);
+    ASSERT_EQ(finding->params.size(), 1u);
+    EXPECT_EQ(finding->params[0], "acceptably");
+}
+
+// "Adequate" and "appropriate" are on CL.4's and CL.5's lists both. One word,
+// one advisory: two findings quoting the same term read as two problems.
+TEST(SccgStagedChecks, CL4_DoesNotRepeatATermCL5AlreadyObjectedTo) {
+    const std::vector<core::sccg::StagedFinding> findings = CheckClaimText("The mitigation is adequate");
+
+    EXPECT_NE(FindByCheck(findings, "check-bounded-qualifiers", "G1"), nullptr);
+    EXPECT_EQ(FindByCheck(findings, "check-claim-ambiguity", "G1"), nullptr);
+}
+
+TEST(SccgStagedChecks, CL4_StaysSilentOnAClaimThatSaysWhatItAsserts) {
+    const std::vector<core::sccg::StagedFinding> findings = CheckClaimText(
+        "The process used to develop software functional requirements satisfies the defined assurance criteria");
+
+    EXPECT_EQ(FindByCheck(findings, "check-claim-ambiguity", "G1"), nullptr);
+}
+
+// CL.3 -- the essay in the box, at the word count SCCG publishes rather than one
+// this tool picked.
+TEST(SccgStagedChecks, CL3_FlagsAClaimPastThePublishedWordCount) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+    const parser::Guideline* cl3 = catalog.document.FindGuidelineById("CL.3");
+    ASSERT_NE(cl3, nullptr);
+    ASSERT_FALSE(cl3->tool.thresholds.empty());
+    const int limit = static_cast<int>(cl3->tool.thresholds[0].value);
+    ASSERT_GT(limit, 0);
+
+    std::string long_claim = "The system is acceptable";
+    for (int word = 0; word <= limit; ++word) {
+        long_claim += " and the subsystem is acceptable";
+    }
+    const std::vector<core::sccg::StagedFinding> findings = CheckClaimText(long_claim);
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-claim-length-and-role-mixing", "G1");
+    ASSERT_NE(finding, nullptr);
+    EXPECT_EQ(finding->guideline_id, "CL.3");
+    ASSERT_EQ(finding->params.size(), 2u);
+    EXPECT_EQ(finding->params[1], std::to_string(limit));
+
+    // And a short claim is not flagged, so the threshold is doing the deciding.
+    EXPECT_EQ(
+        FindByCheck(CheckClaimText("The braking system stops the vehicle"), "check-claim-length-and-role-mixing", "G1"),
+        nullptr);
+}
+
+// The other half of CL.3's published condition. Reporting only the word count
+// under this check id would let an agent read a silent result as the whole
+// check having run.
+TEST(SccgStagedChecks, CL3_FlagsATopicListWrittenAsProse) {
+    const std::vector<core::sccg::StagedFinding> findings =
+        CheckClaimText("The design is sound, including faults, failures and interfaces");
+
+    const core::sccg::StagedFinding* finding = FindByCheck(findings, "check-claim-length-and-role-mixing", "G1");
+    ASSERT_NE(finding, nullptr);
+    ASSERT_EQ(finding->params.size(), 1u);
+    EXPECT_EQ(finding->params[0], "including");
+}
+
+// CL.5's suppression, published as `bounding_marker` and new with 0.7.0: a claim
+// that states the bound the guideline asks for is not a claim missing it.
+TEST(SccgStagedChecks, CL5_StaysSilentWhenTheClaimCarriesABoundingMarker) {
+    EXPECT_NE(FindByCheck(CheckClaimText("The vehicle is safe"), "check-bounded-qualifiers", "G1"), nullptr);
+    EXPECT_EQ(FindByCheck(CheckClaimText("The vehicle is safe as defined in the acceptance criterion"),
+                          "check-bounded-qualifiers",
+                          "G1"),
+              nullptr);
+}
+
+// Every word these checks match on is one SCCG publishes. A term invented here
+// would be this tool's rule wearing SCCG's citation -- which is what the
+// hand-maintained lists were, and why they were narrower than the guideline in
+// ways nothing recorded.
+TEST(SccgStagedChecks, EveryLexicalCheckMatchesOnlyPublishedMarkerTerms) {
+    core::GuidelineCatalog catalog;
+    std::string error;
+    ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
+
+    struct MarkerCase {
+        const char* guideline_id;
+        const char* check_id;
+        const char* kind;
+        const char* term;
+        bool solution_role;
+    };
+    const std::vector<MarkerCase> marker_cases{
+        {"CL.5", "check-bounded-qualifiers", "unbounded_evaluative_term", "nominal", false},
+        {"CL.4", "check-claim-ambiguity", "ambiguous_qualifier", "satisfactory", false},
+        {"RD.1", "check-element-signposting", "inference_connective", "hence", false},
+        {"RD.4", "check-promotional-language", "promotional_term", "state-of-the-art", false},
+        {"LF.3", "check-completeness-vs-absence", "absence_phrase", "no known", false},
+        {"EV.8", "check-evidence-state-fixed", "mutable_source_marker", "trunk", true},
+    };
+
+    for (const MarkerCase& marker_case : marker_cases) {
+        SCOPED_TRACE(marker_case.check_id);
+        // The term is published -- if SCCG drops it, this fails here rather than
+        // silently leaving the check matching a word nobody stands behind.
+        const parser::Guideline* guideline = catalog.document.FindGuidelineById(marker_case.guideline_id);
+        ASSERT_NE(guideline, nullptr);
+        bool published = false;
+        for (const parser::GuidelineMarker& marker : guideline->tool.markers) {
+            if (marker.kind != marker_case.kind) {
+                continue;
+            }
+            published = published ||
+                        std::find(marker.terms.begin(), marker.terms.end(), marker_case.term) != marker.terms.end();
+        }
+        ASSERT_TRUE(published) << marker_case.term << " is not published under " << marker_case.kind;
+
+        // And the check actually matches it, which the hand-written lists did
+        // not: none of these six terms was in them.
+        const std::string sentence = std::string("The result is ") + marker_case.term + " for the assessed scope";
+        const std::vector<core::sccg::StagedFinding> findings =
+            marker_case.solution_role ? CheckSolutionText(sentence) : CheckClaimText(sentence);
+        EXPECT_NE(FindByCheck(findings, marker_case.check_id, marker_case.solution_role ? "Sn1" : "G1"), nullptr)
+            << sentence;
+    }
+}
+
 // The statements the checks embed are quotes, not paraphrases. Each one must
 // still open the guideline it cites -- embedded as a prefix, because a check
 // may deliberately quote only the statement's first sentence. A constant that
@@ -604,26 +744,83 @@ TEST(SccgStagedChecks, EveryEmbeddedStatementStillQuotesTheCatalog) {
     std::string error;
     ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
 
-    // One model tripping every check, so every embedded statement is compared.
+    // One model tripping every check, so every embedded statement is
+    // compared. Built element by element against `ImplementedCheckIds` rather
+    // than grown by hand: the model this replaced reached seven of the thirteen
+    // checks, so six embedded statements were never compared and one of them
+    // was a paraphrase the test was supposed to catch.
     parser::AssuranceCase model;
-    model.elements.push_back(Claim("G1", "The vehicle is safe"));
-    model.elements.push_back(Claim("G2", "Top goal", true));
-    model.elements.push_back(Strategy("S1", "Argue over hazards"));
-    model.elements.push_back(Supports("R1", "S1", "G2"));
-    model.elements.push_back(Claim("G3", "Another goal", true));
-    model.elements.push_back(Solution("Sn1"));
-    model.elements.push_back(Claim("G4", "A goal under evidence", true));
-    model.elements.push_back(Evidences("R2", "Sn1", "G3"));
-    model.elements.push_back(Supports("R3", "G4", "Sn1"));
-    model.elements.push_back(Claim("G5", "First of a cycle", true));
-    model.elements.push_back(Claim("G6", "Second of a cycle", true));
-    model.elements.push_back(Supports("R4", "G6", "G5"));
-    model.elements.push_back(Supports("R5", "G5", "G6"));
+    std::vector<std::string> changed;
+    const auto claim = [&](const char* id, const std::string& claim_text) {
+        model.elements.push_back(Claim(id, claim_text, /*undeveloped=*/true));
+        changed.emplace_back(id);
+    };
 
-    const std::vector<core::sccg::StagedFinding> findings =
-        core::sccg::CheckStagedArgument(model, {"G1", "G2", "S1", "G3", "Sn1", "G4", "G5", "G6"});
+    // EV.1 -- unsupported and not marked undeveloped.
+    model.elements.push_back(Claim("G_UNSUPPORTED", "The braking function meets its requirements"));
+    changed.emplace_back("G_UNSUPPORTED");
+
+    // AR.2 -- two sub-claims, no reasoning step between them and the parent.
+    model.elements.push_back(Claim("G_DECOMPOSED", "The design is acceptable", /*undeveloped=*/true));
+    claim("G_SUB_A", "Fault handling is acceptable");
+    claim("G_SUB_B", "Failure response is acceptable");
+    model.elements.push_back(Supports("R_SUB_A", "G_SUB_A", "G_DECOMPOSED"));
+    model.elements.push_back(Supports("R_SUB_B", "G_SUB_B", "G_DECOMPOSED"));
+    changed.emplace_back("G_DECOMPOSED");
+
+    // AR.1 -- a strategy developing into nothing, and a solution with a child.
+    model.elements.push_back(Strategy("S_EMPTY", "Argue over hazards"));
+    model.elements.push_back(Claim("G_STRATEGY_PARENT", "Top goal", /*undeveloped=*/true));
+    model.elements.push_back(Supports("R_STRATEGY", "S_EMPTY", "G_STRATEGY_PARENT"));
+    changed.emplace_back("S_EMPTY");
+    model.elements.push_back(Claim("G_EVIDENCED", "A goal with evidence", /*undeveloped=*/true));
+    // Not "wiki page": "page" is one of EV.4's citation-precision markers, so a
+    // reference naming it reads as precise and EV.4 stays silent -- which is
+    // how this model first passed while never reaching EV.4's quote.
+    model.elements.push_back(Solution("SN_WITH_CHILD", "Wiki entry holding the results"));
+    model.elements.push_back(Evidences("R_EVIDENCE", "SN_WITH_CHILD", "G_EVIDENCED"));
+    model.elements.push_back(Claim("G_UNDER_EVIDENCE", "A goal under evidence", /*undeveloped=*/true));
+    model.elements.push_back(Supports("R_UNDER", "G_UNDER_EVIDENCE", "SN_WITH_CHILD"));
+    changed.emplace_back("SN_WITH_CHILD");
+    // EV.4, EV.7 and EV.8 all judge that solution's text: it names no part of an
+    // artifact, carries no control attribute, and cites a mutable source with
+    // nothing fixing its state.
+
+    // AR.1 again, as a support cycle.
+    model.elements.push_back(Claim("G_CYCLE_A", "First of a cycle", /*undeveloped=*/true));
+    model.elements.push_back(Claim("G_CYCLE_B", "Second of a cycle", /*undeveloped=*/true));
+    model.elements.push_back(Supports("R_CYCLE_A", "G_CYCLE_B", "G_CYCLE_A"));
+    model.elements.push_back(Supports("R_CYCLE_B", "G_CYCLE_A", "G_CYCLE_B"));
+    changed.emplace_back("G_CYCLE_A");
+    changed.emplace_back("G_CYCLE_B");
+
+    // One claim per lexical check, so a check that stops firing is named rather
+    // than hidden behind another finding on the same element.
+    claim("G_CL5", "The vehicle is safe");
+    claim("G_CL4", "Requirements development is acceptably complete");
+    claim("G_CL2", "Planning software is safe and secure");
+    claim("G_CL6", "Hazards have been identified and validated");
+    claim("G_CL3_LIST", "The design is sound, including faults and failures");
+    claim("G_CL3_LENGTH",
+          "The complete product concept and the system design and the operating envelope and the "
+          "degraded modes and the transitions between them and the interfaces and the dependencies "
+          "and the residual risks and the monitoring arrangements and the review record are in order");
+    claim("G_RD1", "The vehicle stops in time because the brakes were tested");
+    claim("G_RD4", "The team applied world-class engineering practice");
+    claim("G_LF3", "There are no known hazards in the released configuration");
+
+    const std::vector<core::sccg::StagedFinding> findings = core::sccg::CheckStagedArgument(model, changed);
 
     ASSERT_FALSE(findings.empty());
+    // Every check the tool says it implements has to appear here, or the loop
+    // below compares fewer quotes than there are quotes.
+    for (const std::string& check_id : core::sccg::ImplementedCheckIds()) {
+        bool present = false;
+        for (const core::sccg::StagedFinding& finding : findings) {
+            present = present || finding.check_id == check_id;
+        }
+        EXPECT_TRUE(present) << check_id << " fired on nothing, so its embedded statement was never compared.";
+    }
     for (const core::sccg::StagedFinding& finding : findings) {
         const parser::Guideline* guideline = catalog.document.FindGuidelineById(finding.guideline_id);
         ASSERT_NE(guideline, nullptr) << finding.guideline_id;

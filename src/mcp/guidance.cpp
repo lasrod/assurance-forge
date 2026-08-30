@@ -172,55 +172,54 @@ constexpr const char* kLanguages =
     "use for the same concept. Say plainly which languages you wrote, and that a human still has to "
     "check the translation.\n";
 
-// One rule per line, each carrying the id of the guideline it condenses. The
-// pairing is the contract: a line without an id would be our rule rather than
-// SCCG's, and an id without a line in the catalog is caught by the tests that
-// resolve every id below against the loaded catalog.
-struct DoctrineLine {
-    const char* guideline_id;
-    const char* rule;
-};
+// The doctrine's lines were maintained here by hand, including the property
+// this comment used to assert on its own authority -- that every SCCG family is
+// represented. SCCG 0.7.0 publishes the same thing as `authoring_guidance`: the
+// subset a tool should deliver while an author is *writing* rather than when a
+// review is run, each rule with a one-line `short_rule`, a recorded reason for
+// inclusion, and every family covered. Rendering that file is what removes the
+// drift, and the file's own `usage` says how: render `short_rule`, cite the id,
+// do not paraphrase, and do not present the subset as conformance.
+//
+// One trailing full stop is trimmed so the id can carry it. That is punctuation,
+// not paraphrase.
+std::string RenderDoctrineRule(const std::string& short_rule) {
+    if (!short_rule.empty() && short_rule.back() == '.') {
+        return short_rule.substr(0, short_rule.size() - 1);
+    }
+    return short_rule;
+}
 
-// Chosen for the mistakes a model actually makes when a user types "add an
-// argument that X is safe": bundled properties, essays in one goal, inference
-// smuggled into claim text, invented evidence. Every SCCG family is
-// represented so none is invisible to a client that reads nothing else.
-constexpr DoctrineLine kDoctrineLines[] = {
-    {"CL.1", "State each claim as a short proposition a reviewer could judge true or false"},
-    {"CL.2", "Put one claim in one goal -- \"safe and secure\" is two goals, needing different evidence"},
-    {"CL.3", "Keep goal text short: scope belongs in context, reasoning in a strategy, topics in sub-claims"},
-    {"CL.5",
-     "Bound every broad or universal qualifier -- safe, all, normal -- in the claim, its context, or a "
-     "defined term"},
-    {"CL.6",
-     "Keep inference out of claim text: \"because\" and \"therefore\" signal a decomposition the "
-     "structure should be making"},
-    {"AR.1",
-     "Let structure carry the argument: a goal asserts, a strategy states the reasoning, a solution is "
-     "a leaf naming evidence"},
-    {"AR.2",
-     "State the inference step explicitly rather than making the reviewer infer the decomposition rule "
-     "from wording"},
-    {"EV.1", "Give every claim a path to evidence, or mark it undeveloped deliberately; never invent evidence"},
-    {"EV.3", "Make a solution claim the fact the evidence establishes, not the name of the document holding it"},
-    {"EV.4", "Cite precise evidence locations -- section, clause, table, test id -- not a whole annex"},
-    {"EV.8", "Cite evidence at a fixed version, never a live \"latest\""},
-    {"SU.2", "Make assumptions explicit and justify why each is reasonable"},
-    {"LF.3", "Do not argue from absence -- \"no failures observed\" is not evidence of safety"},
-    {"RD.1", "Signpost each element's role in its wording, so no reader has to guess what job the text does"},
-    {"RD.4", "Use no promotional language: the argument persuades by structure and evidence, not adjectives"},
-};
+const parser::AuthoringGuidance* AuthoringGuidance() {
+    std::string error;
+    const core::GuidelineCatalog* catalog = Catalog(error);
+    if (catalog == nullptr || catalog->document.authoring_guidance.core_rules.empty()) {
+        return nullptr;
+    }
+    return &catalog->document.authoring_guidance;
+}
 
 } // namespace
 
 const std::string& AuthoringDoctrine() {
     static const std::string doctrine = [] {
+        const parser::AuthoringGuidance* guidance = AuthoringGuidance();
+        if (guidance == nullptr) {
+            return std::string("This project's argument is written to the Safety Case Core Guidelines (SCCG). "
+                               "The catalog's authoring subset could not be read here, so read the rules "
+                               "directly: the full catalog is the resource sccg://guidelines, and one rule is "
+                               "sccg://guideline/<id>.");
+        }
         std::ostringstream out;
         out << "Writing assurance argument here follows the Safety Case Core Guidelines (SCCG):\n";
-        for (const DoctrineLine& line : kDoctrineLines) {
-            out << "- " << line.rule << " (" << line.guideline_id << ").\n";
+        for (const parser::AuthoringCoreRule& rule : guidance->core_rules) {
+            out << "- " << RenderDoctrineRule(rule.short_rule) << " (" << rule.id << ").\n";
         }
-        out << "The full catalog is the resource sccg://guidelines; one rule is sccg://guideline/<id>.";
+        // SCCG's own caveat, carried so the subset cannot be read as the whole
+        // standard by an agent that reads nothing else.
+        out << "These are the rules most often broken while writing, not a reduced standard -- every SCCG "
+               "guideline still applies. The full catalog is the resource sccg://guidelines; one rule is "
+               "sccg://guideline/<id>.";
         return out.str();
     }();
     return doctrine;
@@ -229,8 +228,10 @@ const std::string& AuthoringDoctrine() {
 const std::vector<std::string>& AuthoringDoctrineGuidelineIds() {
     static const std::vector<std::string> ids = [] {
         std::vector<std::string> collected;
-        for (const DoctrineLine& line : kDoctrineLines) {
-            collected.emplace_back(line.guideline_id);
+        if (const parser::AuthoringGuidance* guidance = AuthoringGuidance()) {
+            for (const parser::AuthoringCoreRule& rule : guidance->core_rules) {
+                collected.push_back(rule.id);
+            }
         }
         return collected;
     }();
@@ -296,19 +297,25 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
             error = load_error;
             return {};
         }
-        // The dist loader -- the path every real build takes -- carries no
-        // document metadata; only the YAML fallback does. Without these
-        // fallbacks the resource opened with an empty heading and a blank
-        // line, which is a poor first impression for the text that exists to
-        // establish authority.
-        const std::string& title = catalog->document.metadata.title;
-        const std::string& purpose = catalog->document.metadata.purpose;
+        // Every tool-facing file has carried a `document` block since SCCG
+        // 0.7.0, so the dist loader -- the path every real build takes --
+        // supplies the same title and purpose the YAML fallback always did, and
+        // the hardcoded title this used to substitute is gone. The version is
+        // stated with them so a finding can cite what it was produced under.
+        const parser::GuidelinesDocument& document = catalog->document;
         std::ostringstream out;
-        out << "# " << (title.empty() ? "Safety Case Core Guidelines (SCCG)" : title) << "\n\n";
-        if (!purpose.empty()) {
-            out << purpose << "\n\n";
+        out << "# " << document.metadata.title << "\n\n";
+        if (!document.sccg_version.empty()) {
+            out << "SCCG " << document.sccg_version;
+            if (!document.metadata.license.id.empty()) {
+                out << " -- " << document.metadata.license.id;
+            }
+            out << "\n\n";
         }
-        for (const parser::Guideline& guideline : catalog->document.guidelines) {
+        if (!document.metadata.purpose.empty()) {
+            out << document.metadata.purpose << "\n\n";
+        }
+        for (const parser::Guideline& guideline : document.guidelines) {
             AppendGuideline(out, guideline);
         }
         return out.str();
@@ -334,24 +341,70 @@ std::string ReadResource(const std::string& uri, bool& found, std::string& error
     return {};
 }
 
-std::vector<std::string> ReviewProfilesForPrompt(const std::string& name) {
+namespace {
+
+// What each prompt actually produces, in SCCG's element-role vocabulary. This
+// much is our editorial judgement -- drafting from a standard writes claims,
+// reasoning, scope and evidence stubs; restructuring only moves claims and the
+// reasoning between them -- and it is the only part left in code. Which profile
+// judges each role is SCCG's, read from `authoring_guidance.element_rules`, so
+// a profile renamed or re-scoped upstream reaches these prompts without anyone
+// copying an id.
+std::vector<std::string> ElementRolesForPrompt(const std::string& name) {
     if (name == "draft_argument_from_standard") {
-        return {"claim_review",
-                "strategy_review",
-                "assumption_review",
-                "context_review",
-                "evidence_review",
-                "justification_review"};
+        return {"claim", "strategy", "assumption", "context", "evidence", "justification"};
     }
     if (name == "add_argumentation") {
-        return {"claim_review", "strategy_review", "context_review"};
+        return {"claim", "strategy", "context"};
     }
     if (name == "restructure_case") {
-        return {"claim_review", "strategy_review"};
+        return {"claim", "strategy"};
     }
     // `translate_case` deliberately carries one guideline, not a profile: a
     // translation that needed the rest has stopped being a translation.
     return {};
+}
+
+// The profile that judges an element role. `authoring_guidance.element_rules`
+// says so directly, but that file is optional in a dist directory, and a dist
+// directory that predates it must not leave every authoring prompt quoting no
+// guidelines at all. The fallback derives the same answer from the profile and
+// package registries, which are never optional: the profile whose required
+// selected-element package carries this role. A test holds the two against each
+// other on the released catalog.
+std::string ReviewProfileForElementRole(const core::GuidelineCatalog& catalog, const std::string& element_role) {
+    const parser::AuthoringElementRule* rule = catalog.document.FindAuthoringElementRule(element_role);
+    if (rule != nullptr && !rule->review_profile_id.empty()) {
+        return rule->review_profile_id;
+    }
+    const parser::ReviewProfile* profile = catalog.document.FindReviewProfileForElementRole(element_role);
+    return profile == nullptr ? std::string() : profile->id;
+}
+
+} // namespace
+
+std::vector<std::string> ReviewProfilesForPrompt(const std::string& name) {
+    const std::vector<std::string> element_roles = ElementRolesForPrompt(name);
+    if (element_roles.empty()) {
+        return {};
+    }
+    std::string error;
+    const core::GuidelineCatalog* catalog = Catalog(error);
+    if (catalog == nullptr) {
+        return {};
+    }
+
+    std::vector<std::string> profile_ids;
+    for (const std::string& element_role : element_roles) {
+        const std::string profile_id = ReviewProfileForElementRole(*catalog, element_role);
+        if (profile_id.empty()) {
+            continue;
+        }
+        if (std::find(profile_ids.begin(), profile_ids.end(), profile_id) == profile_ids.end()) {
+            profile_ids.push_back(profile_id);
+        }
+    }
+    return profile_ids;
 }
 
 std::string BuildPrompt(const std::string& name, const nlohmann::json& arguments) {
