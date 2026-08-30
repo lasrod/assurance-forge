@@ -2,8 +2,15 @@
 
 Assurance Forge is an open-source tool for safety case development, review, and navigation. It is built around the SACM (Structured Assurance Case Metamodel) standard and designed for safety engineers who need a rigorous, efficient workflow for constructing and maintaining assurance arguments.
 
-![Dark Screenshot](docs/screenshot/dark.png)
-![Light Screenshot](docs/screenshot/light.png)
+![Assurance Forge showing a GSN argument on the canvas, with the case explorer on the left and the element inspector on the right](docs/screenshot/dark.png)
+
+*The GSN canvas, case explorer and element inspector, showing the bundled
+[`kitchen-blender`](https://github.com/lasrod/assurance-forge-examples/tree/main/projects/kitchen-blender)
+example case.*
+
+| Light theme | Welcome screen |
+|---|---|
+| [![The same argument view in the light theme](docs/screenshot/light.png)](docs/screenshot/light.png) | [![The welcome screen, offering project creation, SACM import and recent projects](docs/screenshot/welcome.png)](docs/screenshot/welcome.png) |
 
 ---
 
@@ -80,10 +87,18 @@ The vision is to make safety cases **easier to develop, review, and navigate** �
 ### What Assurance Forge delivers today
 
 - **Automatic layout** — Assurance arguments are visualized automatically. Engineers focus on content, not diagram maintenance. No manual positioning of nodes.
-- **GSN visualization** — Safety arguments are rendered using Goal Structuring Notation (GSN), providing a clear, standardized view of the assurance case.
-- **Manual and AI-assisted reviews** — Integrated AI assistance evaluates arguments against the Safety Case Core Guidelines (SCCG), helping teams identify weaknesses and improve argument quality.
-- **SACM-first** — The tool consumes and produces SACM 2.3 XML, and internal structures follow SACM concepts closely. See [Status and limitations](#status-and-limitations) for what is and is not claimed about conformance.
+- **GSN visualization** — Safety arguments are rendered using Goal Structuring Notation (GSN), including pattern, dialectic and assurance-claim-point notation, and exported to SVG.
+- **Manual and AI-assisted reviews** — Integrated AI assistance evaluates arguments against the Safety Case Core Guidelines (SCCG), helping teams identify weaknesses and improve argument quality. Mechanical SCCG checks run without any AI at all.
+- **SACM-first** — The tool consumes and produces SACM 2.3 XML through an independent, reusable SACM library, and an edit the standard cannot express is refused rather than approximated. See [Status and limitations](#status-and-limitations) for what is and is not claimed about conformance.
+- **Audited by construction** — Every edit is a replayable transaction, with undo boundaries, baselines, snapshots, and a timeline that reconstructs the argument as it stood.
+- **Evidence and CSE registers** — Derived views over the SACM document, with their columns and assessments stored in that document rather than a sidecar.
+- **Two languages, reviewed** — Arguments carry a second language end to end; machine-translated text is held for an explicit reviewer acceptance.
+- **Your own AI client, over MCP** — An MCP client you run yourself can read the case and propose changes, behind an explicit consent gate. Proposals land in a working draft a human accepts; nothing is applied behind your back.
 - **Fully open source** — MIT licensed with no vendor lock-in for AI providers.
+
+New to the application? The [user guide](docs/user-guide/index.md) walks through
+opening a project, navigating and editing the argument, reviewing it, and
+connecting an AI client.
 
 ### Future direction
 
@@ -92,7 +107,7 @@ Assurance Forge is designed to grow alongside the evolving safety engineering la
 - **RAAML** — Hazard and risk model integration to connect hazard analysis directly to safety arguments
 - **ReqIF** — Requirements interchange for traceability between requirements and assurance claims
 - **OSLC RM/QM** — Live lifecycle links to requirements management and quality management tools, and SPI (Safety Performance Indicators) support
-- **GSN extensions** — Dialectic Extensions/Challenges (defeater resolution), Modular Extensions (contracts and away elements), Confidence Arguments Extension (ACP), and patterns
+- **GSN extensions** — completing what is partially delivered: defeat semantics and in-doubt state on top of the existing challenge structures, pattern authoring and a pattern catalogue on top of the existing pattern notation, and the Modular Extension (contracts and away elements), which has not started
 - **CAE** — Claim Argument Evidence notation
 - **Safety Case Report** — Produce your own safety case report as LaTeX and PDF
 - **Standard Conformance** — Conduct conformance assessment for UL 4600, ISO 26262 or other standards

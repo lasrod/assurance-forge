@@ -1,23 +1,32 @@
 # Parser and SACM
 
-Assurance Forge loads SACM XML into two synchronized models.
+SACM XML is loaded by the **`libs/sacm` library**, which owns the document.
+Everything else on this page is derived from it.
 
-| Model | Shape | Used by |
-| --- | --- | --- |
-| `parser::AssuranceCase` | Flat list of `parser::SacmElement` records. Relationship elements are stored beside node elements. | UI panels, GSN tree, registers, review logic. |
-| `sacm::AssuranceCasePackage` | Typed SACM package with argument, artifact, and terminology containers. | Save and round-trip behavior. |
+| Model | Shape | Owns | Used by |
+| --- | --- | --- | --- |
+| `sacm_adapter::LibraryDocument` | The `libs/sacm` SACM 2.3 document, including content no application struct models | **The source of truth.** Load, edit and save | Command seams, save, round-trip |
+| `parser::AssuranceCase` | Flat list of `parser::SacmElement` records; relationship elements sit beside node elements | Nothing — projected from the document | UI panels, GSN tree, registers, review logic |
+| `sacm::AssuranceCasePackage` (`src/legacy_sacm`) | Typed legacy package with argument, artifact and terminology containers | Nothing — a derived cache | Some editing paths and terminology display, being retired |
+
+!!! warning "The legacy package is not the save source"
+    It was, and much of the detail below still describes it. `AppState::save_file`
+    serializes the **library document**; the legacy package is a fallback used only
+    when that fails, and because it can only model what the application renders,
+    that fallback drops unknown and vendor-namespace content — so it reports itself
+    in the status bar rather than saving silently.
 
 ```mermaid
 flowchart LR
-    Xml[SACM XML] --> Parser[parser::parse_sacm_xml]
-    Xml --> SacmParser[sacm::parse_sacm]
-    Parser --> Flat[parser::AssuranceCase]
-    SacmParser --> Domain[sacm::AssuranceCasePackage]
+    Xml[SACM XML] --> Library[libs/sacm load_document]
+    Library --> Document[sacm_adapter::LibraryDocument]
+    Document --> Flat[parser::AssuranceCase projection]
+    Document --> Domain[sacm::AssuranceCasePackage cache]
     Flat --> Tree[core::AssuranceTree::Build]
     Flat --> Registers[CSE / evidence registers]
     Flat --> Review[Review and AI payloads]
-    Domain --> Serializer[sacm::serialize_sacm_to_file]
-    Serializer --> Saved[SACM XML]
+    Document --> Save[libs/sacm save_document]
+    Save --> Saved[SACM XML]
 ```
 
 ## Parser Model
@@ -155,18 +164,25 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant UI as Element panel / context menu
-    participant Controller as ElementEditController
-    participant Factory as core::ElementFactory functions
-    participant Parser as parser::AssuranceCase
-    participant Sacm as sacm::AssuranceCasePackage
+    participant Bus as core::commands (command bus)
+    participant Seam as sacm_adapter::document_edit
+    participant Document as LibraryDocument
+    participant Views as parser::AssuranceCase + legacy package
     participant Events as AppEvents
 
-    UI->>Controller: add, remove, or edit
-    Controller->>Factory: mutate models
-    Factory->>Parser: update flat elements
-    Factory->>Sacm: update typed package
-    Controller->>Events: DocumentDirtyEvent
-    Controller->>Events: TreeDirtyEvent
+    UI->>Bus: add, remove, or edit
+    Bus->>Seam: apply through a native library seam
+    Seam->>Document: mutate, or refuse
+    Bus->>Views: re-derive the projections
+    Bus->>Events: DocumentDirtyEvent
+    Bus->>Events: TreeDirtyEvent
 ```
 
-Text edits in the element panel update the selected parser element and call `sync_to_sacm()` so the SACM package remains the save source.
+Every audited edit goes through a library seam. A shape no seam expresses is
+**refused with the tracked file byte-unchanged** rather than rebuilt from a
+projection — the legacy compatibility bridge that used to carry such edits is
+deleted (`AF-STD-011`).
+
+The element panel still calls `sync_to_sacm()` after a text edit. That keeps the
+derived legacy package consistent with an edit that did not route through a
+library operation; it is not what the save reads.

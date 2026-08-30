@@ -55,6 +55,15 @@ extra_javascript:
 
 nav:
   - Home: index.md
+  - User Guide:
+    - Overview: user-guide/index.md
+    - Open a Project: user-guide/open-a-project.md
+    - Navigate the Argument: user-guide/navigate-the-argument.md
+    - Edit the Argument: user-guide/edit-the-argument.md
+    - Review an Element: user-guide/review-an-element.md
+    - Evidence and Registers: user-guide/evidence-and-registers.md
+    - Export a Diagram: user-guide/export-a-diagram.md
+    - Connect an AI Client: user-guide/connect-an-ai-client.md
   - Features:
     - Overview: features/index.md
     - Capability Matrix: features/feature-matrix.md
