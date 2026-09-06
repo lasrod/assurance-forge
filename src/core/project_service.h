@@ -42,6 +42,19 @@ public:
                                    ProjectLoadReport& report,
                                    std::string& error);
 
+    // Creates a project whose first argument is a copy of `source_sacm_path`,
+    // an existing SACM XML file, instead of the empty seed. The copy keeps the
+    // source's file name (with a `.sacm` extension) under `arguments/`; the
+    // source is never touched. The source is read through the SACM library
+    // BEFORE anything is scaffolded, so a file that is not an assurance case
+    // refuses without leaving an empty project folder behind.
+    static bool CreateProjectFromSacm(const std::string& project_name,
+                                      const std::filesystem::path& parent_location,
+                                      const std::filesystem::path& source_sacm_path,
+                                      AssuranceProject& project,
+                                      ProjectLoadReport& report,
+                                      std::string& error);
+
     static bool OpenProject(const std::filesystem::path& project_or_manifest_path,
                             AssuranceProject& project,
                             ProjectLoadReport& report,
@@ -51,6 +64,23 @@ public:
                             const std::string& requested_file_name,
                             ProjectFileEntry& entry,
                             std::string& error);
+
+    // Copies an existing SACM XML file into `arguments/` and tracks it as a
+    // SacmArgument. `requested_file_name` empty means the source's own file
+    // name; the extension is normalized to `.sacm` either way. The bytes are
+    // copied as they are -- the file is the argument, and an import that
+    // rewrote it would be a silent edit -- but the source must load through
+    // the SACM library first, so the project never tracks an argument it
+    // cannot open. A name already tracked is refused, not overwritten.
+    static bool ImportSacmFile(AssuranceProject& project,
+                               const std::filesystem::path& source_sacm_path,
+                               const std::string& requested_file_name,
+                               ProjectFileEntry& entry,
+                               std::string& error);
+
+    // The file name `ImportSacmFile` uses for `source_sacm_path` when none is
+    // requested, so a dialog can offer it before the import is made.
+    static std::filesystem::path DefaultImportedSacmFileName(const std::filesystem::path& source_sacm_path);
 
     static bool AddEvidenceRegister(AssuranceProject& project,
                                     const std::string& requested_file_name,

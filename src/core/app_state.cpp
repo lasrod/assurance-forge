@@ -304,6 +304,28 @@ bool AppState::create_empty_project(const std::string& project_name, const std::
     return true;
 }
 
+bool AppState::create_project_from_sacm(const std::string& project_name,
+                                        const std::string& parent_location,
+                                        const std::filesystem::path& source_sacm_path) {
+    AssuranceProject project;
+    ProjectLoadReport report;
+    std::string error;
+    if (!ProjectService::CreateProjectFromSacm(
+            project_name, parent_location, source_sacm_path, project, report, error)) {
+        status_message = "Project create failed: " + error;
+        last_project_load_report = report;
+        return false;
+    }
+    current_project = std::move(project);
+    last_project_load_report = std::move(report);
+    status_message = "Created project: " + current_project->name + " from " + source_sacm_path.filename().string();
+
+    // The same first-session audit store the empty create needs: the imported
+    // argument is snapshot 0, so its history starts at the file as imported.
+    EnsureAuditStoreForFirstArgument();
+    return true;
+}
+
 void AppState::EnsureAuditStoreForFirstArgument() {
     if (!current_project.has_value())
         return;
@@ -360,6 +382,33 @@ bool AppState::create_project_sacm_file(const std::string& file_name, ProjectFil
 
     // Ensure the audit store is initialized using the newly-created SACM as
     // snapshot 0. Failure here is non-fatal: the file is already on disk.
+    audit::EnsureAuditStoreResult audit_result;
+    std::string audit_error;
+    if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
+        status_message += " (audit store init failed: " + audit_error + ")";
+    }
+    return true;
+}
+
+bool AppState::import_sacm_file(const std::filesystem::path& source_sacm_path,
+                                const std::string& file_name,
+                                ProjectFileEntry* created_entry) {
+    if (!current_project.has_value()) {
+        status_message = "Create or open a project first.";
+        return false;
+    }
+    ProjectFileEntry entry;
+    std::string error;
+    if (!ProjectService::ImportSacmFile(current_project.value(), source_sacm_path, file_name, entry, error)) {
+        status_message = "SACM import failed: " + error;
+        return false;
+    }
+    if (created_entry)
+        *created_entry = entry;
+    status_message = "Imported: " + entry.relativePath.generic_string();
+
+    // As for a created SACM file: the imported argument becomes its own
+    // snapshot 0. Non-fatal, the file is already on disk and tracked.
     audit::EnsureAuditStoreResult audit_result;
     std::string audit_error;
     if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {

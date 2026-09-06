@@ -170,6 +170,81 @@ std::string ReviewItemsJson() {
 // Returns an empty string if the library declines to build or serialize the
 // seed; the caller reports that rather than falling back to a dialect we no
 // longer intend to produce.
+// Reads `source` and confirms the SACM library can load it. The content is
+// returned byte-for-byte: an import copies the argument, it does not
+// reserialize it. A file that does not load is reported with the library's
+// own root cause, since "not a SACM file" alone sends the user looking at the
+// wrong thing when the real problem is a 2.2 dialect or a stray DOCTYPE.
+bool ReadValidatedSacm(const std::filesystem::path& source, std::string& content, std::string& error) {
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(source, ec)) {
+        error = "SACM file not found: " + source.string();
+        return false;
+    }
+    auto text = ReadTextFile(source);
+    if (!text) {
+        error = std::move(text.error());
+        return false;
+    }
+    const sacm_adapter::LoadOutcome outcome = sacm_adapter::load_document(source);
+    if (!outcome.ok || outcome.document == nullptr) {
+        error = "Not a loadable SACM file: " + source.string();
+        const std::string details = sacm_adapter::summarize_load_diagnostics(outcome.diagnostics);
+        if (!details.empty())
+            error += " (" + details + ")";
+        return false;
+    }
+    content = std::move(*text);
+    return true;
+}
+
+// Creates the project directory tree and manifest at `parent_location /
+// project_name` with no files tracked yet. Shared by the two creates so they
+// cannot scaffold differently.
+bool ScaffoldProject(const std::string& project_name,
+                     const std::filesystem::path& parent_location,
+                     AssuranceProject& project,
+                     std::string& error) {
+    // Asked through the shared rule so the create and the dialog that offers it
+    // cannot disagree about what is allowed.
+    switch (ProjectService::FindCreateProjectObstacle(project_name, parent_location)) {
+    case CreateProjectObstacle::NameRequired:
+        error = "Project name is required.";
+        return false;
+    case CreateProjectObstacle::LocationRequired:
+        error = "Project location is required.";
+        return false;
+    case CreateProjectObstacle::FolderExists:
+        error =
+            "Project folder already exists: " + ProjectService::PlanProjectRoot(project_name, parent_location).string();
+        return false;
+    case CreateProjectObstacle::None:
+        break;
+    }
+
+    const std::string clean_name = TrimWhitespace(project_name);
+    const std::filesystem::path root = ProjectService::PlanProjectRoot(project_name, parent_location);
+    std::error_code ec;
+
+    for (const char* directory : kProjectDirectories) {
+        if (!std::filesystem::create_directories(root / directory, ec) && ec) {
+            error = "Could not create project directory: " + (root / directory).string();
+            return false;
+        }
+    }
+
+    EnsureInternalDirectoryIgnored(root);
+
+    project = AssuranceProject{};
+    project.id = GenerateId("af-project");
+    project.name = clean_name;
+    project.rootPath = root;
+    project.createdUtc = NowUtc();
+    project.modifiedUtc = project.createdUtc;
+
+    return ProjectService::WriteManifestSafely(project, error);
+}
+
 std::string MinimalSacmXml(const std::string& case_name) {
     const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi(case_name);
     return seed.ok ? seed.xml : std::string{};
@@ -348,47 +423,45 @@ bool ProjectService::CreateEmptyProject(const std::string& project_name,
                                         AssuranceProject& project,
                                         ProjectLoadReport& report,
                                         std::string& error) {
-    // Asked through the shared rule so the create and the dialog that offers it
-    // cannot disagree about what is allowed.
-    switch (FindCreateProjectObstacle(project_name, parent_location)) {
-    case CreateProjectObstacle::NameRequired:
-        error = "Project name is required.";
-        return false;
-    case CreateProjectObstacle::LocationRequired:
-        error = "Project location is required.";
-        return false;
-    case CreateProjectObstacle::FolderExists:
-        error = "Project folder already exists: " + PlanProjectRoot(project_name, parent_location).string();
-        return false;
-    case CreateProjectObstacle::None:
-        break;
-    }
-
-    const std::string clean_name = TrimWhitespace(project_name);
-    const std::filesystem::path root = PlanProjectRoot(project_name, parent_location);
-    std::error_code ec;
-
-    for (const char* directory : kProjectDirectories) {
-        if (!std::filesystem::create_directories(root / directory, ec) && ec) {
-            error = "Could not create project directory: " + (root / directory).string();
-            return false;
-        }
-    }
-
-    EnsureInternalDirectoryIgnored(root);
-
-    project = AssuranceProject{};
-    project.id = GenerateId("af-project");
-    project.name = clean_name;
-    project.rootPath = root;
-    project.createdUtc = NowUtc();
-    project.modifiedUtc = project.createdUtc;
-
-    if (!WriteManifestSafely(project, error))
+    if (!ScaffoldProject(project_name, parent_location, project, error))
         return false;
 
     ProjectFileEntry main_entry;
     if (!AddSacmFile(project, "main.sacm", main_entry, error))
+        return false;
+
+    ProjectFileEntry review_entry;
+    if (!AddReviewItemsFile(project, "review-items.af.json", review_entry, error))
+        return false;
+
+    report = RefreshFileStatus(project);
+    return true;
+}
+
+bool ProjectService::CreateProjectFromSacm(const std::string& project_name,
+                                           const std::filesystem::path& parent_location,
+                                           const std::filesystem::path& source_sacm_path,
+                                           AssuranceProject& project,
+                                           ProjectLoadReport& report,
+                                           std::string& error) {
+    // Read and check the source first: a refusal here must not leave a project
+    // folder with no argument in it, which the next create would then report
+    // as "already exists".
+    std::string content;
+    if (!ReadValidatedSacm(source_sacm_path, content, error))
+        return false;
+
+    if (!ScaffoldProject(project_name, parent_location, project, error))
+        return false;
+
+    ProjectFileEntry main_entry;
+    if (!AddTrackedFile(project,
+                        "arguments",
+                        DefaultImportedSacmFileName(source_sacm_path),
+                        ProjectFileRole::SacmArgument,
+                        content,
+                        main_entry,
+                        error))
         return false;
 
     ProjectFileEntry review_entry;
@@ -449,6 +522,28 @@ bool ProjectService::AddSacmFile(AssuranceProject& project,
         return false;
     }
     return AddTrackedFile(project, "arguments", file_name, ProjectFileRole::SacmArgument, seed, entry, error);
+}
+
+std::filesystem::path ProjectService::DefaultImportedSacmFileName(const std::filesystem::path& source_sacm_path) {
+    // The stem, not the file name: `case.xml` becomes `case.sacm`, not
+    // `case.xml.sacm`, which is what appending would have made of it.
+    const std::string stem = TrimWhitespace(source_sacm_path.stem().string());
+    return NormalizeFileName(stem, "main.sacm", ".sacm");
+}
+
+bool ProjectService::ImportSacmFile(AssuranceProject& project,
+                                    const std::filesystem::path& source_sacm_path,
+                                    const std::string& requested_file_name,
+                                    ProjectFileEntry& entry,
+                                    std::string& error) {
+    std::string content;
+    if (!ReadValidatedSacm(source_sacm_path, content, error))
+        return false;
+
+    const std::filesystem::path file_name = TrimWhitespace(requested_file_name).empty()
+                                                ? DefaultImportedSacmFileName(source_sacm_path)
+                                                : NormalizeFileName(requested_file_name, "main.sacm", ".sacm");
+    return AddTrackedFile(project, "arguments", file_name, ProjectFileRole::SacmArgument, content, entry, error);
 }
 
 bool ProjectService::AddEvidenceRegister(AssuranceProject& project,

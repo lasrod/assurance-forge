@@ -401,6 +401,161 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
 // function can place it there. The stream states it produces were confirmed
 // separately -- a `read` of 20 bytes from a 10-byte file reports
 // `good=0 eof=1 fail=1 gcount=10`, so the old `!good() && !eof()` guard returned
+namespace {
+
+std::string ReadWholeFile(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
+}
+
+// A SACM file that is known to load: the seed of a freshly created project,
+// copied out under a name that is not `main.sacm` so the tests can tell the
+// imported copy from the seed the destination project already has.
+std::filesystem::path WriteLoadableSacm(const std::filesystem::path& parent, const char* file_name) {
+    core::AssuranceProject donor;
+    core::ProjectLoadReport report;
+    std::string error;
+    EXPECT_TRUE(core::ProjectService::CreateEmptyProject("Donor", parent, donor, report, error)) << error;
+    const std::filesystem::path source = parent / file_name;
+    std::filesystem::copy_file(donor.rootPath / "arguments" / "main.sacm", source);
+    return source;
+}
+
+} // namespace
+
+TEST(ProjectServiceTest, DefaultImportedSacmFileNameKeepsTheStemAndNormalizesTheExtension) {
+    EXPECT_EQ(core::ProjectService::DefaultImportedSacmFileName("C:/cases/existing-case.xml").generic_string(),
+              "existing-case.sacm");
+    EXPECT_EQ(core::ProjectService::DefaultImportedSacmFileName("/cases/existing-case.sacm").generic_string(),
+              "existing-case.sacm");
+    EXPECT_EQ(core::ProjectService::DefaultImportedSacmFileName("existing-case.SACM").generic_string(),
+              "existing-case.sacm");
+    EXPECT_EQ(core::ProjectService::DefaultImportedSacmFileName("").generic_string(), "main.sacm");
+}
+
+// An import is a copy: the file is the argument, so the bytes must land in the
+// project unchanged, tracked under its role, and be there when the manifest is
+// read back.
+TEST(ProjectServiceTest, ImportSacmFileCopiesTheArgumentByteForByteAndTracksIt) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.xml");
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Target", tmp.path, project, report, error)) << error;
+    const size_t files_before = project.files.size();
+
+    core::ProjectFileEntry entry;
+    ASSERT_TRUE(core::ProjectService::ImportSacmFile(project, source, "", entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "arguments/existing-case.sacm");
+    EXPECT_EQ(entry.role, core::ProjectFileRole::SacmArgument);
+    EXPECT_EQ(project.files.size(), files_before + 1);
+    EXPECT_EQ(ReadWholeFile(project.rootPath / entry.relativePath), ReadWholeFile(source));
+    EXPECT_TRUE(std::filesystem::exists(source)) << "the source is copied, never moved";
+
+    core::AssuranceProject reopened;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, report, error)) << error;
+    EXPECT_TRUE(ContainsFileWithRole(reopened, "arguments/existing-case.sacm", core::ProjectFileRole::SacmArgument));
+
+    // A requested name wins over the source's, and lands with the extension.
+    core::ProjectFileEntry renamed;
+    ASSERT_TRUE(core::ProjectService::ImportSacmFile(project, source, "second copy", renamed, error)) << error;
+    EXPECT_EQ(renamed.relativePath.generic_string(), "arguments/second copy.sacm");
+
+    // A name the project already tracks is refused rather than overwritten:
+    // `main.sacm` is the seed argument, and an import that replaced it would
+    // silently discard whatever was in it.
+    core::ProjectFileEntry clash;
+    EXPECT_FALSE(core::ProjectService::ImportSacmFile(project, source, "main.sacm", clash, error));
+    EXPECT_NE(error.find("already exists"), std::string::npos) << error;
+}
+
+// The project must never track an argument it cannot open. A file the library
+// refuses is refused here, with the library's reason, and nothing changes.
+TEST(ProjectServiceTest, ImportSacmFileRefusesAFileTheLibraryCannotLoad) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path bogus = tmp.path / "not-a-case.sacm";
+    {
+        std::ofstream out(bogus);
+        out << "<html><body>not an assurance case</body></html>";
+    }
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Target", tmp.path, project, report, error)) << error;
+    const size_t files_before = project.files.size();
+
+    core::ProjectFileEntry entry;
+    EXPECT_FALSE(core::ProjectService::ImportSacmFile(project, bogus, "", entry, error));
+    EXPECT_NE(error.find("Not a loadable SACM file"), std::string::npos) << error;
+    EXPECT_EQ(project.files.size(), files_before);
+    EXPECT_FALSE(std::filesystem::exists(project.rootPath / "arguments" / "not-a-case.sacm"));
+
+    EXPECT_FALSE(core::ProjectService::ImportSacmFile(project, tmp.path / "missing.sacm", "", entry, error));
+    EXPECT_NE(error.find("not found"), std::string::npos) << error;
+    EXPECT_EQ(project.files.size(), files_before);
+}
+
+// The welcome screen's "Create Project from Existing SACM": the copy is the
+// project's first (and only) argument, the review file is there as for an empty
+// create, and the report says the project is healthy.
+TEST(ProjectServiceTest, CreateProjectFromSacmMakesTheCopyTheFirstArgument) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.xml");
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateProjectFromSacm("FromSacm", tmp.path, source, project, report, error))
+        << error;
+    EXPECT_EQ(project.name, "FromSacm");
+    EXPECT_EQ(project.rootPath, tmp.path / "FromSacm");
+    EXPECT_TRUE(std::filesystem::exists(project.rootPath / "af.proj"));
+    EXPECT_TRUE(ContainsFileWithRole(project, "arguments/existing-case.sacm", core::ProjectFileRole::SacmArgument));
+    EXPECT_FALSE(ContainsFileWithRole(project, "arguments/main.sacm", core::ProjectFileRole::SacmArgument))
+        << "the imported file replaces the empty seed rather than sitting beside it";
+    EXPECT_TRUE(ContainsFileWithRole(project, "reviews/review-items.af.json", core::ProjectFileRole::ReviewItems));
+    EXPECT_EQ(ReadWholeFile(project.rootPath / "arguments" / "existing-case.sacm"), ReadWholeFile(source));
+    EXPECT_FALSE(report.has_failures()) << ReportSummary(report);
+
+    size_t arguments = 0;
+    for (const core::ProjectFileEntry& entry : project.files) {
+        if (entry.role == core::ProjectFileRole::SacmArgument)
+            ++arguments;
+    }
+    EXPECT_EQ(arguments, 1u);
+}
+
+// A refused source must not leave an empty project folder behind: the next
+// attempt with the same name would then be told the folder already exists,
+// for a project that was never made.
+TEST(ProjectServiceTest, CreateProjectFromSacmRefusesBeforeScaffolding) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path bogus = tmp.path / "not-a-case.sacm";
+    {
+        std::ofstream out(bogus);
+        out << "this is not xml";
+    }
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    EXPECT_FALSE(core::ProjectService::CreateProjectFromSacm("FromBogus", tmp.path, bogus, project, report, error));
+    EXPECT_NE(error.find("Not a loadable SACM file"), std::string::npos) << error;
+    EXPECT_FALSE(std::filesystem::exists(tmp.path / "FromBogus"));
+    EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("FromBogus", tmp.path),
+              core::CreateProjectObstacle::None);
+
+    // And the create-obstacle rule still applies before anything is copied.
+    const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.sacm");
+    EXPECT_FALSE(core::ProjectService::CreateProjectFromSacm("Donor", tmp.path, source, project, report, error));
+    EXPECT_NE(error.find("already exists"), std::string::npos) << error;
+}
+
 // success with the buffer's tail left as zeros.
 TEST(ProjectFileIoTest, ReadFileBytesReturnsEveryByteOrSaysWhyNot) {
     TempDir tmp(MakeTempParent());

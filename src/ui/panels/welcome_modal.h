@@ -27,7 +27,7 @@ struct WelcomeModalCallbacks {
     std::function<void()> create_empty_project;
     std::function<void()> create_project_from_template;
     std::function<void()> open_project;
-    std::function<void()> import_sacm;
+    std::function<void()> create_project_from_sacm;
     std::function<void()> walkthrough_get_started;
     std::function<void()> walkthrough_fundamentals;
     std::function<void()> walkthrough_conformance;

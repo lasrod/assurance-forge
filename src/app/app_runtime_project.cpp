@@ -260,6 +260,63 @@ void AppRuntime::BeginCreateProject() {
     }
 }
 
+void AppRuntime::BeginCreateProjectFromSacm() {
+    std::string source_path;
+    std::string error_message;
+    const dialogs::DialogResult source_result =
+        dialogs::BrowseForSacmFile(impl_->project_controller->open_project_path_buf, source_path, error_message);
+    if (source_result == dialogs::DialogResult::Failed) {
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error_message));
+        return;
+    }
+    if (source_result != dialogs::DialogResult::Selected)
+        return;
+
+    std::string parent_path;
+    const dialogs::DialogResult parent_result = dialogs::BrowseForProjectParentFolder(
+        impl_->project_controller->project_parent_buf, parent_path, error_message);
+    if (parent_result == dialogs::DialogResult::Failed) {
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error_message));
+        return;
+    }
+    if (parent_result != dialogs::DialogResult::Selected)
+        return;
+
+    CopyToBuffer(impl_->project_controller->project_parent_buf,
+                 sizeof(impl_->project_controller->project_parent_buf),
+                 parent_path);
+    // The file's own name is the best guess for the project's, better than
+    // whatever the last empty create left in the field.
+    const std::filesystem::path source(source_path);
+    CopyToBuffer(impl_->project_controller->project_name_buf,
+                 sizeof(impl_->project_controller->project_name_buf),
+                 source.stem().string());
+    impl_->project_controller->pending_create_project_source_sacm = source;
+    impl_->project_controller->show_create_project_modal = true;
+}
+
+void AppRuntime::BeginImportSacmFile() {
+    if (!impl_->app_state.current_project.has_value()) {
+        SetStatus(AF_TR("Create or open a project first."));
+        return;
+    }
+    std::string source_path;
+    std::string error_message;
+    const dialogs::DialogResult result =
+        dialogs::BrowseForSacmFile(impl_->project_controller->open_project_path_buf, source_path, error_message);
+    if (result == dialogs::DialogResult::Failed) {
+        SetStatus(ui::i18n::trf("Browse failed: {0}", error_message));
+        return;
+    }
+    if (result != dialogs::DialogResult::Selected)
+        return;
+
+    const std::filesystem::path source(source_path);
+    impl_->project_controller->pending_import_sacm_source = source;
+    impl_->project_controller->BeginProjectFileCreate(
+        ProjectFileCreateKind::ImportedSacm, core::ProjectService::DefaultImportedSacmFileName(source).string());
+}
+
 void AppRuntime::BeginOpenProject() {
     std::string default_path = impl_->project_controller->open_project_path_buf;
     if (default_path.empty() && !impl_->project_controller->recent_projects.empty()) {

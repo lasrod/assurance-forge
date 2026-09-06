@@ -1942,6 +1942,24 @@
       "notes": "Open, save, undo, new SACM file, fit-to-view, export SVG, preferences. Surfaces existing commands only — every button routes to the same callback as its menu item, so the two cannot diverge; it adds no capability of its own. Buttons disable against real state (export needs a loaded case, fit needs the GSN canvas showing) because a control that looks available and does nothing misrepresents what the tool will do. Fit reuses the renderer's existing focus/fit-all request."
     },
     {
+      "id": "AF-PLAT-013",
+      "area": "PLAT",
+      "name": "Create a project from an existing SACM file, or import one into the open project",
+      "status": "supported",
+      "evidence": [
+        "src/core/project_service.cpp",
+        "src/core/app_state.cpp",
+        "src/app/app_runtime_project.cpp",
+        "src/app/areas/modal_host.cpp",
+        "src/ui/panels/welcome_modal.cpp"
+      ],
+      "tests": [
+        "tests/test_project_service.cpp",
+        "tests/test_app_state.cpp"
+      ],
+      "notes": "The welcome screen's **Create Project from Existing SACM** (also **File → Create Project from Existing SACM...**) picks a `.sacm`/`.xml` file and a parent folder, then creates a project whose first argument is a copy of that file under `arguments/`, named after the source. **File → Import SACM File...** copies a file into the open project as another tracked argument and opens it. Both are copies -- the bytes land unchanged and the source is never touched, because the SACM file is the argument and an import that reserialized it would be a silent edit. The source must load through the SACM library first, with the library's own diagnostic in the refusal, so a project never tracks an argument it cannot open; the create checks this before scaffolding, so a refused file leaves no empty project folder behind. A name the project already tracks is refused, not overwritten. The imported argument gets its own audit snapshot 0, so it is auditable from the first edit. **Not yet:** import does not carry a source file's `af.proj` siblings (registers, review state) -- it is one argument file, not a project merge -- and the file is not validated against SCCG or GSN well-formedness at import; those run once it is open."
+    },
+    {
       "id": "AF-PLAT-011",
       "area": "PLAT",
       "name": "Status bar: save state, active document, problem counts",

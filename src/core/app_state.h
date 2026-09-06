@@ -105,8 +105,18 @@ struct AppState {
     void EnsureAuditStoreForFirstArgument();
 
     bool create_empty_project(const std::string& project_name, const std::string& parent_location);
+    // Like create_empty_project, with the first argument copied from an existing
+    // SACM XML file rather than seeded empty.
+    bool create_project_from_sacm(const std::string& project_name,
+                                  const std::string& parent_location,
+                                  const std::filesystem::path& source_sacm_path);
     bool open_project(const std::string& project_or_manifest_path);
     bool create_project_sacm_file(const std::string& file_name, ProjectFileEntry* created_entry = nullptr);
+    // Copies an existing SACM XML file into the open project as a tracked
+    // argument. An empty `file_name` keeps the source's own name.
+    bool import_sacm_file(const std::filesystem::path& source_sacm_path,
+                          const std::string& file_name,
+                          ProjectFileEntry* created_entry = nullptr);
     bool create_project_evidence_register(const std::string& file_name, ProjectFileEntry* created_entry = nullptr);
     bool create_project_j3377_cae_register(const std::string& file_name, ProjectFileEntry* created_entry = nullptr);
     bool open_project_file(const ProjectFileEntry& entry);

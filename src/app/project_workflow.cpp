@@ -16,6 +16,8 @@ const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
         return "New Evidence Register";
     case ProjectFileCreateKind::J3377CaeRegister:
         return "New J3377 CAE Register";
+    case ProjectFileCreateKind::ImportedSacm:
+        return "Import SACM File";
     }
     return "New Project File";
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/project_model.h"
 #include "core/reviews/review_item.h"
 
 #include <functional>
@@ -13,9 +14,13 @@ namespace app::areas {
 
 struct ModalHostCallbacks {
     std::function<void()> begin_create_project;
+    std::function<void()> begin_create_project_from_sacm;
     std::function<void()> begin_open_project;
     std::function<bool(const std::string&)> try_open_project_manifest;
     std::function<bool()> open_first_project_sacm_file;
+    // Opens one tracked file, the way the project tree does -- what an import
+    // needs, since the file it just added is not the project's first.
+    std::function<void(const core::ProjectFileEntry&)> open_project_file;
     // Re-points every controller that owns a file of its own at the project
     // that was just created. Review items, confidence assessments and register
     // assessments all live outside the SACM document.

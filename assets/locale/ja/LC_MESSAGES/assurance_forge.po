@@ -730,6 +730,12 @@ msgstr "分類を作成"
 msgid "Create Empty Assurance Project"
 msgstr "空の保証プロジェクトを作成"
 
+msgid "Create Project from Existing SACM"
+msgstr "既存の SACM からプロジェクトを作成"
+
+msgid "Create Project from Existing SACM..."
+msgstr "既存の SACM からプロジェクトを作成..."
+
 msgid "Create Proposed Change"
 msgstr "提案変更を作成"
 
@@ -1174,14 +1180,14 @@ msgstr "無視"
 msgid "Ignored terms"
 msgstr "無視された用語"
 
-msgid "Import SACM"
-msgstr "SACM をインポート"
+msgid "Import"
+msgstr "インポート"
 
-msgid "Import SACM is not yet implemented."
-msgstr "SACM のインポートは未実装です。"
+msgid "Import SACM File"
+msgstr "SACM ファイルをインポート"
 
-msgid "Import a SACM XML assurance case"
-msgstr "SACM XML 保証ケースをインポートします"
+msgid "Import SACM File..."
+msgstr "SACM ファイルをインポート..."
 
 msgid "Inactive"
 msgstr "非アクティブ"
@@ -2002,6 +2008,9 @@ msgstr "用語カードまたは用語表の行から使用箇所検索を実行
 msgid "SACM Viewer"
 msgstr "SACM ビューア"
 
+msgid "SACM file"
+msgstr "SACM ファイル"
+
 msgid "SACM file is already open: {0}"
 msgstr "SACM ファイルは既に開かれています: {0}"
 
@@ -2166,6 +2175,9 @@ msgstr "開始"
 
 msgid "Start Conformance Assessment"
 msgstr "適合性評価を開始"
+
+msgid "Start a project from a SACM XML assurance case you already have"
+msgstr "手元にある SACM XML 保証ケースからプロジェクトを開始します"
 
 msgid "Start with a blank assurance project workspace"
 msgstr "空の保証プロジェクトワークスペースから開始します"
