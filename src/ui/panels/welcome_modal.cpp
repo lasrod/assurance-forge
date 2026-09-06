@@ -49,7 +49,6 @@ constexpr const char* kWelcomeWalkthroughColumnId = "WalkthroughColumn";
 constexpr const char* kWelcomeTitleIconAsset = "app_settings/icon.png";
 constexpr const char* kTemplatePopupId = "CreateTemplate##not_implemented_popup";
 constexpr const char* kWalkthroughPopupId = "Walkthroughs##not_implemented_popup";
-constexpr const char* kImportSacmPopupId = "ImportSACM##not_implemented_popup";
 constexpr float kNotImplementedPopupButtonWidth = 110.0f;
 
 constexpr int kWelcomeStyleVarCount = 2;
@@ -289,7 +288,6 @@ void ShowWelcomeModal(bool& is_open,
                                    ImGuiWindowFlags_NoTitleBar)) {
         const ui::Theme& theme = ui::GetTheme();
         bool show_template_not_implemented = false;
-        bool show_import_sacm_not_implemented = false;
         bool show_walkthrough_not_implemented = false;
 
         ImDrawList* background = ImGui::GetWindowDrawList();
@@ -402,11 +400,12 @@ void ShowWelcomeModal(bool& is_open,
                 if (callbacks.open_project)
                     callbacks.open_project();
             }
-            if (ActionLink(
-                    ICON_FA_UPLOAD, "##import_sacm", AF_TR("Import SACM"), AF_TR("Import a SACM XML assurance case"))) {
-                if (callbacks.import_sacm)
-                    callbacks.import_sacm();
-                show_import_sacm_not_implemented = true;
+            if (ActionLink(ICON_FA_UPLOAD,
+                           "##create_project_from_sacm",
+                           AF_TR("Create Project from Existing SACM"),
+                           AF_TR("Start a project from a SACM XML assurance case you already have"))) {
+                if (callbacks.create_project_from_sacm)
+                    callbacks.create_project_from_sacm();
             }
 
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeRecentSectionSpacing)));
@@ -471,9 +470,6 @@ void ShowWelcomeModal(bool& is_open,
         if (show_template_not_implemented) {
             ImGui::OpenPopup(kTemplatePopupId);
         }
-        if (show_import_sacm_not_implemented) {
-            ImGui::OpenPopup(kImportSacmPopupId);
-        }
         if (show_walkthrough_not_implemented) {
             ImGui::OpenPopup(kWalkthroughPopupId);
         }
@@ -482,19 +478,6 @@ void ShowWelcomeModal(bool& is_open,
             ImGui::TextUnformatted(AF_TR("Create Assurance Project from Template").c_str());
             ImGui::Separator();
             ImGui::TextUnformatted(AF_TR("Create Assurance Project from Template is not yet implemented.").c_str());
-            ImGui::Spacing();
-            const float button_width = Px(kNotImplementedPopupButtonWidth);
-            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
-            if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0.0f))) {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
-
-        if (ImGui::BeginPopupModal(kImportSacmPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(AF_TR("Import SACM").c_str());
-            ImGui::Separator();
-            ImGui::TextUnformatted(AF_TR("Import SACM is not yet implemented.").c_str());
             ImGui::Spacing();
             const float button_width = Px(kNotImplementedPopupButtonWidth);
             ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);

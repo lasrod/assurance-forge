@@ -461,7 +461,12 @@ void ModalHost::RenderStartupProjectWindow() {
         },
         []() {},
         [this]() { callbacks_.begin_open_project(); },
-        []() {},
+        [this]() {
+            callbacks_.begin_create_project_from_sacm();
+            if (state_.project_controller->show_create_project_modal) {
+                state_.project_controller->show_startup_project_window = false;
+            }
+        },
         []() {},
         []() {},
         []() {},
@@ -487,10 +492,21 @@ void ModalHost::RenderCreateProjectModal() {
     if (!state_.project_controller->show_create_project_modal)
         return;
 
+    // One dialog for both creates: the only differences are the title, a line
+    // naming the file being copied in, and which create the button calls.
+    const std::filesystem::path& source_sacm = state_.project_controller->pending_create_project_source_sacm;
+    const bool from_sacm = !source_sacm.empty();
+    const std::string title =
+        (from_sacm ? AF_TR("Create Project from Existing SACM") : AF_TR("Create Empty Assurance Project")) +
+        "###Create Empty Assurance Project";
+
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str(),
-                               nullptr,
-                               ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (from_sacm) {
+            ImGui::TextUnformatted(AF_TR("SACM file").c_str());
+            ImGui::TextDisabled("%s", source_sacm.string().c_str());
+            ImGui::Spacing();
+        }
         ImGui::TextUnformatted(AF_TR("Project name").c_str());
         ImGui::SetNextItemWidth(420.0f);
         if (ImGui::InputText("##project_name",
@@ -526,8 +542,13 @@ void ModalHost::RenderCreateProjectModal() {
 
         ImGui::BeginDisabled(obstacle != core::CreateProjectObstacle::None);
         if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(110.0f, 0.0f))) {
-            if (state_.app_state.create_empty_project(state_.project_controller->project_name_buf,
-                                                      state_.project_controller->project_parent_buf)) {
+            const bool created =
+                from_sacm ? state_.app_state.create_project_from_sacm(state_.project_controller->project_name_buf,
+                                                                      state_.project_controller->project_parent_buf,
+                                                                      source_sacm)
+                          : state_.app_state.create_empty_project(state_.project_controller->project_name_buf,
+                                                                  state_.project_controller->project_parent_buf);
+            if (created) {
                 state_.document_dirty = false;
                 state_.review_controller->ClearDirty();
                 state_.confidence_controller->ClearDirty();
@@ -539,6 +560,7 @@ void ModalHost::RenderCreateProjectModal() {
                 callbacks_.open_first_project_sacm_file();
                 callbacks_.touch_current_project_recent();
                 state_.project_controller->create_project_error.clear();
+                state_.project_controller->pending_create_project_source_sacm.clear();
                 state_.project_controller->show_create_project_modal = false;
                 ImGui::CloseCurrentPopup();
             } else {
@@ -553,6 +575,7 @@ void ModalHost::RenderCreateProjectModal() {
         ImGui::SameLine();
         if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(110.0f, 0.0f))) {
             state_.project_controller->create_project_error.clear();
+            state_.project_controller->pending_create_project_source_sacm.clear();
             state_.project_controller->show_create_project_modal = false;
             ImGui::CloseCurrentPopup();
         }
@@ -561,7 +584,7 @@ void ModalHost::RenderCreateProjectModal() {
         // Asked once as the dialog opens, so a name that is already taken is
         // reported before a key is pressed rather than after a dead press.
         state_.project_controller->RefreshCreateProjectObstacle();
-        ImGui::OpenPopup((AF_TR("Create Empty Assurance Project") + "###Create Empty Assurance Project").c_str());
+        ImGui::OpenPopup(title.c_str());
     }
 }
 
@@ -586,10 +609,22 @@ void ModalHost::RenderProjectFileNameModal() {
         }
         ImGui::Spacing();
 
-        if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(110.0f, 0.0f))) {
+        const bool is_import =
+            state_.project_controller->pending_project_file_kind == ProjectFileCreateKind::ImportedSacm;
+        if (is_import) {
+            ImGui::TextUnformatted(AF_TR("SACM file").c_str());
+            ImGui::TextDisabled("%s", state_.project_controller->pending_import_sacm_source.string().c_str());
+            ImGui::Spacing();
+        }
+        if (ImGui::Button((is_import ? AF_TR("Import") : AF_TR("Create")).c_str(), ImVec2(110.0f, 0.0f))) {
             bool created = false;
+            core::ProjectFileEntry imported_entry;
             if (state_.project_controller->pending_project_file_kind == ProjectFileCreateKind::Sacm) {
                 created = state_.app_state.create_project_sacm_file(state_.project_controller->project_file_name_buf);
+            } else if (is_import) {
+                created = state_.app_state.import_sacm_file(state_.project_controller->pending_import_sacm_source,
+                                                            state_.project_controller->project_file_name_buf,
+                                                            &imported_entry);
             } else if (state_.project_controller->pending_project_file_kind ==
                        ProjectFileCreateKind::EvidenceRegister) {
                 created =
@@ -608,7 +643,14 @@ void ModalHost::RenderProjectFileNameModal() {
                     callbacks_.open_first_project_sacm_file) {
                     callbacks_.open_first_project_sacm_file();
                 }
+                // The imported argument is what the user just asked for, so it
+                // is what they see next -- through the same path the project
+                // tree uses, which asks about unsaved work in the current file.
+                if (is_import && callbacks_.open_project_file) {
+                    callbacks_.open_project_file(imported_entry);
+                }
                 state_.project_controller->create_project_file_error.clear();
+                state_.project_controller->pending_import_sacm_source.clear();
                 state_.project_controller->show_project_file_name_modal = false;
                 ImGui::CloseCurrentPopup();
             } else {
@@ -621,6 +663,7 @@ void ModalHost::RenderProjectFileNameModal() {
         ImGui::SameLine();
         if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(110.0f, 0.0f))) {
             state_.project_controller->create_project_file_error.clear();
+            state_.project_controller->pending_import_sacm_source.clear();
             state_.project_controller->show_project_file_name_modal = false;
             ImGui::CloseCurrentPopup();
         }

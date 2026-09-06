@@ -9,7 +9,9 @@
 
 namespace app {
 
-enum class ProjectFileCreateKind { Sacm, EvidenceRegister, J3377CaeRegister };
+// `ImportedSacm` copies an existing SACM file the user has already picked;
+// the dialog only asks what to call the copy.
+enum class ProjectFileCreateKind { Sacm, EvidenceRegister, J3377CaeRegister, ImportedSacm };
 
 const char* ProjectFileCreateTitle(ProjectFileCreateKind kind);
 std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project);
