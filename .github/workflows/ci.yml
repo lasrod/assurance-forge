@@ -108,7 +108,7 @@ jobs:
       # request cannot read a cache another branch created, so the first run
       # after this lands is still cold and the saving shows on the run after.
       - name: Set up compiler cache
-        uses: hendrikmuhs/ccache-action@v1.2.23
+        uses: hendrikmuhs/ccache-action@v1.2.24
         with:
           variant: ${{ matrix.cache_variant }}
           key: ${{ matrix.name }}
