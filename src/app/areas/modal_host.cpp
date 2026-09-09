@@ -592,8 +592,8 @@ void ModalHost::RenderProjectFileNameModal() {
     if (!state_.project_controller->show_project_file_name_modal)
         return;
 
-    const char* title_key = ProjectFileCreateTitle(state_.project_controller->pending_project_file_kind);
-    const std::string title = AF_TR(title_key) + "###" + title_key;
+    const ProjectFileCreateKind kind = state_.project_controller->pending_project_file_kind;
+    const std::string title = TranslatedProjectFileCreateTitle(kind) + "###" + ProjectFileCreateTitle(kind);
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(AF_TR("File name").c_str());

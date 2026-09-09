@@ -279,6 +279,20 @@ bool AddTrackedFile(AssuranceProject& project,
         return false;
     }
 
+    // The manifest is asked before the disk is: a tracked file that is missing
+    // on disk (deleted outside the tool, on a share that is offline) is still
+    // that entry's path, and adding a second entry for it would leave the
+    // manifest with two rows claiming one file -- one of them reporting it
+    // missing and the other reporting it fresh.
+    const bool already_tracked =
+        std::any_of(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+            return candidate.relativePath.generic_string() == relative_path.generic_string();
+        });
+    if (already_tracked) {
+        error = "File already tracked: " + relative_path.generic_string();
+        return false;
+    }
+
     std::filesystem::path absolute_path = project.rootPath / relative_path;
     std::error_code ec;
     if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {

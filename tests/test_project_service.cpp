@@ -470,7 +470,34 @@ TEST(ProjectServiceTest, ImportSacmFileCopiesTheArgumentByteForByteAndTracksIt) 
     // silently discard whatever was in it.
     core::ProjectFileEntry clash;
     EXPECT_FALSE(core::ProjectService::ImportSacmFile(project, source, "main.sacm", clash, error));
-    EXPECT_NE(error.find("already exists"), std::string::npos) << error;
+    EXPECT_NE(error.find("already tracked"), std::string::npos) << error;
+}
+
+// A tracked path is taken even when its file is gone from disk. Checking only
+// the disk let an import add a second manifest entry for the same path, so the
+// project reported the file missing and fresh at once.
+TEST(ProjectServiceTest, ImportSacmFileRefusesAPathTheManifestTracksEvenWhenTheFileIsMissing) {
+    TempDir tmp(MakeTempParent());
+    const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.xml");
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Target", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(std::filesystem::remove(project.rootPath / "arguments" / "main.sacm"));
+    const size_t files_before = project.files.size();
+
+    core::ProjectFileEntry entry;
+    EXPECT_FALSE(core::ProjectService::ImportSacmFile(project, source, "main.sacm", entry, error));
+    EXPECT_NE(error.find("already tracked"), std::string::npos) << error;
+    EXPECT_EQ(project.files.size(), files_before);
+    EXPECT_FALSE(std::filesystem::exists(project.rootPath / "arguments" / "main.sacm"))
+        << "a refused import must not write the file either";
+
+    // The same rule guards the seeded create, which shares the helper.
+    EXPECT_FALSE(core::ProjectService::AddSacmFile(project, "main.sacm", entry, error));
+    EXPECT_NE(error.find("already tracked"), std::string::npos) << error;
+    EXPECT_EQ(project.files.size(), files_before);
 }
 
 // The project must never track an argument it cannot open. A file the library
