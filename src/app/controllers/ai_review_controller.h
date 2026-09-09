@@ -10,6 +10,7 @@
 #include "parser/xml_parser.h"
 #include "review/sccg/sccg_profile_selector.h"
 #include "review/sccg/sccg_review.h"
+#include "review/sccg/sccg_review_preparation.h"
 
 #include <chrono>
 #include <memory>
@@ -52,6 +53,10 @@ public:
     const std::string& LastParseError() const;
 
 private:
+    void ReportPreparationFailure(const review::SccgReviewPreparation& preparation,
+                                  const std::string& selected_element_id,
+                                  const std::string& requested_review_profile_id);
+
     AppEvents& events_;
     core::ProblemsManager& problems_manager_;
     ReviewController& review_controller_;

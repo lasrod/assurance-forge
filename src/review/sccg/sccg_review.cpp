@@ -264,6 +264,45 @@ bool HasUnavailable(const AiReviewDataPackageBundle& packages, const std::string
            packages.unavailable.end();
 }
 
+// The packages this tool builds. One of these missing from a request means the
+// case has nothing to put in it, which is a fact about the argument; a package
+// NOT listed here is one Assurance Forge has no source for, which is a fact
+// about the tool. SCCG publishes separate availability states for the two and a
+// review is entitled to read them differently -- absent context the tool could
+// not supply is a gap in the review, absent context the case does not contain
+// may be a gap in the argument.
+//
+// EVIDENCE_BASIS and STANDARD_LINKS are deliberately absent from this list:
+// they are reported as not-implemented above, with their own reasons.
+struct EmptyPackageReason {
+    const char* id;
+    const char* reason;
+};
+
+const EmptyPackageReason* FindEmptyPackageReason(const std::string& package_id) {
+    static constexpr EmptyPackageReason kReasons[] = {
+        {"PARENT", "This element has no parent in the argument."},
+        {"CHILDREN", "This element has no children in the argument."},
+        {"DIRECT_CONTEXT", "No context, assumption or justification is attached to this element."},
+        {"INHERITED_CONTEXT", "No context or assumption is attached to any ancestor of this element."},
+        {"STRATEGY", "No strategy element stands between this element and its support."},
+        {"EVIDENCE_PATH", "No evidence is reachable below this element."},
+        {"EVIDENCE_ITEM", "This element is not an evidence item."},
+        {"SELECTED_CLAIM", "The selected element is not a claim."},
+        {"SELECTED_STRATEGY", "The selected element is not a strategy."},
+        {"SELECTED_EVIDENCE", "The selected element is not an evidence item."},
+        {"SELECTED_CONTEXT", "The selected element is not a context element."},
+        {"SELECTED_ASSUMPTION", "The selected element is not an assumption."},
+        {"SELECTED_JUSTIFICATION", "The selected element is not a justification."},
+        {"SELECTED_CHALLENGE", "The selected element is not a challenge."},
+    };
+    for (const EmptyPackageReason& reason : kReasons) {
+        if (package_id == reason.id)
+            return &reason;
+    }
+    return nullptr;
+}
+
 bool HasPackage(const AiReviewDataPackageBundle& packages, const std::string& id) {
     return std::find_if(packages.available.begin(), packages.available.end(), [&](const AiReviewDataPackage& package) {
                return package.id == id;
@@ -742,11 +781,19 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                     continue;
                 if (HasUnavailable(out_packages, package_id))
                     continue;
+                // A package this tool builds, that this case has nothing for,
+                // is EMPTY -- not "not implemented". A root goal has no parent
+                // and a leaf claim has no children; saying the tool cannot
+                // produce those invites a review to discount structure the case
+                // genuinely does not have, which is the opposite of what the
+                // three availability states are for.
+                const EmptyPackageReason* empty_reason = FindEmptyPackageReason(package_id);
                 AddUnavailable(out_packages,
                                package_id,
-                               "Assurance Forge does not have this data package available yet.",
+                               empty_reason ? empty_reason->reason
+                                            : "Assurance Forge does not have this data package available yet.",
                                required,
-                               DataPackageAbsence::NotImplemented);
+                               empty_reason ? DataPackageAbsence::Empty : DataPackageAbsence::NotImplemented);
             }
         };
         mark_missing(review_profile->required_data, true);

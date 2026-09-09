@@ -355,6 +355,29 @@ endif()
 # alone, the catalog silently vanished from every prompt.
 af_copy_sccg_data(assurance-forge-mcp)
 
+# --- SCCG review evaluation harness ---
+# Runs the SCCG review method over a project from the command line: same
+# profile selection, same data packages, same pre-checks, same request and same
+# response validator as the in-app review, without a window. It exists so a
+# claim about which guideline fires on which element can be measured over a
+# whole argument and over repeated runs, instead of being checked by hand one
+# element at a time.
+#
+# It links af_ai and calls a paid provider, so it is never a CTest: the tests
+# cover review::PrepareSccgReview, and this turns the prepared request into a
+# recorded run. No af_ui, no af_app -- the layer gate holds `eval` to the
+# reusable method.
+add_executable(af-sccg-review-eval src/eval/sccg_review_eval.cpp)
+target_link_libraries(af-sccg-review-eval PRIVATE
+    af_review af_ai af_core af_sacm_adapter af_legacy_sacm af_parser
+)
+if(WIN32)
+    target_link_libraries(af-sccg-review-eval PRIVATE bcrypt advapi32)
+endif()
+# The harness reads the SCCG catalog from its own runtime directory, the same
+# way the GUI and the MCP server do.
+af_copy_sccg_data(af-sccg-review-eval)
+
 # --- Localization catalogs (optional regeneration) ---
 # The Japanese .mo is committed and bundled as an asset, so normal builds need
 # no gettext tools. This convenience target regenerates the .mo from the .po
@@ -446,6 +469,7 @@ add_executable(tests
     tests/test_ai_service.cpp
     tests/test_secret_store.cpp
     tests/test_ai_claim_review.cpp
+    tests/test_sccg_review_preparation.cpp
     tests/test_patch_operation_parsing.cpp
     tests/test_term_definition_survives_save.cpp
     tests/test_openai_provider.cpp

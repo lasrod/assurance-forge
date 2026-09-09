@@ -29,7 +29,18 @@ an aspiration.
 | `src/bridge` | Local transport between the MCP adapter and the running application: protocol, endpoint, transport. | `review/`, `ai/`, `export/`, `ui/`, `agent/`, `mcp/`, `app/` |
 | `src/agent` | Operations an external agent can request — read, change, draft, placement — independent of transport. May use `review/` so external clients get the same review method as the built-in path. | `ai/`, `export/`, `ui/`, `mcp/`, `app/` |
 | `src/mcp` | The MCP server: JSON-RPC, session, tools, guidance. Its own executable entry point. Reaches review behaviour only through `agent`. | `review/`, `ai/`, `export/`, `ui/`, `app/` |
+| `src/eval` | The offline SCCG review evaluation harness: a second composition root that joins `review` and `ai` without a window, so a review can be run over a whole argument and repeated. Its own executable entry point. | `export/`, `ui/`, `bridge/`, `agent/`, `mcp/`, `app/` |
 | `src/app` | Runtime orchestration, controllers, project workflow, modal state, command handling. May include anything. | — |
+
+`eval` is a composition root, not a layer other code may depend on. `app` joins
+`review` and `ai` behind a rendered frame; `eval` joins the same two from a
+command line, which is what makes a claim about the review method — that a
+guideline is carried for an element, that a package was declared absent, that a
+finding cites what it should — measurable over an argument instead of checkable
+one selection at a time. It links no `af_ui` and no `af_app`: a harness that
+could reach them would stop measuring the reusable method and start measuring
+the application. It calls a paid provider and its output depends on a model, so
+it is never a CTest; `review::PrepareSccgReview` is what the tests cover.
 
 `sacm/` now names exactly one thing: the reusable library under `libs/sacm`.
 The legacy model answers to `legacy_sacm/`, so an include states which

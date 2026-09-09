@@ -1,6 +1,5 @@
 #include "app/controllers/ai_review_controller.h"
 
-#include "core/guideline_catalog.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_text_utils.h"
 #include "core/time_utils.h"
@@ -61,15 +60,6 @@ std::string ReviewTitleForProblem(const core::ProblemItem& problem) {
     if (!problem.guideline_id.empty())
         return "AI review finding: " + problem.guideline_id;
     return "AI review finding";
-}
-
-std::vector<std::string> GuidelineIds(const std::vector<const parser::Guideline*>& guidelines) {
-    std::vector<std::string> ids;
-    for (const parser::Guideline* guideline : guidelines) {
-        if (guideline && !guideline->id.empty())
-            ids.push_back(guideline->id);
-    }
-    return ids;
 }
 
 void EmitReviewVisualEvent(AppEvents& events,
@@ -146,153 +136,6 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
         return;
     }
 
-    if (selected_element_id.empty()) {
-        problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem("ai-review:no-selection",
-                                                                 core::ProblemSeverity::Info,
-                                                                 {},
-                                                                 "AI Review",
-                                                                 "No GSN element is selected for AI review."));
-        events_.Emit(StatusMessageEvent{"No GSN element is selected for AI review."});
-        return;
-    }
-
-    if (!assurance_case) {
-        problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem("ai-review:" + selected_element_id + ":no-loaded-case",
-                                                                 core::ProblemSeverity::Error,
-                                                                 selected_element_id,
-                                                                 "AI Review",
-                                                                 "No assurance case is loaded for AI review."));
-        events_.Emit(StatusMessageEvent{"No assurance case is loaded for AI review."});
-        return;
-    }
-
-    const parser::SacmElement* selected_element = review::FindSacmElement(*assurance_case, selected_element_id);
-    if (!selected_element) {
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":missing-element",
-                                core::ProblemSeverity::Error,
-                                selected_element_id,
-                                "AI Review",
-                                "Selected element was not found."));
-        events_.Emit(StatusMessageEvent{"Selected element was not found."});
-        return;
-    }
-
-    if (!review::IsSupportedAiReviewElement(*selected_element)) {
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":unsupported-type",
-                                core::ProblemSeverity::Info,
-                                selected_element_id,
-                                review::AiReviewElementType(*selected_element),
-                                "AI Review does not support the selected element type."));
-        events_.Emit(StatusMessageEvent{"AI Review does not support the selected element type."});
-        return;
-    }
-
-    review::AiReviewPayload payload;
-    std::string payload_error;
-    if (!review::BuildAiReviewPayload(*assurance_case, current_tree, selected_element_id, payload, payload_error)) {
-        ReplaceAiReviewWithSingleItem(review_controller_,
-                                      selected_element_id,
-                                      ReviewCommentPrefix(selected_element_id, review_profile_id),
-                                      "payload-error",
-                                      "AI review setup failed",
-                                      payload_error.empty() ? "AI review payload could not be created." : payload_error,
-                                      core::ProblemSeverity::Error);
-        EmitReviewVisualEvent(events_,
-                              ElementReviewVisualEventKind::AiFailed,
-                              selected_element_id,
-                              review_profile_id,
-                              {},
-                              "AI review payload could not be created.");
-        review_controller_.SetAiReviewOutcome(selected_element_id,
-                                              false,
-                                              true,
-                                              review_profile_id,
-                                              {},
-                                              "AI review payload could not be created.",
-                                              NowUtcString());
-        events_.Emit(StatusMessageEvent{"AI review payload could not be created."});
-        return;
-    }
-
-    core::GuidelineCatalog guideline_catalog;
-    std::string guideline_error;
-    if (!core::LoadGuidelineCatalog(guideline_catalog, guideline_error)) {
-        ReplaceAiReviewWithSingleItem(review_controller_,
-                                      selected_element_id,
-                                      ReviewCommentPrefix(selected_element_id, review_profile_id),
-                                      "guidelines-missing",
-                                      "AI review setup failed",
-                                      "SCCG guidelines could not be loaded for AI review: " + guideline_error,
-                                      core::ProblemSeverity::Error);
-        EmitReviewVisualEvent(events_,
-                              ElementReviewVisualEventKind::AiFailed,
-                              selected_element_id,
-                              review_profile_id,
-                              {},
-                              "SCCG guidelines could not be loaded for AI review.");
-        review_controller_.SetAiReviewOutcome(selected_element_id,
-                                              false,
-                                              true,
-                                              review_profile_id,
-                                              {},
-                                              "SCCG guidelines could not be loaded for AI review.",
-                                              NowUtcString());
-        events_.Emit(StatusMessageEvent{"SCCG guidelines could not be loaded for AI review."});
-        return;
-    }
-
-    const core::TreeNode* selected_node = core::FindTreeNode(current_tree, selected_element_id);
-    review::AiReviewGuidelineSelection guideline_selection =
-        review_profile_id.empty()
-            ? review::SelectReviewProfileForElement(guideline_catalog, *selected_element, selected_node)
-            : review::SelectReviewProfileGuidelines(guideline_catalog, review_profile_id);
-
-    if (!guideline_selection.error_message.empty()) {
-        ReplaceAiReviewWithSingleItem(review_controller_,
-                                      selected_element_id,
-                                      ReviewCommentPrefix(selected_element_id, review_profile_id),
-                                      "guidelines-empty",
-                                      "AI review setup failed",
-                                      guideline_selection.error_message,
-                                      core::ProblemSeverity::Error);
-        EmitReviewVisualEvent(events_,
-                              ElementReviewVisualEventKind::AiFailed,
-                              selected_element_id,
-                              review_profile_id,
-                              guideline_selection.review_profile ? guideline_selection.review_profile->display_name
-                                                                 : "",
-                              guideline_selection.error_message);
-        review_controller_.SetAiReviewOutcome(
-            selected_element_id,
-            false,
-            true,
-            review_profile_id,
-            guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
-            guideline_selection.error_message,
-            NowUtcString());
-        events_.Emit(StatusMessageEvent{guideline_selection.error_message});
-        return;
-    }
-
-    if (guideline_selection.review_profile &&
-        !review::IsReviewProfileCompatibleWithElement(
-            guideline_catalog.document, *guideline_selection.review_profile, *selected_element, selected_node)) {
-        const std::string message = "SCCG review profile '" + guideline_selection.review_profile->display_name +
-                                    "' does not apply to the selected element type.";
-        problems_manager_.AddOrUpdateProblem(
-            MakeAiReviewProblem("ai-review:" + selected_element_id + ":profile-incompatible",
-                                core::ProblemSeverity::Info,
-                                selected_element_id,
-                                payload.selected.type,
-                                message));
-        events_.Emit(StatusMessageEvent{message});
-        return;
-    }
-
-    review::AiReviewDataPackageBundle data_packages;
-    std::string data_package_error;
     // What the tool knows beyond the argument: prior findings, which is what
     // SU.4, SU.5 and SU.11 turn on. Every item rather than the selected
     // element's, because the collector scopes them to what the data packages
@@ -300,66 +143,115 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     // this review's history, and filtering here would hide it.
     review::AiReviewCaseContext case_context;
     case_context.review_items = review_controller_.Items();
-    if (!review::CollectAiReviewDataPackages(*assurance_case,
-                                             current_tree,
-                                             selected_element_id,
-                                             guideline_catalog.document,
-                                             guideline_selection.review_profile,
-                                             data_packages,
-                                             data_package_error,
-                                             &case_context)) {
-        ReplaceAiReviewWithSingleItem(
-            review_controller_,
-            selected_element_id,
-            ReviewCommentPrefix(selected_element_id,
-                                guideline_selection.review_profile ? guideline_selection.review_profile->id
-                                                                   : review_profile_id),
-            "data-package-error",
-            "AI review setup failed",
-            data_package_error.empty() ? "AI review data packages could not be collected." : data_package_error,
-            core::ProblemSeverity::Error);
-        EmitReviewVisualEvent(
-            events_,
-            ElementReviewVisualEventKind::AiFailed,
-            selected_element_id,
-            guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id,
-            guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
-            "AI review data packages could not be collected.");
-        review_controller_.SetAiReviewOutcome(
-            selected_element_id,
-            false,
-            true,
-            guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id,
-            guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "",
-            "AI review data packages could not be collected.",
-            NowUtcString());
-        events_.Emit(StatusMessageEvent{"AI review data packages could not be collected."});
+
+    // Steps 1-5 of the SCCG workflow, which `review` owns. Everything below is
+    // the part only the application can do with the outcome.
+    const review::SccgReviewPreparation preparation =
+        review::PrepareSccgReview(assurance_case, current_tree, selected_element_id, review_profile_id, case_context);
+
+    if (!preparation.ok()) {
+        ReportPreparationFailure(preparation, selected_element_id, review_profile_id);
         return;
     }
 
-    // Step 4 of the SCCG review workflow, which had never run: deterministic
-    // pre-checks, decided before the model is asked for judgement.
-    const std::vector<review::sccg::PrecheckResult> precheck_results =
-        review::sccg::RunPrechecks(guideline_catalog.document, *assurance_case, current_tree, selected_element_id);
-
-    pending_review_ = review::BuildAiReviewRequestArtifacts(
-        payload, guideline_selection.guidelines, guideline_selection.review_profile, &data_packages, &precheck_results);
-    pending_review_element_id_ = payload.selected.id;
-    pending_review_element_type_ = payload.selected.type;
-    pending_review_profile_id_ =
-        guideline_selection.review_profile ? guideline_selection.review_profile->id : review_profile_id;
-    pending_review_profile_name_ =
-        guideline_selection.review_profile ? guideline_selection.review_profile->display_name : "";
-    const std::vector<std::string> reviewed_ids = review::ReviewedElementIds(payload, data_packages);
-    pending_review_scope_element_ids_ = std::unordered_set<std::string>(reviewed_ids.begin(), reviewed_ids.end());
-    pending_review_scope_element_id_list_ = reviewed_ids;
-    pending_guideline_ids_ = GuidelineIds(guideline_selection.guidelines);
-    pending_review_scope_hash_ = core::reviews::ComputeScopeSemanticHash(*assurance_case, reviewed_ids);
+    pending_review_ = preparation.request;
+    pending_review_element_id_ = preparation.payload.selected.id;
+    pending_review_element_type_ = preparation.payload.selected.type;
+    pending_review_profile_id_ = preparation.review_profile_id;
+    pending_review_profile_name_ = preparation.review_profile_name;
+    pending_review_scope_element_ids_ = std::unordered_set<std::string>(preparation.reviewed_element_ids.begin(),
+                                                                        preparation.reviewed_element_ids.end());
+    pending_review_scope_element_id_list_ = preparation.reviewed_element_ids;
+    pending_guideline_ids_ = preparation.guideline_ids;
+    pending_review_scope_hash_ =
+        core::reviews::ComputeScopeSemanticHash(*assurance_case, preparation.reviewed_element_ids);
     pending_review_run_id_.clear();
     last_raw_response_.clear();
     last_parse_error_.clear();
     show_debug_modal_ = false;
     events_.Emit(StatusMessageEvent{"AI review request is ready in the AI Debug panel."});
+}
+
+// The two failure styles are not interchangeable. A setup problem the user can
+// see and fix from the selection alone (nothing selected, an element type SCCG
+// does not review) is a Problems entry; a failure of the review itself is
+// recorded against the element as a review item, drawn on the canvas, and
+// stored as that element's AI review outcome, because a review that was
+// attempted and failed must not leave the element looking unreviewed.
+void AiReviewController::ReportPreparationFailure(const review::SccgReviewPreparation& preparation,
+                                                  const std::string& selected_element_id,
+                                                  const std::string& requested_review_profile_id) {
+    const std::string& message = preparation.error_message;
+
+    const auto report_as_problem = [&](const std::string& problem_suffix,
+                                       core::ProblemSeverity severity,
+                                       const std::string& element_id,
+                                       const std::string& type) {
+        const std::string problem_id =
+            element_id.empty() ? "ai-review:" + problem_suffix : "ai-review:" + element_id + ":" + problem_suffix;
+        problems_manager_.AddOrUpdateProblem(MakeAiReviewProblem(problem_id, severity, element_id, type, message));
+        events_.Emit(StatusMessageEvent{message});
+    };
+
+    const auto report_as_failed_review = [&](const std::string& suffix, const std::string& status_message) {
+        const std::string profile_id =
+            preparation.review_profile_id.empty() ? requested_review_profile_id : preparation.review_profile_id;
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      selected_element_id,
+                                      ReviewCommentPrefix(selected_element_id, profile_id),
+                                      suffix,
+                                      "AI review setup failed",
+                                      message,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              selected_element_id,
+                              profile_id,
+                              preparation.review_profile_name,
+                              status_message);
+        review_controller_.SetAiReviewOutcome(selected_element_id,
+                                              false,
+                                              true,
+                                              profile_id,
+                                              preparation.review_profile_name,
+                                              status_message,
+                                              NowUtcString());
+        events_.Emit(StatusMessageEvent{status_message});
+    };
+
+    switch (preparation.failure) {
+    case review::SccgReviewPreparationFailure::None:
+        return;
+    case review::SccgReviewPreparationFailure::NoSelection:
+        report_as_problem("no-selection", core::ProblemSeverity::Info, {}, "AI Review");
+        return;
+    case review::SccgReviewPreparationFailure::NoCase:
+        report_as_problem("no-loaded-case", core::ProblemSeverity::Error, selected_element_id, "AI Review");
+        return;
+    case review::SccgReviewPreparationFailure::ElementNotFound:
+        report_as_problem("missing-element", core::ProblemSeverity::Error, selected_element_id, "AI Review");
+        return;
+    case review::SccgReviewPreparationFailure::UnsupportedElementType:
+        report_as_problem(
+            "unsupported-type", core::ProblemSeverity::Info, selected_element_id, preparation.element_type);
+        return;
+    case review::SccgReviewPreparationFailure::ProfileIncompatible:
+        report_as_problem(
+            "profile-incompatible", core::ProblemSeverity::Info, selected_element_id, preparation.element_type);
+        return;
+    case review::SccgReviewPreparationFailure::PayloadFailed:
+        report_as_failed_review("payload-error", "AI review payload could not be created.");
+        return;
+    case review::SccgReviewPreparationFailure::CatalogUnavailable:
+        report_as_failed_review("guidelines-missing", "SCCG guidelines could not be loaded for AI review.");
+        return;
+    case review::SccgReviewPreparationFailure::ProfileSelectionFailed:
+        report_as_failed_review("guidelines-empty", message);
+        return;
+    case review::SccgReviewPreparationFailure::DataPackagesFailed:
+        report_as_failed_review("data-package-error", "AI review data packages could not be collected.");
+        return;
+    }
 }
 
 void AiReviewController::MarkPendingRequestIncludesWorkingDraft() {
