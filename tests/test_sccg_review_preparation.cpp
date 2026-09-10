@@ -172,7 +172,7 @@ TEST(SccgReviewPreparationTest, ReportsAnImplementedButEmptyPackageAsEmpty) {
     }
 }
 
-// The counterpart: a package with no source in the tool at all stays
+// The counterpart: a package with a required field this tool cannot fill stays
 // not-implemented, so the distinction the states exist to draw is real in both
 // directions.
 TEST(SccgReviewPreparationTest, ReportsAPackageWithNoSourceAsNotImplemented) {
@@ -184,14 +184,67 @@ TEST(SccgReviewPreparationTest, ReportsAPackageWithNoSourceAsNotImplemented) {
         review::PrepareSccgReview(&assurance_case, tree, "E1", {}, case_context, &Catalog());
     ASSERT_TRUE(preparation.ok()) << preparation.error_message;
 
+    const review::AiReviewUnavailableDataPackage* links = FindUnavailable(preparation.data_packages, "STANDARD_LINKS");
+    ASSERT_NE(links, nullptr);
+    EXPECT_EQ(links->absence, review::DataPackageAbsence::NotImplemented);
+}
+
+// EVIDENCE_BASIS is supplied for an evidence element, empty, rather than
+// declared absent.
+//
+// SCCG gives the package no required fields, so a tool that can address the
+// element can always send one; declaring it unavailable triggers
+// `evidence_review`'s `when_absent` statement, which forbids reporting an
+// absent basis as a finding and names EV.5, EV.6, SU.3, SU.6, SU.7, SU.8, LF.5
+// and LF.7 unassessable. Measured, that cost EV.5 entirely: 0 of 3 runs against
+// evidence whose argument stated no sufficiency basis, while the same guideline
+// fired 3 of 3 under justification_review, which publishes no such statement.
+// An empty package says the true thing -- this case records no acceptance basis
+// -- which is the finding rather than a gap in the review.
+TEST(SccgReviewPreparationTest, SuppliesAnEmptyEvidenceBasisForEvidenceRatherThanDeclaringItAbsent) {
+    const parser::AssuranceCase assurance_case = PaperAInitialFragment();
+    const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    const review::AiReviewCaseContext case_context;
+
+    const review::SccgReviewPreparation preparation =
+        review::PrepareSccgReview(&assurance_case, tree, "E1", {}, case_context, &Catalog());
+    ASSERT_TRUE(preparation.ok()) << preparation.error_message;
+
+    EXPECT_EQ(FindUnavailable(preparation.data_packages, "EVIDENCE_BASIS"), nullptr)
+        << "a package with no required fields must not be reported as unavailable";
+
+    const review::AiReviewDataPackage* basis = nullptr;
+    for (const review::AiReviewDataPackage& package : preparation.data_packages.available) {
+        if (package.id == "EVIDENCE_BASIS")
+            basis = &package;
+    }
+    ASSERT_NE(basis, nullptr) << "EVIDENCE_BASIS should be supplied for an evidence element";
+
+    // Every optional field present and empty, so "we hold none of this" is
+    // stated rather than left to be inferred from a missing key.
+    for (const char* field :
+         {"acceptance_criteria", "coverage", "thresholds", "scenario_set", "configuration", "limitations"}) {
+        SCOPED_TRACE(field);
+        EXPECT_NE(basis->json.find(field), std::string::npos);
+    }
+    // And it must not read as "a basis exists somewhere and was withheld".
+    EXPECT_NE(basis->json.find("no acceptance criteria"), std::string::npos);
+}
+
+// A claim has no acceptance basis of its own, so for a non-evidence element the
+// package is genuinely empty -- and says which of the two reasons that is.
+TEST(SccgReviewPreparationTest, ReportsEvidenceBasisAsEmptyForANonEvidenceElement) {
+    const parser::AssuranceCase assurance_case = PaperAInitialFragment();
+    const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    const review::AiReviewCaseContext case_context;
+
+    const review::SccgReviewPreparation preparation =
+        review::PrepareSccgReview(&assurance_case, tree, "G1", {}, case_context, &Catalog());
+    ASSERT_TRUE(preparation.ok()) << preparation.error_message;
+
     const review::AiReviewUnavailableDataPackage* basis = FindUnavailable(preparation.data_packages, "EVIDENCE_BASIS");
     ASSERT_NE(basis, nullptr);
-    EXPECT_EQ(basis->absence, review::DataPackageAbsence::NotImplemented);
-    // `evidence_review` publishes a when-absent statement for it, and it is
-    // what tells the model which guidelines it cannot assess. A review sent
-    // without it attempts EV.5 on data it was never given.
-    EXPECT_FALSE(basis->when_absent_statement.empty());
-    EXPECT_TRUE(Contains(basis->unassessable_guideline_ids, "EV.5"));
+    EXPECT_EQ(basis->absence, review::DataPackageAbsence::Empty);
 }
 
 TEST(SccgReviewPreparationTest, RefusesWithoutACase) {

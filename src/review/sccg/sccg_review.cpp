@@ -288,6 +288,7 @@ const EmptyPackageReason* FindEmptyPackageReason(const std::string& package_id) 
         {"STRATEGY", "No strategy element stands between this element and its support."},
         {"EVIDENCE_PATH", "No evidence is reachable below this element."},
         {"EVIDENCE_ITEM", "This element is not an evidence item."},
+        {"EVIDENCE_BASIS", "This element is not an evidence item, so it has no acceptance basis of its own."},
         {"SELECTED_CLAIM", "The selected element is not a claim."},
         {"SELECTED_STRATEGY", "The selected element is not a strategy."},
         {"SELECTED_EVIDENCE", "The selected element is not an evidence item."},
@@ -763,16 +764,53 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                        DataPackageAbsence::Empty);
     }
 
-    // The two with no source in the tool at all, named so their absence is a
-    // stated limitation rather than a silent one.
-    AddUnavailable(out_packages,
+    // EVIDENCE_BASIS is SUPPLIED, not declared absent, and the distinction
+    // decides whether eight guidelines can be assessed at all.
+    //
+    // SCCG gives the package `required_fields: []` -- every one of
+    // `acceptance_criteria`, `coverage`, `thresholds`, `scenario_set`,
+    // `configuration` and `limitations` is optional. A package with none of
+    // them populated is therefore a valid instance, and a tool that can address
+    // the evidence element at all can always supply one. Reporting it
+    // unavailable was our misreading: this tool has no source for the six
+    // FIELDS, but the PACKAGE asks for nothing it cannot provide.
+    //
+    // The misreading was not free. `evidence_review` is the only profile
+    // publishing a `when_absent` statement, it applies to this package, and it
+    // instructs the review not to report an absent basis as a finding --
+    // naming EV.5, EV.6, SU.3, SU.6, SU.7, SU.8, LF.5 and LF.7 as unassessable.
+    // Measured over three runs per element, EV.5 was cited 0 of 3 times against
+    // evidence whose argument stated no sufficiency basis at all, with the model
+    // writing "Evidence sufficiency was not assessed because the EVIDENCE_BASIS
+    // package is unavailable" -- while the same guideline fired 3 of 3 under
+    // `justification_review`, which carries it and publishes no such statement.
+    //
+    // Sending the package with its fields empty says the true thing instead:
+    // the case records no acceptance basis for this evidence. That is not a gap
+    // in the review, it is the finding EV.5 exists to raise.
+    // (safety-case-core-guidelines#13)
+    if (selected_node && selected_node->role == core::NodeRole::Solution) {
+        AddPackage(out_packages,
                    "EVIDENCE_BASIS",
-                   "Assurance Forge does not hold the coverage, thresholds, scenarios or limitations "
-                   "behind an evidence item. The route is the evidence register, once it links the "
-                   "artifact itself; sharing a linked item with a review will then be a per-item "
-                   "decision, so this package will often be partly withheld rather than absent.",
-                   true,
-                   DataPackageAbsence::NotImplemented);
+                   {{"element_id", selected_element_id},
+                    {"acceptance_criteria", nlohmann::json::array()},
+                    {"coverage", nlohmann::json::array()},
+                    {"thresholds", nlohmann::json::array()},
+                    {"scenario_set", nlohmann::json::array()},
+                    {"configuration", nlohmann::json::array()},
+                    {"limitations", nlohmann::json::array()},
+                    {"note",
+                     "Assurance Forge has no field in which a project records an acceptance basis for an "
+                     "evidence item, so every field of this package is empty. Read that as: this case states "
+                     "no acceptance criteria, coverage, thresholds, scenario set, configuration or "
+                     "limitations for this evidence. It is not a statement that such a basis exists "
+                     "elsewhere and was withheld."}});
+    }
+
+    // No source in the tool at all, named so the absence is a stated limitation
+    // rather than a silent one. Unlike EVIDENCE_BASIS this package has a
+    // required field (`linked_requirements`) that Assurance Forge cannot fill,
+    // so it genuinely cannot be supplied.
     AddUnavailable(out_packages,
                    "STANDARD_LINKS",
                    "Assurance Forge does not model links to external standard requirements.",

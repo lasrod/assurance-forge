@@ -665,14 +665,30 @@ TEST(AiClaimReviewTest, CarriesTheUsersOwnConcernWhenTheyStatedOne) {
 // no source for reads differently from one the case simply has none of, and
 // both read differently from one deliberately not shared.
 TEST(AiClaimReviewTest, NamesWhyEachAbsentPackageIsAbsent) {
-    const review::AiReviewDataPackageBundle packages = CollectFor(CaseWithATerm(), "G1", nullptr);
+    // Through a real profile, because the required/optional lists are what the
+    // absent packages are reported against: a collection with no profile has
+    // nothing to say a package is missing FROM. The application always has one
+    // (selection fails closed), so a nullptr here would test a path it never
+    // takes.
+    const core::AssuranceTree tree = core::AssuranceTree::Build(CaseWithATerm());
+    const parser::AssuranceCase assurance_case = CaseWithATerm();
+    const parser::ReviewProfile* profile = Catalog().FindReviewProfileById("claim_review");
+    ASSERT_NE(profile, nullptr);
+    review::AiReviewDataPackageBundle packages;
+    std::string error;
+    ASSERT_TRUE(
+        review::CollectAiReviewDataPackages(assurance_case, tree, "G1", Catalog(), profile, packages, error, nullptr))
+        << error;
 
+    // G1 is a claim, so it has no acceptance basis of its own -- and the reason
+    // says which of the two things that is.
     const review::AiReviewUnavailableDataPackage* basis = Unavailable(packages, "EVIDENCE_BASIS");
     ASSERT_NE(basis, nullptr);
-    EXPECT_EQ(basis->absence, review::DataPackageAbsence::NotImplemented);
-    EXPECT_NE(basis->reason.find("evidence register"), std::string::npos)
-        << "the recorded route should survive in the reason a reviewer reads";
+    EXPECT_EQ(basis->absence, review::DataPackageAbsence::Empty);
+    EXPECT_NE(basis->reason.find("not an evidence item"), std::string::npos);
 
+    // STANDARD_LINKS has a required field this tool cannot fill, so unlike
+    // EVIDENCE_BASIS it genuinely cannot be supplied.
     const review::AiReviewUnavailableDataPackage* links = Unavailable(packages, "STANDARD_LINKS");
     ASSERT_NE(links, nullptr);
     EXPECT_EQ(links->absence, review::DataPackageAbsence::NotImplemented);
