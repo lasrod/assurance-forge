@@ -1,5 +1,7 @@
 #include "core/guideline_catalog.h"
 
+#include <cstdlib>
+
 #include "parser/sccg_dist_parser.h"
 
 #ifdef _WIN32
@@ -33,7 +35,31 @@ std::filesystem::path ExecutableDirectory() {
 
 } // namespace
 
+// An explicit SCCG distribution, when one is named.
+//
+// SCCG is a versioned dependency, and an evaluation that compares two versions
+// -- or one that asks what a proposed catalogue change would do -- has to be
+// able to point the tool at a distribution other than the one beside the
+// executable. Discovery alone cannot express that.
+//
+// Opt-in and silent when unset, so a normal run behaves exactly as before. It is
+// not a hidden switch: every review record states the `sccg_catalog_path` it
+// actually loaded, so a run against a substituted catalogue says so in its own
+// output rather than looking like a run against the shipped one.
+std::filesystem::path SccgDistDirectoryOverride() {
+    const char* configured = std::getenv("AF_SCCG_DIST_DIR");
+    if (configured == nullptr || *configured == '\0')
+        return {};
+    std::filesystem::path directory(configured);
+    std::error_code error;
+    if (!std::filesystem::is_directory(directory, error))
+        return {};
+    return directory;
+}
+
 std::filesystem::path FindSccgDistDirectory() {
+    if (std::filesystem::path configured = SccgDistDirectoryOverride(); !configured.empty())
+        return configured;
     const std::filesystem::path executable_dir = ExecutableDirectory();
     const std::filesystem::path current_dir = std::filesystem::current_path();
     const std::vector<std::filesystem::path> candidates = {
@@ -58,6 +84,12 @@ std::filesystem::path FindSccgDistDirectory() {
 }
 
 std::filesystem::path FindSccgCatalogFile() {
+    if (const std::filesystem::path configured = SccgDistDirectoryOverride(); !configured.empty()) {
+        std::error_code error;
+        const std::filesystem::path candidate = configured / "sccg.full.yaml";
+        if (std::filesystem::exists(candidate, error))
+            return candidate;
+    }
     const std::filesystem::path executable_dir = ExecutableDirectory();
     const std::filesystem::path current_dir = std::filesystem::current_path();
     const std::vector<std::filesystem::path> candidates = {
