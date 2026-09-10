@@ -32,10 +32,14 @@ enum class AiTaskState {
     Error,
 };
 
+// The model a fresh install uses. A saved settings file keeps whatever the
+// user chose; this is only the starting point.
+constexpr const char* kDefaultOpenAiModel = "gpt-5.6-sol";
+
 struct AiProviderSettings {
     AiProviderId provider = AiProviderId::OpenAI;
     std::string displayName = "OpenAI";
-    std::string model = "gpt-5.5";
+    std::string model = kDefaultOpenAiModel;
     bool enabled = false;
     bool sendProjectDataOnlyOnExplicitUserAction = true;
 };
@@ -62,7 +66,6 @@ struct AiConnectionStatus {
     std::string message;
 };
 
-constexpr const char* kDefaultOpenAiModel = "gpt-5.5";
 constexpr const char* kOpenAiProviderName = "OpenAI";
 constexpr const char* kOpenAiProviderId = "openai";
 constexpr const char* kOpenAiResponsesEndpoint = "https://api.openai.com/v1/responses";

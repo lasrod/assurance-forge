@@ -34,6 +34,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -42,6 +43,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -85,7 +87,7 @@ Options:
   --out <dir>          Directory for the run records. Default: ./sccg-eval-out
   --tag <text>         Free text stored in every record of this invocation.
   --dry-run            Assemble and record the request; do not call the provider.
-  --list-models        List the models the configured account offers, then exit.
+  --list-models        List the models the configured account offers, newest first, then exit.
   --help
 )";
 }
@@ -136,12 +138,17 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
     return true;
 }
 
-std::shared_ptr<ai::AiService> MakeAiService() {
+struct AiStack {
+    std::shared_ptr<ai::ISecretStore> secret_store;
+    std::shared_ptr<ai::AiService> service;
+};
+
+AiStack MakeAiStack() {
     auto settings_store = std::make_shared<ai::AiSettingsStore>();
     auto secret_store = ai::CreatePlatformSecretStore();
     auto http_client = std::make_shared<ai::LibCurlHttpClient>();
     auto provider = std::make_shared<ai::OpenAiProvider>(http_client);
-    return std::make_shared<ai::AiService>(settings_store, secret_store, provider);
+    return AiStack{secret_store, std::make_shared<ai::AiService>(settings_store, secret_store, provider)};
 }
 
 std::string NowUtcIso() {
@@ -246,23 +253,57 @@ std::vector<std::string> SupportedElementIds(const parser::AssuranceCase& assura
     return ids;
 }
 
-int ListModels(const ai::AiService& service) {
-    // Deliberately not routed through IAiProvider: listing models is not
-    // inference, and giving the provider interface a second responsibility to
-    // serve one diagnostic would put it in every implementation forever.
+// The provider's own catalogue, read rather than guessed. A model name typed
+// from memory is a paid request that fails, or -- worse -- one that succeeds
+// against something other than the model the record will claim was used.
+//
+// Deliberately not routed through IAiProvider: listing models is not inference,
+// and giving that interface a second responsibility to serve one diagnostic
+// would put it in every implementation forever.
+int ListModels(const ai::AiService& service, const ai::ISecretStore& secret_store) {
     const ai::AiProviderSettings settings = service.LoadSettings();
     std::cout << "Configured provider: " << ai::ToString(settings.provider) << "\n";
     std::cout << "Configured model:    " << settings.model << "\n";
     std::cout << "Enabled:             " << (settings.enabled ? "yes" : "no") << "\n";
-    std::cout << "API key stored:      " << (service.HasStoredApiKey() ? "yes" : "no") << "\n";
-    if (!service.HasStoredApiKey()) {
+    std::cout << "Secret store:        " << ai::SecretStoreBackendName() << "\n";
+
+    const ai::SecretLoadResult key =
+        const_cast<ai::ISecretStore&>(secret_store).LoadSecret(ai::kSecretServiceName, ai::kOpenAiSecretAccount);
+    if (!key.success || !key.secret.has_value() || key.secret->empty()) {
         std::cout << "\nNo API key is stored, so the model list cannot be fetched.\n";
         return 1;
     }
-    std::cout << "\nTesting the connection with the configured model...\n";
-    const ai::AiConnectionStatus status = service.TestConnection();
-    std::cout << (status.state == ai::AiTaskState::Success ? "OK: " : "FAILED: ") << status.message << "\n";
-    return status.state == ai::AiTaskState::Success ? 0 : 1;
+
+    ai::LibCurlHttpClient http_client;
+    ai::HttpRequest request;
+    request.url = "https://api.openai.com/v1/models";
+    request.headers.push_back(ai::HttpHeader{"Authorization", "Bearer " + *key.secret});
+    request.timeoutSeconds = 60;
+
+    const ai::HttpResponse response = http_client.Get(request);
+    if (response.statusCode != 200) {
+        std::cerr << "\nModel list request failed (HTTP " << response.statusCode
+                  << "): " << (response.errorMessage.empty() ? response.body : response.errorMessage) << "\n";
+        return 1;
+    }
+
+    const json parsed = json::parse(response.body, nullptr, false);
+    if (parsed.is_discarded() || !parsed.contains("data")) {
+        std::cerr << "\nModel list response could not be parsed.\n";
+        return 1;
+    }
+
+    std::vector<std::pair<long long, std::string>> models;
+    for (const json& entry : parsed["data"]) {
+        models.emplace_back(entry.value("created", 0LL), entry.value("id", std::string{}));
+    }
+    std::sort(
+        models.begin(), models.end(), [](const auto& left, const auto& right) { return left.first > right.first; });
+
+    std::cout << "\n" << models.size() << " model(s), newest first:\n";
+    for (const auto& [created, id] : models)
+        std::cout << "  " << id << "\n";
+    return 0;
 }
 
 } // namespace
@@ -276,9 +317,11 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    std::shared_ptr<ai::AiService> service = MakeAiService();
+    const AiStack ai_stack = MakeAiStack();
+    const std::shared_ptr<ai::AiService>& service = ai_stack.service;
+    const std::shared_ptr<ai::ISecretStore>& secret_store = ai_stack.secret_store;
     if (options.list_models)
-        return ListModels(*service);
+        return ListModels(*service, *secret_store);
 
     if (options.project.empty()) {
         std::cerr << "--project is required.\n\n";

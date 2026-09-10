@@ -14,6 +14,11 @@ public:
         lastRequest = request;
         return response;
     }
+
+    ai::HttpResponse Get(const ai::HttpRequest& request) override {
+        lastRequest = request;
+        return response;
+    }
 };
 
 } // namespace
