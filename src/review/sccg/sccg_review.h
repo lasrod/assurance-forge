@@ -117,6 +117,11 @@ struct AiReviewParseResult {
     std::string reviewedElementType;
     std::vector<core::ProblemItem> problems;
     std::vector<std::string> suggestedElementTexts;
+    // Per finding, in the same order as `problems`: how far the model said the
+    // supplied data supports it, or empty when it did not say. This is the
+    // ranking signal that replaced `severity`, which SCCG never defined and
+    // which the prompt pinned to one value.
+    std::vector<std::string> findingConfidences;
     // Per finding, in the same order as `problems`: the structural repair it
     // asks for, when SCCG's answer is to add or re-attach an element rather
     // than to reword one. Empty for a finding a text edit fixes.
@@ -190,6 +195,17 @@ AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
 // propose structural changes -- the set they are allowed to touch.
 std::vector<std::string> ReviewedElementIds(const AiReviewPayload& payload,
                                             const AiReviewDataPackageBundle& data_packages);
+
+// The pre-checks that independently flagged the same guideline as a finding
+// cites. A finding a deterministic check also reached is corroborated by
+// something that did not come from a model, which is a fact the tool can
+// establish and a reviewer can act on -- unlike a severity the model was told
+// what to write.
+//
+// Empty means the finding stands on the model's reading alone. That is not a
+// mark against it: most guidelines have no pre-check at all.
+std::vector<std::string> CorroboratingPrecheckIds(const std::string& guideline_id,
+                                                  const std::vector<sccg::PrecheckResult>& precheck_results);
 
 std::string BuildExpectedAiReviewResponseSchemaText();
 std::string StripJsonCodeFence(const std::string& response_text);

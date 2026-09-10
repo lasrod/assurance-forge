@@ -309,13 +309,18 @@ bool HasPackage(const AiReviewDataPackageBundle& packages, const std::string& id
            }) != packages.available.end();
 }
 
-core::ProblemSeverity SeverityFromString(const std::string& value) {
-    std::string severity = core::ToLower(value);
-    if (severity == "info")
-        return core::ProblemSeverity::Info;
-    if (severity == "error")
-        return core::ProblemSeverity::Error;
-    return core::ProblemSeverity::Warning;
+// Confidence, as the model reported it, normalized. Unlike the severity this
+// replaced, it is a judgement the model is actually positioned to make: how far
+// the data it was given supports the finding. The contract no longer asks for a
+// severity at all -- SCCG defines none, so the field was the tool's own
+// invention, and the prompt line that said it "should normally be warning" got
+// exactly what it asked for: 149 findings out of 149 marked warning, a field
+// carrying no information a reviewer could rank or filter by.
+std::string ConfidenceFromString(const std::string& value) {
+    const std::string confidence = core::ToLower(value);
+    if (confidence == "low" || confidence == "medium" || confidence == "high")
+        return confidence;
+    return {};
 }
 
 std::string JsonStringValue(const nlohmann::json& object, const char* key) {
@@ -973,6 +978,21 @@ std::vector<std::string> ReviewedElementIds(const AiReviewPayload& payload,
     return std::vector<std::string>(element_ids.begin(), element_ids.end());
 }
 
+std::vector<std::string> CorroboratingPrecheckIds(const std::string& guideline_id,
+                                                  const std::vector<sccg::PrecheckResult>& precheck_results) {
+    std::vector<std::string> ids;
+    if (guideline_id.empty())
+        return ids;
+    for (const sccg::PrecheckResult& precheck : precheck_results) {
+        if (!precheck.candidate)
+            continue;
+        if (std::find(precheck.guideline_ids.begin(), precheck.guideline_ids.end(), guideline_id) !=
+            precheck.guideline_ids.end())
+            ids.push_back(precheck.precheck_id);
+    }
+    return ids;
+}
+
 std::string BuildExpectedAiReviewResponseSchemaText() {
     return R"json(Return exactly one JSON object using this schema:
 
@@ -984,7 +1004,6 @@ std::string BuildExpectedAiReviewResponseSchemaText() {
       "source": "SCCG",
       "guideline_id": "string",
       "guideline_title": "string",
-      "severity": "info | warning | error",
       "confidence": "low | medium | high",
       "message": "string",
       "why_it_matters": "string",
@@ -1014,7 +1033,11 @@ Field rules:
 - source must be "SCCG".
 - guideline_id must match one of the provided SCCG guideline IDs.
 - guideline_title must match the title of the referenced guideline.
-- severity should normally be "warning" for claim quality issues.
+- confidence states how far the supplied data supports the finding: "high" when the
+  provided element text and data packages show the violation directly, "medium" when
+  the finding depends on a reading the data permits but does not settle, "low" when it
+  rests on something you were not shown. Do NOT report a low-confidence finding whose
+  basis is an unavailable data package -- report the missing context instead.
 - message should describe what is violated.
 - why_it_matters should explain the review concern briefly.
 - suggested_fix should describe how the user can improve the selected element or its immediate review context.
@@ -1099,7 +1122,10 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             core::ProblemItem problem;
             problem.id =
                 "ai-review:" + result.reviewedElementId + ":" + guideline_id + ":" + std::to_string(finding_index);
-            problem.severity = SeverityFromString(JsonStringValue(finding, "severity"));
+            // Assigned by the tool, not asked of the model. Every SCCG finding is
+            // an argument-quality observation for a human to judge; ranking them
+            // is what `confidence` and pre-check corroboration are for.
+            problem.severity = core::ProblemSeverity::Warning;
             problem.source = core::ProblemSource::AIReview;
             problem.element_id = result.reviewedElementId;
             problem.type = result.reviewedElementType;
@@ -1111,6 +1137,7 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             }
             problem.guideline_id = unknown_guideline_id || guideline_id == "unknown" ? std::string{} : guideline_id;
             result.problems.push_back(std::move(problem));
+            result.findingConfidences.push_back(ConfidenceFromString(JsonStringValue(finding, "confidence")));
             std::string suggested_element_text = JsonStringValue(finding, "suggested_element_text");
             if (suggested_element_text.empty())
                 suggested_element_text = JsonStringValue(finding, "suggested_claim_wording");

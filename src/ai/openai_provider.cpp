@@ -51,6 +51,13 @@ nlohmann::json BuildRequestBody(const AiProviderSettings& settings, const AiRequ
     nlohmann::json body;
     body["model"] = settings.model.empty() ? kDefaultOpenAiModel : settings.model;
     body["input"] = request.userPrompt;
+    // Omitted rather than defaulted: a model that rejects the parameter must
+    // still be reachable, and "the provider decides" is a real configuration
+    // rather than a missing one.
+    if (settings.temperature.has_value())
+        body["temperature"] = settings.temperature.value();
+    if (settings.seed.has_value())
+        body["seed"] = settings.seed.value();
     if (!request.systemInstruction.empty()) {
         body["instructions"] = request.systemInstruction;
     }

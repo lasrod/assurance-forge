@@ -30,6 +30,7 @@
 #include "core/project_service.h"
 #include "core/sha256.h"
 #include "review/sccg/sccg_review.h"
+#include "review/sccg/sccg_review_consensus.h"
 #include "review/sccg/sccg_review_preparation.h"
 
 #include <nlohmann/json.hpp>
@@ -41,6 +42,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -59,6 +61,10 @@ struct Options {
     bool all_elements = false;
     std::string review_profile_id;
     std::string model;
+    // Unset means the provider decides, which is a real setting and not a
+    // missing one -- a reasoning model rejects a temperature outright.
+    std::optional<double> temperature;
+    std::optional<long long> seed;
     int runs = 1;
     std::filesystem::path out_dir;
     // Assemble and record the request without sending it. The prompt, the
@@ -67,6 +73,10 @@ struct Options {
     // require a paid call.
     bool dry_run = false;
     bool list_models = false;
+    // Findings must be cited by at least this many runs to reach the consensus
+    // list. 0 disables the consensus pass entirely and only per-run records are
+    // written.
+    int consensus_minimum = 0;
     std::string tag;
 };
 
@@ -84,8 +94,15 @@ Options:
   --model <name>       Provider model. Default: the model in the saved AI settings.
   --runs <n>           Repeat each review n times. Default 1. A model is non-deterministic;
                        one run cannot tell a miss from sampling noise.
+  --temperature <t>    Sampling temperature. Omitted entirely unless given, because some
+                       models reject the parameter. 0 is the most repeatable a provider offers.
+  --seed <n>           Sampling seed, where the provider honours one.
   --out <dir>          Directory for the run records. Default: ./sccg-eval-out
   --tag <text>         Free text stored in every record of this invocation.
+  --consensus <m>      After the runs, write a consensus record per element: findings grouped
+                       by guideline with the number of runs citing each. m is the floor for
+                       the main list; findings below it are kept separately, not dropped.
+                       Needs --runs > 1 to mean anything.
   --dry-run            Assemble and record the request; do not call the provider.
   --list-models        List the models the configured account offers, newest first, then exit.
   --help
@@ -113,12 +130,18 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
             options.review_profile_id = value("--profile");
         } else if (arg == "--model") {
             options.model = value("--model");
+        } else if (arg == "--temperature") {
+            options.temperature = std::atof(value("--temperature").c_str());
+        } else if (arg == "--seed") {
+            options.seed = std::atoll(value("--seed").c_str());
         } else if (arg == "--runs") {
             options.runs = std::atoi(value("--runs").c_str());
         } else if (arg == "--out") {
             options.out_dir = value("--out");
         } else if (arg == "--tag") {
             options.tag = value("--tag");
+        } else if (arg == "--consensus") {
+            options.consensus_minimum = std::atoi(value("--consensus").c_str());
         } else if (arg == "--dry-run") {
             options.dry_run = true;
         } else if (arg == "--list-models") {
@@ -234,6 +257,34 @@ json FindingsJson(const review::AiReviewParseResult& parsed) {
             {"severity", SeverityName(problem.severity)},
             {"type", problem.type},
             {"message", problem.message},
+            {"proposed_operations", operations},
+        });
+    }
+    return array;
+}
+
+json ConsensusFindingsJson(const std::vector<review::ConsensusFinding>& findings) {
+    json array = json::array();
+    for (const review::ConsensusFinding& finding : findings) {
+        json operations = json::array();
+        for (const core::reviews::PatchOperation& operation : finding.proposedOperations) {
+            operations.push_back(json{{"type", core::reviews::PatchOperationTypeToString(operation.type)},
+                                      {"element_id",
+                                       operation.element.has_value() && operation.element->existing_id.has_value()
+                                           ? *operation.element->existing_id
+                                           : std::string{}}});
+        }
+        array.push_back(json{
+            {"guideline_id", finding.guideline_id},
+            {"element_id", finding.problem.element_id},
+            {"runs_citing", finding.runs_citing},
+            {"runs_total", finding.runs_total},
+            {"unanimous", finding.unanimous()},
+            {"confidence", finding.confidence},
+            {"corroborating_precheck_ids", finding.corroborating_precheck_ids},
+            {"message", finding.problem.message},
+            {"messages_per_run", finding.messages},
+            {"suggested_element_text", finding.suggestedElementText},
             {"proposed_operations", operations},
         });
     }
@@ -373,6 +424,10 @@ int main(int argc, char** argv) {
     ai::AiProviderSettings settings = service->LoadSettings();
     if (!options.model.empty())
         settings.model = options.model;
+    if (options.temperature.has_value())
+        settings.temperature = options.temperature;
+    if (options.seed.has_value())
+        settings.seed = options.seed;
 
     if (!options.dry_run && !service->HasStoredApiKey()) {
         std::cerr << "No API key is stored for the configured provider. Add one in the application's AI "
@@ -442,6 +497,7 @@ int main(int argc, char** argv) {
                                 {"user_prompt_sha256", core::Sha256::HexDigest(preparation.request.prompt)},
                                 {"user_prompt_bytes", preparation.request.prompt.size()}};
 
+        std::vector<review::AiReviewParseResult> run_results;
         for (int run = 1; run <= options.runs; ++run) {
             json run_record = record;
             run_record["run"] = run;
@@ -450,7 +506,11 @@ int main(int argc, char** argv) {
 
             if (options.dry_run) {
                 run_record["outcome"] = "dry-run";
-                run_record["model"] = json{{"name", settings.model}, {"provider", ai::ToString(settings.provider)}};
+                run_record["model"] = json{
+                    {"name", settings.model},
+                    {"provider", ai::ToString(settings.provider)},
+                    {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
+                    {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
             } else {
                 ai::AiRequest request;
                 request.systemInstruction = preparation.request.systemInstruction;
@@ -461,7 +521,11 @@ int main(int argc, char** argv) {
                 const auto elapsed =
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
 
-                run_record["model"] = json{{"name", settings.model}, {"provider", ai::ToString(settings.provider)}};
+                run_record["model"] = json{
+                    {"name", settings.model},
+                    {"provider", ai::ToString(settings.provider)},
+                    {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
+                    {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
                 run_record["elapsed_ms"] = elapsed.count();
                 run_record["http_status"] = response.httpStatus;
 
@@ -469,12 +533,19 @@ int main(int argc, char** argv) {
                     run_record["outcome"] = "request-failed";
                     run_record["error"] =
                         response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
+                    run_record["error_code"] = ai::ToString(response.errorCode);
+                    // The provider's own words. Without them a failed run says
+                    // only that it failed, which is the one thing already known
+                    // -- and a rejected parameter is indistinguishable from an
+                    // expired key.
+                    run_record["raw_response"] = response.rawJson;
                     ++failures;
                 } else {
                     const std::string raw = response.text.empty() ? response.rawJson : response.text;
                     run_record["raw_response"] = raw;
                     const review::AiReviewParseResult parsed =
                         review::ParseAiReviewResponse(raw, preparation.element_id, preparation.guideline_ids);
+                    run_results.push_back(parsed);
                     if (!parsed.errorMessage.empty()) {
                         run_record["outcome"] = "parse-failed";
                         run_record["error"] = parsed.errorMessage;
@@ -496,6 +567,41 @@ int main(int argc, char** argv) {
 
             std::cout << element_id << " [" << preparation.review_profile_id << "] run " << run << "/" << options.runs
                       << ": " << run_record.value("outcome", "") << " -> " << path.string() << "\n";
+        }
+
+        if (options.consensus_minimum > 0 && !run_results.empty()) {
+            const review::ConsensusReviewResult consensus = review::BuildConsensusReview(
+                run_results, options.runs, options.consensus_minimum, preparation.precheck_results);
+
+            json consensus_record = record;
+            consensus_record["outcome"] = "consensus";
+            consensus_record["runs_requested"] = consensus.runs_requested;
+            consensus_record["runs_succeeded"] = consensus.runs_succeeded;
+            consensus_record["consensus_minimum"] = options.consensus_minimum;
+            consensus_record["run_errors"] = consensus.run_errors;
+            consensus_record["findings"] = ConsensusFindingsJson(consensus.findings);
+            consensus_record["below_threshold"] = ConsensusFindingsJson(consensus.below_threshold);
+            consensus_record["model"] =
+                json{{"name", settings.model},
+                     {"provider", ai::ToString(settings.provider)},
+                     {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
+                     {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
+            consensus_record["finished_utc"] = NowUtcIso();
+
+            const std::filesystem::path path = options.out_dir / (SanitizeForFileName(element_id) + "--consensus.json");
+            std::ofstream(path) << consensus_record.dump(2);
+            ++records;
+
+            int unanimous = 0;
+            for (const review::ConsensusFinding& finding : consensus.findings) {
+                if (finding.unanimous())
+                    ++unanimous;
+            }
+            std::cout << element_id << " [" << preparation.review_profile_id
+                      << "] consensus: " << consensus.findings.size()
+                      << " finding(s) at >=" << options.consensus_minimum << "/" << consensus.runs_succeeded << " ("
+                      << unanimous << " unanimous), " << consensus.below_threshold.size() << " below -> "
+                      << path.string() << "\n";
         }
     }
 
