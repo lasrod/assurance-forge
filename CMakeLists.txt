@@ -367,7 +367,30 @@ af_copy_sccg_data(assurance-forge-mcp)
 # cover review::PrepareSccgReview, and this turns the prepared request into a
 # recorded run. No af_ui, no af_app -- the layer gate holds `eval` to the
 # reusable method.
+# The build a run record was produced by. The prompt is a function of the case,
+# the SCCG version AND this tool's own code -- the response schema and the
+# package rules both live here -- so a record naming only the case and the
+# catalogue does not identify what was sent. Captured at CONFIGURE time, so it
+# can go stale against later commits in the same build tree; `--dirty` at least
+# makes an edited tree visible. The prompt's sha256, which every record already
+# carries, remains the authoritative identity of what was actually sent.
+set(AF_BUILD_ID "unknown")
+find_package(Git QUIET)
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" describe --always --dirty --abbrev=12
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE AF_BUILD_ID
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(AF_BUILD_ID STREQUAL "")
+        set(AF_BUILD_ID "unknown")
+    endif()
+endif()
+
 add_executable(af-sccg-review-eval src/eval/sccg_review_eval.cpp)
+target_compile_definitions(af-sccg-review-eval PRIVATE AF_BUILD_ID="${AF_BUILD_ID}")
 target_link_libraries(af-sccg-review-eval PRIVATE
     af_review af_ai af_core af_sacm_adapter af_legacy_sacm af_parser
 )

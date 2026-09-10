@@ -52,6 +52,11 @@ namespace {
 
 using nlohmann::json;
 
+#ifndef AF_BUILD_ID
+#define AF_BUILD_ID "unknown"
+#endif
+constexpr const char* kBuildId = AF_BUILD_ID;
+
 struct Options {
     std::filesystem::path project;
     std::vector<std::string> element_ids;
@@ -463,6 +468,13 @@ int main(int argc, char** argv) {
         record["project"] = std::filesystem::absolute(options.project).string();
         record["argument_file"] = argument_path.filename().string();
         record["sccg_version"] = catalog.document.sccg_version;
+        // Which build assembled this request. The prompt depends on the tool's
+        // own code -- the response schema and the data-package rules live here,
+        // not in the catalogue -- so a record naming only the case and the SCCG
+        // version does not say what was sent. Learned the hard way: a prompt
+        // regenerated from the same probe and the same SCCG version hashed
+        // differently, because the response schema had changed in between.
+        record["tool_build"] = kBuildId;
         record["sccg_catalog_path"] = catalog.source_path.string();
         record["element"] = json{
             {"id", preparation.element_id.empty() ? element_id : preparation.element_id},
