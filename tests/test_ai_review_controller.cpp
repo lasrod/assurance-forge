@@ -8,6 +8,7 @@
 
 #include <cctype>
 #include <chrono>
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
@@ -87,6 +88,16 @@ public:
     }
 };
 
+// A settings file of the harness's own. A default-constructed AiSettingsStore
+// resolves to the developer's real %APPDATA% (or XDG) settings, and the harness
+// saves into it -- so every run of this suite used to overwrite the model the
+// developer had chosen with the compiled-in default, and switch AI on.
+std::filesystem::path HarnessSettingsPath() {
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    return std::filesystem::temp_directory_path() /
+           ("assurance_forge_ai_review_controller_test_" + std::to_string(stamp)) / "settings.json";
+}
+
 struct ServiceControllerHarness {
     app::AppEvents events;
     core::ProblemsManager problems;
@@ -94,12 +105,18 @@ struct ServiceControllerHarness {
     ai::AiTaskRunner task_runner;
     std::shared_ptr<FakeSecretStore> secret_store = std::make_shared<FakeSecretStore>();
     std::shared_ptr<FixedResponseProvider> provider = std::make_shared<FixedResponseProvider>();
-    std::shared_ptr<ai::AiSettingsStore> settings_store = std::make_shared<ai::AiSettingsStore>();
+    std::filesystem::path settings_path = HarnessSettingsPath();
+    std::shared_ptr<ai::AiSettingsStore> settings_store = std::make_shared<ai::AiSettingsStore>(settings_path);
     std::shared_ptr<ai::AiService> service = std::make_shared<ai::AiService>(settings_store, secret_store, provider);
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
     std::vector<app::ElementReviewVisualEvent> review_visual_events;
     std::vector<app::AiReviewProposalSuggestionsEvent> proposal_suggestion_events;
+
+    ~ServiceControllerHarness() {
+        std::error_code error;
+        std::filesystem::remove_all(settings_path.parent_path(), error);
+    }
 
     ServiceControllerHarness() : reviews(events), controller(events, problems, reviews, task_runner, service) {
         ai::AiProviderSettings settings;
