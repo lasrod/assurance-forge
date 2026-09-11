@@ -114,6 +114,35 @@ sent cannot disagree. A no-findings result is persisted in the element review st
 and rendered as a green check badge on the GSN node, so completion remains visible
 after the spinner stops and after the project is reopened.
 
+Steps one to five of that — resolve the element, select the profile, collect
+the data packages, run the pre-checks, assemble the request — are
+`review::PrepareSccgReview`, so the application and the offline evaluation
+harness (`af-sccg-review-eval`) build the same request from the same code.
+
+**Review passes.** Where a profile publishes `review_passes` (SCCG 0.8.0's
+`claim_review` has four: wording, structure, sufficiency, reasoning), the review
+is sent as one request per pass, concurrently, each carrying only that pass's
+guidelines and the same data packages, and the answers are merged under the one
+profile by `review::MergeReviewPasses`. Profile selection is unchanged. The
+reason is measured: a review files a correctly detected defect under a
+neighbouring guideline when the two arrive in the same request, and splitting
+`claim_review` took 31 probes from 18 to 26 cited as intended. A finding a pass
+cites under a guideline another pass owns is discarded and reported; a pass that
+fails makes the review *incomplete* — the other passes' findings are recorded,
+an "AI review incomplete" item names the failed pass, and the outcome is failed,
+so an incomplete review can never earn the no-findings badge. The AI Debug panel
+shows every pass's prompt under a separator line; an edit that keeps the
+separators goes back to its pass, one that removes them is sent as a single
+request, and the user is told.
+
+**Unavailable data packages** are governed by SCCG's `when_unavailable` rule,
+sent to the model verbatim with SCCG's meaning for each availability state: an
+unavailable package never silences a guideline and is never by itself a finding.
+A profile's `when_absent` entry is the only exception (none is published in
+0.8.0). A package with no required fields counts as available only when one of
+its published fields is populated, so every package the collector builds uses
+SCCG's published field names — a conformance test holds that.
+
 ```mermaid
 sequenceDiagram
     participant UI as UI action
@@ -138,14 +167,16 @@ sequenceDiagram
     Controller->>Data: collect profile-required context
     Data-->>Controller: available and unavailable packages
     Controller->>Artifacts: add profile, guidelines, packages and schema
-    Artifacts-->>Controller: AiReviewRequestArtifacts
+    Artifacts-->>Controller: one AiReviewRequestArtifacts per review pass
     Controller-->>UI: request ready in AI Debug panel
     UI->>Controller: StartPendingRequest()
-    Controller->>Runner: RunGenerate
-    Runner->>Service: Generate(AiRequest)
-    Service-->>Runner: AiResponse
-    Runner-->>Controller: snapshot success/error
-    Controller->>Parser: ParseAiReviewResponse
+    loop each review pass, concurrently
+        Controller->>Runner: RunGenerate
+        Runner->>Service: Generate(AiRequest)
+        Service-->>Runner: AiResponse
+    end
+    Runner-->>Controller: every pass's snapshot
+    Controller->>Parser: ParseAiReviewResponse per pass, then MergeReviewPasses
     Parser-->>Controller: findings + suggested text
     Controller->>Problems: AddOrUpdateProblem
     alt suggested model correction

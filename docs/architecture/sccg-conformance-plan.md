@@ -126,10 +126,16 @@ SCCG's prescribed repair is frequently to **add** an element:
 |---|---|
 | AR.2 | Insert an explicit Strategy between a goal and its children |
 | EV.1 | Add a Solution, or mark the claim undeveloped |
-| CL.3, AR.3, AR.6, AR.7, RD.1, RD.6 | Externalize scope, definitions or dependencies into Context / Assumption / Justification |
-| SU.2, SU.9 | Convert an assumption into a Claim and re-parent it |
+| CL.3, AR.6, AR.7, RD.1, RD.3 | Externalize scope, definitions or dependencies into Context / Assumption / Justification |
+| SU.2 | Convert an assumption into a Claim and re-parent it |
 | SU.11 | Raise a challenge as a Counter Claim element |
 | CL.5 | Define the bounding term once (`CreateTerm`) |
+
+(Rows updated for SCCG 0.8.0, which retired AR.3 — now AR.7 and AR.6 — SU.9 —
+now SU.2 — and RD.6 — now RD.3 and SU.2. Since that release the request no longer
+carries a list like this one at all: each guideline's own `tool.repair`, which
+SCCG publishes for all 45, is sent with it, and the response contract translates
+SCCG's repair vocabulary into operations once.)
 
 This is not a draft-model limitation. `core::reviews::PatchOperationType`
 already defines twenty operations including every `Create*` above, and MCP
