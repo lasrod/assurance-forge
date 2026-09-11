@@ -33,8 +33,6 @@ std::filesystem::path ExecutableDirectory() {
     return std::filesystem::current_path();
 }
 
-} // namespace
-
 // An explicit SCCG distribution, when one is named.
 //
 // SCCG is a versioned dependency, and an evaluation that compares two versions
@@ -56,6 +54,8 @@ std::filesystem::path SccgDistDirectoryOverride() {
         return {};
     return directory;
 }
+
+} // namespace
 
 std::filesystem::path FindSccgDistDirectory() {
     if (std::filesystem::path configured = SccgDistDirectoryOverride(); !configured.empty())

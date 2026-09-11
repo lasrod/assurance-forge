@@ -318,7 +318,7 @@ bool HasPackage(const AiReviewDataPackageBundle& packages, const std::string& id
 // exactly what it asked for: 149 findings out of 149 marked warning, a field
 // carrying no information a reviewer could rank or filter by.
 std::string ConfidenceFromString(const std::string& value) {
-    const std::string confidence = core::ToLower(value);
+    std::string confidence = core::ToLower(value);
     if (confidence == "low" || confidence == "medium" || confidence == "high")
         return confidence;
     return {};

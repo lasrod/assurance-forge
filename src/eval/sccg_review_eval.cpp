@@ -36,6 +36,8 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cerrno>
+#include <charconv>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -114,6 +116,38 @@ Options:
 )";
 }
 
+// A whole number given on the command line. `atoi` and its family read "5x"
+// as 5 and "x" as 0 without a word, so a sweep started with a typo in --runs
+// ran once and reported nothing wrong.
+bool ParseWholeNumber(const std::string& text, long long& out) {
+    const char* begin = text.data();
+    const char* end = begin + text.size();
+    const auto [stopped, result] = std::from_chars(begin, end, out);
+    return !text.empty() && result == std::errc() && stopped == end;
+}
+
+bool ParseRealNumber(const std::string& text, double& out) {
+    if (text.empty())
+        return false;
+    char* stopped = nullptr;
+    errno = 0;
+    out = std::strtod(text.c_str(), &stopped);
+    return errno == 0 && stopped == text.c_str() + text.size();
+}
+
+// Reads an option's value as a whole number, or says which option was wrong.
+template <typename Number>
+void ReadWholeNumber(const char* option, const std::string& text, Number& out, std::string& error) {
+    if (!error.empty())
+        return; // the option had no value at all, which the caller already said
+    long long value = 0;
+    if (!ParseWholeNumber(text, value)) {
+        error = std::string(option) + " needs a whole number, not '" + text + "'.";
+        return;
+    }
+    out = static_cast<Number>(value);
+}
+
 bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -136,17 +170,24 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
         } else if (arg == "--model") {
             options.model = value("--model");
         } else if (arg == "--temperature") {
-            options.temperature = std::atof(value("--temperature").c_str());
+            const std::string text = value("--temperature");
+            double temperature = 0.0;
+            if (ParseRealNumber(text, temperature))
+                options.temperature = temperature;
+            else if (error.empty())
+                error = "--temperature needs a number, not '" + text + "'.";
         } else if (arg == "--seed") {
-            options.seed = std::atoll(value("--seed").c_str());
+            long long seed = 0;
+            ReadWholeNumber("--seed", value("--seed"), seed, error);
+            options.seed = seed;
         } else if (arg == "--runs") {
-            options.runs = std::atoi(value("--runs").c_str());
+            ReadWholeNumber("--runs", value("--runs"), options.runs, error);
         } else if (arg == "--out") {
             options.out_dir = value("--out");
         } else if (arg == "--tag") {
             options.tag = value("--tag");
         } else if (arg == "--consensus") {
-            options.consensus_minimum = std::atoi(value("--consensus").c_str());
+            ReadWholeNumber("--consensus", value("--consensus"), options.consensus_minimum, error);
         } else if (arg == "--dry-run") {
             options.dry_run = true;
         } else if (arg == "--list-models") {
