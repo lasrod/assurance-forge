@@ -368,7 +368,7 @@ TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnEle
     core::GuidelineCatalog catalog;
     std::string error;
     ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
-    ASSERT_EQ(catalog.document.sccg_version, "0.9.0");
+    ASSERT_EQ(catalog.document.sccg_version, "0.10.0");
 
     for (const ReviewProfileSelectionCase& selection_case : ReviewProfileSelectionCases()) {
         SCOPED_TRACE(selection_case.expected_profile_id);

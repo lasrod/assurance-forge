@@ -132,7 +132,7 @@ void ExpectRefused(const std::string& name,
 TEST(GuidelinesParserTest, ParsesTheReleasedCatalogue) {
     const parser::GuidelinesDocument& catalogue = ReleasedCatalogue();
     EXPECT_EQ(catalogue.schema_version, "3.1.0");
-    EXPECT_EQ(catalogue.sccg_version, "0.9.0");
+    EXPECT_EQ(catalogue.sccg_version, "0.10.0");
     EXPECT_EQ(catalogue.guidelines.size(), 45u);
     EXPECT_EQ(catalogue.review_profiles.size(), 7u);
     EXPECT_FALSE(catalogue.data_packages.empty());
