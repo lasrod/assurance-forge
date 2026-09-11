@@ -216,7 +216,9 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
         } else if (arg == "--service-tier") {
             options.service_tier = value("--service-tier");
         } else if (arg == "--timeout") {
-            options.request_timeout_seconds = std::atoi(value("--timeout").c_str());
+            int timeout_seconds = 0;
+            ReadWholeNumber("--timeout", value("--timeout"), timeout_seconds, error);
+            options.request_timeout_seconds = timeout_seconds;
         } else if (arg == "--no-prompt-cache") {
             options.no_prompt_cache = true;
         } else if (arg == "--dry-run") {
