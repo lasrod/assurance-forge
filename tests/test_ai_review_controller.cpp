@@ -856,4 +856,39 @@ TEST(AiReviewControllerTest, DebugPromptEditThatLosesThePassSeparatorsIsSentAsOn
     ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
     harness.controller.PollTask();
     EXPECT_EQ(harness.provider->calls.load(), 1);
+    ASSERT_EQ(harness.provider->requests.size(), 1u);
+    EXPECT_EQ(ai::PromptText(harness.provider->requests[0]), "A prompt the user rewrote from scratch.")
+        << "the edit is what is sent, not the prompt it replaced";
+    EXPECT_TRUE(harness.provider->requests[0].promptSegments.empty()) << "an edited prompt is sent uncached";
+}
+
+// An edit inside one pass keeps the separators, so it goes back to its pass --
+// and that pass must send the edit, not the cached segments it was built from.
+TEST(AiReviewControllerTest, DebugPromptEditInsideAPassIsSentAndNotTheCachedOriginal) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    std::string edited = harness.controller.PendingPrompt();
+    const std::string heading = "## Selected element";
+    const std::size_t at = edited.find(heading);
+    ASSERT_NE(at, std::string::npos);
+    edited.insert(at, "Reviewer's note: look hard at the wording.\n\n");
+    harness.controller.SetPendingPrompt(edited);
+
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    int carrying_the_note = 0;
+    for (const ai::AiRequest& request : harness.provider->requests) {
+        const std::string sent = ai::PromptText(request);
+        if (sent.find("Reviewer's note: look hard at the wording.") == std::string::npos)
+            continue;
+        ++carrying_the_note;
+        EXPECT_TRUE(request.promptSegments.empty()) << "an edited pass is sent uncached, as edited";
+    }
+    EXPECT_EQ(carrying_the_note, 1) << "the edited pass sends the edit";
 }

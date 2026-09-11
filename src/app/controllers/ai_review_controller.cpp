@@ -70,6 +70,15 @@ bool AnyTaskRunning(const std::vector<std::shared_ptr<ai::AiTaskHandle>>& tasks)
     });
 }
 
+bool SegmentsAreThePrompt(const review::AiReviewRequestArtifacts& request) {
+    if (request.promptSegments.empty())
+        return false;
+    std::string joined;
+    for (const std::string& segment : request.promptSegments)
+        joined += segment;
+    return joined == request.prompt;
+}
+
 ai::AiResponse GenerateWith(const std::shared_ptr<ai::AiService>& service, const ai::AiRequest& request) {
     if (service)
         return service->Generate(request);
@@ -301,11 +310,18 @@ void AiReviewController::StartPendingRequest() {
         // the instructions, the profile and its rules -- and not the element's
         // own data: a cache write costs more than an uncached read, and a review
         // of one element is rarely repeated before the cache expires.
-        for (std::size_t index = 0; index < pass.request.promptSegments.size(); ++index) {
-            const bool shared = index + 1 < pass.request.promptSegments.size();
-            request.promptSegments.push_back({pass.request.promptSegments[index], shared});
+        //
+        // Only while the segments are still the prompt: an edit in the debug
+        // panel rewrites the prompt and not its segments, and sending the
+        // segments then would send what the user replaced. An edited prompt is
+        // sent whole, uncached.
+        if (SegmentsAreThePrompt(pass.request)) {
+            for (std::size_t index = 0; index < pass.request.promptSegments.size(); ++index) {
+                const bool shared = index + 1 < pass.request.promptSegments.size();
+                request.promptSegments.push_back({pass.request.promptSegments[index], shared});
+            }
+            request.promptCacheKey = pass.request.promptCacheKey;
         }
-        request.promptCacheKey = pass.request.promptCacheKey;
         review_tasks_.push_back(
             task_runner_.RunGenerate([service, request]() { return GenerateWith(service, request); }));
     }
