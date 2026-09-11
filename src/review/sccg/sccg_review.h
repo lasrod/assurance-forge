@@ -177,6 +177,15 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
                           const std::string& selected_element_id,
                           AiReviewPayload& out_payload,
                           std::string& out_error);
+// SCCG's availability rule (0.9.0), applied to every package in `available`:
+// one supplied with none of its published fields populated -- null, "", [] or
+// {} -- is moved to `unavailable` as empty. The collector calls it; public
+// because it is the catalogue's rule rather than this tool's, and a caller
+// building packages another way must apply the same one.
+void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
+                                     const parser::GuidelinesDocument& catalog,
+                                     const parser::ReviewProfile* review_profile);
+
 // `catalog` names the packages. The selected element goes in whichever
 // package the profile requires with role `selected_element` -- one per element
 // role since SCCG 0.7.0, where a single generic `SEL` used to serve them all.
@@ -195,7 +204,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const parser::ReviewProfile* review_profile = nullptr,
                               const AiReviewDataPackageBundle* data_packages = nullptr,
                               const std::vector<review::sccg::PrecheckResult>* precheck_results = nullptr,
-                              const parser::ReviewPass* review_pass = nullptr);
+                              const parser::ReviewPass* review_pass = nullptr,
+                              const std::string& review_pass_instruction = {});
 AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const std::vector<const parser::Guideline*>& guidelines,
                                         const parser::ReviewProfile* review_profile = nullptr,

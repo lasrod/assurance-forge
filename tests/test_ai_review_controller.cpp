@@ -698,14 +698,18 @@ constexpr const char* kClaimFindingResponse = R"json({
     ]
 })json";
 
-const parser::ReviewProfile& ReleasedClaimReview() {
+const core::GuidelineCatalog& ReleasedCatalog() {
     static const core::GuidelineCatalog catalog = [] {
         core::GuidelineCatalog loaded;
         std::string error;
         EXPECT_TRUE(core::LoadGuidelineCatalog(loaded, error)) << error;
         return loaded;
     }();
-    const parser::ReviewProfile* profile = catalog.document.FindReviewProfileById("claim_review");
+    return catalog;
+}
+
+const parser::ReviewProfile& ReleasedClaimReview() {
+    const parser::ReviewProfile* profile = ReleasedCatalog().document.FindReviewProfileById("claim_review");
     EXPECT_NE(profile, nullptr);
     return *profile;
 }
@@ -752,10 +756,14 @@ TEST(AiReviewControllerTest, AReviewWithAFailedPassIsReportedIncomplete) {
 
     ServiceControllerHarness harness;
     harness.provider->response_text = kClaimFindingResponse;
-    // The phrase only the failing pass's own framing contains. Every pass
-    // request lists all the profile's passes and their questions, so the
-    // question alone would match -- and fail -- all of them.
-    harness.provider->fail_when_prompt_contains = "It asks: " + failing.question;
+    // SCCG's own pass instruction with this pass's question in it: the phrase
+    // only the failing pass's request contains. Every pass request lists all
+    // the profile's passes and their questions, so the question alone would
+    // match -- and fail -- all of them.
+    std::string marker = ReleasedCatalog().document.review_pass_instruction;
+    ASSERT_NE(marker.find("{question}"), std::string::npos);
+    marker.replace(marker.find("{question}"), std::string("{question}").size(), failing.question);
+    harness.provider->fail_when_prompt_contains = marker;
     parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
     core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
 

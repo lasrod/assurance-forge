@@ -151,7 +151,8 @@ SccgReviewPreparation PrepareSccgReview(const parser::AssuranceCase* assurance_c
                                                                  profile,
                                                                  &preparation.data_packages,
                                                                  &preparation.precheck_results,
-                                                                 &pass);
+                                                                 &pass,
+                                                                 catalog->document.review_pass_instruction);
             preparation.passes.push_back(std::move(pass_request));
         }
     } else {

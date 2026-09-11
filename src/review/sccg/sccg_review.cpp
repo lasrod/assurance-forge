@@ -676,11 +676,21 @@ bool IsPopulated(const nlohmann::json& value) {
     return true;
 }
 
-// SCCG 0.8.0: "A package with no required fields counts as available only when
-// at least one of its fields is populated; supplied with nothing in it, it is
-// empty." Applied to every such package the collector built, generically and
-// from the registry, so a package that gains or loses required fields in a later
-// release is judged by that release's definition rather than by a list here.
+} // namespace
+
+// SCCG 0.9.0: a package is available when "supplied with its required fields
+// present, and at least one of its fields is populated", where populated means
+// anything but null, an empty string, an empty list or an empty object -- "the
+// same rule applies to every package, whether or not it has required fields."
+// (0.8.0 stated it only for packages with no required fields, which left
+// `CHILDREN` sent as `{"child_elements": []}` undefined; raised as
+// safety-case-core-guidelines#17.) Applied to every package the collector
+// built, generically and from the registry.
+//
+// Empty is not the absence of information: SCCG's when_unavailable lets the
+// review rely on an empty package as a fact about the case -- a claim with no
+// children has no path to evidence -- so demoting a package to empty is itself
+// something the review is told.
 //
 // Judged on the PUBLISHED field names only. A package carrying its data under a
 // key SCCG does not name has, by the catalogue's own definition, none of its
@@ -690,19 +700,24 @@ void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
                                      const parser::ReviewProfile* review_profile) {
     for (auto package = packages.available.begin(); package != packages.available.end();) {
         const parser::DataPackage* definition = catalog.FindDataPackageById(package->id);
-        if (definition == nullptr || !definition->required_fields.empty()) {
+        if (definition == nullptr) {
             ++package;
             continue;
         }
         const nlohmann::json parsed = nlohmann::json::parse(package->json, nullptr, false);
         bool populated = false;
         if (parsed.is_object()) {
-            for (const std::string& field : definition->optional_fields) {
-                const auto value = parsed.find(field);
-                if (value != parsed.end() && IsPopulated(*value)) {
-                    populated = true;
-                    break;
+            for (const std::vector<std::string>* fields :
+                 {&definition->required_fields, &definition->optional_fields}) {
+                for (const std::string& field : *fields) {
+                    const auto value = parsed.find(field);
+                    if (value != parsed.end() && IsPopulated(*value)) {
+                        populated = true;
+                        break;
+                    }
                 }
+                if (populated)
+                    break;
             }
         }
         if (populated) {
@@ -722,8 +737,6 @@ void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
         package = packages.available.erase(package);
     }
 }
-
-} // namespace
 
 bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                                  const core::AssuranceTree& tree,
@@ -994,7 +1007,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const parser::ReviewProfile* review_profile,
                               const AiReviewDataPackageBundle* data_packages,
                               const std::vector<review::sccg::PrecheckResult>* precheck_results,
-                              const parser::ReviewPass* review_pass) {
+                              const parser::ReviewPass* review_pass,
+                              const std::string& review_pass_instruction) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
     nlohmann::json parent = payload.parent.transform([](const AiReviewElement& p) { return ReviewElementToJson(p); })
                                 .value_or(nlohmann::json(nullptr));
@@ -1028,8 +1042,19 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     // A pass request carries only that pass's guidelines, and the review must
     // not answer the other passes' questions from memory: each is asked in its
     // own request, and a finding cited outside its pass is discarded on merge.
+    // SCCG publishes the sentence (0.9.0), with `{question}` its one
+    // placeholder, and every tool sending it verbatim is what makes two tools
+    // frame a pass the same way. The sentence below is only for a catalogue
+    // that predates it.
     std::string pass_instruction;
-    if (review_pass) {
+    if (review_pass && !review_pass_instruction.empty()) {
+        pass_instruction = review_pass_instruction;
+        const std::string placeholder = "{question}";
+        const std::size_t at = pass_instruction.find(placeholder);
+        if (at != std::string::npos)
+            pass_instruction.replace(at, placeholder.size(), review_pass->question);
+        pass_instruction += "\n\n";
+    } else if (review_pass) {
         pass_instruction = std::format(
             "This request is one review pass of the profile: \"{}\". It asks: {} The profile's other passes are "
             "sent as separate requests, so review only against the rules in this request and do not report a "

@@ -295,6 +295,13 @@ TEST(SccgReviewPreparationTest, SendsClaimReviewAsItsPublishedPasses) {
             << "a pass request carries its own guidelines and no others";
         EXPECT_NE(pass.request.prompt.find("this_request_is_pass"), std::string::npos);
         EXPECT_NE(pass.request.prompt.find(profile->review_passes[index].question), std::string::npos);
+        // SCCG's own pass instruction, verbatim, with this pass's question in
+        // place of the placeholder -- so every tool frames a pass the same way.
+        std::string instruction = Catalog().document.review_pass_instruction;
+        ASSERT_NE(instruction.find("{question}"), std::string::npos);
+        instruction.replace(instruction.find("{question}"), 10, profile->review_passes[index].question);
+        EXPECT_NE(pass.request.prompt.find(instruction), std::string::npos) << "SCCG's pass instruction, verbatim";
+        EXPECT_EQ(pass.request.prompt.find("{question}"), std::string::npos) << "no placeholder may reach the model";
         // The pass changes which rules are asked about, never what the review
         // is shown.
         EXPECT_EQ(pass.request.availableDataPackagesJson, claim.request.availableDataPackagesJson);
@@ -453,4 +460,42 @@ TEST(SccgReviewPreparationTest, CarriesDisambiguationAndRepairIntoTheRequest) {
             EXPECT_EQ(pass.request.prompt.find(retired.id + ","), std::string::npos) << pass.pass_id;
         }
     }
+}
+
+// SCCG 0.9.0: "the same rule applies to every package, whether or not it has
+// required fields" -- a package is available only when one of its published
+// fields is populated. 0.8.0 stated it for packages with no required fields
+// alone, which left CHILDREN sent as {"child_elements": []} counted available;
+// under 0.9.0 it is empty, and an empty package is a fact the review may rely
+// on (a claim with no children has no path to evidence).
+TEST(SccgReviewPreparationTest, AppliesTheAvailabilityRuleToEveryPackage) {
+    const parser::ReviewProfile* claim = Catalog().document.FindReviewProfileById("claim_review");
+    ASSERT_NE(claim, nullptr);
+
+    review::AiReviewDataPackageBundle packages;
+    packages.available.push_back({"CHILDREN", R"({"child_elements": []})"});
+    packages.available.push_back(
+        {"DIRECT_CONTEXT", R"({"context_elements": [], "assumptions": [], "justifications": []})"});
+    packages.available.push_back({"PARENT", R"({"element_id": "G0", "element_type": "claim", "text": "Top."})"});
+    packages.available.push_back({"CHANGE_HISTORY", R"({"prior_findings": null, "review_comments": ""})"});
+    packages.available.push_back({"PROJECT_GLOSSARY", R"({"terms": [{"term": "safe"}]})"});
+
+    review::ApplyContentDefinedAvailability(packages, Catalog().document, claim);
+
+    std::vector<std::string> available;
+    for (const review::AiReviewDataPackage& package : packages.available)
+        available.push_back(package.id);
+    EXPECT_EQ(Sorted(available), (std::vector<std::string>{"PARENT", "PROJECT_GLOSSARY"}));
+
+    for (const char* id : {"CHILDREN", "DIRECT_CONTEXT", "CHANGE_HISTORY"}) {
+        SCOPED_TRACE(id);
+        const review::AiReviewUnavailableDataPackage* package = FindUnavailable(packages, id);
+        ASSERT_NE(package, nullptr) << "a package with its fields all empty is not available";
+        EXPECT_EQ(package->absence, review::DataPackageAbsence::Empty);
+    }
+    // Required-ness follows the profile: claim_review requires CHILDREN and
+    // DIRECT_CONTEXT, and takes CHANGE_HISTORY as optional.
+    EXPECT_TRUE(FindUnavailable(packages, "CHILDREN")->required);
+    EXPECT_TRUE(FindUnavailable(packages, "DIRECT_CONTEXT")->required);
+    EXPECT_FALSE(FindUnavailable(packages, "CHANGE_HISTORY")->required);
 }
