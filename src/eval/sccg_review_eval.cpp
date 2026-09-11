@@ -76,6 +76,10 @@ struct Options {
     std::optional<double> temperature;
     std::optional<long long> seed;
     int runs = 1;
+    // The number the first run of this invocation gets. Runs are files named
+    // by number, so adding runs 4 and 5 to a sweep that has 1-3 needs the new
+    // ones numbered on from there rather than overwriting the first two.
+    int first_run = 1;
     std::filesystem::path out_dir;
     // Assemble and record the request without sending it. The prompt, the
     // profile, the packages and the pre-checks are all decided before the
@@ -119,6 +123,9 @@ Options:
   --temperature <t>    Sampling temperature. Omitted entirely unless given, because some
                        models reject the parameter. 0 is the most repeatable a provider offers.
   --seed <n>           Sampling seed, where the provider honours one.
+  --first-run <n>      Number this invocation's runs from n (default 1), to add runs to a sweep
+                       already on disk without overwriting it. Consensus then covers only the
+                       runs of this invocation.
   --out <dir>          Directory for the run records. Default: ./sccg-eval-out
   --tag <text>         Free text stored in every record of this invocation.
   --consensus <m>      After the runs, write a consensus record per element: findings grouped
@@ -205,6 +212,8 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
             options.seed = seed;
         } else if (arg == "--runs") {
             ReadWholeNumber("--runs", value("--runs"), options.runs, error);
+        } else if (arg == "--first-run") {
+            ReadWholeNumber("--first-run", value("--first-run"), options.first_run, error);
         } else if (arg == "--out") {
             options.out_dir = value("--out");
         } else if (arg == "--tag") {
@@ -235,6 +244,8 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
     options.all_elements = options.element_ids.empty();
     if (options.runs < 1)
         options.runs = 1;
+    if (options.first_run < 1)
+        options.first_run = 1;
     if (options.out_dir.empty())
         options.out_dir = std::filesystem::path("sccg-eval-out");
     return true;
@@ -692,7 +703,8 @@ int main(int argc, char** argv) {
                                 {"passes", pass_prompts}};
 
         std::vector<review::AiReviewParseResult> run_results;
-        for (int run = 1; run <= options.runs; ++run) {
+        const int last_run = options.first_run + options.runs - 1;
+        for (int run = options.first_run; run <= last_run; ++run) {
             json run_record = record;
             run_record["run"] = run;
             run_record["runs_requested"] = options.runs;
@@ -818,7 +830,7 @@ int main(int argc, char** argv) {
             std::ofstream(path) << run_record.dump(2);
             ++records;
 
-            std::cout << element_id << " [" << preparation.review_profile_id << "] run " << run << "/" << options.runs
+            std::cout << element_id << " [" << preparation.review_profile_id << "] run " << run << "/" << last_run
                       << ": " << run_record.value("outcome", "") << " -> " << path.string() << "\n";
         }
 
