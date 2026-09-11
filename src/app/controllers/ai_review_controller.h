@@ -57,7 +57,7 @@ private:
                                   const std::string& selected_element_id,
                                   const std::string& requested_review_profile_id);
     // The single-request path, unchanged from before review passes existed.
-    void CompleteSingleRequest(ai::AiResponse response);
+    void CompleteSingleRequest(const ai::AiResponse& response);
     // A review sent as several passes, merged when every pass has answered.
     void CompletePassRequests(std::vector<ai::AiResponse> responses);
     // Records findings as review items and reports the outcome. A non-empty

@@ -1,6 +1,7 @@
 #include "review/sccg/sccg_review_passes.h"
 
 #include <algorithm>
+#include <format>
 #include <map>
 #include <string>
 #include <utility>
@@ -68,8 +69,10 @@ MergedReviewPasses MergeReviewPasses(const std::vector<ReviewPassOutcome>& outco
         if (!result.reviewedElementId.empty() && result.reviewedElementId != expected_element_id) {
             Fail(merged,
                  pass,
-                 label + " reported reviewing '" + result.reviewedElementId + "' rather than '" + expected_element_id +
-                     "'.");
+                 std::format("{} reported reviewing '{}' rather than '{}'.",
+                             label,
+                             result.reviewedElementId,
+                             expected_element_id));
             continue;
         }
 
@@ -89,8 +92,11 @@ MergedReviewPasses MergeReviewPasses(const std::vector<ReviewPassOutcome>& outco
             if (problem.guideline_id.empty()) {
                 const auto owner = owning_pass.find(cited);
                 if (owner != owning_pass.end() && owner->second != pass.pass_id) {
-                    merged.discarded_findings.push_back(label + " cited " + cited + ", which pass '" + owner->second +
-                                                        "' reviews; the finding was discarded.");
+                    merged.discarded_findings.push_back(
+                        std::format("{} cited {}, which pass '{}' reviews; the finding was discarded.",
+                                    label,
+                                    cited,
+                                    owner->second));
                     continue;
                 }
                 const std::string key =

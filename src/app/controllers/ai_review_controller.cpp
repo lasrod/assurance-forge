@@ -330,12 +330,12 @@ void AiReviewController::PollTask() {
     review_tasks_.clear();
 
     if (responses.size() == 1 && pending_passes_.size() <= 1)
-        CompleteSingleRequest(std::move(responses.front()));
+        CompleteSingleRequest(responses.front());
     else
         CompletePassRequests(std::move(responses));
 }
 
-void AiReviewController::CompleteSingleRequest(ai::AiResponse response) {
+void AiReviewController::CompleteSingleRequest(const ai::AiResponse& response) {
     if (!response.success) {
         std::string message = response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
         last_raw_response_ = response.rawJson;
