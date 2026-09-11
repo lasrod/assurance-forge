@@ -17,7 +17,7 @@ endif()
 # Warning policy.
 #
 # Applied per target rather than globally, because a global
-# add_compile_options() would also hit hello_imgui, curl, yaml-cpp and the rest
+# add_compile_options() would also hit hello_imgui, curl, pugixml and the rest
 # of the fetched dependencies. Their warnings are not ours to fix, and drowning
 # our own in thousands of theirs is how a warning level gets switched back off.
 #
@@ -126,8 +126,11 @@ if(ENABLE_COVERAGE)
     add_link_options(--coverage)
 endif()
 
-# yaml-cpp 0.8.0 still declares cmake_minimum_required(VERSION 3.4).
-# Raise the policy floor for fetched dependencies without patching their sources.
+# Raise the policy floor for fetched and vendored dependencies without patching
+# their sources. Added for yaml-cpp 0.8.0, which declared
+# cmake_minimum_required(VERSION 3.4); yaml-cpp is gone (the SCCG catalogue is
+# read from sccg.full.json), and the floor stays until it is shown on every CI
+# platform that nothing else still relies on it.
 set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 
 include(FetchContent)
@@ -172,25 +175,6 @@ set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
 )
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-
-# --- YAML ---
-set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    yaml-cpp
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG 0.8.0
-)
-FetchContent_MakeAvailable(yaml-cpp)
-
-if(TARGET yaml-cpp::yaml-cpp)
-    set(AF_YAML_CPP_TARGET yaml-cpp::yaml-cpp)
-elseif(TARGET yaml-cpp)
-    set(AF_YAML_CPP_TARGET yaml-cpp)
-else()
-    message(FATAL_ERROR "yaml-cpp target was not created")
-endif()
 
 # --- libcurl ---
 find_package(CURL QUIET)
@@ -244,60 +228,23 @@ set(SACM_REPO_FIXTURES_DIR ${CMAKE_SOURCE_DIR})
 add_subdirectory(libs/sacm)
 
 set(AF_SCCG_DIST_DIR "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist")
-set(AF_SCCG_REQUIRED_DIST_FILES
-    review_profiles.json
-    data_packages.json
-)
-set(AF_SCCG_OPTIONAL_DIST_FILES
-    prechecks.json
-    authoring_guidance.json
-    # The only dist file carrying `retired_guidelines`. Without it the runtime
-    # catalogue silently retired nothing -- the parser test read the submodule
-    # directly and passed; the application, reading this copy, never saw one.
-    sccg.compact.json
-)
-foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
-    if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_DIST_FILE}")
-        message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/${AF_SCCG_DIST_FILE}\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
-    endif()
-endforeach()
-if(EXISTS "${AF_SCCG_DIST_DIR}/ai_rule_export.jsonl")
-    set(AF_SCCG_RULES_JSONL "ai_rule_export.jsonl")
-elseif(EXISTS "${AF_SCCG_DIST_DIR}/sccg.rules.jsonl")
-    set(AF_SCCG_RULES_JSONL "sccg.rules.jsonl")
-else()
-    message(FATAL_ERROR "Missing SCCG rules file: external/safety-case-core-guidelines/dist/ must contain ai_rule_export.jsonl or sccg.rules.jsonl\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
+# The one file SCCG declares sufficient on its own for review, authoring and
+# retirement (contract 3.1.0). It replaced five per-concern files and a YAML
+# copy: the per-concern set SCCG's integration guide pointed a review tool at
+# did not carry the retirement list, and the runtime silently retired nothing.
+set(AF_SCCG_CATALOG_FILE sccg.full.json)
+if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_CATALOG_FILE}")
+    message(FATAL_ERROR "Missing SCCG catalogue: external/safety-case-core-guidelines/dist/${AF_SCCG_CATALOG_FILE}\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
 endif()
 
 function(af_copy_sccg_data target_name)
     add_custom_command(TARGET ${target_name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${AF_SCCG_REQUIRED_DIST_FILES}
-            ${AF_SCCG_RULES_JSONL}
-            "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
-        WORKING_DIRECTORY "${AF_SCCG_DIST_DIR}"
+            "${AF_SCCG_DIST_DIR}/${AF_SCCG_CATALOG_FILE}"
+            "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist/${AF_SCCG_CATALOG_FILE}"
         VERBATIM
     )
-    foreach(AF_SCCG_OPT_FILE IN LISTS AF_SCCG_OPTIONAL_DIST_FILES)
-        if(EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}")
-            add_custom_command(TARGET ${target_name} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}"
-                    "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist/${AF_SCCG_OPT_FILE}"
-                VERBATIM
-            )
-        endif()
-    endforeach()
-    if(EXISTS "${AF_SCCG_DIST_DIR}/sccg.full.yaml")
-        add_custom_command(TARGET ${target_name} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${AF_SCCG_DIST_DIR}/sccg.full.yaml"
-                "$<TARGET_FILE_DIR:${target_name}>/data/sccg.full.yaml"
-            VERBATIM
-        )
-    endif()
 endfunction()
 
 add_subdirectory(src)
@@ -651,11 +598,15 @@ gtest_discover_tests(tests
     TEST_FILTER "-*SACM23_*:*GSN3_*"
     PROPERTIES LABELS "app"
 )
+# The runtime reads exactly one SCCG file; this holds its copy to the pinned
+# submodule. (It compared review_profiles.json until the loader moved to
+# sccg.full.json -- and then failed on a stale per-concern copy the build no
+# longer refreshes, which is the right way for it to fail.)
 add_test(
     NAME SccgDataRuntimeCopy
     COMMAND ${CMAKE_COMMAND} -E compare_files
-    "${AF_SCCG_DIST_DIR}/review_profiles.json"
-    "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
+    "${AF_SCCG_DIST_DIR}/${AF_SCCG_CATALOG_FILE}"
+    "$<TARGET_FILE_DIR:tests>/data/sccg/dist/${AF_SCCG_CATALOG_FILE}"
 )
 # `build`, not `gate`. It compares against a file af_copy_sccg_data() puts in
 # the runtime directory in a POST_BUILD step, so unlike the repository gates it

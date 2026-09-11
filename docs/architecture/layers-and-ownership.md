@@ -121,7 +121,7 @@ what the build enforces.
 
 | Subsystem | Public — in its headers | Private — sources only |
 |---|---|---|
-| `parser` | — | pugixml, yaml-cpp |
+| `parser` | — | pugixml |
 | `sacm` | — | pugixml |
 | `sacm_adapter` | `sacm::sacm` | — |
 | `core` | — | picosha2 |
@@ -193,10 +193,14 @@ assurance-case data.
 
 Safety Case Core Guidelines are tracked as the
 `external/safety-case-core-guidelines` submodule. Assurance Forge consumes the
-generated SCCG distribution rather than the authored source tree: the build
-copies `dist/sccg.full.yaml` into each target runtime directory as
-`data/sccg.full.yaml`, and release packaging overlays it into the shipped `data`
-folder. Runtime discovery prefers `data/sccg.full.yaml`.
+generated SCCG distribution rather than the authored source tree, and reads one
+file of it: `dist/sccg.full.json`, which SCCG declares sufficient on its own for
+review, authoring and retirement (contract 3.1.0). `parser::SccgDistParser`
+loads it and refuses any other contract major. The build copies it into each
+target runtime directory as `data/sccg/dist/sccg.full.json`, and release
+packaging carries that copy into the shipped `data` folder. Runtime discovery
+tries `AF_SCCG_DIST_DIR`, then `data/sccg/dist` beside the executable, then a
+source checkout.
 
 After cloning:
 
@@ -204,5 +208,5 @@ After cloning:
 git submodule update --init --recursive
 ```
 
-If the SCCG submodule is present but `dist/sccg.full.yaml` is missing, regenerate
+If the SCCG submodule is present but `dist/sccg.full.json` is missing, regenerate
 the distribution in the SCCG repository before configuring Assurance Forge.

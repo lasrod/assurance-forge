@@ -65,7 +65,7 @@ User interaction → `UiState` (visual/selection) or `ElementContextActions` (mo
 
 ### SCCG / AI Guidelines
 
-Safety Case Core Guidelines live in `external/safety-case-core-guidelines` (git submodule). The build copies `external/safety-case-core-guidelines/dist/sccg.full.yaml` into each target runtime directory as `data/sccg.full.yaml`. Runtime discovery uses `data/sccg.full.yaml` first. If `dist/sccg.full.yaml` is missing after cloning, regenerate it in the SCCG submodule before configuring.
+Safety Case Core Guidelines live in `external/safety-case-core-guidelines` (git submodule). Assurance Forge reads one file of its distribution, `dist/sccg.full.json` (SCCG contract 3.x; `parser::SccgDistParser` refuses another major). The build copies it into each target runtime directory as `data/sccg/dist/sccg.full.json`; runtime discovery tries `AF_SCCG_DIST_DIR`, then that copy, then a source checkout. If `dist/sccg.full.json` is missing after cloning, regenerate it in the SCCG submodule before configuring.
 
 ### HelloImGui Scope
 

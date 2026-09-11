@@ -29,7 +29,7 @@ TEST(GuidelineCatalogTest, BuildsFlatEntriesAndLookupIds) {
     profile.description = "Reviews claim wording.";
     document.review_profiles.push_back(profile);
 
-    core::GuidelineCatalog catalog = core::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+    core::GuidelineCatalog catalog = core::BuildGuidelineCatalog(std::move(document), "sccg.full.json");
 
     ASSERT_EQ(catalog.entries.size(), 2u);
     EXPECT_EQ(catalog.entries[0].id, "CL.1");
@@ -41,7 +41,7 @@ TEST(GuidelineCatalogTest, BuildsFlatEntriesAndLookupIds) {
     ASSERT_EQ(catalog.review_profile_entries.size(), 1u);
     EXPECT_EQ(catalog.review_profile_entries[0].id, "claim_wording_review");
     EXPECT_TRUE(catalog.review_profile_ids.count("claim_wording_review") > 0);
-    EXPECT_EQ(catalog.source_path.filename().string(), "sccg.full.yaml");
+    EXPECT_EQ(catalog.source_path.filename().string(), "sccg.full.json");
 }
 
 TEST(GuidelineCatalogTest, LoadsRepositoryGuidelines) {

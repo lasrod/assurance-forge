@@ -1,6 +1,7 @@
 #pragma once
 
 #include <expected>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -12,39 +13,12 @@ struct GuidelinesLicense {
     std::string url;
 };
 
-struct GuidelinesRecommendation {
-    std::string method;
-    std::string recommendation;
-};
-
-struct GuidelinesIdSchemeEntry {
-    std::string prefix;
-    std::string meaning;
-};
-
+// The catalogue's `document` block: what the MCP guidance resource opens with.
 struct GuidelinesDocumentMetadata {
     std::string title;
     std::string copyright;
     GuidelinesLicense license;
     std::string purpose;
-    std::string source_policy_summary;
-    std::string method_application_summary;
-    std::vector<GuidelinesRecommendation> recommendations;
-    std::vector<GuidelinesIdSchemeEntry> id_scheme;
-    std::vector<std::string> required_guideline_sections;
-};
-
-struct ReferenceSource {
-    std::string id;
-    std::string display_name;
-    std::string type;
-};
-
-struct GuidelineCategory {
-    std::string id;
-    std::string title;
-    std::string index_title;
-    std::string description;
 };
 
 struct GuidelineExample {
@@ -206,6 +180,11 @@ struct DataPackage {
     std::string element_role;
     std::vector<std::string> required_fields;
     std::vector<std::string> optional_fields;
+    // One line of meaning per field (SCCG 0.9.0). Since availability is judged
+    // on whether published fields are populated, the names decide what a review
+    // is told, and the meaning is what says which of a tool's data belongs in
+    // which field.
+    std::map<std::string, std::string> field_meanings;
     std::string schema_version;
     std::string sccg_version;
 };
@@ -278,8 +257,6 @@ struct GuidelinesDocument {
     std::string schema_version;
     std::string sccg_version;
     GuidelinesDocumentMetadata metadata;
-    std::vector<ReferenceSource> reference_sources;
-    std::vector<GuidelineCategory> categories;
     std::vector<Guideline> guidelines;
     std::vector<ReviewProfile> review_profiles;
     std::vector<DataPackage> data_packages;
@@ -292,6 +269,11 @@ struct GuidelinesDocument {
     // exception. Empty for a catalogue that predates it.
     std::string when_unavailable;
     std::vector<RetiredGuideline> retired_guidelines;
+    // The sentence SCCG publishes for a tool to send with each review-pass
+    // request, `{question}` replaced by the pass's question (SCCG 0.9.0). Sent
+    // verbatim, so every tool frames a pass the same way. Empty for a
+    // catalogue that predates it.
+    std::string review_pass_instruction;
     std::vector<Precheck> prechecks;
     AuthoringGuidance authoring_guidance;
 
@@ -307,8 +289,6 @@ struct GuidelinesDocument {
     std::vector<const Guideline*> FindGuidelinesBySuggestedCheckId(const std::string& check_id) const;
     const SuggestedCheck* FindSuggestedCheckById(const std::string& check_id) const;
     const ReviewProfile* FindReviewProfileById(const std::string& id) const;
-    const ReferenceSource* FindReferenceSourceById(const std::string& source_id) const;
-    const GuidelineCategory* FindCategoryById(const std::string& category_id) const;
     const DataPackage* FindDataPackageById(const std::string& id) const;
     const Precheck* FindPrecheckById(const std::string& id) const;
     const AvailabilityState* FindAvailabilityStateById(const std::string& id) const;
@@ -328,11 +308,5 @@ struct GuidelinesDocument {
 };
 
 using GuidelinesParseResult = std::expected<GuidelinesDocument, std::string>;
-
-class GuidelinesParser {
-public:
-    static GuidelinesParseResult ParseFile(const std::string& file_path);
-    static GuidelinesParseResult ParseString(const std::string& yaml_content);
-};
 
 } // namespace parser

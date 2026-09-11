@@ -42,7 +42,7 @@ warnings had not been suppressed, they had never been requested.
 | GCC, Clang | `-Wall -Wextra` |
 
 Applied **per target**, never globally. A global `add_compile_options()` would
-also hit hello_imgui, curl, yaml-cpp and the rest of the fetched dependencies,
+also hit hello_imgui, curl, pugixml and the rest of the fetched dependencies,
 and drowning a dozen of our own warnings in thousands of theirs is how a warning
 level gets switched back off a week later.
 

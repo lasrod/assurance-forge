@@ -252,7 +252,7 @@ const std::vector<ReviewProfileSelectionCase>& ReviewProfileSelectionCases() {
 }
 
 core::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
-    return core::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+    return core::BuildGuidelineCatalog(std::move(document), "sccg.full.json");
 }
 
 core::ProblemItem MakeManualProblem(const std::string& id, const std::string& element_id) {
@@ -360,7 +360,7 @@ TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnEle
     core::GuidelineCatalog catalog;
     std::string error;
     ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
-    ASSERT_EQ(catalog.document.sccg_version, "0.8.0");
+    ASSERT_EQ(catalog.document.sccg_version, "0.9.0");
 
     for (const ReviewProfileSelectionCase& selection_case : ReviewProfileSelectionCases()) {
         SCOPED_TRACE(selection_case.expected_profile_id);
