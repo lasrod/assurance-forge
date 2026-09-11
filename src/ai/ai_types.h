@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace ai {
 
@@ -18,6 +19,10 @@ enum class AiErrorCode {
     NetworkError,
     Timeout,
     RateLimited,
+    // The account has no credit left. OpenAI reports it with the same HTTP 429
+    // as a rate limit, and a user told "rate limit reached" waits and retries
+    // when the only fix is topping up the account.
+    QuotaExhausted,
     InvalidModel,
     MalformedResponse,
     ProviderError,
@@ -57,13 +62,49 @@ struct AiProviderSettings {
     // tell which.
     std::optional<double> temperature;
     std::optional<long long> seed;
+
+    // The provider's processing tier, sent only when set. "flex" is OpenAI's
+    // slower tier at batch prices: right for an evaluation sweep, wrong for a
+    // user waiting on a review, so nothing in the application sets it.
+    std::optional<std::string> serviceTier;
+    // How long one request may take. A flex request can queue for minutes.
+    int requestTimeoutSeconds = 120;
+};
+
+// One piece of a prompt. The pieces are sent in order and read as one text;
+// `cacheBreakpoint` asks the provider to cache everything up to the end of
+// this piece, so a later request starting with the same pieces reads them from
+// the cache instead of paying for them again.
+struct AiPromptSegment {
+    std::string text;
+    bool cacheBreakpoint = false;
 };
 
 struct AiRequest {
     std::string systemInstruction;
+    // Used when `promptSegments` is empty.
     std::string userPrompt;
+    // The prompt as cacheable pieces. When non-empty it replaces `userPrompt`.
+    std::vector<AiPromptSegment> promptSegments;
+    // Routes requests that share a cacheable prefix to the same cache. Omitted
+    // when empty.
+    std::string promptCacheKey;
     std::optional<std::string> jsonSchemaName;
     std::optional<std::string> jsonSchema;
+};
+
+// What a request consumed, as the provider reported it. `reported` is false
+// when the response carried no usage block, so a zero is never mistaken for
+// a free request.
+struct AiUsage {
+    bool reported = false;
+    long long inputTokens = 0;
+    // Of `inputTokens`: read from the cache, and written to it.
+    long long cachedInputTokens = 0;
+    long long cacheWriteTokens = 0;
+    long long outputTokens = 0;
+    // Of `outputTokens`: the model's hidden reasoning, billed as output.
+    long long reasoningTokens = 0;
 };
 
 struct AiResponse {
@@ -73,7 +114,15 @@ struct AiResponse {
     std::string errorMessage;
     AiErrorCode errorCode = AiErrorCode::None;
     long httpStatus = 0;
+    // The provider's own error code (e.g. "insufficient_quota"), when it sent one.
+    std::string providerErrorCode;
+    AiUsage usage;
+    // The tier that actually served the request, when the provider says.
+    std::string serviceTier;
 };
+
+// The prompt a request sends, whichever form it was given in.
+std::string PromptText(const AiRequest& request);
 
 struct AiConnectionStatus {
     AiTaskState state = AiTaskState::Idle;

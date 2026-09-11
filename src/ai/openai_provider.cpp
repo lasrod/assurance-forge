@@ -7,7 +7,25 @@
 namespace ai {
 namespace {
 
-AiErrorCode ErrorForHttpStatus(long status_code) {
+// The provider's own error code from an error body: `error.code`, or
+// `error.type` when there is no code. Empty for anything else.
+std::string ProviderErrorCode(const std::string& body) {
+    const nlohmann::json root = nlohmann::json::parse(body, nullptr, false);
+    if (!root.is_object() || !root.contains("error") || !root["error"].is_object())
+        return {};
+    const nlohmann::json& error = root["error"];
+    for (const char* field : {"code", "type"}) {
+        if (error.contains(field) && error[field].is_string() && !error[field].get<std::string>().empty())
+            return error[field].get<std::string>();
+    }
+    return {};
+}
+
+bool IsQuotaExhausted(const std::string& provider_error_code) {
+    return provider_error_code == "insufficient_quota" || provider_error_code == "credit_balance_exhausted";
+}
+
+AiErrorCode ErrorForHttpStatus(long status_code, const std::string& provider_error_code) {
     if (status_code == 401 || status_code == 403)
         return AiErrorCode::AuthenticationFailed;
     if (status_code == 404)
@@ -15,7 +33,7 @@ AiErrorCode ErrorForHttpStatus(long status_code) {
     if (status_code == 408 || status_code == 504)
         return AiErrorCode::Timeout;
     if (status_code == 429)
-        return AiErrorCode::RateLimited;
+        return IsQuotaExhausted(provider_error_code) ? AiErrorCode::QuotaExhausted : AiErrorCode::RateLimited;
     if (status_code >= 400)
         return AiErrorCode::ProviderError;
     return AiErrorCode::None;
@@ -47,10 +65,67 @@ std::string ExtractOutputText(const nlohmann::json& root) {
 
 // Builds the JSON request body. May throw nlohmann::json::parse_error if
 // request.jsonSchema contains malformed JSON; callers should handle this.
+// A segmented prompt is one user message whose text parts carry the cache
+// breakpoints. Explicit mode caches only at the breakpoints the caller placed:
+// the implicit breakpoint OpenAI would otherwise add at the end of the message
+// writes the whole prompt to the cache at 1.25x the input price, and a review
+// of an element nobody reviews again never reads it back.
+nlohmann::json SegmentedInput(const AiRequest& request) {
+    nlohmann::json content = nlohmann::json::array();
+    for (const AiPromptSegment& segment : request.promptSegments) {
+        nlohmann::json part = {{"type", "input_text"}, {"text", segment.text}};
+        if (segment.cacheBreakpoint)
+            part["prompt_cache_breakpoint"] = {{"mode", "explicit"}};
+        content.push_back(std::move(part));
+    }
+    return nlohmann::json::array({{{"role", "user"}, {"content", std::move(content)}}});
+}
+
+bool HasCacheBreakpoint(const AiRequest& request) {
+    for (const AiPromptSegment& segment : request.promptSegments) {
+        if (segment.cacheBreakpoint)
+            return true;
+    }
+    return false;
+}
+
+long long IntegerAt(const nlohmann::json& object, const char* field) {
+    if (!object.is_object() || !object.contains(field) || !object[field].is_number_integer())
+        return 0;
+    return object[field].get<long long>();
+}
+
+AiUsage ParseUsage(const nlohmann::json& root) {
+    AiUsage usage;
+    if (!root.contains("usage") || !root["usage"].is_object())
+        return usage;
+    const nlohmann::json& reported = root["usage"];
+    usage.reported = true;
+    usage.inputTokens = IntegerAt(reported, "input_tokens");
+    usage.outputTokens = IntegerAt(reported, "output_tokens");
+    if (reported.contains("input_tokens_details")) {
+        usage.cachedInputTokens = IntegerAt(reported["input_tokens_details"], "cached_tokens");
+        usage.cacheWriteTokens = IntegerAt(reported["input_tokens_details"], "cache_write_tokens");
+    }
+    if (reported.contains("output_tokens_details"))
+        usage.reasoningTokens = IntegerAt(reported["output_tokens_details"], "reasoning_tokens");
+    return usage;
+}
+
 nlohmann::json BuildRequestBody(const AiProviderSettings& settings, const AiRequest& request) {
     nlohmann::json body;
     body["model"] = settings.model.empty() ? kDefaultOpenAiModel : settings.model;
-    body["input"] = request.userPrompt;
+    if (request.promptSegments.empty()) {
+        body["input"] = request.userPrompt;
+    } else {
+        body["input"] = SegmentedInput(request);
+        if (HasCacheBreakpoint(request))
+            body["prompt_cache_options"] = {{"mode", "explicit"}};
+    }
+    if (!request.promptCacheKey.empty())
+        body["prompt_cache_key"] = request.promptCacheKey;
+    if (settings.serviceTier.has_value())
+        body["service_tier"] = settings.serviceTier.value();
     // Omitted rather than defaulted: a model that rejects the parameter must
     // still be reachable, and "the provider decides" is a real configuration
     // rather than a missing one.
@@ -116,7 +191,7 @@ OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& re
 
     HttpRequest http_request;
     http_request.url = kOpenAiResponsesEndpoint;
-    http_request.timeoutSeconds = 120;
+    http_request.timeoutSeconds = settings.requestTimeoutSeconds;
     http_request.headers = {
         {"Content-Type", "application/json"},
         {"Authorization", "Bearer " + api_key},
@@ -139,8 +214,11 @@ OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& re
     }
 
     if (http_response.statusCode < 200 || http_response.statusCode >= 300) {
-        AiErrorCode code = ErrorForHttpStatus(http_response.statusCode);
-        return ErrorResponse(code, ToString(code), http_response.body, http_response.statusCode);
+        const std::string provider_error_code = ProviderErrorCode(http_response.body);
+        AiErrorCode code = ErrorForHttpStatus(http_response.statusCode, provider_error_code);
+        AiResponse response = ErrorResponse(code, ToString(code), http_response.body, http_response.statusCode);
+        response.providerErrorCode = provider_error_code;
+        return response;
     }
 
     try {
@@ -156,6 +234,9 @@ OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& re
         response.text = std::move(text);
         response.rawJson = http_response.body;
         response.httpStatus = http_response.statusCode;
+        response.usage = ParseUsage(root);
+        if (root.contains("service_tier") && root["service_tier"].is_string())
+            response.serviceTier = root["service_tier"].get<std::string>();
         return response;
     } catch (...) {
         return ErrorResponse(AiErrorCode::MalformedResponse, "Unexpected response.", http_response.body);
