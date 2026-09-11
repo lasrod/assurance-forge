@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -78,6 +79,9 @@ public:
     std::atomic<int> calls{0};
     // Fail any request whose prompt contains this, to fail one pass of several.
     std::string fail_when_prompt_contains;
+    // Every request as sent, guarded because the passes run concurrently.
+    std::mutex requests_mutex;
+    std::vector<ai::AiRequest> requests;
 
     ai::AiProviderId ProviderId() const override {
         return ai::AiProviderId::OpenAI;
@@ -89,9 +93,13 @@ public:
 
     ai::AiResponse Generate(const ai::AiProviderSettings&, const ai::AiRequest& request, const std::string&) override {
         calls.fetch_add(1);
+        {
+            std::lock_guard<std::mutex> lock(requests_mutex);
+            requests.push_back(request);
+        }
         ai::AiResponse response;
         if (!fail_when_prompt_contains.empty() &&
-            request.userPrompt.find(fail_when_prompt_contains) != std::string::npos) {
+            ai::PromptText(request).find(fail_when_prompt_contains) != std::string::npos) {
             response.success = false;
             response.errorCode = ai::AiErrorCode::Timeout;
             response.errorMessage = "simulated timeout";
@@ -746,6 +754,41 @@ TEST(AiReviewControllerTest, ClaimReviewIsSentAsOneRequestPerReviewPass) {
 // One pass failing must not read as one pass finding nothing. The findings of
 // the passes that ran are still recorded; the review is reported incomplete and
 // failed, so it can never earn the no-findings badge.
+// The application caches what every review of a profile and pass shares -- the
+// instructions and the pass's rules -- and never the element's own data: a
+// cache write costs more than an uncached read, and one element is rarely
+// reviewed twice before the cache expires. Nothing else about the request
+// changes, so the prompt the model reads is the prompt it read before.
+TEST(AiReviewControllerTest, CachesTheSharedPromptSegmentsButNotTheElementData) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    const std::vector<ai::AiRequest>& requests = harness.provider->requests;
+    ASSERT_EQ(requests.size(), ReleasedClaimReview().review_passes.size()) << "one request per pass";
+    for (const ai::AiRequest& request : requests) {
+        ASSERT_EQ(request.promptSegments.size(), 3u);
+        EXPECT_TRUE(request.promptSegments[0].cacheBreakpoint) << "the shared instructions";
+        EXPECT_TRUE(request.promptSegments[1].cacheBreakpoint) << "the profile, the pass and its rules";
+        EXPECT_FALSE(request.promptSegments[2].cacheBreakpoint) << "the element's own data";
+        EXPECT_EQ(ai::PromptText(request), request.userPrompt) << "the same text, only in pieces";
+        EXPECT_NE(request.promptSegments[2].text.find("claim-1"), std::string::npos);
+        EXPECT_EQ(request.promptSegments[0].text.find("claim-1"), std::string::npos);
+        EXPECT_EQ(request.promptSegments[1].text.find("claim-1"), std::string::npos);
+        EXPECT_EQ(request.promptCacheKey.rfind("sccg-" + ReleasedClaimReview().sccg_version + "-claim_review-", 0), 0u)
+            << request.promptCacheKey;
+    }
+    EXPECT_NE(requests[0].promptCacheKey, requests[1].promptCacheKey) << "each pass caches its own rules";
+    EXPECT_EQ(requests[0].promptSegments[0].text, requests[1].promptSegments[0].text)
+        << "every pass shares the first segment";
+}
+
 TEST(AiReviewControllerTest, AReviewWithAFailedPassIsReportedIncomplete) {
     const parser::ReviewProfile& claim_review = ReleasedClaimReview();
     ASSERT_GT(claim_review.review_passes.size(), 1u);

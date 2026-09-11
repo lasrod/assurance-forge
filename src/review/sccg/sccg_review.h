@@ -112,6 +112,13 @@ struct AiReviewRequestArtifacts {
     std::string responseSchemaJson;
     std::string expectedResponseSchema;
     std::string prompt;
+    // `prompt` in the pieces a provider can cache, most shared first: what
+    // every review sends, what every review of this profile and pass sends,
+    // and what only this element sends. They concatenate to `prompt`.
+    std::vector<std::string> promptSegments;
+    // Names the first two segments, which is what requests sharing a cache
+    // have in common: SCCG version, profile and pass.
+    std::string promptCacheKey;
     std::string debugText;
 };
 

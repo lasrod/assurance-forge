@@ -267,6 +267,60 @@ std::vector<std::string> Sorted(std::vector<std::string> values) {
 
 } // namespace
 
+// A provider caches a prompt by prefix, so what reviews share has to come
+// first and be byte-identical: the first segment across every review, the
+// second across every element reviewed in the same profile and pass. Anything
+// of the element's leaking into those would silently turn every cache read into
+// a write -- nothing would fail, the reviews would only cost more.
+TEST(SccgReviewPreparationTest, OrdersThePromptFromMostSharedToLeastForCaching) {
+    const parser::AssuranceCase assurance_case = PaperAInitialFragment();
+    const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    const review::AiReviewCaseContext case_context;
+
+    const review::SccgReviewPreparation g1 =
+        review::PrepareSccgReview(&assurance_case, tree, "G1", {}, case_context, &Catalog());
+    const review::SccgReviewPreparation g2 =
+        review::PrepareSccgReview(&assurance_case, tree, "G2", {}, case_context, &Catalog());
+    const review::SccgReviewPreparation e1 =
+        review::PrepareSccgReview(&assurance_case, tree, "E1", {}, case_context, &Catalog());
+    ASSERT_TRUE(g1.ok() && g2.ok() && e1.ok());
+    ASSERT_EQ(g1.passes.size(), g2.passes.size());
+    ASSERT_GT(g1.passes.size(), 1u);
+
+    const std::string& shared = g1.passes.front().request.promptSegments.at(0);
+    for (const review::SccgReviewPreparation* preparation : {&g1, &g2, &e1}) {
+        for (const review::SccgReviewPassRequest& pass : preparation->passes) {
+            SCOPED_TRACE(preparation->element_id + " " + pass.pass_id);
+            const std::vector<std::string>& segments = pass.request.promptSegments;
+            ASSERT_EQ(segments.size(), 3u);
+            EXPECT_EQ(segments[0] + segments[1] + segments[2], pass.request.prompt);
+            EXPECT_EQ(segments[0], shared) << "every review, of every profile and pass, shares the first segment";
+            EXPECT_NE(segments[0].find("## Required JSON response"), std::string::npos)
+                << "the response contract is the same for every review, so it is cached with the instructions";
+            EXPECT_NE(segments[1].find("## SCCG rules"), std::string::npos);
+            EXPECT_NE(segments[2].find("## Selected element"), std::string::npos);
+            // The elements' text, not their ids: the response contract's own
+            // example references an element as {"id": "G1"}.
+            for (const char* element_text :
+                 {"The kitchen blender is safe.", "Blade contact hazards are controlled.", "BL-TR-003 rev. A"}) {
+                EXPECT_EQ(segments[0].find(element_text), std::string::npos) << element_text;
+                EXPECT_EQ(segments[1].find(element_text), std::string::npos) << element_text;
+            }
+        }
+    }
+    for (std::size_t index = 0; index < g1.passes.size(); ++index) {
+        SCOPED_TRACE(g1.passes[index].pass_id);
+        EXPECT_EQ(g1.passes[index].request.promptSegments[1], g2.passes[index].request.promptSegments[1])
+            << "two claims reviewed in the same pass share the pass's rules";
+        EXPECT_EQ(g1.passes[index].request.promptCacheKey, g2.passes[index].request.promptCacheKey);
+        EXPECT_NE(g1.passes[index].request.promptSegments[2], g2.passes[index].request.promptSegments[2]);
+    }
+    EXPECT_NE(g1.passes[0].request.promptSegments[1], g1.passes[1].request.promptSegments[1]);
+    EXPECT_NE(g1.passes[0].request.promptCacheKey, g1.passes[1].request.promptCacheKey);
+    EXPECT_EQ(g1.passes[0].request.promptCacheKey,
+              "sccg-" + Catalog().document.sccg_version + "-claim_review-" + g1.passes[0].pass_id);
+}
+
 // SCCG 0.8.0 partitions claim_review into four review passes and lets a tool
 // send one request per pass. Each pass request must carry exactly that pass's
 // guidelines -- a pass that also carried its neighbours' would reintroduce the

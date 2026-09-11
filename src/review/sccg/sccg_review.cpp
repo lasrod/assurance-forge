@@ -1083,9 +1083,18 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
             "data does not exist.\n";
     }
 
-    artifacts.prompt = std::format(
+    // Three segments, ordered from the most shared to the least, so a provider
+    // can cache each prefix and a later request pays for only what differs:
+    //   1. what every review sends: the instructions and the response contract;
+    //   2. what every review of this profile and pass sends: the pass sentence,
+    //      the profile and its rules -- most of the request;
+    //   3. what only this element sends: pre-checks, packages, the element.
+    // The text is the same as when it was one string; only the order changed,
+    // with the response contract moved ahead of the element data. Nothing that
+    // depends on the element may move into the first two segments, or no two
+    // reviews would share them.
+    const std::string shared_segment = std::format(
         "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
-        "{}"
         "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
         "Each element carries the SCCG element_role it maps onto -- claim, strategy, evidence, context, "
         "assumption, justification, challenge -- which is the vocabulary the profile and the data packages "
@@ -1106,36 +1115,44 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         "Do not claim that a rule is violated unless the provided data supports that finding.\n"
         "If there is no clear violation, return an empty findings array.\n"
         "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
-        "## SCCG review profile{}\n\n"
-        "{}\n\n"
-        "## SCCG rules\n\n"
-        "{}\n\n"
-        "## Deterministic pre-check results\n\n"
-        "{}\n\n"
-        "## Available data packages\n\n"
-        "{}\n\n"
-        "## Unavailable data packages\n\n"
-        "{}\n\n"
-        "## Selected element\n\n"
-        "{}\n\n"
-        "## Parent element\n\n"
-        "{}\n\n"
-        "## Direct child/sub-elements\n\n"
-        "{}\n\n"
         "## Required JSON response\n\n"
-        "{}\n",
-        pass_instruction,
+        "{}\n\n",
         unavailable_instruction,
-        review_profile_heading,
-        artifacts.reviewProfileJson,
-        artifacts.guidelinesJson,
-        artifacts.precheckResultsJson,
-        artifacts.availableDataPackagesJson,
-        artifacts.unavailableDataPackagesJson,
-        artifacts.selectedElementJson,
-        artifacts.parentElementJson,
-        artifacts.childElementsJson,
         artifacts.responseSchemaJson);
+    const std::string profile_segment = std::format("{}"
+                                                    "## SCCG review profile{}\n\n"
+                                                    "{}\n\n"
+                                                    "## SCCG rules\n\n"
+                                                    "{}\n\n",
+                                                    pass_instruction,
+                                                    review_profile_heading,
+                                                    artifacts.reviewProfileJson,
+                                                    artifacts.guidelinesJson);
+    const std::string element_segment = std::format("## Deterministic pre-check results\n\n"
+                                                    "{}\n\n"
+                                                    "## Available data packages\n\n"
+                                                    "{}\n\n"
+                                                    "## Unavailable data packages\n\n"
+                                                    "{}\n\n"
+                                                    "## Selected element\n\n"
+                                                    "{}\n\n"
+                                                    "## Parent element\n\n"
+                                                    "{}\n\n"
+                                                    "## Direct child/sub-elements\n\n"
+                                                    "{}\n",
+                                                    artifacts.precheckResultsJson,
+                                                    artifacts.availableDataPackagesJson,
+                                                    artifacts.unavailableDataPackagesJson,
+                                                    artifacts.selectedElementJson,
+                                                    artifacts.parentElementJson,
+                                                    artifacts.childElementsJson);
+    artifacts.promptSegments = {shared_segment, profile_segment, element_segment};
+    artifacts.prompt = shared_segment + profile_segment + element_segment;
+    // Requests that share the first two segments share this key, so the
+    // provider routes them to the cache that already holds those segments.
+    artifacts.promptCacheKey = "sccg-" + (review_profile ? review_profile->sccg_version : std::string("none")) + "-" +
+                               (review_profile ? review_profile->id : std::string("fallback")) +
+                               (review_pass ? "-" + review_pass->id : std::string{});
 
     artifacts.debugText = std::format("Selected element data\n{}\n\n"
                                       "Parent element data\n{}\n\n"

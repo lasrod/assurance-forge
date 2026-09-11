@@ -49,6 +49,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -90,6 +91,14 @@ struct Options {
     // passes. The app never does this; the harness can, so the two can be
     // compared on the same material.
     bool single_request = false;
+    // The provider's processing tier. "flex" costs about half, and may queue:
+    // a sweep can wait, a user cannot, so only the harness offers it.
+    std::optional<std::string> service_tier;
+    // Seconds one request may take. Unset: 120, or 900 on the flex tier.
+    std::optional<int> request_timeout_seconds;
+    // Send the prompt as one uncached string, as before prompt caching, so a
+    // sweep can measure what caching changes.
+    bool no_prompt_cache = false;
     std::string tag;
 };
 
@@ -118,6 +127,12 @@ Options:
                        Needs --runs > 1 to mean anything.
   --single-request     Send the whole profile as one request even where it publishes review
                        passes, for comparison. The application always sends the passes.
+  --service-tier <t>   Provider processing tier, e.g. flex: about half the price, and slower.
+                       A request the tier has no capacity for is retried with backoff.
+  --timeout <s>        Seconds one request may take. Default 120, or 900 with --service-tier flex.
+  --no-prompt-cache    Send each prompt as one uncached string. By default the shared
+                       instructions and each pass's rules are cached, and with --runs > 1 so
+                       is each element's data, since every later run repeats it.
   --dry-run            Assemble and record the request; do not call the provider.
   --list-models        List the models the configured account offers, newest first, then exit.
   --help
@@ -198,6 +213,12 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
             ReadWholeNumber("--consensus", value("--consensus"), options.consensus_minimum, error);
         } else if (arg == "--single-request") {
             options.single_request = true;
+        } else if (arg == "--service-tier") {
+            options.service_tier = value("--service-tier");
+        } else if (arg == "--timeout") {
+            options.request_timeout_seconds = std::atoi(value("--timeout").c_str());
+        } else if (arg == "--no-prompt-cache") {
+            options.no_prompt_cache = true;
         } else if (arg == "--dry-run") {
             options.dry_run = true;
         } else if (arg == "--list-models") {
@@ -228,6 +249,84 @@ AiStack MakeAiStack() {
     auto http_client = std::make_shared<ai::LibCurlHttpClient>();
     auto provider = std::make_shared<ai::OpenAiProvider>(http_client);
     return AiStack{secret_store, std::make_shared<ai::AiService>(settings_store, secret_store, provider)};
+}
+
+// The provider request for one review request, cached the way the
+// application caches it -- after the shared instructions and after the pass's
+// rules -- and, when the element is reviewed more than once, after its data.
+ai::AiRequest ReviewRequest(const review::AiReviewRequestArtifacts& artifacts, bool cache, bool cache_element_data) {
+    ai::AiRequest request;
+    request.systemInstruction = artifacts.systemInstruction;
+    request.userPrompt = artifacts.prompt;
+    if (!cache)
+        return request;
+    for (std::size_t index = 0; index < artifacts.promptSegments.size(); ++index) {
+        const bool last = index + 1 == artifacts.promptSegments.size();
+        request.promptSegments.push_back({artifacts.promptSegments[index], !last || cache_element_data});
+    }
+    request.promptCacheKey = artifacts.promptCacheKey;
+    return request;
+}
+
+struct GenerateResult {
+    ai::AiResponse response;
+    int attempts = 0;
+    long long elapsed_ms = 0;
+};
+
+// Refusals the provider makes before doing any work: a rate limit, the flex
+// tier having no capacity, or an overloaded server. None is charged, and each
+// is worth waiting out in a sweep that was going to take an hour anyway. A
+// timeout is not retried -- the provider may have done, and billed, the work --
+// and neither is an exhausted account, which waiting does not fix.
+bool IsWorthRetrying(const ai::AiResponse& response) {
+    if (response.errorCode == ai::AiErrorCode::RateLimited)
+        return true;
+    return response.httpStatus == 500 || response.httpStatus == 502 || response.httpStatus == 503;
+}
+
+GenerateResult
+GenerateWithRetry(ai::AiService& service, const ai::AiRequest& request, const ai::AiProviderSettings& settings) {
+    constexpr int kMaxAttempts = 7;
+    std::chrono::seconds wait(15);
+    GenerateResult result;
+    for (result.attempts = 1;; ++result.attempts) {
+        result.response = service.Generate(request, settings);
+        if (result.response.success || !IsWorthRetrying(result.response) || result.attempts == kMaxAttempts)
+            return result;
+        std::this_thread::sleep_for(wait);
+        wait *= 2;
+    }
+}
+
+void AddUsage(ai::AiUsage& total, const ai::AiUsage& usage) {
+    if (!usage.reported)
+        return;
+    total.reported = true;
+    total.inputTokens += usage.inputTokens;
+    total.cachedInputTokens += usage.cachedInputTokens;
+    total.cacheWriteTokens += usage.cacheWriteTokens;
+    total.outputTokens += usage.outputTokens;
+    total.reasoningTokens += usage.reasoningTokens;
+}
+
+json UsageJson(const ai::AiUsage& usage) {
+    if (!usage.reported)
+        return nullptr;
+    return json{{"input_tokens", usage.inputTokens},
+                {"cached_input_tokens", usage.cachedInputTokens},
+                {"cache_write_tokens", usage.cacheWriteTokens},
+                {"output_tokens", usage.outputTokens},
+                {"reasoning_tokens", usage.reasoningTokens}};
+}
+
+json ModelJson(const ai::AiProviderSettings& settings, const Options& options) {
+    return json{{"name", settings.model},
+                {"provider", ai::ToString(settings.provider)},
+                {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
+                {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)},
+                {"service_tier", settings.serviceTier.has_value() ? json(*settings.serviceTier) : json(nullptr)},
+                {"prompt_cache", options.no_prompt_cache ? "none" : "explicit"}};
 }
 
 std::string NowUtcIso() {
@@ -484,6 +583,11 @@ int main(int argc, char** argv) {
         settings.temperature = options.temperature;
     if (options.seed.has_value())
         settings.seed = options.seed;
+    if (options.service_tier.has_value())
+        settings.serviceTier = options.service_tier;
+    // A flex request can queue for minutes before it starts.
+    settings.requestTimeoutSeconds = options.request_timeout_seconds.value_or(
+        settings.serviceTier == std::optional<std::string>("flex") ? 900 : settings.requestTimeoutSeconds);
 
     if (!options.dry_run && !service->HasStoredApiKey()) {
         std::cerr << "No API key is stored for the configured provider. Add one in the application's AI "
@@ -594,37 +698,43 @@ int main(int argc, char** argv) {
 
             if (options.dry_run) {
                 run_record["outcome"] = "dry-run";
-                run_record["model"] = json{
-                    {"name", settings.model},
-                    {"provider", ai::ToString(settings.provider)},
-                    {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
-                    {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
+                run_record["model"] = ModelJson(settings, options);
             } else {
                 // Concurrently, as the application sends them.
                 const auto started = std::chrono::steady_clock::now();
-                std::vector<std::future<std::pair<ai::AiResponse, long long>>> pending;
+                std::vector<std::future<GenerateResult>> pending;
+                // Every later run of this element repeats its data, so a sweep
+                // caches that segment too; the application does not.
+                const bool cache_element_data = options.runs > 1;
                 for (const review::SccgReviewPassRequest& pass : passes) {
-                    ai::AiRequest request;
-                    request.systemInstruction = pass.request.systemInstruction;
-                    request.userPrompt = pass.request.prompt;
+                    const ai::AiRequest request =
+                        ReviewRequest(pass.request, !options.no_prompt_cache, cache_element_data);
                     pending.push_back(std::async(std::launch::async, [service, request, settings]() {
                         const auto pass_started = std::chrono::steady_clock::now();
-                        ai::AiResponse response = service->Generate(request, settings);
+                        GenerateResult result = GenerateWithRetry(*service, request, settings);
                         const auto pass_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                             std::chrono::steady_clock::now() - pass_started);
-                        return std::make_pair(std::move(response), static_cast<long long>(pass_elapsed.count()));
+                        result.elapsed_ms = static_cast<long long>(pass_elapsed.count());
+                        return result;
                     }));
                 }
 
                 std::vector<review::ReviewPassOutcome> outcomes;
                 json pass_records = json::array();
+                ai::AiUsage run_usage;
                 for (std::size_t index = 0; index < passes.size(); ++index) {
-                    auto [response, pass_elapsed_ms] = pending[index].get();
+                    GenerateResult generated = pending[index].get();
+                    ai::AiResponse& response = generated.response;
+                    const long long pass_elapsed_ms = generated.elapsed_ms;
+                    AddUsage(run_usage, response.usage);
                     review::ReviewPassOutcome outcome;
                     outcome.pass_id = passes[index].pass_id;
                     json pass_record{{"pass_id", passes[index].pass_id},
                                      {"elapsed_ms", pass_elapsed_ms},
-                                     {"http_status", response.httpStatus}};
+                                     {"http_status", response.httpStatus},
+                                     {"attempts", generated.attempts},
+                                     {"service_tier", response.serviceTier},
+                                     {"usage", UsageJson(response.usage)}};
                     if (!response.success) {
                         outcome.error =
                             response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
@@ -633,6 +743,7 @@ int main(int argc, char** argv) {
                         pass_record["outcome"] = "request-failed";
                         pass_record["error"] = outcome.error;
                         pass_record["error_code"] = ai::ToString(response.errorCode);
+                        pass_record["provider_error_code"] = response.providerErrorCode;
                         pass_record["raw_response"] = response.rawJson;
                     } else {
                         outcome.raw_response = response.text.empty() ? response.rawJson : response.text;
@@ -656,12 +767,9 @@ int main(int argc, char** argv) {
                 const review::MergedReviewPasses merged =
                     review::MergeReviewPasses(outcomes, passes, preparation.element_id);
 
-                run_record["model"] = json{
-                    {"name", settings.model},
-                    {"provider", ai::ToString(settings.provider)},
-                    {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
-                    {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
+                run_record["model"] = ModelJson(settings, options);
                 run_record["elapsed_ms"] = elapsed.count();
+                run_record["usage"] = UsageJson(run_usage);
                 run_record["passes"] = pass_records;
                 run_record["discarded_findings"] = merged.discarded_findings;
                 if (passes.size() == 1)
@@ -724,11 +832,7 @@ int main(int argc, char** argv) {
             consensus_record["run_errors"] = consensus.run_errors;
             consensus_record["findings"] = ConsensusFindingsJson(consensus.findings);
             consensus_record["below_threshold"] = ConsensusFindingsJson(consensus.below_threshold);
-            consensus_record["model"] =
-                json{{"name", settings.model},
-                     {"provider", ai::ToString(settings.provider)},
-                     {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
-                     {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
+            consensus_record["model"] = ModelJson(settings, options);
             consensus_record["finished_utc"] = NowUtcIso();
 
             const std::filesystem::path path = options.out_dir / (SanitizeForFileName(element_id) + "--consensus.json");

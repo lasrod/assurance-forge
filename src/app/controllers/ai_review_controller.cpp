@@ -297,6 +297,15 @@ void AiReviewController::StartPendingRequest() {
         ai::AiRequest request;
         request.systemInstruction = pass.request.systemInstruction;
         request.userPrompt = pass.request.prompt;
+        // Cache the segments every review of this profile and pass shares --
+        // the instructions, the profile and its rules -- and not the element's
+        // own data: a cache write costs more than an uncached read, and a review
+        // of one element is rarely repeated before the cache expires.
+        for (std::size_t index = 0; index < pass.request.promptSegments.size(); ++index) {
+            const bool shared = index + 1 < pass.request.promptSegments.size();
+            request.promptSegments.push_back({pass.request.promptSegments[index], shared});
+        }
+        request.promptCacheKey = pass.request.promptCacheKey;
         review_tasks_.push_back(
             task_runner_.RunGenerate([service, request]() { return GenerateWith(service, request); }));
     }

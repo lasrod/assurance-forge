@@ -1382,12 +1382,13 @@
       "name": "OpenAI-compatible provider",
       "status": "supported",
       "evidence": [
-        "src/ai/openai_provider.cpp"
+        "src/ai/openai_provider.cpp",
+        "src/ai/ai_types.cpp"
       ],
       "tests": [
         "tests/test_openai_provider.cpp"
       ],
-      "notes": ""
+      "notes": "Every successful response reports what it consumed (`AiUsage`: input, cached and cache-written input, output, and the reasoning share of output), or says it reported nothing, so a zero is never read as a free request. **An exhausted account is told apart from a rate limit**: OpenAI answers both with HTTP 429, and the tool used to report \"Rate limit reached\" to a user whose only fix was topping up the account (seen during a 300-run evaluation sweep, 2026-09-11); `insufficient_quota` / `credit_balance_exhausted` now report \"The AI provider account has no credit left\". The provider's own error code is kept on every failure."
     },
     {
       "id": "AF-AI-004",
@@ -1800,7 +1801,7 @@
         "tests/test_sccg_review_preparation.cpp",
         "tests/test_sccg_review_passes.cpp"
       ],
-      "notes": "`af-sccg-review-eval`, a headless binary that runs the SCCG review method over a project from the command line: the same profile selection, data packages, pre-checks, request and response validator as the in-app review, with no window. It writes one JSON record per run — SCCG version, profile, guidelines carried, packages supplied and the availability state of each one absent, pre-check verdicts, model, prompt hash, elapsed time, and every finding with its cited guideline — which is the review record the SCCG method says a tool should retain. `--runs` repeats a review so a guideline that fires intermittently can be told from one that does not fire; `--model` varies the model without touching saved settings; `--dry-run` assembles and records the request without calling a provider, so profile selection, package availability and prompt content can be checked at no cost. It exists because the review method was previously reachable only by rendering a frame, which makes guideline coverage over a whole argument impossible to measure. **It is not a gate**: it calls a paid external provider and its output depends on a model, so it is never a CTest — `review::PrepareSccgReview` is what the tests cover, and this turns the prepared request into a recorded run. Review passes are sent concurrently and merged exactly as the application does; each record lists every pass with its guidelines, prompt hash and size, latency, outcome and raw response, plus any finding discarded for being cited outside its pass. `--single-request` sends the whole profile as one request instead, so the two can be compared on the same material; the application never does."
+      "notes": "`af-sccg-review-eval`, a headless binary that runs the SCCG review method over a project from the command line: the same profile selection, data packages, pre-checks, request and response validator as the in-app review, with no window. It writes one JSON record per run — SCCG version, profile, guidelines carried, packages supplied and the availability state of each one absent, pre-check verdicts, model, prompt hash, elapsed time, and every finding with its cited guideline — which is the review record the SCCG method says a tool should retain. `--runs` repeats a review so a guideline that fires intermittently can be told from one that does not fire; `--model` varies the model without touching saved settings; `--dry-run` assembles and records the request without calling a provider, so profile selection, package availability and prompt content can be checked at no cost. It exists because the review method was previously reachable only by rendering a frame, which makes guideline coverage over a whole argument impossible to measure. **It is not a gate**: it calls a paid external provider and its output depends on a model, so it is never a CTest — `review::PrepareSccgReview` is what the tests cover, and this turns the prepared request into a recorded run. Review passes are sent concurrently and merged exactly as the application does; each record lists every pass with its guidelines, prompt hash and size, latency, outcome and raw response, plus any finding discarded for being cited outside its pass. `--single-request` sends the whole profile as one request instead, so the two can be compared on the same material; the application never does. **Cost controls for sweeps** (none of which the application uses): `--service-tier flex` sends OpenAI's slower tier at batch prices with a 900 s timeout; a refusal made before any work -- a rate limit, flex having no capacity, an overloaded server (HTTP 500/502/503) -- is retried with exponential backoff and the attempts are recorded, while a timeout (possibly billed) and an exhausted account are not. Every run record carries token usage per pass and per run, including cached input and reasoning, and the tier that actually served each request, so the cost of a sweep is in its records rather than only on the provider's invoice."
     },
     {
       "id": "AF-AI-027",
@@ -1830,6 +1831,24 @@
         "tests/test_openai_provider.cpp"
       ],
       "notes": "`temperature` and `seed` are carried as **optional** settings and sent only when set, because \"whatever the provider defaults to\" is a real configuration and a model that rejects the parameter must still be reachable — the current reasoning models reject both, so a settings type that always sent a number could not talk to them. An unconfigured install therefore behaves exactly as it did before these existed. `--temperature` / `--seed` on the evaluation harness, and the model block of every run record states what was actually used, so a run's repeatability is a fact in the record rather than something the reader has to remember about the command line."
+    },
+    {
+      "id": "AF-AI-029",
+      "area": "AI",
+      "name": "Prompt caching for SCCG reviews",
+      "status": "supported",
+      "evidence": [
+        "src/review/sccg/sccg_review.cpp",
+        "src/ai/openai_provider.cpp",
+        "src/app/controllers/ai_review_controller.cpp",
+        "src/eval/sccg_review_eval.cpp"
+      ],
+      "tests": [
+        "tests/test_sccg_review_preparation.cpp",
+        "tests/test_openai_provider.cpp",
+        "tests/test_ai_review_controller.cpp"
+      ],
+      "notes": "A review request is built as three segments, most shared first: what every review sends (instructions and the response contract, ~2.5k tokens), what every review of one profile and pass sends (the pass sentence, the profile and its rules, ~6-7k), and the element's own data (~1.6k). The text is unchanged -- only the order, with the response contract moved ahead of the element data -- and a test holds that nothing of an element reaches the first two segments. The application places explicit cache breakpoints after the first two and none after the element data, in explicit mode, so it never pays the 1.25x cache-write price for data a review of one element will not read back; `prompt_cache_key` names SCCG version, profile and pass so requests that share rules reach the same cache. **Measured** on `gpt-5.6-sol` (2026-09-11): a first claim reviewed wrote ~9-10k tokens per pass to the cache, and a different claim straight after read ~9k of its ~10.5k input tokens per pass from it, at 0.1x the input price. Requests are no slower: under the same provider load the cached requests were as fast or faster than uncached ones. What caching cannot reduce is output: a claim-review pass produces ~2k output tokens, about 70% of them hidden reasoning, and output is now most of the bill. The evaluation harness also caches each element's data when it reviews an element more than once (`--runs` > 1), since every later run repeats it, and `--no-prompt-cache` sends the old single string for comparison."
     },
     {
       "id": "AF-PLAT-001",
