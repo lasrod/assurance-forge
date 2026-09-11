@@ -133,10 +133,10 @@ nlohmann::json PrecheckResultsToJson(const std::vector<review::sccg::PrecheckRes
     return results;
 }
 
-nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) {
+nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile, const parser::ReviewPass* review_pass) {
     if (!review_profile)
         return nlohmann::json(nullptr);
-    return {
+    nlohmann::json profile{
         {"id", review_profile->id},
         {"display_name", review_profile->display_name},
         {"description", review_profile->description},
@@ -145,6 +145,23 @@ nlohmann::json ReviewProfileToJson(const parser::ReviewProfile* review_profile) 
         {"required_data", StringVectorToJson(review_profile->required_data)},
         {"optional_data", StringVectorToJson(review_profile->optional_data)},
     };
+    if (!review_profile->review_passes.empty()) {
+        nlohmann::json passes = nlohmann::json::array();
+        for (const parser::ReviewPass& pass : review_profile->review_passes) {
+            passes.push_back({{"id", pass.id},
+                              {"display_name", pass.display_name},
+                              {"question", pass.question},
+                              {"guideline_ids", StringVectorToJson(pass.guideline_ids)}});
+        }
+        profile["review_passes"] = std::move(passes);
+    }
+    if (review_pass) {
+        profile["this_request_is_pass"] = {{"id", review_pass->id},
+                                           {"display_name", review_pass->display_name},
+                                           {"question", review_pass->question},
+                                           {"guideline_ids", StringVectorToJson(review_pass->guideline_ids)}};
+    }
+    return profile;
 }
 
 nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& guidelines_to_review) {
@@ -159,6 +176,25 @@ nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& gui
                 {"id", check.id},
                 {"description", check.description},
             });
+        }
+
+        // SCCG 0.8.0's disambiguation, verbatim. Published for the pairs it saw
+        // confused: without it a review files a correctly-detected defect under a
+        // neighbouring guideline, which is what 11 of 48 measured probes did.
+        nlohmann::json distinctions = nlohmann::json::array();
+        for (const parser::GuidelineDistinction& distinction : guideline->distinguish_from)
+            distinctions.push_back({{"id", distinction.id}, {"note", distinction.note}});
+
+        // The repair SCCG prescribes, every guideline having one since 0.7.0.
+        // The response contract translates this vocabulary into operations, so the
+        // model proposes the catalogue's repair rather than a list this tool kept
+        // by hand -- a list that named three guidelines SCCG has since retired.
+        nlohmann::json repairs = nlohmann::json::array();
+        for (const parser::GuidelineRepair& repair : guideline->tool.repair) {
+            repairs.push_back({{"action", repair.action},
+                               {"element_role", repair.element_role},
+                               {"attach_to", repair.attach_to},
+                               {"statement", repair.statement}});
         }
 
         guidelines.push_back({
@@ -181,11 +217,13 @@ nlohmann::json GuidelinesToJson(const std::vector<const parser::Guideline*>& gui
                  {"problem", guideline->examples.problem},
                  {"good", guideline->examples.good},
              }},
+            {"distinguish_from", distinctions},
             {"tool",
              {
                  {"applicable_elements", StringVectorToJson(guideline->tool.applicable_elements)},
                  {"detection_hints", StringVectorToJson(guideline->tool.detection_hints)},
                  {"suggested_checks", suggested_checks},
+                 {"repair", repairs},
              }},
         });
     }
@@ -288,7 +326,6 @@ const EmptyPackageReason* FindEmptyPackageReason(const std::string& package_id) 
         {"STRATEGY", "No strategy element stands between this element and its support."},
         {"EVIDENCE_PATH", "No evidence is reachable below this element."},
         {"EVIDENCE_ITEM", "This element is not an evidence item."},
-        {"EVIDENCE_BASIS", "This element is not an evidence item, so it has no acceptance basis of its own."},
         {"SELECTED_CLAIM", "The selected element is not a claim."},
         {"SELECTED_STRATEGY", "The selected element is not a strategy."},
         {"SELECTED_EVIDENCE", "The selected element is not an evidence item."},
@@ -573,24 +610,117 @@ nlohmann::json ProjectGlossaryJson(const parser::AssuranceCase& assurance_case) 
 // CHANGE_HISTORY. Prior findings on the elements under review: whether this
 // claim has been challenged before, and whether the challenge was resolved or
 // dismissed. SU.4, SU.5 and SU.11 all turn on it.
-nlohmann::json ChangeHistoryJson(const std::vector<core::reviews::ReviewItem>& review_items,
-                                 const std::vector<std::string>& scope_element_ids) {
-    nlohmann::json entries = nlohmann::json::array();
+//
+// Filed under SCCG's published field names -- `prior_findings` for what an AI
+// review raised, `review_comments` for what a person wrote -- rather than under
+// a key of this tool's own. That stopped being cosmetic in 0.8.0, which judges
+// the availability of a package with no required fields by whether its
+// published fields are populated: history sent under any other key is, by the
+// catalogue's definition, an empty package.
+struct ChangeHistory {
+    nlohmann::json prior_findings = nlohmann::json::array();
+    nlohmann::json review_comments = nlohmann::json::array();
+
+    bool empty() const {
+        return prior_findings.empty() && review_comments.empty();
+    }
+};
+
+ChangeHistory ChangeHistoryJson(const std::vector<core::reviews::ReviewItem>& review_items,
+                                const std::vector<std::string>& scope_element_ids,
+                                const parser::GuidelinesDocument& catalog) {
+    ChangeHistory history;
     for (const core::reviews::ReviewItem& item : review_items) {
         if (std::find(scope_element_ids.begin(), scope_element_ids.end(), item.element_id) == scope_element_ids.end())
             continue;
-        entries.push_back({
+        nlohmann::json entry{
             {"element_id", item.element_id},
             {"title", item.title},
             {"message", item.message},
-            {"severity", item.severity},
             {"reviewer", item.reviewer_name},
             {"status", core::reviews::ReviewItemStatusToString(item.status)},
             {"guideline_ids", StringVectorToJson(item.guideline_ids)},
             {"created_utc", item.created_utc},
-        });
+        };
+        // A finding recorded against a guideline SCCG has since retired still
+        // happened, so its id is kept as recorded -- and the redirect is carried
+        // beside it, or the review reads a prior AR.3 finding as a citation of a
+        // rule it was never given.
+        nlohmann::json retired = nlohmann::json::array();
+        for (const std::string& guideline_id : item.guideline_ids) {
+            if (const parser::RetiredGuideline* entry_retired = catalog.FindRetiredGuidelineById(guideline_id)) {
+                retired.push_back({{"id", entry_retired->id},
+                                   {"retired_in", entry_retired->retired_in},
+                                   {"replaced_by", StringVectorToJson(entry_retired->replaced_by)},
+                                   {"note", entry_retired->note}});
+            }
+        }
+        if (!retired.empty())
+            entry["retired_guidelines"] = std::move(retired);
+
+        if (item.source == core::reviews::ReviewItemSource::AIReview)
+            history.prior_findings.push_back(std::move(entry));
+        else
+            history.review_comments.push_back(std::move(entry));
     }
-    return entries;
+    return history;
+}
+
+bool IsPopulated(const nlohmann::json& value) {
+    if (value.is_null())
+        return false;
+    if (value.is_string())
+        return !value.get_ref<const std::string&>().empty();
+    if (value.is_array() || value.is_object())
+        return !value.empty();
+    return true;
+}
+
+// SCCG 0.8.0: "A package with no required fields counts as available only when
+// at least one of its fields is populated; supplied with nothing in it, it is
+// empty." Applied to every such package the collector built, generically and
+// from the registry, so a package that gains or loses required fields in a later
+// release is judged by that release's definition rather than by a list here.
+//
+// Judged on the PUBLISHED field names only. A package carrying its data under a
+// key SCCG does not name has, by the catalogue's own definition, none of its
+// fields populated -- which is exactly the drift this is meant to surface.
+void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
+                                     const parser::GuidelinesDocument& catalog,
+                                     const parser::ReviewProfile* review_profile) {
+    for (auto package = packages.available.begin(); package != packages.available.end();) {
+        const parser::DataPackage* definition = catalog.FindDataPackageById(package->id);
+        if (definition == nullptr || !definition->required_fields.empty()) {
+            ++package;
+            continue;
+        }
+        const nlohmann::json parsed = nlohmann::json::parse(package->json, nullptr, false);
+        bool populated = false;
+        if (parsed.is_object()) {
+            for (const std::string& field : definition->optional_fields) {
+                const auto value = parsed.find(field);
+                if (value != parsed.end() && IsPopulated(*value)) {
+                    populated = true;
+                    break;
+                }
+            }
+        }
+        if (populated) {
+            ++package;
+            continue;
+        }
+        const bool required =
+            review_profile != nullptr &&
+            std::find(review_profile->required_data.begin(), review_profile->required_data.end(), package->id) !=
+                review_profile->required_data.end();
+        packages.unavailable.push_back(
+            AiReviewUnavailableDataPackage{package->id,
+                                           "Supplied with none of its published fields populated, which SCCG counts "
+                                           "as empty.",
+                                           required,
+                                           DataPackageAbsence::Empty});
+        package = packages.available.erase(package);
+    }
 }
 
 } // namespace
@@ -604,6 +734,8 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                                  std::string& out_error,
                                  const AiReviewCaseContext* case_context) {
     out_packages = {};
+    out_packages.when_unavailable = catalog.when_unavailable;
+    out_packages.availability_states = catalog.availability_states;
     const parser::SacmElement* selected = FindSacmElement(assurance_case, selected_element_id);
     if (!selected) {
         out_error = "Selected element was not found.";
@@ -740,9 +872,14 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
             if (!parsed.is_discarded())
                 CollectElementIdsFrom(parsed, scope_ids);
         }
-        const nlohmann::json history = ChangeHistoryJson(case_context->review_items, scope_ids);
+        const ChangeHistory history = ChangeHistoryJson(case_context->review_items, scope_ids, catalog);
         if (!history.empty()) {
-            AddPackage(out_packages, "CHANGE_HISTORY", {{"review_items", history}});
+            nlohmann::json package = nlohmann::json::object();
+            if (!history.prior_findings.empty())
+                package["prior_findings"] = history.prior_findings;
+            if (!history.review_comments.empty())
+                package["review_comments"] = history.review_comments;
+            AddPackage(out_packages, "CHANGE_HISTORY", package);
         } else {
             AddUnavailable(out_packages,
                            "CHANGE_HISTORY",
@@ -752,7 +889,9 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
         }
 
         if (!case_context->user_review_intent.empty()) {
-            AddPackage(out_packages, "USER_REVIEW_INTENT", {{"intent", case_context->user_review_intent}});
+            // `review_intent` is the package's one published field; `intent`, the
+            // key this used to be sent under, is not in the catalogue at all.
+            AddPackage(out_packages, "USER_REVIEW_INTENT", {{"review_intent", case_context->user_review_intent}});
         }
     }
 
@@ -764,60 +903,47 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
                        DataPackageAbsence::Empty);
     }
 
-    // EVIDENCE_BASIS is SUPPLIED, not declared absent, and the distinction
-    // decides whether eight guidelines can be assessed at all.
+    // EVIDENCE_BASIS: this tool has no field for any of the six things the
+    // package carries -- acceptance criteria, coverage, thresholds, scenario
+    // set, configuration, limitations -- so it has no source for the package.
     //
-    // SCCG gives the package `required_fields: []` -- every one of
-    // `acceptance_criteria`, `coverage`, `thresholds`, `scenario_set`,
-    // `configuration` and `limitations` is optional. A package with none of
-    // them populated is therefore a valid instance, and a tool that can address
-    // the evidence element at all can always supply one. Reporting it
-    // unavailable was our misreading: this tool has no source for the six
-    // FIELDS, but the PACKAGE asks for nothing it cannot provide.
-    //
-    // The misreading was not free. `evidence_review` is the only profile
-    // publishing a `when_absent` statement, it applies to this package, and it
-    // instructs the review not to report an absent basis as a finding --
-    // naming EV.5, EV.6, SU.3, SU.6, SU.7, SU.8, LF.5 and LF.7 as unassessable.
-    // Measured over three runs per element, EV.5 was cited 0 of 3 times against
-    // evidence whose argument stated no sufficiency basis at all, with the model
-    // writing "Evidence sufficiency was not assessed because the EVIDENCE_BASIS
-    // package is unavailable" -- while the same guideline fired 3 of 3 under
-    // `justification_review`, which carries it and publishes no such statement.
-    //
-    // Sending the package with its fields empty says the true thing instead:
-    // the case records no acceptance basis for this evidence. That is not a gap
-    // in the review, it is the finding EV.5 exists to raise.
-    // (safety-case-core-guidelines#13)
-    if (selected_node && selected_node->role == core::NodeRole::Solution) {
-        AddPackage(out_packages,
+    // Under SCCG 0.7.0 that absence silenced eight guidelines: evidence_review's
+    // `when_absent` named EV.5, EV.6, SU.3, SU.6, SU.7, SU.8, LF.5 and LF.7
+    // unassessable, and measured over three runs per element EV.5 was cited 0 of
+    // 3 times against evidence that stated no sufficiency basis at all. This
+    // tool worked round it by sending the package available with every field
+    // empty. SCCG 0.8.0 fixed the cause instead (safety-case-core-guidelines#13):
+    // the package is optional in evidence_review, the `when_absent` entry is
+    // gone, and the registry-wide `when_unavailable` rule says an unavailable
+    // package never silences a guideline. It also defines a package with no
+    // required fields and nothing in it as EMPTY, which makes the workaround
+    // non-conforming. So the package is reported for what it is.
+    AddUnavailable(out_packages,
                    "EVIDENCE_BASIS",
-                   {{"element_id", selected_element_id},
-                    {"acceptance_criteria", nlohmann::json::array()},
-                    {"coverage", nlohmann::json::array()},
-                    {"thresholds", nlohmann::json::array()},
-                    {"scenario_set", nlohmann::json::array()},
-                    {"configuration", nlohmann::json::array()},
-                    {"limitations", nlohmann::json::array()},
-                    {"note",
-                     "Assurance Forge has no field in which a project records an acceptance basis for an "
-                     "evidence item, so every field of this package is empty. Read that as: this case states "
-                     "no acceptance criteria, coverage, thresholds, scenario set, configuration or "
-                     "limitations for this evidence. It is not a statement that such a basis exists "
-                     "elsewhere and was withheld."}});
-    }
+                   "Assurance Forge has no field in which a project records the acceptance criteria, coverage, "
+                   "thresholds, scenario set, configuration or limitations behind an evidence item. The route is "
+                   "the evidence register, once it links the artifact itself.",
+                   false,
+                   DataPackageAbsence::NotImplemented);
 
     // No source in the tool at all, named so the absence is a stated limitation
-    // rather than a silent one. Unlike EVIDENCE_BASIS this package has a
-    // required field (`linked_requirements`) that Assurance Forge cannot fill,
-    // so it genuinely cannot be supplied.
+    // rather than a silent one.
     AddUnavailable(out_packages,
                    "STANDARD_LINKS",
                    "Assurance Forge does not model links to external standard requirements.",
                    false,
                    DataPackageAbsence::NotImplemented);
 
+    ApplyContentDefinedAvailability(out_packages, catalog, review_profile);
+
     if (review_profile) {
+        // EVIDENCE_BASIS was added above as not required; say whether this
+        // profile requires it, now that the profile is known.
+        for (AiReviewUnavailableDataPackage& package : out_packages.unavailable) {
+            if (std::find(review_profile->required_data.begin(), review_profile->required_data.end(), package.id) !=
+                review_profile->required_data.end())
+                package.required = true;
+        }
         auto mark_missing = [&](const std::vector<std::string>& package_ids, bool required) {
             for (const std::string& package_id : package_ids) {
                 if (HasPackage(out_packages, package_id))
@@ -867,7 +993,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const std::vector<const parser::Guideline*>& guidelines_to_review,
                               const parser::ReviewProfile* review_profile,
                               const AiReviewDataPackageBundle* data_packages,
-                              const std::vector<review::sccg::PrecheckResult>* precheck_results) {
+                              const std::vector<review::sccg::PrecheckResult>* precheck_results,
+                              const parser::ReviewPass* review_pass) {
     nlohmann::json selected = ReviewElementToJson(payload.selected);
     nlohmann::json parent = payload.parent.transform([](const AiReviewElement& p) { return ReviewElementToJson(p); })
                                 .value_or(nlohmann::json(nullptr));
@@ -875,7 +1002,7 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     for (const AiReviewElement& child : payload.children) {
         children.push_back(ReviewElementToJson(child));
     }
-    nlohmann::json review_profile_json = ReviewProfileToJson(review_profile);
+    nlohmann::json review_profile_json = ReviewProfileToJson(review_profile, review_pass);
     nlohmann::json guidelines = GuidelinesToJson(guidelines_to_review);
     nlohmann::json available_data_packages = ReviewDataPackagesToJson(data_packages);
     nlohmann::json unavailable_data_packages = UnavailableDataPackagesToJson(data_packages);
@@ -894,28 +1021,63 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
     artifacts.expectedResponseSchema = artifacts.responseSchemaJson;
 
     const std::string review_profile_heading =
-        review_profile ? ": " + review_profile->id : std::string(": CL category fallback");
+        (review_profile ? ": " + review_profile->id : std::string(": CL category fallback")) +
+        (review_pass ? ", pass " + review_pass->id : std::string{});
+
+    // The pass this request is, stated where the model reads its instructions.
+    // A pass request carries only that pass's guidelines, and the review must
+    // not answer the other passes' questions from memory: each is asked in its
+    // own request, and a finding cited outside its pass is discarded on merge.
+    std::string pass_instruction;
+    if (review_pass) {
+        pass_instruction = std::format(
+            "This request is one review pass of the profile: \"{}\". It asks: {} The profile's other passes are "
+            "sent as separate requests, so review only against the rules in this request and do not report a "
+            "finding under any other guideline, even one the profile carries.\n\n",
+            review_pass->display_name,
+            review_pass->question);
+    }
+
+    // SCCG's own rule for unavailable packages, and its own meaning for each
+    // availability state, from the catalogue the packages were collected
+    // against. The paraphrase that stood here predates the published rule and
+    // is kept only for a catalogue that has none.
+    std::string unavailable_instruction;
+    if (data_packages != nullptr && !data_packages->when_unavailable.empty()) {
+        unavailable_instruction =
+            "Unavailable data packages -- SCCG's rule, follow it exactly: " + data_packages->when_unavailable + "\n";
+        for (const parser::AvailabilityState& state : data_packages->availability_states) {
+            unavailable_instruction += "  - " + state.id + ": " + state.meaning + "\n";
+        }
+    } else {
+        unavailable_instruction =
+            "Treat unavailable data packages as unavailable; do not assume their contents.\n"
+            "An unavailable package says why: not_implemented means this tool has no source for it, empty means "
+            "the case holds none, and withheld means it exists and was deliberately not shared. Withheld is not "
+            "absent -- say so when a judgement is bounded by what you were not shown, rather than concluding the "
+            "data does not exist.\n";
+    }
+
     artifacts.prompt = std::format(
         "You are reviewing the selected assurance case element using the SCCG review profile below.\n\n"
+        "{}"
         "Assurance Forge is an assurance case tool using SACM as the domain model and GSN as one graphical view. "
         "Each element carries the SCCG element_role it maps onto -- claim, strategy, evidence, context, "
         "assumption, justification, challenge -- which is the vocabulary the profile and the data packages "
         "use. Interpret the element through its role and its data.\n\n"
         "Use only the SCCG rules provided in this request. Return findings that reference the relevant SCCG rule "
-        "IDs.\n\n"
+        "IDs.\n"
+        "Where a rule lists distinguish_from, its notes are SCCG's instruction for choosing between that rule and "
+        "a neighbouring one. When a defect could be read as either, cite the one the note says fits.\n\n"
         "Review only the selected element. Use related elements and data packages only as context.\n\n"
         "Do not invent missing project information.\n"
         "Pre-check results are candidate signals a tool decided mechanically, not findings. Observe each "
         "one's stated interpretation: a candidate still needs your judgement, and a check reported not_run "
         "was never performed, which is not the same as passing.\n"
-        "Treat unavailable data packages as unavailable; do not assume their contents.\n"
-        "An unavailable package says why: not_implemented means this tool has no source for it, empty means "
-        "the case holds none, and withheld means it exists and was deliberately not shared. Withheld is not "
-        "absent -- say so when a judgement is bounded by what you were not shown, rather than concluding the "
-        "data does not exist.\n"
-        "Where an unavailable package carries a when_absent statement, follow it exactly: it is SCCG's own "
-        "instruction for reviewing without that package, and the guidelines it names as unassessable are not "
-        "to be reported against the argument.\n"
+        "{}"
+        "Where an unavailable package carries a when_absent statement, it is the one exception SCCG makes to that "
+        "rule: follow it exactly, and do not report the guidelines it names as unassessable against the "
+        "argument.\n"
         "Do not claim that a rule is violated unless the provided data supports that finding.\n"
         "If there is no clear violation, return an empty findings array.\n"
         "Return JSON only. Do not include Markdown. Do not include explanations outside the JSON object.\n\n"
@@ -937,6 +1099,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
         "{}\n\n"
         "## Required JSON response\n\n"
         "{}\n",
+        pass_instruction,
+        unavailable_instruction,
         review_profile_heading,
         artifacts.reviewProfileJson,
         artifacts.guidelinesJson,
@@ -1086,12 +1250,18 @@ Field rules:
   - AddSupportedBy attaches "source" beneath "target"; AddInContextOf attaches context, assumption or justification to "target".
   - Reference an existing element as {"id": "G1"} and a new one as {"ref": "$strategy"}.
   - Every existing element you touch must be one shown to you in the data packages above. Operations reaching outside them are refused.
-- What SCCG asks for, when the repair is structural:
-  - AR.2, a decomposition with no stated reasoning: CreateStrategy, then AddSupportedBy it under the parent and re-attach the sub-claims beneath it.
-  - EV.1, a claim with no evidence path: CreateSolution and AddSupportedBy, or SetUndeveloped when the work is genuinely outstanding.
-  - CL.3, AR.3, AR.6, AR.7, RD.1, RD.6, scope or a dependency hidden in the claim text: CreateContext or CreateAssumption, then AddInContextOf.
-  - SU.2, SU.9, an assumption that is really an unsupported claim: CreateClaim and attach it, so it needs support.
-  - CL.5, an unbounded qualifier: CreateTerm, defining the term once, rather than restating the bound in every claim.
+- Each rule's tool.repair states the repair SCCG prescribes for it. Propose that repair, translated as follows, and nothing the rule does not prescribe:
+  - add_element, element_role strategy, attach_to between_selected_and_children: CreateStrategy; AddSupportedBy it under the selected element; move the selected element's children beneath it (RemoveSupportedBy, then AddSupportedBy under the strategy).
+  - add_element, element_role claim, attach_to children: CreateClaim; AddSupportedBy it under the selected element, so the new claim itself needs support.
+  - add_element, element_role evidence, attach_to children: CreateSolution; AddSupportedBy it under the selected element.
+  - add_element, element_role context, assumption or justification, attach_to selected: CreateContext, CreateAssumption or CreateJustification; AddInContextOf the selected element.
+  - add_element, element_role challenge: there is no operation for adding a challenge. Describe it in suggested_fix and propose no operation.
+  - move_text with an element_role of context or assumption: CreateContext or CreateAssumption carrying the moved text; AddInContextOf the selected element; and give the selected element's remaining text in suggested_element_text.
+  - move_text with no element_role: give the remaining text in suggested_element_text and say in suggested_fix where the moved text belongs.
+  - define_term: CreateTerm, defining the term once, rather than restating the bound in every claim.
+  - mark_undeveloped: SetUndeveloped on the selected element, when the support is genuinely outstanding.
+  - reword_element: no operation; put the new wording in suggested_element_text.
+  - split_element: CreateClaim for each part split off, attached where the selected element is attached; the part the selected element keeps goes in suggested_element_text.
 - Do not propose an operation you cannot justify from a provided guideline. A finding with no repair is better than an invented one.
 - related_element_ids should include the selected element ID and any parent/child IDs relevant to the finding.
 - If there are no findings, return "findings": [].
@@ -1176,6 +1346,7 @@ AiReviewParseResult ParseAiReviewResponse(const std::string& response_text,
             problem.guideline_id = unknown_guideline_id || guideline_id == "unknown" ? std::string{} : guideline_id;
             result.problems.push_back(std::move(problem));
             result.findingConfidences.push_back(ConfidenceFromString(JsonStringValue(finding, "confidence")));
+            result.citedGuidelineIds.push_back(original_guideline_id);
             std::string suggested_element_text = JsonStringValue(finding, "suggested_element_text");
             if (suggested_element_text.empty())
                 suggested_element_text = JsonStringValue(finding, "suggested_claim_wording");

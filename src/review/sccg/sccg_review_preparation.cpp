@@ -129,6 +129,37 @@ SccgReviewPreparation PrepareSccgReview(const parser::AssuranceCase* assurance_c
                                                         &preparation.precheck_results);
     preparation.guideline_ids = GuidelineIds(guideline_selection.guidelines);
     preparation.reviewed_element_ids = ReviewedElementIds(preparation.payload, preparation.data_packages);
+
+    // One request per pass, each carrying only its own guidelines and the same
+    // packages and pre-checks: the pass changes which rules are asked about,
+    // never what the review is shown.
+    const parser::ReviewProfile* profile = guideline_selection.review_profile;
+    if (profile != nullptr && !profile->review_passes.empty()) {
+        for (const parser::ReviewPass& pass : profile->review_passes) {
+            std::vector<const parser::Guideline*> pass_guidelines;
+            for (const std::string& guideline_id : pass.guideline_ids) {
+                if (const parser::Guideline* guideline = catalog->document.FindGuidelineById(guideline_id))
+                    pass_guidelines.push_back(guideline);
+            }
+            SccgReviewPassRequest pass_request;
+            pass_request.pass_id = pass.id;
+            pass_request.display_name = pass.display_name;
+            pass_request.question = pass.question;
+            pass_request.guideline_ids = GuidelineIds(pass_guidelines);
+            pass_request.request = BuildAiReviewRequestArtifacts(preparation.payload,
+                                                                 pass_guidelines,
+                                                                 profile,
+                                                                 &preparation.data_packages,
+                                                                 &preparation.precheck_results,
+                                                                 &pass);
+            preparation.passes.push_back(std::move(pass_request));
+        }
+    } else {
+        SccgReviewPassRequest whole;
+        whole.guideline_ids = preparation.guideline_ids;
+        whole.request = preparation.request;
+        preparation.passes.push_back(std::move(whole));
+    }
     return preparation;
 }
 

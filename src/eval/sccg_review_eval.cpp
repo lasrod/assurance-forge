@@ -31,6 +31,7 @@
 #include "core/sha256.h"
 #include "review/sccg/sccg_review.h"
 #include "review/sccg/sccg_review_consensus.h"
+#include "review/sccg/sccg_review_passes.h"
 #include "review/sccg/sccg_review_preparation.h"
 
 #include <nlohmann/json.hpp>
@@ -39,6 +40,7 @@
 #include <cerrno>
 #include <charconv>
 #include <chrono>
+#include <future>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -84,6 +86,10 @@ struct Options {
     // list. 0 disables the consensus pass entirely and only per-run records are
     // written.
     int consensus_minimum = 0;
+    // Send the whole profile in one request even where SCCG publishes review
+    // passes. The app never does this; the harness can, so the two can be
+    // compared on the same material.
+    bool single_request = false;
     std::string tag;
 };
 
@@ -110,6 +116,8 @@ Options:
                        by guideline with the number of runs citing each. m is the floor for
                        the main list; findings below it are kept separately, not dropped.
                        Needs --runs > 1 to mean anything.
+  --single-request     Send the whole profile as one request even where it publishes review
+                       passes, for comparison. The application always sends the passes.
   --dry-run            Assemble and record the request; do not call the provider.
   --list-models        List the models the configured account offers, newest first, then exit.
   --help
@@ -188,6 +196,8 @@ bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
             options.tag = value("--tag");
         } else if (arg == "--consensus") {
             ReadWholeNumber("--consensus", value("--consensus"), options.consensus_minimum, error);
+        } else if (arg == "--single-request") {
+            options.single_request = true;
         } else if (arg == "--dry-run") {
             options.dry_run = true;
         } else if (arg == "--list-models") {
@@ -545,10 +555,35 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        record["prompt"] = json{{"system_instruction", preparation.request.systemInstruction},
-                                {"user_prompt", preparation.request.prompt},
-                                {"user_prompt_sha256", core::Sha256::HexDigest(preparation.request.prompt)},
-                                {"user_prompt_bytes", preparation.request.prompt.size()}};
+        // What will be sent: the profile's review passes, or the whole profile in
+        // one request under --single-request or when it publishes none.
+        std::vector<review::SccgReviewPassRequest> passes = preparation.passes;
+        if (options.single_request || passes.empty()) {
+            review::SccgReviewPassRequest whole;
+            whole.guideline_ids = preparation.guideline_ids;
+            whole.request = preparation.request;
+            passes = {std::move(whole)};
+        }
+
+        // `user_prompt` is every pass's prompt under its separator, so one hash
+        // covers everything sent and the prompt-stripping tool still finds it.
+        const std::string combined_prompt =
+            passes.size() > 1 ? review::CombinePassPrompts(passes) : passes.front().request.prompt;
+        json pass_prompts = json::array();
+        std::size_t prompt_bytes = 0;
+        for (const review::SccgReviewPassRequest& pass : passes) {
+            prompt_bytes += pass.request.prompt.size();
+            pass_prompts.push_back(json{{"pass_id", pass.pass_id},
+                                        {"guideline_ids", pass.guideline_ids},
+                                        {"user_prompt_sha256", core::Sha256::HexDigest(pass.request.prompt)},
+                                        {"user_prompt_bytes", pass.request.prompt.size()}});
+        }
+        record["review_passes"] = passes.size() > 1 ? static_cast<int>(passes.size()) : 0;
+        record["prompt"] = json{{"system_instruction", passes.front().request.systemInstruction},
+                                {"user_prompt", combined_prompt},
+                                {"user_prompt_sha256", core::Sha256::HexDigest(combined_prompt)},
+                                {"user_prompt_bytes", prompt_bytes},
+                                {"passes", pass_prompts}};
 
         std::vector<review::AiReviewParseResult> run_results;
         for (int run = 1; run <= options.runs; ++run) {
@@ -565,14 +600,61 @@ int main(int argc, char** argv) {
                     {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
                     {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
             } else {
-                ai::AiRequest request;
-                request.systemInstruction = preparation.request.systemInstruction;
-                request.userPrompt = preparation.request.prompt;
-
+                // Concurrently, as the application sends them.
                 const auto started = std::chrono::steady_clock::now();
-                const ai::AiResponse response = service->Generate(request, settings);
+                std::vector<std::future<std::pair<ai::AiResponse, long long>>> pending;
+                for (const review::SccgReviewPassRequest& pass : passes) {
+                    ai::AiRequest request;
+                    request.systemInstruction = pass.request.systemInstruction;
+                    request.userPrompt = pass.request.prompt;
+                    pending.push_back(std::async(std::launch::async, [service, request, settings]() {
+                        const auto pass_started = std::chrono::steady_clock::now();
+                        ai::AiResponse response = service->Generate(request, settings);
+                        const auto pass_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - pass_started);
+                        return std::make_pair(std::move(response), static_cast<long long>(pass_elapsed.count()));
+                    }));
+                }
+
+                std::vector<review::ReviewPassOutcome> outcomes;
+                json pass_records = json::array();
+                for (std::size_t index = 0; index < passes.size(); ++index) {
+                    auto [response, pass_elapsed_ms] = pending[index].get();
+                    review::ReviewPassOutcome outcome;
+                    outcome.pass_id = passes[index].pass_id;
+                    json pass_record{{"pass_id", passes[index].pass_id},
+                                     {"elapsed_ms", pass_elapsed_ms},
+                                     {"http_status", response.httpStatus}};
+                    if (!response.success) {
+                        outcome.error =
+                            response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
+                        // The provider's own words: without them a rejected
+                        // parameter is indistinguishable from an expired key.
+                        pass_record["outcome"] = "request-failed";
+                        pass_record["error"] = outcome.error;
+                        pass_record["error_code"] = ai::ToString(response.errorCode);
+                        pass_record["raw_response"] = response.rawJson;
+                    } else {
+                        outcome.raw_response = response.text.empty() ? response.rawJson : response.text;
+                        outcome.result = review::ParseAiReviewResponse(
+                            outcome.raw_response, preparation.element_id, passes[index].guideline_ids);
+                        pass_record["raw_response"] = outcome.raw_response;
+                        if (!outcome.result.errorMessage.empty()) {
+                            pass_record["outcome"] = "parse-failed";
+                            pass_record["error"] = outcome.result.errorMessage;
+                        } else {
+                            pass_record["outcome"] = "ok";
+                            pass_record["findings"] = FindingsJson(outcome.result);
+                        }
+                    }
+                    pass_records.push_back(std::move(pass_record));
+                    outcomes.push_back(std::move(outcome));
+                }
                 const auto elapsed =
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+
+                const review::MergedReviewPasses merged =
+                    review::MergeReviewPasses(outcomes, passes, preparation.element_id);
 
                 run_record["model"] = json{
                     {"name", settings.model},
@@ -580,35 +662,43 @@ int main(int argc, char** argv) {
                     {"temperature", settings.temperature.has_value() ? json(*settings.temperature) : json(nullptr)},
                     {"seed", settings.seed.has_value() ? json(*settings.seed) : json(nullptr)}};
                 run_record["elapsed_ms"] = elapsed.count();
-                run_record["http_status"] = response.httpStatus;
+                run_record["passes"] = pass_records;
+                run_record["discarded_findings"] = merged.discarded_findings;
+                if (passes.size() == 1)
+                    run_record["raw_response"] = outcomes.front().raw_response;
 
-                if (!response.success) {
-                    run_record["outcome"] = "request-failed";
-                    run_record["error"] =
-                        response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
-                    run_record["error_code"] = ai::ToString(response.errorCode);
-                    // The provider's own words. Without them a failed run says
-                    // only that it failed, which is the one thing already known
-                    // -- and a rejected parameter is indistinguishable from an
-                    // expired key.
-                    run_record["raw_response"] = response.rawJson;
+                if (!merged.any_succeeded()) {
+                    // Every pass failed. A single request keeps the outcome
+                    // names the records have always used.
+                    const std::string single_outcome =
+                        passes.size() == 1 ? pass_records.front().value("outcome", "request-failed") : "request-failed";
+                    run_record["outcome"] = single_outcome;
+                    run_record["error"] = merged.merged.errorMessage;
+                    if (passes.size() == 1 && pass_records.front().contains("raw_response"))
+                        run_record["raw_response"] = pass_records.front()["raw_response"];
+                    review::AiReviewParseResult failed;
+                    failed.errorMessage = merged.merged.errorMessage;
+                    run_results.push_back(failed);
+                    ++failures;
+                } else if (!merged.complete()) {
+                    // Some passes ran, some did not. Reported, and kept out of
+                    // any consensus: a run missing a pass would count every
+                    // guideline in it as "not cited", which it was not -- it was
+                    // not asked.
+                    run_record["outcome"] = "incomplete";
+                    run_record["error"] = merged.pass_errors;
+                    run_record["findings"] = FindingsJson(merged.merged);
+                    review::AiReviewParseResult incomplete;
+                    incomplete.errorMessage =
+                        "incomplete: " + std::to_string(merged.failed_pass_ids.size()) + " pass(es) failed";
+                    run_results.push_back(incomplete);
                     ++failures;
                 } else {
-                    const std::string raw = response.text.empty() ? response.rawJson : response.text;
-                    run_record["raw_response"] = raw;
-                    const review::AiReviewParseResult parsed =
-                        review::ParseAiReviewResponse(raw, preparation.element_id, preparation.guideline_ids);
-                    run_results.push_back(parsed);
-                    if (!parsed.errorMessage.empty()) {
-                        run_record["outcome"] = "parse-failed";
-                        run_record["error"] = parsed.errorMessage;
-                        ++failures;
-                    } else {
-                        run_record["outcome"] = "ok";
-                        run_record["findings"] = FindingsJson(parsed);
-                        run_record["suggested_element_texts"] = parsed.suggestedElementTexts;
-                        run_record["rejected_operation_reasons"] = parsed.rejectedOperationReasons;
-                    }
+                    run_record["outcome"] = "ok";
+                    run_record["findings"] = FindingsJson(merged.merged);
+                    run_record["suggested_element_texts"] = merged.merged.suggestedElementTexts;
+                    run_record["rejected_operation_reasons"] = merged.merged.rejectedOperationReasons;
+                    run_results.push_back(merged.merged);
                 }
             }
 

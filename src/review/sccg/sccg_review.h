@@ -89,6 +89,14 @@ struct AiReviewCaseContext {
 struct AiReviewDataPackageBundle {
     std::vector<AiReviewDataPackage> available;
     std::vector<AiReviewUnavailableDataPackage> unavailable;
+    // SCCG's rule for every package in `unavailable`, and its meaning for each
+    // availability state, copied from the catalogue the packages were collected
+    // against. Carried with the packages rather than looked up at prompt time so
+    // the request states the rule of the catalogue that decided availability,
+    // never of whichever catalogue happens to be loaded when it is assembled.
+    // Both empty for a catalogue that predates SCCG 0.8.0.
+    std::string when_unavailable;
+    std::vector<parser::AvailabilityState> availability_states;
 };
 
 struct AiReviewRequestArtifacts {
@@ -122,6 +130,12 @@ struct AiReviewParseResult {
     // ranking signal that replaced `severity`, which SCCG never defined and
     // which the prompt pinned to one value.
     std::vector<std::string> findingConfidences;
+    // Per finding, in the same order as `problems`: the guideline id exactly as
+    // the model cited it, including one that was refused. `problem.guideline_id`
+    // is emptied for a refused id, which is right for display and loses the one
+    // fact a review-pass merge needs -- whether the refused id belongs to a
+    // different pass of the same profile.
+    std::vector<std::string> citedGuidelineIds;
     // Per finding, in the same order as `problems`: the structural repair it
     // asks for, when SCCG's answer is to add or re-attach an element rather
     // than to reword one. Empty for a finding a text edit fixes.
@@ -180,7 +194,8 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const std::vector<const parser::Guideline*>& guidelines,
                               const parser::ReviewProfile* review_profile = nullptr,
                               const AiReviewDataPackageBundle* data_packages = nullptr,
-                              const std::vector<review::sccg::PrecheckResult>* precheck_results = nullptr);
+                              const std::vector<review::sccg::PrecheckResult>* precheck_results = nullptr,
+                              const parser::ReviewPass* review_pass = nullptr);
 AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const std::vector<const parser::Guideline*>& guidelines,
                                         const parser::ReviewProfile* review_profile = nullptr,

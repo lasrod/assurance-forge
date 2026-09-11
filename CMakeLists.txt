@@ -498,6 +498,7 @@ add_executable(tests
     tests/test_ai_claim_review.cpp
     tests/test_sccg_review_preparation.cpp
     tests/test_sccg_review_consensus.cpp
+    tests/test_sccg_review_passes.cpp
     tests/test_patch_operation_parsing.cpp
     tests/test_term_definition_survives_save.cpp
     tests/test_openai_provider.cpp

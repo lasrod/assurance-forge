@@ -24,6 +24,7 @@
 #include "parser/xml_parser.h"
 #include "review/sccg/sccg_prechecks.h"
 #include "review/sccg/sccg_review.h"
+#include "review/sccg/sccg_review_passes.h"
 
 #include <string>
 #include <vector>
@@ -87,6 +88,14 @@ struct SccgReviewPreparation {
 
     AiReviewDataPackageBundle data_packages;
     std::vector<sccg::PrecheckResult> precheck_results;
+
+    // The requests to send. One per review pass when the profile publishes
+    // passes (SCCG 0.8.0's claim_review has four), otherwise one covering the
+    // whole profile with an empty `pass_id`. Callers send these, not `request`:
+    // `request` is the whole profile in one request, kept for a caller that
+    // deliberately wants the unsplit review -- the evaluation harness compares
+    // the two -- and for display.
+    std::vector<SccgReviewPassRequest> passes;
 
     bool ok() const {
         return failure == SccgReviewPreparationFailure::None;

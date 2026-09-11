@@ -7,7 +7,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -60,6 +62,22 @@ std::string ReviewTitleForProblem(const core::ProblemItem& problem) {
     if (!problem.guideline_id.empty())
         return "AI review finding: " + problem.guideline_id;
     return "AI review finding";
+}
+
+bool AnyTaskRunning(const std::vector<std::shared_ptr<ai::AiTaskHandle>>& tasks) {
+    return std::any_of(tasks.begin(), tasks.end(), [](const std::shared_ptr<ai::AiTaskHandle>& task) {
+        return task && task->IsRunning();
+    });
+}
+
+ai::AiResponse GenerateWith(const std::shared_ptr<ai::AiService>& service, const ai::AiRequest& request) {
+    if (service)
+        return service->Generate(request);
+    ai::AiResponse response;
+    response.success = false;
+    response.errorCode = ai::AiErrorCode::Unknown;
+    response.errorMessage = "AI service is unavailable.";
+    return response;
 }
 
 void EmitReviewVisualEvent(AppEvents& events,
@@ -131,7 +149,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                                                  const core::AssuranceTree& current_tree,
                                                  const std::string& selected_element_id,
                                                  const std::string& review_profile_id) {
-    if (review_task_ && review_task_->IsRunning()) {
+    if (AnyTaskRunning(review_tasks_)) {
         events_.Emit(StatusMessageEvent{"AI review is already running."});
         return;
     }
@@ -155,6 +173,8 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     }
 
     pending_review_ = preparation.request;
+    pending_passes_ = preparation.passes;
+    RebuildCombinedPrompt();
     pending_review_element_id_ = preparation.payload.selected.id;
     pending_review_element_type_ = preparation.payload.selected.type;
     pending_review_profile_id_ = preparation.review_profile_id;
@@ -262,26 +282,24 @@ void AiReviewController::MarkPendingRequestIncludesWorkingDraft() {
 }
 
 void AiReviewController::StartPendingRequest() {
-    if (pending_review_.prompt.empty())
+    if (pending_review_.prompt.empty() || pending_passes_.empty())
         return;
-    if (review_task_ && review_task_->IsRunning())
+    if (AnyTaskRunning(review_tasks_))
         return;
 
-    ai::AiRequest request;
-    request.systemInstruction = pending_review_.systemInstruction;
-    request.userPrompt = pending_review_.prompt;
     pending_review_run_id_ = GenerateAiReviewRunId();
-
+    review_tasks_.clear();
+    // Concurrent, not sequential: the passes are independent requests over the
+    // same data, and four smaller requests in parallel finish sooner than one
+    // large one -- which is part of what makes splitting affordable.
     std::shared_ptr<ai::AiService> service = ai_service_;
-    review_task_ = task_runner_.RunGenerate([service, request]() {
-        if (service)
-            return service->Generate(request);
-        ai::AiResponse response;
-        response.success = false;
-        response.errorCode = ai::AiErrorCode::Unknown;
-        response.errorMessage = "AI service is unavailable.";
-        return response;
-    });
+    for (const review::SccgReviewPassRequest& pass : pending_passes_) {
+        ai::AiRequest request;
+        request.systemInstruction = pass.request.systemInstruction;
+        request.userPrompt = pass.request.prompt;
+        review_tasks_.push_back(
+            task_runner_.RunGenerate([service, request]() { return GenerateWith(service, request); }));
+    }
     EmitReviewVisualEvent(events_,
                           ElementReviewVisualEventKind::AiStarted,
                           pending_review_element_id_,
@@ -296,19 +314,28 @@ void AiReviewController::StartPendingRequest() {
                                           pending_review_profile_name_,
                                           "AI review in progress.",
                                           NowUtcString());
-    events_.Emit(StatusMessageEvent{"AI review request sent."});
+    events_.Emit(StatusMessageEvent{
+        pending_passes_.size() > 1 ? "AI review sent as " + std::to_string(pending_passes_.size()) + " review passes."
+                                   : std::string("AI review request sent.")});
 }
 
 void AiReviewController::PollTask() {
-    if (!review_task_)
+    if (review_tasks_.empty() || AnyTaskRunning(review_tasks_))
         return;
 
-    ai::AiTaskSnapshot snapshot = review_task_->Snapshot();
-    if (snapshot.state == ai::AiTaskState::Running)
-        return;
+    std::vector<ai::AiResponse> responses;
+    responses.reserve(review_tasks_.size());
+    for (const std::shared_ptr<ai::AiTaskHandle>& task : review_tasks_)
+        responses.push_back(task ? task->Snapshot().response : ai::AiResponse{});
+    review_tasks_.clear();
 
-    review_task_.reset();
-    ai::AiResponse response = std::move(snapshot.response);
+    if (responses.size() == 1 && pending_passes_.size() <= 1)
+        CompleteSingleRequest(std::move(responses.front()));
+    else
+        CompletePassRequests(std::move(responses));
+}
+
+void AiReviewController::CompleteSingleRequest(ai::AiResponse response) {
     if (!response.success) {
         std::string message = response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
         last_raw_response_ = response.rawJson;
@@ -401,6 +428,12 @@ void AiReviewController::PollTask() {
         return;
     }
 
+    ApplyReviewFindings(std::move(parse_result), {});
+}
+
+void AiReviewController::ApplyReviewFindings(review::AiReviewParseResult parse_result,
+                                             const std::string& incomplete_reason) {
+    const bool incomplete = !incomplete_reason.empty();
     if (parse_result.reviewedElementType.empty())
         parse_result.reviewedElementType = pending_review_element_type_;
     for (core::ProblemItem& problem : parse_result.problems) {
@@ -444,27 +477,53 @@ void AiReviewController::PollTask() {
         events_.Emit(StatusMessageEvent{"AI review proposed a change that could not be read: " + rejected});
     }
 
-    EmitReviewVisualEvent(events_,
-                          parse_result.problems.empty() ? ElementReviewVisualEventKind::AiNoFindings
-                                                        : ElementReviewVisualEventKind::AiFindings,
-                          pending_review_element_id_,
-                          pending_review_profile_id_,
-                          pending_review_profile_name_,
-                          parse_result.problems.empty() ? "AI review completed with no findings."
-                                                        : "AI review completed with findings.");
-    review_controller_.SetAiReviewOutcome(pending_review_element_id_,
-                                          parse_result.problems.empty(),
-                                          false,
-                                          pending_review_profile_id_,
-                                          pending_review_profile_name_,
-                                          parse_result.problems.empty() ? "AI review completed with no findings."
-                                                                        : "AI review completed with findings.",
-                                          NowUtcString());
+    if (incomplete) {
+        // Recorded as its own review item so the gap is visible next to the
+        // findings, not only in a status line that scrolls away.
+        const std::string review_item_id = review_prefix + "incomplete";
+        review_controller_.AddOrUpdateItem(MakeAiReviewItem(review_item_id,
+                                                            pending_review_element_id_,
+                                                            "AI review incomplete",
+                                                            incomplete_reason,
+                                                            core::ProblemSeverity::Error,
+                                                            timestamp));
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              pending_review_element_id_,
+                              pending_review_profile_id_,
+                              pending_review_profile_name_,
+                              "AI review incomplete.");
+        review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                              false,
+                                              true,
+                                              pending_review_profile_id_,
+                                              pending_review_profile_name_,
+                                              "AI review incomplete.",
+                                              NowUtcString());
+        events_.Emit(StatusMessageEvent{"AI review incomplete: " + incomplete_reason});
+    } else {
+        EmitReviewVisualEvent(events_,
+                              parse_result.problems.empty() ? ElementReviewVisualEventKind::AiNoFindings
+                                                            : ElementReviewVisualEventKind::AiFindings,
+                              pending_review_element_id_,
+                              pending_review_profile_id_,
+                              pending_review_profile_name_,
+                              parse_result.problems.empty() ? "AI review completed with no findings."
+                                                            : "AI review completed with findings.");
+        review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                              parse_result.problems.empty(),
+                                              false,
+                                              pending_review_profile_id_,
+                                              pending_review_profile_name_,
+                                              parse_result.problems.empty() ? "AI review completed with no findings."
+                                                                            : "AI review completed with findings.",
+                                              NowUtcString());
 
-    events_.Emit(StatusMessageEvent{parse_result.problems.empty()
-                                        ? "AI review completed with no findings."
-                                        : "AI review completed with " + std::to_string(parse_result.problems.size()) +
-                                              " finding(s) added as review comment(s)."});
+        events_.Emit(StatusMessageEvent{
+            parse_result.problems.empty() ? "AI review completed with no findings."
+                                          : "AI review completed with " + std::to_string(parse_result.problems.size()) +
+                                                " finding(s) added as review comment(s)."});
+    }
     if (!proposal_suggestions.empty()) {
         AiReviewProposalSuggestionsEvent event;
         event.suggestions = std::move(proposal_suggestions);
@@ -477,9 +536,101 @@ void AiReviewController::PollTask() {
     }
 }
 
+void AiReviewController::CompletePassRequests(std::vector<ai::AiResponse> responses) {
+    std::vector<review::ReviewPassOutcome> outcomes;
+    std::string combined_raw;
+    for (std::size_t index = 0; index < pending_passes_.size(); ++index) {
+        const review::SccgReviewPassRequest& pass = pending_passes_[index];
+        review::ReviewPassOutcome outcome;
+        outcome.pass_id = pass.pass_id;
+        if (index >= responses.size()) {
+            outcome.error = "no response was received.";
+        } else if (!responses[index].success) {
+            const ai::AiResponse& response = responses[index];
+            outcome.error =
+                "the request failed: " +
+                (response.errorMessage.empty() ? std::string(ai::ToString(response.errorCode)) : response.errorMessage);
+            outcome.raw_response = response.rawJson;
+        } else {
+            const ai::AiResponse& response = responses[index];
+            outcome.raw_response = response.text.empty() ? response.rawJson : response.text;
+            // Each pass may cite only its own guidelines; one citing another
+            // pass's guideline is placed by the merge, not by the parser.
+            outcome.result =
+                review::ParseAiReviewResponse(outcome.raw_response, pending_review_element_id_, pass.guideline_ids);
+        }
+        combined_raw += (combined_raw.empty() ? "" : "\n\n") + std::string("===== ") + pass.pass_id + " =====\n" +
+                        outcome.raw_response;
+        outcomes.push_back(std::move(outcome));
+    }
+    last_raw_response_ = combined_raw;
+
+    review::MergedReviewPasses merged =
+        review::MergeReviewPasses(outcomes, pending_passes_, pending_review_element_id_);
+    last_parse_error_.clear();
+    for (const std::string& error : merged.pass_errors)
+        last_parse_error_ += (last_parse_error_.empty() ? "" : " ") + error;
+    for (const std::string& discarded : merged.discarded_findings)
+        events_.Emit(StatusMessageEvent{"AI review: " + discarded});
+
+    if (!merged.any_succeeded()) {
+        // Reported the way a single request failing the same way would be: a
+        // review whose every pass came back unparseable is a parse failure, and
+        // calling it a request failure would send the reader to check a
+        // connection that worked.
+        const bool every_pass_unparseable =
+            std::all_of(outcomes.begin(), outcomes.end(), [](const review::ReviewPassOutcome& outcome) {
+                return outcome.error.empty() && !outcome.result.errorMessage.empty();
+            });
+        const std::string suffix = every_pass_unparseable ? "parse-error" : "request-error";
+        const std::string title =
+            every_pass_unparseable ? "AI review response could not be parsed" : "AI review request failed";
+        const std::string message =
+            every_pass_unparseable
+                ? "AI response could not be parsed as the expected JSON format. " + merged.merged.errorMessage
+                : "AI review request failed: " + merged.merged.errorMessage;
+        const std::string outcome_text =
+            every_pass_unparseable ? "AI review response could not be parsed." : "AI review request failed.";
+        ReplaceAiReviewWithSingleItem(review_controller_,
+                                      pending_review_element_id_,
+                                      ReviewCommentPrefix(pending_review_element_id_, pending_review_profile_id_),
+                                      suffix,
+                                      title,
+                                      message,
+                                      core::ProblemSeverity::Error);
+        EmitReviewVisualEvent(events_,
+                              ElementReviewVisualEventKind::AiFailed,
+                              pending_review_element_id_,
+                              pending_review_profile_id_,
+                              pending_review_profile_name_,
+                              outcome_text);
+        review_controller_.SetAiReviewOutcome(pending_review_element_id_,
+                                              false,
+                                              true,
+                                              pending_review_profile_id_,
+                                              pending_review_profile_name_,
+                                              outcome_text,
+                                              NowUtcString());
+        events_.Emit(StatusMessageEvent{outcome_text});
+        return;
+    }
+
+    std::string incomplete_reason;
+    if (!merged.complete()) {
+        incomplete_reason = std::to_string(merged.failed_pass_ids.size()) + " of " +
+                            std::to_string(merged.passes_total) +
+                            " review passes did not complete, so guidelines in those passes were not reviewed.";
+        for (const std::string& error : merged.pass_errors)
+            incomplete_reason += " " + error;
+    }
+    ApplyReviewFindings(std::move(merged.merged), incomplete_reason);
+}
+
 void AiReviewController::CancelPendingRequest() {
     show_debug_modal_ = false;
     pending_review_ = {};
+    pending_passes_.clear();
+    pending_combined_prompt_.clear();
     pending_review_element_id_.clear();
     pending_review_element_type_.clear();
     pending_review_profile_id_.clear();
@@ -492,13 +643,22 @@ void AiReviewController::CancelPendingRequest() {
 }
 
 bool AiReviewController::IsReviewRunning() const {
-    return review_task_ && review_task_->IsRunning() && !pending_review_.prompt.empty();
+    return AnyTaskRunning(review_tasks_) && !pending_review_.prompt.empty();
 }
 
 bool AiReviewController::WaitForCompletion(std::chrono::milliseconds timeout) const {
-    if (!review_task_)
-        return true;
-    return review_task_->WaitUntilComplete(timeout);
+    // One deadline for all passes, not one each: a caller waiting "up to a
+    // second" must not wait four.
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    for (const std::shared_ptr<ai::AiTaskHandle>& task : review_tasks_) {
+        if (!task)
+            continue;
+        const auto remaining =
+            std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+        if (!task->WaitUntilComplete(std::max(remaining, std::chrono::milliseconds(0))))
+            return false;
+    }
+    return true;
 }
 
 bool AiReviewController::ShouldShowDebugModal() const {
@@ -514,11 +674,38 @@ bool AiReviewController::HasPendingRequest() const {
 }
 
 const std::string& AiReviewController::PendingPrompt() const {
-    return pending_review_.prompt;
+    return pending_passes_.size() > 1 ? pending_combined_prompt_ : pending_review_.prompt;
 }
 
+// An edit in the AI Debug panel. For a multi-pass review the panel shows every
+// pass under a separator; an edit that keeps the separators goes back to the
+// passes it was made in. One that removes them cannot be attributed to a pass,
+// so it is sent the way it now reads -- as one request over the whole profile
+// -- and the user is told, rather than having part of their edit dropped.
 void AiReviewController::SetPendingPrompt(std::string prompt) {
+    if (pending_passes_.size() <= 1) {
+        pending_review_.prompt = prompt;
+        if (!pending_passes_.empty())
+            pending_passes_.front().request.prompt = std::move(prompt);
+        return;
+    }
+    if (review::SplitPassPrompts(prompt, pending_passes_)) {
+        pending_combined_prompt_ = std::move(prompt);
+        return;
+    }
+    review::SccgReviewPassRequest whole;
+    whole.guideline_ids = pending_guideline_ids_;
+    whole.request = pending_review_;
+    whole.request.prompt = prompt;
     pending_review_.prompt = std::move(prompt);
+    pending_passes_ = {std::move(whole)};
+    pending_combined_prompt_.clear();
+    events_.Emit(StatusMessageEvent{
+        "The edited prompt no longer separates into its review passes; it will be sent as one request."});
+}
+
+void AiReviewController::RebuildCombinedPrompt() {
+    pending_combined_prompt_ = pending_passes_.size() > 1 ? review::CombinePassPrompts(pending_passes_) : std::string{};
 }
 
 const std::string& AiReviewController::PendingDebugText() const {
