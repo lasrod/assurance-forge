@@ -251,6 +251,10 @@ set(AF_SCCG_REQUIRED_DIST_FILES
 set(AF_SCCG_OPTIONAL_DIST_FILES
     prechecks.json
     authoring_guidance.json
+    # The only dist file carrying `retired_guidelines`. Without it the runtime
+    # catalogue silently retired nothing -- the parser test read the submodule
+    # directly and passed; the application, reading this copy, never saw one.
+    sccg.compact.json
 )
 foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
     if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_DIST_FILE}")

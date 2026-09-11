@@ -291,8 +291,8 @@ TEST(GuidelinesParserTest, ParsesRealGuidelinesFile) {
     auto result = parser::GuidelinesParser::ParseFile(RepositoryGuidelinesPath().string());
 
     ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
-    EXPECT_EQ(result.value().schema_version, "2.0.0");
-    EXPECT_EQ(result.value().sccg_version, "0.7.0");
+    EXPECT_EQ(result.value().schema_version, "3.0.0");
+    EXPECT_EQ(result.value().sccg_version, "0.8.0");
     EXPECT_EQ(result.value().metadata.title, "Safety Case Core Guidelines");
     EXPECT_FALSE(result.value().categories.empty());
     EXPECT_FALSE(result.value().reference_sources.empty());
@@ -336,8 +336,8 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
     auto result = parser::SccgDistParser::ParseDirectory(RepositorySccgDistPath());
 
     ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
-    EXPECT_EQ(result.value().schema_version, "2.0.0");
-    EXPECT_EQ(result.value().sccg_version, "0.7.0");
+    EXPECT_EQ(result.value().schema_version, "3.0.0");
+    EXPECT_EQ(result.value().sccg_version, "0.8.0");
     EXPECT_GT(result.value().guidelines.size(), 30u);
     EXPECT_FALSE(result.value().review_profiles.empty());
     EXPECT_FALSE(result.value().data_packages.empty());
@@ -414,11 +414,16 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
         EXPECT_NE(result.value().FindAvailabilityStateById(state_id), nullptr) << state_id;
     }
 
+    // SCCG 0.8.0 removed the statement that silenced EV.5 and seven other
+    // guidelines when EVIDENCE_BASIS was absent (safety-case-core-guidelines#13):
+    // the package is optional for evidence review, and no profile publishes a
+    // when_absent entry any more -- the registry-wide rule governs every absence.
     const parser::ReviewProfile* evidence_profile = result.value().FindReviewProfileById("evidence_review");
     ASSERT_NE(evidence_profile, nullptr);
-    ASSERT_FALSE(evidence_profile->when_absent.empty());
-    EXPECT_EQ(evidence_profile->when_absent[0].id, "EVIDENCE_BASIS");
-    EXPECT_FALSE(evidence_profile->when_absent[0].unassessable_guideline_ids.empty());
+    EXPECT_TRUE(evidence_profile->when_absent.empty());
+    EXPECT_NE(
+        std::find(evidence_profile->optional_data.begin(), evidence_profile->optional_data.end(), "EVIDENCE_BASIS"),
+        evidence_profile->optional_data.end());
 
     EXPECT_EQ(result.value().metadata.title, "Safety Case Core Guidelines");
     EXPECT_FALSE(result.value().metadata.purpose.empty());
@@ -451,6 +456,221 @@ TEST(GuidelinesParserTest, ParsesRealSccgDistArtifacts) {
     }
     EXPECT_EQ(result.value().FindReviewProfileForElementRole("nonesuch"), nullptr);
     EXPECT_EQ(result.value().FindReviewProfileForElementRole(""), nullptr);
+}
+
+// SCCG 0.8.0 adds four things a tool has to read, and both loaders must read
+// them the same way: a catalogue read one way by the dist path every build takes
+// and another by the YAML fallback would review differently depending on which
+// file happened to be found.
+TEST(GuidelinesParserTest, BothLoadersReadTheSccg080Contract) {
+    auto dist = parser::SccgDistParser::ParseDirectory(RepositorySccgDistPath());
+    auto yaml = parser::GuidelinesParser::ParseFile(RepositoryGuidelinesPath().string());
+    ASSERT_TRUE(dist.has_value()) << (dist ? "" : dist.error());
+    ASSERT_TRUE(yaml.has_value()) << (yaml ? "" : yaml.error());
+
+    for (const parser::GuidelinesDocument* document : {&dist.value(), &yaml.value()}) {
+        SCOPED_TRACE(document == &dist.value() ? "dist" : "yaml");
+
+        // The rule for every package a review was not given.
+        EXPECT_NE(document->when_unavailable.find("never silences a guideline"), std::string::npos)
+            << document->when_unavailable;
+
+        // Three guidelines retired, each redirecting to the ones that carry it.
+        // A retired id is no longer a guideline, and is findable only as retired.
+        for (const char* retired_id : {"AR.3", "SU.9", "RD.6"}) {
+            SCOPED_TRACE(retired_id);
+            EXPECT_EQ(document->FindGuidelineById(retired_id), nullptr);
+            const parser::RetiredGuideline* retired = document->FindRetiredGuidelineById(retired_id);
+            ASSERT_NE(retired, nullptr);
+            EXPECT_EQ(retired->retired_in, "0.8.0");
+            EXPECT_FALSE(retired->replaced_by.empty());
+            for (const std::string& replacement : retired->replaced_by)
+                EXPECT_NE(document->FindGuidelineById(replacement), nullptr) << replacement;
+        }
+        const parser::RetiredGuideline* ar3 = document->FindRetiredGuidelineById("AR.3");
+        ASSERT_NE(ar3, nullptr);
+        EXPECT_EQ(ar3->replaced_by, (std::vector<std::string>{"AR.7", "AR.6"}));
+
+        // The disambiguation published for pairs observed to be confused: CL.4
+        // with CL.5 and with AR.4, the reciprocal swap the probe corpus found.
+        const parser::Guideline* cl4 = document->FindGuidelineById("CL.4");
+        ASSERT_NE(cl4, nullptr);
+        std::vector<std::string> neighbours;
+        for (const parser::GuidelineDistinction& distinction : cl4->distinguish_from) {
+            EXPECT_FALSE(distinction.note.empty()) << distinction.id;
+            neighbours.push_back(distinction.id);
+        }
+        EXPECT_NE(std::find(neighbours.begin(), neighbours.end(), "CL.5"), neighbours.end());
+        EXPECT_NE(std::find(neighbours.begin(), neighbours.end(), "AR.4"), neighbours.end());
+
+        // claim_review in four passes that partition it exactly.
+        const parser::ReviewProfile* claim = document->FindReviewProfileById("claim_review");
+        ASSERT_NE(claim, nullptr);
+        ASSERT_EQ(claim->review_passes.size(), 4u);
+        std::vector<std::string> covered;
+        for (const parser::ReviewPass& pass : claim->review_passes) {
+            EXPECT_FALSE(pass.question.empty()) << pass.id;
+            covered.insert(covered.end(), pass.guideline_ids.begin(), pass.guideline_ids.end());
+        }
+        std::vector<std::string> published = claim->guideline_ids;
+        std::sort(covered.begin(), covered.end());
+        std::sort(published.begin(), published.end());
+        EXPECT_EQ(covered, published) << "the passes must list every claim guideline exactly once";
+    }
+}
+
+namespace {
+
+// A valid two-guideline distribution whose one profile carries `review_passes`
+// as given, and optionally a retired-guideline list in sccg.compact.json -- the
+// only file of the dist set that publishes one.
+std::filesystem::path WritePassFixture(const std::string& name,
+                                       const nlohmann::json& review_passes,
+                                       const nlohmann::json& retired = nlohmann::json::array(),
+                                       bool write_compact = true,
+                                       const std::string& schema_version = "3.0.0") {
+    const std::filesystem::path directory = std::filesystem::temp_directory_path() / ("af_sccg_dist_" + name);
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+
+    nlohmann::json profile{{"id", "claim_review"},
+                           {"display_name", "Claim review"},
+                           {"applies_to", nlohmann::json::array({"GSN Goal"})},
+                           {"guideline_ids", nlohmann::json::array({"CL.1", "CL.2"})},
+                           {"required_data", nlohmann::json::array({"SELECTED_CLAIM"})}};
+    if (!review_passes.is_null())
+        profile["review_passes"] = review_passes;
+    std::ofstream(directory / "review_profiles.json") << nlohmann::json{
+        {"schema_version", schema_version},
+        {"sccg_version", "0.8.0"},
+        {"review_profiles",
+         nlohmann::json::array({profile})}}.dump(2);
+    std::ofstream(directory / "data_packages.json") << nlohmann::json{
+        {"schema_version", schema_version},
+        {"sccg_version", "0.8.0"},
+        {"when_unavailable", "Judge what was supplied."},
+        {"data_packages",
+         nlohmann::json::array(
+             {nlohmann::json{{"id", "SELECTED_CLAIM"},
+                             {"display_name", "Selected claim"},
+                             {"role", "selected_element"},
+                             {"element_role", "claim"}}})}}.dump(2);
+    std::ofstream rules(directory / "ai_rule_export.jsonl");
+    for (const char* id : {"CL.1", "CL.2"}) {
+        rules << nlohmann::json{{"id", id},
+                                {"title", std::string("Rule ") + id},
+                                {"statement", "State it."},
+                                {"rationale", "Because."},
+                                {"category", "CL"},
+                                {"schema_version", schema_version},
+                                {"sccg_version", "0.8.0"}}
+                     .dump()
+              << "\n";
+    }
+    rules.close();
+    if (write_compact)
+        std::ofstream(directory / "sccg.compact.json") << nlohmann::json{{"retired_guidelines", retired}}.dump(2);
+    return directory;
+}
+
+nlohmann::json Pass(const std::string& id, std::vector<std::string> guideline_ids) {
+    return nlohmann::json{{"id", id},
+                          {"display_name", id},
+                          {"question", "Is it " + id + "?"},
+                          {"guideline_ids", std::move(guideline_ids)}};
+}
+
+} // namespace
+
+TEST(GuidelinesParserTest, AcceptsReviewPassesThatPartitionTheProfile) {
+    const std::filesystem::path directory =
+        WritePassFixture("passes_ok", nlohmann::json::array({Pass("first", {"CL.1"}), Pass("second", {"CL.2"})}));
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+
+    ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
+    const parser::ReviewProfile* profile = result.value().FindReviewProfileById("claim_review");
+    ASSERT_NE(profile, nullptr);
+    ASSERT_EQ(profile->review_passes.size(), 2u);
+    EXPECT_EQ(profile->review_passes[1].guideline_ids, (std::vector<std::string>{"CL.2"}));
+    EXPECT_EQ(result.value().when_unavailable, "Judge what was supplied.");
+    std::filesystem::remove_all(directory);
+}
+
+// A fan-out review sends one request per pass. A pass partition that dropped a
+// guideline would be a review that never asks about it, with nothing failing to
+// say so; one listing a guideline twice would ask and report it twice.
+TEST(GuidelinesParserTest, RefusesReviewPassesThatOmitAGuideline) {
+    const std::filesystem::path directory =
+        WritePassFixture("passes_omit", nlohmann::json::array({Pass("first", {"CL.1"}), Pass("second", {})}));
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+    ASSERT_FALSE(result.has_value());
+    std::filesystem::remove_all(directory);
+
+    const std::filesystem::path missing =
+        WritePassFixture("passes_missing", nlohmann::json::array({Pass("first", {"CL.1"}), Pass("second", {"CL.1"})}));
+    auto missing_result = parser::SccgDistParser::ParseDirectory(missing);
+    ASSERT_FALSE(missing_result.has_value());
+    EXPECT_NE(missing_result.error().find("more than one review pass"), std::string::npos) << missing_result.error();
+    std::filesystem::remove_all(missing);
+}
+
+TEST(GuidelinesParserTest, RefusesAReviewPassListingAGuidelineTheProfileDoesNotCarry) {
+    const std::filesystem::path directory = WritePassFixture(
+        "passes_foreign", nlohmann::json::array({Pass("first", {"CL.1", "CL.9"}), Pass("second", {"CL.2"})}));
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_NE(result.error().find("CL.9"), std::string::npos) << result.error();
+    std::filesystem::remove_all(directory);
+}
+
+// A retired id still in use would be two meanings for one id, and a redirect to
+// a guideline that does not exist would send a stored finding nowhere.
+TEST(GuidelinesParserTest, RefusesAnInconsistentRetirementList) {
+    const std::filesystem::path still_published = WritePassFixture(
+        "retired_published",
+        nlohmann::json(nullptr),
+        nlohmann::json::array({nlohmann::json{
+            {"id", "CL.2"}, {"title", "x"}, {"retired_in", "0.8.0"}, {"replaced_by", {"CL.1"}}, {"note", "n"}}}));
+    auto published_result = parser::SccgDistParser::ParseDirectory(still_published);
+    ASSERT_FALSE(published_result.has_value());
+    EXPECT_NE(published_result.error().find("both retired and published"), std::string::npos)
+        << published_result.error();
+    std::filesystem::remove_all(still_published);
+
+    const std::filesystem::path dangling = WritePassFixture(
+        "retired_dangling",
+        nlohmann::json(nullptr),
+        nlohmann::json::array({nlohmann::json{
+            {"id", "AR.3"}, {"title", "x"}, {"retired_in", "0.8.0"}, {"replaced_by", {"AR.99"}}, {"note", "n"}}}));
+    auto dangling_result = parser::SccgDistParser::ParseDirectory(dangling);
+    ASSERT_FALSE(dangling_result.has_value());
+    EXPECT_NE(dangling_result.error().find("AR.99"), std::string::npos) << dangling_result.error();
+    std::filesystem::remove_all(dangling);
+}
+
+// A 3.0.0 distribution without the file carrying `retired_guidelines` is
+// incomplete, and loading it would silently retire nothing -- the failure the
+// runtime copy had until the build copied sccg.compact.json. Refused, loudly.
+TEST(GuidelinesParserTest, RefusesAVersion3DistributionMissingItsRetirementList) {
+    const std::filesystem::path directory =
+        WritePassFixture("no_compact", nlohmann::json(nullptr), nlohmann::json::array(), false, "3.0.0");
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_NE(result.error().find("sccg.compact.json"), std::string::npos) << result.error();
+    std::filesystem::remove_all(directory);
+}
+
+// A distribution that predates 0.8.0 retired nothing and splits no profile.
+// Refusing it for lacking either would be the loader inventing a requirement
+// the catalogue never had.
+TEST(GuidelinesParserTest, LoadsADistributionThatPredatesRetirementAndPasses) {
+    const std::filesystem::path directory =
+        WritePassFixture("pre_080", nlohmann::json(nullptr), nlohmann::json::array(), false, "2.0.0");
+    auto result = parser::SccgDistParser::ParseDirectory(directory);
+    ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
+    EXPECT_TRUE(result.value().retired_guidelines.empty());
+    EXPECT_TRUE(result.value().FindReviewProfileById("claim_review")->review_passes.empty());
+    std::filesystem::remove_all(directory);
 }
 
 namespace {

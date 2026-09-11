@@ -301,6 +301,17 @@ std::vector<Guideline> ParseGuidelines(const YAML::Node& node, std::string& erro
             tool_node = ReadMapValue(guideline_node, "tool_guidance");
         guideline.tool = ParseTool(tool_node);
 
+        const YAML::Node distinctions_node = ReadMapValue(guideline_node, "distinguish_from");
+        if (IsDefinedNode(distinctions_node) && distinctions_node.IsSequence()) {
+            for (const auto& distinction_node : distinctions_node) {
+                GuidelineDistinction distinction;
+                distinction.id = ReadStringKey(distinction_node, "id");
+                distinction.note = ReadStringKey(distinction_node, "note");
+                if (!distinction.id.empty())
+                    guideline.distinguish_from.push_back(std::move(distinction));
+            }
+        }
+
         if (guideline.id.empty() || guideline.category.empty() || guideline.title.empty() ||
             guideline.statement.empty()) {
             std::ostringstream out;
@@ -344,6 +355,18 @@ std::vector<ReviewProfile> ParseReviewProfiles(const YAML::Node& node) {
                     ReadStringSequence(ReadMapValue(entry_node, "unassessable_guideline_ids"));
                 if (!statement.id.empty())
                     profile.when_absent.push_back(std::move(statement));
+            }
+        }
+        const YAML::Node passes_node = ReadMapValue(profile_node, "review_passes");
+        if (IsDefinedNode(passes_node) && passes_node.IsSequence()) {
+            for (const auto& pass_node : passes_node) {
+                ReviewPass pass;
+                pass.id = ReadStringKey(pass_node, "id");
+                pass.display_name = ReadStringKey(pass_node, "display_name");
+                pass.question = ReadStringKey(pass_node, "question");
+                pass.guideline_ids = ReadStringSequence(ReadMapValue(pass_node, "guideline_ids"));
+                if (!pass.id.empty())
+                    profile.review_passes.push_back(std::move(pass));
             }
         }
         profile.schema_version = ReadStringKey(profile_node, "schema_version");
@@ -516,11 +539,33 @@ GuidelinesParseResult ParseRoot(const YAML::Node& root) {
         ParseAvailabilityStates(ReadSectionFallback(root, "availability_states", "availability_states"));
     document.authoring_guidance =
         ParseAuthoringGuidance(ReadSectionFallback(root, "authoring_guidance", "authoring_guidance"));
+    document.when_unavailable = ReadStringKey(root, "when_unavailable");
+
+    const YAML::Node retired_node = ReadMapValue(root, "retired_guidelines");
+    if (IsDefinedNode(retired_node) && retired_node.IsSequence()) {
+        for (const auto& entry_node : retired_node) {
+            RetiredGuideline retired;
+            retired.id = ReadStringKey(entry_node, "id");
+            retired.title = ReadStringKey(entry_node, "title");
+            retired.retired_in = ReadStringKey(entry_node, "retired_in");
+            retired.replaced_by = ReadStringSequence(ReadMapValue(entry_node, "replaced_by"));
+            retired.note = ReadStringKey(entry_node, "note");
+            if (!retired.id.empty())
+                document.retired_guidelines.push_back(std::move(retired));
+        }
+    }
 
     return document;
 }
 
 } // namespace
+
+const RetiredGuideline* GuidelinesDocument::FindRetiredGuidelineById(const std::string& id) const {
+    auto found = std::find_if(retired_guidelines.begin(),
+                              retired_guidelines.end(),
+                              [&](const RetiredGuideline& retired) { return retired.id == id; });
+    return found == retired_guidelines.end() ? nullptr : &(*found);
+}
 
 const Guideline* GuidelinesDocument::FindGuidelineById(const std::string& id) const {
     auto found = std::find_if(

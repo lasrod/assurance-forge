@@ -175,6 +175,13 @@ Guideline ParseRuleRecord(const json& object) {
             guideline.references.push_back(ParseReference(reference_json));
         }
     }
+    for (const json& distinction_json : object.value("distinguish_from", json::array())) {
+        GuidelineDistinction distinction;
+        distinction.id = StringValue(distinction_json, "id");
+        distinction.note = StringValue(distinction_json, "note");
+        if (!distinction.id.empty())
+            guideline.distinguish_from.push_back(std::move(distinction));
+    }
     guideline.tool = ParseTool(object.value("tool", json::object()));
     if (guideline.rule_id.empty())
         guideline.rule_id = guideline.id;
@@ -274,6 +281,15 @@ bool ParseReviewProfiles(const std::filesystem::path& path, GuidelinesDocument& 
             if (!statement.id.empty())
                 profile.when_absent.push_back(std::move(statement));
         }
+        for (const json& pass_json : profile_json.value("review_passes", json::array())) {
+            ReviewPass pass;
+            pass.id = StringValue(pass_json, "id");
+            pass.display_name = StringValue(pass_json, "display_name");
+            pass.question = StringValue(pass_json, "question");
+            pass.guideline_ids = StringArrayValue(pass_json, "guideline_ids");
+            if (!pass.id.empty())
+                profile.review_passes.push_back(std::move(pass));
+        }
         profile.schema_version = schema_version;
         profile.sccg_version = sccg_version;
         if (profile.id.empty() || profile.display_name.empty() || profile.applies_to.empty() ||
@@ -303,6 +319,7 @@ bool ParseDataPackages(const std::filesystem::path& path, GuidelinesDocument& do
     if (document.sccg_version.empty())
         document.sccg_version = sccg_version;
     ApplyDocumentBlock(root, document);
+    document.when_unavailable = StringValue(root, "when_unavailable");
 
     for (const json& state_json : root.value("availability_states", json::array())) {
         AvailabilityState state;
@@ -371,6 +388,59 @@ bool ParsePrechecks(const std::filesystem::path& path, GuidelinesDocument& docum
             return false;
         }
         document.prechecks.push_back(std::move(precheck));
+    }
+    return true;
+}
+
+// Retired guideline ids. SCCG publishes them only in the whole-catalogue files
+// (`sccg.compact.json`, `sccg.full.json`), none of which the dist path otherwise
+// opens -- the per-concern files it reads were split out before retirement
+// existed. Optional: a distribution that predates 0.8.0 retired nothing, and
+// refusing to load it for lacking an empty list would be the loader inventing
+// a requirement.
+int MajorVersion(const std::string& version) {
+    try {
+        return std::stoi(version.substr(0, version.find('.')));
+    } catch (const std::exception&) {
+        return 0;
+    }
+}
+
+bool ParseRetiredGuidelines(const std::filesystem::path& dist_dir, GuidelinesDocument& document, std::string& error) {
+    std::filesystem::path path = dist_dir / "sccg.compact.json";
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(path, filesystem_error))
+        path = dist_dir / "sccg.full.json";
+    if (!std::filesystem::exists(path, filesystem_error)) {
+        // Optional only for a catalogue that predates it. Schema 3.0.0 makes
+        // `retired_guidelines` a required part of the catalogue, so a 3.0.0
+        // distribution with no file carrying it is incomplete -- and accepting
+        // it would load a catalogue that silently retired nothing, which is how
+        // the runtime copy ran until the build started copying the file.
+        if (MajorVersion(document.schema_version) >= 3) {
+            error = "SCCG " + document.schema_version +
+                    " publishes retired guidelines in sccg.compact.json or sccg.full.json, and neither is in " +
+                    dist_dir.string() + ".";
+            return false;
+        }
+        return true;
+    }
+
+    json root;
+    if (!ReadJsonFile(path, root, error))
+        return false;
+    for (const json& entry_json : root.value("retired_guidelines", json::array())) {
+        RetiredGuideline retired;
+        retired.id = StringValue(entry_json, "id");
+        retired.title = StringValue(entry_json, "title");
+        retired.retired_in = StringValue(entry_json, "retired_in");
+        retired.replaced_by = StringArrayValue(entry_json, "replaced_by");
+        retired.note = StringValue(entry_json, "note");
+        if (retired.id.empty() || retired.replaced_by.empty()) {
+            error = path.filename().string() + " contains a retired guideline missing id or replaced_by.";
+            return false;
+        }
+        document.retired_guidelines.push_back(std::move(retired));
     }
     return true;
 }
@@ -506,6 +576,74 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
         }
     }
 
+    // A pass partition that dropped a guideline would be a fan-out review that
+    // silently never asks about it, and one that listed a guideline twice would
+    // ask twice and report it twice. SCCG validates the partition upstream; the
+    // tool refuses a catalogue that fails it rather than trusting that it passed.
+    for (const ReviewProfile& profile : document.review_profiles) {
+        if (profile.review_passes.empty())
+            continue;
+        std::unordered_set<std::string> in_profile(profile.guideline_ids.begin(), profile.guideline_ids.end());
+        std::unordered_set<std::string> covered;
+        std::unordered_set<std::string> pass_ids;
+        for (const ReviewPass& pass : profile.review_passes) {
+            if (!pass_ids.insert(pass.id).second) {
+                error = "SCCG review profile '" + profile.id + "' names review pass '" + pass.id + "' twice.";
+                return false;
+            }
+            if (pass.guideline_ids.empty()) {
+                error =
+                    "SCCG review profile '" + profile.id + "' has review pass '" + pass.id + "' with no guidelines.";
+                return false;
+            }
+            for (const std::string& guideline_id : pass.guideline_ids) {
+                if (in_profile.count(guideline_id) == 0) {
+                    error = "SCCG review pass '" + profile.id + "/" + pass.id + "' lists '" + guideline_id +
+                            "', which the profile does not carry.";
+                    return false;
+                }
+                if (!covered.insert(guideline_id).second) {
+                    error = "SCCG review profile '" + profile.id + "' lists guideline '" + guideline_id +
+                            "' in more than one review pass.";
+                    return false;
+                }
+            }
+        }
+        for (const std::string& guideline_id : profile.guideline_ids) {
+            if (covered.count(guideline_id) == 0) {
+                error = "SCCG review profile '" + profile.id + "' has review passes that omit guideline '" +
+                        guideline_id + "'.";
+                return false;
+            }
+        }
+    }
+
+    for (const Guideline& guideline : document.guidelines) {
+        for (const GuidelineDistinction& distinction : guideline.distinguish_from) {
+            if (rule_ids.count(distinction.id) == 0) {
+                error = "SCCG guideline '" + guideline.id + "' distinguishes itself from unknown guideline '" +
+                        distinction.id + "'.";
+                return false;
+            }
+        }
+    }
+
+    // A retired id still in use is two meanings for one id, and a redirect to a
+    // guideline that does not exist sends a stored finding nowhere.
+    for (const RetiredGuideline& retired : document.retired_guidelines) {
+        if (rule_ids.count(retired.id) != 0) {
+            error = "SCCG guideline '" + retired.id + "' is both retired and published.";
+            return false;
+        }
+        for (const std::string& replacement : retired.replaced_by) {
+            if (rule_ids.count(replacement) == 0) {
+                error = "Retired SCCG guideline '" + retired.id + "' is replaced by unknown guideline '" + replacement +
+                        "'.";
+                return false;
+            }
+        }
+    }
+
     for (const Precheck& precheck : document.prechecks) {
         for (const std::string& guideline_id : precheck.related_guideline_ids) {
             if (rule_ids.count(guideline_id) == 0) {
@@ -546,7 +684,7 @@ GuidelinesParseResult SccgDistParser::ParseDirectory(const std::filesystem::path
         !ParseDataPackages(data_packages_path, document, error) ||
         !ParsePrechecks(dist_dir / "prechecks.json", document, error) ||
         !ParseAuthoringGuidance(dist_dir / "authoring_guidance.json", document, error) ||
-        !ValidateConsistency(document, error)) {
+        !ParseRetiredGuidelines(dist_dir, document, error) || !ValidateConsistency(document, error)) {
         return std::unexpected(std::move(error));
     }
 
