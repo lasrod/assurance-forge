@@ -26,6 +26,13 @@ public:
 
     AiConnectionStatus TestConnection() const;
     AiResponse Generate(const AiRequest& request) const;
+    // Same call against settings the caller supplies rather than the saved
+    // ones. For a caller that varies the model per request -- an evaluation
+    // comparing two of them -- where the alternative is writing the user's
+    // settings file to change a model for one call and writing it back
+    // afterwards. The stored API key is still the credential: settings say
+    // which model, never which account.
+    AiResponse Generate(const AiRequest& request, const AiProviderSettings& settings) const;
 
 private:
     SecretLoadResult LoadApiKey() const;

@@ -3,14 +3,18 @@
 #include "ai/ai_provider.h"
 #include "ai/secret_store.h"
 #include "app/review_problem_sync.h"
+#include "core/guideline_catalog.h"
 #include "core/reviews/review_proposal.h"
 #include "review/sccg/sccg_profile_selector.h"
 
+#include <atomic>
 #include <cctype>
 #include <chrono>
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -70,6 +74,14 @@ public:
 class FixedResponseProvider final : public ai::IAiProvider {
 public:
     std::string response_text;
+    // Requests run concurrently on the task runner's threads, one per review
+    // pass, so the count is atomic.
+    std::atomic<int> calls{0};
+    // Fail any request whose prompt contains this, to fail one pass of several.
+    std::string fail_when_prompt_contains;
+    // Every request as sent, guarded because the passes run concurrently.
+    std::mutex requests_mutex;
+    std::vector<ai::AiRequest> requests;
 
     ai::AiProviderId ProviderId() const override {
         return ai::AiProviderId::OpenAI;
@@ -79,13 +91,35 @@ public:
         return ai::SuccessStatus("ok");
     }
 
-    ai::AiResponse Generate(const ai::AiProviderSettings&, const ai::AiRequest&, const std::string&) override {
+    ai::AiResponse Generate(const ai::AiProviderSettings&, const ai::AiRequest& request, const std::string&) override {
+        calls.fetch_add(1);
+        {
+            std::lock_guard<std::mutex> lock(requests_mutex);
+            requests.push_back(request);
+        }
         ai::AiResponse response;
+        if (!fail_when_prompt_contains.empty() &&
+            ai::PromptText(request).find(fail_when_prompt_contains) != std::string::npos) {
+            response.success = false;
+            response.errorCode = ai::AiErrorCode::Timeout;
+            response.errorMessage = "simulated timeout";
+            return response;
+        }
         response.success = true;
         response.text = response_text;
         return response;
     }
 };
+
+// A settings file of the harness's own. A default-constructed AiSettingsStore
+// resolves to the developer's real %APPDATA% (or XDG) settings, and the harness
+// saves into it -- so every run of this suite used to overwrite the model the
+// developer had chosen with the compiled-in default, and switch AI on.
+std::filesystem::path HarnessSettingsPath() {
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    return std::filesystem::temp_directory_path() /
+           ("assurance_forge_ai_review_controller_test_" + std::to_string(stamp)) / "settings.json";
+}
 
 struct ServiceControllerHarness {
     app::AppEvents events;
@@ -94,12 +128,18 @@ struct ServiceControllerHarness {
     ai::AiTaskRunner task_runner;
     std::shared_ptr<FakeSecretStore> secret_store = std::make_shared<FakeSecretStore>();
     std::shared_ptr<FixedResponseProvider> provider = std::make_shared<FixedResponseProvider>();
-    std::shared_ptr<ai::AiSettingsStore> settings_store = std::make_shared<ai::AiSettingsStore>();
+    std::filesystem::path settings_path = HarnessSettingsPath();
+    std::shared_ptr<ai::AiSettingsStore> settings_store = std::make_shared<ai::AiSettingsStore>(settings_path);
     std::shared_ptr<ai::AiService> service = std::make_shared<ai::AiService>(settings_store, secret_store, provider);
     app::controllers::AiReviewController controller;
     std::vector<std::string> statuses;
     std::vector<app::ElementReviewVisualEvent> review_visual_events;
     std::vector<app::AiReviewProposalSuggestionsEvent> proposal_suggestion_events;
+
+    ~ServiceControllerHarness() {
+        std::error_code error;
+        std::filesystem::remove_all(settings_path.parent_path(), error);
+    }
 
     ServiceControllerHarness() : reviews(events), controller(events, problems, reviews, task_runner, service) {
         ai::AiProviderSettings settings;
@@ -220,7 +260,7 @@ const std::vector<ReviewProfileSelectionCase>& ReviewProfileSelectionCases() {
 }
 
 core::GuidelineCatalog MakeCatalog(parser::GuidelinesDocument document) {
-    return core::BuildGuidelineCatalog(std::move(document), "sccg.full.yaml");
+    return core::BuildGuidelineCatalog(std::move(document), "sccg.full.json");
 }
 
 core::ProblemItem MakeManualProblem(const std::string& id, const std::string& element_id) {
@@ -328,7 +368,7 @@ TEST(AiReviewControllerTest, SccgReleaseSelectsOneProfileForEverySupportedGsnEle
     core::GuidelineCatalog catalog;
     std::string error;
     ASSERT_TRUE(core::LoadGuidelineCatalog(catalog, error)) << error;
-    ASSERT_EQ(catalog.document.sccg_version, "0.7.0");
+    ASSERT_EQ(catalog.document.sccg_version, "0.10.0");
 
     for (const ReviewProfileSelectionCase& selection_case : ReviewProfileSelectionCases()) {
         SCOPED_TRACE(selection_case.expected_profile_id);
@@ -645,4 +685,210 @@ TEST(AiReviewControllerTest, NoFindingsEmitsAiOkEventAndPreservesUnrelatedProble
     EXPECT_FALSE(review_state.failed);
     EXPECT_EQ(review_state.last_review_message, "AI review completed with no findings.");
     EXPECT_EQ(harness.statuses.back(), "AI review completed with no findings.");
+}
+
+namespace {
+
+constexpr const char* kClaimFindingResponse = R"json({
+    "reviewed_element_id": "claim-1",
+    "reviewed_element_type": "GSN Goal / SACM Claim",
+    "findings": [
+        {
+            "source": "SCCG",
+            "guideline_id": "CL.1",
+            "guideline_title": "Write each claim as a falsifiable proposition",
+            "confidence": "high",
+            "message": "The claim is too vague to falsify.",
+            "why_it_matters": "Reviewers need a testable proposition.",
+            "suggested_fix": "Rewrite the claim as a measurable statement.",
+            "related_element_ids": ["claim-1"]
+        }
+    ]
+})json";
+
+const core::GuidelineCatalog& ReleasedCatalog() {
+    static const core::GuidelineCatalog catalog = [] {
+        core::GuidelineCatalog loaded;
+        std::string error;
+        EXPECT_TRUE(core::LoadGuidelineCatalog(loaded, error)) << error;
+        return loaded;
+    }();
+    return catalog;
+}
+
+const parser::ReviewProfile& ReleasedClaimReview() {
+    const parser::ReviewProfile* profile = ReleasedCatalog().document.FindReviewProfileById("claim_review");
+    EXPECT_NE(profile, nullptr);
+    return *profile;
+}
+
+} // namespace
+
+// SCCG 0.8.0 publishes claim_review as four review passes, and a claim review is
+// sent as one request per pass. The canned response cites CL.1 to every pass;
+// only the pass that owns CL.1 may keep it, so the reviewer sees it once.
+TEST(AiReviewControllerTest, ClaimReviewIsSentAsOneRequestPerReviewPass) {
+    const parser::ReviewProfile& claim_review = ReleasedClaimReview();
+    ASSERT_GT(claim_review.review_passes.size(), 1u);
+
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    EXPECT_EQ(harness.provider->calls.load(), static_cast<int>(claim_review.review_passes.size()));
+    const std::vector<core::reviews::ReviewItem> comments = harness.reviews.ItemsForElement("claim-1");
+    ASSERT_EQ(comments.size(), 1u) << "CL.1 is the wording pass's; the other passes' copies are discarded";
+    ASSERT_EQ(comments[0].guideline_ids.size(), 1u);
+    EXPECT_EQ(comments[0].guideline_ids[0], "CL.1");
+    const core::reviews::ElementReviewState state = harness.reviews.ElementReviewStateForElement("claim-1");
+    EXPECT_FALSE(state.failed);
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFindings);
+}
+
+// One pass failing must not read as one pass finding nothing. The findings of
+// the passes that ran are still recorded; the review is reported incomplete and
+// failed, so it can never earn the no-findings badge.
+// The application caches what every review of a profile and pass shares -- the
+// instructions and the pass's rules -- and never the element's own data: a
+// cache write costs more than an uncached read, and one element is rarely
+// reviewed twice before the cache expires. Nothing else about the request
+// changes, so the prompt the model reads is the prompt it read before.
+TEST(AiReviewControllerTest, CachesTheSharedPromptSegmentsButNotTheElementData) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    const std::vector<ai::AiRequest>& requests = harness.provider->requests;
+    ASSERT_EQ(requests.size(), ReleasedClaimReview().review_passes.size()) << "one request per pass";
+    for (const ai::AiRequest& request : requests) {
+        ASSERT_EQ(request.promptSegments.size(), 3u);
+        EXPECT_TRUE(request.promptSegments[0].cacheBreakpoint) << "the shared instructions";
+        EXPECT_TRUE(request.promptSegments[1].cacheBreakpoint) << "the profile, the pass and its rules";
+        EXPECT_FALSE(request.promptSegments[2].cacheBreakpoint) << "the element's own data";
+        EXPECT_EQ(ai::PromptText(request), request.userPrompt) << "the same text, only in pieces";
+        EXPECT_NE(request.promptSegments[2].text.find("claim-1"), std::string::npos);
+        EXPECT_EQ(request.promptSegments[0].text.find("claim-1"), std::string::npos);
+        EXPECT_EQ(request.promptSegments[1].text.find("claim-1"), std::string::npos);
+        EXPECT_EQ(request.promptCacheKey.rfind("sccg-" + ReleasedClaimReview().sccg_version + "-claim_review-", 0), 0u)
+            << request.promptCacheKey;
+    }
+    EXPECT_NE(requests[0].promptCacheKey, requests[1].promptCacheKey) << "each pass caches its own rules";
+    EXPECT_EQ(requests[0].promptSegments[0].text, requests[1].promptSegments[0].text)
+        << "every pass shares the first segment";
+}
+
+TEST(AiReviewControllerTest, AReviewWithAFailedPassIsReportedIncomplete) {
+    const parser::ReviewProfile& claim_review = ReleasedClaimReview();
+    ASSERT_GT(claim_review.review_passes.size(), 1u);
+    const parser::ReviewPass& failing = claim_review.review_passes.back();
+    ASSERT_EQ(std::find(failing.guideline_ids.begin(), failing.guideline_ids.end(), "CL.1"),
+              failing.guideline_ids.end())
+        << "the failing pass must not be the one that owns the canned finding";
+
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    // SCCG's own pass instruction with this pass's question in it: the phrase
+    // only the failing pass's request contains. Every pass request lists all
+    // the profile's passes and their questions, so the question alone would
+    // match -- and fail -- all of them.
+    std::string marker = ReleasedCatalog().document.review_pass_instruction;
+    ASSERT_NE(marker.find("{question}"), std::string::npos);
+    marker.replace(marker.find("{question}"), std::string("{question}").size(), failing.question);
+    harness.provider->fail_when_prompt_contains = marker;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    const std::vector<core::reviews::ReviewItem> items = harness.reviews.ItemsForElement("claim-1");
+    bool has_finding = false;
+    bool has_incomplete_notice = false;
+    for (const core::reviews::ReviewItem& item : items) {
+        has_finding = has_finding || (!item.guideline_ids.empty() && item.guideline_ids[0] == "CL.1");
+        if (item.title == "AI review incomplete") {
+            has_incomplete_notice = true;
+            EXPECT_NE(item.message.find("simulated timeout"), std::string::npos) << item.message;
+            EXPECT_NE(item.message.find(failing.id), std::string::npos) << item.message;
+        }
+    }
+    EXPECT_TRUE(has_finding) << "the passes that ran still report";
+    EXPECT_TRUE(has_incomplete_notice);
+
+    const core::reviews::ElementReviewState state = harness.reviews.ElementReviewStateForElement("claim-1");
+    EXPECT_TRUE(state.failed);
+    EXPECT_FALSE(state.ai_ok);
+    EXPECT_EQ(harness.review_visual_events.back().kind, app::ElementReviewVisualEventKind::AiFailed);
+}
+
+// The AI Debug panel edits one prompt. For a pass review it shows every pass
+// under a separator; an edit that removes the separators cannot be attributed to
+// a pass, so it is sent as written -- one request -- and the user is told.
+TEST(AiReviewControllerTest, DebugPromptEditThatLosesThePassSeparatorsIsSentAsOneRequest) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    const std::string combined = harness.controller.PendingPrompt();
+    EXPECT_NE(combined.find("===== SCCG review pass 1/"), std::string::npos);
+
+    harness.controller.SetPendingPrompt("A prompt the user rewrote from scratch.");
+    EXPECT_EQ(harness.controller.PendingPrompt(), "A prompt the user rewrote from scratch.");
+    EXPECT_NE(harness.statuses.back().find("sent as one request"), std::string::npos) << harness.statuses.back();
+
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+    EXPECT_EQ(harness.provider->calls.load(), 1);
+    ASSERT_EQ(harness.provider->requests.size(), 1u);
+    EXPECT_EQ(ai::PromptText(harness.provider->requests[0]), "A prompt the user rewrote from scratch.")
+        << "the edit is what is sent, not the prompt it replaced";
+    EXPECT_TRUE(harness.provider->requests[0].promptSegments.empty()) << "an edited prompt is sent uncached";
+}
+
+// An edit inside one pass keeps the separators, so it goes back to its pass --
+// and that pass must send the edit, not the cached segments it was built from.
+TEST(AiReviewControllerTest, DebugPromptEditInsideAPassIsSentAndNotTheCachedOriginal) {
+    ServiceControllerHarness harness;
+    harness.provider->response_text = kClaimFindingResponse;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    std::string edited = harness.controller.PendingPrompt();
+    const std::string heading = "## Selected element";
+    const std::size_t at = edited.find(heading);
+    ASSERT_NE(at, std::string::npos);
+    edited.insert(at, "Reviewer's note: look hard at the wording.\n\n");
+    harness.controller.SetPendingPrompt(edited);
+
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    int carrying_the_note = 0;
+    for (const ai::AiRequest& request : harness.provider->requests) {
+        const std::string sent = ai::PromptText(request);
+        if (sent.find("Reviewer's note: look hard at the wording.") == std::string::npos)
+            continue;
+        ++carrying_the_note;
+        EXPECT_TRUE(request.promptSegments.empty()) << "an edited pass is sent uncached, as edited";
+    }
+    EXPECT_EQ(carrying_the_note, 1) << "the edited pass sends the edit";
 }

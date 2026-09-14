@@ -101,6 +101,16 @@ jobs:
             cp -R assets "$stage/"
           fi
           cp -R data "$stage/"
+          # The SCCG catalogue the build copied beside the binary. The macOS
+          # bundle already carries it inside Contents/MacOS; elsewhere only the
+          # executable was copied, so a release found no catalogue and had no
+          # guideline review at all.
+          if [ "$RUNNER_OS" != "macOS" ]; then
+            runtime_catalogue="$(dirname "${{ matrix.binary_path }}")/data/sccg/dist/sccg.full.json"
+            test -f "$runtime_catalogue"
+            mkdir -p "$stage/data/sccg/dist"
+            cp "$runtime_catalogue" "$stage/data/sccg/dist/"
+          fi
           cp README.md "$stage/"
           cp LICENSE.md "$stage/"
 

@@ -1,5 +1,7 @@
 #include "core/guideline_catalog.h"
 
+#include <cstdlib>
+
 #include "parser/sccg_dist_parser.h"
 
 #ifdef _WIN32
@@ -13,7 +15,9 @@
 #endif
 
 #include <filesystem>
+#include <format>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -31,9 +35,36 @@ std::filesystem::path ExecutableDirectory() {
     return std::filesystem::current_path();
 }
 
+// An explicit SCCG distribution, when one is named.
+//
+// SCCG is a versioned dependency, and an evaluation that compares two versions
+// -- or one that asks what a proposed catalogue change would do -- has to be
+// able to point the tool at a distribution other than the one beside the
+// executable. Discovery alone cannot express that.
+//
+// Opt-in and silent when unset, so a normal run behaves exactly as before. It is
+// not a hidden switch: every review record states the `sccg_catalog_path` it
+// actually loaded, so a run against a substituted catalogue says so in its own
+// output rather than looking like a run against the shipped one.
+//
+// Authoritative when set: returned whether or not it names a directory, and
+// LoadGuidelineCatalog refuses one that does not. Falling back to discovery
+// ran an evaluation meant for another catalogue against the shipped one.
+std::filesystem::path SccgDistDirectoryOverride() {
+    const char* configured = std::getenv("AF_SCCG_DIST_DIR");
+    if (configured == nullptr || *configured == '\0')
+        return {};
+    return std::filesystem::path(configured);
+}
+
 } // namespace
 
+// The directory holding `sccg.full.json`, the one file SCCG declares
+// sufficient for a tool (contract 3.1.0). An explicit AF_SCCG_DIST_DIR wins;
+// otherwise the copy beside the executable, then a source checkout.
 std::filesystem::path FindSccgDistDirectory() {
+    if (std::filesystem::path configured = SccgDistDirectoryOverride(); !configured.empty())
+        return configured;
     const std::filesystem::path executable_dir = ExecutableDirectory();
     const std::filesystem::path current_dir = std::filesystem::current_path();
     const std::vector<std::filesystem::path> candidates = {
@@ -45,42 +76,10 @@ std::filesystem::path FindSccgDistDirectory() {
 
     for (const std::filesystem::path& candidate : candidates) {
         std::error_code error;
-        if (!std::filesystem::exists(candidate, error) || !std::filesystem::is_directory(candidate, error))
-            continue;
-        const bool has_profiles = std::filesystem::exists(candidate / "review_profiles.json", error);
-        const bool has_data_packages = std::filesystem::exists(candidate / "data_packages.json", error);
-        const bool has_rules = std::filesystem::exists(candidate / "ai_rule_export.jsonl", error) ||
-                               std::filesystem::exists(candidate / "sccg.rules.jsonl", error);
-        if (has_profiles && has_data_packages && has_rules)
+        if (std::filesystem::exists(candidate / parser::SccgDistParser::kCatalogFileName, error))
             return candidate;
     }
     return {};
-}
-
-std::filesystem::path FindSccgCatalogFile() {
-    const std::filesystem::path executable_dir = ExecutableDirectory();
-    const std::filesystem::path current_dir = std::filesystem::current_path();
-    const std::vector<std::filesystem::path> candidates = {
-        executable_dir / "data" / "sccg.full.yaml",
-        current_dir / "data" / "sccg.full.yaml",
-        current_dir / "external" / "safety-case-core-guidelines" / "dist" / "sccg.full.yaml",
-        current_dir.parent_path() / "external" / "safety-case-core-guidelines" / "dist" / "sccg.full.yaml",
-        executable_dir / "data" / "guidelines.yaml",
-        current_dir / "data" / "guidelines.yaml",
-        current_dir / "external" / "safety-case-core-guidelines" / "data" / "guidelines.yaml",
-        current_dir.parent_path() / "external" / "safety-case-core-guidelines" / "data" / "guidelines.yaml",
-    };
-
-    for (const std::filesystem::path& candidate : candidates) {
-        std::error_code error;
-        if (std::filesystem::exists(candidate, error))
-            return candidate;
-    }
-    return {};
-}
-
-std::filesystem::path FindGuidelinesFile() {
-    return FindSccgCatalogFile();
 }
 
 GuidelineCatalog BuildGuidelineCatalog(parser::GuidelinesDocument document, std::filesystem::path source_path) {
@@ -118,43 +117,36 @@ bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
     error.clear();
 
     const std::filesystem::path dist_dir = FindSccgDistDirectory();
-    if (!dist_dir.empty()) {
-        auto result = parser::SccgDistParser::ParseDirectory(dist_dir);
-        if (!result) {
-            error = "SCCG dist artifacts could not be parsed: " + std::move(result.error());
+    if (!SccgDistDirectoryOverride().empty()) {
+        std::error_code ignored;
+        if (!std::filesystem::is_directory(dist_dir, ignored)) {
+            error = std::format(
+                "AF_SCCG_DIST_DIR names {}, which is not a directory; the shipped SCCG catalogue is not loaded "
+                "in its place.",
+                dist_dir.string());
             return false;
         }
-
-        catalog = BuildGuidelineCatalog(std::move(*result), dist_dir);
-        if (catalog.entries.empty()) {
-            error = "No SCCG rules were found in dist artifacts.";
-            return false;
-        }
-        if (catalog.review_profile_entries.empty()) {
-            error = "No SCCG review profiles were found in dist artifacts.";
-            return false;
-        }
-        return true;
     }
-
-    const std::filesystem::path guidelines_path = FindSccgCatalogFile();
-    if (guidelines_path.empty()) {
-        error = "SCCG catalog could not be found.";
+    if (dist_dir.empty()) {
+        error = std::string("SCCG catalogue could not be found: no ") + parser::SccgDistParser::kCatalogFileName +
+                " beside the executable or in a source checkout.";
         return false;
     }
-
-    auto result = parser::GuidelinesParser::ParseFile(guidelines_path.string());
+    auto result = parser::SccgDistParser::ParseDirectory(dist_dir);
     if (!result) {
-        error = "SCCG catalog could not be parsed: " + std::move(result.error());
+        error = "SCCG catalogue could not be parsed: " + std::move(result.error());
         return false;
     }
 
-    catalog = BuildGuidelineCatalog(std::move(*result), guidelines_path);
+    catalog = BuildGuidelineCatalog(std::move(*result), dist_dir);
     if (catalog.entries.empty()) {
-        error = "No SCCG guidelines were found.";
+        error = "No SCCG guidelines were found in the catalogue.";
         return false;
     }
-
+    if (catalog.review_profile_entries.empty()) {
+        error = "No SCCG review profiles were found in the catalogue.";
+        return false;
+    }
     return true;
 }
 

@@ -1,6 +1,8 @@
 #include "parser/sccg_dist_parser.h"
 
+#include <algorithm>
 #include <fstream>
+#include <map>
 #include <nlohmann/json.hpp>
 #include <set>
 #include <sstream>
@@ -11,6 +13,13 @@ namespace parser {
 namespace {
 
 using json = nlohmann::json;
+
+// The one contract major this loader reads. A minor adds keys and fields and
+// never changes an existing one, so it is compared by major only; SCCG's own
+// changelog says to do exactly that. Another major may rename or restructure
+// what this loader reads, and loading it anyway would be reading a contract by
+// guesswork.
+constexpr int kSupportedSchemaMajor = 3;
 
 bool ReadJsonFile(const std::filesystem::path& path, json& out_json, std::string& error) {
     std::ifstream input(path);
@@ -60,25 +69,25 @@ double DoubleValue(const json& object, const char* key) {
     return found->get<double>();
 }
 
-// The `document` block every tool-facing file now carries. Read from whichever
-// file supplies it first, so the dist path no longer opens `sccg://guidelines`
-// with an empty heading the way it did when only the YAML fallback had it.
-void ApplyDocumentBlock(const json& root, GuidelinesDocument& document) {
+int MajorVersion(const std::string& version) {
+    try {
+        return std::stoi(version.substr(0, version.find('.')));
+    } catch (const std::exception&) {
+        return 0;
+    }
+}
+
+void ParseDocumentBlock(const json& root, GuidelinesDocument& document) {
     const json block = root.value("document", json::object());
     if (!block.is_object())
         return;
-    if (document.metadata.title.empty())
-        document.metadata.title = StringValue(block, "title");
-    if (document.metadata.purpose.empty())
-        document.metadata.purpose = StringValue(block, "purpose");
-    if (document.metadata.copyright.empty())
-        document.metadata.copyright = StringValue(block, "copyright");
-    if (document.metadata.license.id.empty()) {
-        const json license = block.value("license", json::object());
-        document.metadata.license.id = StringValue(license, "id");
-        document.metadata.license.name = StringValue(license, "name");
-        document.metadata.license.url = StringValue(license, "url");
-    }
+    document.metadata.title = StringValue(block, "title");
+    document.metadata.purpose = StringValue(block, "purpose");
+    document.metadata.copyright = StringValue(block, "copyright");
+    const json license = block.value("license", json::object());
+    document.metadata.license.id = StringValue(license, "id");
+    document.metadata.license.name = StringValue(license, "name");
+    document.metadata.license.url = StringValue(license, "url");
 }
 
 GuidelineReference ParseReference(const json& object) {
@@ -96,156 +105,106 @@ GuidelineTool ParseTool(const json& object) {
 
     tool.applicable_elements = StringArrayValue(object, "applicable_elements");
     tool.detection_hints = StringArrayValue(object, "detection_hints");
-    auto checks = object.find("suggested_checks");
-    if (checks != object.end() && checks->is_array()) {
-        for (const json& check_json : *checks) {
-            SuggestedCheck check;
-            check.id = StringValue(check_json, "id");
-            check.description = StringValue(check_json, "description");
-            if (!check.id.empty() || !check.description.empty())
-                tool.suggested_checks.push_back(std::move(check));
-        }
+    for (const json& check_json : object.value("suggested_checks", json::array())) {
+        SuggestedCheck check;
+        check.id = StringValue(check_json, "id");
+        check.description = StringValue(check_json, "description");
+        if (!check.id.empty() || !check.description.empty())
+            tool.suggested_checks.push_back(std::move(check));
     }
-
-    auto markers = object.find("markers");
-    if (markers != object.end() && markers->is_array()) {
-        for (const json& marker_json : *markers) {
-            GuidelineMarker marker;
-            marker.kind = StringValue(marker_json, "kind");
-            marker.effect = StringValue(marker_json, "effect");
-            marker.terms = StringArrayValue(marker_json, "terms");
-            if (!marker.terms.empty())
-                tool.markers.push_back(std::move(marker));
-        }
+    for (const json& marker_json : object.value("markers", json::array())) {
+        GuidelineMarker marker;
+        marker.kind = StringValue(marker_json, "kind");
+        marker.effect = StringValue(marker_json, "effect");
+        marker.terms = StringArrayValue(marker_json, "terms");
+        if (!marker.terms.empty())
+            tool.markers.push_back(std::move(marker));
     }
-
-    auto thresholds = object.find("thresholds");
-    if (thresholds != object.end() && thresholds->is_array()) {
-        for (const json& threshold_json : *thresholds) {
-            GuidelineThreshold threshold;
-            threshold.id = StringValue(threshold_json, "id");
-            threshold.value = DoubleValue(threshold_json, "value");
-            threshold.unit = StringValue(threshold_json, "unit");
-            threshold.note = StringValue(threshold_json, "note");
-            if (!threshold.id.empty())
-                tool.thresholds.push_back(std::move(threshold));
-        }
+    for (const json& threshold_json : object.value("thresholds", json::array())) {
+        GuidelineThreshold threshold;
+        threshold.id = StringValue(threshold_json, "id");
+        threshold.value = DoubleValue(threshold_json, "value");
+        threshold.unit = StringValue(threshold_json, "unit");
+        threshold.note = StringValue(threshold_json, "note");
+        if (!threshold.id.empty())
+            tool.thresholds.push_back(std::move(threshold));
     }
-
-    auto repairs = object.find("repair");
-    if (repairs != object.end() && repairs->is_array()) {
-        for (const json& repair_json : *repairs) {
-            GuidelineRepair repair;
-            repair.action = StringValue(repair_json, "action");
-            repair.element_role = StringValue(repair_json, "element_role");
-            repair.attach_to = StringValue(repair_json, "attach_to");
-            repair.statement = StringValue(repair_json, "statement");
-            if (!repair.action.empty())
-                tool.repair.push_back(std::move(repair));
-        }
+    for (const json& repair_json : object.value("repair", json::array())) {
+        GuidelineRepair repair;
+        repair.action = StringValue(repair_json, "action");
+        repair.element_role = StringValue(repair_json, "element_role");
+        repair.attach_to = StringValue(repair_json, "attach_to");
+        repair.statement = StringValue(repair_json, "statement");
+        if (!repair.action.empty())
+            tool.repair.push_back(std::move(repair));
     }
     return tool;
 }
 
-Guideline ParseRuleRecord(const json& object) {
-    Guideline guideline;
-    guideline.id = StringValue(object, "id");
-    guideline.rule_id = StringValue(object, "rule_id");
-    guideline.category = StringValue(object, "category");
-    guideline.category_id = StringValue(object, "category_id");
-    guideline.title = StringValue(object, "title");
-    guideline.statement = StringValue(object, "statement");
-    guideline.short_rule = StringValue(object, "short_rule");
-    guideline.rationale = StringValue(object, "rationale");
-    guideline.review_prompts = StringArrayValue(object, "review_prompts");
-    guideline.reference_source_ids = StringArrayValue(object, "reference_source_ids");
-    guideline.review_profile_ids = StringArrayValue(object, "review_profile_ids");
-    guideline.data_package_ids = StringArrayValue(object, "data_package_ids");
-    guideline.schema_version = StringValue(object, "schema_version");
-    guideline.sccg_version = StringValue(object, "sccg_version");
-
-    const json examples = object.value("examples", json::object());
-    guideline.examples.bad = StringValue(examples, "bad");
-    guideline.examples.problem = StringValue(examples, "problem");
-    guideline.examples.good = StringValue(examples, "good");
-
-    auto references = object.find("references");
-    if (references != object.end() && references->is_array()) {
-        for (const json& reference_json : *references) {
-            guideline.references.push_back(ParseReference(reference_json));
-        }
-    }
-    guideline.tool = ParseTool(object.value("tool", json::object()));
-    if (guideline.rule_id.empty())
-        guideline.rule_id = guideline.id;
-    if (guideline.category.empty())
-        guideline.category = guideline.category_id;
-    if (guideline.category_id.empty())
-        guideline.category_id = guideline.category;
-    return guideline;
-}
-
-bool ParseRulesJsonl(const std::filesystem::path& path, GuidelinesDocument& document, std::string& error) {
-    std::ifstream input(path);
-    if (!input) {
-        error = "Could not open " + path.string();
+bool ParseGuidelines(const json& root, GuidelinesDocument& document, std::string& error) {
+    const json guidelines = root.value("guidelines", json::array());
+    if (!guidelines.is_array() || guidelines.empty()) {
+        error = "sccg.full.json contains no guidelines.";
         return false;
     }
+    for (const json& object : guidelines) {
+        Guideline guideline;
+        guideline.id = StringValue(object, "id");
+        guideline.category = StringValue(object, "category");
+        guideline.title = StringValue(object, "title");
+        guideline.statement = StringValue(object, "statement");
+        guideline.short_rule = StringValue(object, "short_rule");
+        guideline.rationale = StringValue(object, "rationale");
+        guideline.review_prompts = StringArrayValue(object, "review_prompts");
 
-    std::string line;
-    int line_number = 0;
-    while (std::getline(input, line)) {
-        ++line_number;
-        if (line.empty())
-            continue;
-        try {
-            json record = json::parse(line);
-            Guideline guideline = ParseRuleRecord(record);
-            if (guideline.id.empty() || guideline.title.empty() || guideline.statement.empty() ||
-                guideline.rationale.empty()) {
-                std::ostringstream out;
-                out << path.filename().string() << ": rule line " << line_number
-                    << " is missing id, title, statement, or rationale";
-                error = out.str();
-                return false;
-            }
-            if (document.schema_version.empty())
-                document.schema_version = guideline.schema_version;
-            if (document.sccg_version.empty())
-                document.sccg_version = guideline.sccg_version;
-            document.guidelines.push_back(std::move(guideline));
-        } catch (const json::exception& exception) {
-            std::ostringstream out;
-            out << path.filename().string() << ": JSONL parse error on line " << line_number << ": "
-                << exception.what();
-            error = out.str();
+        const json examples = object.value("examples", json::object());
+        guideline.examples.bad = StringValue(examples, "bad");
+        guideline.examples.problem = StringValue(examples, "problem");
+        guideline.examples.good = StringValue(examples, "good");
+
+        std::set<std::string> source_ids;
+        for (const json& reference_json : object.value("references", json::array())) {
+            GuidelineReference reference = ParseReference(reference_json);
+            if (!reference.source_id.empty())
+                source_ids.insert(reference.source_id);
+            guideline.references.push_back(std::move(reference));
+        }
+        guideline.reference_source_ids.assign(source_ids.begin(), source_ids.end());
+
+        for (const json& distinction_json : object.value("distinguish_from", json::array())) {
+            GuidelineDistinction distinction;
+            distinction.id = StringValue(distinction_json, "id");
+            distinction.note = StringValue(distinction_json, "note");
+            if (!distinction.id.empty())
+                guideline.distinguish_from.push_back(std::move(distinction));
+        }
+        guideline.tool = ParseTool(object.value("tool", json::object()));
+
+        // The whole-catalogue record carries no copy of these; the rule export
+        // does, derived from the same catalogue. Derived here the way the export
+        // derives them, so the request a tool builds is the same whichever file
+        // it was written against.
+        guideline.rule_id = guideline.id;
+        guideline.category_id = guideline.category;
+        guideline.schema_version = document.schema_version;
+        guideline.sccg_version = document.sccg_version;
+
+        if (guideline.id.empty() || guideline.title.empty() || guideline.statement.empty() ||
+            guideline.rationale.empty()) {
+            error = "sccg.full.json contains a guideline missing id, title, statement, or rationale.";
             return false;
         }
-    }
-
-    if (document.guidelines.empty()) {
-        error = path.filename().string() + " contained no SCCG rule records.";
-        return false;
+        document.guidelines.push_back(std::move(guideline));
     }
     return true;
 }
 
-bool ParseReviewProfiles(const std::filesystem::path& path, GuidelinesDocument& document, std::string& error) {
-    json root;
-    if (!ReadJsonFile(path, root, error))
-        return false;
-    if (!root.is_object() || !root.contains("review_profiles") || !root["review_profiles"].is_array()) {
-        error = path.filename().string() + " is missing review_profiles array.";
+bool ParseReviewProfiles(const json& root, GuidelinesDocument& document, std::string& error) {
+    const json profiles = root.value("review_profiles", json::array());
+    if (!profiles.is_array() || profiles.empty()) {
+        error = "sccg.full.json contains no review profiles.";
         return false;
     }
-
-    const std::string schema_version = StringValue(root, "schema_version");
-    const std::string sccg_version = StringValue(root, "sccg_version");
-    if (document.schema_version.empty())
-        document.schema_version = schema_version;
-    if (document.sccg_version.empty())
-        document.sccg_version = sccg_version;
-    ApplyDocumentBlock(root, document);
 
     for (const json& element_json : root.value("selectable_elements", json::array())) {
         SelectableElement element;
@@ -257,7 +216,7 @@ bool ParseReviewProfiles(const std::filesystem::path& path, GuidelinesDocument& 
             document.selectable_elements.push_back(std::move(element));
     }
 
-    for (const json& profile_json : root["review_profiles"]) {
+    for (const json& profile_json : profiles) {
         ReviewProfile profile;
         profile.id = StringValue(profile_json, "id");
         profile.display_name = StringValue(profile_json, "display_name");
@@ -274,35 +233,51 @@ bool ParseReviewProfiles(const std::filesystem::path& path, GuidelinesDocument& 
             if (!statement.id.empty())
                 profile.when_absent.push_back(std::move(statement));
         }
-        profile.schema_version = schema_version;
-        profile.sccg_version = sccg_version;
+        for (const json& pass_json : profile_json.value("review_passes", json::array())) {
+            ReviewPass pass;
+            pass.id = StringValue(pass_json, "id");
+            pass.display_name = StringValue(pass_json, "display_name");
+            pass.question = StringValue(pass_json, "question");
+            pass.guideline_ids = StringArrayValue(pass_json, "guideline_ids");
+            // Not dropped: a profile whose only published pass was malformed
+            // would then have none, which reads as "send the profile as one
+            // request" -- overriding the partition SCCG published.
+            if (pass.id.empty()) {
+                error = "sccg.full.json contains a review pass of profile '" + profile.id + "' missing id.";
+                return false;
+            }
+            profile.review_passes.push_back(std::move(pass));
+        }
+        profile.schema_version = document.schema_version;
+        profile.sccg_version = document.sccg_version;
         if (profile.id.empty() || profile.display_name.empty() || profile.applies_to.empty() ||
             profile.guideline_ids.empty()) {
-            error = path.filename().string() +
-                    " contains a review profile missing id, display_name, applies_to, or guideline_ids.";
+            error = "sccg.full.json contains a review profile missing id, display_name, applies_to, or guideline_ids.";
             return false;
         }
         document.review_profiles.push_back(std::move(profile));
     }
+    // Optional before SCCG 0.9.0, so an omitted key is a catalogue that predates
+    // it and the tool's own framing applies. A key that is present but not a
+    // usable string is a broken catalogue, not an old one; reading it as omitted
+    // would quietly swap SCCG's framing for this tool's.
+    if (const auto instruction = root.find("review_pass_instruction"); instruction != root.end()) {
+        if (!instruction->is_string() || instruction->get_ref<const std::string&>().empty()) {
+            error = "sccg.full.json has a review_pass_instruction that is not a non-empty string.";
+            return false;
+        }
+        document.review_pass_instruction = instruction->get<std::string>();
+    }
     return true;
 }
 
-bool ParseDataPackages(const std::filesystem::path& path, GuidelinesDocument& document, std::string& error) {
-    json root;
-    if (!ReadJsonFile(path, root, error))
-        return false;
-    if (!root.is_object() || !root.contains("data_packages") || !root["data_packages"].is_array()) {
-        error = path.filename().string() + " is missing data_packages array.";
+bool ParseDataPackages(const json& root, GuidelinesDocument& document, std::string& error) {
+    const json packages = root.value("data_packages", json::array());
+    if (!packages.is_array() || packages.empty()) {
+        error = "sccg.full.json contains no data packages.";
         return false;
     }
-
-    const std::string schema_version = StringValue(root, "schema_version");
-    const std::string sccg_version = StringValue(root, "sccg_version");
-    if (document.schema_version.empty())
-        document.schema_version = schema_version;
-    if (document.sccg_version.empty())
-        document.sccg_version = sccg_version;
-    ApplyDocumentBlock(root, document);
+    document.when_unavailable = StringValue(root, "when_unavailable");
 
     for (const json& state_json : root.value("availability_states", json::array())) {
         AvailabilityState state;
@@ -313,7 +288,7 @@ bool ParseDataPackages(const std::filesystem::path& path, GuidelinesDocument& do
             document.availability_states.push_back(std::move(state));
     }
 
-    for (const json& package_json : root["data_packages"]) {
+    for (const json& package_json : packages) {
         DataPackage data_package;
         data_package.id = StringValue(package_json, "id");
         data_package.display_name = StringValue(package_json, "display_name");
@@ -322,10 +297,17 @@ bool ParseDataPackages(const std::filesystem::path& path, GuidelinesDocument& do
         data_package.element_role = StringValue(package_json, "element_role");
         data_package.required_fields = StringArrayValue(package_json, "required_fields");
         data_package.optional_fields = StringArrayValue(package_json, "optional_fields");
-        data_package.schema_version = schema_version;
-        data_package.sccg_version = sccg_version;
+        const json meanings = package_json.value("field_meanings", json::object());
+        if (meanings.is_object()) {
+            for (const auto& [field, meaning] : meanings.items()) {
+                if (meaning.is_string())
+                    data_package.field_meanings[field] = meaning.get<std::string>();
+            }
+        }
+        data_package.schema_version = document.schema_version;
+        data_package.sccg_version = document.sccg_version;
         if (data_package.id.empty() || data_package.display_name.empty()) {
-            error = path.filename().string() + " contains a data package missing id or display_name.";
+            error = "sccg.full.json contains a data package missing id or display_name.";
             return false;
         }
         document.data_packages.push_back(std::move(data_package));
@@ -333,28 +315,8 @@ bool ParseDataPackages(const std::filesystem::path& path, GuidelinesDocument& do
     return true;
 }
 
-bool ParsePrechecks(const std::filesystem::path& path, GuidelinesDocument& document, std::string& error) {
-    std::error_code filesystem_error;
-    if (!std::filesystem::exists(path, filesystem_error)) {
-        if (filesystem_error) {
-            error = "Could not check existence of " + path.filename().string() + ": " + filesystem_error.message();
-            return false;
-        }
-        return true;
-    }
-
-    json root;
-    if (!ReadJsonFile(path, root, error))
-        return false;
-    if (!root.is_object() || !root.contains("prechecks") || !root["prechecks"].is_array()) {
-        error = path.filename().string() + " is missing prechecks array.";
-        return false;
-    }
-
-    const std::string schema_version = StringValue(root, "schema_version");
-    const std::string sccg_version = StringValue(root, "sccg_version");
-    ApplyDocumentBlock(root, document);
-    for (const json& precheck_json : root["prechecks"]) {
+bool ParsePrechecks(const json& root, GuidelinesDocument& document, std::string& error) {
+    for (const json& precheck_json : root.value("prechecks", json::array())) {
         Precheck precheck;
         precheck.id = StringValue(precheck_json, "id");
         precheck.display_name = StringValue(precheck_json, "display_name");
@@ -364,10 +326,10 @@ bool ParsePrechecks(const std::filesystem::path& path, GuidelinesDocument& docum
         precheck.description = StringValue(precheck_json, "description");
         precheck.fires_when = StringValue(precheck_json, "fires_when");
         precheck.interpretation = StringValue(precheck_json, "interpretation");
-        precheck.schema_version = schema_version;
-        precheck.sccg_version = sccg_version;
+        precheck.schema_version = document.schema_version;
+        precheck.sccg_version = document.sccg_version;
         if (precheck.id.empty()) {
-            error = path.filename().string() + " contains a precheck missing id.";
+            error = "sccg.full.json contains a precheck missing id.";
             return false;
         }
         document.prechecks.push_back(std::move(precheck));
@@ -375,32 +337,18 @@ bool ParsePrechecks(const std::filesystem::path& path, GuidelinesDocument& docum
     return true;
 }
 
-// Optional in the same sense `prechecks.json` is: a dist directory that
-// predates the file still loads, and the authoring surfaces then fall back to
-// the review profiles rather than refusing to start.
-bool ParseAuthoringGuidance(const std::filesystem::path& path, GuidelinesDocument& document, std::string& error) {
-    std::error_code filesystem_error;
-    if (!std::filesystem::exists(path, filesystem_error)) {
-        if (filesystem_error) {
-            error = "Could not check existence of " + path.filename().string() + ": " + filesystem_error.message();
-            return false;
-        }
+// Under `authoring_guidance` in the whole file, because its keys (`description`,
+// `usage`) would be ambiguous at the root -- the one per-concern file SCCG does
+// not place at the root.
+bool ParseAuthoringGuidance(const json& root, GuidelinesDocument& document, std::string& error) {
+    const json block = root.value("authoring_guidance", json::object());
+    if (!block.is_object())
         return true;
-    }
-
-    json root;
-    if (!ReadJsonFile(path, root, error))
-        return false;
-    if (!root.is_object()) {
-        error = path.filename().string() + " is not a JSON object.";
-        return false;
-    }
-    ApplyDocumentBlock(root, document);
 
     AuthoringGuidance guidance;
-    guidance.description = StringValue(root, "description");
-    guidance.usage = StringValue(root, "usage");
-    for (const json& rule_json : root.value("core_rules", json::array())) {
+    guidance.description = StringValue(block, "description");
+    guidance.usage = StringValue(block, "usage");
+    for (const json& rule_json : block.value("core_rules", json::array())) {
         AuthoringCoreRule rule;
         rule.id = StringValue(rule_json, "id");
         rule.category = StringValue(rule_json, "category");
@@ -408,25 +356,68 @@ bool ParseAuthoringGuidance(const std::filesystem::path& path, GuidelinesDocumen
         rule.statement = StringValue(rule_json, "statement");
         rule.reason = StringValue(rule_json, "reason");
         if (rule.id.empty() || rule.short_rule.empty()) {
-            error = path.filename().string() + " contains a core rule missing id or short_rule.";
+            error = "sccg.full.json contains an authoring core rule missing id or short_rule.";
             return false;
         }
         guidance.core_rules.push_back(std::move(rule));
     }
-    for (const json& rule_json : root.value("element_rules", json::array())) {
+    for (const json& rule_json : block.value("element_rules", json::array())) {
         AuthoringElementRule rule;
         rule.element_role = StringValue(rule_json, "element_role");
         rule.elements = StringArrayValue(rule_json, "elements");
         rule.guideline_ids = StringArrayValue(rule_json, "guideline_ids");
         rule.review_profile_id = StringValue(rule_json, "review_profile_id");
         if (rule.element_role.empty()) {
-            error = path.filename().string() + " contains an element rule missing element_role.";
+            error = "sccg.full.json contains an authoring element rule missing element_role.";
             return false;
         }
         guidance.element_rules.push_back(std::move(rule));
     }
     document.authoring_guidance = std::move(guidance);
     return true;
+}
+
+// Required by contract 3, empty or not. Read as optional, a catalogue without
+// the list loaded and retired nothing, and a stored finding citing a retired id
+// lost its redirect with no error anywhere.
+bool ParseRetiredGuidelines(const json& root, GuidelinesDocument& document, std::string& error) {
+    const auto retired_list = root.find("retired_guidelines");
+    if (retired_list == root.end() || !retired_list->is_array()) {
+        error = "sccg.full.json has no retired_guidelines list, which SCCG contract 3 requires.";
+        return false;
+    }
+    for (const json& entry_json : *retired_list) {
+        RetiredGuideline retired;
+        retired.id = StringValue(entry_json, "id");
+        retired.title = StringValue(entry_json, "title");
+        retired.retired_in = StringValue(entry_json, "retired_in");
+        retired.replaced_by = StringArrayValue(entry_json, "replaced_by");
+        retired.note = StringValue(entry_json, "note");
+        if (retired.id.empty() || retired.replaced_by.empty()) {
+            error = "sccg.full.json contains a retired guideline missing id or replaced_by.";
+            return false;
+        }
+        document.retired_guidelines.push_back(std::move(retired));
+    }
+    return true;
+}
+
+// The per-guideline profile and package lists the rule export carries,
+// derived from the profiles: a guideline is reviewed by every profile that lists
+// it, and may be given any package those profiles require or accept.
+void DeriveGuidelineProfileLinks(GuidelinesDocument& document) {
+    for (Guideline& guideline : document.guidelines) {
+        std::set<std::string> packages;
+        for (const ReviewProfile& profile : document.review_profiles) {
+            if (std::find(profile.guideline_ids.begin(), profile.guideline_ids.end(), guideline.id) ==
+                profile.guideline_ids.end())
+                continue;
+            guideline.review_profile_ids.push_back(profile.id);
+            packages.insert(profile.required_data.begin(), profile.required_data.end());
+            packages.insert(profile.optional_data.begin(), profile.optional_data.end());
+        }
+        guideline.data_package_ids.assign(packages.begin(), packages.end());
+    }
 }
 
 bool ValidateConsistency(const GuidelinesDocument& document, std::string& error) {
@@ -474,12 +465,11 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
             }
         }
         // The element under review is named by whichever required package
-        // carries the `selected_element` role. Refusing the catalog here is
-        // deliberate: a profile that names none, or names two, leaves the
-        // review method with no defensible answer to "which element is this
-        // about", and the failure a version ago was silent -- every review kept
-        // running and quietly reported the profile's own selected-element
-        // package as unavailable.
+        // carries the `selected_element` role. A profile that names none, or
+        // two, leaves the review method with no defensible answer to "which
+        // element is this about", and the failure a version ago was silent --
+        // every review kept running and reported the profile's own
+        // selected-element package as unavailable.
         std::size_t selected_element_packages = 0;
         const DataPackage* selected_element_package = nullptr;
         for (const std::string& package_id : profile.required_data) {
@@ -494,15 +484,76 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
                     " selected-element data packages; exactly one is required.";
             return false;
         }
-        // The role is what everything downstream matches on -- which profile
-        // applies to an element, and which package that element is sent in. A
-        // package carrying the role field but no value would match no element,
-        // so every review would fail with "no profile applies" rather than with
-        // the catalog defect that caused it.
         if (selected_element_package->element_role.empty()) {
             error = "SCCG review profile '" + profile.id + "' requires selected-element data package '" +
                     selected_element_package->id + "', which carries no element_role.";
             return false;
+        }
+
+        // A pass partition that dropped a guideline would be a fan-out review
+        // that never asks about it, and one listing a guideline twice would ask
+        // and report it twice. SCCG validates this upstream; the tool refuses a
+        // catalogue that fails it rather than trusting that it passed.
+        if (profile.review_passes.empty())
+            continue;
+        std::unordered_set<std::string> in_profile(profile.guideline_ids.begin(), profile.guideline_ids.end());
+        std::unordered_set<std::string> covered;
+        std::unordered_set<std::string> pass_ids;
+        for (const ReviewPass& pass : profile.review_passes) {
+            if (!pass_ids.insert(pass.id).second) {
+                error = "SCCG review profile '" + profile.id + "' names review pass '" + pass.id + "' twice.";
+                return false;
+            }
+            if (pass.guideline_ids.empty()) {
+                error =
+                    "SCCG review profile '" + profile.id + "' has review pass '" + pass.id + "' with no guidelines.";
+                return false;
+            }
+            for (const std::string& guideline_id : pass.guideline_ids) {
+                if (in_profile.count(guideline_id) == 0) {
+                    error = "SCCG review pass '" + profile.id + "/" + pass.id + "' lists '" + guideline_id +
+                            "', which the profile does not carry.";
+                    return false;
+                }
+                if (!covered.insert(guideline_id).second) {
+                    error = "SCCG review profile '" + profile.id + "' lists guideline '" + guideline_id +
+                            "' in more than one review pass.";
+                    return false;
+                }
+            }
+        }
+        for (const std::string& guideline_id : profile.guideline_ids) {
+            if (covered.count(guideline_id) == 0) {
+                error = "SCCG review profile '" + profile.id + "' has review passes that omit guideline '" +
+                        guideline_id + "'.";
+                return false;
+            }
+        }
+    }
+
+    for (const Guideline& guideline : document.guidelines) {
+        for (const GuidelineDistinction& distinction : guideline.distinguish_from) {
+            if (rule_ids.count(distinction.id) == 0) {
+                error = "SCCG guideline '" + guideline.id + "' distinguishes itself from unknown guideline '" +
+                        distinction.id + "'.";
+                return false;
+            }
+        }
+    }
+
+    // A retired id still in use is two meanings for one id, and a redirect to a
+    // guideline that does not exist sends a stored finding nowhere.
+    for (const RetiredGuideline& retired : document.retired_guidelines) {
+        if (rule_ids.count(retired.id) != 0) {
+            error = "SCCG guideline '" + retired.id + "' is both retired and published.";
+            return false;
+        }
+        for (const std::string& replacement : retired.replaced_by) {
+            if (rule_ids.count(replacement) == 0) {
+                error = "Retired SCCG guideline '" + retired.id + "' is replaced by unknown guideline '" + replacement +
+                        "'.";
+                return false;
+            }
         }
     }
 
@@ -515,42 +566,59 @@ bool ValidateConsistency(const GuidelinesDocument& document, std::string& error)
         }
     }
 
+    // SCCG requires {question} exactly once and no other brace; a tool that
+    // substituted into anything else would send the model a literal placeholder.
+    if (!document.review_pass_instruction.empty()) {
+        const std::string& instruction = document.review_pass_instruction;
+        const std::size_t placeholder = instruction.find("{question}");
+        const std::size_t braces = std::count(instruction.begin(), instruction.end(), '{') +
+                                   std::count(instruction.begin(), instruction.end(), '}');
+        if (placeholder == std::string::npos || braces != 2) {
+            error = "SCCG review_pass_instruction must contain {question} once and no other brace.";
+            return false;
+        }
+    }
     return true;
 }
 
 } // namespace
 
-GuidelinesParseResult SccgDistParser::ParseDirectory(const std::filesystem::path& dist_dir) {
-    std::error_code filesystem_error;
-    if (!std::filesystem::exists(dist_dir, filesystem_error) ||
-        !std::filesystem::is_directory(dist_dir, filesystem_error)) {
-        return std::unexpected("SCCG dist directory was not found: " + dist_dir.string());
-    }
-
-    const std::filesystem::path review_profiles_path = dist_dir / "review_profiles.json";
-    const std::filesystem::path data_packages_path = dist_dir / "data_packages.json";
-    std::filesystem::path rules_path = dist_dir / "ai_rule_export.jsonl";
-    if (!std::filesystem::exists(rules_path, filesystem_error))
-        rules_path = dist_dir / "sccg.rules.jsonl";
-
-    for (const std::filesystem::path& required_path : {review_profiles_path, data_packages_path, rules_path}) {
-        if (!std::filesystem::exists(required_path, filesystem_error)) {
-            return std::unexpected("SCCG runtime artifact missing: " + required_path.filename().string() + " in " +
-                                   dist_dir.string());
-        }
-    }
+GuidelinesParseResult SccgDistParser::ParseFile(const std::filesystem::path& catalog_path) {
+    json root;
+    std::string error;
+    if (!ReadJsonFile(catalog_path, root, error))
+        return std::unexpected(std::move(error));
+    if (!root.is_object())
+        return std::unexpected(catalog_path.filename().string() + " is not a JSON object.");
 
     GuidelinesDocument document;
-    std::string error;
-    if (!ParseRulesJsonl(rules_path, document, error) || !ParseReviewProfiles(review_profiles_path, document, error) ||
-        !ParseDataPackages(data_packages_path, document, error) ||
-        !ParsePrechecks(dist_dir / "prechecks.json", document, error) ||
-        !ParseAuthoringGuidance(dist_dir / "authoring_guidance.json", document, error) ||
-        !ValidateConsistency(document, error)) {
+    document.schema_version = StringValue(root, "schema_version");
+    document.sccg_version = StringValue(root, "sccg_version");
+    if (MajorVersion(document.schema_version) != kSupportedSchemaMajor) {
+        return std::unexpected(
+            "SCCG contract " +
+            (document.schema_version.empty() ? std::string("(unversioned)") : document.schema_version) +
+            " is not supported; this tool reads contract " + std::to_string(kSupportedSchemaMajor) + ".x.");
+    }
+    ParseDocumentBlock(root, document);
+
+    if (!ParseGuidelines(root, document, error) || !ParseReviewProfiles(root, document, error) ||
+        !ParseDataPackages(root, document, error) || !ParsePrechecks(root, document, error) ||
+        !ParseAuthoringGuidance(root, document, error) || !ParseRetiredGuidelines(root, document, error)) {
         return std::unexpected(std::move(error));
     }
-
+    DeriveGuidelineProfileLinks(document);
+    if (!ValidateConsistency(document, error))
+        return std::unexpected(std::move(error));
     return document;
+}
+
+GuidelinesParseResult SccgDistParser::ParseDirectory(const std::filesystem::path& dist_dir) {
+    const std::filesystem::path catalog_path = dist_dir / kCatalogFileName;
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(catalog_path, filesystem_error))
+        return std::unexpected("SCCG catalogue not found: " + catalog_path.string());
+    return ParseFile(catalog_path);
 }
 
 } // namespace parser

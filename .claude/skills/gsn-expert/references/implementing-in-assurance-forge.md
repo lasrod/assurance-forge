@@ -86,9 +86,9 @@ SACM equivalents run the other way; the reader swaps on import.
 ## Where the argument-quality path lives
 
 - Problems: `src/core/problems/` → `src/ui/panels/problems_panel.cpp`.
-- Guidelines: `src/parser/sccg_dist_parser.cpp`, `guidelines_parser.cpp`, from
+- Guidelines: `src/parser/sccg_dist_parser.cpp` reads `sccg.full.json` from
   the `external/safety-case-core-guidelines` submodule, copied to
-  `data/sccg.full.yaml` at build time.
+  `data/sccg/dist/` at build time.
 - AI review: `src/ai/ai_claim_review.cpp`; proposals and patches in
   `src/core/reviews/`.
 

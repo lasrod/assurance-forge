@@ -26,6 +26,13 @@
 # `agent` may use `review` so an external client gets the same method and
 # validator as the built-in path; `mcp` still reaches it only through `agent`.
 #
+# `eval` is the offline evaluation harness: a second composition root that
+# joins `review` and `ai` the way `app` does, without a window. It is
+# governed rather than unlisted because a harness that could reach `ui/` or
+# `app/` would stop measuring the reusable method and start measuring the
+# application, and because an ungoverned directory under `src/` is a hole in
+# the gate rather than an exemption from it.
+#
 # `mcp` forbidding `ai/` is deliberate, not incidental: the MCP server and the
 # in-app AI review are two independent features that must not share an inference
 # path (docs/features/mcp-server.md). The gate is what keeps that separation from
@@ -67,6 +74,7 @@ set(_AF_FORBIDDEN_ui     "review/;ai/;export/;app/")
 set(_AF_FORBIDDEN_bridge "review/;ai/;export/;ui/;agent/;mcp/;app/")
 set(_AF_FORBIDDEN_agent  "ai/;export/;ui/;mcp/;app/")
 set(_AF_FORBIDDEN_mcp    "review/;ai/;export/;ui/;app/")
+set(_AF_FORBIDDEN_eval   "export/;ui/;bridge/;agent/;mcp/;app/")
 # app may include anything.
 
 # Known cross-layer includes recorded as exceptions. Format:
@@ -85,7 +93,7 @@ set(_AF_FORBIDDEN_mcp    "review/;ai/;export/;ui/;app/")
 set(_AF_ALLOWLIST
 )
 
-set(_AF_LAYERS parser legacy_sacm sacm_adapter core review ai export ui bridge agent mcp)
+set(_AF_LAYERS parser legacy_sacm sacm_adapter core review ai export ui bridge agent mcp eval)
 set(_AF_VIOLATIONS "")
 
 foreach(layer IN LISTS _AF_LAYERS)

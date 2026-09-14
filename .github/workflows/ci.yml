@@ -98,7 +98,7 @@ jobs:
           python-version: '3.12'
 
       # Caches compiled objects across runs, including the FetchContent
-      # dependencies (curl, hello_imgui, yaml-cpp, googletest) which are pinned
+      # dependencies (curl, hello_imgui, googletest) which are pinned
       # and rarely change — that rebuild is most of the build time. The cache is
       # keyed per OS by the action.
       #

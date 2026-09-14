@@ -24,7 +24,7 @@ cmake --preset default
 cmake --build build --config Release --target assurance-forge assurance-forge-mcp tests
 ```
 
-Configure takes ~2 minutes (it fetches curl, yaml-cpp, GoogleTest and nlohmann).
+Configure takes ~2 minutes (it fetches curl, GoogleTest and nlohmann).
 The layer gate runs at configure time, so a cross-layer include fails here rather
 than at link.
 
@@ -226,4 +226,4 @@ corpus is present — that is expected, not a failure.
 | `app is not running; -Action launch first` | App exited between calls | `-Action state`, then `launch`. |
 | MCP tool returns `has not been given permission` | Consent gate closed | Point `--settings` at a file containing `{"mcp":{"enabled":true}}`. |
 | `assurance-forge-mcp not found next to Assurance Forge` in Preferences | Only the GUI target was built | Build `assurance-forge-mcp` too. |
-| Configure fails on missing `sccg.full.yaml` | SCCG submodule not populated | Regenerate `dist/` in `external/safety-case-core-guidelines`. |
+| Configure fails on missing `sccg.full.json` | SCCG submodule not populated | Regenerate `dist/` in `external/safety-case-core-guidelines`. |

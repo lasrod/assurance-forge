@@ -7,6 +7,7 @@ namespace ai {
 class LibCurlHttpClient final : public IHttpClient {
 public:
     HttpResponse Post(const HttpRequest& request) override;
+    HttpResponse Get(const HttpRequest& request) override;
 };
 
 } // namespace ai

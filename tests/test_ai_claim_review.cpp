@@ -276,10 +276,15 @@ TEST(AiClaimReviewTest, EveryAbsenceStateIsOnePublishedByTheCatalog) {
     EXPECT_NE(Catalog().FindAvailabilityStateById("available"), nullptr);
 }
 
-// EVIDENCE_BASIS stays required and this tool still has no source for it. What
-// changed is that the catalog now says what a review missing it should do, so
-// the degradation is declared rather than improvised.
-TEST(AiClaimReviewTest, EvidenceBasisAbsenceCarriesTheProfilesDeclaredDegradation) {
+// EVIDENCE_BASIS: this tool still has no source for it, so it is reported
+// not_implemented. What SCCG 0.8.0 changed is what that absence does. Under 0.7.0
+// evidence_review's when_absent statement named EV.5 and seven other guidelines
+// unassessable, and measured over three runs per element EV.5 was cited 0 of 3
+// times against evidence stating no sufficiency basis at all. 0.8.0 made the
+// package optional and removed the statement; the registry-wide when_unavailable
+// rule -- an unavailable package never silences a guideline -- governs instead,
+// and it has to reach the model in SCCG's own words.
+TEST(AiClaimReviewTest, EvidenceBasisAbsenceSilencesNothingAndCarriesSccgsRule) {
     parser::AssuranceCase assurance_case;
     assurance_case.elements.push_back(MakeElement("SN1", "artifactreference", "Evidence", {}, "Test report."));
     core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
@@ -297,19 +302,24 @@ TEST(AiClaimReviewTest, EvidenceBasisAbsenceCarriesTheProfilesDeclaredDegradatio
             basis = &package;
     }
     ASSERT_NE(basis, nullptr);
-    EXPECT_TRUE(basis->required);
-    EXPECT_FALSE(basis->when_absent_statement.empty());
-    EXPECT_NE(std::find(basis->unassessable_guideline_ids.begin(), basis->unassessable_guideline_ids.end(), "EV.5"),
-              basis->unassessable_guideline_ids.end());
-    // And it reaches the model, not just the struct.
+    EXPECT_EQ(basis->absence, review::DataPackageAbsence::NotImplemented);
+    EXPECT_FALSE(basis->required) << "0.8.0 made EVIDENCE_BASIS optional for evidence review";
+    EXPECT_TRUE(basis->when_absent_statement.empty());
+    EXPECT_TRUE(basis->unassessable_guideline_ids.empty()) << "nothing may be silenced by an absent package";
+
+    // The rule is carried with the packages, and it reaches the model.
+    EXPECT_EQ(packages.when_unavailable, Catalog().when_unavailable);
     const review::AiReviewPayload payload;
     const std::vector<const parser::Guideline*> guidelines;
     const review::AiReviewRequestArtifacts artifacts =
         review::BuildAiReviewRequestArtifacts(payload, guidelines, profile, &packages);
-    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("when_absent"), std::string::npos)
+    EXPECT_NE(artifacts.prompt.find(Catalog().when_unavailable), std::string::npos)
+        << "SCCG's when_unavailable rule must reach the model verbatim";
+    EXPECT_EQ(artifacts.unavailableDataPackagesJson.find("unassessable_guideline_ids"), std::string::npos)
         << artifacts.unavailableDataPackagesJson;
-    EXPECT_NE(artifacts.unavailableDataPackagesJson.find("EV.5"), std::string::npos)
-        << artifacts.unavailableDataPackagesJson;
+    // And every availability state is defined in SCCG's words, not this tool's.
+    for (const parser::AvailabilityState& state : Catalog().availability_states)
+        EXPECT_NE(artifacts.prompt.find(state.meaning), std::string::npos) << state.id;
 }
 
 // The two halves of a `when_absent` entry are serialized independently. A
@@ -665,14 +675,32 @@ TEST(AiClaimReviewTest, CarriesTheUsersOwnConcernWhenTheyStatedOne) {
 // no source for reads differently from one the case simply has none of, and
 // both read differently from one deliberately not shared.
 TEST(AiClaimReviewTest, NamesWhyEachAbsentPackageIsAbsent) {
-    const review::AiReviewDataPackageBundle packages = CollectFor(CaseWithATerm(), "G1", nullptr);
+    // Through a real profile, because the required/optional lists are what the
+    // absent packages are reported against: a collection with no profile has
+    // nothing to say a package is missing FROM. The application always has one
+    // (selection fails closed), so a nullptr here would test a path it never
+    // takes.
+    const core::AssuranceTree tree = core::AssuranceTree::Build(CaseWithATerm());
+    const parser::AssuranceCase assurance_case = CaseWithATerm();
+    const parser::ReviewProfile* profile = Catalog().FindReviewProfileById("claim_review");
+    ASSERT_NE(profile, nullptr);
+    review::AiReviewDataPackageBundle packages;
+    std::string error;
+    ASSERT_TRUE(
+        review::CollectAiReviewDataPackages(assurance_case, tree, "G1", Catalog(), profile, packages, error, nullptr))
+        << error;
 
+    // No source in this tool for any of the package's fields, so it is not
+    // implemented -- which under SCCG 0.8.0 silences nothing -- and the reason
+    // names the route by which it would become implementable.
     const review::AiReviewUnavailableDataPackage* basis = Unavailable(packages, "EVIDENCE_BASIS");
     ASSERT_NE(basis, nullptr);
     EXPECT_EQ(basis->absence, review::DataPackageAbsence::NotImplemented);
     EXPECT_NE(basis->reason.find("evidence register"), std::string::npos)
         << "the recorded route should survive in the reason a reviewer reads";
 
+    // STANDARD_LINKS has a required field this tool cannot fill, so unlike
+    // EVIDENCE_BASIS it genuinely cannot be supplied.
     const review::AiReviewUnavailableDataPackage* links = Unavailable(packages, "STANDARD_LINKS");
     ASSERT_NE(links, nullptr);
     EXPECT_EQ(links->absence, review::DataPackageAbsence::NotImplemented);

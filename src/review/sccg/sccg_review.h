@@ -89,6 +89,14 @@ struct AiReviewCaseContext {
 struct AiReviewDataPackageBundle {
     std::vector<AiReviewDataPackage> available;
     std::vector<AiReviewUnavailableDataPackage> unavailable;
+    // SCCG's rule for every package in `unavailable`, and its meaning for each
+    // availability state, copied from the catalogue the packages were collected
+    // against. Carried with the packages rather than looked up at prompt time so
+    // the request states the rule of the catalogue that decided availability,
+    // never of whichever catalogue happens to be loaded when it is assembled.
+    // Both empty for a catalogue that predates SCCG 0.8.0.
+    std::string when_unavailable;
+    std::vector<parser::AvailabilityState> availability_states;
 };
 
 struct AiReviewRequestArtifacts {
@@ -104,6 +112,13 @@ struct AiReviewRequestArtifacts {
     std::string responseSchemaJson;
     std::string expectedResponseSchema;
     std::string prompt;
+    // `prompt` in the pieces a provider can cache, most shared first: what
+    // every review sends, what every review of this profile and pass sends,
+    // and what only this element sends. They concatenate to `prompt`.
+    std::vector<std::string> promptSegments;
+    // Names the first two segments, which is what requests sharing a cache
+    // have in common: SCCG version, profile and pass.
+    std::string promptCacheKey;
     std::string debugText;
 };
 
@@ -117,6 +132,17 @@ struct AiReviewParseResult {
     std::string reviewedElementType;
     std::vector<core::ProblemItem> problems;
     std::vector<std::string> suggestedElementTexts;
+    // Per finding, in the same order as `problems`: how far the model said the
+    // supplied data supports it, or empty when it did not say. This is the
+    // ranking signal that replaced `severity`, which SCCG never defined and
+    // which the prompt pinned to one value.
+    std::vector<std::string> findingConfidences;
+    // Per finding, in the same order as `problems`: the guideline id exactly as
+    // the model cited it, including one that was refused. `problem.guideline_id`
+    // is emptied for a refused id, which is right for display and loses the one
+    // fact a review-pass merge needs -- whether the refused id belongs to a
+    // different pass of the same profile.
+    std::vector<std::string> citedGuidelineIds;
     // Per finding, in the same order as `problems`: the structural repair it
     // asks for, when SCCG's answer is to add or re-attach an element rather
     // than to reword one. Empty for a finding a text edit fixes.
@@ -158,6 +184,16 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
                           const std::string& selected_element_id,
                           AiReviewPayload& out_payload,
                           std::string& out_error);
+// SCCG's availability rule (0.9.0), applied to every package in `available`:
+// one supplied with none of its published fields populated -- null, "", [] or
+// {} -- is moved to `unavailable` as empty, and one with something populated but
+// a required field left out is moved there as not implemented. The collector calls it; public
+// because it is the catalogue's rule rather than this tool's, and a caller
+// building packages another way must apply the same one.
+void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
+                                     const parser::GuidelinesDocument& catalog,
+                                     const parser::ReviewProfile* review_profile);
+
 // `catalog` names the packages. The selected element goes in whichever
 // package the profile requires with role `selected_element` -- one per element
 // role since SCCG 0.7.0, where a single generic `SEL` used to serve them all.
@@ -175,7 +211,9 @@ BuildAiReviewRequestArtifacts(const AiReviewPayload& payload,
                               const std::vector<const parser::Guideline*>& guidelines,
                               const parser::ReviewProfile* review_profile = nullptr,
                               const AiReviewDataPackageBundle* data_packages = nullptr,
-                              const std::vector<review::sccg::PrecheckResult>* precheck_results = nullptr);
+                              const std::vector<review::sccg::PrecheckResult>* precheck_results = nullptr,
+                              const parser::ReviewPass* review_pass = nullptr,
+                              const std::string& review_pass_instruction = {});
 AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
                                         const std::vector<const parser::Guideline*>& guidelines,
                                         const parser::ReviewProfile* review_profile = nullptr,
@@ -190,6 +228,17 @@ AiReviewPromptParts BuildAiReviewPrompt(const AiReviewPayload& payload,
 // propose structural changes -- the set they are allowed to touch.
 std::vector<std::string> ReviewedElementIds(const AiReviewPayload& payload,
                                             const AiReviewDataPackageBundle& data_packages);
+
+// The pre-checks that independently flagged the same guideline as a finding
+// cites. A finding a deterministic check also reached is corroborated by
+// something that did not come from a model, which is a fact the tool can
+// establish and a reviewer can act on -- unlike a severity the model was told
+// what to write.
+//
+// Empty means the finding stands on the model's reading alone. That is not a
+// mark against it: most guidelines have no pre-check at all.
+std::vector<std::string> CorroboratingPrecheckIds(const std::string& guideline_id,
+                                                  const std::vector<sccg::PrecheckResult>& precheck_results);
 
 std::string BuildExpectedAiReviewResponseSchemaText();
 std::string StripJsonCodeFence(const std::string& response_text);

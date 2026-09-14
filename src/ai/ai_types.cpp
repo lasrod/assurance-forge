@@ -47,6 +47,8 @@ const char* ToString(AiErrorCode errorCode) {
         return "Connection timed out";
     case AiErrorCode::RateLimited:
         return "Rate limit reached";
+    case AiErrorCode::QuotaExhausted:
+        return "The AI provider account has no credit left";
     case AiErrorCode::InvalidModel:
         return "Model not available";
     case AiErrorCode::MalformedResponse:
@@ -59,6 +61,15 @@ const char* ToString(AiErrorCode errorCode) {
         return "Unknown error";
     }
     return "Unknown error";
+}
+
+std::string PromptText(const AiRequest& request) {
+    if (request.promptSegments.empty())
+        return request.userPrompt;
+    std::string text;
+    for (const AiPromptSegment& segment : request.promptSegments)
+        text += segment.text;
+    return text;
 }
 
 AiConnectionStatus MakeStatus(AiTaskState state, AiErrorCode errorCode, std::string message) {
