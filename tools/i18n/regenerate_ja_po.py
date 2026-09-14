@@ -370,6 +370,8 @@ TRANSLATIONS = {
     # ===== Modals =====
     "Project Loading Status": "プロジェクト読み込み状況",
     "External changes detected": "外部の変更を検出しました",
+    "OK records these changes as seen on this computer, so they are not reported again unless the file changes again. af.proj is not modified.": "「OK」を押すと、これらの変更をこのコンピューター上で確認済みとして記録します。ファイルが再び変更されない限り、再度報告されることはありません。af.proj は変更されません。",
+    "The external changes could not be recorded as seen, so they will be reported again on the next open: {0}": "外部の変更を確認済みとして記録できなかったため、次にプロジェクトを開いたときにも報告されます: {0}",
     "Project name": "プロジェクト名",
     "Parent location": "親の場所",
     "File name": "ファイル名",

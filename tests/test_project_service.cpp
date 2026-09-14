@@ -13,6 +13,7 @@
 #include <fstream>
 #include <sstream>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -389,6 +390,211 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     EXPECT_EQ(evidence_it->state, core::ProjectFileState::Missing);
     EXPECT_TRUE(missing_report.has_failures());
     EXPECT_TRUE(missing_report.showPopup);
+}
+
+namespace {
+
+void AppendNewline(const std::filesystem::path& path) {
+    std::ofstream file(path, std::ios::app | std::ios::binary);
+    file << "\n";
+}
+
+core::ProjectFileState EvidenceRegisterState(const core::AssuranceProject& project) {
+    for (const core::ProjectFileEntry& file : project.files) {
+        if (file.role == core::ProjectFileRole::EvidenceRegister)
+            return file.state;
+    }
+    return core::ProjectFileState::Missing;
+}
+
+} // namespace
+
+// #402: the "modified outside Assurance Forge" warning used to repeat on every
+// open until something saved the project. Acknowledged once, the same change is
+// not reported again -- and acknowledging does not rewrite af.proj, whose
+// recorded hash is the evidence that the file was edited outside the tool.
+TEST(ProjectServiceTest, AnAcknowledgedExternalChangeIsNotReportedAgainAndTheManifestKeepsItsHash) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Acknowledged", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    AppendNewline(project.rootPath / entry.relativePath);
+
+    core::AssuranceProject opened;
+    core::ProjectLoadReport first;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, opened, first, error)) << error;
+    ASSERT_EQ(first.externalChanges.size(), 1u);
+    EXPECT_FALSE(first.externalChanges.front().acknowledged);
+    EXPECT_NE(first.externalChanges.front().recordedRawHash, first.externalChanges.front().observedRawHash);
+    EXPECT_EQ(first.warnings.size(), 1u);
+    EXPECT_TRUE(first.showPopup);
+
+    const std::filesystem::path manifest = core::ProjectService::ManifestPath(opened);
+    const std::string manifest_before = core::ReadTextFile(manifest).value();
+    ASSERT_TRUE(core::ProjectService::AcknowledgeExternalChanges(opened, first.externalChanges, error)) << error;
+    EXPECT_EQ(core::ReadTextFile(manifest).value(), manifest_before) << "acknowledging must not rewrite af.proj";
+    EXPECT_TRUE(std::filesystem::exists(project.rootPath / ".af" / ".gitignore"));
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport second;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, second, error)) << error;
+    EXPECT_TRUE(second.warnings.empty());
+    EXPECT_FALSE(second.showPopup);
+    ASSERT_EQ(second.externalChanges.size(), 1u);
+    EXPECT_TRUE(second.externalChanges.front().acknowledged);
+    // The warning is withheld; the fact is not.
+    EXPECT_EQ(EvidenceRegisterState(reopened), core::ProjectFileState::ModifiedOutsideAssuranceForge);
+
+    // A further edit is a different change, and is reported.
+    AppendNewline(project.rootPath / entry.relativePath);
+    core::AssuranceProject edited_again;
+    core::ProjectLoadReport third;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, edited_again, third, error)) << error;
+    EXPECT_EQ(third.warnings.size(), 1u);
+    EXPECT_TRUE(third.showPopup);
+    ASSERT_EQ(third.externalChanges.size(), 1u);
+    EXPECT_FALSE(third.externalChanges.front().acknowledged);
+}
+
+// Only the shape AcknowledgeExternalChanges writes acknowledges anything. Every
+// other file -- unreadable, another format or version, an entry missing a field --
+// leaves the change reported, as it was before acknowledgements existed. The first
+// case is the control: the same entry in the written format does acknowledge, so
+// each refusal below is about the shape and not about a hash that never matched.
+TEST(ProjectServiceTest, AnAcknowledgementFileNotInTheWrittenFormatAcknowledgesNothing) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Unreadable", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    AppendNewline(project.rootPath / entry.relativePath);
+
+    core::AssuranceProject opened;
+    core::ProjectLoadReport first;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, opened, first, error)) << error;
+    ASSERT_EQ(first.externalChanges.size(), 1u);
+    const core::ExternalFileChange& change = first.externalChanges.front();
+    const nlohmann::json valid{{"format", "assurance-forge.acknowledged-external-changes"},
+                               {"version", 1},
+                               {"changes",
+                                nlohmann::json::array({{{"path", change.relativePath.generic_string()},
+                                                        {"recorded_raw_hash", change.recordedRawHash},
+                                                        {"observed_raw_hash", change.observedRawHash},
+                                                        {"acknowledged_utc", "2026-09-15T00:00:00Z"}}})}};
+
+    nlohmann::json no_format = valid;
+    no_format.erase("format");
+    nlohmann::json other_version = valid;
+    other_version["version"] = 2;
+    nlohmann::json no_recorded_hash = valid;
+    no_recorded_hash["changes"][0].erase("recorded_raw_hash");
+    nlohmann::json no_time = valid;
+    no_time["changes"][0].erase("acknowledged_utc");
+    nlohmann::json path_not_a_string = valid;
+    path_not_a_string["changes"][0]["path"] = 5;
+
+    struct Case {
+        const char* label;
+        std::string content;
+        bool acknowledges;
+    };
+    const std::vector<Case> cases = {
+        {"the written format (control)", valid.dump(), true},
+        {"not JSON", "{ not json", false},
+        {"no format", no_format.dump(), false},
+        {"another version", other_version.dump(), false},
+        {"an entry without its recorded hash", no_recorded_hash.dump(), false},
+        {"an entry without its time", no_time.dump(), false},
+        {"a path that is not a string", path_not_a_string.dump(), false},
+    };
+    std::filesystem::create_directories(project.rootPath / ".af");
+    for (const Case& test_case : cases) {
+        SCOPED_TRACE(test_case.label);
+        std::ofstream(project.rootPath / ".af" / "acknowledged-external-changes.json", std::ios::binary)
+            << test_case.content;
+        core::AssuranceProject reopened;
+        core::ProjectLoadReport open_report;
+        ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, open_report, error)) << error;
+        EXPECT_EQ(open_report.warnings.empty(), test_case.acknowledges);
+        EXPECT_EQ(open_report.showPopup, !test_case.acknowledges);
+    }
+}
+
+// Every acknowledged pair is kept, not the latest per file. A file changed to A
+// and acknowledged, then to B and acknowledged, then back to A is back at a change
+// already acknowledged.
+TEST(ProjectServiceTest, AReturnToAnAcknowledgedChangeIsNotReportedAgain) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Returned", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    const std::filesystem::path file = project.rootPath / entry.relativePath;
+
+    AppendNewline(file);
+    core::AssuranceProject at_a;
+    core::ProjectLoadReport report_a;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, at_a, report_a, error)) << error;
+    ASSERT_EQ(report_a.warnings.size(), 1u);
+    ASSERT_TRUE(core::ProjectService::AcknowledgeExternalChanges(at_a, report_a.externalChanges, error)) << error;
+
+    AppendNewline(file);
+    core::AssuranceProject at_b;
+    core::ProjectLoadReport report_b;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, at_b, report_b, error)) << error;
+    ASSERT_EQ(report_b.warnings.size(), 1u);
+    ASSERT_TRUE(core::ProjectService::AcknowledgeExternalChanges(at_b, report_b.externalChanges, error)) << error;
+
+    // Back to A: drop the newline B added.
+    std::filesystem::resize_file(file, std::filesystem::file_size(file) - 1);
+    core::AssuranceProject back_at_a;
+    core::ProjectLoadReport report_back;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, back_at_a, report_back, error)) << error;
+    EXPECT_TRUE(report_back.warnings.empty());
+    ASSERT_EQ(report_back.externalChanges.size(), 1u);
+    EXPECT_TRUE(report_back.externalChanges.front().acknowledged);
+}
+
+// An acknowledged change must not hide a missing file in the load report: the
+// missing file is what keeps the popup open, so the message has to name it.
+TEST(ProjectServiceTest, AnAcknowledgedChangeDoesNotHideAMissingFileInTheLoadReport) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Missing", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    AppendNewline(project.rootPath / entry.relativePath);
+
+    core::AssuranceProject opened;
+    core::ProjectLoadReport first;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, opened, first, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AcknowledgeExternalChanges(opened, first.externalChanges, error)) << error;
+
+    const auto other = std::find_if(opened.files.begin(), opened.files.end(), [](const core::ProjectFileEntry& file) {
+        return file.role != core::ProjectFileRole::EvidenceRegister;
+    });
+    ASSERT_NE(other, opened.files.end());
+    std::filesystem::remove(project.rootPath / other->relativePath);
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport second;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, second, error)) << error;
+    EXPECT_TRUE(second.showPopup);
+    const auto step = std::find_if(second.steps.begin(), second.steps.end(), [](const core::ProjectLoadStep& s) {
+        return s.label == "Recalculate raw hashes";
+    });
+    ASSERT_NE(step, second.steps.end());
+    EXPECT_NE(step->message.find("1 missing file(s)"), std::string::npos) << step->message;
+    EXPECT_NE(step->message.find("already acknowledged"), std::string::npos) << step->message;
 }
 // `ReadFileBytes` had no test. It measures the file with `tellg`, sizes a buffer
 // to that, and reads. The read now has to deliver every byte it asked for, so

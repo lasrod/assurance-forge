@@ -26,6 +26,20 @@ The MCP server also accepts a bare `.sacm` path (`--project`), read-only.
 The three **Walkthroughs** cards are likewise placeholders at present; they
 report that walkthroughs are not yet implemented.
 
+## When a file changed outside Assurance Forge
+
+`af.proj` records a hash of every file the project tracks. If a file no longer
+matches it (someone edited the argument in another tool, or a checkout changed
+its line endings), opening the project shows **Project Loading Status** with the
+file listed under **External changes detected**.
+
+Pressing **OK** records those changes as seen on this computer, in the `.af/`
+folder that version control ignores, so the next open does not report them
+again. It does not update `af.proj`. The file keeps showing as modified outside
+Assurance Forge until Assurance Forge next saves it, and a further change to it
+is reported again. Anyone else opening the same project sees the warning
+themselves.
+
 ## Open Recent Projects
 
 Each entry shows the project name, its claim / strategy / evidence / undeveloped
