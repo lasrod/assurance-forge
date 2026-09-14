@@ -29,7 +29,8 @@
         "sacm-conformance-verifier"
       ],
       "assert": {
-        "writes": "none"
+        "writes": "none",
+        "write_hook_denies": true
       }
     },
     {
@@ -41,7 +42,8 @@
         "feature-matrix-steward"
       ],
       "assert": {
-        "writes": "none"
+        "writes": "none",
+        "write_hook_denies": true
       }
     },
     {
@@ -53,7 +55,8 @@
         "sacm-researcher"
       ],
       "assert": {
-        "writes": "none"
+        "writes": "none",
+        "write_hook_denies": true
       }
     },
     {

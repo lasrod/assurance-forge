@@ -68,7 +68,7 @@
       "description": [
         "The tools the agent may use, as a comma-separated list, or `all`.",
         "Must be consistent with `writes`: a `writes: none` agent may not list",
-        "Write, Edit or NotebookEdit, and may not use `all`. The checker enforces",
+        "Write, Edit, MultiEdit or NotebookEdit, and may not use `all`. The checker enforces",
         "that, so the boundary cannot be stated in one field and contradicted in",
         "the other."
       ]
@@ -90,5 +90,5 @@
     "min_length": 200,
     "description": "The agent prompt, in Markdown, below the frontmatter. Carried into every adapter verbatim."
   },
-  "write_denied_tools": ["Write", "Edit", "NotebookEdit"]
+  "write_denied_tools": ["Write", "Edit", "MultiEdit", "NotebookEdit"]
 }
