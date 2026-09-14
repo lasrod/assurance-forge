@@ -208,6 +208,99 @@ TEST(OpenAiProviderTest, AResponseWithoutUsageSaysSoRatherThanReportingZero) {
     EXPECT_FALSE(provider.Generate(ai::AiProviderSettings{}, request, "sk-test").usage.reported);
 }
 
+// A usage block without both token counts measured nothing. Read as reported,
+// it would enter a sweep's totals as a free request.
+TEST(OpenAiProviderTest, DoesNotReportAUsageBlockWithoutItsTokenCounts) {
+    auto http = std::make_shared<FakeHttpClient>();
+    http->response.statusCode = 200;
+    ai::OpenAiProvider provider(http);
+    ai::AiRequest request;
+    request.userPrompt = "plain";
+
+    for (const char* body : {R"({"output_text":"ok","usage":{}})",
+                             R"({"output_text":"ok","usage":{"input_tokens":"10","output_tokens":5}})",
+                             R"({"output_text":"ok","usage":{"input_tokens":10}})"}) {
+        SCOPED_TRACE(body);
+        http->response.body = body;
+        const ai::AiResponse response = provider.Generate(ai::AiProviderSettings{}, request, "sk-test");
+        ASSERT_TRUE(response.success) << response.errorMessage;
+        EXPECT_FALSE(response.usage.reported);
+    }
+}
+
+// A billed response is billed whether or not its output is usable. Usage read
+// only after the text was accepted vanished from a sweep's totals.
+TEST(OpenAiProviderTest, KeepsTheUsageOfAResponseWhoseOutputIsUnusable) {
+    auto http = std::make_shared<FakeHttpClient>();
+    http->response.statusCode = 200;
+    http->response.body = R"({"id":"resp_1","usage":{"input_tokens":900,"output_tokens":40}})";
+    ai::OpenAiProvider provider(http);
+    ai::AiRequest request;
+    request.userPrompt = "plain";
+
+    const ai::AiResponse response = provider.Generate(ai::AiProviderSettings{}, request, "sk-test");
+
+    EXPECT_FALSE(response.success);
+    EXPECT_EQ(response.errorCode, ai::AiErrorCode::MalformedResponse);
+    EXPECT_TRUE(response.usage.reported);
+    EXPECT_EQ(response.usage.inputTokens, 900);
+    EXPECT_EQ(response.usage.outputTokens, 40);
+}
+
+// Sampling controls are sent exactly when set: a model that rejects
+// `temperature` must stay reachable, and a requested seed must not be dropped.
+TEST(OpenAiProviderTest, SendsTemperatureAndSeedOnlyWhenSet) {
+    auto http = std::make_shared<FakeHttpClient>();
+    http->response.statusCode = 200;
+    http->response.body = R"({"output_text":"ok"})";
+    ai::OpenAiProvider provider(http);
+    ai::AiRequest request;
+    request.userPrompt = "plain";
+
+    ASSERT_TRUE(provider.Generate(ai::AiProviderSettings{}, request, "sk-test").success);
+    nlohmann::json body = nlohmann::json::parse(http->lastRequest.body);
+    EXPECT_FALSE(body.contains("temperature"));
+    EXPECT_FALSE(body.contains("seed"));
+
+    ai::AiProviderSettings settings;
+    settings.temperature = 0.0;
+    settings.seed = 42;
+    ASSERT_TRUE(provider.Generate(settings, request, "sk-test").success);
+    body = nlohmann::json::parse(http->lastRequest.body);
+    ASSERT_TRUE(body.contains("temperature"));
+    EXPECT_EQ(body["temperature"].get<double>(), 0.0);
+    ASSERT_TRUE(body.contains("seed"));
+    EXPECT_EQ(body["seed"].get<long long>(), 42);
+}
+
+// Explicit mode caches only at the breakpoints placed, so explicit mode with
+// none is the opt-out. Without it a plain prompt gets OpenAI's implicit
+// breakpoint at its end, and an "uncached" request is cached after all.
+TEST(OpenAiProviderTest, OptsOutOfImplicitCachingWhenTheRequestDisablesIt) {
+    auto http = std::make_shared<FakeHttpClient>();
+    http->response.statusCode = 200;
+    http->response.body = R"({"output_text":"ok"})";
+    ai::OpenAiProvider provider(http);
+
+    ai::AiRequest plain;
+    plain.userPrompt = "edited";
+    plain.promptCacheDisabled = true;
+    ASSERT_TRUE(provider.Generate(ai::AiProviderSettings{}, plain, "sk-test").success);
+    nlohmann::json body = nlohmann::json::parse(http->lastRequest.body);
+    EXPECT_EQ(body["prompt_cache_options"], nlohmann::json({{"mode", "explicit"}}));
+    EXPECT_EQ(body["input"], "edited");
+    EXPECT_FALSE(body.contains("prompt_cache_key"));
+
+    ai::AiRequest segmented;
+    segmented.promptSegments = {{"shared ", false}, {"element", false}};
+    segmented.promptCacheDisabled = true;
+    ASSERT_TRUE(provider.Generate(ai::AiProviderSettings{}, segmented, "sk-test").success);
+    body = nlohmann::json::parse(http->lastRequest.body);
+    EXPECT_EQ(body["prompt_cache_options"], nlohmann::json({{"mode", "explicit"}}));
+    for (const nlohmann::json& part : body["input"][0]["content"])
+        EXPECT_FALSE(part.contains("prompt_cache_breakpoint"));
+}
+
 // OpenAI answers an account with no credit with the same HTTP 429 as a rate
 // limit. Told "rate limit reached", a user waits and retries; the only fix is
 // to top up the account.

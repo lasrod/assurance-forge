@@ -314,13 +314,16 @@ void AiReviewController::StartPendingRequest() {
         // Only while the segments are still the prompt: an edit in the debug
         // panel rewrites the prompt and not its segments, and sending the
         // segments then would send what the user replaced. An edited prompt is
-        // sent whole, uncached.
+        // sent whole, and uncached explicitly: with no breakpoints the provider
+        // would otherwise cache it on its own, at a cache-write price.
         if (SegmentsAreThePrompt(pass.request)) {
             for (std::size_t index = 0; index < pass.request.promptSegments.size(); ++index) {
                 const bool shared = index + 1 < pass.request.promptSegments.size();
                 request.promptSegments.push_back({pass.request.promptSegments[index], shared});
             }
             request.promptCacheKey = pass.request.promptCacheKey;
+        } else {
+            request.promptCacheDisabled = true;
         }
         review_tasks_.push_back(
             task_runner_.RunGenerate([service, request]() { return GenerateWith(service, request); }));

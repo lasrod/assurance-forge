@@ -144,13 +144,15 @@ bool SplitPassPrompts(const std::string& combined, std::vector<SccgReviewPassReq
     if (passes.empty())
         return false;
 
-    // Every separator must still be there, in order, each opening its own line.
+    // Every separator must still be there, in order, each opening its own line
+    // -- and the first must open the text. Anything before it belongs to no
+    // pass, and splitting from the separator would drop it unsent.
     std::vector<std::size_t> starts;
     std::size_t search_from = 0;
     for (std::size_t index = 0; index < passes.size(); ++index) {
         const std::string separator = Separator(index, passes.size(), passes[index].pass_id);
         const std::size_t found = combined.find(separator, search_from);
-        if (found == std::string::npos || (found > 0 && combined[found - 1] != '\n'))
+        if (found == std::string::npos || (index == 0 ? found != 0 : combined[found - 1] != '\n'))
             return false;
         starts.push_back(found);
         search_from = found + separator.size();

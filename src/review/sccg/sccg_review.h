@@ -186,7 +186,8 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
                           std::string& out_error);
 // SCCG's availability rule (0.9.0), applied to every package in `available`:
 // one supplied with none of its published fields populated -- null, "", [] or
-// {} -- is moved to `unavailable` as empty. The collector calls it; public
+// {} -- is moved to `unavailable` as empty, and one with something populated but
+// a required field left out is moved there as not implemented. The collector calls it; public
 // because it is the catalogue's rule rather than this tool's, and a caller
 // building packages another way must apply the same one.
 void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,

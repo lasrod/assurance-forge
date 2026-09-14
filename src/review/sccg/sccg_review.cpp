@@ -695,6 +695,11 @@ bool IsPopulated(const nlohmann::json& value) {
 // Judged on the PUBLISHED field names only. A package carrying its data under a
 // key SCCG does not name has, by the catalogue's own definition, none of its
 // fields populated -- which is exactly the drift this is meant to surface.
+//
+// Both halves of the rule apply. A package with something populated but a
+// required field left out is not available; it is not empty either -- the case
+// may well hold what was left out -- so it is reported as a package the tool did
+// not supply, naming the fields it lacks.
 void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
                                      const parser::GuidelinesDocument& catalog,
                                      const parser::ReviewProfile* review_profile) {
@@ -705,6 +710,14 @@ void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
             continue;
         }
         const nlohmann::json parsed = nlohmann::json::parse(package->json, nullptr, false);
+        std::string missing_required;
+        for (const std::string& field : definition->required_fields) {
+            if (parsed.is_object() && parsed.contains(field))
+                continue;
+            if (!missing_required.empty())
+                missing_required += ", ";
+            missing_required += field;
+        }
         bool populated = false;
         if (parsed.is_object()) {
             for (const std::vector<std::string>* fields :
@@ -720,7 +733,7 @@ void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
                     break;
             }
         }
-        if (populated) {
+        if (populated && missing_required.empty()) {
             ++package;
             continue;
         }
@@ -728,12 +741,20 @@ void ApplyContentDefinedAvailability(AiReviewDataPackageBundle& packages,
             review_profile != nullptr &&
             std::find(review_profile->required_data.begin(), review_profile->required_data.end(), package->id) !=
                 review_profile->required_data.end();
-        packages.unavailable.push_back(
-            AiReviewUnavailableDataPackage{package->id,
-                                           "Supplied with none of its published fields populated, which SCCG counts "
-                                           "as empty.",
-                                           required,
-                                           DataPackageAbsence::Empty});
+        if (populated) {
+            std::string reason = "Supplied without its required field(s) ";
+            reason += missing_required;
+            reason += ", so SCCG does not count it as available.";
+            packages.unavailable.push_back(AiReviewUnavailableDataPackage{
+                package->id, std::move(reason), required, DataPackageAbsence::NotImplemented});
+        } else {
+            packages.unavailable.push_back(
+                AiReviewUnavailableDataPackage{package->id,
+                                               "Supplied with none of its published fields populated, which SCCG "
+                                               "counts as empty.",
+                                               required,
+                                               DataPackageAbsence::Empty});
+        }
         package = packages.available.erase(package);
     }
 }

@@ -445,6 +445,54 @@ TEST(GuidelinesParserTest, RefusesAPassInstructionWithoutExactlyOnePlaceholder) 
     }
 }
 
+// Optional before SCCG 0.9.0, so a catalogue without the key still loads. A key
+// that is present but unusable is a broken catalogue, not an old one: reading it
+// as absent silently swapped SCCG's framing for this tool's own.
+TEST(GuidelinesParserTest, TellsAnOmittedPassInstructionFromAnUnusableOne) {
+    const std::filesystem::path omitted = WriteCatalogue(
+        "instruction_omitted", [](nlohmann::json& catalogue) { catalogue.erase("review_pass_instruction"); });
+    auto result = parser::SccgDistParser::ParseDirectory(omitted);
+    ASSERT_TRUE(result.has_value()) << (result ? "" : result.error());
+    EXPECT_TRUE(result->review_pass_instruction.empty());
+    std::filesystem::remove_all(omitted);
+
+    const std::vector<nlohmann::json> unusable_values = {
+        nlohmann::json(nullptr), nlohmann::json(42), nlohmann::json("")};
+    for (const nlohmann::json& unusable : unusable_values) {
+        SCOPED_TRACE(unusable.dump());
+        ExpectRefused(
+            "instruction_unusable",
+            [&](nlohmann::json& catalogue) { catalogue["review_pass_instruction"] = unusable; },
+            "review_pass_instruction");
+    }
+}
+
+// A pass with no id was dropped on read, and a profile whose only pass was
+// malformed then had no passes at all -- which the tool reads as "send the
+// profile as one request", overriding the partition SCCG published.
+TEST(GuidelinesParserTest, RefusesAReviewPassWithoutAnId) {
+    ExpectRefused(
+        "pass_no_id",
+        [](nlohmann::json& catalogue) {
+            catalogue["review_profiles"][0]["review_passes"] = nlohmann::json::array({Pass("", {"CL.1", "CL.2"})});
+        },
+        "review pass");
+}
+
+// SCCG's schema requires the list, empty or not. Without it a catalogue loaded
+// and retired nothing, and a stored finding citing a retired id lost its
+// redirect with no error anywhere.
+TEST(GuidelinesParserTest, RefusesACatalogueWithoutARetirementList) {
+    ExpectRefused(
+        "retired_missing",
+        [](nlohmann::json& catalogue) { catalogue.erase("retired_guidelines"); },
+        "retired_guidelines");
+    ExpectRefused(
+        "retired_not_a_list",
+        [](nlohmann::json& catalogue) { catalogue["retired_guidelines"] = nlohmann::json::object(); },
+        "retired_guidelines");
+}
+
 // The failure this gate exists for was silent: SCCG 0.6.0's one generic `SEL`
 // package became seven role-specific ones, and a tool that kept sending `SEL`
 // went on running, reporting the profile's real requirement as an unavailable

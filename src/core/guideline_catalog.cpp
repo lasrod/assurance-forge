@@ -15,7 +15,9 @@
 #endif
 
 #include <filesystem>
+#include <format>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -44,15 +46,15 @@ std::filesystem::path ExecutableDirectory() {
 // not a hidden switch: every review record states the `sccg_catalog_path` it
 // actually loaded, so a run against a substituted catalogue says so in its own
 // output rather than looking like a run against the shipped one.
+//
+// Authoritative when set: returned whether or not it names a directory, and
+// LoadGuidelineCatalog refuses one that does not. Falling back to discovery
+// ran an evaluation meant for another catalogue against the shipped one.
 std::filesystem::path SccgDistDirectoryOverride() {
     const char* configured = std::getenv("AF_SCCG_DIST_DIR");
     if (configured == nullptr || *configured == '\0')
         return {};
-    std::filesystem::path directory(configured);
-    std::error_code error;
-    if (!std::filesystem::is_directory(directory, error))
-        return {};
-    return directory;
+    return std::filesystem::path(configured);
 }
 
 } // namespace
@@ -115,6 +117,16 @@ bool LoadGuidelineCatalog(GuidelineCatalog& catalog, std::string& error) {
     error.clear();
 
     const std::filesystem::path dist_dir = FindSccgDistDirectory();
+    if (!SccgDistDirectoryOverride().empty()) {
+        std::error_code ignored;
+        if (!std::filesystem::is_directory(dist_dir, ignored)) {
+            error = std::format(
+                "AF_SCCG_DIST_DIR names {}, which is not a directory; the shipped SCCG catalogue is not loaded "
+                "in its place.",
+                dist_dir.string());
+            return false;
+        }
+    }
     if (dist_dir.empty()) {
         error = std::string("SCCG catalogue could not be found: no ") + parser::SccgDistParser::kCatalogFileName +
                 " beside the executable or in a source checkout.";

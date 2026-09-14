@@ -95,11 +95,18 @@ long long IntegerAt(const nlohmann::json& object, const char* field) {
     return object[field].get<long long>();
 }
 
+// Reported only when both token counts are there as integers: a usage block
+// without them measured nothing, and reading it as zeros would enter a billed
+// request into a total as a free one.
 AiUsage ParseUsage(const nlohmann::json& root) {
     AiUsage usage;
     if (!root.contains("usage") || !root["usage"].is_object())
         return usage;
     const nlohmann::json& reported = root["usage"];
+    for (const char* field : {"input_tokens", "output_tokens"}) {
+        if (!reported.contains(field) || !reported[field].is_number_integer())
+            return usage;
+    }
     usage.reported = true;
     usage.inputTokens = IntegerAt(reported, "input_tokens");
     usage.outputTokens = IntegerAt(reported, "output_tokens");
@@ -115,13 +122,15 @@ AiUsage ParseUsage(const nlohmann::json& root) {
 nlohmann::json BuildRequestBody(const AiProviderSettings& settings, const AiRequest& request) {
     nlohmann::json body;
     body["model"] = settings.model.empty() ? kDefaultOpenAiModel : settings.model;
-    if (request.promptSegments.empty()) {
+    if (request.promptSegments.empty())
         body["input"] = request.userPrompt;
-    } else {
+    else
         body["input"] = SegmentedInput(request);
-        if (HasCacheBreakpoint(request))
-            body["prompt_cache_options"] = {{"mode", "explicit"}};
-    }
+    // Explicit mode caches only at the breakpoints placed, so explicit mode with
+    // none is how a request opts out: "when no explicit breakpoints are placed,
+    // the request does not use prompt caching or create cache writes."
+    if (HasCacheBreakpoint(request) || request.promptCacheDisabled)
+        body["prompt_cache_options"] = {{"mode", "explicit"}};
     if (!request.promptCacheKey.empty())
         body["prompt_cache_key"] = request.promptCacheKey;
     if (settings.serviceTier.has_value())
@@ -223,9 +232,16 @@ OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& re
 
     try {
         nlohmann::json root = nlohmann::json::parse(http_response.body);
+        // Read before the output is judged: a response with no usable text was
+        // still processed, and billed, and its usage belongs in whatever total
+        // the caller keeps.
+        const AiUsage usage = ParseUsage(root);
         std::string text = ExtractOutputText(root);
         if (text.empty()) {
-            return ErrorResponse(AiErrorCode::MalformedResponse, "Unexpected response.", http_response.body);
+            AiResponse response =
+                ErrorResponse(AiErrorCode::MalformedResponse, "Unexpected response.", http_response.body);
+            response.usage = usage;
+            return response;
         }
 
         AiResponse response;
@@ -234,7 +250,7 @@ OpenAiProvider::Generate(const AiProviderSettings& settings, const AiRequest& re
         response.text = std::move(text);
         response.rawJson = http_response.body;
         response.httpStatus = http_response.statusCode;
-        response.usage = ParseUsage(root);
+        response.usage = usage;
         if (root.contains("service_tier") && root["service_tier"].is_string())
             response.serviceTier = root["service_tier"].get<std::string>();
         return response;

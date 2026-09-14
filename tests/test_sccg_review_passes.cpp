@@ -207,3 +207,15 @@ TEST(SccgReviewPassesTest, RefusesToSplitWhenASeparatorWasRemoved) {
     EXPECT_EQ(passes[0].request.prompt, "prompt for wording\nsecond line");
     EXPECT_EQ(passes[1].request.prompt, "prompt for structure\nsecond line");
 }
+
+// Text before the first separator belongs to no pass. Splitting from the first
+// separator dropped it -- a reviewer's note never sent -- so the split refuses,
+// and the edited prompt goes as one request with the note in it.
+TEST(SccgReviewPassesTest, RefusesToSplitWhenTextPrecedesTheFirstSeparator) {
+    std::vector<review::SccgReviewPassRequest> passes = TwoPasses();
+    const std::string prefixed = "Reviewer's note: look hard at the wording.\n" + review::CombinePassPrompts(passes);
+
+    EXPECT_FALSE(review::SplitPassPrompts(prefixed, passes));
+    EXPECT_EQ(passes[0].request.prompt, "prompt for wording\nsecond line");
+    EXPECT_EQ(passes[1].request.prompt, "prompt for structure\nsecond line");
+}

@@ -239,8 +239,14 @@ bool ParseReviewProfiles(const json& root, GuidelinesDocument& document, std::st
             pass.display_name = StringValue(pass_json, "display_name");
             pass.question = StringValue(pass_json, "question");
             pass.guideline_ids = StringArrayValue(pass_json, "guideline_ids");
-            if (!pass.id.empty())
-                profile.review_passes.push_back(std::move(pass));
+            // Not dropped: a profile whose only published pass was malformed
+            // would then have none, which reads as "send the profile as one
+            // request" -- overriding the partition SCCG published.
+            if (pass.id.empty()) {
+                error = "sccg.full.json contains a review pass of profile '" + profile.id + "' missing id.";
+                return false;
+            }
+            profile.review_passes.push_back(std::move(pass));
         }
         profile.schema_version = document.schema_version;
         profile.sccg_version = document.sccg_version;
@@ -251,7 +257,17 @@ bool ParseReviewProfiles(const json& root, GuidelinesDocument& document, std::st
         }
         document.review_profiles.push_back(std::move(profile));
     }
-    document.review_pass_instruction = StringValue(root, "review_pass_instruction");
+    // Optional before SCCG 0.9.0, so an omitted key is a catalogue that predates
+    // it and the tool's own framing applies. A key that is present but not a
+    // usable string is a broken catalogue, not an old one; reading it as omitted
+    // would quietly swap SCCG's framing for this tool's.
+    if (const auto instruction = root.find("review_pass_instruction"); instruction != root.end()) {
+        if (!instruction->is_string() || instruction->get_ref<const std::string&>().empty()) {
+            error = "sccg.full.json has a review_pass_instruction that is not a non-empty string.";
+            return false;
+        }
+        document.review_pass_instruction = instruction->get<std::string>();
+    }
     return true;
 }
 
@@ -361,8 +377,16 @@ bool ParseAuthoringGuidance(const json& root, GuidelinesDocument& document, std:
     return true;
 }
 
+// Required by contract 3, empty or not. Read as optional, a catalogue without
+// the list loaded and retired nothing, and a stored finding citing a retired id
+// lost its redirect with no error anywhere.
 bool ParseRetiredGuidelines(const json& root, GuidelinesDocument& document, std::string& error) {
-    for (const json& entry_json : root.value("retired_guidelines", json::array())) {
+    const auto retired_list = root.find("retired_guidelines");
+    if (retired_list == root.end() || !retired_list->is_array()) {
+        error = "sccg.full.json has no retired_guidelines list, which SCCG contract 3 requires.";
+        return false;
+    }
+    for (const json& entry_json : *retired_list) {
         RetiredGuideline retired;
         retired.id = StringValue(entry_json, "id");
         retired.title = StringValue(entry_json, "title");

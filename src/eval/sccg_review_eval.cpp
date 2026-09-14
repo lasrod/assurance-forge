@@ -29,6 +29,7 @@
 #include "core/guideline_catalog.h"
 #include "core/project_service.h"
 #include "core/sha256.h"
+#include "eval/sccg_review_eval_options.h"
 #include "review/sccg/sccg_review.h"
 #include "review/sccg/sccg_review_consensus.h"
 #include "review/sccg/sccg_review_passes.h"
@@ -37,8 +38,6 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
-#include <cerrno>
-#include <charconv>
 #include <chrono>
 #include <future>
 #include <cstdlib>
@@ -49,62 +48,28 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
 
-namespace {
-
-using nlohmann::json;
-
+// Stamped at BUILD time by cmake/write_build_id.cmake, so a commit or a
+// checkout in the same build tree is reflected on the next build. The
+// static-analysis job configures without building, so the header may not exist
+// when a tool reads this file; the id is then unknown, which is what it is.
+#if __has_include("af_build_id.h")
+#include "af_build_id.h"
+#endif
 #ifndef AF_BUILD_ID
 #define AF_BUILD_ID "unknown"
 #endif
-constexpr const char* kBuildId = AF_BUILD_ID;
 
-struct Options {
-    std::filesystem::path project;
-    std::vector<std::string> element_ids;
-    // Empty means: every element the loaded case offers that SCCG review
-    // supports. That is what a coverage run wants, and typing seven ids is what
-    // it would otherwise cost.
-    bool all_elements = false;
-    std::string review_profile_id;
-    std::string model;
-    // Unset means the provider decides, which is a real setting and not a
-    // missing one -- a reasoning model rejects a temperature outright.
-    std::optional<double> temperature;
-    std::optional<long long> seed;
-    int runs = 1;
-    // The number the first run of this invocation gets. Runs are files named
-    // by number, so adding runs 4 and 5 to a sweep that has 1-3 needs the new
-    // ones numbered on from there rather than overwriting the first two.
-    int first_run = 1;
-    std::filesystem::path out_dir;
-    // Assemble and record the request without sending it. The prompt, the
-    // profile, the packages and the pre-checks are all decided before the
-    // provider is involved, so checking them costs nothing and should not
-    // require a paid call.
-    bool dry_run = false;
-    bool list_models = false;
-    // Findings must be cited by at least this many runs to reach the consensus
-    // list. 0 disables the consensus pass entirely and only per-run records are
-    // written.
-    int consensus_minimum = 0;
-    // Send the whole profile in one request even where SCCG publishes review
-    // passes. The app never does this; the harness can, so the two can be
-    // compared on the same material.
-    bool single_request = false;
-    // The provider's processing tier. "flex" costs about half, and may queue:
-    // a sweep can wait, a user cannot, so only the harness offers it.
-    std::optional<std::string> service_tier;
-    // Seconds one request may take. Unset: 120, or 900 on the flex tier.
-    std::optional<int> request_timeout_seconds;
-    // Send the prompt as one uncached string, as before prompt caching, so a
-    // sweep can measure what caching changes.
-    bool no_prompt_cache = false;
-    std::string tag;
-};
+namespace {
+
+using eval::Options;
+using nlohmann::json;
+
+constexpr const char* kBuildId = AF_BUILD_ID;
 
 void PrintUsage() {
     std::cout << R"(af-sccg-review-eval - run SCCG-guided AI review over a project, offline from the GUI.
@@ -146,111 +111,6 @@ Options:
 )";
 }
 
-// A whole number given on the command line. `atoi` and its family read "5x"
-// as 5 and "x" as 0 without a word, so a sweep started with a typo in --runs
-// ran once and reported nothing wrong.
-bool ParseWholeNumber(const std::string& text, long long& out) {
-    const char* begin = text.data();
-    const char* end = begin + text.size();
-    const auto [stopped, result] = std::from_chars(begin, end, out);
-    return !text.empty() && result == std::errc() && stopped == end;
-}
-
-bool ParseRealNumber(const std::string& text, double& out) {
-    if (text.empty())
-        return false;
-    char* stopped = nullptr;
-    errno = 0;
-    out = std::strtod(text.c_str(), &stopped);
-    return errno == 0 && stopped == text.c_str() + text.size();
-}
-
-// Reads an option's value as a whole number, or says which option was wrong.
-template <typename Number>
-void ReadWholeNumber(const char* option, const std::string& text, Number& out, std::string& error) {
-    if (!error.empty())
-        return; // the option had no value at all, which the caller already said
-    long long value = 0;
-    if (!ParseWholeNumber(text, value)) {
-        error = std::string(option) + " needs a whole number, not '" + text + "'.";
-        return;
-    }
-    out = static_cast<Number>(value);
-}
-
-bool ParseArgs(int argc, char** argv, Options& options, std::string& error) {
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        const auto value = [&](const char* name) -> std::string {
-            if (i + 1 >= argc) {
-                error = std::string(name) + " needs a value.";
-                return {};
-            }
-            return argv[++i];
-        };
-        if (arg == "--help" || arg == "-h") {
-            PrintUsage();
-            std::exit(0);
-        } else if (arg == "--project") {
-            options.project = value("--project");
-        } else if (arg == "--element") {
-            options.element_ids.push_back(value("--element"));
-        } else if (arg == "--profile") {
-            options.review_profile_id = value("--profile");
-        } else if (arg == "--model") {
-            options.model = value("--model");
-        } else if (arg == "--temperature") {
-            const std::string text = value("--temperature");
-            double temperature = 0.0;
-            if (ParseRealNumber(text, temperature))
-                options.temperature = temperature;
-            else if (error.empty())
-                error = "--temperature needs a number, not '" + text + "'.";
-        } else if (arg == "--seed") {
-            long long seed = 0;
-            ReadWholeNumber("--seed", value("--seed"), seed, error);
-            options.seed = seed;
-        } else if (arg == "--runs") {
-            ReadWholeNumber("--runs", value("--runs"), options.runs, error);
-        } else if (arg == "--first-run") {
-            ReadWholeNumber("--first-run", value("--first-run"), options.first_run, error);
-        } else if (arg == "--out") {
-            options.out_dir = value("--out");
-        } else if (arg == "--tag") {
-            options.tag = value("--tag");
-        } else if (arg == "--consensus") {
-            ReadWholeNumber("--consensus", value("--consensus"), options.consensus_minimum, error);
-        } else if (arg == "--single-request") {
-            options.single_request = true;
-        } else if (arg == "--service-tier") {
-            options.service_tier = value("--service-tier");
-        } else if (arg == "--timeout") {
-            int timeout_seconds = 0;
-            ReadWholeNumber("--timeout", value("--timeout"), timeout_seconds, error);
-            options.request_timeout_seconds = timeout_seconds;
-        } else if (arg == "--no-prompt-cache") {
-            options.no_prompt_cache = true;
-        } else if (arg == "--dry-run") {
-            options.dry_run = true;
-        } else if (arg == "--list-models") {
-            options.list_models = true;
-        } else {
-            error = "Unknown argument: " + arg;
-            return false;
-        }
-        if (!error.empty())
-            return false;
-    }
-    options.all_elements = options.element_ids.empty();
-    if (options.runs < 1)
-        options.runs = 1;
-    if (options.first_run < 1)
-        options.first_run = 1;
-    if (options.out_dir.empty())
-        options.out_dir = std::filesystem::path("sccg-eval-out");
-    return true;
-}
-
 struct AiStack {
     std::shared_ptr<ai::ISecretStore> secret_store;
     std::shared_ptr<ai::AiService> service;
@@ -271,8 +131,13 @@ ai::AiRequest ReviewRequest(const review::AiReviewRequestArtifacts& artifacts, b
     ai::AiRequest request;
     request.systemInstruction = artifacts.systemInstruction;
     request.userPrompt = artifacts.prompt;
-    if (!cache)
+    if (!cache) {
+        // Uncached on purpose, and said so: with no breakpoints the provider
+        // would place its own at the end of the prompt, and the comparison this
+        // exists for would compare caching with caching.
+        request.promptCacheDisabled = true;
         return request;
+    }
     for (std::size_t index = 0; index < artifacts.promptSegments.size(); ++index) {
         const bool last = index + 1 == artifacts.promptSegments.size();
         request.promptSegments.push_back({artifacts.promptSegments[index], !last || cache_element_data});
@@ -333,6 +198,18 @@ json UsageJson(const ai::AiUsage& usage) {
                 {"reasoning_tokens", usage.reasoningTokens}};
 }
 
+// A run's usage is the sum of its passes', and the sum is the run's cost only
+// when every pass reported usage. `complete` says whether it did: without it a
+// run with one unreported pass read as cheaper than it was.
+json RunUsageJson(const ai::AiUsage& total, std::size_t passes_reporting, std::size_t passes) {
+    json usage = UsageJson(total);
+    if (usage.is_object()) {
+        usage["passes_reporting"] = passes_reporting;
+        usage["complete"] = passes_reporting == passes;
+    }
+    return usage;
+}
+
 json ModelJson(const ai::AiProviderSettings& settings, const Options& options) {
     return json{{"name", settings.model},
                 {"provider", ai::ToString(settings.provider)},
@@ -364,6 +241,19 @@ std::string SanitizeForFileName(const std::string& value) {
         sanitized.push_back(safe ? character : '-');
     }
     return sanitized;
+}
+
+// Writes one record. A record that could not be written is a failure, not a
+// line on stdout: a sweep that reports success over a directory it could not
+// write has lost the evidence it was run to produce.
+bool WriteRecord(const std::filesystem::path& path, const json& record) {
+    std::ofstream stream(path);
+    stream << record.dump(2);
+    stream.close();
+    if (stream)
+        return true;
+    std::cerr << "Could not write " << path.string() << "\n";
+    return false;
 }
 
 const char* SeverityName(core::ProblemSeverity severity) {
@@ -422,7 +312,11 @@ json FindingsJson(const review::AiReviewParseResult& parsed) {
         array.push_back(json{
             {"guideline_id", problem.guideline_id},
             {"element_id", problem.element_id},
+            // The severity is the tool's, and the same for every finding; the
+            // model's confidence is the ranking signal, so every run record
+            // carries it rather than only the consensus.
             {"severity", SeverityName(problem.severity)},
+            {"confidence", index < parsed.findingConfidences.size() ? parsed.findingConfidences[index] : std::string{}},
             {"type", problem.type},
             {"message", problem.message},
             {"proposed_operations", operations},
@@ -530,10 +424,17 @@ int ListModels(const ai::AiService& service, const ai::ISecretStore& secret_stor
 int main(int argc, char** argv) {
     Options options;
     std::string error;
-    if (!ParseArgs(argc, argv, options, error)) {
+    std::vector<std::string> arguments;
+    for (int i = 1; i < argc; ++i)
+        arguments.emplace_back(argv[i]);
+    if (!eval::ParseArgs(arguments, options, error)) {
         std::cerr << error << "\n\n";
         PrintUsage();
         return 2;
+    }
+    if (options.show_help) {
+        PrintUsage();
+        return 0;
     }
 
     const AiStack ai_stack = MakeAiStack();
@@ -615,7 +516,16 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::filesystem::create_directories(options.out_dir);
+    // Before any provider call: runs that cannot be recorded are runs paid for
+    // and lost.
+    std::error_code directory_error;
+    std::filesystem::create_directories(options.out_dir, directory_error);
+    std::error_code probe_error;
+    if (!std::filesystem::is_directory(options.out_dir, probe_error)) {
+        std::cerr << "Could not create the output directory " << options.out_dir.string()
+                  << (directory_error ? ": " + directory_error.message() : std::string{}) << "\n";
+        return 1;
+    }
     const std::string session_started = NowUtcIso();
 
     int failures = 0;
@@ -666,7 +576,8 @@ int main(int argc, char** argv) {
             record["error"] = preparation.error_message;
             const std::filesystem::path path =
                 options.out_dir / (SanitizeForFileName(element_id) + "--preparation-failed.json");
-            std::ofstream(path) << record.dump(2);
+            if (WriteRecord(path, record))
+                ++records;
             std::cerr << element_id << ": preparation failed: " << preparation.error_message << "\n";
             ++failures;
             continue;
@@ -696,14 +607,19 @@ int main(int argc, char** argv) {
                                         {"user_prompt_bytes", pass.request.prompt.size()}});
         }
         record["review_passes"] = passes.size() > 1 ? static_cast<int>(passes.size()) : 0;
+        // `user_prompt_bytes` is the size of the string `user_prompt_sha256`
+        // hashes, separators included, so the two describe one text. What the
+        // provider is sent is the passes' own prompts, which sum to
+        // `passes_prompt_bytes`.
         record["prompt"] = json{{"system_instruction", passes.front().request.systemInstruction},
                                 {"user_prompt", combined_prompt},
                                 {"user_prompt_sha256", core::Sha256::HexDigest(combined_prompt)},
-                                {"user_prompt_bytes", prompt_bytes},
+                                {"user_prompt_bytes", combined_prompt.size()},
+                                {"passes_prompt_bytes", prompt_bytes},
                                 {"passes", pass_prompts}};
 
         std::vector<review::AiReviewParseResult> run_results;
-        const int last_run = options.first_run + options.runs - 1;
+        const int last_run = eval::LastRunNumber(options);
         for (int run = options.first_run; run <= last_run; ++run) {
             json run_record = record;
             run_record["run"] = run;
@@ -736,11 +652,14 @@ int main(int argc, char** argv) {
                 std::vector<review::ReviewPassOutcome> outcomes;
                 json pass_records = json::array();
                 ai::AiUsage run_usage;
+                std::size_t passes_reporting_usage = 0;
                 for (std::size_t index = 0; index < passes.size(); ++index) {
                     GenerateResult generated = pending[index].get();
                     ai::AiResponse& response = generated.response;
                     const long long pass_elapsed_ms = generated.elapsed_ms;
                     AddUsage(run_usage, response.usage);
+                    if (response.usage.reported)
+                        ++passes_reporting_usage;
                     review::ReviewPassOutcome outcome;
                     outcome.pass_id = passes[index].pass_id;
                     json pass_record{{"pass_id", passes[index].pass_id},
@@ -780,10 +699,20 @@ int main(int argc, char** argv) {
 
                 const review::MergedReviewPasses merged =
                     review::MergeReviewPasses(outcomes, passes, preparation.element_id);
+                // A pass that parsed but the merge failed -- one that reviewed a
+                // different element -- must not still read "ok" in its record.
+                for (json& pass_record : pass_records) {
+                    const std::string pass_id = pass_record.value("pass_id", std::string{});
+                    const bool failed_by_merge =
+                        std::find(merged.failed_pass_ids.begin(), merged.failed_pass_ids.end(), pass_id) !=
+                        merged.failed_pass_ids.end();
+                    if (failed_by_merge && pass_record.value("outcome", std::string{}) == "ok")
+                        pass_record["outcome"] = "rejected";
+                }
 
                 run_record["model"] = ModelJson(settings, options);
                 run_record["elapsed_ms"] = elapsed.count();
-                run_record["usage"] = UsageJson(run_usage);
+                run_record["usage"] = RunUsageJson(run_usage, passes_reporting_usage, passes.size());
                 run_record["passes"] = pass_records;
                 run_record["discarded_findings"] = merged.discarded_findings;
                 if (passes.size() == 1)
@@ -827,8 +756,10 @@ int main(int argc, char** argv) {
             run_record["finished_utc"] = NowUtcIso();
             const std::string file_name = SanitizeForFileName(element_id) + "--run" + std::to_string(run) + ".json";
             const std::filesystem::path path = options.out_dir / file_name;
-            std::ofstream(path) << run_record.dump(2);
-            ++records;
+            if (WriteRecord(path, run_record))
+                ++records;
+            else
+                ++failures;
 
             std::cout << element_id << " [" << preparation.review_profile_id << "] run " << run << "/" << last_run
                       << ": " << run_record.value("outcome", "") << " -> " << path.string() << "\n";
@@ -840,6 +771,11 @@ int main(int argc, char** argv) {
 
             json consensus_record = record;
             consensus_record["outcome"] = "consensus";
+            // Which runs this consensus is over. With --first-run a directory
+            // can hold runs from several invocations, and the counts alone do
+            // not say which of them were counted.
+            consensus_record["first_run"] = options.first_run;
+            consensus_record["last_run"] = last_run;
             consensus_record["runs_requested"] = consensus.runs_requested;
             consensus_record["runs_succeeded"] = consensus.runs_succeeded;
             consensus_record["consensus_minimum"] = options.consensus_minimum;
@@ -850,8 +786,10 @@ int main(int argc, char** argv) {
             consensus_record["finished_utc"] = NowUtcIso();
 
             const std::filesystem::path path = options.out_dir / (SanitizeForFileName(element_id) + "--consensus.json");
-            std::ofstream(path) << consensus_record.dump(2);
-            ++records;
+            if (WriteRecord(path, consensus_record))
+                ++records;
+            else
+                ++failures;
 
             int unanimous = 0;
             for (const review::ConsensusFinding& finding : consensus.findings) {

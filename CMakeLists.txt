@@ -321,27 +321,26 @@ af_copy_sccg_data(assurance-forge-mcp)
 # The build a run record was produced by. The prompt is a function of the case,
 # the SCCG version AND this tool's own code -- the response schema and the
 # package rules both live here -- so a record naming only the case and the
-# catalogue does not identify what was sent. Captured at CONFIGURE time, so it
-# can go stale against later commits in the same build tree; `--dirty` at least
-# makes an edited tree visible. The prompt's sha256, which every record already
-# carries, remains the authoritative identity of what was actually sent.
-set(AF_BUILD_ID "unknown")
+# catalogue does not identify what was sent. Stamped at BUILD time by
+# cmake/write_build_id.cmake: an id captured at configure time went stale with
+# the next commit in the same build tree. The prompt's sha256, which every record
+# already carries, remains the authoritative identity of what was actually sent.
 find_package(Git QUIET)
-if(GIT_FOUND)
-    execute_process(
-        COMMAND "${GIT_EXECUTABLE}" describe --always --dirty --abbrev=12
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        OUTPUT_VARIABLE AF_BUILD_ID
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-    )
-    if(AF_BUILD_ID STREQUAL "")
-        set(AF_BUILD_ID "unknown")
-    endif()
-endif()
+set(AF_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
+add_custom_target(af_build_id
+    COMMAND "${CMAKE_COMMAND}"
+        "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        "-DOUTPUT=${AF_GENERATED_DIR}/af_build_id.h"
+        "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/write_build_id.cmake"
+    BYPRODUCTS "${AF_GENERATED_DIR}/af_build_id.h"
+    COMMENT "Stamping the evaluation harness with git describe"
+    VERBATIM
+)
 
-add_executable(af-sccg-review-eval src/eval/sccg_review_eval.cpp)
-target_compile_definitions(af-sccg-review-eval PRIVATE AF_BUILD_ID="${AF_BUILD_ID}")
+add_executable(af-sccg-review-eval src/eval/sccg_review_eval.cpp src/eval/sccg_review_eval_options.cpp)
+add_dependencies(af-sccg-review-eval af_build_id)
+target_include_directories(af-sccg-review-eval PRIVATE "${AF_GENERATED_DIR}")
 target_link_libraries(af-sccg-review-eval PRIVATE
     af_review af_ai af_core af_sacm_adapter af_legacy_sacm af_parser
 )
@@ -446,6 +445,7 @@ add_executable(tests
     tests/test_sccg_review_preparation.cpp
     tests/test_sccg_review_consensus.cpp
     tests/test_sccg_review_passes.cpp
+    tests/test_sccg_review_eval_options.cpp
     tests/test_patch_operation_parsing.cpp
     tests/test_term_definition_survives_save.cpp
     tests/test_openai_provider.cpp
@@ -530,6 +530,9 @@ target_link_libraries(tests PRIVATE
     hello_imgui
     af_app af_ui af_review af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
+# The evaluation harness has no layer library -- it is one executable -- but its
+# command line is plain parsing the tests hold it to.
+target_sources(tests PRIVATE src/eval/sccg_review_eval_options.cpp)
 
 # The per-layer object libraries are not the whole of the first-party code. The
 # executables carry their own translation units -- src/app/main.cpp,

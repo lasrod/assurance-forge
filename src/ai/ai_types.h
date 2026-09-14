@@ -60,6 +60,12 @@ struct AiProviderSettings {
     // provider allows. Two reviews of an unchanged argument that disagree are
     // not two opinions -- one of them is noise, and a reviewer has no way to
     // tell which.
+    //
+    // Not persisted: AiSettingsStore neither reads nor writes them, so a saved
+    // settings file never carries one and the application sends neither. They
+    // are per-invocation overrides the evaluation harness sets from its command
+    // line. Persisting them would need a preferences control, and a hidden
+    // setting that changes every review is worse than none.
     std::optional<double> temperature;
     std::optional<long long> seed;
 
@@ -89,13 +95,17 @@ struct AiRequest {
     // Routes requests that share a cacheable prefix to the same cache. Omitted
     // when empty.
     std::string promptCacheKey;
+    // Cache nothing for this request. Without breakpoints a provider may still
+    // cache on its own -- OpenAI places one at the end of the message by
+    // default -- so a request meant to be uncached has to say so.
+    bool promptCacheDisabled = false;
     std::optional<std::string> jsonSchemaName;
     std::optional<std::string> jsonSchema;
 };
 
 // What a request consumed, as the provider reported it. `reported` is false
-// when the response carried no usage block, so a zero is never mistaken for
-// a free request.
+// when the response carried no usage block with both token counts, so a zero is
+// never mistaken for a free request.
 struct AiUsage {
     bool reported = false;
     long long inputTokens = 0;

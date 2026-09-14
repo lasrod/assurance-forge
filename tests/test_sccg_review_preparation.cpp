@@ -553,3 +553,29 @@ TEST(SccgReviewPreparationTest, AppliesTheAvailabilityRuleToEveryPackage) {
     EXPECT_TRUE(FindUnavailable(packages, "DIRECT_CONTEXT")->required);
     EXPECT_FALSE(FindUnavailable(packages, "CHANGE_HISTORY")->required);
 }
+
+// The rule's other half: required fields present. Only "one field populated"
+// was checked, so a package that left out a required field but filled another
+// counted as available. It is not empty either -- the case may hold what was
+// left out -- so it is reported as a package the tool did not supply.
+TEST(SccgReviewPreparationTest, DoesNotCountAPackageMissingARequiredFieldAsAvailable) {
+    const parser::ReviewProfile* claim = Catalog().document.FindReviewProfileById("claim_review");
+    ASSERT_NE(claim, nullptr);
+
+    review::AiReviewDataPackageBundle packages;
+    packages.available.push_back({"PARENT", R"({"element_id": "G0", "element_type": "claim"})"});
+    packages.available.push_back({"CHILDREN", R"({"relationship_types": ["SupportedBy"]})"});
+
+    review::ApplyContentDefinedAvailability(packages, Catalog().document, claim);
+
+    EXPECT_TRUE(packages.available.empty());
+    const review::AiReviewUnavailableDataPackage* parent = FindUnavailable(packages, "PARENT");
+    ASSERT_NE(parent, nullptr);
+    EXPECT_EQ(parent->absence, review::DataPackageAbsence::NotImplemented);
+    EXPECT_NE(parent->reason.find("text"), std::string::npos) << parent->reason;
+    const review::AiReviewUnavailableDataPackage* children = FindUnavailable(packages, "CHILDREN");
+    ASSERT_NE(children, nullptr);
+    EXPECT_EQ(children->absence, review::DataPackageAbsence::NotImplemented);
+    EXPECT_NE(children->reason.find("child_elements"), std::string::npos) << children->reason;
+    EXPECT_TRUE(children->required) << "claim_review requires CHILDREN";
+}
