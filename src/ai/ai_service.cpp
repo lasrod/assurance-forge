@@ -86,7 +86,10 @@ AiConnectionStatus AiService::TestConnection() const {
 }
 
 AiResponse AiService::Generate(const AiRequest& request) const {
-    AiProviderSettings settings = LoadSettings();
+    return Generate(request, LoadSettings());
+}
+
+AiResponse AiService::Generate(const AiRequest& request, const AiProviderSettings& settings) const {
     if (!settings.enabled) {
         AiResponse response;
         response.success = false;

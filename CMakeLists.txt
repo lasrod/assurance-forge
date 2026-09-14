@@ -17,7 +17,7 @@ endif()
 # Warning policy.
 #
 # Applied per target rather than globally, because a global
-# add_compile_options() would also hit hello_imgui, curl, yaml-cpp and the rest
+# add_compile_options() would also hit hello_imgui, curl, pugixml and the rest
 # of the fetched dependencies. Their warnings are not ours to fix, and drowning
 # our own in thousands of theirs is how a warning level gets switched back off.
 #
@@ -126,8 +126,11 @@ if(ENABLE_COVERAGE)
     add_link_options(--coverage)
 endif()
 
-# yaml-cpp 0.8.0 still declares cmake_minimum_required(VERSION 3.4).
-# Raise the policy floor for fetched dependencies without patching their sources.
+# Raise the policy floor for fetched and vendored dependencies without patching
+# their sources. Added for yaml-cpp 0.8.0, which declared
+# cmake_minimum_required(VERSION 3.4); yaml-cpp is gone (the SCCG catalogue is
+# read from sccg.full.json), and the floor stays until it is shown on every CI
+# platform that nothing else still relies on it.
 set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 
 include(FetchContent)
@@ -172,25 +175,6 @@ set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
 )
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-
-# --- YAML ---
-set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    yaml-cpp
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG 0.8.0
-)
-FetchContent_MakeAvailable(yaml-cpp)
-
-if(TARGET yaml-cpp::yaml-cpp)
-    set(AF_YAML_CPP_TARGET yaml-cpp::yaml-cpp)
-elseif(TARGET yaml-cpp)
-    set(AF_YAML_CPP_TARGET yaml-cpp)
-else()
-    message(FATAL_ERROR "yaml-cpp target was not created")
-endif()
 
 # --- libcurl ---
 find_package(CURL QUIET)
@@ -244,56 +228,23 @@ set(SACM_REPO_FIXTURES_DIR ${CMAKE_SOURCE_DIR})
 add_subdirectory(libs/sacm)
 
 set(AF_SCCG_DIST_DIR "${CMAKE_SOURCE_DIR}/external/safety-case-core-guidelines/dist")
-set(AF_SCCG_REQUIRED_DIST_FILES
-    review_profiles.json
-    data_packages.json
-)
-set(AF_SCCG_OPTIONAL_DIST_FILES
-    prechecks.json
-    authoring_guidance.json
-)
-foreach(AF_SCCG_DIST_FILE IN LISTS AF_SCCG_REQUIRED_DIST_FILES)
-    if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_DIST_FILE}")
-        message(FATAL_ERROR "Missing SCCG distribution file: external/safety-case-core-guidelines/dist/${AF_SCCG_DIST_FILE}\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
-    endif()
-endforeach()
-if(EXISTS "${AF_SCCG_DIST_DIR}/ai_rule_export.jsonl")
-    set(AF_SCCG_RULES_JSONL "ai_rule_export.jsonl")
-elseif(EXISTS "${AF_SCCG_DIST_DIR}/sccg.rules.jsonl")
-    set(AF_SCCG_RULES_JSONL "sccg.rules.jsonl")
-else()
-    message(FATAL_ERROR "Missing SCCG rules file: external/safety-case-core-guidelines/dist/ must contain ai_rule_export.jsonl or sccg.rules.jsonl\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
+# The one file SCCG declares sufficient on its own for review, authoring and
+# retirement (contract 3.1.0). It replaced five per-concern files and a YAML
+# copy: the per-concern set SCCG's integration guide pointed a review tool at
+# did not carry the retirement list, and the runtime silently retired nothing.
+set(AF_SCCG_CATALOG_FILE sccg.full.json)
+if(NOT EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_CATALOG_FILE}")
+    message(FATAL_ERROR "Missing SCCG catalogue: external/safety-case-core-guidelines/dist/${AF_SCCG_CATALOG_FILE}\n\nRun:\ngit submodule update --init --recursive\n\nIf the SCCG submodule is checked out but dist is missing, run:\ncd external/safety-case-core-guidelines\npython -m pip install -r requirements.txt\npython scripts/build_dist.py")
 endif()
 
 function(af_copy_sccg_data target_name)
     add_custom_command(TARGET ${target_name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${AF_SCCG_REQUIRED_DIST_FILES}
-            ${AF_SCCG_RULES_JSONL}
-            "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist"
-        WORKING_DIRECTORY "${AF_SCCG_DIST_DIR}"
+            "${AF_SCCG_DIST_DIR}/${AF_SCCG_CATALOG_FILE}"
+            "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist/${AF_SCCG_CATALOG_FILE}"
         VERBATIM
     )
-    foreach(AF_SCCG_OPT_FILE IN LISTS AF_SCCG_OPTIONAL_DIST_FILES)
-        if(EXISTS "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}")
-            add_custom_command(TARGET ${target_name} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${AF_SCCG_DIST_DIR}/${AF_SCCG_OPT_FILE}"
-                    "$<TARGET_FILE_DIR:${target_name}>/data/sccg/dist/${AF_SCCG_OPT_FILE}"
-                VERBATIM
-            )
-        endif()
-    endforeach()
-    if(EXISTS "${AF_SCCG_DIST_DIR}/sccg.full.yaml")
-        add_custom_command(TARGET ${target_name} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target_name}>/data"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${AF_SCCG_DIST_DIR}/sccg.full.yaml"
-                "$<TARGET_FILE_DIR:${target_name}>/data/sccg.full.yaml"
-            VERBATIM
-        )
-    endif()
 endfunction()
 
 add_subdirectory(src)
@@ -354,6 +305,51 @@ endif()
 # the GUI target happened to share the output directory -- built or shipped
 # alone, the catalog silently vanished from every prompt.
 af_copy_sccg_data(assurance-forge-mcp)
+
+# --- SCCG review evaluation harness ---
+# Runs the SCCG review method over a project from the command line: same
+# profile selection, same data packages, same pre-checks, same request and same
+# response validator as the in-app review, without a window. It exists so a
+# claim about which guideline fires on which element can be measured over a
+# whole argument and over repeated runs, instead of being checked by hand one
+# element at a time.
+#
+# It links af_ai and calls a paid provider, so it is never a CTest: the tests
+# cover review::PrepareSccgReview, and this turns the prepared request into a
+# recorded run. No af_ui, no af_app -- the layer gate holds `eval` to the
+# reusable method.
+# The build a run record was produced by. The prompt is a function of the case,
+# the SCCG version AND this tool's own code -- the response schema and the
+# package rules both live here -- so a record naming only the case and the
+# catalogue does not identify what was sent. Stamped at BUILD time by
+# cmake/write_build_id.cmake: an id captured at configure time went stale with
+# the next commit in the same build tree. The prompt's sha256, which every record
+# already carries, remains the authoritative identity of what was actually sent.
+find_package(Git QUIET)
+set(AF_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
+add_custom_target(af_build_id
+    COMMAND "${CMAKE_COMMAND}"
+        "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        "-DOUTPUT=${AF_GENERATED_DIR}/af_build_id.h"
+        "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/write_build_id.cmake"
+    BYPRODUCTS "${AF_GENERATED_DIR}/af_build_id.h"
+    COMMENT "Stamping the evaluation harness with git describe"
+    VERBATIM
+)
+
+add_executable(af-sccg-review-eval src/eval/sccg_review_eval.cpp src/eval/sccg_review_eval_options.cpp)
+add_dependencies(af-sccg-review-eval af_build_id)
+target_include_directories(af-sccg-review-eval PRIVATE "${AF_GENERATED_DIR}")
+target_link_libraries(af-sccg-review-eval PRIVATE
+    af_review af_ai af_core af_sacm_adapter af_legacy_sacm af_parser
+)
+if(WIN32)
+    target_link_libraries(af-sccg-review-eval PRIVATE bcrypt advapi32)
+endif()
+# The harness reads the SCCG catalog from its own runtime directory, the same
+# way the GUI and the MCP server do.
+af_copy_sccg_data(af-sccg-review-eval)
 
 # --- Localization catalogs (optional regeneration) ---
 # The Japanese .mo is committed and bundled as an asset, so normal builds need
@@ -446,6 +442,10 @@ add_executable(tests
     tests/test_ai_service.cpp
     tests/test_secret_store.cpp
     tests/test_ai_claim_review.cpp
+    tests/test_sccg_review_preparation.cpp
+    tests/test_sccg_review_consensus.cpp
+    tests/test_sccg_review_passes.cpp
+    tests/test_sccg_review_eval_options.cpp
     tests/test_patch_operation_parsing.cpp
     tests/test_term_definition_survives_save.cpp
     tests/test_openai_provider.cpp
@@ -530,6 +530,9 @@ target_link_libraries(tests PRIVATE
     hello_imgui
     af_app af_ui af_review af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
+# The evaluation harness has no layer library -- it is one executable -- but its
+# command line is plain parsing the tests hold it to.
+target_sources(tests PRIVATE src/eval/sccg_review_eval_options.cpp)
 
 # The per-layer object libraries are not the whole of the first-party code. The
 # executables carry their own translation units -- src/app/main.cpp,
@@ -598,11 +601,15 @@ gtest_discover_tests(tests
     TEST_FILTER "-*SACM23_*:*GSN3_*"
     PROPERTIES LABELS "app"
 )
+# The runtime reads exactly one SCCG file; this holds its copy to the pinned
+# submodule. (It compared review_profiles.json until the loader moved to
+# sccg.full.json -- and then failed on a stale per-concern copy the build no
+# longer refreshes, which is the right way for it to fail.)
 add_test(
     NAME SccgDataRuntimeCopy
     COMMAND ${CMAKE_COMMAND} -E compare_files
-    "${AF_SCCG_DIST_DIR}/review_profiles.json"
-    "$<TARGET_FILE_DIR:tests>/data/sccg/dist/review_profiles.json"
+    "${AF_SCCG_DIST_DIR}/${AF_SCCG_CATALOG_FILE}"
+    "$<TARGET_FILE_DIR:tests>/data/sccg/dist/${AF_SCCG_CATALOG_FILE}"
 )
 # `build`, not `gate`. It compares against a file af_copy_sccg_data() puts in
 # the runtime directory in a POST_BUILD step, so unlike the repository gates it

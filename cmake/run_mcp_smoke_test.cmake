@@ -110,8 +110,9 @@ endforeach()
 # the user has flipped the sharing switch.
 #   - The heading pins the document block. It used to pin a hardcoded fallback,
 #     because only the YAML carried document metadata and the dist path opened
-#     with an empty heading; since SCCG 0.7.0 every dist file carries a
-#     `document` block, so this now proves the shipped binary read it.
+#     with an empty heading; the one catalogue file the binary reads
+#     (sccg.full.json) carries a `document` block, so this now proves the
+#     shipped binary read it.
 #   - CL.1 proves real guideline text came back, not a placeholder.
 #   - CL.5 proves the translate prompt carries the qualifier rule it cites.
 #   - The CL.2 phrase is quoted from the published authoring subset's own

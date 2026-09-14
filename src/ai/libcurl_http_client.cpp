@@ -19,9 +19,7 @@ void EnsureCurlInitialized() {
     std::call_once(once, []() { curl_global_init(CURL_GLOBAL_DEFAULT); });
 }
 
-} // namespace
-
-HttpResponse LibCurlHttpClient::Post(const HttpRequest& request) {
+HttpResponse Perform(const HttpRequest& request, bool post) {
     EnsureCurlInitialized();
 
     HttpResponse response;
@@ -41,9 +39,13 @@ HttpResponse LibCurlHttpClient::Post(const HttpRequest& request) {
     char error_buffer[CURL_ERROR_SIZE] = {};
     std::string body;
     curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.data());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(request.body.size()));
+    if (post) {
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.data());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(request.body.size()));
+    } else {
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeoutSeconds);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
@@ -66,6 +68,16 @@ HttpResponse LibCurlHttpClient::Post(const HttpRequest& request) {
         curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
     return response;
+}
+
+} // namespace
+
+HttpResponse LibCurlHttpClient::Post(const HttpRequest& request) {
+    return Perform(request, true);
+}
+
+HttpResponse LibCurlHttpClient::Get(const HttpRequest& request) {
+    return Perform(request, false);
 }
 
 } // namespace ai

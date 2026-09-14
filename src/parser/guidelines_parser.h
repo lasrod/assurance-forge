@@ -1,6 +1,7 @@
 #pragma once
 
 #include <expected>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -12,39 +13,12 @@ struct GuidelinesLicense {
     std::string url;
 };
 
-struct GuidelinesRecommendation {
-    std::string method;
-    std::string recommendation;
-};
-
-struct GuidelinesIdSchemeEntry {
-    std::string prefix;
-    std::string meaning;
-};
-
+// The catalogue's `document` block: what the MCP guidance resource opens with.
 struct GuidelinesDocumentMetadata {
     std::string title;
     std::string copyright;
     GuidelinesLicense license;
     std::string purpose;
-    std::string source_policy_summary;
-    std::string method_application_summary;
-    std::vector<GuidelinesRecommendation> recommendations;
-    std::vector<GuidelinesIdSchemeEntry> id_scheme;
-    std::vector<std::string> required_guideline_sections;
-};
-
-struct ReferenceSource {
-    std::string id;
-    std::string display_name;
-    std::string type;
-};
-
-struct GuidelineCategory {
-    std::string id;
-    std::string title;
-    std::string index_title;
-    std::string description;
 };
 
 struct GuidelineExample {
@@ -105,6 +79,16 @@ struct GuidelineTool {
     std::vector<GuidelineRepair> repair;
 };
 
+// A neighbouring guideline a reviewer is likely to cite in this one's place, or
+// this one in its, and which to cite when. SCCG publishes these for the pairs it
+// observed being confused (0.8.0), so that two reviews citing the same defect
+// cite the same id. Carried into the review request verbatim: the note is the
+// disambiguation, and a tool paraphrasing it would be a second catalogue.
+struct GuidelineDistinction {
+    std::string id;
+    std::string note;
+};
+
 struct Guideline {
     std::string id;
     std::string rule_id;
@@ -122,9 +106,35 @@ struct Guideline {
     std::vector<std::string> reference_source_ids;
     std::vector<std::string> review_profile_ids;
     std::vector<std::string> data_package_ids;
+    std::vector<GuidelineDistinction> distinguish_from;
     GuidelineTool tool;
     std::string schema_version;
     std::string sccg_version;
+};
+
+// A guideline id SCCG no longer uses. Retired ids are never reused, and each
+// names the guidelines that now carry its content, so a stored finding or a link
+// that cites one can be redirected rather than left pointing at nothing.
+struct RetiredGuideline {
+    std::string id;
+    std::string title;
+    std::string retired_in;
+    std::vector<std::string> replaced_by;
+    std::string note;
+};
+
+// One review question inside a profile, and the guidelines that answer it.
+// SCCG 0.8.0 partitions `claim_review` this way: the passes together list every
+// guideline of the profile exactly once, profile selection is unchanged, and a
+// tool may send one request per pass and merge the findings under the profile.
+// Measured, that is the difference between 18 and 26 of 31 claim guidelines
+// cited as intended -- a review mis-attributes a finding when two confusable
+// guidelines arrive in the same request.
+struct ReviewPass {
+    std::string id;
+    std::string display_name;
+    std::string question;
+    std::vector<std::string> guideline_ids;
 };
 
 // What a review should do when a required package is missing anyway. Declared
@@ -145,7 +155,12 @@ struct ReviewProfile {
     std::vector<std::string> guideline_ids;
     std::vector<std::string> required_data;
     std::vector<std::string> optional_data;
+    // Since SCCG 0.8.0 an EXCEPTION to the registry-wide `when_unavailable` rule,
+    // for a required package whose absence leaves some of this profile's
+    // guidelines with nothing to judge. No 0.8.0 profile publishes one.
     std::vector<DataPackageAbsenceStatement> when_absent;
+    // Empty when the profile is reviewed in one request.
+    std::vector<ReviewPass> review_passes;
     std::string schema_version;
     std::string sccg_version;
 };
@@ -165,6 +180,11 @@ struct DataPackage {
     std::string element_role;
     std::vector<std::string> required_fields;
     std::vector<std::string> optional_fields;
+    // One line of meaning per field (SCCG 0.9.0). Since availability is judged
+    // on whether published fields are populated, the names decide what a review
+    // is told, and the meaning is what says which of a tool's data belongs in
+    // which field.
+    std::map<std::string, std::string> field_meanings;
     std::string schema_version;
     std::string sccg_version;
 };
@@ -237,25 +257,38 @@ struct GuidelinesDocument {
     std::string schema_version;
     std::string sccg_version;
     GuidelinesDocumentMetadata metadata;
-    std::vector<ReferenceSource> reference_sources;
-    std::vector<GuidelineCategory> categories;
     std::vector<Guideline> guidelines;
     std::vector<ReviewProfile> review_profiles;
     std::vector<DataPackage> data_packages;
     std::vector<SelectableElement> selectable_elements;
     std::vector<AvailabilityState> availability_states;
+    // SCCG's rule for every package a review would use and was not given
+    // (0.8.0): judge what was supplied, never let an absent package silence a
+    // guideline, never treat an absence as a finding by itself, and say which
+    // packages were not available. A profile's `when_absent` is the only
+    // exception. Empty for a catalogue that predates it.
+    std::string when_unavailable;
+    std::vector<RetiredGuideline> retired_guidelines;
+    // The sentence SCCG publishes for a tool to send with each review-pass
+    // request, `{question}` replaced by the pass's question (SCCG 0.9.0). Sent
+    // verbatim, so every tool frames a pass the same way. Empty for a
+    // catalogue that predates it.
+    std::string review_pass_instruction;
     std::vector<Precheck> prechecks;
     AuthoringGuidance authoring_guidance;
 
     const Guideline* FindGuidelineById(const std::string& id) const;
+    // A retired id, or null. Not folded into FindGuidelineById on purpose: a
+    // retired guideline has no statement, profile or review prompts, and a
+    // caller that got one back where it expected a live guideline would review
+    // against a rule SCCG no longer publishes.
+    const RetiredGuideline* FindRetiredGuidelineById(const std::string& id) const;
     std::vector<const Guideline*> FindGuidelinesByCategory(const std::string& category_id) const;
     std::vector<const Guideline*> FindGuidelinesByApplicableElement(const std::string& element_name) const;
     std::vector<const Guideline*> FindGuidelinesByReviewProfile(const std::string& review_profile_id) const;
     std::vector<const Guideline*> FindGuidelinesBySuggestedCheckId(const std::string& check_id) const;
     const SuggestedCheck* FindSuggestedCheckById(const std::string& check_id) const;
     const ReviewProfile* FindReviewProfileById(const std::string& id) const;
-    const ReferenceSource* FindReferenceSourceById(const std::string& source_id) const;
-    const GuidelineCategory* FindCategoryById(const std::string& category_id) const;
     const DataPackage* FindDataPackageById(const std::string& id) const;
     const Precheck* FindPrecheckById(const std::string& id) const;
     const AvailabilityState* FindAvailabilityStateById(const std::string& id) const;
@@ -275,11 +308,5 @@ struct GuidelinesDocument {
 };
 
 using GuidelinesParseResult = std::expected<GuidelinesDocument, std::string>;
-
-class GuidelinesParser {
-public:
-    static GuidelinesParseResult ParseFile(const std::string& file_path);
-    static GuidelinesParseResult ParseString(const std::string& yaml_content);
-};
 
 } // namespace parser
