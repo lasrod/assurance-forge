@@ -51,7 +51,9 @@ void AppRuntime::RenderFrame(bool& done) {
 
     frame::AppMenuBarCallbacks menu_callbacks;
     menu_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
+    menu_callbacks.begin_create_project_from_sacm = [this]() { BeginCreateProjectFromSacm(); };
     menu_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
+    menu_callbacks.begin_import_sacm_file = [this]() { BeginImportSacmFile(); };
     menu_callbacks.save_project = [this]() { return SaveProject(); };
     menu_callbacks.export_gsn_svg = [this]() { ExportGsnSvg(); };
     menu_callbacks.request_exit = [this](bool& done_ref) { RequestExit(done_ref); };
@@ -579,7 +581,9 @@ void AppRuntime::RenderFrame(bool& done) {
 
     areas::ModalHostCallbacks modal_callbacks;
     modal_callbacks.begin_create_project = [this]() { BeginCreateProject(); };
+    modal_callbacks.begin_create_project_from_sacm = [this]() { BeginCreateProjectFromSacm(); };
     modal_callbacks.begin_open_project = [this]() { BeginOpenProject(); };
+    modal_callbacks.open_project_file = [this](const core::ProjectFileEntry& entry) { OpenProjectFile(entry); };
     modal_callbacks.try_open_project_manifest = [this](const std::string& selected_path) {
         return TryOpenProjectManifest(selected_path);
     };

@@ -153,7 +153,13 @@ private:
     areas::WorkbenchAreaCallbacks MakeWorkbenchAreaCallbacks();
 
     void BeginCreateProject();
+    // Picks an existing SACM file, then a parent folder, and opens the create
+    // dialog with that file as the project's first argument.
+    void BeginCreateProjectFromSacm();
     void BeginOpenProject();
+    // Picks an existing SACM file to copy into the open project as another
+    // tracked argument.
+    void BeginImportSacmFile();
     void BeginCreateProjectSacmFile();
     void BeginCreateProjectEvidenceRegister();
     void BeginCreateProjectJ3377CaeRegister();

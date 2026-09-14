@@ -138,6 +138,10 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         if (ImGui::MenuItem(AF_TR("Create Empty Assurance Project").c_str()) && callbacks.begin_create_project) {
             callbacks.begin_create_project();
         }
+        if (ImGui::MenuItem(AF_TR("Create Project from Existing SACM...").c_str()) &&
+            callbacks.begin_create_project_from_sacm) {
+            callbacks.begin_create_project_from_sacm();
+        }
         if (ImGui::MenuItem(AF_TR("Open Project").c_str()) && callbacks.begin_open_project) {
             callbacks.begin_open_project();
         }
@@ -145,6 +149,11 @@ float RenderAppMenuBar(AppRuntimeState& state, bool& done, const AppMenuBarCallb
         bool has_project = state.app_state.current_project.has_value();
         if (!has_project)
             ImGui::BeginDisabled();
+        // Adds an argument to the project that is open, so it sits with the
+        // project-scoped items rather than beside the creates above.
+        if (ImGui::MenuItem(AF_TR("Import SACM File...").c_str()) && callbacks.begin_import_sacm_file) {
+            callbacks.begin_import_sacm_file();
+        }
         if (ImGui::MenuItem(AF_TR("Save Project").c_str()) && callbacks.save_project) {
             callbacks.save_project();
         }

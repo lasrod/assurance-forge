@@ -2,6 +2,7 @@
 
 #include "core/project_service.h"
 #include "core/string_utils.h"
+#include "ui/i18n/localization.h"
 
 #include <algorithm>
 #include <system_error>
@@ -16,8 +17,24 @@ const char* ProjectFileCreateTitle(ProjectFileCreateKind kind) {
         return "New Evidence Register";
     case ProjectFileCreateKind::J3377CaeRegister:
         return "New J3377 CAE Register";
+    case ProjectFileCreateKind::ImportedSacm:
+        return "Import SACM File";
     }
     return "New Project File";
+}
+
+std::string TranslatedProjectFileCreateTitle(ProjectFileCreateKind kind) {
+    switch (kind) {
+    case ProjectFileCreateKind::Sacm:
+        return AF_TR("New GSN / SACM File");
+    case ProjectFileCreateKind::EvidenceRegister:
+        return AF_TR("New Evidence Register");
+    case ProjectFileCreateKind::J3377CaeRegister:
+        return AF_TR("New J3377 CAE Register");
+    case ProjectFileCreateKind::ImportedSacm:
+        return AF_TR("Import SACM File");
+    }
+    return AF_TR("New Project File");
 }
 
 std::filesystem::path ReviewItemsPath(const core::AssuranceProject& project) {

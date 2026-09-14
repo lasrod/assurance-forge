@@ -128,6 +128,24 @@ BrowseForProjectManifest(const std::string& default_path, std::string& selected_
 }
 
 DialogResult
+BrowseForSacmFile(const std::string& default_path, std::string& selected_path, std::string& error_message) {
+    NfdSession session;
+    if (!session.ok()) {
+        error_message = session.error_message();
+        return DialogResult::Failed;
+    }
+
+    const std::string default_folder = ExistingFolderForDialog(default_path);
+    // Both spellings a SACM interchange document arrives under. The import
+    // itself decides whether the content loads; the filter only narrows the
+    // picker.
+    nfdfilteritem_t filters[] = {{"SACM assurance case", "sacm,xml"}};
+    NFD::UniquePath out_path;
+    const nfdresult_t result = NFD::OpenDialog(out_path, filters, 1, default_folder.c_str());
+    return RunDialog(result, out_path, selected_path, error_message);
+}
+
+DialogResult
 BrowseForEvidenceFile(const std::string& default_path, std::string& selected_path, std::string& error_message) {
     NfdSession session;
     if (!session.ok()) {

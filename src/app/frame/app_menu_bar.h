@@ -10,7 +10,9 @@ namespace app::frame {
 
 struct AppMenuBarCallbacks {
     std::function<void()> begin_create_project;
+    std::function<void()> begin_create_project_from_sacm;
     std::function<void()> begin_open_project;
+    std::function<void()> begin_import_sacm_file;
     std::function<bool()> save_project;
     std::function<void()> export_gsn_svg;
     std::function<void(bool&)> request_exit;

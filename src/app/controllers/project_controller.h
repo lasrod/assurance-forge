@@ -6,6 +6,7 @@
 #include "core/project_service.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -32,6 +33,13 @@ public:
     char project_parent_buf[kPathBufferSize] = ".";
     char open_project_path_buf[kPathBufferSize] = "";
     char project_file_name_buf[256] = "main.sacm";
+    // The SACM file the create-project dialog copies in as the first argument.
+    // Empty means the dialog creates an empty project. Set by the "from existing
+    // SACM" entry points, cleared when the dialog closes either way.
+    std::filesystem::path pending_create_project_source_sacm;
+    // The SACM file an `ImportedSacm` file-name dialog copies into the open
+    // project.
+    std::filesystem::path pending_import_sacm_source;
     std::vector<RecentProjectEntry> recent_projects;
 
     // Whether the name in the create dialog can be used, re-asked whenever it

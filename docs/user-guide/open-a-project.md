@@ -12,7 +12,16 @@ Assurance Forge opens on the welcome screen. It is also reachable later from
 | **Create Empty Assurance Project** | Asks for a name and a location, and creates a project with an empty argument file. |
 | **Create Assurance Project from Template** | **Not implemented yet** — the button reports so and does nothing. |
 | **Open Project** | Opens an OS file picker for an existing `af.proj`. |
-| **Import SACM** | **Not implemented yet.** The file picker behind **Open Project** filters for `.proj` only, so an existing SACM file reaches the application as a file listed in a project manifest — the layout the [example projects](https://github.com/lasrod/assurance-forge-examples) use. The MCP server does accept a bare `.sacm` path (`--project`), read-only. |
+| **Create Project from Existing SACM** | Asks for a SACM file (`.sacm` or `.xml`), then a location, then a name (the file's own name is offered). The project's first argument is a **copy** of that file under `arguments/`; the original is not touched. A file the SACM library cannot load is refused with the library's reason, and no project folder is left behind. |
+
+Once a project is open, **File → Import SACM File...** copies another SACM file
+into it as a further tracked argument, asks what to call the copy (a name the
+project already tracks is refused rather than overwritten), and opens it. Both
+imports copy the bytes as they are — the SACM file is the argument, and an import
+that rewrote it would be a silent edit. Neither carries anything but the one
+argument file: registers, review state and audit history of a source project are
+not merged. To work on an existing Assurance Forge project, use **Open Project**.
+The MCP server also accepts a bare `.sacm` path (`--project`), read-only.
 
 The three **Walkthroughs** cards are likewise placeholders at present; they
 report that walkthroughs are not yet implemented.

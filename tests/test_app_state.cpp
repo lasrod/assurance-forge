@@ -221,6 +221,73 @@ TEST(AppStateTest, ACreatedProjectIsAuditableInTheSessionThatCreatedIt) {
     EXPECT_NE(bus, nullptr) << bus_error;
 }
 
+// The same first-session guarantee for a project created from an existing
+// SACM file: the imported argument is snapshot 0 and the bus opens over it.
+TEST(AppStateTest, AProjectCreatedFromSacmIsAuditableInTheSessionThatCreatedIt) {
+    TempDir temp(MakeTempDir());
+    core::AppState donor;
+    ASSERT_TRUE(donor.create_empty_project("Donor", temp.path.string())) << donor.status_message;
+    const std::filesystem::path source = temp.path / "existing-case.xml";
+    std::filesystem::copy_file(donor.current_project->rootPath / "arguments" / "main.sacm", source);
+
+    core::AppState state;
+    ASSERT_TRUE(state.create_project_from_sacm("FromSacm", temp.path.string(), source)) << state.status_message;
+    ASSERT_TRUE(state.current_project.has_value());
+
+    const std::filesystem::path root = state.current_project->rootPath;
+    EXPECT_TRUE(std::filesystem::exists(root / ".af" / "manifest.af.json"));
+    EXPECT_TRUE(std::filesystem::exists(root / ".af" / "snapshots" / "snapshot_000000"));
+    EXPECT_TRUE(state.last_project_load_report.warnings.empty());
+
+    const core::ProjectFileEntry* main_entry =
+        FindProjectFileWithRole(state.current_project.value(), core::ProjectFileRole::SacmArgument);
+    ASSERT_NE(main_entry, nullptr);
+    EXPECT_EQ(main_entry->relativePath.generic_string(), "arguments/existing-case.sacm");
+    std::string bus_error;
+    const std::unique_ptr<core::commands::CommandBus> bus =
+        core::commands::CommandBus::Open(state.current_project.value(), root / main_entry->relativePath, bus_error);
+    EXPECT_NE(bus, nullptr) << bus_error;
+
+    // And the copy is openable as the project's argument.
+    ASSERT_TRUE(state.open_project_file(*main_entry)) << state.status_message;
+    EXPECT_TRUE(state.loaded_case.has_value());
+    EXPECT_EQ(state.active_project_file_path, root / main_entry->relativePath);
+
+    // The refusal path reports through the same status the dialog shows.
+    core::AppState refused;
+    EXPECT_FALSE(refused.create_project_from_sacm("Nope", temp.path.string(), temp.path / "missing.sacm"));
+    EXPECT_NE(refused.status_message.find("Project create failed"), std::string::npos) << refused.status_message;
+    EXPECT_FALSE(refused.current_project.has_value());
+}
+
+// File > Import SACM File: the copy is tracked, opens as the active argument,
+// and has its own audit store so it is auditable from the first edit.
+TEST(AppStateTest, ImportedSacmFileIsTrackedAndOpensAsTheActiveArgument) {
+    TempDir temp(MakeTempDir());
+    core::AppState donor;
+    ASSERT_TRUE(donor.create_empty_project("Donor", temp.path.string())) << donor.status_message;
+    const std::filesystem::path source = donor.current_project->rootPath / "arguments" / "main.sacm";
+
+    core::AppState state;
+    EXPECT_FALSE(state.import_sacm_file(source, "", nullptr)) << "no project to import into";
+
+    ASSERT_TRUE(state.create_empty_project("Target", temp.path.string())) << state.status_message;
+    core::ProjectFileEntry imported;
+    ASSERT_TRUE(state.import_sacm_file(source, "second", &imported)) << state.status_message;
+    EXPECT_EQ(imported.relativePath.generic_string(), "arguments/second.sacm");
+    EXPECT_NE(state.status_message.find("Imported: arguments/second.sacm"), std::string::npos) << state.status_message;
+    EXPECT_EQ(state.status_message.find("audit store init failed"), std::string::npos) << state.status_message;
+
+    ASSERT_TRUE(state.open_project_file(imported)) << state.status_message;
+    EXPECT_TRUE(state.loaded_case.has_value());
+    EXPECT_EQ(state.active_project_file_path, state.current_project->rootPath / imported.relativePath);
+
+    // The seed's name is taken, so the source's own name is refused, and the
+    // refusal reaches the status the file-name dialog reports from.
+    EXPECT_FALSE(state.import_sacm_file(source, "", nullptr));
+    EXPECT_NE(state.status_message.find("SACM import failed"), std::string::npos) << state.status_message;
+}
+
 TEST(AppStateTest, FailedProjectSacmOpenPreservesCurrentDocument) {
     TempDir temp(MakeTempDir());
     core::AppState state;
