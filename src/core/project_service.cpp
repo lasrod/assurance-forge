@@ -88,8 +88,11 @@ void EnsureInternalDirectoryIgnored(const std::filesystem::path& root) {
 }
 
 constexpr const char* kAcknowledgedExternalChangesFileName = "acknowledged-external-changes.json";
+constexpr const char* kAcknowledgedExternalChangesFormat = "assurance-forge.acknowledged-external-changes";
+constexpr int kAcknowledgedExternalChangesVersion = 1;
 
 struct AcknowledgedExternalChange {
+    std::string path;
     std::string recorded_raw_hash;
     std::string observed_raw_hash;
     std::string acknowledged_utc;
@@ -100,11 +103,19 @@ std::string JsonStringField(const nlohmann::json& object, const char* key) {
     return found != object.end() && found->is_string() ? found->get<std::string>() : std::string{};
 }
 
-// The acknowledgements recorded for a project, keyed by relative path. A missing
-// or unreadable file is no acknowledgements: every external change is reported,
-// which is what happened before acknowledgements existed.
-std::map<std::string, AcknowledgedExternalChange> LoadAcknowledgedExternalChanges(const std::filesystem::path& root) {
-    std::map<std::string, AcknowledgedExternalChange> acknowledged;
+// Every acknowledgement recorded for a project.
+//
+// Only the exact shape AcknowledgeExternalChanges writes counts. A missing or
+// unreadable file, another format or version, or an entry lacking any field is
+// no acknowledgement, and the change is reported as it was before
+// acknowledgements existed. A hand-written entry naming only a path and a hash
+// would otherwise be enough to hide a warning.
+//
+// Every acknowledged pair is kept, not the latest per file. A file that went from
+// the manifest's hash to A, was acknowledged, then went to B and back to A is back
+// at a change already acknowledged, and must not warn about it again.
+std::vector<AcknowledgedExternalChange> LoadAcknowledgedExternalChanges(const std::filesystem::path& root) {
+    std::vector<AcknowledgedExternalChange> acknowledged;
     if (root.empty())
         return acknowledged;
     const std::expected<std::string, std::string> text =
@@ -112,33 +123,58 @@ std::map<std::string, AcknowledgedExternalChange> LoadAcknowledgedExternalChange
     if (!text)
         return acknowledged;
     const nlohmann::json parsed = nlohmann::json::parse(*text, nullptr, false);
-    if (!parsed.is_object() || !parsed.contains("changes") || !parsed["changes"].is_array())
+    if (!parsed.is_object() || JsonStringField(parsed, "format") != kAcknowledgedExternalChangesFormat)
         return acknowledged;
-    for (const nlohmann::json& change : parsed["changes"]) {
+    const auto version = parsed.find("version");
+    if (version == parsed.end() || !version->is_number_integer() ||
+        version->get<int>() != kAcknowledgedExternalChangesVersion)
+        return acknowledged;
+    const auto changes = parsed.find("changes");
+    if (changes == parsed.end() || !changes->is_array())
+        return acknowledged;
+    for (const nlohmann::json& change : *changes) {
         if (!change.is_object())
             continue;
-        const std::string path = JsonStringField(change, "path");
-        AcknowledgedExternalChange entry{JsonStringField(change, "recorded_raw_hash"),
+        AcknowledgedExternalChange entry{JsonStringField(change, "path"),
+                                         JsonStringField(change, "recorded_raw_hash"),
                                          JsonStringField(change, "observed_raw_hash"),
                                          JsonStringField(change, "acknowledged_utc")};
-        if (path.empty() || entry.observed_raw_hash.empty())
+        if (entry.path.empty() || entry.recorded_raw_hash.empty() || entry.observed_raw_hash.empty() ||
+            entry.acknowledged_utc.empty())
             continue;
-        acknowledged[path] = std::move(entry);
+        acknowledged.push_back(std::move(entry));
     }
     return acknowledged;
 }
 
-bool IsAcknowledged(const std::map<std::string, AcknowledgedExternalChange>& acknowledged,
-                    const ExternalFileChange& change) {
-    const auto found = acknowledged.find(change.relativePath.generic_string());
-    return found != acknowledged.end() && found->second.recorded_raw_hash == change.recordedRawHash &&
-           found->second.observed_raw_hash == change.observedRawHash;
+bool IsAcknowledged(const std::vector<AcknowledgedExternalChange>& acknowledged, const ExternalFileChange& change) {
+    const std::string path = change.relativePath.generic_string();
+    for (const AcknowledgedExternalChange& entry : acknowledged) {
+        if (entry.path == path && entry.recorded_raw_hash == change.recordedRawHash &&
+            entry.observed_raw_hash == change.observedRawHash)
+            return true;
+    }
+    return false;
 }
 
-std::string ExternalChangeSummary(size_t reported_count, size_t acknowledged_count) {
-    std::string summary = std::to_string(reported_count) + " externally modified file(s)";
+// Every count that is not zero. An acknowledged change must never stand in for a
+// missing file in this line: the missing file is what keeps the popup open, and a
+// message that mentions only the acknowledged change hides the reason.
+std::string RawHashSummary(size_t reported_count, size_t acknowledged_count, size_t missing_count) {
+    std::vector<std::string> parts;
+    if (reported_count > 0)
+        parts.push_back(std::to_string(reported_count) + " externally modified file(s)");
     if (acknowledged_count > 0)
-        summary += ", " + std::to_string(acknowledged_count) + " already acknowledged";
+        parts.push_back(std::to_string(acknowledged_count) + " externally modified file(s) already acknowledged");
+    if (missing_count > 0)
+        parts.push_back(std::to_string(missing_count) + " missing file(s)");
+    if (parts.empty())
+        return "Raw hashes recalculated";
+    std::string summary = parts.front();
+    for (size_t index = 1; index < parts.size(); ++index) {
+        summary += ", ";
+        summary += parts[index];
+    }
     return summary;
 }
 
@@ -914,8 +950,7 @@ ProjectLoadReport ProjectService::RefreshFileStatus(AssuranceProject& project) {
     size_t changed_count = 0;
     size_t acknowledged_count = 0;
     size_t missing_count = 0;
-    const std::map<std::string, AcknowledgedExternalChange> acknowledged =
-        LoadAcknowledgedExternalChanges(project.rootPath);
+    const std::vector<AcknowledgedExternalChange> acknowledged = LoadAcknowledgedExternalChanges(project.rootPath);
 
     for (auto& entry : project.files) {
         const std::string previous_raw_hash = entry.rawHash;
@@ -952,16 +987,11 @@ ProjectLoadReport ProjectService::RefreshFileStatus(AssuranceProject& project) {
         }
     }
 
-    std::string raw_hash_message = "Raw hashes recalculated";
-    if (changed_count > 0 || acknowledged_count > 0)
-        raw_hash_message = ExternalChangeSummary(changed_count, acknowledged_count);
-    else if (missing_count > 0)
-        raw_hash_message = std::to_string(missing_count) + " missing file(s)";
     AddStep(report,
             "Recalculate raw hashes",
             raw_hashes_ok ? (changed_count > 0 ? ProjectLoadStepStatus::Warning : ProjectLoadStepStatus::Passed)
                           : ProjectLoadStepStatus::Failed,
-            raw_hash_message);
+            RawHashSummary(changed_count, acknowledged_count, missing_count));
     AddStep(report,
             "Parse changed files",
             parsing_ok ? ProjectLoadStepStatus::Passed : ProjectLoadStepStatus::Failed,
@@ -993,27 +1023,34 @@ bool ProjectService::AcknowledgeExternalChanges(const AssuranceProject& project,
         return false;
     }
 
-    std::map<std::string, AcknowledgedExternalChange> acknowledged = LoadAcknowledgedExternalChanges(project.rootPath);
+    // Read, add, write back. Two instances with the project open (the application
+    // warns about that but allows it) that acknowledge at the same moment can each
+    // write over the other and drop one entry. The cost is that change's warning
+    // once more on the next open -- the behaviour before acknowledgements existed,
+    // failing toward the warning -- so it is accepted rather than locked against.
+    std::vector<AcknowledgedExternalChange> acknowledged = LoadAcknowledgedExternalChanges(project.rootPath);
     bool added = false;
     for (const ExternalFileChange& change : changes) {
-        if (change.acknowledged || change.observedRawHash.empty())
+        if (change.acknowledged || change.recordedRawHash.empty() || change.observedRawHash.empty() ||
+            IsAcknowledged(acknowledged, change))
             continue;
-        acknowledged[change.relativePath.generic_string()] =
-            AcknowledgedExternalChange{change.recordedRawHash, change.observedRawHash, NowUtc()};
+        acknowledged.push_back(AcknowledgedExternalChange{
+            change.relativePath.generic_string(), change.recordedRawHash, change.observedRawHash, NowUtc()});
         added = true;
     }
     if (!added)
         return true;
 
     nlohmann::json entries = nlohmann::json::array();
-    for (const auto& [path, entry] : acknowledged) {
-        entries.push_back(nlohmann::json{{"path", path},
+    for (const AcknowledgedExternalChange& entry : acknowledged) {
+        entries.push_back(nlohmann::json{{"path", entry.path},
                                          {"recorded_raw_hash", entry.recorded_raw_hash},
                                          {"observed_raw_hash", entry.observed_raw_hash},
                                          {"acknowledged_utc", entry.acknowledged_utc}});
     }
-    const nlohmann::json document{
-        {"format", "assurance-forge.acknowledged-external-changes"}, {"version", 1}, {"changes", entries}};
+    const nlohmann::json document{{"format", kAcknowledgedExternalChangesFormat},
+                                  {"version", kAcknowledgedExternalChangesVersion},
+                                  {"changes", entries}};
 
     const std::filesystem::path internal = project.rootPath / ".af";
     std::error_code ec;
