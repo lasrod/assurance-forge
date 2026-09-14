@@ -11,6 +11,11 @@ Runs as the `agent_definition_check` CTest. Three failures it is for:
    are a boundary nobody can rely on.
 3. An adapter that no longer matches what the canonical definition generates,
    including one with no definition behind it at all.
+4. A Claude write refusal that is not wired, or does not refuse (#326). On
+   Claude the refusal is a PreToolUse hook, so this reads `.claude/settings.json`
+   for it and runs the hook against synthetic calls: a write by each write-denied
+   agent must be refused, and a write by an agent that may write, or by the main
+   session, must not be.
 
 The third is the reason this exists. Before #294 each role was hand-written per
 platform with nothing comparing them, and `sacm-conformance-verifier` had already
@@ -25,6 +30,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 import tomllib
 
@@ -37,6 +43,81 @@ from agent_defs import (
     parse_list,
 )
 from generate_adapters import planned_outputs
+
+HOOK_SCRIPT = "tools/agents/deny_writes_hook.py"
+CLAUDE_SETTINGS = ".claude/settings.json"
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+
+
+def hook_denies(agent_type: str | None, tool: str) -> bool:
+    """Run the write hook the way Claude Code does, and report whether it refused.
+
+    Through a real process with the input on stdin, rather than by importing the
+    decision function: a hook whose logic is right but whose entry point cannot
+    start refuses nothing, and only running it shows that.
+    """
+    payload: dict = {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": {"file_path": "probe.txt"}}
+    if agent_type is not None:
+        payload["agent_type"] = agent_type
+    result = subprocess.run(
+        [sys.executable, str(REPO / HOOK_SCRIPT)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return False
+    try:
+        decision = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return False
+    return decision.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+
+
+def check_write_hook(agents: list[dict], manifest: dict) -> list[str]:
+    """The Claude write refusal is a hook: check it is wired, and that it refuses (#326).
+
+    `writes: none` in a definition says what was intended, and a generated
+    paragraph that says "refused by a hook" is only true if the hook is in the
+    settings Claude loads and actually answers "deny". This checks both, and the
+    two directions that would make the hook a nuisance instead of a guard: a
+    refused read, and a refused write by an agent that is allowed to write.
+    """
+    if manifest["platforms"].get("claude", {}).get("enforcement_scope") != "hook":
+        return []
+
+    try:
+        settings = json.loads((REPO / CLAUDE_SETTINGS).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return [f"{CLAUDE_SETTINGS}: cannot be read ({error}), so no write-denied agent is refused anything"]
+
+    problems: list[str] = []
+    wired: set[str] = set()
+    for group in settings.get("hooks", {}).get("PreToolUse", []):
+        commands = [hook.get("command", "") for hook in group.get("hooks", []) if hook.get("type") == "command"]
+        if any(HOOK_SCRIPT in command for command in commands):
+            wired.update(group.get("matcher", "").split("|"))
+    unmatched = [tool for tool in WRITE_TOOLS if tool not in wired]
+    if unmatched:
+        problems.append(
+            f"{CLAUDE_SETTINGS}: no PreToolUse hook runs {HOOK_SCRIPT} for {', '.join(unmatched)}"
+        )
+
+    for agent in agents:
+        name = agent["fields"].get("name", agent["stem"])
+        if agent["fields"].get("writes") == "none":
+            for tool in WRITE_TOOLS:
+                if not hook_denies(name, tool):
+                    problems.append(f"{HOOK_SCRIPT}: does not refuse {tool} by write-denied agent {name}")
+            if hook_denies(name, "Read"):
+                problems.append(f"{HOOK_SCRIPT}: refuses a Read by {name}; it must only refuse writes")
+        elif hook_denies(name, "Write"):
+            problems.append(f"{HOOK_SCRIPT}: refuses a Write by {name}, which may write")
+    if hook_denies(None, "Write"):
+        problems.append(f"{HOOK_SCRIPT}: refuses a Write by the main session, which names no agent")
+    return problems
 
 
 def check_frontmatter(agent: dict, schema: dict, manifest: dict) -> list[str]:
@@ -183,6 +264,10 @@ def check_evals(agents: list[dict]) -> tuple[list[str], int, int]:
                 )
             if expected.get("has_rationale") and not agent["fields"].get("writes_rationale"):
                 problems.append(f"{where}: expects {name} to state a `writes_rationale`, and it does not")
+            if expected.get("write_hook_denies"):
+                allowed = [tool for tool in WRITE_TOOLS if not hook_denies(name, tool)]
+                if allowed:
+                    problems.append(f"{where}: expects the write hook to refuse {name}, and it allows {', '.join(allowed)}")
 
     return problems, mechanical, reviewable
 
@@ -265,6 +350,13 @@ def main() -> int:
             "\n  python tools/agents/generate_adapters.py",
             file=sys.stderr,
         )
+        return 1
+
+    hook_problems = check_write_hook(agents, manifest)
+    if hook_problems:
+        print(f"{len(hook_problems)} write-hook problem(s):\n", file=sys.stderr)
+        for problem in hook_problems:
+            print(f"  {problem}", file=sys.stderr)
         return 1
 
     eval_problems, mechanical, reviewable = check_evals(agents)

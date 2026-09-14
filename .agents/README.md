@@ -93,17 +93,33 @@ restriction is the one the next person relaxes when it becomes inconvenient.
 
 | Platform | Mechanism | Covers | Left to the prompt |
 |---|---|---|---|
-| Claude | `tools:` frontmatter | Write, Edit, NotebookEdit | Writing via `Bash`, which is granted |
+| Claude | PreToolUse hook: `.claude/settings.json` runs `tools/agents/deny_writes_hook.py` | Write, Edit, MultiEdit, NotebookEdit, while project hooks run | Writing via `Bash`, which is granted; any write in a session with hooks disabled |
 | Codex | `sandbox_mode = "read-only"` | All writes, shell included | — |
 
 The two are **not the same boundary**, and the generated paragraph says which is
-which on each platform. Claude's tool list cannot stop a shell command, because a
-read-only role still needs `Bash` to build and run things; Codex's sandbox can.
+which on each platform. Claude's hook cannot stop a shell command, because a
+read-only role still needs `Bash` to build and run things, and a command that
+writes a file cannot be reliably recognised from its text; Codex's sandbox can.
 
-Both are emitted by the generator and both are checked: `check_agents.py` parses
-each generated `.toml` and fails if a `writes: none` agent's file does not carry
-the read-only sandbox. Asserting `writes: none` in the definition says what was
-intended; parsing the artifact says what the platform will actually load.
+Both are checked. `check_agents.py` parses each generated `.toml` and fails if a
+`writes: none` agent's file does not carry the read-only sandbox. On Claude it
+reads `.claude/settings.json` to confirm the hook runs for every write tool, then
+starts the hook as a process against synthetic calls: a write by each write-denied
+agent must be refused, and a read by one, a write by an agent that may write, and
+a write by the main session must not be. Asserting `writes: none` in the
+definition says what was intended; checking the artifact says what the platform
+will actually do.
+
+> **This table said `tools:` frontmatter for Claude until
+> [#326](https://github.com/lasrod/assurance-forge/issues/326)**, and the
+> generated paragraph told three agents "the harness applies that, so it holds
+> whether or not you remember it". A probe had `sacm-conformance-verifier`
+> (`tools: Read, Grep, Glob, Bash`) call `Write` and `Edit` successfully.
+> Subagents here run in the background by default, and a background subagent is
+> given Write and Edit whatever `tools:` lists. The hook input names the calling
+> subagent in `agent_type`, which is what lets a project hook refuse the call.
+> The adapters still carry `tools:` and, for write-denied agents,
+> `disallowedTools:`, and nothing relies on either.
 
 Every role now targets both platforms. `feature-matrix-steward` was the last
 Claude-only one, and [#329](https://github.com/lasrod/assurance-forge/issues/329)
@@ -160,10 +176,9 @@ to close. #294 is closed on what it delivered; these are what it did not.
   modes and `sacm-implementer` two scopes, and under #294's own principle those
   are knowledge rather than authority. They are prompt sections because there is
   nowhere better yet.
-- **The runtime may grant more than the definitions declare** —
-  [#326](https://github.com/lasrod/assurance-forge/issues/326). The Claude
-  session roster has listed write-denied agents with `Write` and `Edit`,
-  including one created in the same session, which rules out a stale file. If
-  that is real, the `tools:` mechanism this package treats as enforcement is
-  weaker than the generated paragraph claims — the same error as #324, in the
-  opposite direction. It needs an experiment, not more reading.
+- **Writes through `Bash` are not refused on Claude** —
+  [#326](https://github.com/lasrod/assurance-forge/issues/326). The hook refuses
+  the file-writing tools only. For write-denied agents, a shell command that
+  writes a file is prohibited by the Authority paragraph and by nothing else, and
+  the paragraph says so. The hook also depends on project hooks running and on
+  Python being startable as `python3` or `python`.

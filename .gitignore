@@ -13,6 +13,9 @@ cmake-build-*/
 !.claude/agents/
 # Skills are shared project knowledge, not local tooling config.
 !.claude/skills/
+# The project hook that refuses writes to write-denied agents (#326) is policy,
+# not a personal setting. settings.local.json stays untracked.
+!.claude/settings.json
 *.user
 *.suo
 *.sln

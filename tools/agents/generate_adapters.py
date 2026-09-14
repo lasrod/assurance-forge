@@ -29,10 +29,15 @@ from agent_defs import (
 def render_claude(agent: dict, manifest: dict) -> str:
     """Markdown with the frontmatter Claude reads.
 
-    `tools:` is the mechanism, so it is emitted from the canonical `tools` field
-    and never hand-edited in the output. `all` means "no restriction", which
-    Claude spells by omitting the key entirely -- emitting `tools: all` would
-    name a tool that does not exist.
+    `tools:` is emitted from the canonical `tools` field and never hand-edited in
+    the output. `all` means "no restriction", which Claude spells by omitting the
+    key entirely -- emitting `tools: all` would name a tool that does not exist.
+
+    It is not the write-denial mechanism. #326 found a background subagent given
+    Write and Edit whatever its `tools:` list said; the refusal that holds is
+    tools/agents/deny_writes_hook.py. `disallowedTools:` is emitted for
+    write-denied agents as a second barrier on a release that honours it, and
+    nothing relies on it.
     """
     fields = agent["fields"]
     lines = [
@@ -45,6 +50,8 @@ def render_claude(agent: dict, manifest: dict) -> str:
     ]
     if agent["tools"] != ["all"]:
         lines.append(f"tools: {', '.join(agent['tools'])}")
+    if fields.get("writes") == "none":
+        lines.append("disallowedTools: Write, Edit, NotebookEdit")
     # A blank line after the closing `---`, which is what the hand-written files
     # had. Matching the existing convention keeps the migration diff to what
     # actually changed instead of burying it in whitespace.

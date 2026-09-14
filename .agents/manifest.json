@@ -15,16 +15,25 @@
       "extension": ".md",
       "enforces_write_denial": true,
       "how": [
-        "The `tools:` frontmatter key. An agent listed without Write, Edit or",
-        "NotebookEdit cannot call them -- the harness applies that, rather than",
-        "asking the model to remember it.",
+        "A PreToolUse hook. `.claude/settings.json` runs",
+        "tools/agents/deny_writes_hook.py before every Write, Edit, MultiEdit or",
+        "NotebookEdit call. The hook input names the calling subagent in",
+        "`agent_type`, and a call from an agent whose canonical definition says",
+        "`writes: none` is refused.",
         "",
-        "It covers those tools and nothing else. `Bash` is still granted, because a",
-        "read-only role has to be able to build and run things, and a shell can write",
-        "a file. So on this platform the prohibition on writing *through a shell* is",
-        "an instruction, and the generated paragraph says which half is which."
+        "Not the `tools:` frontmatter key, which is what this said until #326. A",
+        "probe had sacm-conformance-verifier (`tools: Read, Grep, Glob, Bash`) call",
+        "Write and Edit successfully: subagents run in the background by default,",
+        "and a background subagent is given Write and Edit whatever `tools:` lists.",
+        "`tools:` and `disallowedTools:` are still emitted, and nothing relies on them.",
+        "",
+        "The hook covers those tools and nothing else. `Bash` is still granted,",
+        "because a read-only role has to be able to build and run things, and a shell",
+        "can write a file. The hook also holds only while project hooks run: a session",
+        "with hooks disabled, or a machine that cannot start Python, refuses nothing.",
+        "The generated paragraph states both remainders."
       ],
-      "enforcement_scope": "tools"
+      "enforcement_scope": "hook"
     },
     "codex": {
       "output_dir": ".codex/agents",
