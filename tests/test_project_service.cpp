@@ -390,6 +390,97 @@ TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
     EXPECT_TRUE(missing_report.has_failures());
     EXPECT_TRUE(missing_report.showPopup);
 }
+
+namespace {
+
+void AppendNewline(const std::filesystem::path& path) {
+    std::ofstream file(path, std::ios::app | std::ios::binary);
+    file << "\n";
+}
+
+core::ProjectFileState EvidenceRegisterState(const core::AssuranceProject& project) {
+    for (const core::ProjectFileEntry& file : project.files) {
+        if (file.role == core::ProjectFileRole::EvidenceRegister)
+            return file.state;
+    }
+    return core::ProjectFileState::Missing;
+}
+
+} // namespace
+
+// #402: the "modified outside Assurance Forge" warning used to repeat on every
+// open until something saved the project. Acknowledged once, the same change is
+// not reported again -- and acknowledging does not rewrite af.proj, whose
+// recorded hash is the evidence that the file was edited outside the tool.
+TEST(ProjectServiceTest, AnAcknowledgedExternalChangeIsNotReportedAgainAndTheManifestKeepsItsHash) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Acknowledged", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    AppendNewline(project.rootPath / entry.relativePath);
+
+    core::AssuranceProject opened;
+    core::ProjectLoadReport first;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, opened, first, error)) << error;
+    ASSERT_EQ(first.externalChanges.size(), 1u);
+    EXPECT_FALSE(first.externalChanges.front().acknowledged);
+    EXPECT_NE(first.externalChanges.front().recordedRawHash, first.externalChanges.front().observedRawHash);
+    EXPECT_EQ(first.warnings.size(), 1u);
+    EXPECT_TRUE(first.showPopup);
+
+    const std::filesystem::path manifest = core::ProjectService::ManifestPath(opened);
+    const std::string manifest_before = core::ReadTextFile(manifest).value();
+    ASSERT_TRUE(core::ProjectService::AcknowledgeExternalChanges(opened, first.externalChanges, error)) << error;
+    EXPECT_EQ(core::ReadTextFile(manifest).value(), manifest_before) << "acknowledging must not rewrite af.proj";
+    EXPECT_TRUE(std::filesystem::exists(project.rootPath / ".af" / ".gitignore"));
+
+    core::AssuranceProject reopened;
+    core::ProjectLoadReport second;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, reopened, second, error)) << error;
+    EXPECT_TRUE(second.warnings.empty());
+    EXPECT_FALSE(second.showPopup);
+    ASSERT_EQ(second.externalChanges.size(), 1u);
+    EXPECT_TRUE(second.externalChanges.front().acknowledged);
+    // The warning is withheld; the fact is not.
+    EXPECT_EQ(EvidenceRegisterState(reopened), core::ProjectFileState::ModifiedOutsideAssuranceForge);
+
+    // A further edit is a different change, and is reported.
+    AppendNewline(project.rootPath / entry.relativePath);
+    core::AssuranceProject edited_again;
+    core::ProjectLoadReport third;
+    ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, edited_again, third, error)) << error;
+    EXPECT_EQ(third.warnings.size(), 1u);
+    EXPECT_TRUE(third.showPopup);
+    ASSERT_EQ(third.externalChanges.size(), 1u);
+    EXPECT_FALSE(third.externalChanges.front().acknowledged);
+}
+
+// An acknowledgement file that cannot be read acknowledges nothing: the change is
+// reported, as it was before acknowledgements existed, rather than hidden.
+TEST(ProjectServiceTest, AnUnreadableAcknowledgementFileLeavesExternalChangesReported) {
+    TempDir tmp(MakeTempParent());
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    core::ProjectFileEntry entry;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Unreadable", tmp.path, project, report, error)) << error;
+    ASSERT_TRUE(core::ProjectService::AddEvidenceRegister(project, "", entry, error)) << error;
+    AppendNewline(project.rootPath / entry.relativePath);
+    std::filesystem::create_directories(project.rootPath / ".af");
+
+    for (const char* content : {"{ not json", R"({"changes": [{"path": 5, "observed_raw_hash": []}]})"}) {
+        SCOPED_TRACE(content);
+        std::ofstream(project.rootPath / ".af" / "acknowledged-external-changes.json", std::ios::binary) << content;
+        core::AssuranceProject opened;
+        core::ProjectLoadReport open_report;
+        ASSERT_TRUE(core::ProjectService::OpenProject(project.rootPath, opened, open_report, error)) << error;
+        EXPECT_EQ(open_report.warnings.size(), 1u);
+        EXPECT_TRUE(open_report.showPopup);
+    }
+}
 // `ReadFileBytes` had no test. It measures the file with `tellg`, sizes a buffer
 // to that, and reads. The read now has to deliver every byte it asked for, so
 // these pin the sizes that must keep succeeding -- most of all the empty file,

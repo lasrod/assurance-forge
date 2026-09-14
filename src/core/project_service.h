@@ -141,6 +141,18 @@ public:
     static bool WriteManifestSafely(const AssuranceProject& project, std::string& error);
     static std::filesystem::path ManifestPath(const AssuranceProject& project);
     static ProjectLoadReport RefreshFileStatus(AssuranceProject& project);
+
+    // Records `changes` as seen, so the next open does not report them again.
+    //
+    // Kept in `.af/acknowledged-external-changes.json`, never in `af.proj`: the
+    // manifest's recorded hash is the evidence that a file was edited outside the
+    // tool, and rewriting it on acknowledgement would erase that trace for the
+    // next person to open the project. `.af/` is not version-controlled, so an
+    // acknowledgement is per checkout. An entry names the file and both hashes, so
+    // a further change to the same file is a different change and is reported.
+    static bool AcknowledgeExternalChanges(const AssuranceProject& project,
+                                           const std::vector<ExternalFileChange>& changes,
+                                           std::string& error);
 };
 
 } // namespace core

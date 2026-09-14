@@ -6,6 +6,7 @@
 #include "app/project_workflow.h"
 #include "app/recent_projects.h"
 #include "core/element_factory.h"
+#include "core/project_service.h"
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "hello_imgui/hello_imgui.h"
@@ -673,6 +674,25 @@ void ModalHost::RenderProjectFileNameModal() {
     }
 }
 
+namespace {
+
+// Records the external changes the load report just showed as seen, so the next
+// open does not report them again (#402). If that cannot be written the warning
+// repeats on the next open, as it always did, and the status bar says why.
+void AcknowledgeReportedExternalChanges(core::AppState& app_state) {
+    const core::ProjectLoadReport& report = app_state.last_project_load_report;
+    if (!app_state.current_project.has_value() || report.externalChanges.empty())
+        return;
+    std::string error;
+    if (!core::ProjectService::AcknowledgeExternalChanges(*app_state.current_project, report.externalChanges, error)) {
+        app_state.status_message = ui::i18n::trf(
+            "The external changes could not be recorded as seen, so they will be reported again on the next open: {0}",
+            error);
+    }
+}
+
+} // namespace
+
 void ModalHost::RenderProjectLoadReportModal() {
     auto& report = state_.app_state.last_project_load_report;
     if (!report.showPopup)
@@ -700,9 +720,17 @@ void ModalHost::RenderProjectLoadReportModal() {
             for (const auto& warning : report.warnings) {
                 ImGui::BulletText("%s", warning.c_str());
             }
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 32.0f);
+            ImGui::TextDisabled("%s",
+                                AF_TR("OK records these changes as seen on this computer, so they are not reported "
+                                      "again unless the file changes again. af.proj is not modified.")
+                                    .c_str());
+            ImGui::PopTextWrapPos();
         }
         ImGui::Spacing();
         if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(100.0f, 0.0f))) {
+            AcknowledgeReportedExternalChanges(state_.app_state);
             report.showPopup = false;
             ImGui::CloseCurrentPopup();
         }
