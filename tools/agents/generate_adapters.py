@@ -19,6 +19,7 @@ import sys
 # Same directory as this script, which Python puts on sys.path[0] when running it.
 from agent_defs import (
     REPO,
+    WRITE_TOOLS,
     DefinitionError,
     authority_section,
     load_agents,
@@ -51,7 +52,7 @@ def render_claude(agent: dict, manifest: dict) -> str:
     if agent["tools"] != ["all"]:
         lines.append(f"tools: {', '.join(agent['tools'])}")
     if fields.get("writes") == "none":
-        lines.append("disallowedTools: Write, Edit, NotebookEdit")
+        lines.append(f"disallowedTools: {', '.join(WRITE_TOOLS)}")
     # A blank line after the closing `---`, which is what the hand-written files
     # had. Matching the existing convention keeps the migration diff to what
     # actually changed instead of burying it in whitespace.

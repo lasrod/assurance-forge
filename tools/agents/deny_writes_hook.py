@@ -38,12 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from agent_defs import DefinitionError, load_agents  # noqa: E402
-
-# Every tool that creates or changes a file on its own. MultiEdit is listed
-# although a release may not offer it: refusing a tool that does not exist costs
-# nothing, and a release that brings it back must not open a hole.
-WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+from agent_defs import WRITE_TOOLS, load_agents  # noqa: E402
 
 
 def write_denied_agent_names() -> frozenset[str]:
@@ -116,7 +111,11 @@ def main() -> int:
     denied: frozenset[str] | None
     try:
         denied = write_denied_agent_names()
-    except (DefinitionError, OSError):
+    except Exception:  # noqa: BLE001 -- fail closed on any unreadable roster
+        # Deliberately broad. A malformed manifest raises JSONDecodeError, an
+        # undecodable definition UnicodeDecodeError, a definition missing a key
+        # KeyError; naming the ones foreseen is how the unforeseen one would exit
+        # without a decision and let a write-denied agent write.
         denied = None
     decision = decide(payload, denied)
     if decision is not None:

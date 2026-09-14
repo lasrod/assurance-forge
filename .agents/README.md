@@ -103,10 +103,15 @@ writes a file cannot be reliably recognised from its text; Codex's sandbox can.
 
 Both are checked. `check_agents.py` parses each generated `.toml` and fails if a
 `writes: none` agent's file does not carry the read-only sandbox. On Claude it
-reads `.claude/settings.json` to confirm the hook runs for every write tool, then
-starts the hook as a process against synthetic calls: a write by each write-denied
-agent must be refused, and a read by one, a write by an agent that may write, and
-a write by the main session must not be. Asserting `writes: none` in the
+runs each command `.claude/settings.json` configures for a write tool, through
+bash with `CLAUDE_PROJECT_DIR` set as Claude Code runs it, and requires a refusal
+for a write-denied agent. A command that only *names* the script refuses nothing
+and fails. It then starts the hook against synthetic calls: every write by each
+write-denied agent must be refused, and a read by one, a write by an agent that
+may write, and a write by the main session must get no decision at all. An
+explicit `allow` fails too, because the hook never grants anything. A roster the
+hook cannot read refuses a subagent's write. The write tools are one list in
+`tools/agents/agent_defs.py`, and the schema's `write_denied_tools` must match it. Asserting `writes: none` in the
 definition says what was intended; checking the artifact says what the platform
 will actually do.
 
