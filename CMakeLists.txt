@@ -338,7 +338,8 @@ add_custom_target(af_build_id
     VERBATIM
 )
 
-add_executable(af-sccg-review-eval src/eval/sccg_review_eval.cpp src/eval/sccg_review_eval_options.cpp)
+add_executable(af-sccg-review-eval
+    src/eval/sccg_review_eval.cpp src/eval/sccg_review_eval_options.cpp src/eval/baseline_review.cpp)
 add_dependencies(af-sccg-review-eval af_build_id)
 target_include_directories(af-sccg-review-eval PRIVATE "${AF_GENERATED_DIR}")
 target_link_libraries(af-sccg-review-eval PRIVATE
@@ -446,6 +447,7 @@ add_executable(tests
     tests/test_sccg_review_consensus.cpp
     tests/test_sccg_review_passes.cpp
     tests/test_sccg_review_eval_options.cpp
+    tests/test_baseline_review.cpp
     tests/test_patch_operation_parsing.cpp
     tests/test_term_definition_survives_save.cpp
     tests/test_openai_provider.cpp
@@ -531,8 +533,9 @@ target_link_libraries(tests PRIVATE
     af_app af_ui af_review af_ai af_export af_mcp af_agent af_bridge af_core af_sacm_adapter af_legacy_sacm af_parser
 )
 # The evaluation harness has no layer library -- it is one executable -- but its
-# command line is plain parsing the tests hold it to.
-target_sources(tests PRIVATE src/eval/sccg_review_eval_options.cpp)
+# command line is plain parsing the tests hold it to, and its --baseline request
+# is held to reading what an SCCG review reads.
+target_sources(tests PRIVATE src/eval/sccg_review_eval_options.cpp src/eval/baseline_review.cpp)
 
 # The per-layer object libraries are not the whole of the first-party code. The
 # executables carry their own translation units -- src/app/main.cpp,

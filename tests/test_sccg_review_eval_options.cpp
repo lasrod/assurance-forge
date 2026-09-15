@@ -103,6 +103,27 @@ TEST(SccgReviewEvalOptionsTest, RefusesAnUnknownArgumentOrAMissingValue) {
     EXPECT_NE(missing.error.find("needs a value"), std::string::npos) << missing.error;
 }
 
+// A baseline review has no profile, no passes and no cited guidelines, so an
+// option that would act on them is refused rather than silently ignored.
+TEST(SccgReviewEvalOptionsTest, ParsesBaselineAndRefusesWhatOnlyAnSccgReviewHas) {
+    const Parsed baseline = Parse({"--project", "case", "--baseline", "--runs", "5", "--consensus", "0"});
+    ASSERT_TRUE(baseline.ok) << baseline.error;
+    EXPECT_TRUE(baseline.options.baseline);
+    EXPECT_FALSE(Parse({"--project", "case"}).options.baseline);
+
+    const std::vector<std::vector<std::string>> conflicting = {
+        {"--baseline", "--profile", "claim_review"},
+        {"--baseline", "--single-request"},
+        {"--baseline", "--consensus", "3"},
+    };
+    for (const std::vector<std::string>& arguments : conflicting) {
+        SCOPED_TRACE(arguments[1]);
+        const Parsed parsed = Parse(arguments);
+        EXPECT_FALSE(parsed.ok);
+        EXPECT_NE(parsed.error.find("--baseline"), std::string::npos) << parsed.error;
+    }
+}
+
 // Help is a result the caller acts on, not an exit from inside the parser.
 TEST(SccgReviewEvalOptionsTest, ReportsARequestForHelp) {
     const Parsed parsed = Parse({"--help"});

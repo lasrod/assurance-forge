@@ -104,6 +104,8 @@ bool ParseArgs(const std::vector<std::string>& arguments, Options& options, std:
             options.request_timeout_seconds = timeout_seconds;
         } else if (arg == "--no-prompt-cache") {
             options.no_prompt_cache = true;
+        } else if (arg == "--baseline") {
+            options.baseline = true;
         } else if (arg == "--dry-run") {
             options.dry_run = true;
         } else if (arg == "--list-models") {
@@ -124,6 +126,16 @@ bool ParseArgs(const std::vector<std::string>& arguments, Options& options, std:
                             options.first_run,
                             options.runs,
                             std::numeric_limits<int>::max());
+        return false;
+    }
+
+    // A baseline review sends no profile and no passes, and cites no guideline,
+    // so a forced profile, a single request instead of passes, or a consensus
+    // over cited guidelines would each be an option doing nothing without a word.
+    if (options.baseline &&
+        (!options.review_profile_id.empty() || options.single_request || options.consensus_minimum > 0)) {
+        error = "--baseline sends no SCCG profile, passes or guidelines, so it cannot be combined with --profile, "
+                "--single-request or --consensus.";
         return false;
     }
 

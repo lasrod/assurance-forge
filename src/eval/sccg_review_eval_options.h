@@ -55,6 +55,11 @@ struct Options {
     // Send the prompt as one uncached string, as before prompt caching, so a
     // sweep can measure what caching changes.
     bool no_prompt_cache = false;
+    // Review without SCCG, as the control of a comparison: the same system
+    // instruction, element and surrounding argument, a generic review prompt,
+    // and no catalogue, profile, passes or pre-checks. The application never
+    // sends it.
+    bool baseline = false;
     std::string tag;
     // --help was given. Parsing stops there and the caller prints the usage.
     bool show_help = false;

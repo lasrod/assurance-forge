@@ -29,6 +29,7 @@
 #include "core/guideline_catalog.h"
 #include "core/project_service.h"
 #include "core/sha256.h"
+#include "eval/baseline_review.h"
 #include "eval/sccg_review_eval_options.h"
 #include "review/sccg/sccg_review.h"
 #include "review/sccg/sccg_review_consensus.h"
@@ -105,6 +106,10 @@ Options:
   --no-prompt-cache    Send each prompt as one uncached string. By default the shared
                        instructions and each pass's rules are cached, and with --runs > 1 so
                        is each element's data, since every later run repeats it.
+  --baseline           Review without SCCG, as a control: the same system instruction, element
+                       and surrounding argument, with a generic review prompt and no catalogue,
+                       profile, passes or pre-checks. Not with --profile, --single-request or
+                       --consensus.
   --dry-run            Assemble and record the request; do not call the provider.
   --list-models        List the models the configured account offers, newest first, then exit.
   --help
@@ -419,6 +424,184 @@ int ListModels(const ai::AiService& service, const ai::ISecretStore& secret_stor
     return 0;
 }
 
+// One element reviewed with --baseline's generic, SCCG-free request. Apart from
+// the SCCG loop in `main` so nothing SCCG-specific -- profile, passes, packages,
+// pre-checks, consensus -- can reach a baseline record by accident. What the two
+// share is the provider call, the retry policy and the shape of the record.
+void RunBaselineElement(const Options& options,
+                        const parser::AssuranceCase& assurance_case,
+                        const core::AssuranceTree& tree,
+                        const std::string& element_id,
+                        const std::filesystem::path& argument_path,
+                        const std::string& session_started,
+                        ai::AiService& service,
+                        const ai::AiProviderSettings& settings,
+                        int& records,
+                        int& failures) {
+    eval::BaselineReviewRequest request;
+    std::string error;
+    const bool prepared = eval::BuildBaselineReviewRequest(assurance_case, tree, element_id, request, error);
+    const parser::SacmElement* element = review::FindSacmElement(assurance_case, element_id);
+
+    json record;
+    record["schema"] = "assurance-forge.sccg-review-eval/1";
+    record["mode"] = "baseline";
+    record["baseline_prompt_version"] = eval::kBaselinePromptVersion;
+    record["session_started_utc"] = session_started;
+    record["tag"] = options.tag;
+    record["project"] = std::filesystem::absolute(options.project).string();
+    record["argument_file"] = argument_path.filename().string();
+    // No catalogue went into the request, so none is named: a baseline record
+    // stating an SCCG version would read as a review made under it.
+    record["sccg_version"] = nullptr;
+    record["tool_build"] = kBuildId;
+    record["sccg_catalog_path"] = nullptr;
+    // The text an SCCG record gives for the element, so a reader of both sets
+    // compares like with like.
+    record["element"] = json{
+        {"id", element_id},
+        {"type", element ? review::AiReviewElementType(*element, core::FindTreeNode(tree, element_id)) : std::string{}},
+        {"sccg_role", nullptr},
+        {"text", element ? (element->content.empty() ? element->description : element->content) : std::string{}},
+    };
+    record["review_profile"] = nullptr;
+    record["guideline_ids"] = json::array();
+    record["reviewed_element_ids"] = request.reviewed_element_ids;
+    record["data_packages"] = nullptr;
+    record["prechecks"] = json::array();
+    record["carries_review_history"] = false;
+
+    if (!prepared) {
+        record["outcome"] = "preparation-failed";
+        record["error"] = error;
+        const std::filesystem::path path =
+            options.out_dir / (SanitizeForFileName(element_id) + "--preparation-failed.json");
+        if (WriteRecord(path, record))
+            ++records;
+        std::cerr << element_id << ": baseline preparation failed: " << error << "\n";
+        ++failures;
+        return;
+    }
+
+    const std::string prompt_sha256 = core::Sha256::HexDigest(request.prompt);
+    record["review_passes"] = 0;
+    record["prompt"] = json{{"system_instruction", request.system_instruction},
+                            {"user_prompt", request.prompt},
+                            {"user_prompt_sha256", prompt_sha256},
+                            {"user_prompt_bytes", request.prompt.size()},
+                            {"passes_prompt_bytes", request.prompt.size()},
+                            {"passes",
+                             json::array({json{{"pass_id", ""},
+                                               {"guideline_ids", json::array()},
+                                               {"user_prompt_sha256", prompt_sha256},
+                                               {"user_prompt_bytes", request.prompt.size()}}})}};
+
+    ai::AiRequest ai_request;
+    ai_request.systemInstruction = request.system_instruction;
+    ai_request.userPrompt = request.prompt;
+    if (options.no_prompt_cache) {
+        ai_request.promptCacheDisabled = true;
+    } else {
+        // Every baseline review shares the instruction, and every later run of
+        // an element repeats its data, as an SCCG sweep caches its own.
+        ai_request.promptSegments.push_back({request.prompt_segments[0], true});
+        ai_request.promptSegments.push_back({request.prompt_segments[1], options.runs > 1});
+        ai_request.promptCacheKey = eval::kBaselinePromptVersion;
+    }
+
+    const int last_run = eval::LastRunNumber(options);
+    for (int run = options.first_run; run <= last_run; ++run) {
+        json run_record = record;
+        run_record["run"] = run;
+        run_record["runs_requested"] = options.runs;
+        run_record["started_utc"] = NowUtcIso();
+        run_record["model"] = ModelJson(settings, options);
+
+        if (options.dry_run) {
+            run_record["outcome"] = "dry-run";
+        } else {
+            const auto started = std::chrono::steady_clock::now();
+            const GenerateResult generated = GenerateWithRetry(service, ai_request, settings);
+            const long long elapsed_ms = static_cast<long long>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started)
+                    .count());
+            const ai::AiResponse& response = generated.response;
+            json pass_record{{"pass_id", ""},
+                             {"elapsed_ms", elapsed_ms},
+                             {"http_status", response.httpStatus},
+                             {"attempts", generated.attempts},
+                             {"service_tier", response.serviceTier},
+                             {"usage", UsageJson(response.usage)}};
+            if (!response.success) {
+                const std::string message =
+                    response.errorMessage.empty() ? ai::ToString(response.errorCode) : response.errorMessage;
+                pass_record["outcome"] = "request-failed";
+                pass_record["error"] = message;
+                pass_record["error_code"] = ai::ToString(response.errorCode);
+                pass_record["provider_error_code"] = response.providerErrorCode;
+                pass_record["raw_response"] = response.rawJson;
+                run_record["outcome"] = "request-failed";
+                run_record["error"] = message;
+                run_record["raw_response"] = response.rawJson;
+                ++failures;
+            } else {
+                const std::string raw_response = response.text.empty() ? response.rawJson : response.text;
+                const eval::BaselineReviewParseResult parsed = eval::ParseBaselineReviewResponse(raw_response);
+                pass_record["raw_response"] = raw_response;
+                run_record["raw_response"] = raw_response;
+                if (!parsed.error_message.empty()) {
+                    pass_record["outcome"] = "parse-failed";
+                    pass_record["error"] = parsed.error_message;
+                    run_record["outcome"] = "parse-failed";
+                    run_record["error"] = parsed.error_message;
+                    ++failures;
+                } else if (!parsed.reviewed_element_id.empty() && parsed.reviewed_element_id != element_id) {
+                    // What an SCCG merge rejects too: a review of some other
+                    // element is not a review of this one.
+                    const std::string message =
+                        "The response reviewed " + parsed.reviewed_element_id + ", not " + element_id + ".";
+                    pass_record["outcome"] = "rejected";
+                    pass_record["error"] = message;
+                    run_record["outcome"] = "rejected";
+                    run_record["error"] = message;
+                    ++failures;
+                } else {
+                    json findings = json::array();
+                    for (const eval::BaselineFinding& finding : parsed.findings) {
+                        findings.push_back(json{{"guideline_id", ""},
+                                                {"element_id", element_id},
+                                                {"severity", ""},
+                                                {"confidence", finding.confidence},
+                                                {"type", "baseline"},
+                                                {"message", finding.message},
+                                                {"proposed_operations", json::array()}});
+                    }
+                    pass_record["outcome"] = "ok";
+                    pass_record["findings"] = findings;
+                    run_record["outcome"] = "ok";
+                    run_record["findings"] = findings;
+                }
+            }
+            ai::AiUsage usage;
+            AddUsage(usage, response.usage);
+            run_record["elapsed_ms"] = elapsed_ms;
+            run_record["usage"] = RunUsageJson(usage, response.usage.reported ? 1 : 0, 1);
+            run_record["passes"] = json::array({pass_record});
+            run_record["discarded_findings"] = json::array();
+        }
+
+        run_record["finished_utc"] = NowUtcIso();
+        const std::filesystem::path path =
+            options.out_dir / (SanitizeForFileName(element_id) + "--run" + std::to_string(run) + ".json");
+        if (WriteRecord(path, run_record))
+            ++records;
+        else
+            ++failures;
+        std::cout << element_id << " [baseline] run " << run << "/" << last_run << ": "
+                  << run_record.value("outcome", "") << " -> " << path.string() << "\n";
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -485,7 +668,9 @@ int main(int argc, char** argv) {
     const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
 
     core::GuidelineCatalog catalog;
-    if (!core::LoadGuidelineCatalog(catalog, error)) {
+    // A baseline review uses no SCCG, so it neither needs a catalogue nor may
+    // fail for want of one.
+    if (!options.baseline && !core::LoadGuidelineCatalog(catalog, error)) {
         std::cerr << "Could not load the SCCG catalog: " << error << "\n";
         return 1;
     }
@@ -531,6 +716,20 @@ int main(int argc, char** argv) {
     int failures = 0;
     int records = 0;
     for (const std::string& element_id : element_ids) {
+        if (options.baseline) {
+            RunBaselineElement(options,
+                               assurance_case,
+                               tree,
+                               element_id,
+                               argument_path,
+                               session_started,
+                               *service,
+                               settings,
+                               records,
+                               failures);
+            continue;
+        }
+
         // Prior findings are deliberately not carried: the harness reviews the
         // accepted case with no review history, so a run is reproducible from
         // the project files alone. The application passes its own review items
