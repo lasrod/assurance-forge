@@ -60,6 +60,10 @@ struct Options {
     // and no catalogue, profile, passes or pre-checks. The application never
     // sends it.
     bool baseline = false;
+    // With --baseline-element-only: the baseline request carries the selected
+    // element alone, as a claim pasted into a chat tool, with no surrounding
+    // argument. Implies `baseline`.
+    bool baseline_element_only = false;
     std::string tag;
     // --help was given. Parsing stops there and the caller prints the usage.
     bool show_help = false;

@@ -106,6 +106,9 @@ bool ParseArgs(const std::vector<std::string>& arguments, Options& options, std:
             options.no_prompt_cache = true;
         } else if (arg == "--baseline") {
             options.baseline = true;
+        } else if (arg == "--baseline-element-only") {
+            options.baseline = true;
+            options.baseline_element_only = true;
         } else if (arg == "--dry-run") {
             options.dry_run = true;
         } else if (arg == "--list-models") {

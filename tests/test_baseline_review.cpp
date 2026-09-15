@@ -133,6 +133,26 @@ TEST(BaselineReviewTest, SendsTheSccgSystemInstructionAndNothingFromTheCatalogue
     }
 }
 
+// The chat-paste control: the element alone, so what the surrounding argument
+// contributes can be separated from what the prompt does.
+TEST(BaselineReviewTest, ElementOnlySendsTheElementAndNothingAroundIt) {
+    const parser::AssuranceCase assurance_case = ArgumentFragment();
+    const core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    eval::BaselineReviewRequest request;
+    std::string error;
+    ASSERT_TRUE(eval::BuildBaselineReviewRequest(
+        assurance_case, tree, "G2", request, error, eval::BaselineContext::ElementOnly))
+        << error;
+
+    EXPECT_NE(request.prompt.find("The motor unit is acceptably safe."), std::string::npos);
+    EXPECT_EQ(request.prompt.find("The blender is acceptably safe."), std::string::npos);
+    EXPECT_EQ(request.prompt.find("Blade contact is prevented."), std::string::npos);
+    EXPECT_EQ(request.prompt.find("surrounding argument"), std::string::npos);
+    EXPECT_EQ(request.reviewed_element_ids, std::vector<std::string>{"G2"});
+    EXPECT_STREQ(eval::BaselinePromptVersion(eval::BaselineContext::ElementOnly), "baseline-element-only-v1");
+    EXPECT_STREQ(eval::BaselinePromptVersion(eval::BaselineContext::SurroundingArgument), "baseline-generic-v1");
+}
+
 TEST(BaselineReviewTest, RefusesWhatAnSccgReviewRefuses) {
     parser::AssuranceCase assurance_case = ArgumentFragment();
     assurance_case.elements.push_back(MakeElement("X1", "activity", "Activity", "Work item."));

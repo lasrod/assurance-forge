@@ -110,6 +110,9 @@ Options:
                        and surrounding argument, with a generic review prompt and no catalogue,
                        profile, passes or pre-checks. Not with --profile, --single-request or
                        --consensus.
+  --baseline-element-only
+                       As --baseline, with the selected element alone and no surrounding
+                       argument, as a claim pasted into a chat tool.
   --dry-run            Assemble and record the request; do not call the provider.
   --list-models        List the models the configured account offers, newest first, then exit.
   --help
@@ -438,15 +441,19 @@ void RunBaselineElement(const Options& options,
                         const ai::AiProviderSettings& settings,
                         int& records,
                         int& failures) {
+    const eval::BaselineContext context =
+        options.baseline_element_only ? eval::BaselineContext::ElementOnly : eval::BaselineContext::SurroundingArgument;
     eval::BaselineReviewRequest request;
     std::string error;
-    const bool prepared = eval::BuildBaselineReviewRequest(assurance_case, tree, element_id, request, error);
+    const bool prepared = eval::BuildBaselineReviewRequest(assurance_case, tree, element_id, request, error, context);
     const parser::SacmElement* element = review::FindSacmElement(assurance_case, element_id);
 
     json record;
     record["schema"] = "assurance-forge.sccg-review-eval/1";
     record["mode"] = "baseline";
-    record["baseline_prompt_version"] = eval::kBaselinePromptVersion;
+    record["baseline_prompt_version"] = eval::BaselinePromptVersion(context);
+    record["baseline_context"] =
+        context == eval::BaselineContext::ElementOnly ? "element-only" : "surrounding-argument";
     record["session_started_utc"] = session_started;
     record["tag"] = options.tag;
     record["project"] = std::filesystem::absolute(options.project).string();
@@ -506,7 +513,7 @@ void RunBaselineElement(const Options& options,
         // an element repeats its data, as an SCCG sweep caches its own.
         ai_request.promptSegments.push_back({request.prompt_segments[0], true});
         ai_request.promptSegments.push_back({request.prompt_segments[1], options.runs > 1});
-        ai_request.promptCacheKey = eval::kBaselinePromptVersion;
+        ai_request.promptCacheKey = eval::BaselinePromptVersion(context);
     }
 
     const int last_run = eval::LastRunNumber(options);

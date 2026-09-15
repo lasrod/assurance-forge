@@ -109,7 +109,14 @@ TEST(SccgReviewEvalOptionsTest, ParsesBaselineAndRefusesWhatOnlyAnSccgReviewHas)
     const Parsed baseline = Parse({"--project", "case", "--baseline", "--runs", "5", "--consensus", "0"});
     ASSERT_TRUE(baseline.ok) << baseline.error;
     EXPECT_TRUE(baseline.options.baseline);
+    EXPECT_FALSE(baseline.options.baseline_element_only);
     EXPECT_FALSE(Parse({"--project", "case"}).options.baseline);
+
+    const Parsed element_only = Parse({"--project", "case", "--baseline-element-only"});
+    ASSERT_TRUE(element_only.ok) << element_only.error;
+    EXPECT_TRUE(element_only.options.baseline);
+    EXPECT_TRUE(element_only.options.baseline_element_only);
+    EXPECT_FALSE(Parse({"--baseline-element-only", "--single-request"}).ok);
 
     const std::vector<std::vector<std::string>> conflicting = {
         {"--baseline", "--profile", "claim_review"},

@@ -30,6 +30,19 @@ Return JSON only, in this shape:
 
 )PROMPT";
 
+// Version `baseline-element-only-v1`: `baseline-generic-v1` less its reference
+// to a surrounding argument, since none is sent. Added after the pilot of the
+// generic baseline, to separate what the argument contributes from what the
+// prompt does.
+constexpr const char* kElementOnlyInstruction = R"PROMPT(Review the selected element of a safety case argument.
+
+Act as an experienced safety case reviewer. Report the weaknesses a reviewer should raise about the selected element below: for example unclear or ambiguous wording, claims that are not supported or not fully supported, gaps or flaws in the reasoning, problems with the evidence, and unstated assumptions or limitations. Report only real problems with the selected element. If you find none, return an empty findings array. Do not invent project information that is not supplied.
+
+Return JSON only, in this shape:
+{"reviewed_element_id": "<id of the selected element>", "findings": [{"message": "<the problem>", "why_it_matters": "<why a safety reviewer should care>", "suggested_fix": "<how to fix it>", "confidence": "low | medium | high"}]}
+
+)PROMPT";
+
 const parser::SacmElement* ElementForNode(const parser::AssuranceCase& assurance_case, const core::TreeNode* node) {
     return node ? review::FindSacmElement(assurance_case, node->id) : nullptr;
 }
@@ -165,11 +178,16 @@ std::string StringField(const json& object, const char* key) {
 
 } // namespace
 
+const char* BaselinePromptVersion(BaselineContext context) {
+    return context == BaselineContext::ElementOnly ? "baseline-element-only-v1" : "baseline-generic-v1";
+}
+
 bool BuildBaselineReviewRequest(const parser::AssuranceCase& assurance_case,
                                 const core::AssuranceTree& tree,
                                 const std::string& element_id,
                                 BaselineReviewRequest& out_request,
-                                std::string& out_error) {
+                                std::string& out_error,
+                                BaselineContext context) {
     const parser::SacmElement* selected = review::FindSacmElement(assurance_case, element_id);
     if (!selected) {
         out_error = "Selected element was not found.";
@@ -182,16 +200,21 @@ bool BuildBaselineReviewRequest(const parser::AssuranceCase& assurance_case,
 
     const core::TreeNode* node = core::FindTreeNode(tree, element_id);
     const json selected_json = ElementJson(*selected, node);
-    const json argument = SurroundingArgument(assurance_case, node);
 
     BaselineReviewRequest request;
     request.system_instruction = kSystemInstruction;
-    std::string element_data =
-        "## Selected element\n\n" + selected_json.dump(2) + "\n\n## Surrounding argument\n\n" + argument.dump(2) + "\n";
-    request.prompt_segments = {kInstruction, element_data};
-    request.prompt = std::string(kInstruction) + element_data;
     request.reviewed_element_ids = {selected->id};
-    CollectElementIds(argument, request.reviewed_element_ids);
+    const char* instruction = kInstruction;
+    std::string element_data = "## Selected element\n\n" + selected_json.dump(2) + "\n";
+    if (context == BaselineContext::ElementOnly) {
+        instruction = kElementOnlyInstruction;
+    } else {
+        const json argument = SurroundingArgument(assurance_case, node);
+        element_data += "\n## Surrounding argument\n\n" + argument.dump(2) + "\n";
+        CollectElementIds(argument, request.reviewed_element_ids);
+    }
+    request.prompt_segments = {instruction, element_data};
+    request.prompt = std::string(instruction) + element_data;
 
     out_request = std::move(request);
     out_error.clear();

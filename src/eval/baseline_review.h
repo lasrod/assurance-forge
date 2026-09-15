@@ -22,9 +22,19 @@
 
 namespace eval {
 
+// How much of the argument a baseline request carries.
+enum class BaselineContext {
+    // The selected element and the surrounding argument an SCCG review's data
+    // packages carry: the control for SCCG itself.
+    SurroundingArgument,
+    // The selected element alone, as a claim pasted into a chat tool: the
+    // control for what supplying the argument contributes.
+    ElementOnly,
+};
+
 // Named in every baseline record, so a change to the wording is a new version
 // rather than a silent change to what an existing sweep measured.
-inline constexpr const char* kBaselinePromptVersion = "baseline-generic-v1";
+const char* BaselinePromptVersion(BaselineContext context);
 
 struct BaselineReviewRequest {
     std::string system_instruction;
@@ -44,7 +54,8 @@ bool BuildBaselineReviewRequest(const parser::AssuranceCase& assurance_case,
                                 const core::AssuranceTree& tree,
                                 const std::string& element_id,
                                 BaselineReviewRequest& out_request,
-                                std::string& out_error);
+                                std::string& out_error,
+                                BaselineContext context = BaselineContext::SurroundingArgument);
 
 struct BaselineFinding {
     // The model's message, why it matters, its suggested fix and its
