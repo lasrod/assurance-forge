@@ -28,8 +28,6 @@ void RenderAddChildMenuItem(const parser::SacmElement* parent,
         ImGui::SetTooltip("%s", refusal.c_str());
 }
 
-} // namespace
-
 // GSN v3 Modular Extension (GSN3-MOD-003): an Away Goal cites a goal defined
 // in another module. The menu offers the goals that can be cited rather than a
 // free-text id, because a citation that resolves to nothing is not an away
@@ -56,6 +54,8 @@ void RenderAwayGoalMenu(const ElementContextActions& actions) {
     }
     ImGui::EndMenu();
 }
+
+} // namespace
 
 void RenderAddElementMenu(const parser::AssuranceCase* active_case,
                           const std::string& selected_id,
