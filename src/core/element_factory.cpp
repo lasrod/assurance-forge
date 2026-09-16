@@ -164,6 +164,8 @@ void MirrorClaim(sacm::ArgumentPackage* ap, const parser::SacmElement& src) {
     c.name = src.name;
     c.name_ml.set("en", src.name);
     c.isAbstract = src.is_abstract;
+    c.isCitation = src.is_citation;
+    c.citedElement = src.cited_element_id;
     c.assertionDeclaration = src.assertion_declaration;
     c.undeveloped = src.undeveloped;
     c.taggedValues.push_back(sacm::TaggedValue{
@@ -856,6 +858,176 @@ bool AddTopGoalWithId(parser::AssuranceCase& ac,
                       std::string& out_error) {
     out_error.clear();
     return InstallTopGoal(ac, pkg, element_id, out_error);
+}
+
+// ===== Away Goal (GSN v3 Modular Extension, GSN3-MOD-003) ==================
+
+namespace {
+
+// GSN identifies a module by name; the package id is the fallback so an
+// unnamed package still draws something a reader can match to a package.
+std::string ArgumentPackageIdentifier(const sacm::ArgumentPackage* ap) {
+    if (!ap)
+        return {};
+    return ap->name.empty() ? ap->id : ap->name;
+}
+
+bool InstallAwayGoal(parser::AssuranceCase& ac,
+                     sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     const std::string& cited_id,
+                     const std::string& element_id,
+                     const std::string& relationship_id,
+                     std::string& out_error) {
+    if (!CanAddAwayGoal(ac, pkg, parent_id, cited_id, out_error))
+        return false;
+    if (element_id.empty() || relationship_id.empty()) {
+        out_error = "Element and relationship ids must be non-empty.";
+        return false;
+    }
+
+    parser::SacmElement away;
+    away.id = element_id;
+    away.gsn_identifier = element_id;
+    away.type = "claim";
+    away.is_citation = true;
+    away.cited_element_id = cited_id;
+    away.away_module_identifier = ResolveAwayModuleIdentifier(pkg, parent_id, cited_id);
+    // No statement is copied from the cited goal. The away goal IS that goal,
+    // read from here, so a copy would be a second place the same claim is
+    // written and the two would drift the moment either is edited. Renderers
+    // resolve the text through `cited_element_id`.
+
+    parser::SacmElement rel;
+    rel.id = relationship_id;
+    rel.type = "assertedinference";
+    rel.source_refs.push_back(element_id);
+    rel.target_refs.push_back(parent_id);
+
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
+    if (ap) {
+        MirrorClaim(ap, away);
+        MirrorInference(ap, rel);
+    }
+
+    ac.elements.push_back(std::move(away));
+    ac.elements.push_back(std::move(rel));
+    return true;
+}
+
+} // namespace
+
+std::string ResolveAwayModuleIdentifier(const sacm::AssuranceCasePackage* pkg,
+                                        const std::string& local_anchor_id,
+                                        const std::string& cited_id) {
+    if (!pkg || cited_id.empty())
+        return {};
+    const sacm::ArgumentPackage* cited_package = FindOwningArgumentPackageConst(pkg, cited_id);
+    if (!cited_package)
+        return {};
+    const sacm::ArgumentPackage* local_package = FindOwningArgumentPackageConst(pkg, local_anchor_id);
+    if (local_package == cited_package)
+        return {};
+    return ArgumentPackageIdentifier(cited_package);
+}
+
+bool IsAwayGoal(const parser::SacmElement& element) {
+    return element.type == "claim" && element.is_citation && !element.cited_element_id.empty() &&
+           !element.away_module_identifier.empty();
+}
+
+bool CanAddAwayGoal(const parser::AssuranceCase& ac,
+                    const sacm::AssuranceCasePackage* pkg,
+                    const std::string& parent_id,
+                    const std::string& cited_id,
+                    std::string& out_error) {
+    out_error.clear();
+
+    if (parent_id.empty()) {
+        out_error = "No parent element selected.";
+        return false;
+    }
+    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    if (!parent) {
+        out_error = "Selected element not found in model.";
+        return false;
+    }
+    // An away goal stands where a sub-goal would, so it answers to the same
+    // Core connection rules (GSN3-CORE-015).
+    if (!CanAddChildElement(*parent, NewElementKind::Goal, out_error))
+        return false;
+
+    if (cited_id.empty()) {
+        out_error = "No away goal target selected.";
+        return false;
+    }
+    if (cited_id == parent_id) {
+        out_error = "A goal cannot cite itself as an away goal.";
+        return false;
+    }
+    const parser::SacmElement* cited = FindElement(ac, cited_id);
+    if (!cited) {
+        out_error = "The cited goal is not in this assurance case.";
+        return false;
+    }
+    if (cited->type != "claim") {
+        out_error = "An away goal must cite a Goal.";
+        return false;
+    }
+    if (ResolveAwayModuleIdentifier(pkg, parent_id, cited_id).empty()) {
+        out_error = "An away goal must cite a goal in another module.";
+        return false;
+    }
+    return true;
+}
+
+bool PlanAwayGoalIds(const parser::AssuranceCase& ac,
+                     const sacm::AssuranceCasePackage* pkg,
+                     const std::string& parent_id,
+                     const std::string& cited_id,
+                     std::string& out_element_id,
+                     std::string& out_relationship_id,
+                     std::string& out_error) {
+    out_element_id.clear();
+    out_relationship_id.clear();
+    if (!CanAddAwayGoal(ac, pkg, parent_id, cited_id, out_error))
+        return false;
+    return PlanChildElementIds(
+        ac, pkg, parent_id, NewElementKind::Goal, out_element_id, out_relationship_id, out_error);
+}
+
+bool AddAwayGoal(parser::AssuranceCase& ac,
+                 sacm::AssuranceCasePackage* pkg,
+                 const std::string& parent_id,
+                 const std::string& cited_id,
+                 std::string& out_new_id,
+                 std::string& out_new_relationship_id,
+                 std::string& out_error) {
+    out_new_id.clear();
+    out_new_relationship_id.clear();
+    out_error.clear();
+
+    std::string element_id;
+    std::string relationship_id;
+    if (!PlanAwayGoalIds(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error))
+        return false;
+    if (!InstallAwayGoal(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error))
+        return false;
+
+    out_new_id = std::move(element_id);
+    out_new_relationship_id = std::move(relationship_id);
+    return true;
+}
+
+bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
+                        sacm::AssuranceCasePackage* pkg,
+                        const std::string& parent_id,
+                        const std::string& cited_id,
+                        const std::string& element_id,
+                        const std::string& relationship_id,
+                        std::string& out_error) {
+    out_error.clear();
+    return InstallAwayGoal(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error);
 }
 
 // ===== Remove helpers (planner) ============================================

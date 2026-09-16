@@ -136,6 +136,13 @@ core::SacmElement project_element(const sacm::model::SACMElement& element) {
     // decorator. Dropping it here made a library-loaded pattern look like a
     // finished instance even though the source document still held the flag.
     projected.is_abstract = element.is_abstract();
+    // isCitation/citedElement carry GSN's Away elements (GSN3-MOD-003). Dropped
+    // here, an away goal loaded from a file rendered as an ordinary local goal,
+    // silently claiming this module proves what another module actually proves.
+    projected.is_citation = element.is_citation();
+    if (element.cited_element().has_value()) {
+        projected.cited_element_id = element.cited_element()->value();
+    }
 
     if (const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element)) {
         projected.name = model_element->name().content;
@@ -430,6 +437,30 @@ std::string sacm_class_name_for_pod_type(std::string_view pod_type) {
     return std::string(pod_type);
 }
 
+namespace {
+
+// Which module owns what. GSN's Away elements (GSN3-MOD-003) are SACM
+// citations read across a module boundary, and the module is the
+// ArgumentPackage owning the cited element, so the question cannot be answered
+// once package membership has been flattened away.
+void collect_argument_package_membership(const sacm::model::AssuranceCasePackage& case_package,
+                                         std::unordered_map<std::string, std::string>& out_package_of_element,
+                                         std::unordered_map<std::string, std::string>& out_identifier_of_package) {
+    for (const auto& argument_package : case_package.argument_packages()) {
+        const std::string package_id = argument_package->id().value();
+        const std::string& name = argument_package->name().content;
+        out_identifier_of_package[package_id] = name.empty() ? package_id : name;
+        for (const auto& element : argument_package->argument_elements()) {
+            out_package_of_element[element->id().value()] = package_id;
+        }
+    }
+    for (const auto& nested : case_package.assurance_case_packages()) {
+        collect_argument_package_membership(*nested, out_package_of_element, out_identifier_of_package);
+    }
+}
+
+} // namespace
+
 core::AssuranceCase project_case(const LibraryDocument& document) {
     const sacm::model::Document& source = LibraryDocumentAccess::document(document);
 
@@ -487,6 +518,33 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
             collect_acps(*model_element, is_relationship ? "relationship" : "element", projected.acps);
         }
     });
+
+    // An away element is a citation that crosses a module boundary
+    // (GSN3-MOD-003). Resolved here, with the whole document in hand, because a
+    // citation is only *away* when the cited element's ArgumentPackage is not
+    // the citing element's own -- and one inside a single module is an ordinary
+    // citation that must not be drawn as an away goal.
+    {
+        std::unordered_map<std::string, std::string> package_of_element;
+        std::unordered_map<std::string, std::string> identifier_of_package;
+        for (const auto& case_root : source.roots()) {
+            collect_argument_package_membership(*case_root, package_of_element, identifier_of_package);
+        }
+        for (core::SacmElement& element : projected.elements) {
+            if (!element.is_citation || element.cited_element_id.empty()) {
+                continue;
+            }
+            const auto citing = package_of_element.find(element.id);
+            const auto cited = package_of_element.find(element.cited_element_id);
+            if (citing == package_of_element.end() || cited == package_of_element.end()) {
+                continue;
+            }
+            if (citing->second == cited->second) {
+                continue;
+            }
+            element.away_module_identifier = identifier_of_package[cited->second];
+        }
+    }
 
     // An ArtifactReference cites its evidence by id, and the location lives on
     // the cited Resource rather than on the reference. Resolved here, once the

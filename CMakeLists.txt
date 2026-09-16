@@ -410,6 +410,7 @@ add_executable(tests
     tests/test_ignored_terminology_store.cpp
     tests/test_translation_review_sync.cpp
     tests/test_element_factory.cpp
+    tests/test_away_goal.cpp
     tests/test_tree_editing.cpp
     tests/test_app_state.cpp
     tests/test_project_service.cpp
