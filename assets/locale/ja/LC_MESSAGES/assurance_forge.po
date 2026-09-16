@@ -2848,6 +2848,9 @@ msgstr "{0} 件の変更提案を正常に適用できません"
 msgid "{0} changes the accepted argument, which a working draft is open against. Accept or discard the draft from the argument canvas first."
 msgstr "{0}は、作業ドラフトの元になっている受理済みの論証を変更します。先に論証キャンバスでドラフトを受理または破棄してください。"
 
+msgid "{0} cites {1} as a goal proved in another module, but nothing in this case has that id. The goal reads as proved elsewhere and there is no elsewhere."
+msgstr "{0} は {1} を他モジュールで立証された目標として参照していますが、その ID はこのケースに存在しません。他所で立証済みと読めますが、その他所がありません。"
+
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
@@ -2865,6 +2868,9 @@ msgstr "{0} には複数の意味があります。"
 
 msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
 msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
+
+msgid "{0} is an away goal proved in module {1}, but it is also supported here. An away goal shows an argument made elsewhere; developing it here makes two."
+msgstr "{0} はモジュール {1} で立証された他モジュールの目標ですが、ここでも支持されています。他モジュールの目標は他所で構築された論証を示すものであり、ここで展開すると論証が二重になります。"
 
 msgid "{0} is given context by relationship {1}, but only a Goal or a Strategy is declared in context in GSN."
 msgstr "{0} は関係 {1} によってコンテキストを与えられていますが、GSN でコンテキストの中で述べられるのはゴールまたは戦略のみです。"

@@ -12,6 +12,7 @@
 
 #include "core/element_factory.h"
 #include "core/assurance_tree.h"
+#include "core/problems/gsn_wellformedness.h"
 #include "export/gsn_projection.h"
 #include "export/svg_writer.h"
 #include "core/commands/element_commands.h"
@@ -403,4 +404,80 @@ TEST(AwayGoalTest, GSN3_MOD_003_SvgExportLeavesOrdinaryGoalsUndecorated) {
     // Nothing here is away, so the compartment must not appear. Drawing it on
     // an ordinary goal would claim its support lives in another module.
     EXPECT_EQ(svg.find("gsn-away-module-divider"), std::string::npos);
+}
+
+// --------------------------------------------------------------------------
+// Validation. Two things go wrong with an away goal that no Core rule covers:
+// the citation points at nothing, or the goal is also argued here.
+// --------------------------------------------------------------------------
+
+namespace {
+
+bool HasRule(const std::vector<core::GsnFinding>& findings, core::GsnRule rule, const std::string& element_id) {
+    for (const core::GsnFinding& finding : findings) {
+        if (finding.rule == rule && finding.element_id == element_id)
+            return true;
+    }
+    return false;
+}
+
+parser::SacmElement MakeSupport(const std::string& id, const std::string& source, const std::string& target) {
+    parser::SacmElement relationship = MakeElement(id, "assertedinference", "");
+    relationship.source_refs.push_back(source);
+    relationship.target_refs.push_back(target);
+    return relationship;
+}
+
+} // namespace
+
+TEST(AwayGoalTest, GSN3_MOD_003_ReportsACitationThatResolvesToNothing) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    parser::SacmElement away = MakeElement("AG1", "claim", "");
+    away.is_citation = true;
+    away.cited_element_id = "G_MISSING";
+    mc.ac.elements.push_back(away);
+    mc.ac.elements.push_back(MakeSupport("R1", "AG1", "G1"));
+
+    const std::vector<core::GsnFinding> findings = core::CheckGsnWellFormedness(mc.ac);
+    ASSERT_TRUE(HasRule(findings, core::GsnRule::AwayGoalCitationUnresolved, "AG1"));
+    for (const core::GsnFinding& finding : findings) {
+        if (finding.rule == core::GsnRule::AwayGoalCitationUnresolved) {
+            // The diagnostic names the requirement it enforces, so a reader can
+            // check the tool against the standard instead of trusting it.
+            EXPECT_STREQ(core::GsnRequirementId(finding.rule), "GSN3-MOD-003");
+            EXPECT_EQ(finding.detail, "G_MISSING");
+        }
+    }
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_ReportsAnAwayGoalThatIsAlsoArguedHere) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string new_id;
+    std::string relationship_id;
+    std::string error;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, "G1", "G2", new_id, relationship_id, error)) << error;
+
+    // Something in this module now supports the away goal, which is the module
+    // claiming to prove what it said another module proves.
+    mc.ac.elements.push_back(MakeElement("Sn1", "artifactreference", "Local report"));
+    mc.ac.elements.push_back(MakeSupport("R9", "Sn1", new_id));
+
+    const std::vector<core::GsnFinding> findings = core::CheckGsnWellFormedness(mc.ac);
+    EXPECT_TRUE(HasRule(findings, core::GsnRule::AwayGoalDevelopedLocally, new_id));
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_SaysNothingAboutAWellFormedAwayGoal) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string new_id;
+    std::string relationship_id;
+    std::string error;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, "G1", "G2", new_id, relationship_id, error)) << error;
+
+    // A check that never fires on good input is not evidence that it works, so
+    // this is the companion of the two above rather than a formality.
+    const std::vector<core::GsnFinding> findings = core::CheckGsnWellFormedness(mc.ac);
+    for (const core::GsnFinding& finding : findings) {
+        EXPECT_NE(finding.rule, core::GsnRule::AwayGoalCitationUnresolved);
+        EXPECT_NE(finding.rule, core::GsnRule::AwayGoalDevelopedLocally);
+    }
 }

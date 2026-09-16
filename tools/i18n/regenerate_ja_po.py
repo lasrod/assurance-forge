@@ -560,6 +560,8 @@ TRANSLATIONS = {
     "Select {0}": "{0} を選択",
     "Add ACP": "ACP を追加",
     "Away Goal": "他モジュールの目標",
+    "{0} cites {1} as a goal proved in another module, but nothing in this case has that id. The goal reads as proved elsewhere and there is no elsewhere.": "{0} は {1} を他モジュールで立証された目標として参照していますが、その ID はこのケースに存在しません。他所で立証済みと読めますが、その他所がありません。",
+    "{0} is an away goal proved in module {1}, but it is also supported here. An away goal shows an argument made elsewhere; developing it here makes two.": "{0} はモジュール {1} で立証された他モジュールの目標ですが、ここでも支持されています。他モジュールの目標は他所で構築された論証を示すものであり、ここで展開すると論証が二重になります。",
     "An away goal cannot be added while a draft is open.": "ドラフトを開いている間は他モジュールの目標を追加できません。",
     "Add Counter Argument": "反論を追加",
     "Add Counter Evidence": "反証を追加",

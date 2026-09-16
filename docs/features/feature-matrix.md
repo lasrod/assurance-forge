@@ -138,7 +138,7 @@ partial — say so in Notes rather than downgrading the row.
 |---|---|---|---|---|---|
 | AF-MOD-001 | GSN Module and Argument View notation | planned | | | SACM package infrastructure is supported by AF-STD-016, but the standard GSN Module symbol and Argument View are not drawn or editable. |
 | AF-MOD-002 | Cross-module relationships and module dependency view | planned | | | Includes module-level SupportedBy/InContextOf dependencies distinct from package containment. |
-| AF-MOD-003 | Away Goal | planned | | | |
+| AF-MOD-003 | Away Goal | supported | src/core/element_factory.cpp, src/ui/gsn/gsn_shapes.cpp, src/export/svg_writer.cpp, src/core/problems/gsn_wellformedness.cpp | tests/test_away_goal.cpp | Cites a goal in another argument package, stored as SACM `isCitation` and `citedElement` and drawn with its source module by both renderers. See GSN3-MOD-003. Cannot be staged into a draft, and the other Away elements remain planned. |
 | AF-MOD-004 | Away Solution | planned | | | |
 | AF-MOD-005 | Away Context | planned | | | Metamodel is contested; decided 2026-07-20 to preserve rather than retype. See docs/sacm/sacm-gsn-mapping.md. |
 | AF-MOD-006 | Away Assumption and Away Justification | planned | | | |

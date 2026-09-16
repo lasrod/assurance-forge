@@ -53,6 +53,8 @@ enum class GsnRule {
     EvidenceSourceIsNotASolution, // GSN3-CORE-003
     DuplicateNotationIdentifier,  // GSN3-CORE-010
     UndevelopedElementHasSupport, // GSN3-CORE-009
+    AwayGoalCitationUnresolved,   // GSN3-MOD-003
+    AwayGoalDevelopedLocally,     // GSN3-MOD-003
 };
 
 struct GsnFinding {

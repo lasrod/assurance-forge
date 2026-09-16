@@ -242,6 +242,50 @@ void CheckUndevelopedDecorators(const parser::AssuranceCase& model,
     }
 }
 
+// GSN v3 Modular Extension (GSN3-MOD-003). An Away Goal is a Goal proved in
+// another module and cited here, so two things can go wrong that no Core rule
+// covers: the citation can point at nothing, and the goal can be developed here
+// as though this module proved it after all.
+void CheckAwayGoals(const parser::AssuranceCase& model, const ElementIndex& index, std::vector<GsnFinding>& findings) {
+    // Everything a relationship supports, so a locally developed away goal can
+    // be recognised without walking the relationships once per goal.
+    std::set<std::string> locally_supported;
+    for (const parser::SacmElement& relationship : model.elements) {
+        if (relationship.type != "assertedinference" && relationship.type != "assertedevidence")
+            continue;
+        for (const std::string& target : relationship.target_refs)
+            locally_supported.insert(target);
+    }
+
+    for (const parser::SacmElement& element : model.elements) {
+        if (element.type != "claim" || !element.is_citation)
+            continue;
+
+        // A citation that resolves to nothing is the failure that matters most:
+        // the goal reads as proved elsewhere, and there is no elsewhere.
+        if (element.cited_element_id.empty() || index.Resolve(element.cited_element_id) == nullptr) {
+            AddFinding(findings,
+                       GsnRule::AwayGoalCitationUnresolved,
+                       element.id,
+                       std::string(),
+                       std::string(),
+                       element.cited_element_id);
+            continue;
+        }
+
+        if (!IsAwayGoal(element))
+            continue;
+        if (locally_supported.count(element.id) > 0) {
+            AddFinding(findings,
+                       GsnRule::AwayGoalDevelopedLocally,
+                       element.id,
+                       element.cited_element_id,
+                       std::string(),
+                       element.away_module_identifier);
+        }
+    }
+}
+
 // Findings are collected in document order, which the model does not control —
 // two files carrying the same argument can list their elements differently. A
 // total order over the finding's own content makes the reported list a function
@@ -301,6 +345,9 @@ const char* GsnRequirementId(GsnRule rule) {
         return "GSN3-CORE-010";
     case GsnRule::UndevelopedElementHasSupport:
         return "GSN3-CORE-009";
+    case GsnRule::AwayGoalCitationUnresolved:
+    case GsnRule::AwayGoalDevelopedLocally:
+        return "GSN3-MOD-003";
     }
     return "";
 }
@@ -323,6 +370,10 @@ const char* GsnRuleName(GsnRule rule) {
         return "DuplicateNotationIdentifier";
     case GsnRule::UndevelopedElementHasSupport:
         return "UndevelopedElementHasSupport";
+    case GsnRule::AwayGoalCitationUnresolved:
+        return "AwayGoalCitationUnresolved";
+    case GsnRule::AwayGoalDevelopedLocally:
+        return "AwayGoalDevelopedLocally";
     }
     return "";
 }
@@ -340,6 +391,7 @@ std::vector<GsnFinding> CheckGsnWellFormedness(const parser::AssuranceCase& mode
     }
     CheckIdentifiers(model, findings);
     CheckUndevelopedDecorators(model, index, findings);
+    CheckAwayGoals(model, index, findings);
 
     std::sort(findings.begin(), findings.end(), [](const GsnFinding& lhs, const GsnFinding& rhs) {
         return SortKey(lhs) < SortKey(rhs);

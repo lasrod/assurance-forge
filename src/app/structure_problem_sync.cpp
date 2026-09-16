@@ -108,6 +108,16 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
         return ui::i18n::trf("{0} is marked undeveloped but is already supported. Either the decorator or "
                              "the support is out of date.",
                              finding.element_id);
+    case core::GsnRule::AwayGoalCitationUnresolved:
+        return ui::i18n::trf("{0} cites {1} as a goal proved in another module, but nothing in this case has "
+                             "that id. The goal reads as proved elsewhere and there is no elsewhere.",
+                             finding.element_id,
+                             finding.detail);
+    case core::GsnRule::AwayGoalDevelopedLocally:
+        return ui::i18n::trf("{0} is an away goal proved in module {1}, but it is also supported here. An away "
+                             "goal shows an argument made elsewhere; developing it here makes two.",
+                             finding.element_id,
+                             finding.detail);
     }
     return std::string();
 }
@@ -116,8 +126,12 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
 // stale undeveloped decorator is a warning, because the argument is still
 // well-formed — the diagram just no longer says what the author meant.
 core::ProblemSeverity SeverityFor(core::GsnRule rule) {
-    return rule == core::GsnRule::UndevelopedElementHasSupport ? core::ProblemSeverity::Warning
-                                                               : core::ProblemSeverity::Error;
+    // A locally developed away goal joins the stale-decorator case: the
+    // structure is legal, but the diagram no longer says what the author meant.
+    // An unresolved citation stays an error -- it points at nothing.
+    return (rule == core::GsnRule::UndevelopedElementHasSupport || rule == core::GsnRule::AwayGoalDevelopedLocally)
+               ? core::ProblemSeverity::Warning
+               : core::ProblemSeverity::Error;
 }
 
 // The repair offered for each rule, as an English msgid the panel translates at
@@ -141,6 +155,13 @@ const char* RepairLabelFor(core::GsnRule rule) {
         return "Renumber";
     case core::GsnRule::UndevelopedElementHasSupport:
         return "Clear decorator";
+    case core::GsnRule::AwayGoalCitationUnresolved:
+    case core::GsnRule::AwayGoalDevelopedLocally:
+        // No quick fix. Clearing the citation turns the away goal into an
+        // ordinary local goal that asserts what another module was carrying,
+        // and deleting the local support throws away an argument someone wrote.
+        // Both choices belong to a person.
+        return "";
     }
     return "";
 }
