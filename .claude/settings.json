@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/agents/deny_writes_hook.py\" 2>/dev/null || python \"$CLAUDE_PROJECT_DIR/tools/agents/deny_writes_hook.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -23,6 +23,14 @@ AGENTS_DIR = REPO / ".agents"
 MANIFEST_PATH = AGENTS_DIR / "manifest.json"
 SCHEMA_PATH = AGENTS_DIR / "schema" / "agent.schema.json"
 
+# Every tool that creates or changes a file on its own: the tools the write hook
+# refuses, `disallowedTools:` names, the Authority paragraph lists, and the schema's
+# `write_denied_tools` must equal (the checker compares them). One list, because
+# four hand-kept copies had already disagreed about MultiEdit. MultiEdit is listed
+# although a release may not offer it: refusing a tool that does not exist costs
+# nothing, and a release that brings it back must not open a hole.
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+
 # Frontmatter is `key: value`, one per line, values never spanning lines. That is
 # all the canonical format allows, which is why it can be parsed in six lines
 # rather than depending on a YAML implementation.
@@ -120,11 +128,12 @@ def authority_section(agent: dict, platform: str, manifest: dict) -> str:
     spec = manifest["platforms"][platform]
     if not spec["enforces_write_denial"]:
         scope = "none"
-    elif "enforcement_scope" not in spec:
+    elif spec.get("enforcement_scope") not in ("hook", "sandbox"):
         raise DefinitionError(
-            f"manifest: platform {platform!r} claims to enforce write denial but does not say "
-            "what that covers. Set `enforcement_scope` to 'tools' or 'sandbox' -- the generated "
-            "paragraph has to state the boundary, and the two are not the same boundary."
+            f"manifest: platform {platform!r} claims to enforce write denial but its "
+            f"`enforcement_scope` is {spec.get('enforcement_scope')!r}. Set it to 'hook' or 'sandbox' "
+            "-- the generated paragraph has to state the boundary, and the two are not the same "
+            "boundary."
         )
     else:
         scope = spec["enforcement_scope"]
@@ -135,14 +144,23 @@ def authority_section(agent: dict, platform: str, manifest: dict) -> str:
     # sandbox and false of Claude's tool list -- `Bash` is granted there, so a
     # shell can still write a file. Overstating an enforcement boundary is the
     # same mistake as understating one, and this generator has now made both.
-    if scope == "tools":
+    #
+    # And a third time, in #326: the Claude paragraph said the `tools:` list
+    # removed the write tools, "so it holds whether or not you remember it", and a
+    # probe showed a background subagent calling Write and Edit anyway. The
+    # 'tools' scope is gone rather than kept for a platform that might honour it;
+    # a scope this generator does not recognise now stops the run instead of
+    # falling through to a paragraph that claims enforcement.
+    if scope == "hook":
         mechanism = (
-            "You have no write, edit or notebook-edit tools. The harness applies that, so it "
-            "holds whether or not you remember it.\n\n"
-            "It does not cover `Bash`, which you do have. Writing a file through a shell "
-            "command is therefore prohibited by this paragraph rather than by the platform -- "
-            "the one part of your boundary that depends on you. Do not create, edit, move or "
-            "delete a file that way."
+            "A Write, Edit, MultiEdit or NotebookEdit call from you is refused by a project hook "
+            "(`tools/agents/deny_writes_hook.py`, wired in `.claude/settings.json`), which checks "
+            "your canonical definition. Your `tools:` list does not do this on its own: a subagent "
+            "here can be handed those tools regardless of it (#326).\n\n"
+            "The hook does not cover `Bash`, which you do have, and it runs only while project "
+            "hooks do -- with hooks disabled, or where Python cannot start, nothing refuses the "
+            "call. Both remainders are prohibited by this paragraph rather than by the platform. "
+            "Do not create, edit, move or delete a file, by tool or by shell command."
         )
     elif scope == "sandbox":
         mechanism = (
@@ -158,10 +176,21 @@ def authority_section(agent: dict, platform: str, manifest: dict) -> str:
             "the enforcement. Treat it as binding."
         )
 
-    closing = (
-        f"Your tools are {tools}. `Bash` is for building and running things -- you cannot "
-        "judge what you have not executed -- and never for changing them."
-    )
+    if scope == "hook":
+        # Not "your tools are": on this platform the list the agent is shown can be
+        # longer than its definition (#326), and a sentence saying otherwise would
+        # be the same false claim the paragraph above just corrected.
+        closing = (
+            f"Your definition grants {tools}. The platform may still show you more tools -- that is "
+            "what #326 found -- and the hook above is what refuses the write tools among them. "
+            "`Bash` is for building and running things -- you cannot judge what you have not "
+            "executed -- and never for changing them."
+        )
+    else:
+        closing = (
+            f"Your tools are {tools}. `Bash` is for building and running things -- you cannot "
+            "judge what you have not executed -- and never for changing them."
+        )
 
     # `mechanism` may itself be more than one paragraph -- the tools-scoped one is
     # two, because what the platform enforces and what it leaves to you are
