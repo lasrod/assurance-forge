@@ -30,6 +30,11 @@ struct GsnLayoutInputNode {
     std::string label_secondary;
     bool undeveloped = false;
     bool uninstantiated = false;
+    // GSN v3 Modular Extension (GSN3-MOD-003): non-empty only on an Away Goal,
+    // naming the module it is defined in. GSN draws it in a compartment across
+    // the bottom of the shape, which is what tells a reader the support lives
+    // somewhere else and where to go and read it.
+    std::string away_module_identifier;
     std::string parent_id;
     std::vector<std::string> group1_children;
     std::vector<std::string> group2_attachments;
@@ -62,6 +67,11 @@ struct GsnLayoutNode {
     std::string label_secondary;
     bool undeveloped = false;
     bool uninstantiated = false;
+    // GSN v3 Modular Extension (GSN3-MOD-003): non-empty only on an Away Goal,
+    // naming the module it is defined in. GSN draws it in a compartment across
+    // the bottom of the shape, which is what tells a reader the support lives
+    // somewhere else and where to go and read it.
+    std::string away_module_identifier;
     std::string parent_id;
     double x = 0.0;
     double y = 0.0;

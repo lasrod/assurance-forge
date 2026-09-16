@@ -43,6 +43,12 @@ struct GsnNode {
     // Identifiers of Assurance Claim Points attached to this element.
     std::vector<std::string> acp_labels;
 
+    // GSN v3 Modular Extension (GSN3-MOD-003): non-empty only on an Away Goal,
+    // naming the module the goal is defined in. Drawn in a compartment across
+    // the bottom of the shape. The canvas is a separate renderer with its own
+    // model, so this field existing there does not put it here.
+    std::string away_module_identifier;
+
     // Where the evidence this node stands for is: the location recorded on the
     // Artifact/Resource the ArtifactReference cites. The projection copies it
     // verbatim; the exporter rewrites it into something an SVG reader can

@@ -32,6 +32,11 @@ struct LayoutNode {
     std::string label_secondary;
     bool undeveloped = false;
     bool uninstantiated = false;
+    // GSN v3 Modular Extension (GSN3-MOD-003): non-empty only on an Away Goal,
+    // naming the module it is defined in. GSN draws it in a compartment across
+    // the bottom of the shape, which is what tells a reader the support lives
+    // somewhere else and where to go and read it.
+    std::string away_module_identifier;
     ImVec2 position;
     ImVec2 size;
     std::string parent_id;

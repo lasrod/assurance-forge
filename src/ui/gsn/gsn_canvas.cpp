@@ -273,16 +273,24 @@ void DrawGsnNode(const GsnNode& node,
         }
     }
 
+    // GSN v3 Modular Extension (GSN3-MOD-003): an Away Goal reserves a strip
+    // along the bottom of its shape for the module it comes from, so the label
+    // area stops above it. Without the reservation a long statement runs
+    // through the divider and over the module name.
+    ImVec2 label_bottom_right = bottom_right;
+    label_bottom_right.y -= AwayModuleCompartmentHeight(node, zoom);
+
     // Draw label text
     float text_left, text_wrap;
-    ComputeTextRegion(node, top_left, bottom_right, zoom, has_attention, text_left, text_wrap);
+    ComputeTextRegion(node, top_left, label_bottom_right, zoom, has_attention, text_left, text_wrap);
     ImU32 ink = marked_for_removal ? GetTheme().text_primary : InkOn(fill_color);
     if (proposal_dimmed)
         ink = DimmedProposalInk(fill_color);
     {
         core::perf::ScopedTimer perf_scope("gsn.node.label");
-        DrawNodeLabel(draw_list, node, top_left, bottom_right, text_left, text_wrap, zoom, ink, ui_state);
+        DrawNodeLabel(draw_list, node, top_left, label_bottom_right, text_left, text_wrap, zoom, ink, ui_state);
     }
+    DrawAwayModuleCompartment(draw_list, node, top_left, bottom_right, zoom, ink);
     std::vector<TerminologySpanHitRegion> terminology_regions;
     if (core::perf::GetPerfToggles().terminology_spans) {
         core::perf::ScopedTimer perf_scope("gsn.node.terminology_spans");

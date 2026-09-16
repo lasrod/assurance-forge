@@ -11,6 +11,9 @@
 // such module exists.
 
 #include "core/element_factory.h"
+#include "core/assurance_tree.h"
+#include "export/gsn_projection.h"
+#include "export/svg_writer.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/audit/audit_event.h"
@@ -18,6 +21,7 @@
 #include "legacy_sacm/sacm_model.h"
 
 #include <gtest/gtest.h>
+#include <memory>
 
 namespace {
 
@@ -333,4 +337,70 @@ TEST(AwayGoalTest, GSN3_MOD_003_CommandRefusesASameModuleCitation) {
     // claiming support that was never cited.
     EXPECT_EQ(mc.ac.elements.size(), elements_before);
     EXPECT_TRUE(cmd.GeneratedId().empty());
+}
+
+// --------------------------------------------------------------------------
+// Rendering. The canvas and the SVG export are separate renderers with
+// separate models, so each is checked on its own: a decorator added to one is
+// silently absent from the other.
+// --------------------------------------------------------------------------
+
+TEST(AwayGoalTest, GSN3_MOD_003_CanvasNodeCarriesTheModuleAndTheCitedStatement) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string new_id;
+    std::string relationship_id;
+    std::string error;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, "G1", "G2", new_id, relationship_id, error)) << error;
+
+    const core::AssuranceTree tree = core::AssuranceTree::Build(mc.ac, "");
+    const core::TreeNode* away = nullptr;
+    for (const std::unique_ptr<core::TreeNode>& node : tree.nodes) {
+        if (node->id == new_id) {
+            away = node.get();
+            break;
+        }
+    }
+    ASSERT_NE(away, nullptr);
+    EXPECT_EQ(away->away_module_identifier, "Platform");
+    // The away goal holds no statement of its own, so the label has to come
+    // through the citation. A blank node here would be an argument step the
+    // reader cannot read.
+    EXPECT_NE(away->label.find("Goal proved in the platform module"), std::string::npos);
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_SvgExportDrawsTheModuleCompartment) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string new_id;
+    std::string relationship_id;
+    std::string error;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, "G1", "G2", new_id, relationship_id, error)) << error;
+
+    const export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(mc.ac);
+    const export_gsn::GsnNode* exported = nullptr;
+    for (const export_gsn::GsnNode& node : projection.diagram.nodes) {
+        if (node.display_id == new_id || node.id == new_id) {
+            exported = &node;
+            break;
+        }
+    }
+    ASSERT_NE(exported, nullptr);
+    EXPECT_EQ(exported->away_module_identifier, "Platform");
+    // Resolved through the citation here too. The export projection is a
+    // separate model from the canvas, so it can lose this on its own.
+    EXPECT_EQ(exported->title, "Goal proved in the platform module");
+
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+    EXPECT_NE(svg.find("gsn-away-module-divider"), std::string::npos);
+    EXPECT_NE(svg.find(">Platform<"), std::string::npos);
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_SvgExportLeavesOrdinaryGoalsUndecorated) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+
+    const export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(mc.ac);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    // Nothing here is away, so the compartment must not appear. Drawing it on
+    // an ordinary goal would claim its support lives in another module.
+    EXPECT_EQ(svg.find("gsn-away-module-divider"), std::string::npos);
 }

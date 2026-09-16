@@ -36,6 +36,10 @@ struct TreeNode {
     bool has_name_secondary = false;
     bool undeveloped = false;
     bool uninstantiated = false;
+    // GSN v3 Modular Extension (GSN3-MOD-003): when non-empty this node is an
+    // Away Goal and this is the module it is defined in, which GSN draws in a
+    // compartment along the bottom of the shape.
+    std::string away_module_identifier;
     NodeRole role = NodeRole::Other;
     ElementGroup group = ElementGroup::Group1;
 
