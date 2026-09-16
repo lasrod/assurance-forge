@@ -53,6 +53,10 @@ public:
 
     // Add a new top-level Goal (root claim) to the current model.
     bool AddTopGoal();
+    // GSN v3 Modular Extension (GSN3-MOD-003): cite a goal in another module as
+    // an Away Goal under the selection, and the goals that may be cited.
+    bool AddAwayGoalToSelected(const std::string& cited_id);
+    std::vector<core::AwayGoalCandidate> AwayGoalCandidatesForSelection() const;
 
     bool AddAcpToSelectedElement();
     bool AddAcpToRelationship(const std::string& relationship_id);

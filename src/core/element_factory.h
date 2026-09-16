@@ -233,6 +233,24 @@ bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
                         const std::string& relationship_id,
                         std::string& out_error);
 
+// A goal in another module that some element may cite as an Away Goal.
+struct AwayGoalCandidate {
+    std::string id;
+    // The goal's notation identifier and statement, for a menu row.
+    std::string label;
+    // The module it is defined in, so a reader choosing between two goals of
+    // the same name can tell them apart.
+    std::string module_identifier;
+};
+
+// Goals `parent_id` could cite as an Away Goal: every claim in another module,
+// sorted by module then id so a caller can group them without re-sorting.
+// Elements that are themselves citations are excluded -- cite the goal, not
+// another module's citation of it.
+std::vector<AwayGoalCandidate> ListAwayGoalCandidates(const parser::AssuranceCase& ac,
+                                                      const sacm::AssuranceCasePackage* pkg,
+                                                      const std::string& parent_id);
+
 // Add a new top-level Goal (root claim) without creating a relationship.
 // Useful for starting a fresh argument from the canvas background.
 bool AddTopGoal(parser::AssuranceCase& ac,

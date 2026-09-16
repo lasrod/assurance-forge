@@ -66,6 +66,33 @@ private:
     std::string generated_relationship_id_;
 };
 
+// Cite a goal in another module as an Away Goal supporting `parent_id`
+// (GSN v3 Modular Extension, GSN3-MOD-003). Creates the citing Claim and its
+// SupportedBy relationship, then records the citation that makes it away.
+class CreateAwayGoalCommand final : public ICommand {
+public:
+    CreateAwayGoalCommand(std::string parent_id, std::string cited_id)
+        : parent_id_(std::move(parent_id)), cited_id_(std::move(cited_id)) {}
+
+    std::string Name() const override {
+        return "CreateAwayGoal";
+    }
+    bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
+
+    const std::string& GeneratedId() const {
+        return generated_id_;
+    }
+    const std::string& GeneratedRelationshipId() const {
+        return generated_relationship_id_;
+    }
+
+private:
+    std::string parent_id_;
+    std::string cited_id_;
+    std::string generated_id_;
+    std::string generated_relationship_id_;
+};
+
 // Create a GSN v3 dialectic challenge (counter argument / counter evidence)
 // against an element or relationship target. Creates the counter element plus a
 // counter relationship (isCounter=true) via `core::AddChallenge`, capturing the

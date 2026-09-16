@@ -11,6 +11,9 @@
 // such module exists.
 
 #include "core/element_factory.h"
+#include "core/commands/element_commands.h"
+#include "core/commands/command_bus.h"
+#include "core/audit/audit_event.h"
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_model.h"
 
@@ -253,4 +256,81 @@ TEST(AwayGoalTest, GSN3_MOD_003_ReplayInstallsTheSameCitationWithGivenIds) {
     EXPECT_TRUE(away->is_citation);
     EXPECT_EQ(away->cited_element_id, "G2");
     EXPECT_NE(Find(mc.ac, "R7"), nullptr);
+}
+
+// --------------------------------------------------------------------------
+// Choosing what to cite, and the command a menu click runs.
+// --------------------------------------------------------------------------
+
+TEST(AwayGoalTest, GSN3_MOD_003_OffersOnlyGoalsFromOtherModules) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+
+    const std::vector<core::AwayGoalCandidate> candidates = core::ListAwayGoalCandidates(mc.ac, &mc.pkg, "G1");
+
+    ASSERT_EQ(candidates.size(), 1u);
+    EXPECT_EQ(candidates.front().id, "G2");
+    EXPECT_EQ(candidates.front().module_identifier, "Platform");
+    // G3 is a goal in the selection's own module and E1 is not a goal, so
+    // neither may be cited; offering them would invite a refusal after a click.
+    for (const core::AwayGoalCandidate& candidate : candidates) {
+        EXPECT_NE(candidate.id, "G3");
+        EXPECT_NE(candidate.id, "E1");
+        EXPECT_NE(candidate.id, "G1");
+    }
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_DoesNotOfferACitationOfACitation) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string new_id;
+    std::string relationship_id;
+    std::string error;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, "G1", "G2", new_id, relationship_id, error)) << error;
+
+    // The new away goal now sits in the local module. Seen from the remote
+    // module it is a goal elsewhere, but citing it would point a reader at a
+    // signpost rather than at the argument it points to.
+    const std::vector<core::AwayGoalCandidate> candidates = core::ListAwayGoalCandidates(mc.ac, &mc.pkg, "G2");
+    for (const core::AwayGoalCandidate& candidate : candidates) {
+        EXPECT_NE(candidate.id, new_id);
+    }
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_CommandCreatesTheCitationAndRecordsIt) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    core::commands::CommandContext ctx{mc.ac, mc.pkg};
+    core::commands::CreateAwayGoalCommand cmd("G1", "G2");
+    core::audit::AuditEvent event;
+    std::string error;
+
+    ASSERT_TRUE(cmd.Apply(ctx, event, error)) << error;
+    ASSERT_FALSE(cmd.GeneratedId().empty());
+
+    const parser::SacmElement* away = Find(mc.ac, cmd.GeneratedId());
+    ASSERT_NE(away, nullptr);
+    EXPECT_TRUE(away->is_citation);
+    EXPECT_EQ(away->cited_element_id, "G2");
+
+    // The audit payload has to carry what was cited. Replay that recreates the
+    // goal without its citation recreates a different argument.
+    EXPECT_EQ(event.event_type, "CreateAwayGoal");
+    EXPECT_EQ(event.payload["parent_id"], "G1");
+    EXPECT_EQ(event.payload["cited_id"], "G2");
+    EXPECT_EQ(event.payload["generated_id"], cmd.GeneratedId());
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_CommandRefusesASameModuleCitation) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    const size_t elements_before = mc.ac.elements.size();
+
+    core::commands::CommandContext ctx{mc.ac, mc.pkg};
+    core::commands::CreateAwayGoalCommand cmd("G1", "G3");
+    core::audit::AuditEvent event;
+    std::string error;
+
+    EXPECT_FALSE(cmd.Apply(ctx, event, error));
+    EXPECT_FALSE(error.empty());
+    // Refused before anything was created, so no bare goal is left behind
+    // claiming support that was never cited.
+    EXPECT_EQ(mc.ac.elements.size(), elements_before);
+    EXPECT_TRUE(cmd.GeneratedId().empty());
 }

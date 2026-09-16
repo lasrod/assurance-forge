@@ -26,6 +26,15 @@ bool ElementActions::AddChildToSelected(core::NewElementKind kind) {
     return state_.element_edit_controller->AddChildToSelected(state_, selected_id, kind);
 }
 
+bool ElementActions::AddAwayGoalToSelected(const std::string& cited_id) {
+    if (!state_.app_state.loaded_case.has_value()) {
+        SetStatus(state_, "No assurance case loaded.");
+        return false;
+    }
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    return state_.element_edit_controller->AddAwayGoal(state_, selected_id, cited_id);
+}
+
 bool ElementActions::AddTopGoal() {
     if (!state_.app_state.loaded_case.has_value()) {
         SetStatus(state_, "No assurance case loaded.");

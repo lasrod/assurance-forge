@@ -559,6 +559,8 @@ TRANSLATIONS = {
     "Remove ACP": "ACP を除去",
     "Select {0}": "{0} を選択",
     "Add ACP": "ACP を追加",
+    "Away Goal": "他モジュールの目標",
+    "An away goal cannot be added while a draft is open.": "ドラフトを開いている間は他モジュールの目標を追加できません。",
     "Add Counter Argument": "反論を追加",
     "Add Counter Evidence": "反証を追加",
     "ACP is not supported for this relationship.": "この関係では ACP はサポートされていません。",

@@ -47,6 +47,10 @@ struct ElementContextActions {
     // Opens a piece of evidence's recorded location (a file or URL) from its
     // node's link badge; the same action the register's Open button takes.
     std::function<void(const std::string& location)> open_evidence_location;
+    // GSN v3 Modular Extension (GSN3-MOD-003). The candidates are goals in other
+    // modules, built by the app layer because the POD case records no module.
+    std::vector<core::AwayGoalCandidate> away_goal_candidates;
+    std::function<void(const std::string& cited_id)> add_away_goal;
 };
 
 // Renders the Add submenu for the selected element. Kinds the selection cannot

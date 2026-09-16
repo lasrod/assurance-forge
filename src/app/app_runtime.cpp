@@ -168,6 +168,8 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     actions.focus_problem = [](const std::string& problem_id, const std::string& element_id) {
         ui::FocusProblemInPanel(ui::GetUiState(), problem_id, element_id);
     };
+    actions.add_away_goal = [&runtime](const std::string& cited_id) { runtime.AddAwayGoalToSelected(cited_id); };
+    actions.away_goal_candidates = runtime.AwayGoalCandidatesForSelection();
     actions.add_counter_argument = [&runtime]() { runtime.AddCounterArgumentToSelected(); };
     actions.add_counter_evidence = [&runtime]() { runtime.AddCounterEvidenceToSelected(); };
     actions.add_counter_argument_to_relationship = [&runtime](const std::string& relationship_id) {
@@ -341,6 +343,28 @@ bool AppRuntime::AddTopGoal() {
     if (AddTopGoalAsDraft())
         return true;
     return actions::ElementActions(*impl_).AddTopGoal();
+}
+
+bool AppRuntime::AddAwayGoalToSelected(const std::string& cited_id) {
+    // No draft path yet: the patch vocabulary has no operation that sets a
+    // citation, so staging an away goal would drop the very thing that makes it
+    // away and promote an ordinary local goal. Refusing is better than writing
+    // it into the accepted model underneath the draft the canvas is drawing.
+    if (DraftEditingActive()) {
+        SetStatus(AF_TR("An away goal cannot be added while a draft is open."));
+        return false;
+    }
+    return actions::ElementActions(*impl_).AddAwayGoalToSelected(cited_id);
+}
+
+std::vector<core::AwayGoalCandidate> AppRuntime::AwayGoalCandidatesForSelection() const {
+    const std::string& selected_id = ui::GetUiState().selected_element_id;
+    if (selected_id.empty() || !impl_->app_state.loaded_case.has_value() ||
+        !impl_->app_state.sacm_package.has_value()) {
+        return {};
+    }
+    return core::ListAwayGoalCandidates(
+        impl_->app_state.loaded_case.value(), &impl_->app_state.sacm_package.value(), selected_id);
 }
 
 bool AppRuntime::AddAcpToSelectedElement() {

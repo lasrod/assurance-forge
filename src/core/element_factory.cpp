@@ -1030,6 +1030,40 @@ bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
     return InstallAwayGoal(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error);
 }
 
+std::vector<AwayGoalCandidate> ListAwayGoalCandidates(const parser::AssuranceCase& ac,
+                                                      const sacm::AssuranceCasePackage* pkg,
+                                                      const std::string& parent_id) {
+    std::vector<AwayGoalCandidate> candidates;
+    if (!pkg || parent_id.empty())
+        return candidates;
+
+    for (const parser::SacmElement& element : ac.elements) {
+        if (element.type != "claim" || element.id == parent_id)
+            continue;
+        // Citing a citation points at a signpost rather than at the argument.
+        if (element.is_citation)
+            continue;
+        std::string module = ResolveAwayModuleIdentifier(pkg, parent_id, element.id);
+        if (module.empty())
+            continue;
+
+        AwayGoalCandidate candidate;
+        candidate.id = element.id;
+        candidate.module_identifier = std::move(module);
+        candidate.label = GsnIdentifierFor(element);
+        if (!element.name.empty())
+            candidate.label += ": " + element.name;
+        candidates.push_back(std::move(candidate));
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const AwayGoalCandidate& a, const AwayGoalCandidate& b) {
+        if (a.module_identifier != b.module_identifier)
+            return a.module_identifier < b.module_identifier;
+        return a.id < b.id;
+    });
+    return candidates;
+}
+
 // ===== Remove helpers (planner) ============================================
 
 namespace {

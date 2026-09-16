@@ -310,6 +310,9 @@ msgstr "開いている間許可"
 msgid "An audit log is created automatically the first time a model-mutating command is recorded for a SACM file in this project."
 msgstr "このプロジェクトの SACM ファイルに対してモデル変更コマンドが初めて記録されたとき、監査ログが自動的に作成されます。"
 
+msgid "An away goal cannot be added while a draft is open."
+msgstr "ドラフトを開いている間は他モジュールの目標を追加できません。"
+
 msgid "Appearance"
 msgstr "外観"
 
@@ -396,6 +399,9 @@ msgstr "自動保存の書き込みに失敗しました"
 
 msgid "Available in a later release."
 msgstr "後のリリースで利用可能になります。"
+
+msgid "Away Goal"
+msgstr "他モジュールの目標"
 
 msgid "Back up and start new confidence file"
 msgstr "バックアップして新しい信頼度ファイルを開始"
