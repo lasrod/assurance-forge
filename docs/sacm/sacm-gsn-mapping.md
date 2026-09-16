@@ -95,6 +95,7 @@ because `ArgumentReasoning` extends `ArgumentAsset`.
 | **Choice** / ChoiceNode | *none — preserved* | [N] | See below |
 | **AwayContext** | *none — preserved* | [G] | Contested; see below |
 | Choice "m of n" cardinality | *none* | [G] | GSN v3 concept, no metamodel exists |
+| **Off-diagram decorator** (v3 §1:2.2.20) | *none — there is no diagram construct* | [G] | Open decision; see below |
 | ACP, Challenge, Defeated (v3) | partial — see gap report | [G] | v3 has no published metamodel. Challenge/Defeat/ACP work on `Claim` and `AssertedRelationship` (both are `Assertion`s) but **not** on `Solution`, `Context` or `Strategy`, which extend `ArgumentAsset` directly and so have neither `metaClaim` nor `assertionDeclaration`. SACM 2.4 is removing both. See `sacm-gsn-metamodel-gaps.md`. |
 
 ### Context — undecidable by design
@@ -127,6 +128,46 @@ evidence on a 2-versus-2 split is not something to do silently.
 metamodel settles it, or if real files show the ambiguity actually costs us
 something. Recorded here so it is a standing decision rather than an oversight
 someone "fixes" later without the context.
+
+### Off-diagram — there is no diagram for an element to be off (open, 2026-09-16)
+
+GSN v3 §1:2.2.20 makes an off-diagram decorator normative. The public v2→v3 changes
+deck (`https://scsc.uk/file/gc-main/GSNv2-to-v3_changes-1092.pdf`, 04/05/2021,
+slides 27–28) introduces it as *"'off diagram' notation to link separate diagrams
+that illustrate fragments of a goal structure"*, records §1:2.2.20 as an *"added
+normative part of the standard saying that off-diagram decorator need to be distinct
+from the GSN elements"*, and says the standard *"recommends a preferred off-diagram
+symbol"*. The accompanying figure draws the same goal `G5` twice — once as the bottom
+element of diagram y and once as the top element of diagram x — each occurrence
+labelled with the *other* diagram's name.
+
+So the decorator's payload is **a reference to another diagram**. That is what makes
+the construct unimplementable today rather than merely unimplemented:
+
+- **GSN Metamodel v2.2 has no class for it.** The decorator is a v3 addition and the
+  current metamodel targets v2. GSN v2 (SCSC-141B, 82pp) contains no off-diagram
+  notation at all.
+- **SACM 2.3 has no diagram.** SACM models argument content, not its presentation.
+  No View, Diagram, Notation or Presentation construct exists anywhere in the
+  metamodel for such a decorator to point at.
+- **Assurance Forge has no diagram either.** The canvas partitions by
+  `ArgumentPackage`, which is GSN's **Module** — a different concept that the same
+  standard distinguishes from core off-diagram notation. Those tabs are derived, not
+  authored: a user cannot create a diagram, name it, or assign an element to it.
+
+The tempting shortcut is to read "diagram" as "argument package", because the tabs
+already exist. **Do not.** It answers a Core GSN requirement with the Modular
+extension's semantics, and it pre-empts the Away Goal design (`AF-MOD-003` to
+`AF-MOD-007`), which is how GSN actually cites an element held in another module.
+Every cross-package edge would render as an off-diagram continuation rather than as
+an Away Goal — a claim about the argument's modular structure that nobody decided.
+
+**Status: open.** What a diagram is, whether it is authored or derived, and what
+stores it given that strict SACM output must stay free of representation metadata,
+are recorded as an open question in `sacm-decisions-and-questions.md`. Gap row 14 in
+`sacm-gsn-metamodel-gaps.md` carries the defect to the SCSC ACWG and the OMG RTF.
+Until it is settled, GSN3-CORE-012 is `blocked` in every column of the GSN matrix
+rather than merely absent.
 
 ## Attribute mappings for pure-SACM export
 

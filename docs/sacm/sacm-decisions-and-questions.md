@@ -101,6 +101,31 @@ Layout is outside the SACM library. Still decide in Assurance Forge:
 
 Recommended initial answer: compute deterministic layout from SACM data and keep strict SACM files free of layout metadata.
 
+### What is a "diagram"? (GSN off-diagram notation, raised 2026-09-16)
+
+GSN v3 §1:2.2.20 makes the off-diagram decorator normative, and its payload is a
+reference to *another diagram*. Nothing defines a diagram: SACM 2.3 models argument
+content rather than its presentation, GSN Metamodel v2.2 predates the construct, and
+Assurance Forge partitions the canvas by `ArgumentPackage`, which is GSN's Module.
+Decision 19 above defers layout and representation, so the carrier is open. Still
+decide:
+
+- Is a diagram **authored** — a user creates it, names it, and assigns elements to it
+  — or **derived** from the graph, as the package tabs are today?
+- What stores diagram membership, given that strict SACM 2.3 output must stay free of
+  representation metadata? A vendor `TaggedValue` under clause 8.12 is legal but
+  private, and would repeat the interoperability problem the `assuranceForge.acp` tag
+  already has.
+- May one element appear on more than one diagram, as the standard's own figure shows?
+- Does a diagram nest inside an `ArgumentPackage`, cut across packages, or neither?
+
+Recommended initial answer: **do not equate a diagram with an `ArgumentPackage`.** It
+would answer a Core GSN requirement with the Modular extension's semantics and
+pre-empt the Away Goal work (`AF-MOD-003` to `AF-MOD-007`). Prefer an explicitly
+authored diagram stored outside the SACM document, and leave GSN3-CORE-012 `blocked`
+until one exists. The evidence is in `sacm-gsn-mapping.md`; the standards defect is
+gap row 14 in `sacm-gsn-metamodel-gaps.md`.
+
 ### Interoperability corpus
 
 The current preference is Papyrus-style SACM material and possibly OASC. The interop researcher should determine:
