@@ -1525,6 +1525,9 @@ msgstr "元に戻す操作はありません。"
 msgid "OK"
 msgstr "OK"
 
+msgid "OK records these changes as seen on this computer, so they are not reported again unless the file changes again. af.proj is not modified."
+msgstr "「OK」を押すと、これらの変更をこのコンピューター上で確認済みとして記録します。ファイルが再び変更されない限り、再度報告されることはありません。af.proj は変更されません。"
+
 msgid "One of this draft's changes no longer applies."
 msgstr "このドラフトの変更のいずれかが適用できなくなっています。"
 
@@ -2361,6 +2364,9 @@ msgstr "ドラフトは受理されましたが、監査ログに記録できま
 
 msgid "The edit was made, but the draft could not be written to disk: {0}"
 msgstr "編集は適用されましたが、ドラフトをディスクに書き込めませんでした: {0}"
+
+msgid "The external changes could not be recorded as seen, so they will be reported again on the next open: {0}"
+msgstr "外部の変更を確認済みとして記録できなかったため、次にプロジェクトを開いたときにも報告されます: {0}"
 
 msgid "The last accept did not happen: {0}"
 msgstr "直前の受理は行われませんでした: {0}"

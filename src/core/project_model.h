@@ -76,9 +76,23 @@ struct ProjectLoadStep {
     std::string message;
 };
 
+// A tracked file whose bytes no longer match the hash `af.proj` records for it.
+// Both hashes are kept because the refresh overwrites the recorded one in memory,
+// and "this exact change" is what an acknowledgement has to name (#402).
+struct ExternalFileChange {
+    std::filesystem::path relativePath;
+    std::string recordedRawHash;
+    std::string observedRawHash;
+    // Already recorded as seen on this computer, so not reported as a warning.
+    bool acknowledged = false;
+};
+
 struct ProjectLoadReport {
     std::vector<ProjectLoadStep> steps;
     std::vector<std::string> warnings;
+    // Every external change found, acknowledged or not. `warnings` carries only
+    // the unacknowledged ones.
+    std::vector<ExternalFileChange> externalChanges;
     bool showPopup = false;
 
     bool has_failures() const;
