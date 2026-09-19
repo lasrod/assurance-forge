@@ -125,7 +125,7 @@ To build a packaged zip without creating a GitHub Release, use **workflow_dispat
 2. Pick a branch and click *Run workflow*.
 3. When the run finishes, download the zip from the run's *Artifacts* section.
 
-`workflow_dispatch` builds use a `dev-<short-sha>` version string and never create a GitHub Release — even when run from the default branch.
+`workflow_dispatch` builds use a `0.0.0-dev.<short-sha>` version string and never create a GitHub Release — even when run from the default branch. The version is dotted like a tag's on purpose: the earlier `dev-<short-sha>` had no dot, so no dry run met the PowerShell argument-splitting bug that broke the Windows job of the `0.3.0-alpha.1` tag run.
 
 > Note: `workflow_dispatch` only works for workflow files that exist on the repository's default branch. To run an experimental build from a feature branch, the workflow file must already be present on `main`.
 
