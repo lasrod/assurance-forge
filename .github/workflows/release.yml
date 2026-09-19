@@ -73,10 +73,14 @@ jobs:
         id: version
         shell: bash
         run: |
+          # A dry run's version has a tag's shape -- dots and a prerelease
+          # label -- so it exercises the same path. dev-<sha> had no dot, and
+          # the 0.3.0-alpha.1 tag was the first run to meet the quoting bug
+          # the Configure step below now avoids.
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "version=0.0.0-dev.${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
       # CPack's INNOSETUP generator needs ISCC at configure time, and the
@@ -92,8 +96,12 @@ jobs:
           choco upgrade innosetup --version 6.7.1 --allow-downgrade -y --no-progress
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw "ISCC.exe not found after installing Inno Setup" }
 
+      # Quoted: on Windows this step runs under PowerShell, which passes an
+      # unquoted -DAF_PACKAGE_VERSION=0.3.0-alpha.1 to CMake as "...=0" plus a
+      # stray ".3.0-alpha.1". The 0.3.0-alpha.1 tag run built
+      # assurance-forge.0-windows-x64.zip that way.
       - name: Configure CMake
-        run: ${{ matrix.configure }} -DAF_PACKAGE_VERSION=${{ steps.version.outputs.version }}
+        run: ${{ matrix.configure }} "-DAF_PACKAGE_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Build (Release)
         run: ${{ matrix.build }}

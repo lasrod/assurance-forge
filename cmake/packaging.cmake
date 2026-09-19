@@ -22,7 +22,7 @@ if(NOT WIN32)
 endif()
 
 # The version the packages carry. The release workflow passes the git tag
-# (e.g. 0.2.0-alpha.3), or dev-<sha> for a workflow_dispatch build.
+# (e.g. 0.2.0-alpha.3), or 0.0.0-dev.<sha> for a workflow_dispatch build.
 set(AF_PACKAGE_VERSION "0.0.0-dev" CACHE STRING "Version written into release packages")
 # Windows file-version resources take numbers only; the prerelease label lives
 # in the display version, and a dev build has no number at all.
@@ -100,10 +100,6 @@ set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/lasrod/assurance-forge")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Assurance Forge")
 # The installer's name is set per generator in packaging_project_config.cmake.
 set(CPACK_PACKAGE_FILE_NAME "assurance-forge.${AF_PACKAGE_VERSION}-windows-x64")
-# The zip unpacks into one folder of that name, which the release workflow's
-# package check expects. The ZIP generator's default already does this; stated
-# so a changed default cannot move the files out from under the check.
-set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/packaging_project_config.cmake")
 
 # Start-menu shortcut, and an optional (unchecked) desktop shortcut. The
@@ -163,12 +159,13 @@ set(CPACK_INNOSETUP_SETUP_MinVersion "10.0")
 set(CPACK_INNOSETUP_SETUP_SetupLogging ON)
 
 # The finish page links. A tagged release has its own notes page; a dev build
-# does not, so it gets the list of releases.
+# (0.0.0-dev.<sha>, or the 0.0.0-dev default) does not, so it gets the list of
+# releases.
 set(CPACK_INNOSETUP_DEFINE_AfUserGuideUrl "https://lasrod.github.io/assurance-forge/user-guide/")
 set(CPACK_INNOSETUP_DEFINE_AfExamplesUrl "https://github.com/lasrod/assurance-forge-examples")
 # installer.iss takes the tour page's screenshot from here.
 set(CPACK_INNOSETUP_DEFINE_AfInstallerArtDir "${AF_INSTALLER_DIR}/art")
-if(AF_PACKAGE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
+if(AF_PACKAGE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+" AND NOT AF_PACKAGE_VERSION MATCHES "-dev")
     set(CPACK_INNOSETUP_DEFINE_AfReleaseNotesUrl
         "https://github.com/lasrod/assurance-forge/releases/tag/${AF_PACKAGE_VERSION}")
 else()

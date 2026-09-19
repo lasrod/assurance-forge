@@ -1,6 +1,14 @@
 # Read by CPack once per generator (CPACK_PROJECT_CONFIG_FILE), so settings can
 # differ between the portable zip and the installer.
 
+if(CPACK_GENERATOR STREQUAL "ZIP")
+    # The zip unpacks into one folder named like the package, which the release
+    # workflow's package check expects. It is the ZIP generator's default;
+    # stated so a changed default cannot move the files out from under the
+    # check. Set here, per generator, because Inno Setup refuses the option.
+    set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
+endif()
+
 if(CPACK_GENERATOR STREQUAL "INNOSETUP")
     # A "-setup" suffix tells the installer apart from the portable zip on the
     # Releases page, where both otherwise carry the same name.
