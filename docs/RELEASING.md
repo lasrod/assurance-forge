@@ -21,7 +21,7 @@ Tags containing `-` are automatically marked as **prerelease** by the workflow.
    git push origin 0.2.0
    ```
 
-3. The `Release` workflow builds the project, packages a zip, and creates a GitHub Release named `assurance-forge <tag>` with the zip attached.
+3. The `Release` workflow builds, tests and packages the project on Windows, Linux and macOS. Only when all three succeed does its final `Publish release` job create a GitHub Release named `assurance-forge <tag>` with every package attached; a failure on any platform publishes nothing. (Each platform used to publish its own files, which is how `0.3.0-alpha.1` shipped without Windows.)
 4. Edit the Release on GitHub to add a description. The workflow leaves the body empty intentionally so the release notes can be written by hand.
 
 A Windows release carries two packages built from the same install layout:
@@ -131,8 +131,9 @@ To build a packaged zip without creating a GitHub Release, use **workflow_dispat
 
 ## Conformance evidence package
 
-Alongside the binaries, the Windows job generates and attaches
-`assurance-forge.<tag>-evidence-package.zip` — the release-bound SACM 2.3
+Alongside the binaries, the Windows job generates
+`assurance-forge.<tag>-evidence-package.zip`, which the publish job attaches with
+the other packages, — the release-bound SACM 2.3
 conformance evidence required by
 [#295](https://github.com/lasrod/assurance-forge/issues/295): the frozen
 conformance matrix and decision pages, requirement-to-test traceability, the
