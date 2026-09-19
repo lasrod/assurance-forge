@@ -180,6 +180,19 @@ foreach(_af_dpi 100 125 150 175 200 225 250)
 endforeach()
 list(JOIN _af_wizard_images "," CPACK_INNOSETUP_SETUP_WizardImageFile)
 list(JOIN _af_wizard_small_images "," CPACK_INNOSETUP_SETUP_WizardSmallImageFile)
+# In dark mode Inno Setup substitutes its own built-in artwork unless it is told
+# otherwise. The panel is dark and the small image transparent, so the same
+# files serve both modes.
+set(CPACK_INNOSETUP_SETUP_WizardImageFileDynamicDark "${CPACK_INNOSETUP_SETUP_WizardImageFile}")
+set(CPACK_INNOSETUP_SETUP_WizardSmallImageFileDynamicDark "${CPACK_INNOSETUP_SETUP_WizardSmallImageFile}")
+
+# The installer's optional components (installer.iss) own these files; the zip
+# carries everything. packaging_project_config.cmake maps them per file.
+set(CPACK_AF_SAMPLE_NAMES "")
+foreach(_af_sample IN LISTS AF_SAMPLE_CASES)
+    get_filename_component(_af_sample_name "${_af_sample}" NAME)
+    list(APPEND CPACK_AF_SAMPLE_NAMES "${_af_sample_name}")
+endforeach()
 # Per-user by default: installs into %LOCALAPPDATA%\Programs without admin
 # rights, which is what a tester on a managed laptop has. The dialog still
 # offers an all-users install to someone who can elevate.

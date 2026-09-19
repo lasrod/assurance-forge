@@ -55,10 +55,22 @@ has the Visual C++ runtime installed and a tester's machine may not.
 ### The installer's pages and look
 
 `packaging/windows/` holds what CPack does not generate: `installer.iss` (the
-Welcome and Finish text in English and Japanese, and the Finish page's launch,
-user-guide and release-notes boxes), `installer_code.pas` (first install vs
-upgrade, and the keep-settings question on uninstall), and `art/`, the wizard
-images at each DPI size. The images are rendered from the application icon by
+components page, the AI-assistant tasks, all the wizard text in English and
+Japanese, and the Finish page's launch, user-guide and release-notes boxes),
+`installer_code.pas` (first install vs upgrade, MCP client registration, the
+Finish text, and the keep-settings question on uninstall), and `art/`, the
+wizard images at each DPI size.
+
+The components page lists the application's built-in features ticked and
+locked, so a new user sees what they are getting; **every feature named there
+must be a `supported` row in the capability matrix.** The sample cases and the
+MCP server are optional components; `cmake/packaging_project_config.cmake` ties
+their files to them. When Claude Code or Codex is on PATH, the installer offers
+(unticked) to register the MCP server with it at user scope, with no arguments.
+It never touches an `assurance-forge` entry it did not create, records the ones
+it did in `HKCU\Software\Assurance Forge\Installer`, and removes only those on
+uninstall. Registration shares nothing by itself: the MCP consent gate in the
+application still applies. The images are rendered from the application icon by
 `tools/release/render_installer_art.py`; rerun it after changing the icon or the
 theme colours. The [Setup] directives -- page flow, colours, light/dark mode --
 are in `cmake/packaging.cmake`.

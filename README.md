@@ -143,6 +143,9 @@ Pre-built Windows binaries are published on the [Releases page](https://github.c
 and run it. It installs for your user account only, so it needs no administrator
 rights, adds Assurance Forge to the Start menu, and upgrades an earlier version in
 place. It runs in English or Japanese and follows Windows' light or dark mode.
+The sample cases and the MCP server are optional, and if Claude Code or Codex is
+installed it offers to register Assurance Forge's MCP server with it (nothing is
+shared until you switch MCP on in Preferences and allow the client).
 Uninstall from *Settings → Apps*; it asks whether to keep your settings and saved
 API key, and keeps them unless you choose otherwise.
 
