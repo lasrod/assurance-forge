@@ -355,6 +355,30 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
         return true;
     }
 
+    // GSN3-MOD-003. Replayed through the same factory the live legacy path
+    // uses, so the citation is reinstalled with the ids the event recorded; a
+    // replay that recreated the goal without it would reproduce a different
+    // argument and fail verification.
+    if (type == "CreateAwayGoal") {
+        std::string parent_id, cited_id, element_id, relationship_id;
+        if (!require_string("parent_id", parent_id))
+            return false;
+        if (!require_string("cited_id", cited_id))
+            return false;
+        if (!require_string("generated_id", element_id))
+            return false;
+        if (!require_string("generated_relationship_id", relationship_id))
+            return false;
+        std::string err;
+        if (!core::AddAwayGoalWithIds(
+                state.model, &state.package, parent_id, cited_id, element_id, relationship_id, err)) {
+            out_error =
+                "AddAwayGoalWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+
     if (type == "CreateChallenge") {
         std::string target_id, target_kind_token, source_type_token, element_id, relationship_id;
         if (!require_string("target_id", target_id))
@@ -1191,6 +1215,34 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure(
                 "apply_add_child", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        return true;
+    }
+
+    // GSN3-MOD-003: the goal and its relationship, then the citation that makes
+    // it away -- the same two library operations the live command performs.
+    if (type == "CreateAwayGoal") {
+        std::string parent_id, cited_id, element_id, relationship_id;
+        if (!require_string("parent_id", parent_id))
+            return false;
+        if (!require_string("cited_id", cited_id))
+            return false;
+        if (!require_string("generated_id", element_id))
+            return false;
+        if (!require_string("generated_relationship_id", relationship_id))
+            return false;
+        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_child(
+            document, parent_id, sacm_adapter::ChildKind::Goal, element_id, relationship_id);
+        if (!outcome.supported || !outcome.applied) {
+            out_error = FormatSeamFailure(
+                "apply_add_child", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);
+            return false;
+        }
+        const sacm_adapter::EditOutcome citation = sacm_adapter::apply_set_citation(document, element_id, cited_id);
+        if (!citation.supported || !citation.applied) {
+            out_error = FormatSeamFailure(
+                "apply_set_citation", tx_seq, event, citation.supported, citation.applied, citation.diagnostics);
             return false;
         }
         return true;

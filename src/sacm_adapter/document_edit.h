@@ -479,6 +479,14 @@ apply_set_gsn_identifier(LibraryDocument& document, const std::string& element_i
 // did nothing.
 EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& element_id, bool undeveloped);
 
+// Set or clear an element's citation (SACM clause 8.2), the pair GSN's Modular
+// Extension builds its Away elements on (GSN3-MOD-003). An empty
+// `cited_element_id` clears both `isCitation` and `citedElement`. The library
+// owns the pair, so a citation written only into the projection is lost on save
+// and the away goal reloads as an ordinary local goal.
+EditOutcome
+apply_set_citation(LibraryDocument& document, const std::string& element_id, const std::string& cited_element_id);
+
 // Replace an AssertedRelationship's endpoints, mirroring the model write in
 // `core::DropRelationshipReference`. All three slots go together because the
 // clause-11.13 multiplicity spans them: source[1..*], target[1] -- exactly one.

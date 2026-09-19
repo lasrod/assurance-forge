@@ -75,6 +75,39 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
     return true;
 }
 
+bool ElementEditController::AddAwayGoal(AppRuntimeState& state,
+                                        const std::string& selected_id,
+                                        const std::string& cited_id) {
+    if (selected_id.empty()) {
+        events_.Emit(StatusMessageEvent{"No element selected."});
+        return false;
+    }
+    if (cited_id.empty()) {
+        events_.Emit(StatusMessageEvent{AF_TR("No away goal selected.")});
+        return false;
+    }
+    parser::AssuranceCase* model = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    if (!TryGetWorkingModel(state, "Add", events_, model, package))
+        return false;
+    (void)model;
+    (void)package;
+
+    core::commands::CreateAwayGoalCommand cmd(selected_id, cited_id);
+    const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
+    if (!outcome.success) {
+        events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
+        return false;
+    }
+
+    const std::string& new_id = cmd.GeneratedId();
+    events_.Emit(TreeDirtyEvent{});
+    events_.Emit(SelectionChangedEvent{new_id, true});
+    events_.Emit(DocumentDirtyEvent{});
+    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    return true;
+}
+
 bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
     parser::AssuranceCase* model = nullptr;
     sacm::AssuranceCasePackage* package = nullptr;

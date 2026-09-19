@@ -28,6 +28,33 @@ void RenderAddChildMenuItem(const parser::SacmElement* parent,
         ImGui::SetTooltip("%s", refusal.c_str());
 }
 
+// GSN v3 Modular Extension (GSN3-MOD-003): an Away Goal cites a goal defined
+// in another module. The menu offers the goals that can be cited rather than a
+// free-text id, because a citation that resolves to nothing is not an away
+// goal -- it is a goal claiming support from a module that does not have it.
+// Disabled, with no rows, when the selection has no other module to cite.
+void RenderAwayGoalMenu(const ElementContextActions& actions) {
+    const bool available = static_cast<bool>(actions.add_away_goal) && !actions.away_goal_candidates.empty();
+    if (!ImGui::BeginMenu(AF_TR("Away Goal").c_str(), available))
+        return;
+
+    std::string current_module;
+    for (const core::AwayGoalCandidate& candidate : actions.away_goal_candidates) {
+        // Candidates arrive sorted by module, so a change of module starts a
+        // new group. The module heading is what tells a reader which argument
+        // they are reaching into.
+        if (candidate.module_identifier != current_module) {
+            if (!current_module.empty())
+                ImGui::Separator();
+            current_module = candidate.module_identifier;
+            ImGui::TextDisabled("%s", current_module.c_str());
+        }
+        if (ImGui::MenuItem(candidate.label.c_str()))
+            actions.add_away_goal(candidate.id);
+    }
+    ImGui::EndMenu();
+}
+
 } // namespace
 
 void RenderAddElementMenu(const parser::AssuranceCase* active_case,
@@ -45,6 +72,7 @@ void RenderAddElementMenu(const parser::AssuranceCase* active_case,
         RenderAddChildMenuItem(parent, AF_TR("Context").c_str(), core::NewElementKind::Context, actions);
         RenderAddChildMenuItem(parent, AF_TR("Assumption").c_str(), core::NewElementKind::Assumption, actions);
         RenderAddChildMenuItem(parent, AF_TR("Justification").c_str(), core::NewElementKind::Justification, actions);
+        RenderAwayGoalMenu(actions);
         ImGui::Separator();
         if (ImGui::MenuItem(
                 AF_TR("ACP").c_str(), nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))

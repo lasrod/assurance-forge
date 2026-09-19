@@ -234,6 +234,7 @@ LayoutNode ConvertPlacedNode(const core::GsnLayoutNode& placed, const core::Tree
     ln.label_secondary = placed.label_secondary;
     ln.undeveloped = placed.undeveloped;
     ln.uninstantiated = placed.uninstantiated;
+    ln.away_module_identifier = placed.away_module_identifier;
     ln.size = ImVec2(static_cast<float>(placed.width), static_cast<float>(placed.height));
     ln.parent_id = placed.parent_id;
     ln.is_left_side = placed.is_left_side;
@@ -259,6 +260,7 @@ core::GsnLayoutInputNode MakeInputNode(const core::TreeNode& tn) {
     node.label_secondary = tn.label_secondary;
     node.undeveloped = tn.undeveloped;
     node.uninstantiated = tn.uninstantiated;
+    node.away_module_identifier = tn.away_module_identifier;
     // Counters are cluster roots reached only via their host's challenge_children,
     // so they never carry a structural parent in the layout input.
     node.parent_id = (tn.parent && !tn.is_counter_source) ? tn.parent->id : "";

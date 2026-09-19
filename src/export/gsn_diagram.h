@@ -5,6 +5,12 @@
 
 namespace export_gsn {
 
+// Height of the module compartment an Away Goal carries across the bottom of
+// its shape (GSN3-MOD-003). Shared, because the layout has to make room for it
+// and the writer draws it; if the two disagreed the goal's statement would run
+// under the divider and over the module name.
+inline constexpr double kAwayModuleCompartmentHeight = 24.0;
+
 enum class GsnNodeKind {
     Goal,
     Strategy,
@@ -42,6 +48,12 @@ struct GsnNode {
     bool uninstantiated = false;
     // Identifiers of Assurance Claim Points attached to this element.
     std::vector<std::string> acp_labels;
+
+    // GSN v3 Modular Extension (GSN3-MOD-003): non-empty only on an Away Goal,
+    // naming the module the goal is defined in. Drawn in a compartment across
+    // the bottom of the shape. The canvas is a separate renderer with its own
+    // model, so this field existing there does not put it here.
+    std::string away_module_identifier;
 
     // Where the evidence this node stands for is: the location recorded on the
     // Artifact/Resource the ArtifactReference cites. The projection copies it

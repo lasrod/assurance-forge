@@ -108,6 +108,16 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
         return ui::i18n::trf("{0} is marked undeveloped but is already supported. Either the decorator or "
                              "the support is out of date.",
                              finding.element_id);
+    case core::GsnRule::AwayGoalCitationUnresolved:
+        return ui::i18n::trf("{0} cites {1} as a goal proved in another module, but nothing in this case has "
+                             "that id. The goal reads as proved elsewhere and there is no elsewhere.",
+                             finding.element_id,
+                             finding.detail);
+    case core::GsnRule::AwayGoalDevelopedLocally:
+        return ui::i18n::trf("{0} is an away goal proved in module {1}, but it is also supported here. An away "
+                             "goal shows an argument made elsewhere; developing it here makes two.",
+                             finding.element_id,
+                             finding.detail);
     }
     return std::string();
 }
@@ -116,6 +126,13 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
 // stale undeveloped decorator is a warning, because the argument is still
 // well-formed — the diagram just no longer says what the author meant.
 core::ProblemSeverity SeverityFor(core::GsnRule rule) {
+    // A locally developed away goal is an error, not a stale decorator: the
+    // standard forbids it outright -- "Away goals cannot be (hierarchically)
+    // decomposed and further supported by sub-elements within the current
+    // argument module; rather, decomposition needs to occur within the
+    // referenced argument module" (GSN v2 Annex B1.3.1.1, unchanged in the v3
+    // change list). Severity follows the text, not a judgement about how bad
+    // the result looks.
     return rule == core::GsnRule::UndevelopedElementHasSupport ? core::ProblemSeverity::Warning
                                                                : core::ProblemSeverity::Error;
 }
@@ -141,6 +158,13 @@ const char* RepairLabelFor(core::GsnRule rule) {
         return "Renumber";
     case core::GsnRule::UndevelopedElementHasSupport:
         return "Clear decorator";
+    case core::GsnRule::AwayGoalCitationUnresolved:
+    case core::GsnRule::AwayGoalDevelopedLocally:
+        // No quick fix. Clearing the citation turns the away goal into an
+        // ordinary local goal that asserts what another module was carrying,
+        // and deleting the local support throws away an argument someone wrote.
+        // Both choices belong to a person.
+        return "";
     }
     return "";
 }

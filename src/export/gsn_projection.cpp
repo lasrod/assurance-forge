@@ -481,10 +481,26 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
         node.display_id = is_visible_terminology_context ? source_id : core::GsnIdentifierFor(element);
         node.source_gid = element.gid;
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
-        node.title = LanguageOrPrimary(element.name_langs, secondary_language, element.name);
-        node.text = TextFor(element, secondary_language);
+        // An away goal holds no statement of its own -- it IS the cited goal,
+        // read from this module -- so its text is resolved through the citation
+        // exactly as the canvas resolves it. Without this the export draws a
+        // node labelled "(no title)" where the argument has a claim.
+        const parser::SacmElement* away_text_source = nullptr;
+        if (core::IsAwayGoal(element)) {
+            for (const parser::SacmElement& candidate : model.elements) {
+                if (candidate.id == element.cited_element_id) {
+                    away_text_source = &candidate;
+                    break;
+                }
+            }
+        }
+        const parser::SacmElement& text_source = (away_text_source != nullptr) ? *away_text_source : element;
+
+        node.title = LanguageOrPrimary(text_source.name_langs, secondary_language, text_source.name);
+        node.text = TextFor(text_source, secondary_language);
         node.undeveloped = element.undeveloped;
         node.uninstantiated = element.is_abstract;
+        node.away_module_identifier = element.away_module_identifier;
         node.location = element.artifact_location;
         AttachAcpLabels(node.acp_labels, element_acp_labels, element.id, element.gid);
         if (node.title.empty() && node.text.empty()) {

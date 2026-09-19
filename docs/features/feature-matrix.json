@@ -610,10 +610,17 @@
       "id": "AF-MOD-003",
       "area": "MOD",
       "name": "Away Goal",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": ""
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/ui/gsn/gsn_shapes.cpp",
+        "src/export/svg_writer.cpp",
+        "src/core/problems/gsn_wellformedness.cpp"
+      ],
+      "tests": [
+        "tests/test_away_goal.cpp"
+      ],
+      "notes": "Cites a goal in another argument package, stored as SACM `isCitation` and `citedElement` and drawn with its source module by both renderers. See GSN3-MOD-003. Cites only goals in the same SACM file, and cannot be staged into a draft. The other Away elements remain planned."
     },
     {
       "id": "AF-MOD-004",

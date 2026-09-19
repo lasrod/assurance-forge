@@ -106,6 +106,22 @@ struct SacmElement {
     // element remains to be instantiated.
     bool is_abstract = false;
 
+    // SACMElement::isCitation and citedElement (clause 8.2). GSN's Modular
+    // Extension builds its Away elements on this pair: an Away Goal is a Claim
+    // that cites a Claim owned by another ArgumentPackage, which is the module
+    // it comes away from (docs/sacm/sacm-gsn-mapping.md, GSN3-MOD-003). Carried
+    // on the POD because both renderers must draw the citing element with its
+    // source module and neither can see the library document.
+    bool is_citation = false;
+    std::string cited_element_id;
+    // Identifier of the module this element is cited *away from*: the
+    // ArgumentPackage owning `cited_element_id`, when that package is not this
+    // element's own. Empty for a citation inside one module, which is not an
+    // away element. Resolved by whoever still knows package membership -- the
+    // projection, or the factory at create time -- because this case is flat
+    // and records none, so no renderer could work it out.
+    std::string away_module_identifier;
+
     // Multi-language maps: lang code -> text (e.g. "en" -> "...", "ja" -> "...")
     std::map<std::string, std::string> name_langs;
     std::map<std::string, std::string> description_langs;

@@ -276,17 +276,35 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         const std::string display_identifier = core::GsnIdentifierFor(element);
         node->undeveloped = element.undeveloped;
         node->uninstantiated = element.is_abstract;
+        node->away_module_identifier = element.away_module_identifier;
+
+        // An away goal carries no statement of its own. It IS the cited goal,
+        // read from this module, so the text is resolved through the citation
+        // rather than copied when it was created -- a copy would be a second
+        // place the same claim is written and the two would drift on the first
+        // edit. When the cited goal is not in this document the away element
+        // stands in: a module we cannot see should render blank, not wrong.
+        const parser::SacmElement* cited_source = nullptr;
+        if (core::IsAwayGoal(element)) {
+            for (const parser::SacmElement& candidate : ac.elements) {
+                if (candidate.id == element.cited_element_id) {
+                    cited_source = &candidate;
+                    break;
+                }
+            }
+        }
+        const parser::SacmElement& text_source = (cited_source != nullptr) ? *cited_source : element;
 
         // Build label: "ID: Name\nDetail"
         // Per SACM spec: Claim (11.11) and ArgumentReasoning (11.12) carry their primary
         // text in the dedicated 'content' field.  All other elements (Artifact, ArtifactReference,
         // etc.) inherit descriptive text from the SACMElement 'description' field.
         bool uses_content = (element.type == "claim" || element.type == "argumentreasoning");
-        std::string detail = uses_content ? element.content : element.description;
+        std::string detail = uses_content ? text_source.content : text_source.description;
         // The separator belongs to the name, not the identifier: an element with
         // no name yet must not render as "CG1: ", which reads as a broken node.
-        node->has_name = !element.name.empty();
-        node->label = node->has_name ? display_identifier + ": " + element.name : display_identifier;
+        node->has_name = !text_source.name.empty();
+        node->label = node->has_name ? display_identifier + ": " + text_source.name : display_identifier;
         if (!detail.empty()) {
             node->label += "\n" + detail;
         }
@@ -296,22 +314,23 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
             const std::string& sec_lang = secondary_language;
             std::string sec_detail;
             if (uses_content) {
-                auto cit = element.content_langs.find(sec_lang);
-                if (cit != element.content_langs.end() && !cit->second.empty()) {
+                auto cit = text_source.content_langs.find(sec_lang);
+                if (cit != text_source.content_langs.end() && !cit->second.empty()) {
                     sec_detail = cit->second;
                 } else {
-                    auto dit = element.description_langs.find(sec_lang);
+                    auto dit = text_source.description_langs.find(sec_lang);
                     sec_detail =
-                        (dit != element.description_langs.end() && !dit->second.empty()) ? dit->second : detail;
+                        (dit != text_source.description_langs.end() && !dit->second.empty()) ? dit->second : detail;
                 }
             } else {
-                auto dit = element.description_langs.find(sec_lang);
-                sec_detail = (dit != element.description_langs.end() && !dit->second.empty()) ? dit->second : detail;
+                auto dit = text_source.description_langs.find(sec_lang);
+                sec_detail =
+                    (dit != text_source.description_langs.end() && !dit->second.empty()) ? dit->second : detail;
             }
             // Use translated name if available, otherwise primary name
-            auto nit = element.name_langs.find(sec_lang);
+            auto nit = text_source.name_langs.find(sec_lang);
             const std::string& sec_name =
-                (nit != element.name_langs.end() && !nit->second.empty()) ? nit->second : element.name;
+                (nit != text_source.name_langs.end() && !nit->second.empty()) ? nit->second : text_source.name;
             node->has_name_secondary = !sec_name.empty();
             node->label_secondary =
                 node->has_name_secondary ? display_identifier + ": " + sec_name : display_identifier;

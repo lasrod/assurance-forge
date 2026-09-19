@@ -258,6 +258,22 @@ void WriteLinkMarker(std::ostringstream& out, const GsnNode& node) {
     out << "    </g>\n";
 }
 
+// GSN v3 Modular Extension (GSN3-MOD-003): an Away Goal names the module it is
+// defined in, in a compartment across the bottom of its shape. Drawn after the
+// node's own text so the divider and the module name stay legible; an away goal
+// exported without it is indistinguishable from a goal this module proves.
+void WriteAwayModuleCompartment(std::ostringstream& out, const GsnNode& node) {
+    if (node.away_module_identifier.empty())
+        return;
+    const double divider_y = node.y + node.height - kAwayModuleCompartmentHeight;
+    out << "    <line class=\"gsn-away-module-divider\" x1=\"" << node.x << "\" y1=\"" << divider_y << "\" x2=\""
+        << node.x + node.width << "\" y2=\"" << divider_y << "\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
+    out << "    <text class=\"gsn-away-module\" x=\"" << node.x + node.width / 2.0 << "\" y=\""
+        << divider_y + kAwayModuleCompartmentHeight * 0.68 << "\" text-anchor=\"middle\""
+        << " font-family=\"Arial, Helvetica, sans-serif\" font-size=\"12\" fill=\"black\">"
+        << EscapeXml(node.away_module_identifier) << "</text>\n";
+}
+
 void WriteNode(std::ostringstream& out, const GsnNode& node) {
     // A node whose evidence has a recorded location is a link: the whole node
     // is the click target, and the title is what a reader sees on hover.
@@ -312,6 +328,7 @@ void WriteNode(std::ostringstream& out, const GsnNode& node) {
         break;
     }
     }
+    WriteAwayModuleCompartment(out, node);
     WriteElementAbstractionMarker(out, node);
     WriteElementAcpBadge(out, node);
     WriteLinkMarker(out, node);

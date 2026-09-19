@@ -20,6 +20,10 @@ constexpr float kUndDiamondRadius = 24.0f;
 constexpr float kUndGap = 0.50f;
 constexpr float kDetailedNodeZoom = 0.70f;
 constexpr float kUndLabelZoom = 0.55f;
+constexpr float kAwayCompartmentHeight = 22.0f;
+constexpr float kAwayCompartmentFontSize = 11.0f;
+constexpr float kAwayCompartmentTextZoom = 0.45f;
+constexpr float kAwayCompartmentPadX = 6.0f;
 
 bool ShouldDrawShadows(float zoom) {
     return core::perf::GetPerfToggles().node_shadows && zoom >= kDetailedNodeZoom;
@@ -235,6 +239,44 @@ void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right
         }
     }
     draw_list->AddRect(top_left, bottom_right, OutlineColor(), rounding, 0, outline);
+}
+
+float AwayModuleCompartmentHeight(const GsnNode& node, float zoom) {
+    if (node.away_module_identifier.empty())
+        return 0.0f;
+    return DpiSize(kAwayCompartmentHeight) * zoom;
+}
+
+void DrawAwayModuleCompartment(
+    ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom, ImU32 ink) {
+    const float height = AwayModuleCompartmentHeight(node, zoom);
+    if (height <= 0.0f)
+        return;
+
+    const float divider_y = bottom_right.y - height;
+    draw_list->AddLine(
+        ImVec2(top_left.x, divider_y), ImVec2(bottom_right.x, divider_y), OutlineColor(), kOutlineThickness * zoom);
+
+    // Zoomed far out the identifier is illegible, but the divider alone still
+    // says this goal is defined elsewhere, which is the part that changes how
+    // the argument reads.
+    if (zoom < kAwayCompartmentTextZoom)
+        return;
+
+    ImFont* font = ImGui::GetFont();
+    if (font == nullptr)
+        return;
+    const float font_size = std::max(DpiSize(kAwayCompartmentFontSize) * zoom, 1.0f);
+    const char* text = node.away_module_identifier.c_str();
+    const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text);
+
+    const float pad_x = DpiSize(kAwayCompartmentPadX) * zoom;
+    const ImVec2 text_pos(std::max(top_left.x + pad_x, (top_left.x + bottom_right.x) * 0.5f - text_size.x * 0.5f),
+                          divider_y + (height - text_size.y) * 0.5f);
+    // Clipped to the compartment: a long module name must not spill past the
+    // shape, where it would read as text belonging to a neighbouring node.
+    const ImVec4 clip(top_left.x + pad_x, divider_y, bottom_right.x - pad_x, bottom_right.y);
+    draw_list->AddText(font, font_size, text_pos, ink, text, nullptr, 0.0f, &clip);
 }
 
 void DrawElementAbstractionMarker(

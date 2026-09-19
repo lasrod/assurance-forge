@@ -46,6 +46,20 @@ TEST(AuditDiff, CreateChildElementAddsElementAndRelationship) {
     EXPECT_TRUE(cs.added.count("AP1_AI1"));
 }
 
+TEST(AuditDiff, GSN3_MOD_003_CreateAwayGoalAddsGoalAndRelationship) {
+    auto tx = MakeTx(
+        1,
+        {MakeEvent(
+            "CreateAwayGoal",
+            {{"parent_id", "G1"}, {"cited_id", "G2"}, {"generated_id", "G7"}, {"generated_relationship_id", "R7"}})});
+    const auto cs = core::audit::ComputeChangeSet(tx);
+    // Without a case for this event, history showed an away goal appearing
+    // from nowhere: neither it nor its relationship was counted as added.
+    EXPECT_EQ(cs.added.size(), 2u);
+    EXPECT_TRUE(cs.added.count("G7"));
+    EXPECT_TRUE(cs.added.count("R7"));
+}
+
 TEST(AuditDiff, RemoveElementUsesDeletedIdsArray) {
     auto tx = MakeTx(1,
                      {MakeEvent("RemoveElement",

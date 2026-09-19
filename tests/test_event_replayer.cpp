@@ -32,6 +32,18 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
+// Two modules, so a goal in one can cite a goal in the other (GSN3-MOD-003).
+constexpr const char* kTwoModuleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2/Argumentation" id="AC1" name="Sample">
+  <argumentPackage id="AP1" name="Vehicle">
+    <claim id="G1" name="Top goal" content="The vehicle is safe."/>
+  </argumentPackage>
+  <argumentPackage id="AP2" name="Platform">
+    <claim id="G2" name="Platform goal" content="The platform is safe."/>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
+)";
+
 std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
     auto root = std::filesystem::temp_directory_path() /
                 ("af_replay_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
@@ -53,11 +65,11 @@ struct ProjectFixture {
     parser::AssuranceCase model;
 };
 
-ProjectFixture MakeFixture(const std::string& tag) {
+ProjectFixture MakeFixture(const std::string& tag, const char* sacm = kSampleSacm) {
     ProjectFixture f;
     const auto root = MakeTempProjectRoot(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
-    WriteFile(root / sacm_rel, kSampleSacm);
+    WriteFile(root / sacm_rel, sacm);
 
     f.project.id = "p";
     f.project.name = "Project";
@@ -76,7 +88,7 @@ ProjectFixture MakeFixture(const std::string& tag) {
     auto pkg = sacm::parse_sacm(f.sacm_abs.string());
     EXPECT_TRUE(pkg.has_value()) << (pkg.has_value() ? "" : pkg.error());
     f.package = std::move(pkg.value());
-    auto parsed = parser::parse_sacm_xml_string(kSampleSacm);
+    auto parsed = parser::parse_sacm_xml_string(sacm);
     EXPECT_TRUE(parsed.has_value()) << (parsed.has_value() ? "" : parsed.error());
     f.model = std::move(parsed.value());
     return f;
@@ -260,6 +272,41 @@ TEST(EventReplayer, StopsAtRequestedTransactionSequence) {
     }
     EXPECT_TRUE(has_a);
     EXPECT_FALSE(has_b);
+}
+
+TEST(EventReplayer, GSN3_MOD_003_ReplaysAnAwayGoalWithItsCitation) {
+    auto f = MakeFixture("away_goal", kTwoModuleSacm);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CreateAwayGoalCommand cmd("G1", "G2");
+    core::commands::CommandContext ctx{f.model, f.package};
+    auto live_result = bus->Execute(cmd, ctx, "tester");
+    ASSERT_TRUE(live_result.success) << live_result.error;
+
+    // Before this event had a replay case, restoring or verifying history
+    // stopped here with "Unknown event type".
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+
+    // The canonical hash covers citedElement, so a replay that recreated the
+    // goal without its citation would differ here.
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
+
+    const parser::SacmElement* away = nullptr;
+    for (const auto& e : replayed->model.elements) {
+        if (e.id == cmd.GeneratedId()) {
+            away = &e;
+            break;
+        }
+    }
+    ASSERT_NE(away, nullptr);
+    EXPECT_TRUE(away->is_citation);
+    EXPECT_EQ(away->cited_element_id, "G2");
 }
 
 TEST(EventReplayer, ReturnsErrorOnUnknownEventType) {

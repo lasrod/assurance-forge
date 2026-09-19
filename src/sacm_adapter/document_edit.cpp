@@ -1372,6 +1372,41 @@ EditOutcome apply_set_undeveloped(LibraryDocument& document, const std::string& 
         doc.apply(sacm::commands::SetAssertionDeclaration{.element = element, .declaration = target}));
 }
 
+EditOutcome
+apply_set_citation(LibraryDocument& document, const std::string& element_id, const std::string& cited_element_id) {
+    if (element_id.empty()) {
+        return EditOutcome{.supported = false};
+    }
+    sacm::model::Document& doc = LibraryDocumentAccess::mutable_document(document);
+    const sacm::model::ElementId element(element_id);
+    if (doc.find(element) == nullptr) {
+        EditOutcome outcome;
+        outcome.diagnostics.push_back(LoadDiagnostic{
+            .code = "SACM-CMD-002",
+            .severity = "error",
+            .message = "'" + element_id + "' is not in the document, so it cannot cite anything",
+        });
+        return outcome;
+    }
+
+    std::optional<sacm::model::ElementId> cited;
+    if (!cited_element_id.empty()) {
+        const sacm::model::ElementId target(cited_element_id);
+        if (doc.find(target) == nullptr) {
+            EditOutcome outcome;
+            outcome.diagnostics.push_back(LoadDiagnostic{
+                .code = "SACM-CMD-002",
+                .severity = "error",
+                .message = "'" + cited_element_id + "' is not in the document, so it cannot be cited",
+            });
+            return outcome;
+        }
+        cited = target;
+    }
+
+    return applied_outcome(doc.apply(sacm::commands::SetCitation{.element = element, .cited = cited}));
+}
+
 namespace {
 
 sacm::metadata::ElementKind to_element_kind(RelationshipKind kind) {

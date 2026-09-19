@@ -30,6 +30,18 @@ void DrawRoundedRect(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right
 void DrawElementAbstractionMarker(
     ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom);
 
+// GSN v3 Modular Extension (GSN3-MOD-003). An Away Goal names the module it is
+// defined in, in a compartment across the bottom of its shape. This returns the
+// height that compartment occupies, and 0 for a node that is not away, so a
+// caller can shrink the label area by it unconditionally.
+float AwayModuleCompartmentHeight(const GsnNode& node, float zoom);
+
+// Draw that compartment: a divider across the shape with the module identifier
+// under it. Without it an away goal looks like an ordinary goal, and a reader
+// has no way to tell that its support lives in another module -- or which.
+void DrawAwayModuleCompartment(
+    ImDrawList* draw_list, const GsnNode& node, ImVec2 top_left, ImVec2 bottom_right, float zoom, ImU32 ink);
+
 // Pulsing outline drawn around nodes that are inside the active review scope.
 void DrawReviewScopeHighlight(ImDrawList* draw_list, ImVec2 top_left, ImVec2 bottom_right, float zoom, bool primary);
 

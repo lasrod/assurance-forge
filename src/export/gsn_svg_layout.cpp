@@ -146,7 +146,12 @@ void ApplyNodeSize(GsnNode& node) {
         line_count = WrappedLineCount(node, width);
     }
 
-    const double required_height = static_cast<double>(line_count) * kTextLineHeight + kTextVerticalPadding;
+    double required_height = static_cast<double>(line_count) * kTextLineHeight + kTextVerticalPadding;
+    // An away goal gives the bottom of its shape to the module compartment, so
+    // the text needs that much more height or its last lines run under the
+    // divider (GSN3-MOD-003).
+    if (!node.away_module_identifier.empty())
+        required_height += kAwayModuleCompartmentHeight;
     node.width = width;
     node.height = std::max(limits.base_height, required_height);
 }

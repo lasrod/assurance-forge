@@ -22,6 +22,12 @@ void CopyCommonSacmFields(sacm::SacmElement& target, const parser::SacmElement& 
     target.name = source.name;
     target.description = source.description;
     target.isAbstract = source.is_abstract;
+    // isCitation/citedElement (clause 8.2) carry GSN's Away elements
+    // (GSN3-MOD-003). Every save and every canonical hash rebuilds the package
+    // through here, so leaving them out turned an away goal back into an
+    // ordinary local goal on its first round trip.
+    target.isCitation = source.is_citation;
+    target.citedElement = source.cited_element_id;
     target.name_ml.texts = source.name_langs;
     target.description_ml.texts = source.description_langs;
     if (target.name_ml.texts.empty() && !source.name.empty())

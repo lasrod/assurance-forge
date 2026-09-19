@@ -239,6 +239,19 @@ void extract_elements_recursive(pugi::xml_node node, AssuranceCase& assurance_ca
             element.content = child.attribute("content").as_string();
             element.gsn_identifier = tagged_value(child, core::kGsnIdentifierTagKey);
             element.is_abstract = read_bool_attr(child, "isAbstract", false);
+            // isCitation/citedElement (clause 8.2) carry GSN Away elements.
+            // citedElement may be an attribute or a child ref, the same two
+            // spellings the legacy SACM parser accepts.
+            element.is_citation = read_bool_attr(child, "isCitation", false);
+            element.cited_element_id = child.attribute("citedElement").as_string();
+            if (element.cited_element_id.empty()) {
+                for (pugi::xml_node ref_child : child.children()) {
+                    if (get_local_name(ref_child.name()) == "citedelement") {
+                        element.cited_element_id = get_ref(ref_child);
+                        break;
+                    }
+                }
+            }
             element.assertion_declaration = child.attribute("assertionDeclaration").as_string();
             if (local_name == "claim" || local_name == "argumentreasoning") {
                 element.undeveloped = read_bool_attr(child, "undeveloped", false);
