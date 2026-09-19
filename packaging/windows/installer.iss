@@ -45,8 +45,10 @@ Name: "app\languages"; Description: "{cm:CompLanguages}"; Types: custom; Flags: 
 Name: "samples"; Description: "{cm:CompSamples}"; Types: custom
 
 [Messages]
-english.WelcomeLabel2=Welcome! Let's get [name/ver] set up on your computer.%n%nAssurance Forge helps you build, review and navigate safety cases: GSN arguments that lay themselves out on the canvas, saved as SACM 2.3 files that stay yours. Your cases stay on your computer; nothing is sent anywhere unless you ask.%n%nThis is an early build and it is growing fast. We'd love to hear what you think at github.com/lasrod/assurance-forge.
-japanese.WelcomeLabel2=ようこそ！[name/ver] のセットアップを始めましょう。%n%nAssurance Forge は安全ケースの作成・レビュー・閲覧を支援します。GSN の議論はキャンバス上で自動的にレイアウトされ、SACM 2.3 ファイルとしてお手元に保存されます。ケースはお使いのコンピューターに留まり、あなたが求めない限りどこにも送信されません。%n%nこれは早期ビルドで、どんどん進化しています。ご意見を github.com/lasrod/assurance-forge でお待ちしています。
+english.WelcomeLabel2=Welcome! Let's get [name/ver] set up on your computer.%n%nAssurance Forge helps you build, review and navigate safety cases: GSN arguments that lay themselves out on the canvas, kept on your computer as SACM 2.3 files that stay yours.%n%nThis is an early build and it is growing fast. We'd love to hear what you think at github.com/lasrod/assurance-forge.
+japanese.WelcomeLabel2=ようこそ！[name/ver] のセットアップを始めましょう。%n%nAssurance Forge は安全ケースの作成・レビュー・閲覧を支援します。GSN の議論はキャンバス上で自動的にレイアウトされ、SACM 2.3 ファイルとしてお使いのコンピューターに保存されます。ファイルはずっとあなたのものです。%n%nこれは早期ビルドで、どんどん進化しています。ご意見を github.com/lasrod/assurance-forge でお待ちしています。
+english.SelectTasksLabel2=Almost there! Would you like a shortcut on your desktop as well?
+japanese.SelectTasksLabel2=あと少しです！デスクトップにもショートカットを作成しますか？
 english.SelectComponentsLabel2=Here is everything Assurance Forge brings along. The ticked and locked items are built in. AI features come on the next page.
 japanese.SelectComponentsLabel2=Assurance Forge に含まれる機能の一覧です。チェックが固定された項目は標準で組み込まれています。AI 機能は次のページで説明します。
 
@@ -81,33 +83,35 @@ japanese.TourPoints=•  自動でレイアウトされる GSN の議論を作�
 ; "AI assistance": two different things, side by side.
 english.AiCaption=AI assistance
 japanese.AiCaption=AI アシスタンス
-english.AiDescription=Two ways to use AI in Assurance Forge. Both are optional.
-japanese.AiDescription=Assurance Forge で AI を使う 2 つの方法です。どちらも任意です。
+english.AiDescription=Two ways to bring AI into your work. Both are optional: pick what suits you, or skip it for now.
+japanese.AiDescription=AI を作業に取り入れる 2 つの方法です。どちらも任意です。必要なものを選ぶか、今はスキップしてもかまいません。
 english.AiReviewHeading=Built-in AI review
 japanese.AiReviewHeading=組み込みの AI レビュー
-english.AiReviewText=Assurance Forge asks an AI model to review your argument against the Safety Case Core Guidelines. It uses your own API key for an OpenAI-compatible service, which you add later under Edit → Preferences → AI. Nothing to install now.
-japanese.AiReviewText=Assurance Forge が AI モデルに、Safety Case Core Guidelines に沿った議論のレビューを依頼します。OpenAI 互換サービスの API キーをご自身で用意し、あとで 編集 → 設定 → AI で登録してください。ここでインストールするものはありません。
+english.AiReviewText=A second pair of eyes on your argument: Assurance Forge asks an AI model to review it against the Safety Case Core Guidelines. Add your own API key for an OpenAI-compatible service whenever you're ready, under Edit → Preferences → AI. Nothing to install now.
+japanese.AiReviewText=議論にもう一つの視点を。Assurance Forge が AI モデルに、Safety Case Core Guidelines に沿ったレビューを依頼します。準備ができたら、OpenAI 互換サービスの API キーを 編集 → 設定 → AI で登録してください。ここでインストールするものはありません。
 english.AiMcpHeading=Your own AI assistant, connected over MCP
 japanese.AiMcpHeading=お使いの AI アシスタントを MCP で接続
-english.AiMcpText=Let Claude Code, Codex or another assistant read your case and propose changes, which you accept in the app. It runs on the assistant's own account, so it needs no API key here, and it sees nothing until you switch it on and allow it in the app.
-japanese.AiMcpText=Claude Code や Codex などのアシスタントがケースを読み、変更を提案します。提案はアプリの中であなたが承認します。アシスタント自身のアカウントで動くため、ここで API キーは不要です。アプリで有効にして許可するまで、何も見えません。
+english.AiMcpText=Already working with Claude Code, Codex or another assistant? Let it read your case and suggest changes, which you review and accept in the app. It runs on your assistant's own account, so no API key is needed here, and it only sees your case once you switch it on and allow it in the app.
+japanese.AiMcpText=Claude Code や Codex などのアシスタントをすでにお使いですか？ケースを読んで変更を提案させ、アプリの中で確認して承認できます。アシスタント自身のアカウントで動くため、ここで API キーは不要です。アプリで有効にして許可するまで、ケースは見えません。
 english.AiInstallMcp=Install the MCP server
 japanese.AiInstallMcp=MCP サーバーをインストールする
 english.AiConnect=Connect %1 to Assurance Forge
 japanese.AiConnect=%1 を Assurance Forge に接続する
-english.AiFooter=Assurance Forge is open source (MIT) and works with the AI provider you choose.
-japanese.AiFooter=Assurance Forge はオープンソース（MIT）で、お好きな AI プロバイダーと組み合わせて使えます。
+english.AiFooter=Assurance Forge is open source (MIT), and the choice of AI provider is always yours.
+japanese.AiFooter=Assurance Forge はオープンソース（MIT）です。AI プロバイダーは、いつでもあなたが選べます。
 
-english.FinishReady=You're all set! Assurance Forge is ready to go.
-japanese.FinishReady=準備が整いました！Assurance Forge をすぐにお使いいただけます。
-english.FinishSamples=New here? Choose Create Project from Existing SACM on the welcome screen and open one of the sample cases to look around.
-japanese.FinishSamples=はじめての方は、ウェルカム画面で「既存の SACM からプロジェクトを作成」を選び、サンプルを開いてみてください。
-english.FinishMcpConnected=%1 can now find Assurance Forge. When you want to share a case, switch on Edit → Preferences → MCP Server; the app asks you before any client reads a project.
-japanese.FinishMcpConnected=%1 から Assurance Forge を利用できるようになりました。ケースを共有するときは、編集 → 設定 → MCP サーバーで有効にしてください。クライアントがプロジェクトを読む前に、アプリが必ず確認します。
-english.FinishMcpManual=To connect an AI assistant later, copy its configuration from Edit → Preferences → MCP Server.
-japanese.FinishMcpManual=あとで AI アシスタントを接続するには、編集 → 設定 → MCP サーバーから構成をコピーしてください。
+english.FinishReady=You're all set! Assurance Forge is ready when you are. Thank you for trying it out.
+japanese.FinishReady=準備が整いました！Assurance Forge はいつでもお使いいただけます。お試しいただきありがとうございます。
+english.FinishSamples=New here? A good first step: choose Create Project from Existing SACM on the welcome screen and open one of the sample cases to look around.
+japanese.FinishSamples=はじめての方は、まずウェルカム画面で「既存の SACM からプロジェクトを作成」を選び、サンプルを開いてみてください。
+english.FinishMcpConnected=%1 is connected and can find Assurance Forge. Whenever you want to work on a case together, switch on Edit → Preferences → MCP Server; the app always asks you before a client reads a project.
+japanese.FinishMcpConnected=%1 が接続され、Assurance Forge を利用できるようになりました。一緒にケースに取り組むときは、編集 → 設定 → MCP サーバーで有効にしてください。クライアントがプロジェクトを読む前に、アプリが必ず確認します。
+english.FinishMcpManual=Want to bring in an AI assistant later? Its configuration is waiting under Edit → Preferences → MCP Server.
+japanese.FinishMcpManual=あとで AI アシスタントを加えたくなったら、編集 → 設定 → MCP サーバーに構成が用意されています。
 english.FinishMcpFailed=Connecting %1 did not work. You can connect it later from Edit → Preferences → MCP Server; the setup log in your Temp folder says what went wrong.
 japanese.FinishMcpFailed=%1 への接続に失敗しました。あとで 編集 → 設定 → MCP サーバー から接続できます。原因は Temp フォルダーのセットアップログに記録されています。
+english.FinishFeedback=Found a rough edge, or have an idea? We'd love to hear it at github.com/lasrod/assurance-forge.
+japanese.FinishFeedback=気になる点やアイデアがあれば、ぜひ github.com/lasrod/assurance-forge でお知らせください。
 english.ClientsBoth=%1 and %2
 japanese.ClientsBoth=%1 と %2
 english.OpenUserGuide=Open the user guide

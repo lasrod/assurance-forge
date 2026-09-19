@@ -399,6 +399,7 @@ begin
     Text := Text + #13#10#13#10 + FmtMessage(CustomMessage('FinishMcpFailed'), [ClientsFailed]);
   if ShouldInstallMcp() and (ClientsConnected = '') and (ClientsFailed = '') then
     Text := Text + #13#10#13#10 + CustomMessage('FinishMcpManual');
+  Text := Text + #13#10#13#10 + CustomMessage('FinishFeedback');
   WizardForm.FinishedLabel.Caption := Text;
   WizardForm.AdjustLabelHeight(WizardForm.FinishedLabel);
   WizardForm.RunList.Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(12);
