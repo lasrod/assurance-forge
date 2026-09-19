@@ -483,7 +483,7 @@
       "status": "planned",
       "evidence": [],
       "tests": [],
-      "notes": "Core GSN notation needed both for bounded diagrams/reports and for following argument structure across diagrams. Blocked on an open decision rather than queued for build: the decorator references another diagram, and no diagram construct exists in GSN Metamodel v2.2, in SACM 2.3, or in this tool. See GSN3-CORE-012 and docs/sacm/sacm-decisions-and-questions.md."
+      "notes": "Needed to split an SVG export for reports and printing across several files, marking where each continues. Decided in #454 as an export concern: nothing is stored in SACM and the canvas does not draw it. Not built yet. See GSN3-CORE-012."
     },
     {
       "id": "AF-PAT-001",

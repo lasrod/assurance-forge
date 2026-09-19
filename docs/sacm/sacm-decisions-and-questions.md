@@ -37,6 +37,7 @@ This document records the current project decisions for the SACM 2.3 library-fir
 | 29 | ArgumentPackage content homogeneity (clause 11.4) | **Enforced as an error, but a contained interface or binding does not trigger it.** Clause 11.4 says a package that nests ArgumentPackages "is only allowed to contain ArgumentPackages". Read literally that is unsatisfiable alongside clause 11.6, which requires an ArgumentPackageInterface to reside *inside* the package it describes — every non-empty package that declares an interface would be non-conformant by construction. The library therefore triggers 11.4 only on a nested *plain* ArgumentPackage. ([#334](https://github.com/lasrod/assurance-forge/issues/334)) |
 | 30 | Severity follows the clause's own modal verb | Where the specification says "must", or gives an OCL invariant, a violation is an **error**; where it says "should" with no OCL, a **warning**. This is why clause 8.2's abstractForm rules split three ways (the citing element's `isAbstract` is stated flatly → error; the referred element's `isAbstract` and its type are "should" → warning), and why clause 8.4's expression/content exclusivity is a warning while clause 10.10's OCL is an error. Flattening them all to error would report conformant-but-unidiomatic files as broken; flattening to warning would lose the distinction the specification itself draws. ([#335](https://github.com/lasrod/assurance-forge/issues/335)) |
 | 31 | Where the new clause checks live | The clause checks added for [#333](https://github.com/lasrod/assurance-forge/issues/333)/[#334](https://github.com/lasrod/assurance-forge/issues/334)/[#335](https://github.com/lasrod/assurance-forge/issues/335) are in `validate()`, **not** `validate_structure()`. `validate_structure` is asserted after every successful command in debug builds — it is the invariant every mutation must preserve — while these are constraints on document *content*, which a document can legitimately arrive violating. Putting them there would turn "this loaded file is non-conformant" into "this build aborts". The command layer keeps its existing generic ArgumentAsset end typing; it does not enforce the family-specific rules, so a client can still build a document validation will then flag. |
+| 32 | GSN off-diagram notation (GSN3-CORE-012, [#454](https://github.com/lasrod/assurance-forge/issues/454)) | **An SVG export concern, not model data.** The decorator marks where an export split across several SVG files continues; the "diagram" it names is that other file. Nothing is stored in SACM or the project, and the canvas, which shows the whole argument, does not draw it. It is not an `ArgumentPackage`: a package is a GSN Module, reached through an Away Goal, which cites within one SACM file. Decided 2026-09-19 by the maintainer, against the earlier recommendation to model an authored diagram: the standard describes fragments of one goal structure, which a split export is. |
 
 ## Non-negotiable boundary
 
@@ -100,31 +101,6 @@ Layout is outside the SACM library. Still decide in Assurance Forge:
 - Should external layout metadata be ignored, preserved separately, or visualized only in compatibility mode?
 
 Recommended initial answer: compute deterministic layout from SACM data and keep strict SACM files free of layout metadata.
-
-### What is a "diagram"? (GSN off-diagram notation, raised 2026-09-16)
-
-GSN v3 §1:2.2.20 makes the off-diagram decorator normative, and its payload is a
-reference to *another diagram*. Nothing defines a diagram: SACM 2.3 models argument
-content rather than its presentation, GSN Metamodel v2.2 predates the construct, and
-Assurance Forge partitions the canvas by `ArgumentPackage`, which is GSN's Module.
-Decision 19 above defers layout and representation, so the carrier is open. Still
-decide:
-
-- Is a diagram **authored** — a user creates it, names it, and assigns elements to it
-  — or **derived** from the graph, as the package tabs are today?
-- What stores diagram membership, given that strict SACM 2.3 output must stay free of
-  representation metadata? A vendor `TaggedValue` under clause 8.12 is legal but
-  private, and would repeat the interoperability problem the `assuranceForge.acp` tag
-  already has.
-- May one element appear on more than one diagram, as the standard's own figure shows?
-- Does a diagram nest inside an `ArgumentPackage`, cut across packages, or neither?
-
-Recommended initial answer: **do not equate a diagram with an `ArgumentPackage`.** It
-would answer a Core GSN requirement with the Modular extension's semantics and
-pre-empt the Away Goal work (`AF-MOD-003` to `AF-MOD-007`). Prefer an explicitly
-authored diagram stored outside the SACM document, and leave GSN3-CORE-012 `blocked`
-until one exists. The evidence is in `sacm-gsn-mapping.md`; the standards defect is
-gap row 14 in `sacm-gsn-metamodel-gaps.md`.
 
 ### Interoperability corpus
 

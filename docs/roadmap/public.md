@@ -90,7 +90,7 @@ disagree, the matrix wins.
 | Theme system refresh | Next | Move to a more consistent and extensible theming approach. |
 | AI review improvements | Next | Continue improving profile handling, review control, and feedback quality. |
 | SCCG workflow refinements | Next | Widen the mechanical checks that need judgement calibration, and improve usability in the review flow. |
-| Safety case report | Next / Later | Produce a report document from the case (`AF-ENG-004`); LaTeX and PDF below. Waits on the off-diagram decision behind `AF-GSN-013`, without which a report cannot show where a goal structure continues on another page. |
+| Safety case report | Next / Later | Produce a report document from the case (`AF-ENG-004`); LaTeX and PDF below. Needs off-diagram indicators in split SVG exports (`AF-GSN-013`) so a report can show where a goal structure continues on another page; decided, not yet built. |
 
 ## Long-Term Direction (Later)
 
