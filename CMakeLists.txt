@@ -188,6 +188,15 @@ if(NOT CURL_FOUND)
         set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)
         set(CURL_WINDOWS_SSPI ON CACHE BOOL "" FORCE)
     endif()
+    # curl links any zlib, libssh2 or libpsl it happens to find. On a machine
+    # with Strawberry Perl on PATH that is Strawberry's, and the resulting exe
+    # needs zlib1__.dll and libssh2-1__.dll at runtime -- DLLs no installer
+    # ships and no tester has. We use none of the three (no SCP/SFTP, no
+    # compressed transfers, no cookie public-suffix checks), so every build gets
+    # the same self-contained libcurl the CI runner produces.
+    set(CURL_ZLIB OFF CACHE STRING "" FORCE)
+    set(CURL_USE_LIBSSH2 OFF CACHE BOOL "" FORCE)
+    set(CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
         curl
         URL https://github.com/curl/curl/releases/download/curl-8_9_1/curl-8.9.1.tar.xz
