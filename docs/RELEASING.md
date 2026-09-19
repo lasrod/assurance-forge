@@ -132,8 +132,8 @@ To build a packaged zip without creating a GitHub Release, use **workflow_dispat
 ## Conformance evidence package
 
 Alongside the binaries, the Windows job generates
-`assurance-forge.<tag>-evidence-package.zip`, which the publish job attaches with
-the other packages, — the release-bound SACM 2.3
+`assurance-forge.<tag>-evidence-package.zip`, and the publish job attaches it
+with the other packages. It is the release-bound SACM 2.3
 conformance evidence required by
 [#295](https://github.com/lasrod/assurance-forge/issues/295): the frozen
 conformance matrix and decision pages, requirement-to-test traceability, the
