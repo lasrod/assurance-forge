@@ -544,6 +544,18 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
                 record_argument_package_membership(*argument_package, package_of_element, identifier_of_package);
             }
         }
+        // "The module identifier must uniquely identify an argument module"
+        // (GSN v2 2.5.2.6). A name two packages share identifies neither, so
+        // each of them falls back to its package id, which is unique.
+        std::unordered_map<std::string, int> identifier_uses;
+        for (const auto& entry : identifier_of_package) {
+            ++identifier_uses[entry.second];
+        }
+        for (auto& entry : identifier_of_package) {
+            if (identifier_uses[entry.second] > 1) {
+                entry.second = entry.first;
+            }
+        }
         for (core::SacmElement& element : projected.elements) {
             if (!element.is_citation || element.cited_element_id.empty()) {
                 continue;

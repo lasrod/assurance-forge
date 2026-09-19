@@ -864,12 +864,23 @@ bool AddTopGoalWithId(parser::AssuranceCase& ac,
 
 namespace {
 
-// GSN identifies a module by name; the package id is the fallback so an
-// unnamed package still draws something a reader can match to a package.
-std::string ArgumentPackageIdentifier(const sacm::ArgumentPackage* ap) {
+// GSN identifies a module by name, falling back to the package id for an
+// unnamed package. "The module identifier must uniquely identify an argument
+// module" (GSN v2 2.5.2.6), so a name another package also answers to names
+// neither of them and the id, unique by construction, is used instead.
+std::string ArgumentPackageIdentifier(const sacm::AssuranceCasePackage& pkg, const sacm::ArgumentPackage* ap) {
     if (!ap)
         return {};
-    return ap->name.empty() ? ap->id : ap->name;
+    if (ap->name.empty())
+        return ap->id;
+    for (const sacm::ArgumentPackage& other : pkg.argumentPackages) {
+        if (&other == ap)
+            continue;
+        const std::string& other_identifier = other.name.empty() ? other.id : other.name;
+        if (other_identifier == ap->name)
+            return ap->id;
+    }
+    return ap->name;
 }
 
 bool InstallAwayGoal(parser::AssuranceCase& ac,
@@ -928,7 +939,7 @@ std::string ResolveAwayModuleIdentifier(const sacm::AssuranceCasePackage* pkg,
     const sacm::ArgumentPackage* local_package = FindOwningArgumentPackageConst(pkg, local_anchor_id);
     if (local_package == cited_package)
         return {};
-    return ArgumentPackageIdentifier(cited_package);
+    return ArgumentPackageIdentifier(*pkg, cited_package);
 }
 
 bool IsAwayGoal(const parser::SacmElement& element) {

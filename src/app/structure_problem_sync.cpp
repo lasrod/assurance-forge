@@ -126,12 +126,15 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
 // stale undeveloped decorator is a warning, because the argument is still
 // well-formed — the diagram just no longer says what the author meant.
 core::ProblemSeverity SeverityFor(core::GsnRule rule) {
-    // A locally developed away goal joins the stale-decorator case: the
-    // structure is legal, but the diagram no longer says what the author meant.
-    // An unresolved citation stays an error -- it points at nothing.
-    return (rule == core::GsnRule::UndevelopedElementHasSupport || rule == core::GsnRule::AwayGoalDevelopedLocally)
-               ? core::ProblemSeverity::Warning
-               : core::ProblemSeverity::Error;
+    // A locally developed away goal is an error, not a stale decorator: the
+    // standard forbids it outright -- "Away goals cannot be (hierarchically)
+    // decomposed and further supported by sub-elements within the current
+    // argument module; rather, decomposition needs to occur within the
+    // referenced argument module" (GSN v2 Annex B1.3.1.1, unchanged in the v3
+    // change list). Severity follows the text, not a judgement about how bad
+    // the result looks.
+    return rule == core::GsnRule::UndevelopedElementHasSupport ? core::ProblemSeverity::Warning
+                                                               : core::ProblemSeverity::Error;
 }
 
 // The repair offered for each rule, as an English msgid the panel translates at

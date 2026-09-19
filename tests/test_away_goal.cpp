@@ -11,6 +11,8 @@
 // such module exists.
 
 #include "core/element_factory.h"
+#include "app/structure_problem_sync.h"
+#include "core/problems/problems_manager.h"
 #include "core/assurance_tree.h"
 #include "core/library_package_projection.h"
 #include "sacm_adapter/case_projection.h"
@@ -679,4 +681,83 @@ TEST(AwayGoalTest, GSN3_MOD_003_ResolvesModulesInADocumentRootedAtBarePackages) 
     const parser::SacmElement& away = RequireProjected(projected, "AG1");
     EXPECT_TRUE(away.is_citation);
     EXPECT_EQ(away.away_module_identifier, "Platform");
+}
+
+// --------------------------------------------------------------------------
+// GSN v2 Annex B, which the v3 change list leaves unchanged on both points:
+// an away goal is decomposed only in the module it comes from, and a module
+// identifier must identify one module.
+// --------------------------------------------------------------------------
+
+TEST(AwayGoalTest, GSN3_MOD_003_DevelopingAnAwayGoalLocallyIsAnError) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string new_id;
+    std::string relationship_id;
+    std::string error;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, "G1", "G2", new_id, relationship_id, error)) << error;
+    mc.ac.elements.push_back(MakeElement("Sn1", "artifactreference", "Local report"));
+    mc.ac.elements.push_back(MakeSupport("R9", "Sn1", new_id));
+
+    core::ProblemsManager problems;
+    app::SyncStructureProblems(problems, &mc.ac);
+
+    const core::ProblemItem* found = nullptr;
+    for (const core::ProblemItem& problem : problems.GetProblems()) {
+        if (problem.type == "AwayGoalDevelopedLocally")
+            found = &problem;
+    }
+    ASSERT_NE(found, nullptr);
+    // "Away goals cannot be (hierarchically) decomposed and further supported
+    // by sub-elements within the current argument module" is a prohibition, so
+    // it is reported as a violation of the notation, not as advice.
+    EXPECT_EQ(found->severity, core::ProblemSeverity::Error);
+    EXPECT_EQ(found->guideline_id, "GSN3-MOD-003");
+    EXPECT_EQ(found->element_id, new_id);
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_SharedModuleNameFallsBackToThePackageId) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    // Both packages now answer to "Vehicle", so the name identifies neither.
+    mc.pkg.argumentPackages.back().name = "Vehicle";
+
+    EXPECT_EQ(core::ResolveAwayModuleIdentifier(&mc.pkg, "G1", "G2"), "AP_Remote");
+}
+
+namespace {
+
+// Two packages that share a name, which SACM permits and GSN's module
+// identifier rule does not.
+constexpr std::string_view kSharedModuleNameCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:S="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0">
+  <S:AssuranceCasePackage xmi:id="acp_1">
+    <name content="Shared names"/>
+    <argumentPackage xmi:id="ap_vehicle">
+      <name content="Safety"/>
+      <argumentElement xsi:type="S:Claim" xmi:id="G1">
+        <name lang="en" content="The vehicle is acceptably safe."/>
+      </argumentElement>
+      <argumentElement xsi:type="S:Claim" xmi:id="AG1" isCitation="true" citedElement="G2"/>
+      <argumentElement xsi:type="S:AssertedInference" xmi:id="inf_1" source="AG1" target="G1"/>
+    </argumentPackage>
+    <argumentPackage xmi:id="ap_platform">
+      <name content="Safety"/>
+      <argumentElement xsi:type="S:Claim" xmi:id="G2">
+        <name lang="en" content="The platform is acceptably safe."/>
+      </argumentElement>
+    </argumentPackage>
+  </S:AssuranceCasePackage>
+</xmi:XMI>
+)";
+
+} // namespace
+
+TEST(AwayGoalTest, GSN3_MOD_003_LoadedModulesWithASharedNameAreNamedByPackageId) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kSharedModuleNameCase));
+
+    const parser::AssuranceCase projected = sacm_adapter::project_case(document);
+    const parser::SacmElement& away = RequireProjected(projected, "AG1");
+    // "Safety" would send a reader to either module; the package id sends them
+    // to the one the goal actually comes from.
+    EXPECT_EQ(away.away_module_identifier, "ap_platform");
 }
