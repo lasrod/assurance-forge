@@ -69,15 +69,6 @@ jobs:
         shell: bash
         run: bash scripts/fetch-sacm23-references.sh
 
-      - name: Configure CMake
-        run: ${{ matrix.configure }}
-
-      - name: Build (Release)
-        run: ${{ matrix.build }}
-
-      - name: Run tests
-        run: ${{ matrix.test }}
-
       - name: Determine package version
         id: version
         shell: bash
@@ -88,7 +79,63 @@ jobs:
             echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
+      # CPack's INNOSETUP generator needs ISCC at configure time. Installed only
+      # when the runner image does not already carry it.
+      - name: Install Inno Setup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Configure CMake
+        run: ${{ matrix.configure }} -DAF_PACKAGE_VERSION=${{ steps.version.outputs.version }}
+
+      - name: Build (Release)
+        run: ${{ matrix.build }}
+
+      - name: Run tests
+        run: ${{ matrix.test }}
+
+      # Windows packages come from the install() rules in cmake/packaging.cmake:
+      # one staging, turned into the portable zip and the per-user installer.
+      - name: Build packages (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: cpack --config build/CPackConfig.cmake -C Release -B package
+
+      # The build machine has DLLs a tester's may not (the VC++ runtime among
+      # them), so a package that runs here proves nothing. Check each package's
+      # imports resolve to Windows or to files it ships, and start the MCP
+      # server from it. The installer is installed silently for the current
+      # user, checked, and uninstalled again.
+      - name: Check packages (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.version.outputs.version }}"
+          $base = "assurance-forge.$version-${{ matrix.archive_suffix }}"
+
+          $unzipped = Join-Path $env:RUNNER_TEMP 'af-zip'
+          Expand-Archive "package/$base.zip" -DestinationPath $unzipped -Force
+          python tools/release/check_windows_package.py (Join-Path $unzipped $base) --run
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $installed = Join-Path $env:RUNNER_TEMP 'af-installed'
+          $setup = Start-Process "package/$base-setup.exe" -Wait -PassThru -ArgumentList `
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"$installed`""
+          if ($setup.ExitCode -ne 0) { throw "installer exited $($setup.ExitCode)" }
+          python tools/release/check_windows_package.py $installed --run
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $uninstall = Start-Process (Join-Path $installed 'unins000.exe') -Wait -PassThru -ArgumentList `
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          if ($uninstall.ExitCode -ne 0) { throw "uninstaller exited $($uninstall.ExitCode)" }
+
       - name: Stage package contents
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -145,15 +192,6 @@ jobs:
           path: package/assurance-forge.${{ steps.version.outputs.version }}-evidence-package.zip
           if-no-files-found: error
 
-      - name: Create archive (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $stage = "package/assurance-forge.$version"
-          $archive = "package/assurance-forge.$version-${{ matrix.archive_suffix }}.${{ matrix.archive_ext }}"
-          Compress-Archive -Path $stage -DestinationPath $archive -Force
-
       - name: Create archive (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -181,6 +219,14 @@ jobs:
           path: package/assurance-forge.${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}.${{ matrix.archive_ext }}
           if-no-files-found: error
 
+      - name: Upload installer artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: assurance-forge-${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}-setup
+          path: package/assurance-forge.${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}-setup.exe
+          if-no-files-found: error
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
@@ -198,4 +244,11 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: package/assurance-forge.${{ steps.version.outputs.version }}-evidence-package.zip
+          fail_on_unmatched_files: true
+
+      - name: Attach installer to Release (Windows)
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Windows'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: package/assurance-forge.${{ steps.version.outputs.version }}-${{ matrix.archive_suffix }}-setup.exe
           fail_on_unmatched_files: true

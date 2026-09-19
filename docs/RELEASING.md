@@ -24,12 +24,56 @@ Tags containing `-` are automatically marked as **prerelease** by the workflow.
 3. The `Release` workflow builds the project, packages a zip, and creates a GitHub Release named `assurance-forge <tag>` with the zip attached.
 4. Edit the Release on GitHub to add a description. The workflow leaves the body empty intentionally so the release notes can be written by hand.
 
-The release zip is named `assurance-forge.<tag>-windows-x64.zip` and contains:
+A Windows release carries two packages built from the same install layout:
 
-- `assurance-forge.exe`
-- `data/` (sample SACM files)
-- `README.md`
-- `LICENSE.md`
+- `assurance-forge.<tag>-windows-x64-setup.exe` — an Inno Setup installer. It
+  installs per user into `%LOCALAPPDATA%\Programs\Assurance Forge` without
+  administrator rights (an all-users install is offered to someone who can
+  elevate), adds a Start-menu shortcut, and upgrades an earlier install in place.
+- `assurance-forge.<tag>-windows-x64.zip` — the same files, to unzip and run.
+
+Both hold `assurance-forge.exe`, `assurance-forge-mcp.exe`, `assets/`, the SCCG
+catalogue in `data/sccg/dist/`, the sample SACM files in `data/`, the Visual C++
+runtime DLLs, `README.md` and `LICENSE.md`.
+
+### Where the layout is defined
+
+The Windows packages come from the `install()` rules in
+[`cmake/packaging.cmake`](https://github.com/lasrod/assurance-forge/blob/main/cmake/packaging.cmake)
+and CPack; a file the application needs at runtime is added there, not in the
+workflow. Linux and macOS archives are still staged by hand in the workflow.
+
+The workflow checks both Windows packages before publishing them, with
+`tools/release/check_windows_package.py`: every file the application looks for
+beside itself must be present, every DLL either executable imports must be part
+of Windows or shipped in the package, and `assurance-forge-mcp.exe --version`
+must start. The installer is installed silently, checked, and uninstalled. A
+package that runs on the build machine proves little, because the build machine
+has the Visual C++ runtime installed and a tester's machine may not.
+
+### Building the packages locally
+
+With [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed
+(`winget install JRSoftware.InnoSetup`):
+
+```bash
+cmake --preset default -DAF_PACKAGE_VERSION=0.2.0-alpha.3
+cmake --build --preset release
+cpack --config build/CPackConfig.cmake -C Release -B build/package
+python tools/release/check_windows_package.py <unzipped-or-installed-dir> --run
+```
+
+`AF_PACKAGE_VERSION` defaults to `0.0.0-dev`. It is written into the package
+names and the installer's displayed version; the Windows file-version resource
+takes only its numeric `major.minor.patch` part.
+
+### The packages are not code-signed
+
+Windows SmartScreen warns on first run (*More info → Run anyway*). Signing is
+deferred while the project is in alpha; the free SignPath Foundation programme
+for open-source projects is the likely route when it is added. The installer's
+`AppId` in `cmake/packaging.cmake` must never change: it is how a newer
+installer finds and upgrades the installed copy.
 
 ## Experimental builds (no release)
 
