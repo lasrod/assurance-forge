@@ -181,7 +181,12 @@ set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # --- libcurl ---
-find_package(CURL QUIET)
+# Windows always builds the fetched curl below. A system one -- Strawberry Perl
+# ships a libcurl -- would bring whatever optional DLLs it was built with into
+# the release package, which is what the options below exist to prevent.
+if(NOT WIN32)
+    find_package(CURL QUIET)
+endif()
 if(NOT CURL_FOUND)
     set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
     set(CURL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)

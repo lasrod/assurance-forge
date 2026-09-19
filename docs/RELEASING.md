@@ -78,9 +78,11 @@ that unticks it removes it); when Claude Code or Codex is on PATH, the page
 offers (unticked) to register the server with it at user scope, with no
 arguments. Silent installs take `/MCP=0` to leave the server out and
 `/CONNECT=claudecode,codex` to connect clients.
-It never touches an `assurance-forge` entry it did not create, records the ones
-it did in `HKCU\Software\Assurance Forge\Installer`, and removes only those on
-uninstall. Registration shares nothing by itself: the MCP consent gate in the
+It never touches an `assurance-forge` entry it did not create. It records the
+ones it did, with the server path each launches, in
+`HKCU\Software\Assurance Forge\Installer`, and on uninstall (or an upgrade that
+unticks the server) removes an entry only if the client still reports that path
+-- one the user has since edited or replaced is theirs, and stays. Registration shares nothing by itself: the MCP consent gate in the
 application still applies. The images are rendered from the application icon by
 `tools/release/render_installer_art.py`; rerun it after changing the icon or the
 theme colours. The [Setup] directives -- page flow, colours, light/dark mode --

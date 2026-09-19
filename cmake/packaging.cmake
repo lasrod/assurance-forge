@@ -100,6 +100,10 @@ set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/lasrod/assurance-forge")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Assurance Forge")
 # The installer's name is set per generator in packaging_project_config.cmake.
 set(CPACK_PACKAGE_FILE_NAME "assurance-forge.${AF_PACKAGE_VERSION}-windows-x64")
+# The zip unpacks into one folder of that name, which the release workflow's
+# package check expects. The ZIP generator's default already does this; stated
+# so a changed default cannot move the files out from under the check.
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/packaging_project_config.cmake")
 
 # Start-menu shortcut, and an optional (unchecked) desktop shortcut. The

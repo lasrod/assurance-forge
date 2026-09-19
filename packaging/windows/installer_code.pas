@@ -149,8 +149,9 @@ end;
   An "assurance-forge" server the client already has is left exactly as it is:
   it may be one the user configured by hand (a development build, a project
   argument), and an installer has no business overwriting that. Only a server
-  this installer added is recorded, and only a recorded one is removed again on
-  uninstall. An upgrade finds its own earlier entry and leaves it too. }
+  this installer added is recorded, with the path it launches, and only an
+  entry that still launches that path is removed again on uninstall. An upgrade
+  finds its own earlier entry and leaves it too. }
 function RegisterWithClient(const ClientPath, Scope, MarkerName: String): Boolean;
 begin
   if RunClient(ClientPath, 'mcp get ' + McpServerName) then
@@ -161,27 +162,60 @@ begin
   end;
   Result := RunClient(ClientPath, 'mcp add ' + Scope + McpServerName + ' -- "' + McpServerPath() + '"');
   if Result then
-    RegWriteDWordValue(HKA, InstallerRegistryKey, MarkerName, 1);
+    RegWriteStringValue(HKA, InstallerRegistryKey, MarkerName, McpServerPath());
 end;
 
-function WasRegistered(const MarkerName: String): Boolean;
+{ Whether the client's "assurance-forge" entry still launches ServerPath, the
+  server this installer registered. The user may have edited it, or removed it
+  and made their own under the same name since; either way it is theirs now. }
+function ClientEntryLaunches(const ClientPath, ServerPath: String): Boolean;
 var
-  Value: Cardinal;
+  Filename, Parameters, Text: String;
+  ResultCode, Line: Integer;
+  Output: TExecOutput;
 begin
-  Result := RegQueryDWordValue(HKA, InstallerRegistryKey, MarkerName, Value) and (Value = 1);
+  Result := False;
+  Parameters := 'mcp get ' + McpServerName;
+  if CompareText(ExtractFileExt(ClientPath), '.exe') = 0 then
+    Filename := ClientPath
+  else
+  begin
+    Filename := ExpandConstant('{cmd}');
+    Parameters := '/C ""' + ClientPath + '" ' + Parameters + '"';
+  end;
+  try
+    if not ExecAndCaptureOutput(Filename, Parameters, GetEnv('USERPROFILE'), SW_HIDE, ewWaitUntilTerminated,
+                                ResultCode, Output) or (ResultCode <> 0) then
+      Exit;
+  except
+    Log('Assurance Forge: ' + GetExceptionMessage());
+    Exit;
+  end;
+  Text := '';
+  for Line := 0 to GetArrayLength(Output.StdOut) - 1 do
+    Text := Text + Output.StdOut[Line] + #10;
+  { Clients print the path with either slash. }
+  StringChangeEx(Text, '/', '\', True);
+  Result := Pos(Lowercase(ServerPath), Lowercase(Text)) > 0;
 end;
 
-{ Removes the server from a client only if this installer added it, looking the
-  client up again now: it may have moved or gone since. }
+{ Removes the server from a client only if this installer added it and the
+  entry still launches the server it added. The client is looked up again now:
+  it may have moved or gone since. }
 procedure UnregisterClient(const Names, Scope, MarkerName: String);
 var
-  ClientPath: String;
+  ClientPath, ServerPath: String;
 begin
-  if not WasRegistered(MarkerName) then
+  if not RegQueryStringValue(HKA, InstallerRegistryKey, MarkerName, ServerPath) then
     Exit;
   ClientPath := FindOnPath(Names);
   if ClientPath <> '' then
-    RunClient(ClientPath, 'mcp remove ' + Scope + McpServerName);
+  begin
+    if ClientEntryLaunches(ClientPath, ServerPath) then
+      RunClient(ClientPath, 'mcp remove ' + Scope + McpServerName)
+    else
+      Log('Assurance Forge: the ' + McpServerName + ' entry no longer launches ' + ServerPath + '; leaving it');
+  end;
   RegDeleteValue(HKA, InstallerRegistryKey, MarkerName);
 end;
 

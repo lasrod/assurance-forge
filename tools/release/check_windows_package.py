@@ -24,12 +24,14 @@ import sys
 from pathlib import Path
 
 # Files the executables look for beside themselves. A package missing one
-# starts, then fails later: no fonts, no Japanese UI, no guideline review.
+# starts, then fails later: no fonts, no Japanese UI, no guideline review. The
+# fonts are the ones src/app/app_ui_bootstrap.cpp loads, plus HelloImGui's.
 REQUIRED_FILES = [
     "assurance-forge.exe",
     "assurance-forge-mcp.exe",
     "assets/app_settings/icon.png",
     "assets/fonts/NotoSansJP-Regular.otf",
+    "assets/fonts/NotoSansJP-Bold.otf",
     # HelloImGui's default assets, merged into the build's assets folder rather
     # than living in ours: the UI font and the icon fonts. A package without
     # them starts fine and shows "?" for every icon.
