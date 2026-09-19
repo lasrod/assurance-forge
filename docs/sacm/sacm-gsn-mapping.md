@@ -95,6 +95,7 @@ because `ArgumentReasoning` extends `ArgumentAsset`.
 | **Choice** / ChoiceNode | *none — preserved* | [N] | See below |
 | **AwayContext** | *none — preserved* | [G] | Contested; see below |
 | Choice "m of n" cardinality | *none* | [G] | GSN v3 concept, no metamodel exists |
+| **Off-diagram decorator** (v3 §1:2.2.20) | *none — an SVG export split, not model data* | [N] | Decided 2026-09-19; see below |
 | ACP, Challenge, Defeated (v3) | partial — see gap report | [G] | v3 has no published metamodel. Challenge/Defeat/ACP work on `Claim` and `AssertedRelationship` (both are `Assertion`s) but **not** on `Solution`, `Context` or `Strategy`, which extend `ArgumentAsset` directly and so have neither `metaClaim` nor `assertionDeclaration`. SACM 2.4 is removing both. See `sacm-gsn-metamodel-gaps.md`. |
 
 ### Context — undecidable by design
@@ -127,6 +128,39 @@ evidence on a 2-versus-2 split is not something to do silently.
 metamodel settles it, or if real files show the ambiguity actually costs us
 something. Recorded here so it is a standing decision rather than an oversight
 someone "fixes" later without the context.
+
+### Off-diagram — an export split, not model data (decided 2026-09-19)
+
+GSN v3 §1:2.2.20 makes an off-diagram decorator normative. The public v2→v3 changes
+deck (`https://scsc.uk/file/gc-main/GSNv2-to-v3_changes-1092.pdf`, 04/05/2021,
+slides 27–28) introduces it as *"'off diagram' notation to link separate diagrams
+that illustrate fragments of a goal structure"*, records §1:2.2.20 as an *"added
+normative part of the standard saying that off-diagram decorator need to be distinct
+from the GSN elements"*, and says the standard *"recommends a preferred off-diagram
+symbol"*. The accompanying figure draws the same goal `G5` twice, once as the bottom
+element of diagram y and once as the top element of diagram x, each occurrence
+labelled with the other diagram's name.
+
+*Fragments of a goal structure* is the reading that settles it: one argument, drawn in
+several pieces because it does not fit on one. **The decision (#454): off-diagram is an
+SVG export concern.** When an export is split across several SVG files, the decorator
+marks where each piece continues, and the "diagram" it names is the other file.
+
+- **Nothing is stored in SACM or the project.** SACM models argument content, not its
+  presentation, and has no diagram construct; this reading does not need one. The
+  model, authoring, validation and interchange columns of GSN3-CORE-012 are therefore
+  `n/a`, and only rendering remains.
+- **The canvas does not draw it.** It shows the whole argument and has no pages to
+  split. The decorator appears only in split exports, which is what report creation
+  (`AF-ENG-004`) needs.
+- **It is not an `ArgumentPackage`.** A package is a GSN **Module**, and a goal in
+  another module is reached through an Away Goal (GSN3-MOD-003), which cites within one
+  SACM file. Reading "diagram" as "package" would answer a Core requirement with the
+  Modular extension's semantics.
+
+GSN Metamodel v2.2 still has no class for the decorator (gap row 14 in
+`sacm-gsn-metamodel-gaps.md`), which matters to tools exchanging split diagrams and not
+to this one, since an export split is regenerated rather than exchanged.
 
 ## Attribute mappings for pure-SACM export
 

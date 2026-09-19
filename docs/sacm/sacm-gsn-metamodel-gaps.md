@@ -85,9 +85,10 @@ merely a GSN one, and it is the most consequential technical result here.
 | 11 | Architecture View symbols | **(c)** | Diagrammatic; lands in SACM 2.4 draft §15.3 (SACM24-78, -106) |
 | 12 | Element identifier now mandatory | **(b)** | Maps to `name`; needs only a multiplicity constraint |
 | 13 | Pattern Definition (v3 §1:3.4) | **(c)** | No GSN or SACM class |
+| 14 | **Off-diagram decorator** (v3 §1:2.2.20) | **(c)** | v3 introduces "off diagram" notation "to link separate diagrams that illustrate fragments of a goal structure", and §1:2.2.20 is an "added normative part of the standard" requiring the decorator be "distinct from the GSN elements". Its payload is a reference to another *diagram*, and neither GSN v2.2 nor SACM 2.3 defines any diagram, view or presentation construct for it to reference. Source: v2→v3 changes deck slides 27–28 |
 
 Rows 1–9 are verified against **GSN Community Standard v3 (May 2021)** directly.
-Rows 10–13 derive from the public v2→v3 changes deck and the v3 contents; they are
+Rows 10–14 derive from the public v2→v3 changes deck and the v3 contents; they are
 sound but were not traced to a specific normative clause.
 
 The two strongest items are rows 3 and 7, because in both cases GSN v3 *normatively
