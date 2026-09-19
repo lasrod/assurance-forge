@@ -2050,6 +2050,23 @@
         "tests/test_status_bar.cpp"
       ],
       "notes": "Saved and unsaved render as distinct labels plus a dot, never as the absence of one — an ambiguous save indicator is a trust problem when the artifact is a safety argument. Also the sink for `core::AppState::status_message`: roughly twenty call sites set it and, before this, only the SACM viewer panel rendered it, so most feedback (load warnings, save failures) was produced and discarded. Save state is reported from `AppState::has_unsaved_changes`, which the audited dispatch clears when `CommandResult::sacm_written` confirms the command bus wrote the file — before this, an autosaved edit stayed marked unsaved forever because the ~30 `DocumentDirtyEvent` emitters run after the dispatch and cannot know it was persisted. **Only command-bus edits autosave**; paths that bypass the bus mutate in memory and are genuinely unsaved until an explicit save, so the indicator is not a claim that every edit is persisted. No last-saved timestamp yet."
+    },
+    {
+      "id": "AF-PLAT-014",
+      "area": "PLAT",
+      "name": "Windows installer and portable zip",
+      "status": "prototype",
+      "evidence": [
+        "cmake/packaging.cmake",
+        "cmake/packaging_project_config.cmake",
+        "packaging/windows/installer.iss",
+        "packaging/windows/installer_code.pas",
+        ".github/workflows/release.yml"
+      ],
+      "tests": [
+        "tools/release/check_windows_package.py"
+      ],
+      "notes": "A per-user Inno Setup installer (no administrator rights; an all-users install is offered to someone who can elevate) and a portable zip, both built by CPack from one set of `install()` rules. Each holds the GUI, `assurance-forge-mcp`, the SCCG catalogue, the sample files and the Visual C++ runtime, which the zip before it did not ship -- a machine without the VC++ Redistributable could not start the released exe, and the MCP server was not in the release at all. The installer runs in English or Japanese, follows Windows' light or dark mode on the application's own colours, shows a screenshot and what the tool does on a first install, lists the built-in features (each a `supported` row here) ticked and locked, explains the built-in AI review (own API key) and the MCP server (own assistant) side by side on one page, makes the sample cases and the MCP server optional, offers to register the MCP server with Claude Code or Codex when either is on PATH (never touching an entry it did not create, and removing only its own on uninstall; the in-app consent gate still applies), upgrades an earlier install in place (skipping the folder page), offers the user guide after a first install and the release notes after an upgrade, and on uninstall asks whether to keep the user's settings and saved API key, defaulting to keep. The wizard's pages have not yet been reviewed on screen at every DPI and in both modes. The release workflow checks both packages before publishing: required files present, every imported DLL either part of Windows or shipped, and the MCP server starting from the package; the installer is installed silently, checked and uninstalled. **Prototype**: the packages are **not code-signed**, so SmartScreen warns on first run, and the file association for SACM files and an MSI for managed deployment are not built. Windows only; Linux and macOS releases remain hand-staged archives."
     }
   ]
 }

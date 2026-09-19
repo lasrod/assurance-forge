@@ -150,6 +150,10 @@ set(HELLOIMGUI_USE_FREETYPE OFF CACHE BOOL "" FORCE)
 set(HELLOIMGUI_USE_GLFW3 ON CACHE BOOL "" FORCE)
 set(HELLOIMGUI_HAS_OPENGL3 ON CACHE BOOL "" FORCE)
 set(HELLOIMGUI_USE_EXTERNAL_JSON ON CACHE BOOL "" FORCE)
+# hello_imgui_add_app would add its own install() rules for the exe and assets.
+# cmake/packaging.cmake describes the whole shipped layout instead, so there is
+# one place that says what a release contains.
+set(HELLOIMGUI_ADD_APP_WITH_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/hello_imgui)
 
 # hello_imgui sets CMAKE_CXX_STANDARD to 17 in its own top-level CMake,
@@ -177,7 +181,12 @@ set(ASSURANCE_FORGE_IMGUI_INCLUDE_DIRS
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # --- libcurl ---
-find_package(CURL QUIET)
+# Windows always builds the fetched curl below. A system one -- Strawberry Perl
+# ships a libcurl -- would bring whatever optional DLLs it was built with into
+# the release package, which is what the options below exist to prevent.
+if(NOT WIN32)
+    find_package(CURL QUIET)
+endif()
 if(NOT CURL_FOUND)
     set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
     set(CURL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
@@ -188,6 +197,15 @@ if(NOT CURL_FOUND)
         set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)
         set(CURL_WINDOWS_SSPI ON CACHE BOOL "" FORCE)
     endif()
+    # curl links any zlib, libssh2 or libpsl it happens to find. On a machine
+    # with Strawberry Perl on PATH that is Strawberry's, and the resulting exe
+    # needs zlib1__.dll and libssh2-1__.dll at runtime -- DLLs no installer
+    # ships and no tester has. We use none of the three (no SCP/SFTP, no
+    # compressed transfers, no cookie public-suffix checks), so every build gets
+    # the same self-contained libcurl the CI runner produces.
+    set(CURL_ZLIB OFF CACHE STRING "" FORCE)
+    set(CURL_USE_LIBSSH2 OFF CACHE BOOL "" FORCE)
+    set(CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
         curl
         URL https://github.com/curl/curl/releases/download/curl-8_9_1/curl-8.9.1.tar.xz
@@ -350,6 +368,9 @@ endif()
 # The harness reads the SCCG catalog from its own runtime directory, the same
 # way the GUI and the MCP server do.
 af_copy_sccg_data(af-sccg-review-eval)
+
+# --- Install layout and installers (Windows) ---
+include("${CMAKE_SOURCE_DIR}/cmake/packaging.cmake")
 
 # --- Localization catalogs (optional regeneration) ---
 # The Japanese .mo is committed and bundled as an asset, so normal builds need
@@ -678,6 +699,17 @@ if(Python3_Interpreter_FOUND)
         NAME feature_matrix_check
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/features/check_feature_matrix.py"
     )
+
+    # The release workflow trusts check_windows_package.py to say a package
+    # runs on a clean machine. An import reader that silently read nothing
+    # would pass every package, so its self-test runs with the other gates.
+    if(WIN32)
+        add_test(
+            NAME windows_package_checker_selftest
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/release/check_windows_package.py" --self-test
+        )
+        set_tests_properties(windows_package_checker_selftest PROPERTIES LABELS "gate")
+    endif()
 
     # Repository hygiene gate: fails if a captured build log, test output, CTest
     # working directory, generated file or scratch file is tracked by git.
