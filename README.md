@@ -142,8 +142,9 @@ Pre-built Windows binaries are published on the [Releases page](https://github.c
 **Installer (recommended).** Download `assurance-forge.<version>-windows-x64-setup.exe`
 and run it. It installs for your user account only, so it needs no administrator
 rights, adds Assurance Forge to the Start menu, and upgrades an earlier version in
-place. Uninstall from *Settings → Apps*; your settings in `%APPDATA%\AssuranceForge`
-are kept.
+place. It runs in English or Japanese and follows Windows' light or dark mode.
+Uninstall from *Settings → Apps*; it asks whether to keep your settings and saved
+API key, and keeps them unless you choose otherwise.
 
 **Portable zip.** Download `assurance-forge.<version>-windows-x64.zip`, unzip it
 anywhere, and run `assurance-forge.exe` from the extracted folder.

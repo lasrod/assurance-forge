@@ -79,15 +79,18 @@ jobs:
             echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
-      # CPack's INNOSETUP generator needs ISCC at configure time. Installed only
-      # when the runner image does not already carry it.
+      # CPack's INNOSETUP generator needs ISCC at configure time, and the
+      # installer script needs Inno Setup 6.6 or later (dark mode, background
+      # colours). Pinned rather than "whatever the image carries" so the
+      # installer a release ships does not change with the runner image;
+      # upgrade deliberately, after building the installer locally with the
+      # new version.
       - name: Install Inno Setup (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
-            choco install innosetup --no-progress -y
-          }
+          choco upgrade innosetup --version 6.7.1 --allow-downgrade -y --no-progress
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw "ISCC.exe not found after installing Inno Setup" }
 
       - name: Configure CMake
         run: ${{ matrix.configure }} -DAF_PACKAGE_VERSION=${{ steps.version.outputs.version }}

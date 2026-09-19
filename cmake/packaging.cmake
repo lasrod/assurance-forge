@@ -93,9 +93,10 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "Assurance Forge")
 set(CPACK_PACKAGE_FILE_NAME "assurance-forge.${AF_PACKAGE_VERSION}-windows-x64")
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/packaging_project_config.cmake")
 
-# Start-menu shortcut, and the "Launch Assurance Forge" box on the last page.
+# Start-menu shortcut, and an optional (unchecked) desktop shortcut. The
+# Finish page's launch box is in installer.iss, so it can come first.
 set(CPACK_PACKAGE_EXECUTABLES assurance-forge "Assurance Forge")
-set(CPACK_INNOSETUP_RUN_EXECUTABLES assurance-forge)
+set(CPACK_CREATE_DESKTOP_LINKS assurance-forge)
 # One shortcut does not need a folder of its own.
 set(CPACK_INNOSETUP_PROGRAM_MENU_FOLDER ".")
 
@@ -114,22 +115,78 @@ endif()
 set(CPACK_INNOSETUP_ARCHITECTURE x64)
 set(CPACK_INNOSETUP_USE_MODERN_WIZARD ON)
 set(CPACK_INNOSETUP_ICON_FILE "${CMAKE_SOURCE_DIR}/assets/app_settings/icon.ico")
+# The application's two UI languages. Setup follows Windows' language and asks
+# only when it matches neither.
 set(CPACK_INNOSETUP_LANGUAGES english japanese)
 # MIT asks for no acceptance; a license page would only be one more click.
 set(CPACK_INNOSETUP_IGNORE_LICENSE_PAGE ON)
 
+# The installer's own pages, words and actions (packaging/windows/). The
+# directives below need Inno Setup 6.6 or later: dark mode, background colours,
+# and the modern wizard's image sizes.
+set(AF_INSTALLER_DIR "${CMAKE_SOURCE_DIR}/packaging/windows")
+set(CPACK_INNOSETUP_EXTRA_SCRIPTS "${AF_INSTALLER_DIR}/installer.iss")
+set(CPACK_INNOSETUP_CODE_FILES "${AF_INSTALLER_DIR}/installer_code.pas")
+
 # Never change the AppId. It is how a newer installer finds the installed copy
 # and upgrades it in place rather than installing a second one beside it.
-set(CPACK_INNOSETUP_SETUP_AppId "{{7CF6066C-F278-421C-8938-4C75497F3BD8}")
+# installer_code.pas reads it too, to tell an upgrade from a first install.
+set(AF_INSTALLER_APP_GUID "7CF6066C-F278-421C-8938-4C75497F3BD8")
+set(CPACK_INNOSETUP_DEFINE_AfAppGuid "${AF_INSTALLER_APP_GUID}")
+set(CPACK_INNOSETUP_SETUP_AppId "{{${AF_INSTALLER_APP_GUID}}")
 set(CPACK_INNOSETUP_SETUP_AppVersion "${AF_PACKAGE_VERSION}")
+set(CPACK_INNOSETUP_SETUP_AppCopyright "Copyright (C) 2026 Jesper Brännström. MIT License.")
+set(CPACK_INNOSETUP_SETUP_AppSupportURL "https://github.com/lasrod/assurance-forge/issues")
+set(CPACK_INNOSETUP_SETUP_AppUpdatesURL "https://github.com/lasrod/assurance-forge/releases")
 set(CPACK_INNOSETUP_SETUP_VersionInfoVersion "${AF_PACKAGE_NUMERIC_VERSION}")
+set(CPACK_INNOSETUP_SETUP_VersionInfoProductName "Assurance Forge")
+set(CPACK_INNOSETUP_SETUP_VersionInfoProductTextVersion "${AF_PACKAGE_VERSION}")
+set(CPACK_INNOSETUP_SETUP_VersionInfoDescription "Assurance Forge Setup")
 set(CPACK_INNOSETUP_SETUP_UninstallDisplayIcon "{app}\\assurance-forge.exe")
+# The app ships no Universal CRT (see InstallRequiredSystemLibraries above), so
+# it needs the one Windows 10 and later include.
+set(CPACK_INNOSETUP_SETUP_MinVersion "10.0")
+# A log in %TEMP% (Setup Log <date>.txt) for a tester whose install went wrong.
+set(CPACK_INNOSETUP_SETUP_SetupLogging ON)
+
+# The finish page links. A tagged release has its own notes page; a dev build
+# does not, so it gets the list of releases.
+set(CPACK_INNOSETUP_DEFINE_AfUserGuideUrl "https://lasrod.github.io/assurance-forge/user-guide/")
+if(AF_PACKAGE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
+    set(CPACK_INNOSETUP_DEFINE_AfReleaseNotesUrl
+        "https://github.com/lasrod/assurance-forge/releases/tag/${AF_PACKAGE_VERSION}")
+else()
+    set(CPACK_INNOSETUP_DEFINE_AfReleaseNotesUrl "https://github.com/lasrod/assurance-forge/releases")
+endif()
+
+# Pages: Welcome, then the install folder on a first install only (an upgrade
+# goes where the last one went), the desktop-shortcut choice, and Finish. No
+# Ready page: with one checkbox before it, it only repeats what was just chosen.
+set(CPACK_INNOSETUP_SETUP_DisableWelcomePage OFF)
+set(CPACK_INNOSETUP_SETUP_DisableDirPage auto)
+set(CPACK_INNOSETUP_SETUP_DisableReadyPage ON)
+
+# Look: the modern wizard, following Windows' light or dark mode, on the
+# application's own background colours (src/ui/theme.cpp), with artwork from
+# tools/release/render_installer_art.py at every DPI size Inno Setup uses.
+set(CPACK_INNOSETUP_SETUP_WizardStyle "modern dynamic")
+set(CPACK_INNOSETUP_SETUP_WizardBackColor "#F5F7FA")
+set(CPACK_INNOSETUP_SETUP_WizardBackColorDynamicDark "#0B0F14")
+set(_af_wizard_images "")
+set(_af_wizard_small_images "")
+foreach(_af_dpi 100 125 150 175 200 225 250)
+    list(APPEND _af_wizard_images "${AF_INSTALLER_DIR}/art/wizard-${_af_dpi}.png")
+    list(APPEND _af_wizard_small_images "${AF_INSTALLER_DIR}/art/wizard-small-${_af_dpi}.png")
+endforeach()
+list(JOIN _af_wizard_images "," CPACK_INNOSETUP_SETUP_WizardImageFile)
+list(JOIN _af_wizard_small_images "," CPACK_INNOSETUP_SETUP_WizardSmallImageFile)
 # Per-user by default: installs into %LOCALAPPDATA%\Programs without admin
 # rights, which is what a tester on a managed laptop has. The dialog still
 # offers an all-users install to someone who can elevate.
 set(CPACK_INNOSETUP_SETUP_PrivilegesRequired lowest)
 set(CPACK_INNOSETUP_SETUP_PrivilegesRequiredOverridesAllowed "commandline dialog")
-# Settings in %APPDATA%\AssuranceForge are not the installer's files, so an
-# uninstall leaves them; a tester moving between builds keeps their setup.
+# Uninstall asks whether to keep the settings in %APPDATA%\AssuranceForge
+# (installer_code.pas), defaulting to keep: a tester moving between builds keeps
+# their setup, and a silent uninstall never removes it.
 
 include(CPack)

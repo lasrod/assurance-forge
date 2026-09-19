@@ -30,6 +30,7 @@ A Windows release carries two packages built from the same install layout:
   installs per user into `%LOCALAPPDATA%\Programs\Assurance Forge` without
   administrator rights (an all-users install is offered to someone who can
   elevate), adds a Start-menu shortcut, and upgrades an earlier install in place.
+  On uninstall it asks whether to keep the user's settings, defaulting to keep.
 - `assurance-forge.<tag>-windows-x64.zip` — the same files, to unzip and run.
 
 Both hold `assurance-forge.exe`, `assurance-forge-mcp.exe`, `assets/`, the SCCG
@@ -50,6 +51,22 @@ of Windows or shipped in the package, and `assurance-forge-mcp.exe --version`
 must start. The installer is installed silently, checked, and uninstalled. A
 package that runs on the build machine proves little, because the build machine
 has the Visual C++ runtime installed and a tester's machine may not.
+
+### The installer's pages and look
+
+`packaging/windows/` holds what CPack does not generate: `installer.iss` (the
+Welcome and Finish text in English and Japanese, and the Finish page's launch,
+user-guide and release-notes boxes), `installer_code.pas` (first install vs
+upgrade, and the keep-settings question on uninstall), and `art/`, the wizard
+images at each DPI size. The images are rendered from the application icon by
+`tools/release/render_installer_art.py`; rerun it after changing the icon or the
+theme colours. The [Setup] directives -- page flow, colours, light/dark mode --
+are in `cmake/packaging.cmake`.
+
+The script needs **Inno Setup 6.6 or later** and refuses to compile on an older
+one. The release workflow pins 6.7.1 so a release's installer does not change
+with the runner image; raise the pin deliberately, after building the installer
+locally with the new version.
 
 ### Building the packages locally
 
