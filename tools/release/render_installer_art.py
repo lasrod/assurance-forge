@@ -5,6 +5,7 @@ Writes packaging/windows/art/:
 
     wizard-<dpi>.png        the Welcome and Finish pages' side panel
     wizard-small-<dpi>.png  the top-right image on every other page
+    tour.png                the application itself, on the "A quick look" page
 
 at each DPI setting's exact image-area size for the modern wizard style of
 Inno Setup 6.6 and later, so Inno Setup never has to stretch one.
@@ -25,6 +26,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 REPO = Path(__file__).resolve().parents[2]
 ICON = REPO / "assets" / "app_settings" / "icon.png"
+SCREENSHOT = REPO / "docs" / "screenshot" / "dark.png"
 OUT = REPO / "packaging" / "windows" / "art"
 
 # Image-area sizes per DPI setting, from the WizardImageFile and
@@ -141,16 +143,30 @@ def render_small():
     return image
 
 
+def render_tour():
+    """The README's dark screenshot, sized for the wizard page (Setup scales it
+    down to fit), with rounded corners so it reads as a window on either the
+    light or the dark wizard background."""
+    shot = Image.open(SCREENSHOT).convert("RGBA")
+    width = 1000
+    shot = shot.resize((width, round(shot.height * width / shot.width)), Image.LANCZOS)
+    mask = Image.new("L", shot.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, shot.width - 1, shot.height - 1], radius=14, fill=255)
+    shot.putalpha(mask)
+    return shot
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     panel, small = render_panel(), render_small()
-    for old in OUT.glob("wizard*.png"):
+    for old in list(OUT.glob("wizard*.png")) + list(OUT.glob("tour*.png")):
         old.unlink()
     for dpi, size in PANEL_SIZES.items():
         panel.resize(size, Image.LANCZOS).save(OUT / f"wizard-{dpi}.png", optimize=True)
     for dpi, side in SMALL_SIZES.items():
         small.resize((side, side), Image.LANCZOS).save(OUT / f"wizard-small-{dpi}.png", optimize=True)
-    print(f"wrote {len(PANEL_SIZES) + len(SMALL_SIZES)} images to {OUT.relative_to(REPO)}")
+    render_tour().save(OUT / "tour.png", optimize=True)
+    print(f"wrote {len(PANEL_SIZES) + len(SMALL_SIZES) + 1} images to {OUT.relative_to(REPO)}")
 
 
 if __name__ == "__main__":

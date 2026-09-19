@@ -55,18 +55,29 @@ has the Visual C++ runtime installed and a tester's machine may not.
 ### The installer's pages and look
 
 `packaging/windows/` holds what CPack does not generate: `installer.iss` (the
-components page, the AI-assistant tasks, all the wizard text in English and
-Japanese, and the Finish page's launch, user-guide and release-notes boxes),
-`installer_code.pas` (first install vs upgrade, MCP client registration, the
-Finish text, and the keep-settings question on uninstall), and `art/`, the
-wizard images at each DPI size.
+components page and all the wizard text in English and Japanese, and the Finish
+page's launch, user-guide, examples and release-notes boxes),
+`installer_code.pas` (the "A quick look" and "AI assistance" pages, first
+install vs upgrade, MCP client registration, the Finish text, and the
+keep-settings question on uninstall), and `art/`, the wizard images at each DPI
+size and the tour page's screenshot.
 
-The components page lists the application's built-in features ticked and
-locked, so a new user sees what they are getting; **every feature named there
-must be a `supported` row in the capability matrix.** The sample cases and the
-MCP server are optional components; `cmake/packaging_project_config.cmake` ties
-their files to them. When Claude Code or Codex is on PATH, the installer offers
-(unticked) to register the MCP server with it at user scope, with no arguments.
+Pages, on a first install: Welcome, A quick look (a screenshot and what the
+tool does), the install folder, the components page (the built-in features
+ticked and locked, so a new user sees what they are getting, plus the optional
+sample cases), AI assistance, the desktop-shortcut choice, and Finish. An
+upgrade skips the tour and the folder page. **Every feature the installer names
+must be a `supported` row in the capability matrix.**
+
+The AI assistance page exists because the application has two kinds of AI that
+are easy to confuse: the built-in SCCG review, which needs the user's own API
+key and installs nothing, and the MCP server, which lets the user's own
+assistant work with the app and needs no key. The page shows them side by side.
+The MCP server is installed by default (remembered across upgrades; an upgrade
+that unticks it removes it); when Claude Code or Codex is on PATH, the page
+offers (unticked) to register the server with it at user scope, with no
+arguments. Silent installs take `/MCP=0` to leave the server out and
+`/CONNECT=claudecode,codex` to connect clients.
 It never touches an `assurance-forge` entry it did not create, records the ones
 it did in `HKCU\Software\Assurance Forge\Installer`, and removes only those on
 uninstall. Registration shares nothing by itself: the MCP consent gate in the

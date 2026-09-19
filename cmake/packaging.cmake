@@ -44,7 +44,16 @@ install(TARGETS assurance-forge assurance-forge-mcp
 )
 
 # Fonts, locale catalogues and the app icon. HelloImGui looks for them in an
-# `assets` folder beside the exe.
+# `assets` folder beside the exe. At build time hello_imgui_add_app merges its
+# own default assets into that folder -- DroidSans, the UI font, and Font
+# Awesome, every icon in the application -- so the package needs them too:
+# without them every icon renders as "?" and the text falls back to ImGui's
+# built-in font. Installed first so our own files win where names collide, as
+# they do in the build.
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/external/hello_imgui/hello_imgui_assets/"
+    DESTINATION assets
+    COMPONENT ${AF_RUNTIME_COMPONENT}
+)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/assets/"
     DESTINATION assets
     COMPONENT ${AF_RUNTIME_COMPONENT}
@@ -152,6 +161,9 @@ set(CPACK_INNOSETUP_SETUP_SetupLogging ON)
 # The finish page links. A tagged release has its own notes page; a dev build
 # does not, so it gets the list of releases.
 set(CPACK_INNOSETUP_DEFINE_AfUserGuideUrl "https://lasrod.github.io/assurance-forge/user-guide/")
+set(CPACK_INNOSETUP_DEFINE_AfExamplesUrl "https://github.com/lasrod/assurance-forge-examples")
+# installer.iss takes the tour page's screenshot from here.
+set(CPACK_INNOSETUP_DEFINE_AfInstallerArtDir "${AF_INSTALLER_DIR}/art")
 if(AF_PACKAGE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
     set(CPACK_INNOSETUP_DEFINE_AfReleaseNotesUrl
         "https://github.com/lasrod/assurance-forge/releases/tag/${AF_PACKAGE_VERSION}")

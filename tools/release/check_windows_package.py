@@ -30,6 +30,12 @@ REQUIRED_FILES = [
     "assurance-forge-mcp.exe",
     "assets/app_settings/icon.png",
     "assets/fonts/NotoSansJP-Regular.otf",
+    # HelloImGui's default assets, merged into the build's assets folder rather
+    # than living in ours: the UI font and the icon fonts. A package without
+    # them starts fine and shows "?" for every icon.
+    "assets/fonts/DroidSans.ttf",
+    "assets/fonts/Font_Awesome_6_Free-Solid-900.otf",
+    "assets/fonts/fontawesome-webfont.ttf",
     "assets/locale/ja/LC_MESSAGES/assurance_forge.mo",
     "data/sccg/dist/sccg.full.json",
 ]
