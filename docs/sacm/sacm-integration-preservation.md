@@ -350,7 +350,7 @@ Writing it found four losses nobody had measured:
 
 | Lost | Clause | What it means when it goes |
 |---|---|---|
-| `Claim@isCitation` + `@citedElement` | 8.2 | A citation of another package's claim becomes an original claim. The argument gains a proposition it never asserted. |
+| `Claim@isCitation` + `@citedElement` | 8.2 | A citation of another package's claim becomes an original claim. The argument gains a proposition it never asserted. **Carried since 2026-09-19**: GSN Away elements (GSN3-MOD-003) are built on this pair, and the field copier the package rebuild shares now copies it. |
 | `Claim@abstractForm` | 8.2 | A concrete element's link to the pattern element it instantiates. Pattern provenance is severed. |
 | `AssuranceCasePackage@gid` | 8.2 | SACM's model-global identifier on the case package — the handle other tools key on. |
 | `Expression@element` | 10.10 | The ExpressionElements a structured Expression is built from; the production rule is left naming things that resolve to nothing. |

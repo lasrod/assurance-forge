@@ -262,16 +262,14 @@ void WriteLinkMarker(std::ostringstream& out, const GsnNode& node) {
 // defined in, in a compartment across the bottom of its shape. Drawn after the
 // node's own text so the divider and the module name stay legible; an away goal
 // exported without it is indistinguishable from a goal this module proves.
-constexpr double kAwayCompartmentHeight = 24.0;
-
 void WriteAwayModuleCompartment(std::ostringstream& out, const GsnNode& node) {
     if (node.away_module_identifier.empty())
         return;
-    const double divider_y = node.y + node.height - kAwayCompartmentHeight;
+    const double divider_y = node.y + node.height - kAwayModuleCompartmentHeight;
     out << "    <line class=\"gsn-away-module-divider\" x1=\"" << node.x << "\" y1=\"" << divider_y << "\" x2=\""
         << node.x + node.width << "\" y2=\"" << divider_y << "\" stroke=\"black\" stroke-width=\"1.2\"/>\n";
     out << "    <text class=\"gsn-away-module\" x=\"" << node.x + node.width / 2.0 << "\" y=\""
-        << divider_y + kAwayCompartmentHeight * 0.68 << "\" text-anchor=\"middle\""
+        << divider_y + kAwayModuleCompartmentHeight * 0.68 << "\" text-anchor=\"middle\""
         << " font-family=\"Arial, Helvetica, sans-serif\" font-size=\"12\" fill=\"black\">"
         << EscapeXml(node.away_module_identifier) << "</text>\n";
 }

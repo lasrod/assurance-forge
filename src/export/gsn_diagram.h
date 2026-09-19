@@ -5,6 +5,12 @@
 
 namespace export_gsn {
 
+// Height of the module compartment an Away Goal carries across the bottom of
+// its shape (GSN3-MOD-003). Shared, because the layout has to make room for it
+// and the writer draws it; if the two disagreed the goal's statement would run
+// under the divider and over the module name.
+inline constexpr double kAwayModuleCompartmentHeight = 24.0;
+
 enum class GsnNodeKind {
     Goal,
     Strategy,

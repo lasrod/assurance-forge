@@ -106,18 +106,13 @@ const std::set<std::string>& KnownRejectedFixtures() {
 // The difference from the lost kinds matters and is stated on SACM23-LIB-002:
 // the bridge's guard sweeps ELEMENTS, so a document that would lose only
 // attributes is NOT refused -- it goes through, and the attribute is gone. That
-// is the silent half these four occupy, and closing it is bridge-retirement work
+// is the silent half these occupy, and closing it is bridge-retirement work
 // (issue #350), not a list entry.
 const std::set<std::string>& KnownLostAttributes() {
     static const std::set<std::string> attributes = {
         // clause 8.2. A concrete element's link to the abstract pattern element
         // it instantiates.
         "claim.abstractForm",
-        // clause 8.2. The pair that makes an element a CITATION of another
-        // rather than an assertion in its own right -- dropping them turns a
-        // reference into an original claim.
-        "claim.isCitation",
-        "claim.citedElement",
         // clause 8.2. SACM's model-global identifier on the case package. The
         // POD carries gid on elements but has no field for it on the package.
         "assurancecasepackage.gid",

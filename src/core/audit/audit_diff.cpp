@@ -25,6 +25,18 @@ void AddAddedFromEvent(const AuditEvent& event, AuditChangeSet& out) {
         return;
     }
 
+    // An away goal is a goal plus its SupportedBy relationship, exactly like a
+    // child element, so it is two additions (GSN3-MOD-003).
+    if (type == "CreateAwayGoal") {
+        auto element_it = payload.find("generated_id");
+        if (element_it != payload.end() && element_it->is_string())
+            out.added.insert(element_it->get<std::string>());
+        auto rel_it = payload.find("generated_relationship_id");
+        if (rel_it != payload.end() && rel_it->is_string())
+            out.added.insert(rel_it->get<std::string>());
+        return;
+    }
+
     if (type == "RemoveElement") {
         auto deleted_it = payload.find("deleted_ids");
         if (deleted_it != payload.end() && deleted_it->is_array()) {

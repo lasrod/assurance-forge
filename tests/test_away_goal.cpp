@@ -12,9 +12,13 @@
 
 #include "core/element_factory.h"
 #include "core/assurance_tree.h"
+#include "core/library_package_projection.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "core/problems/gsn_wellformedness.h"
 #include "export/gsn_projection.h"
 #include "export/svg_writer.h"
+#include "export/gsn_svg_layout.h"
 #include "core/commands/element_commands.h"
 #include "core/commands/command_bus.h"
 #include "core/audit/audit_event.h"
@@ -23,6 +27,7 @@
 
 #include <gtest/gtest.h>
 #include <memory>
+#include <string_view>
 
 namespace {
 
@@ -480,4 +485,198 @@ TEST(AwayGoalTest, GSN3_MOD_003_SaysNothingAboutAWellFormedAwayGoal) {
         EXPECT_NE(finding.rule, core::GsnRule::AwayGoalCitationUnresolved);
         EXPECT_NE(finding.rule, core::GsnRule::AwayGoalDevelopedLocally);
     }
+}
+
+// --------------------------------------------------------------------------
+// Round trip. The flat POD model is rebuilt into the legacy package on every
+// save and every canonical hash, so a citation dropped anywhere on that path
+// turns an away goal back into an ordinary local goal with no warning.
+// --------------------------------------------------------------------------
+
+namespace {
+
+// Two argument packages in one case. AG1 in "Vehicle" cites G2 in "Platform",
+// so it is an away goal; C1 in "Vehicle" cites G1 in its own package, so it is
+// a citation but not an away one.
+constexpr std::string_view kTwoModuleCitationCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:S="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0">
+  <S:AssuranceCasePackage xmi:id="acp_1">
+    <name content="Two module case"/>
+    <argumentPackage xmi:id="ap_vehicle">
+      <name content="Vehicle"/>
+      <argumentElement xsi:type="S:Claim" xmi:id="G1">
+        <name lang="en" content="The vehicle is acceptably safe."/>
+      </argumentElement>
+      <argumentElement xsi:type="S:Claim" xmi:id="AG1" isCitation="true" citedElement="G2"/>
+      <argumentElement xsi:type="S:Claim" xmi:id="C1" isCitation="true" citedElement="G1"/>
+      <argumentElement xsi:type="S:AssertedInference" xmi:id="inf_1" source="AG1" target="G1"/>
+    </argumentPackage>
+    <argumentPackage xmi:id="ap_platform">
+      <name content="Platform"/>
+      <argumentElement xsi:type="S:Claim" xmi:id="G2">
+        <name lang="en" content="The platform is acceptably safe."/>
+      </argumentElement>
+    </argumentPackage>
+  </S:AssuranceCasePackage>
+</xmi:XMI>
+)";
+
+const parser::SacmElement& RequireProjected(const parser::AssuranceCase& ac, const std::string& id) {
+    const parser::SacmElement* element = Find(ac, id);
+    if (element == nullptr) {
+        ADD_FAILURE() << "element " << id << " is missing from the projection";
+        static const parser::SacmElement empty;
+        return empty;
+    }
+    return *element;
+}
+
+} // namespace
+
+TEST(AwayGoalTest, GSN3_MOD_003_LoadResolvesOnlyTheCrossModuleCitationAsAway) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kTwoModuleCitationCase));
+
+    const parser::AssuranceCase projected = sacm_adapter::project_case(document);
+    const parser::SacmElement& away = RequireProjected(projected, "AG1");
+    EXPECT_TRUE(away.is_citation);
+    EXPECT_EQ(away.cited_element_id, "G2");
+    EXPECT_EQ(away.away_module_identifier, "Platform");
+    EXPECT_TRUE(core::IsAwayGoal(away));
+
+    // A citation inside one module is still a citation, but not an away goal.
+    const parser::SacmElement& local = RequireProjected(projected, "C1");
+    EXPECT_TRUE(local.is_citation);
+    EXPECT_TRUE(local.away_module_identifier.empty());
+    EXPECT_FALSE(core::IsAwayGoal(local));
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_AwayGoalSurvivesSaveAndReload) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kTwoModuleCitationCase));
+
+    // The application's save: the library document written as SACM XMI and
+    // read back. The module is re-resolved from the reloaded packages, so this
+    // also checks that the two modules are still two.
+    const sacm_adapter::SaveOutcome saved = sacm_adapter::save_document(document);
+    ASSERT_TRUE(saved.ok);
+    sacm_adapter::LibraryDocument reloaded;
+    ASSERT_TRUE(sacm_adapter::reload_document(reloaded, saved.xml));
+
+    const parser::AssuranceCase after = sacm_adapter::project_case(reloaded);
+    const parser::SacmElement& away = RequireProjected(after, "AG1");
+    EXPECT_TRUE(away.is_citation);
+    EXPECT_EQ(away.cited_element_id, "G2");
+    EXPECT_EQ(away.away_module_identifier, "Platform");
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_ApplicationPackageKeepsTheCitationInItsModule) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kTwoModuleCitationCase));
+
+    // The package the application keeps beside the library document, and saves
+    // from on the compatibility path. It is rebuilt from the flat model one
+    // package at a time; the claim copier it uses dropped the citation, so an
+    // away goal came back an ordinary local goal.
+    const sacm::AssuranceCasePackage package = core::project_library_package_with_tags(document);
+    const sacm::ArgumentPackage* vehicle = nullptr;
+    for (const sacm::ArgumentPackage& argument_package : package.argumentPackages) {
+        if (argument_package.id == "ap_vehicle")
+            vehicle = &argument_package;
+    }
+    ASSERT_NE(vehicle, nullptr);
+
+    const sacm::Claim* away = nullptr;
+    for (const sacm::Claim& claim : vehicle->claims) {
+        if (claim.id == "AG1")
+            away = &claim;
+    }
+    ASSERT_NE(away, nullptr) << "the away goal must stay in the module that cites";
+    EXPECT_TRUE(away->isCitation);
+    EXPECT_EQ(away->citedElement, "G2");
+}
+
+TEST(AwayGoalTest, GSN3_MOD_003_AuditProjectionCarriesTheCitation) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kTwoModuleCitationCase));
+
+    // The audit projection collapses packages by design -- it only has to agree
+    // with itself on both sides of the canonical hash -- so the module is not
+    // expected to survive it. The citation is: a hash that ignored it could not
+    // tell an away goal from a local one, and verification would pass over a
+    // change in what the argument rests on.
+    const sacm::AssuranceCasePackage package = core::project_library_package(document);
+    const sacm::Claim* away = FindClaim(package, "AG1");
+    ASSERT_NE(away, nullptr);
+    EXPECT_TRUE(away->isCitation);
+    EXPECT_EQ(away->citedElement, "G2");
+}
+
+// --------------------------------------------------------------------------
+// Review follow-ups: the exported shape has room for its compartment, and a
+// document rooted at bare argument packages still resolves its modules.
+// --------------------------------------------------------------------------
+
+TEST(AwayGoalTest, GSN3_MOD_003_SvgLayoutMakesRoomForTheModuleCompartment) {
+    // Two identical goals, one of them away. The away one must be taller by the
+    // compartment, or its statement's last line runs under the divider.
+    export_gsn::GsnDiagram diagram;
+    export_gsn::GsnNode local;
+    local.id = "G1";
+    local.display_id = "G1";
+    local.kind = export_gsn::GsnNodeKind::Goal;
+    local.title = "A goal whose statement is long enough to need several wrapped lines of text in the box";
+    export_gsn::GsnNode away = local;
+    away.id = "AG1";
+    away.display_id = "AG1";
+    away.away_module_identifier = "Platform";
+    diagram.nodes.push_back(local);
+    diagram.nodes.push_back(away);
+
+    export_gsn::LayoutGsnSvgDiagram(diagram);
+
+    double local_height = 0.0;
+    double away_height = 0.0;
+    for (const export_gsn::GsnNode& node : diagram.nodes) {
+        if (node.id == "G1")
+            local_height = node.height;
+        if (node.id == "AG1")
+            away_height = node.height;
+    }
+    ASSERT_GT(local_height, 0.0);
+    EXPECT_GE(away_height, local_height + export_gsn::kAwayModuleCompartmentHeight);
+}
+
+namespace {
+
+// Two bare ArgumentPackages as interchange roots, which SACM clause 2 permits.
+// They arrive in other_roots() rather than roots().
+constexpr std::string_view kBarePackageRootsCase = R"(<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:S="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmi:version="2.0">
+  <S:ArgumentPackage xmi:id="ap_vehicle">
+    <name content="Vehicle"/>
+    <argumentElement xsi:type="S:Claim" xmi:id="G1">
+      <name lang="en" content="The vehicle is acceptably safe."/>
+    </argumentElement>
+    <argumentElement xsi:type="S:Claim" xmi:id="AG1" isCitation="true" citedElement="G2"/>
+  </S:ArgumentPackage>
+  <S:ArgumentPackage xmi:id="ap_platform">
+    <name content="Platform"/>
+    <argumentElement xsi:type="S:Claim" xmi:id="G2">
+      <name lang="en" content="The platform is acceptably safe."/>
+    </argumentElement>
+  </S:ArgumentPackage>
+</xmi:XMI>
+)";
+
+} // namespace
+
+TEST(AwayGoalTest, GSN3_MOD_003_ResolvesModulesInADocumentRootedAtBarePackages) {
+    sacm_adapter::LibraryDocument document;
+    ASSERT_TRUE(sacm_adapter::reload_document(document, kBarePackageRootsCase));
+
+    const parser::AssuranceCase projected = sacm_adapter::project_case(document);
+    const parser::SacmElement& away = RequireProjected(projected, "AG1");
+    EXPECT_TRUE(away.is_citation);
+    EXPECT_EQ(away.away_module_identifier, "Platform");
 }

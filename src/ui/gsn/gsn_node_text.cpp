@@ -54,7 +54,7 @@ void ComputeTextRegion(const GsnNode& node,
 void DrawNodeLabel(ImDrawList* draw_list,
                    const GsnNode& node,
                    ImVec2 top_left,
-                   ImVec2 /*bottom_right*/,
+                   ImVec2 bottom_right,
                    float text_left,
                    float text_wrap,
                    float zoom,
@@ -84,7 +84,12 @@ void DrawNodeLabel(ImDrawList* draw_list,
         bold_text_size = bold_font->CalcTextSizeA(font_size, FLT_MAX, text_wrap, label_start, nullptr);
     }
 
-    float scaled_node_height = node.size.y * zoom;
+    // Center within the region the caller hands over rather than the whole
+    // node. For every ordinary node that region IS the whole node, so nothing
+    // moves; an Away Goal passes a region ending above its module compartment,
+    // and centering on the full height put the statement over the divider
+    // (GSN3-MOD-003).
+    float scaled_node_height = bottom_right.y - top_left.y;
     float total_text_height = bold_text_size.y + rest_text_size.y;
     float text_y = top_left.y + (scaled_node_height - total_text_height) * 0.5f;
     if (text_y < top_left.y + scaled_padding)

@@ -83,7 +83,7 @@ bool ElementEditController::AddAwayGoal(AppRuntimeState& state,
         return false;
     }
     if (cited_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No away goal selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No away goal selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;

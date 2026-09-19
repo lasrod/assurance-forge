@@ -443,16 +443,22 @@ namespace {
 // citations read across a module boundary, and the module is the
 // ArgumentPackage owning the cited element, so the question cannot be answered
 // once package membership has been flattened away.
+void record_argument_package_membership(const sacm::model::ArgumentPackage& argument_package,
+                                        std::unordered_map<std::string, std::string>& out_package_of_element,
+                                        std::unordered_map<std::string, std::string>& out_identifier_of_package) {
+    const std::string package_id = argument_package.id().value();
+    const std::string& name = argument_package.name().content;
+    out_identifier_of_package[package_id] = name.empty() ? package_id : name;
+    for (const auto& element : argument_package.argument_elements()) {
+        out_package_of_element[element->id().value()] = package_id;
+    }
+}
+
 void collect_argument_package_membership(const sacm::model::AssuranceCasePackage& case_package,
                                          std::unordered_map<std::string, std::string>& out_package_of_element,
                                          std::unordered_map<std::string, std::string>& out_identifier_of_package) {
     for (const auto& argument_package : case_package.argument_packages()) {
-        const std::string package_id = argument_package->id().value();
-        const std::string& name = argument_package->name().content;
-        out_identifier_of_package[package_id] = name.empty() ? package_id : name;
-        for (const auto& element : argument_package->argument_elements()) {
-            out_package_of_element[element->id().value()] = package_id;
-        }
+        record_argument_package_membership(*argument_package, out_package_of_element, out_identifier_of_package);
     }
     for (const auto& nested : case_package.assurance_case_packages()) {
         collect_argument_package_membership(*nested, out_package_of_element, out_identifier_of_package);
@@ -529,6 +535,14 @@ core::AssuranceCase project_case(const LibraryDocument& document) {
         std::unordered_map<std::string, std::string> identifier_of_package;
         for (const auto& case_root : source.roots()) {
             collect_argument_package_membership(*case_root, package_of_element, identifier_of_package);
+        }
+        // SACM clause 2 also permits a bare ArgumentPackage as an interchange
+        // root, and those arrive in other_roots(). Skipping them left a
+        // citation between two such packages drawn as a local goal.
+        for (const auto& other_root : source.other_roots()) {
+            if (const auto* argument_package = dynamic_cast<const sacm::model::ArgumentPackage*>(other_root.get())) {
+                record_argument_package_membership(*argument_package, package_of_element, identifier_of_package);
+            }
         }
         for (core::SacmElement& element : projected.elements) {
             if (!element.is_citation || element.cited_element_id.empty()) {

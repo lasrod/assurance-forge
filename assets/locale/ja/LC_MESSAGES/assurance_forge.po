@@ -1402,6 +1402,9 @@ msgstr "XML ファイルが見つかりません"
 msgid "No arguments yet."
 msgstr "議論はまだありません。"
 
+msgid "No away goal selected."
+msgstr "他モジュールの目標が選択されていません。"
+
 msgid "No categories"
 msgstr "分類なし"
 

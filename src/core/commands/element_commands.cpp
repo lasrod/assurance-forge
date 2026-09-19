@@ -359,10 +359,16 @@ bool CreateAwayGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_ev
             const sacm_adapter::EditOutcome citation =
                 sacm_adapter::apply_set_citation(*ctx.library_document, outcome.new_element_id, cited_id_);
             // A goal that reached the document without its citation is not an
-            // away goal, it is a duplicate claiming the cited goal's support.
-            // Refusing here rather than leaving it is the lesser wrong, and the
-            // bus rolls the document back with the command.
+            // away goal, it is an ordinary local goal claiming support nobody
+            // gave. The bus does not roll back a failed Apply, so undo the goal
+            // here: deleting it scrubs it out of its inference, which is then
+            // dropped for having no source.
             if (!citation.applied) {
+                (void)sacm_adapter::apply_delete_element(*ctx.library_document, outcome.new_element_id);
+                // The library was touched, so the live views have to be
+                // re-derived from it at the next frame boundary. The bus does
+                // that only for a command that says it went library-first.
+                ctx.library_primary = true;
                 out_error = LibraryRejection("the away goal citation", citation.diagnostics);
                 return false;
             }
