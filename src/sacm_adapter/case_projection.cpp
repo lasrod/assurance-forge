@@ -830,4 +830,24 @@ std::vector<ArgumentPackageShell> project_argument_package_shells(const LibraryD
     return result;
 }
 
+std::vector<ElementTaggedValue> tagged_values_with_prefix(const LibraryDocument& document,
+                                                          const std::string& key_prefix) {
+    std::vector<ElementTaggedValue> result;
+    LibraryDocumentAccess::document(document).for_each_element(
+        [&result, &key_prefix](const sacm::model::SACMElement& element) {
+            const auto* model_element = dynamic_cast<const sacm::model::ModelElement*>(&element);
+            if (model_element == nullptr) {
+                return;
+            }
+            for (const auto& tag : model_element->tagged_values()) {
+                const std::string_view key = tag->key().primary();
+                if (key.starts_with(key_prefix)) {
+                    result.push_back(ElementTaggedValue{
+                        model_element->id().value(), std::string(key), std::string(tag->content().primary())});
+                }
+            }
+        });
+    return result;
+}
+
 } // namespace sacm_adapter

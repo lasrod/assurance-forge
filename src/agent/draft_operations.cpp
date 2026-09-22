@@ -501,8 +501,23 @@ Result StageOntoDraftDocument(const DraftContext& context,
                               context.working_revision());
         }
     }
+    // Who is making this change travels with the elements it touches (ADR
+    // 0016), written in the same all-or-nothing batch as the change itself, so
+    // there is no window in which the draft holds an edit nobody is named for.
+    core::drafts::DraftProvenance provenance;
+    provenance.contribution_id = group_id;
+    provenance.source = core::drafts::DraftSource::Mcp;
+    if (const core::drafts::DraftWorkspace* workspace = context.store.workspace()) {
+        if (const core::drafts::DraftChangeGroup* group = workspace->FindGroup(group_id)) {
+            provenance.source = group->source;
+            provenance.label = group->source_label;
+            provenance.session_id = group->source_session_id;
+            provenance.title = group->title;
+            provenance.rationale = group->rationale;
+        }
+    }
     const core::drafts::DraftOperationResult applied = core::drafts::ApplyOperationsToDraftDocument(
-        *document.document(), operations, AnchorForOperations(arguments, operations));
+        *document.document(), operations, AnchorForOperations(arguments, operations), &provenance);
     if (!applied.applied) {
         // Positioned, because a client staging ten operations has to be told
         // which one to fix rather than re-send the batch blind. The batch is

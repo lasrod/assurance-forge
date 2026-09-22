@@ -16,6 +16,7 @@
 //
 // Ownership follows ADR 0008 unchanged: only the running application writes here.
 
+#include "core/drafts/draft_provenance.h" // kDraftProvenanceTagPrefix
 #include "core/sacm_model.h"
 #include "legacy_sacm/sacm_model.h"
 #include "sacm_adapter/library_load.h"
@@ -26,12 +27,6 @@
 #include <string>
 
 namespace core::drafts {
-
-// The TaggedValue key prefix every piece of draft provenance is filed under, and
-// the one `AcceptInto` strips. A single constant because the writer and the
-// stripper disagreeing would either lose provenance while a draft is open or
-// leak it into an accepted safety case.
-inline constexpr char kDraftProvenanceTagPrefix[] = "assuranceForge.draft.";
 
 // Where the draft for `argument_path` lives inside `project_root`.
 //

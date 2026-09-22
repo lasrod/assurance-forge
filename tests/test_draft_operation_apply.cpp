@@ -2,15 +2,19 @@
 
 #include "core/drafts/draft_document_diff.h"
 #include "core/drafts/draft_document_store.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/project_file_io.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <system_error>
+#include <vector>
 
 // Contributor operations applied straight to the draft document (ADR 0016).
 //
@@ -558,4 +562,202 @@ TEST(DraftOperationApplyTest, ATermWithADefinitionStillStages) {
     const core::SacmElement* term = Find(draft, result.created_ids.at("$alarp"));
     ASSERT_NE(term, nullptr);
     EXPECT_EQ(term->description, "As low as reasonably practicable.");
+}
+
+// ---------------------------------------------------------------------------
+// Provenance (ADR 0016, #409): who made a change is written onto the elements
+// the change touched, in the same all-or-nothing batch as the change.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+core::drafts::DraftProvenance McpProvenance(const std::string& group_id) {
+    core::drafts::DraftProvenance provenance;
+    provenance.contribution_id = group_id;
+    provenance.source = core::drafts::DraftSource::Mcp;
+    provenance.label = "Claude Code";
+    provenance.session_id = "session-7";
+    provenance.title = "Develop the top goal";
+    provenance.rationale = "The top goal had no support.";
+    return provenance;
+}
+
+core::drafts::DraftProvenance HumanProvenance(const std::string& author) {
+    core::drafts::DraftProvenance provenance;
+    provenance.contribution_id = core::drafts::HumanContributionId(author);
+    provenance.source = core::drafts::DraftSource::Human;
+    provenance.label = author;
+    return provenance;
+}
+
+const core::drafts::DraftContribution* FindContribution(const std::vector<core::drafts::DraftContribution>& all,
+                                                        const std::string& contribution_id) {
+    for (const core::drafts::DraftContribution& contribution : all) {
+        if (contribution.provenance.contribution_id == contribution_id)
+            return &contribution;
+    }
+    return nullptr;
+}
+
+std::string
+RelationshipBetween(const core::AssuranceCase& model, const std::string& source, const std::string& target) {
+    for (const core::SacmElement& element : model.elements) {
+        if (!element.source_refs.empty() && element.source_refs.front() == source && !element.target_refs.empty() &&
+            element.target_refs.front() == target)
+            return element.id;
+    }
+    return {};
+}
+
+} // namespace
+
+// The claim and the relationship attaching it are what the batch made. The goal
+// it was attached under did not change, so it is not this contribution's to
+// claim -- tagging it would name an agent as a contributor to an accepted goal
+// it never edited.
+TEST(DraftOperationApplyTest, ProvenanceIsWrittenOnExactlyWhatTheBatchAddedOrChanged) {
+    const std::unique_ptr<Fixture> f = MakeFixture("provenance_exact");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+    const core::drafts::DraftProvenance provenance = McpProvenance("group-1");
+
+    const core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+        *f->store.document(),
+        {Create(core::reviews::PatchOperationType::CreateClaim, "$sub", "Blade hazards are controlled."),
+         Supports(ByRef("$sub"), ById(top))},
+        top,
+        &provenance);
+    ASSERT_TRUE(result.applied) << result.error;
+    const std::string sub = result.created_ids.at("$sub");
+    const std::string link = RelationshipBetween(f->Draft(), sub, top);
+    ASSERT_FALSE(link.empty());
+
+    std::vector<std::string> expected{sub, link};
+    std::sort(expected.begin(), expected.end());
+    EXPECT_EQ(result.attributed_ids, expected);
+
+    const std::vector<core::drafts::DraftContribution> read = core::drafts::ReadDraftProvenance(*f->store.document());
+    ASSERT_EQ(read.size(), 1u);
+    const core::drafts::DraftProvenance& recorded = read.front().provenance;
+    EXPECT_EQ(recorded.contribution_id, "group-1");
+    EXPECT_EQ(recorded.source, core::drafts::DraftSource::Mcp);
+    EXPECT_EQ(recorded.label, "Claude Code");
+    EXPECT_EQ(recorded.session_id, "session-7");
+    EXPECT_EQ(recorded.title, "Develop the top goal");
+    EXPECT_EQ(recorded.rationale, "The top goal had no support.");
+    EXPECT_EQ(read.front().element_ids, expected);
+}
+
+// The reason the contribution is in the tag KEY. Had the second contributor
+// overwritten the first, the claim would read as the reviewer's alone, and the
+// agent that wrote it would vanish from the record of its own sentence.
+TEST(DraftOperationApplyTest, ASecondContributorToAnElementDoesNotEraseTheFirst) {
+    const std::unique_ptr<Fixture> f = MakeFixture("provenance_two");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+    const core::drafts::DraftProvenance agent = McpProvenance("group-1");
+    const core::drafts::DraftOperationResult created = core::drafts::ApplyOperationsToDraftDocument(
+        *f->store.document(),
+        {Create(core::reviews::PatchOperationType::CreateClaim, "$sub", "Blade hazards are controlled."),
+         Supports(ByRef("$sub"), ById(top))},
+        top,
+        &agent);
+    ASSERT_TRUE(created.applied) << created.error;
+    const std::string sub = created.created_ids.at("$sub");
+
+    const core::drafts::DraftProvenance reviewer = HumanProvenance("Ada");
+    const core::drafts::DraftOperationResult reworded = core::drafts::ApplyOperationsToDraftDocument(
+        *f->store.document(), {UpdateText(ById(sub), "content", "Blade hazards are fully controlled.")}, {}, &reviewer);
+    ASSERT_TRUE(reworded.applied) << reworded.error;
+    EXPECT_EQ(reworded.attributed_ids, std::vector<std::string>{sub})
+        << "the reword touched the claim only, not the relationship the agent made";
+
+    const std::vector<core::drafts::DraftContribution> read = core::drafts::ReadDraftProvenance(*f->store.document());
+    ASSERT_EQ(read.size(), 2u);
+    const core::drafts::DraftContribution* first = FindContribution(read, "group-1");
+    const core::drafts::DraftContribution* second = FindContribution(read, reviewer.contribution_id);
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(first->element_ids, created.attributed_ids) << "the agent keeps its record of everything it made";
+    EXPECT_EQ(second->element_ids, std::vector<std::string>{sub});
+    EXPECT_EQ(second->provenance.source, core::drafts::DraftSource::Human);
+    EXPECT_EQ(second->provenance.label, "Ada");
+}
+
+// The draft is written and re-read repeatedly over its life (ADR 0016), so
+// provenance that only lived in memory would be lost on the next project open.
+TEST(DraftOperationApplyTest, ProvenanceSurvivesSavingAndReopeningTheDraft) {
+    const std::unique_ptr<Fixture> f = MakeFixture("provenance_reopen");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+    const core::drafts::DraftProvenance provenance = McpProvenance("group-3");
+    const core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+        *f->store.document(), {UpdateText(ById(top), "content", "The blender is acceptably safe.")}, {}, &provenance);
+    ASSERT_TRUE(result.applied) << result.error;
+    f->store.MarkChanged();
+    std::string error;
+    ASSERT_TRUE(f->store.Save(error)) << error;
+
+    core::drafts::DraftDocumentStore reopened;
+    ASSERT_TRUE(reopened.Open(f->root, f->argument, *f->accepted, error)) << error;
+    ASSERT_TRUE(reopened.active());
+    const std::vector<core::drafts::DraftContribution> read = core::drafts::ReadDraftProvenance(*reopened.document());
+    ASSERT_EQ(read.size(), 1u);
+    EXPECT_EQ(read.front().provenance.contribution_id, "group-3");
+    EXPECT_EQ(read.front().provenance.rationale, "The top goal had no support.");
+    EXPECT_EQ(read.front().element_ids, std::vector<std::string>{top});
+}
+
+// Provenance is written inside the batch's copy, so a contribution that cannot
+// be named refuses the whole batch. The alternative -- landing the change
+// unattributed -- is the state this design exists to make impossible.
+TEST(DraftOperationApplyTest, ABatchWhoseProvenanceCannotBeRecordedIsRefusedWhole) {
+    const std::unique_ptr<Fixture> f = MakeFixture("provenance_refused");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+    const std::size_t before = f->Draft().elements.size();
+
+    const core::drafts::DraftProvenance provenance = McpProvenance("group.1");
+    const core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+        *f->store.document(),
+        {Create(core::reviews::PatchOperationType::CreateClaim, "$sub", "Blade hazards are controlled."),
+         Supports(ByRef("$sub"), ById(top))},
+        top,
+        &provenance);
+
+    EXPECT_FALSE(result.applied);
+    EXPECT_FALSE(result.error.empty());
+    EXPECT_TRUE(result.created_ids.empty());
+    EXPECT_TRUE(result.attributed_ids.empty());
+    EXPECT_EQ(f->Draft().elements.size(), before) << "nothing from the refused batch may remain in the draft";
+    EXPECT_TRUE(core::drafts::ReadDraftProvenance(*f->store.document()).empty());
+}
+
+// End to end against the real strip: the tags the applier writes are under the
+// prefix accept removes. A writer and stripper that disagreed would leak draft
+// provenance into an accepted safety case.
+TEST(DraftOperationApplyTest, AcceptStripsTheProvenanceTheApplierWrote) {
+    const std::unique_ptr<Fixture> f = MakeFixture("provenance_accept");
+    ASSERT_NE(f, nullptr);
+    const std::string top = FirstClaimId(*f->store.document());
+    const core::drafts::DraftProvenance provenance = McpProvenance("group-1");
+    const core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+        *f->store.document(), {UpdateText(ById(top), "content", "The blender is acceptably safe.")}, {}, &provenance);
+    ASSERT_TRUE(result.applied) << result.error;
+    ASSERT_FALSE(core::drafts::ReadDraftProvenance(*f->store.document()).empty());
+    f->store.MarkChanged();
+
+    std::string error;
+    ASSERT_TRUE(f->store.AcceptInto(f->argument, error)) << error;
+    const std::expected<std::string, std::string> written = core::ReadTextFile(f->argument);
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(written->find(core::drafts::kDraftProvenanceTagPrefix), std::string::npos);
+    EXPECT_NE(written->find("The blender is acceptably safe."), std::string::npos);
+}
+
+TEST(DraftOperationApplyTest, HandEditsFromOnePersonShareOneContribution) {
+    EXPECT_EQ(core::drafts::HumanContributionId("Ada"), core::drafts::HumanContributionId("Ada"));
+    EXPECT_NE(core::drafts::HumanContributionId("Ada"), core::drafts::HumanContributionId("Grace"));
+    EXPECT_EQ(core::drafts::HumanContributionId("Ada.Lovelace").find('.'), std::string::npos)
+        << "a name with a dot must still produce a usable key segment";
 }

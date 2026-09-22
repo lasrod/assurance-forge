@@ -1,6 +1,7 @@
 #include "core/drafts/draft_operation_apply.h"
 
 #include "core/cse_attributes.h"
+#include "core/drafts/draft_document_diff.h"
 #include "core/evidence_attributes.h"
 
 #include "core/sacm_model.h"
@@ -823,7 +824,8 @@ bool Applier::Apply(const PatchOperation& operation, std::string& error) {
 
 DraftOperationResult ApplyOperationsToDraftDocument(sacm_adapter::LibraryDocument& document,
                                                     const std::vector<reviews::PatchOperation>& operations,
-                                                    const std::string& anchor_element_id) {
+                                                    const std::string& anchor_element_id,
+                                                    const DraftProvenance* provenance) {
     DraftOperationResult result;
     if (operations.empty()) {
         result.error = "There are no operations to apply.";
@@ -861,10 +863,30 @@ DraftOperationResult ApplyOperationsToDraftDocument(sacm_adapter::LibraryDocumen
         }
     }
 
+    if (provenance != nullptr) {
+        // Against the draft as it stood before this batch, not against the
+        // accepted argument: an element another contributor added earlier and
+        // this batch left alone is not this contribution's to claim.
+        const DraftDocumentDiff touched =
+            DiffAcceptedAgainstDraft(sacm_adapter::project_case(document), sacm_adapter::project_case(scratch));
+        for (const DraftDocumentChange& change : touched.changes) {
+            if (change.change == DraftElementChange::Added || change.change == DraftElementChange::Modified)
+                result.attributed_ids.push_back(change.element_id);
+        }
+        std::string error;
+        if (!WriteDraftProvenance(scratch, result.attributed_ids, *provenance, error)) {
+            result.error = error;
+            result.created_ids.clear();
+            result.attributed_ids.clear();
+            return result;
+        }
+    }
+
     const sacm_adapter::SaveOutcome edited = sacm_adapter::save_document(scratch);
     if (!edited.ok || !sacm_adapter::reload_document(document, edited.xml)) {
         result.error = "The edited working draft could not be stored.";
         result.created_ids.clear();
+        result.attributed_ids.clear();
         return result;
     }
     result.applied = true;

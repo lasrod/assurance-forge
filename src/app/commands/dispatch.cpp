@@ -166,8 +166,15 @@ DraftEditOutcome DispatchDraftDocumentEdit(AppRuntimeState& state,
         return outcome;
     }
 
+    // Named the same way the legacy hand-edit group is, so a reviewer who has
+    // not set a name reads as "You" in either store.
+    core::drafts::DraftProvenance provenance;
+    provenance.source = core::drafts::DraftSource::Human;
+    provenance.label = state.reviewer_name.empty() ? std::string("You") : state.reviewer_name;
+    provenance.contribution_id = core::drafts::HumanContributionId(provenance.label);
+
     const core::drafts::DraftOperationResult applied =
-        core::drafts::ApplyOperationsToDraftDocument(*state.draft_document.document(), operations);
+        core::drafts::ApplyOperationsToDraftDocument(*state.draft_document.document(), operations, {}, &provenance);
     if (!applied.applied) {
         outcome.error = applied.error;
         return outcome;

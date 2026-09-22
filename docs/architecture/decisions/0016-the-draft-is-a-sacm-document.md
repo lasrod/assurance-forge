@@ -166,6 +166,20 @@ the accepted document. That transformation is a pure function over the document
 and is the one deviation from a byte-for-byte copy; it is deterministic,
 testable, and cannot partially apply because the result is written once.
 
+Implemented (#409) in `core/drafts/draft_provenance.h` as one tag per field per
+contribution: `assuranceForge.draft.<contribution>.<field>`, with fields
+`source`, `label`, `session`, `title` and `rationale`. The contribution is in the
+key so that two contributors to one element each keep their record; an MCP
+contribution is its change-group id, and hand edits are one contribution per
+reviewer name. The tags are written inside the batch's all-or-nothing copy, on
+exactly the elements the draft comparison reports as added or modified by that
+batch, so a batch whose provenance cannot be recorded is refused rather than
+landing unattributed. MCP staging and the user's draft edits write them. SCCG
+review suggestions do not yet, because they do not yet reach the draft document.
+
+A removed element is absent from the draft and so carries no tag: who removed it
+is not recorded by this mechanism. The comparison still reports the removal.
+
 ### Discard is always available
 
 Discarding deletes the draft file. It is available in every state, without
