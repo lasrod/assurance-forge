@@ -3,6 +3,7 @@
 #include "core/app_state.h"
 #include "core/drafts/draft_document_diff.h"
 #include "core/drafts/draft_document_store.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/project_file_io.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
@@ -12,6 +13,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 // What a connected MCP client actually drives, once staging reaches the draft
 // document rather than an operation log (ADR 0016).
@@ -206,6 +208,45 @@ TEST(AgentDraftDocument, StagedOperationsReachTheDraftDocumentAndNotTheAcceptedA
 
     // Persisted, so the conversation survives a restart.
     EXPECT_TRUE(std::filesystem::exists(project.document.path()));
+}
+
+// Who staged a change travels with the elements it touched (ADR 0016, #409),
+// not only in the change group beside the document. The group id is the
+// contribution id, so what the tags record joins to what the panel lists.
+TEST(AgentDraftDocument, StagedChangesCarryTheClientsProvenanceOnTheElements) {
+    ConnectedProject project;
+    ASSERT_TRUE(project.Open("provenance"));
+    const app::AgentRequestContext context = project.Context();
+
+    const std::string anchor = FirstClaimId(project.state.loaded_case.value());
+    ASSERT_FALSE(anchor.empty());
+    const auto [group_id, revision] = BeginGroup(context, CurrentRevision(context));
+    ASSERT_FALSE(group_id.empty());
+
+    const bridge::Response staged = app::HandleAgentRequest(
+        MakeRequest("stage_operations",
+                    {{"group_id", group_id},
+                     {"expected_working_revision", revision},
+                     {"anchor_element_id", anchor},
+                     {"operations",
+                      nlohmann::json::array({{{"type", "CreateClaim"},
+                                              {"create_ref", "$monitoring"},
+                                              {"text", "Monitoring detects unsafe blender operation"}}})}}),
+        context);
+    ASSERT_FALSE(staged.result.value("isError", true)) << staged.result.dump();
+    const std::string created = staged.result["created_element_ids"]["$monitoring"].get<std::string>();
+
+    ASSERT_TRUE(project.document.active());
+    const std::vector<core::drafts::DraftContribution> contributions =
+        core::drafts::ReadDraftProvenance(*project.document.document());
+    ASSERT_EQ(contributions.size(), 1u);
+    const core::drafts::DraftContribution& contribution = contributions.front();
+    EXPECT_EQ(contribution.provenance.contribution_id, group_id);
+    EXPECT_EQ(contribution.provenance.source, core::drafts::DraftSource::Mcp);
+    EXPECT_EQ(contribution.provenance.label, "MCP test client");
+    EXPECT_EQ(contribution.provenance.title, "Strengthen the monitoring argument");
+    EXPECT_FALSE(contribution.provenance.session_id.empty());
+    EXPECT_EQ(contribution.element_ids, std::vector<std::string>{created});
 }
 
 // The defect class ADR 0016 exists for. A relationship endpoint the library

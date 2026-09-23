@@ -16,6 +16,7 @@
 // distinct shapes the seams later refused, each of them producing a draft the
 // user could see and never accept.
 
+#include "core/drafts/draft_provenance.h"
 #include "core/reviews/review_proposal.h"
 #include "sacm_adapter/library_load.h"
 
@@ -40,6 +41,9 @@ struct DraftOperationResult {
     // reserved and pinned: there is no later materialization that could allocate
     // a different one.
     std::map<std::string, std::string> created_ids;
+    // The elements this batch added or changed, and so the ones its provenance
+    // was written on, sorted. Empty when no provenance was given.
+    std::vector<std::string> attributed_ids;
 };
 
 // Applies `operations` to `document` as one all-or-nothing batch.
@@ -53,8 +57,15 @@ struct DraftOperationResult {
 // filed in -- the package owning the anchor, falling back to the document's
 // first. A flat model records no package, and guessing would put a proposed
 // claim in the wrong package of a multi-package case.
+//
+// `provenance`, when given, is written onto every element the batch added or
+// changed (ADR 0016), inside the same all-or-nothing copy: a batch whose
+// provenance cannot be recorded is refused rather than landing unattributed.
+// What counts as changed is what the draft comparison reports, so provenance
+// sits on exactly the elements the reviewer is shown as changed.
 DraftOperationResult ApplyOperationsToDraftDocument(sacm_adapter::LibraryDocument& document,
                                                     const std::vector<reviews::PatchOperation>& operations,
-                                                    const std::string& anchor_element_id = {});
+                                                    const std::string& anchor_element_id = {},
+                                                    const DraftProvenance* provenance = nullptr);
 
 } // namespace core::drafts

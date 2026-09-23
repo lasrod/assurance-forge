@@ -94,4 +94,21 @@ struct ArgumentPackageShell {
 };
 std::vector<ArgumentPackageShell> project_argument_package_shells(const LibraryDocument& document);
 
+// One vendor TaggedValue (clause 8.12) and the element carrying it.
+struct ElementTaggedValue {
+    std::string element_id;
+    std::string key;
+    std::string value;
+};
+
+// Every TaggedValue in the document whose key begins with `key_prefix`, in
+// document order, wherever it sits.
+//
+// The reading counterpart of `apply_remove_tagged_values_with_prefix`. Draft
+// provenance (ADR 0016) is read this way: it is recorded on whichever elements a
+// contributor touched, so a reader asking "who contributed to this draft" has to
+// look at all of them rather than at the ones the flat projection keeps.
+std::vector<ElementTaggedValue> tagged_values_with_prefix(const LibraryDocument& document,
+                                                          const std::string& key_prefix);
+
 } // namespace sacm_adapter

@@ -8,6 +8,7 @@
 #include "core/commands/command_bus.h"
 #include "core/drafts/draft_change_index.h"
 #include "core/drafts/draft_operation_apply.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/reviews/review_proposal.h"
 #include "core/terminology_package_service.h"
 #include "ui/imgui_buffer_utils.h"
@@ -342,6 +343,33 @@ TEST(WorkingGlossary, AGlossaryTheDraftCreatesIsShownWithoutAnAcceptedCounterpar
     const ui::panels::TerminologyDraftMark* mark = FindMark(model, model.package->terms.front().id);
     ASSERT_NE(mark, nullptr);
     EXPECT_EQ(mark->change, core::drafts::DraftElementChange::Added);
+}
+
+// A hand edit is attributed like any other contribution (ADR 0016, #409): the
+// person who made it is recorded on what it touched, under one contribution per
+// person. Before this, document-backed hand edits were recorded nowhere at all.
+TEST(WorkingGlossary, AHandEditInTheDraftIsAttributedToTheReviewer) {
+    std::unique_ptr<GlossaryFixture> fixture = MakeFixture("hand_provenance", kNoGlossarySacm);
+    app::AppRuntimeState state;
+    OpenProject(state, *fixture);
+    OpenDraft(state, *fixture);
+    state.reviewer_name = "Ada";
+
+    const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(
+        state, {DefineTerm("$hazard", "hazard", "A system state that could lead to harm.")});
+    ASSERT_TRUE(outcome.success) << outcome.error;
+    const std::string term_id = outcome.created_ids.at("$hazard");
+
+    const std::vector<core::drafts::DraftContribution> contributions =
+        core::drafts::ReadDraftProvenance(*state.draft_document.document());
+    ASSERT_EQ(contributions.size(), 1u);
+    const core::drafts::DraftContribution& contribution = contributions.front();
+    EXPECT_EQ(contribution.provenance.contribution_id, core::drafts::HumanContributionId("Ada"));
+    EXPECT_EQ(contribution.provenance.source, core::drafts::DraftSource::Human);
+    EXPECT_EQ(contribution.provenance.label, "Ada");
+    EXPECT_NE(std::find(contribution.element_ids.begin(), contribution.element_ids.end(), term_id),
+              contribution.element_ids.end())
+        << "the term the reviewer defined carries their name";
 }
 
 // The other half of showing the draft: the user's own glossary edits go into
