@@ -620,7 +620,7 @@
       "tests": [
         "tests/test_away_goal.cpp"
       ],
-      "notes": "Cites a goal in another argument package, stored as SACM `isCitation` and `citedElement` and drawn with its source module by both renderers. See GSN3-MOD-003. Cites only goals in the same SACM file, and cannot be staged into a draft. The other Away elements remain planned."
+      "notes": "Cites a goal in another argument package, stored as SACM `isCitation` and `citedElement` and drawn with its source module by both renderers. See GSN3-MOD-003. Cites only goals in the same SACM file, and cannot be staged into a draft. **Correction:** the Away Goal menu offered every Claim in another module, assumptions and justifications included, and choosing one drew a goal where the other module states only an assumption; it now offers goals only (`tests/test_away_assumption_justification.cpp`). Away Assumption and Away Justification are AF-MOD-006; Away Solution and Away Context remain planned."
     },
     {
       "id": "AF-MOD-004",
@@ -644,10 +644,18 @@
       "id": "AF-MOD-006",
       "area": "MOD",
       "name": "Away Assumption and Away Justification",
-      "status": "planned",
-      "evidence": [],
-      "tests": [],
-      "notes": ""
+      "status": "supported",
+      "evidence": [
+        "src/core/element_factory.cpp",
+        "src/core/commands/element_commands.cpp",
+        "src/ui/element_context_menu.cpp",
+        "src/core/problems/gsn_wellformedness.cpp"
+      ],
+      "tests": [
+        "tests/test_away_assumption_justification.cpp",
+        "tests/test_event_replayer.cpp"
+      ],
+      "notes": "Cites an assumption or justification in another argument package from the Add menu, in context of the selected goal or strategy, stored as a SACM Claim declared `assumed` or as a justification, carrying `isCitation` and `citedElement`. Each menu offers only elements of its own kind from other modules. Both renderers draw the element with its source module and read its statement through the citation. A citation that resolves to nothing is reported under GSN3-MOD-006 or GSN3-MOD-007. Before this, an imported away assumption was classified as an away goal; it happened to render correctly, but only by accident. Same limits as AF-MOD-003: cites only within one SACM file, and cannot be staged into a draft. See GSN3-MOD-006 and GSN3-MOD-007."
     },
     {
       "id": "AF-MOD-007",

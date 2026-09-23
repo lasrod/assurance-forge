@@ -27,7 +27,10 @@ public:
 
     bool AddChildToSelected(AppRuntimeState& state, const std::string& selected_id, core::NewElementKind kind);
     // GSN v3 Modular Extension: cite a goal in another module (GSN3-MOD-003).
-    bool AddAwayGoal(AppRuntimeState& state, const std::string& selected_id, const std::string& cited_id);
+    bool AddAwayElement(AppRuntimeState& state,
+                        const std::string& selected_id,
+                        const std::string& cited_id,
+                        core::AwayElementKind kind);
     bool AddTopGoal(AppRuntimeState& state);
 
     // Create a GSN v3 dialectic challenge (counter argument / counter evidence)

@@ -883,14 +883,77 @@ std::string ArgumentPackageIdentifier(const sacm::AssuranceCasePackage& pkg, con
     return ap->name;
 }
 
-bool InstallAwayGoal(parser::AssuranceCase& ac,
-                     sacm::AssuranceCasePackage* pkg,
-                     const std::string& parent_id,
-                     const std::string& cited_id,
-                     const std::string& element_id,
-                     const std::string& relationship_id,
-                     std::string& out_error) {
-    if (!CanAddAwayGoal(ac, pkg, parent_id, cited_id, out_error))
+NewElementKind ChildKindFor(AwayElementKind kind) {
+    switch (kind) {
+    case AwayElementKind::Goal:
+        return NewElementKind::Goal;
+    case AwayElementKind::Assumption:
+        return NewElementKind::Assumption;
+    case AwayElementKind::Justification:
+        return NewElementKind::Justification;
+    }
+    return NewElementKind::Goal;
+}
+
+// The declaration that makes a Claim this kind of GSN element, as the projection
+// spells it. Empty for a goal, which is an ordinary asserted Claim.
+const char* DeclarationFor(AwayElementKind kind) {
+    switch (kind) {
+    case AwayElementKind::Goal:
+        return "";
+    case AwayElementKind::Assumption:
+        return "assumed";
+    case AwayElementKind::Justification:
+        return "justification";
+    }
+    return "";
+}
+
+// Lower-case noun for messages: "an away assumption must cite an assumption".
+const char* NounFor(AwayElementKind kind) {
+    switch (kind) {
+    case AwayElementKind::Goal:
+        return "goal";
+    case AwayElementKind::Assumption:
+        return "assumption";
+    case AwayElementKind::Justification:
+        return "justification";
+    }
+    return "goal";
+}
+
+const char* ArticleFor(AwayElementKind kind) {
+    return kind == AwayElementKind::Goal ? "a" : "an";
+}
+
+// Whether a Claim is the GSN element `kind` names, read from its declaration
+// exactly as the tree classifies it. An Away Goal citing an assumption would
+// draw a goal where the other module states only an assumption.
+bool ClaimIsKind(const parser::SacmElement& element, AwayElementKind kind) {
+    if (element.type != "claim")
+        return false;
+    const bool assumed = element.assertion_declaration == "assumed";
+    const bool justification = element.assertion_declaration == "justification";
+    switch (kind) {
+    case AwayElementKind::Goal:
+        return !assumed && !justification;
+    case AwayElementKind::Assumption:
+        return assumed;
+    case AwayElementKind::Justification:
+        return justification;
+    }
+    return false;
+}
+
+bool InstallAwayElement(parser::AssuranceCase& ac,
+                        sacm::AssuranceCasePackage* pkg,
+                        const std::string& parent_id,
+                        const std::string& cited_id,
+                        AwayElementKind kind,
+                        const std::string& element_id,
+                        const std::string& relationship_id,
+                        std::string& out_error) {
+    if (!CanAddAwayElement(ac, pkg, parent_id, cited_id, kind, out_error))
         return false;
     if (element_id.empty() || relationship_id.empty()) {
         out_error = "Element and relationship ids must be non-empty.";
@@ -901,24 +964,30 @@ bool InstallAwayGoal(parser::AssuranceCase& ac,
     away.id = element_id;
     away.gsn_identifier = element_id;
     away.type = "claim";
+    away.assertion_declaration = DeclarationFor(kind);
     away.is_citation = true;
     away.cited_element_id = cited_id;
     away.away_module_identifier = ResolveAwayModuleIdentifier(pkg, parent_id, cited_id);
-    // No statement is copied from the cited goal. The away goal IS that goal,
-    // read from here, so a copy would be a second place the same claim is
-    // written and the two would drift the moment either is edited. Renderers
-    // resolve the text through `cited_element_id`.
+    // No statement is copied from the cited element. The away element IS that
+    // element, read from here, so a copy would be a second place the same
+    // statement is written and the two would drift the moment either is edited.
+    // Renderers resolve the text through `cited_element_id`.
 
+    // The away element is the SACM source and the parent the target: premise to
+    // conclusion for a goal, context to what it is context for otherwise.
     parser::SacmElement rel;
     rel.id = relationship_id;
-    rel.type = "assertedinference";
+    rel.type = kind == AwayElementKind::Goal ? "assertedinference" : "assertedcontext";
     rel.source_refs.push_back(element_id);
     rel.target_refs.push_back(parent_id);
 
     sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
     if (ap) {
         MirrorClaim(ap, away);
-        MirrorInference(ap, rel);
+        if (kind == AwayElementKind::Goal)
+            MirrorInference(ap, rel);
+        else
+            MirrorContext(ap, rel);
     }
 
     ac.elements.push_back(std::move(away));
@@ -927,6 +996,21 @@ bool InstallAwayGoal(parser::AssuranceCase& ac,
 }
 
 } // namespace
+
+const char* AwayElementKindName(AwayElementKind kind) {
+    return NounFor(kind);
+}
+
+bool AwayElementKindFromName(const std::string& name, AwayElementKind& out_kind) {
+    for (const AwayElementKind kind :
+         {AwayElementKind::Goal, AwayElementKind::Assumption, AwayElementKind::Justification}) {
+        if (name == NounFor(kind)) {
+            out_kind = kind;
+            return true;
+        }
+    }
+    return false;
+}
 
 std::string ResolveAwayModuleIdentifier(const sacm::AssuranceCasePackage* pkg,
                                         const std::string& local_anchor_id,
@@ -942,17 +1026,35 @@ std::string ResolveAwayModuleIdentifier(const sacm::AssuranceCasePackage* pkg,
     return ArgumentPackageIdentifier(*pkg, cited_package);
 }
 
-bool IsAwayGoal(const parser::SacmElement& element) {
-    return element.type == "claim" && element.is_citation && !element.cited_element_id.empty() &&
-           !element.away_module_identifier.empty();
+std::optional<AwayElementKind> AwayElementKindOf(const parser::SacmElement& element) {
+    if (element.type != "claim" || !element.is_citation || element.cited_element_id.empty() ||
+        element.away_module_identifier.empty()) {
+        return std::nullopt;
+    }
+    for (const AwayElementKind kind : {AwayElementKind::Assumption, AwayElementKind::Justification}) {
+        if (ClaimIsKind(element, kind))
+            return kind;
+    }
+    return AwayElementKind::Goal;
 }
 
-bool CanAddAwayGoal(const parser::AssuranceCase& ac,
-                    const sacm::AssuranceCasePackage* pkg,
-                    const std::string& parent_id,
-                    const std::string& cited_id,
-                    std::string& out_error) {
+bool IsAwayElement(const parser::SacmElement& element) {
+    return AwayElementKindOf(element).has_value();
+}
+
+bool IsAwayGoal(const parser::SacmElement& element) {
+    return AwayElementKindOf(element) == AwayElementKind::Goal;
+}
+
+bool CanAddAwayElement(const parser::AssuranceCase& ac,
+                       const sacm::AssuranceCasePackage* pkg,
+                       const std::string& parent_id,
+                       const std::string& cited_id,
+                       AwayElementKind kind,
+                       std::string& out_error) {
     out_error.clear();
+    const std::string noun = NounFor(kind);
+    const std::string article = ArticleFor(kind);
 
     if (parent_id.empty()) {
         out_error = "No parent element selected.";
@@ -963,33 +1065,94 @@ bool CanAddAwayGoal(const parser::AssuranceCase& ac,
         out_error = "Selected element not found in model.";
         return false;
     }
-    // An away goal stands where a sub-goal would, so it answers to the same
-    // Core connection rules (GSN3-CORE-015).
-    if (!CanAddChildElement(*parent, NewElementKind::Goal, out_error))
+    // An away element stands where a local one of the same kind would, so it
+    // answers to the same Core connection rules (GSN3-CORE-015).
+    if (!CanAddChildElement(*parent, ChildKindFor(kind), out_error))
         return false;
 
     if (cited_id.empty()) {
-        out_error = "No away goal target selected.";
+        out_error = "No away " + noun + " target selected.";
         return false;
     }
     if (cited_id == parent_id) {
-        out_error = "A goal cannot cite itself as an away goal.";
+        out_error = "A goal cannot cite itself as an away " + noun + ".";
         return false;
     }
     const parser::SacmElement* cited = FindElement(ac, cited_id);
     if (!cited) {
-        out_error = "The cited goal is not in this assurance case.";
+        out_error = "The cited " + noun + " is not in this assurance case.";
         return false;
     }
-    if (cited->type != "claim") {
-        out_error = "An away goal must cite a Goal.";
+    if (!ClaimIsKind(*cited, kind)) {
+        std::string capitalized = noun;
+        capitalized[0] = static_cast<char>(capitalized[0] - 'a' + 'A');
+        out_error = "An away " + noun + " must cite " + article + " " + capitalized + ".";
         return false;
     }
     if (ResolveAwayModuleIdentifier(pkg, parent_id, cited_id).empty()) {
-        out_error = "An away goal must cite a goal in another module.";
+        out_error = "An away " + noun + " must cite " + article + " " + noun + " in another module.";
         return false;
     }
     return true;
+}
+
+bool PlanAwayElementIds(const parser::AssuranceCase& ac,
+                        const sacm::AssuranceCasePackage* pkg,
+                        const std::string& parent_id,
+                        const std::string& cited_id,
+                        AwayElementKind kind,
+                        std::string& out_element_id,
+                        std::string& out_relationship_id,
+                        std::string& out_error) {
+    out_element_id.clear();
+    out_relationship_id.clear();
+    if (!CanAddAwayElement(ac, pkg, parent_id, cited_id, kind, out_error))
+        return false;
+    return PlanChildElementIds(ac, pkg, parent_id, ChildKindFor(kind), out_element_id, out_relationship_id, out_error);
+}
+
+bool AddAwayElement(parser::AssuranceCase& ac,
+                    sacm::AssuranceCasePackage* pkg,
+                    const std::string& parent_id,
+                    const std::string& cited_id,
+                    AwayElementKind kind,
+                    std::string& out_new_id,
+                    std::string& out_new_relationship_id,
+                    std::string& out_error) {
+    out_new_id.clear();
+    out_new_relationship_id.clear();
+    out_error.clear();
+
+    std::string element_id;
+    std::string relationship_id;
+    if (!PlanAwayElementIds(ac, pkg, parent_id, cited_id, kind, element_id, relationship_id, out_error))
+        return false;
+    if (!InstallAwayElement(ac, pkg, parent_id, cited_id, kind, element_id, relationship_id, out_error))
+        return false;
+
+    out_new_id = std::move(element_id);
+    out_new_relationship_id = std::move(relationship_id);
+    return true;
+}
+
+bool AddAwayElementWithIds(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& parent_id,
+                           const std::string& cited_id,
+                           AwayElementKind kind,
+                           const std::string& element_id,
+                           const std::string& relationship_id,
+                           std::string& out_error) {
+    out_error.clear();
+    return InstallAwayElement(ac, pkg, parent_id, cited_id, kind, element_id, relationship_id, out_error);
+}
+
+bool CanAddAwayGoal(const parser::AssuranceCase& ac,
+                    const sacm::AssuranceCasePackage* pkg,
+                    const std::string& parent_id,
+                    const std::string& cited_id,
+                    std::string& out_error) {
+    return CanAddAwayElement(ac, pkg, parent_id, cited_id, AwayElementKind::Goal, out_error);
 }
 
 bool PlanAwayGoalIds(const parser::AssuranceCase& ac,
@@ -999,12 +1162,8 @@ bool PlanAwayGoalIds(const parser::AssuranceCase& ac,
                      std::string& out_element_id,
                      std::string& out_relationship_id,
                      std::string& out_error) {
-    out_element_id.clear();
-    out_relationship_id.clear();
-    if (!CanAddAwayGoal(ac, pkg, parent_id, cited_id, out_error))
-        return false;
-    return PlanChildElementIds(
-        ac, pkg, parent_id, NewElementKind::Goal, out_element_id, out_relationship_id, out_error);
+    return PlanAwayElementIds(
+        ac, pkg, parent_id, cited_id, AwayElementKind::Goal, out_element_id, out_relationship_id, out_error);
 }
 
 bool AddAwayGoal(parser::AssuranceCase& ac,
@@ -1014,20 +1173,8 @@ bool AddAwayGoal(parser::AssuranceCase& ac,
                  std::string& out_new_id,
                  std::string& out_new_relationship_id,
                  std::string& out_error) {
-    out_new_id.clear();
-    out_new_relationship_id.clear();
-    out_error.clear();
-
-    std::string element_id;
-    std::string relationship_id;
-    if (!PlanAwayGoalIds(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error))
-        return false;
-    if (!InstallAwayGoal(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error))
-        return false;
-
-    out_new_id = std::move(element_id);
-    out_new_relationship_id = std::move(relationship_id);
-    return true;
+    return AddAwayElement(
+        ac, pkg, parent_id, cited_id, AwayElementKind::Goal, out_new_id, out_new_relationship_id, out_error);
 }
 
 bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
@@ -1037,19 +1184,20 @@ bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
                         const std::string& element_id,
                         const std::string& relationship_id,
                         std::string& out_error) {
-    out_error.clear();
-    return InstallAwayGoal(ac, pkg, parent_id, cited_id, element_id, relationship_id, out_error);
+    return AddAwayElementWithIds(
+        ac, pkg, parent_id, cited_id, AwayElementKind::Goal, element_id, relationship_id, out_error);
 }
 
-std::vector<AwayGoalCandidate> ListAwayGoalCandidates(const parser::AssuranceCase& ac,
-                                                      const sacm::AssuranceCasePackage* pkg,
-                                                      const std::string& parent_id) {
-    std::vector<AwayGoalCandidate> candidates;
+std::vector<AwayCandidate> ListAwayElementCandidates(const parser::AssuranceCase& ac,
+                                                     const sacm::AssuranceCasePackage* pkg,
+                                                     const std::string& parent_id,
+                                                     AwayElementKind kind) {
+    std::vector<AwayCandidate> candidates;
     if (!pkg || parent_id.empty())
         return candidates;
 
     for (const parser::SacmElement& element : ac.elements) {
-        if (element.type != "claim" || element.id == parent_id)
+        if (!ClaimIsKind(element, kind) || element.id == parent_id)
             continue;
         // Citing a citation points at a signpost rather than at the argument.
         if (element.is_citation)
@@ -1058,7 +1206,7 @@ std::vector<AwayGoalCandidate> ListAwayGoalCandidates(const parser::AssuranceCas
         if (module.empty())
             continue;
 
-        AwayGoalCandidate candidate;
+        AwayCandidate candidate;
         candidate.id = element.id;
         candidate.module_identifier = std::move(module);
         candidate.label = GsnIdentifierFor(element);
@@ -1067,12 +1215,18 @@ std::vector<AwayGoalCandidate> ListAwayGoalCandidates(const parser::AssuranceCas
         candidates.push_back(std::move(candidate));
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const AwayGoalCandidate& a, const AwayGoalCandidate& b) {
+    std::sort(candidates.begin(), candidates.end(), [](const AwayCandidate& a, const AwayCandidate& b) {
         if (a.module_identifier != b.module_identifier)
             return a.module_identifier < b.module_identifier;
         return a.id < b.id;
     });
     return candidates;
+}
+
+std::vector<AwayCandidate> ListAwayGoalCandidates(const parser::AssuranceCase& ac,
+                                                  const sacm::AssuranceCasePackage* pkg,
+                                                  const std::string& parent_id) {
+    return ListAwayElementCandidates(ac, pkg, parent_id, AwayElementKind::Goal);
 }
 
 // ===== Remove helpers (planner) ============================================

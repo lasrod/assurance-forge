@@ -40,6 +40,7 @@ constexpr const char* kTwoModuleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
   </argumentPackage>
   <argumentPackage id="AP2" name="Platform">
     <claim id="G2" name="Platform goal" content="The platform is safe."/>
+    <claim id="A2" name="Platform assumption" content="Operators are trained." assertionDeclaration="assumed"/>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
 )";
@@ -281,7 +282,7 @@ TEST(EventReplayer, GSN3_MOD_003_ReplaysAnAwayGoalWithItsCitation) {
     auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
     ASSERT_TRUE(bus) << error;
 
-    core::commands::CreateAwayGoalCommand cmd("G1", "G2");
+    core::commands::CreateAwayElementCommand cmd("G1", "G2", core::AwayElementKind::Goal);
     core::commands::CommandContext ctx{f.model, f.package};
     auto live_result = bus->Execute(cmd, ctx, "tester");
     ASSERT_TRUE(live_result.success) << live_result.error;
@@ -307,6 +308,39 @@ TEST(EventReplayer, GSN3_MOD_003_ReplaysAnAwayGoalWithItsCitation) {
     ASSERT_NE(away, nullptr);
     EXPECT_TRUE(away->is_citation);
     EXPECT_EQ(away->cited_element_id, "G2");
+}
+
+// The kinds added after the Away Goal are recorded as `CreateAwayElement` with a
+// `kind`; a replay that ignored the kind would recreate a goal where the author
+// cited an assumption, and the hash below would differ.
+TEST(EventReplayer, GSN3_MOD_006_ReplaysAnAwayAssumptionAsAnAssumption) {
+    auto f = MakeFixture("away_assumption", kTwoModuleSacm);
+
+    std::string error;
+    auto bus = core::commands::CommandBus::Open(f.project, f.sacm_abs, error);
+    ASSERT_TRUE(bus) << error;
+
+    core::commands::CreateAwayElementCommand cmd("G1", "A2", core::AwayElementKind::Assumption);
+    core::commands::CommandContext ctx{f.model, f.package};
+    auto live_result = bus->Execute(cmd, ctx, "tester");
+    ASSERT_TRUE(live_result.success) << live_result.error;
+
+    auto snapshot = LoadSnapshotState(f.project.rootPath, core::audit::kInitialSnapshotId);
+    auto replayed = core::audit::Replayer::ReplayFrom(
+        snapshot.model, snapshot.package, bus->Store().Transactions(), std::numeric_limits<std::uint64_t>::max());
+    ASSERT_TRUE(replayed.has_value()) << (replayed.has_value() ? "" : replayed.error());
+    EXPECT_EQ(core::audit::CanonicalModelHash(replayed->package), core::audit::CanonicalModelHash(f.package));
+
+    const parser::SacmElement* away = nullptr;
+    for (const auto& e : replayed->model.elements) {
+        if (e.id == cmd.GeneratedId()) {
+            away = &e;
+            break;
+        }
+    }
+    ASSERT_NE(away, nullptr);
+    EXPECT_EQ(away->assertion_declaration, "assumed");
+    EXPECT_EQ(away->cited_element_id, "A2");
 }
 
 TEST(EventReplayer, ReturnsErrorOnUnknownEventType) {

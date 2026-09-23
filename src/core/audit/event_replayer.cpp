@@ -359,8 +359,21 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
     // uses, so the citation is reinstalled with the ids the event recorded; a
     // replay that recreated the goal without it would reproduce a different
     // argument and fail verification.
-    if (type == "CreateAwayGoal") {
+    if (type == "CreateAwayGoal" || type == "CreateAwayElement") {
         std::string parent_id, cited_id, element_id, relationship_id;
+        // `CreateAwayGoal` predates the other kinds and carries no `kind`; it is
+        // always a goal. `CreateAwayElement` names its kind (GSN3-MOD-006/007).
+        core::AwayElementKind kind = core::AwayElementKind::Goal;
+        if (type == "CreateAwayElement") {
+            std::string kind_token;
+            if (!require_string("kind", kind_token))
+                return false;
+            if (!core::AwayElementKindFromName(kind_token, kind)) {
+                out_error = "Unknown away element kind '" + kind_token + "' at " +
+                            FormatLocation(tx_seq, event.event_sequence, type);
+                return false;
+            }
+        }
         if (!require_string("parent_id", parent_id))
             return false;
         if (!require_string("cited_id", cited_id))
@@ -370,10 +383,10 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
         if (!require_string("generated_relationship_id", relationship_id))
             return false;
         std::string err;
-        if (!core::AddAwayGoalWithIds(
-                state.model, &state.package, parent_id, cited_id, element_id, relationship_id, err)) {
+        if (!core::AddAwayElementWithIds(
+                state.model, &state.package, parent_id, cited_id, kind, element_id, relationship_id, err)) {
             out_error =
-                "AddAwayGoalWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+                "AddAwayElementWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;
@@ -1220,10 +1233,24 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         return true;
     }
 
-    // GSN3-MOD-003: the goal and its relationship, then the citation that makes
-    // it away -- the same two library operations the live command performs.
-    if (type == "CreateAwayGoal") {
+    // GSN3-MOD-003/006/007: the element and its relationship, then the citation
+    // that makes it away -- the same two library operations the live command
+    // performs.
+    if (type == "CreateAwayGoal" || type == "CreateAwayElement") {
         std::string parent_id, cited_id, element_id, relationship_id;
+        // `CreateAwayGoal` predates the other kinds and carries no `kind`; it is
+        // always a goal. `CreateAwayElement` names its kind (GSN3-MOD-006/007).
+        core::AwayElementKind kind = core::AwayElementKind::Goal;
+        if (type == "CreateAwayElement") {
+            std::string kind_token;
+            if (!require_string("kind", kind_token))
+                return false;
+            if (!core::AwayElementKindFromName(kind_token, kind)) {
+                out_error = "Unknown away element kind '" + kind_token + "' at " +
+                            FormatLocation(tx_seq, event.event_sequence, type);
+                return false;
+            }
+        }
         if (!require_string("parent_id", parent_id))
             return false;
         if (!require_string("cited_id", cited_id))
@@ -1233,7 +1260,7 @@ bool ApplyEventToLibrary(sacm_adapter::LibraryDocument& document,
         if (!require_string("generated_relationship_id", relationship_id))
             return false;
         const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_child(
-            document, parent_id, sacm_adapter::ChildKind::Goal, element_id, relationship_id);
+            document, parent_id, core::commands::LibraryChildKindFor(kind), element_id, relationship_id);
         if (!outcome.supported || !outcome.applied) {
             out_error = FormatSeamFailure(
                 "apply_add_child", tx_seq, event, outcome.supported, outcome.applied, outcome.diagnostics);

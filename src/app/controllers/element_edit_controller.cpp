@@ -75,15 +75,16 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
     return true;
 }
 
-bool ElementEditController::AddAwayGoal(AppRuntimeState& state,
-                                        const std::string& selected_id,
-                                        const std::string& cited_id) {
+bool ElementEditController::AddAwayElement(AppRuntimeState& state,
+                                           const std::string& selected_id,
+                                           const std::string& cited_id,
+                                           core::AwayElementKind kind) {
     if (selected_id.empty()) {
         events_.Emit(StatusMessageEvent{"No element selected."});
         return false;
     }
     if (cited_id.empty()) {
-        events_.Emit(StatusMessageEvent{AF_TR("No away goal selected.")});
+        events_.Emit(StatusMessageEvent{AF_TR("No away element selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -93,7 +94,7 @@ bool ElementEditController::AddAwayGoal(AppRuntimeState& state,
     (void)model;
     (void)package;
 
-    core::commands::CreateAwayGoalCommand cmd(selected_id, cited_id);
+    core::commands::CreateAwayElementCommand cmd(selected_id, cited_id, kind);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
         events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});

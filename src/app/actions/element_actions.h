@@ -20,7 +20,7 @@ public:
     bool AddChildToSelected(core::NewElementKind kind);
     bool AddTopGoal();
     // GSN v3 Modular Extension: cite a goal in another module (GSN3-MOD-003).
-    bool AddAwayGoalToSelected(const std::string& cited_id);
+    bool AddAwayElementToSelected(core::AwayElementKind kind, const std::string& cited_id);
 
     // GSN v3 dialectic challenges. The "*ToSelectedElement" variants challenge
     // the currently selected element; the "*ToRelationship" variants challenge

@@ -277,14 +277,14 @@ TEST(AwayGoalTest, GSN3_MOD_003_ReplayInstallsTheSameCitationWithGivenIds) {
 TEST(AwayGoalTest, GSN3_MOD_003_OffersOnlyGoalsFromOtherModules) {
     TwoModuleCase mc = MakeTwoModuleCase();
 
-    const std::vector<core::AwayGoalCandidate> candidates = core::ListAwayGoalCandidates(mc.ac, &mc.pkg, "G1");
+    const std::vector<core::AwayCandidate> candidates = core::ListAwayGoalCandidates(mc.ac, &mc.pkg, "G1");
 
     ASSERT_EQ(candidates.size(), 1u);
     EXPECT_EQ(candidates.front().id, "G2");
     EXPECT_EQ(candidates.front().module_identifier, "Platform");
     // G3 is a goal in the selection's own module and E1 is not a goal, so
     // neither may be cited; offering them would invite a refusal after a click.
-    for (const core::AwayGoalCandidate& candidate : candidates) {
+    for (const core::AwayCandidate& candidate : candidates) {
         EXPECT_NE(candidate.id, "G3");
         EXPECT_NE(candidate.id, "E1");
         EXPECT_NE(candidate.id, "G1");
@@ -301,8 +301,8 @@ TEST(AwayGoalTest, GSN3_MOD_003_DoesNotOfferACitationOfACitation) {
     // The new away goal now sits in the local module. Seen from the remote
     // module it is a goal elsewhere, but citing it would point a reader at a
     // signpost rather than at the argument it points to.
-    const std::vector<core::AwayGoalCandidate> candidates = core::ListAwayGoalCandidates(mc.ac, &mc.pkg, "G2");
-    for (const core::AwayGoalCandidate& candidate : candidates) {
+    const std::vector<core::AwayCandidate> candidates = core::ListAwayGoalCandidates(mc.ac, &mc.pkg, "G2");
+    for (const core::AwayCandidate& candidate : candidates) {
         EXPECT_NE(candidate.id, new_id);
     }
 }
@@ -310,7 +310,7 @@ TEST(AwayGoalTest, GSN3_MOD_003_DoesNotOfferACitationOfACitation) {
 TEST(AwayGoalTest, GSN3_MOD_003_CommandCreatesTheCitationAndRecordsIt) {
     TwoModuleCase mc = MakeTwoModuleCase();
     core::commands::CommandContext ctx{mc.ac, mc.pkg};
-    core::commands::CreateAwayGoalCommand cmd("G1", "G2");
+    core::commands::CreateAwayElementCommand cmd("G1", "G2", core::AwayElementKind::Goal);
     core::audit::AuditEvent event;
     std::string error;
 
@@ -335,7 +335,7 @@ TEST(AwayGoalTest, GSN3_MOD_003_CommandRefusesASameModuleCitation) {
     const size_t elements_before = mc.ac.elements.size();
 
     core::commands::CommandContext ctx{mc.ac, mc.pkg};
-    core::commands::CreateAwayGoalCommand cmd("G1", "G3");
+    core::commands::CreateAwayElementCommand cmd("G1", "G3", core::AwayElementKind::Goal);
     core::audit::AuditEvent event;
     std::string error;
 

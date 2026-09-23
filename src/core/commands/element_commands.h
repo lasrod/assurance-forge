@@ -7,6 +7,10 @@
 
 #include <string>
 
+namespace sacm_adapter {
+enum class ChildKind;
+}
+
 // Concrete commands that mutate elements in the assurance case. Each command
 // is a small POD that captures the inputs, plus an `Apply` that calls the
 // existing pure mutator helpers in `core/element_factory.h` and fills the
@@ -66,16 +70,27 @@ private:
     std::string generated_relationship_id_;
 };
 
-// Cite a goal in another module as an Away Goal supporting `parent_id`
-// (GSN v3 Modular Extension, GSN3-MOD-003). Creates the citing Claim and its
-// SupportedBy relationship, then records the citation that makes it away.
-class CreateAwayGoalCommand final : public ICommand {
+// The library child an away element of `kind` is created as, before the
+// citation that makes it away is set. Shared by the command and its replay so
+// the two cannot build different elements.
+sacm_adapter::ChildKind LibraryChildKindFor(AwayElementKind kind);
+
+// Cite an element in another module as an away element attached to `parent_id`
+// (GSN v3 Modular Extension): an Away Goal supporting it (GSN3-MOD-003), or an
+// Away Assumption or Away Justification in context of it (GSN3-MOD-006/007).
+// Creates the citing Claim and its relationship, then records the citation that
+// makes it away.
+//
+// An Away Goal is recorded as `CreateAwayGoal`, exactly as before the other
+// kinds existed, so audit logs written then still replay; the other kinds are
+// `CreateAwayElement` with a `kind`.
+class CreateAwayElementCommand final : public ICommand {
 public:
-    CreateAwayGoalCommand(std::string parent_id, std::string cited_id)
-        : parent_id_(std::move(parent_id)), cited_id_(std::move(cited_id)) {}
+    CreateAwayElementCommand(std::string parent_id, std::string cited_id, AwayElementKind kind)
+        : parent_id_(std::move(parent_id)), cited_id_(std::move(cited_id)), kind_(kind) {}
 
     std::string Name() const override {
-        return "CreateAwayGoal";
+        return kind_ == AwayElementKind::Goal ? "CreateAwayGoal" : "CreateAwayElement";
     }
     bool Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) override;
 
@@ -89,6 +104,7 @@ public:
 private:
     std::string parent_id_;
     std::string cited_id_;
+    AwayElementKind kind_;
     std::string generated_id_;
     std::string generated_relationship_id_;
 };
