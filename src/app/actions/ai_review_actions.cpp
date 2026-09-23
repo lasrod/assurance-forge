@@ -1,6 +1,7 @@
 #include "app/actions/ai_review_actions.h"
 
 #include "app/app_runtime_state.h"
+#include "app/commands/dispatch.h"
 #include "ui/ui_state.h"
 
 #include <optional>
@@ -21,7 +22,14 @@ std::optional<AiReviewInput> BuildAiReviewInput(AppRuntimeState& state) {
 
     input.model = &state.app_state.loaded_case.value();
     const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
-    if (workspace != nullptr && workspace->has_active_groups()) {
+    if (commands::ArgumentDraftsAsDocument(state)) {
+        // The draft document is the working argument (ADR 0016) -- the one the
+        // canvas draws and Accept writes. The change-group materialization
+        // replays only what MCP recorded in its ledger, so it misses the user's
+        // own draft edits, and a review of it would judge text nobody sees.
+        input.model = commands::DraftDocumentWorkingModel(state);
+        input.includes_working_draft = state.DraftDocumentHasChanges();
+    } else if (workspace != nullptr && workspace->has_active_groups()) {
         const core::drafts::DraftMaterializationResult& result =
             state.draft_workspace.Materialize(state.app_state.loaded_case.value(), state.app_state.case_revision);
         if (!result.success) {

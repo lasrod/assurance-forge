@@ -75,6 +75,20 @@ struct DraftEditOutcome {
 // replaces the file with that copy.
 bool DraftDocumentTakesEdits(const AppRuntimeState& state);
 
+// True when the open argument drafts as a document at all (ADR 0016): it has a
+// library document to copy, and the draft store is open for it. Unlike
+// `DraftDocumentTakesEdits` this does not need a draft to exist yet -- a
+// contributor that must never edit the accepted argument (MCP, SCCG review)
+// creates the draft with its first change, and choosing the legacy change-group
+// path merely because no draft existed yet would strand its changes the moment
+// one did.
+bool ArgumentDraftsAsDocument(const AppRuntimeState& state);
+
+// The argument a contributor is working on while drafting as a document: the
+// draft's projection when a draft exists, the accepted argument otherwise.
+// Null when no argument is loaded.
+const parser::AssuranceCase* DraftDocumentWorkingModel(AppRuntimeState& state);
+
 // The draft-document counterpart of `DispatchAuditedCommand`: applies one
 // batch of the user's operations to the working draft through the same seams an
 // MCP client's operations go through, so a hand edit is accepted or refused by

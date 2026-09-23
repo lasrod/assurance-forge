@@ -174,8 +174,9 @@ contribution is its change-group id, and hand edits are one contribution per
 reviewer name. The tags are written inside the batch's all-or-nothing copy, on
 exactly the elements the draft comparison reports as added or modified by that
 batch, so a batch whose provenance cannot be recorded is refused rather than
-landing unattributed. MCP staging and the user's draft edits write them. SCCG
-review suggestions do not yet, because they do not yet reach the draft document.
+landing unattributed. MCP staging, SCCG review suggestions and the user's draft
+edits all write them. An SCCG review also reads the draft document, so it judges
+the wording the user sees rather than the accepted one.
 
 A removed element is absent from the draft and so carries no tag: who removed it
 is not recorded by this mechanism. The comparison still reports the removal.

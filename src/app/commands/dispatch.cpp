@@ -151,6 +151,19 @@ bool DraftDocumentTakesEdits(const AppRuntimeState& state) {
     return state.draft_document.active() && state.app_state.library_document != nullptr;
 }
 
+bool ArgumentDraftsAsDocument(const AppRuntimeState& state) {
+    return state.app_state.library_document != nullptr && !state.draft_document.path().empty();
+}
+
+const parser::AssuranceCase* DraftDocumentWorkingModel(AppRuntimeState& state) {
+    if (!state.app_state.loaded_case.has_value())
+        return nullptr;
+    if (!state.draft_document.active())
+        return &state.app_state.loaded_case.value();
+    state.RefreshDraftDocumentView();
+    return &state.draft_document_view;
+}
+
 DraftEditOutcome DispatchDraftDocumentEdit(AppRuntimeState& state,
                                            const std::vector<core::reviews::PatchOperation>& operations) {
     DraftEditOutcome outcome;
