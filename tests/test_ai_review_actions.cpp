@@ -443,7 +443,9 @@ TEST(AiReviewActionsTest, WithADraftDocumentASuggestionReachesTheDocumentAndSurv
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
     std::string error;
     ASSERT_TRUE(state.draft_document.Open(temp.path, argument, *state.app_state.library_document, error)) << error;
-    ASSERT_TRUE(state.draft_document.EnsureDraft(*state.app_state.library_document, error)) << error;
+    // No draft yet: the first suggestion is what brings one into being, as the
+    // first MCP change does.
+    ASSERT_FALSE(state.draft_document.active());
 
     core::reviews::ReviewItem item = MakeReviewItem();
     item.element_id = claim_id;
@@ -473,6 +475,8 @@ TEST(AiReviewActionsTest, WithADraftDocumentASuggestionReachesTheDocumentAndSurv
     ASSERT_TRUE(linked.has_value());
     EXPECT_EQ(linked->draft_group_ids.size(), 1u);
 
+    ASSERT_TRUE(state.draft_document.active()) << "the suggestion must have created the draft";
+    EXPECT_TRUE(std::filesystem::exists(state.draft_document.path())) << "and saved it";
     const parser::AssuranceCase draft = state.draft_document.Projection();
     const parser::SacmElement* suggested = parser::FindElementByIdOrGidValue(draft, claim_id);
     ASSERT_NE(suggested, nullptr);
@@ -545,4 +549,63 @@ TEST(AiReviewActionsTest, WithADraftDocumentTheReviewReadsTheUsersDraftEdits) {
     EXPECT_NE(state.ai.review_controller->PendingDebugText().find("unaccepted working-draft content"),
               std::string::npos);
     ui::GetUiState().selected_element_id.clear();
+}
+
+// Change groups holding staged work with no draft document predate the document
+// (ADR 0016). A document started beside them would leave that work out, and the
+// accept would then clear it -- so a suggestion joins them on the path that can
+// still show and accept them.
+TEST(AiReviewActionsTest, SuggestionsJoinLegacyChangeGroupsRatherThanStartADocumentBesideThem) {
+    TempDir temp = MakeTempDir("legacy_groups");
+    const std::filesystem::path argument = temp.path / "argument.sacm";
+    const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi("Kettle");
+    ASSERT_TRUE(seed.ok);
+    ASSERT_TRUE(core::WriteTextFileAtomic(argument, seed.xml).has_value());
+
+    app::AppRuntimeState state;
+    ASSERT_TRUE(state.app_state.load_file(argument.string())) << state.app_state.status_message;
+    ASSERT_NE(state.app_state.library_document, nullptr);
+    const parser::AssuranceCase& accepted = *state.app_state.loaded_case;
+    std::string claim_id;
+    for (const parser::SacmElement& element : accepted.elements) {
+        if (element.type == "claim") {
+            claim_id = element.id;
+            break;
+        }
+    }
+    ASSERT_FALSE(claim_id.empty());
+    const parser::SacmElement* accepted_claim = parser::FindElementByIdOrGidValue(accepted, claim_id);
+    ASSERT_NE(accepted_claim, nullptr);
+    const review::ElementTextTarget target = review::TextTargetFor(*accepted_claim);
+
+    OpenDraftStore(state, temp, accepted);
+    std::string error;
+    ASSERT_TRUE(state.draft_document.Open(temp.path, argument, *state.app_state.library_document, error)) << error;
+    StageDraftEditTo(state, accepted, claim_id, target.current_text, "LEGACY_STAGED_WORDING");
+    ASSERT_FALSE(app::commands::ArgumentDraftsAsDocument(state));
+
+    core::reviews::ReviewItem item = MakeReviewItem();
+    item.element_id = claim_id;
+    ASSERT_TRUE(state.review_controller->AddOrUpdateItem(item));
+    const core::drafts::DraftMaterializationResult& before =
+        state.draft_workspace.Materialize(accepted, state.app_state.case_revision);
+    ASSERT_TRUE(before.success) << before.error;
+
+    app::AiReviewProposalSuggestionsEvent event;
+    event.review_profile_name = "Claim review";
+    event.review_run_id = "run-43";
+    event.reviewed_element_ids = {claim_id};
+    event.reviewed_scope_hash = core::reviews::ComputeScopeSemanticHash(before.working_model, {claim_id});
+    event.suggestions.push_back({item.id, claim_id, "AI_SUGGESTED_OVER_LEGACY_WORDING"});
+
+    app::actions::ProposalActions(state).CreateAiGenerated(event);
+
+    EXPECT_FALSE(state.draft_document.active()) << "no document may be started beside the staged groups";
+    ASSERT_EQ(state.draft_workspace.workspace()->ActiveGroups().size(), 2u);
+    const core::drafts::DraftMaterializationResult& after =
+        state.draft_workspace.Materialize(accepted, state.app_state.case_revision);
+    ASSERT_TRUE(after.success) << after.error;
+    const parser::SacmElement* suggested = parser::FindElementByIdOrGidValue(after.working_model, claim_id);
+    ASSERT_NE(suggested, nullptr);
+    EXPECT_EQ(review::TextTargetFor(*suggested).current_text, "AI_SUGGESTED_OVER_LEGACY_WORDING");
 }

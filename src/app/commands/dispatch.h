@@ -82,6 +82,10 @@ bool DraftDocumentTakesEdits(const AppRuntimeState& state);
 // creates the draft with its first change, and choosing the legacy change-group
 // path merely because no draft existed yet would strand its changes the moment
 // one did.
+//
+// False while change groups hold staged work and no draft document exists:
+// that work predates the document, and a document started beside it would
+// leave it out.
 bool ArgumentDraftsAsDocument(const AppRuntimeState& state);
 
 // The argument a contributor is working on while drafting as a document: the

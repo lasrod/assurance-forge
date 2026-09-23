@@ -484,6 +484,10 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         SetStatus(state_, refusal);
 
     size_t staged_count = 0;
+    // Tracked apart from `staged_count`. Once a suggestion is in the document it
+    // is there whatever happens to its group afterwards, so the draft has to be
+    // saved and redrawn even when marking the group ready or linking it fails.
+    bool document_changed = false;
     for (const review::SuggestedDraftGroup& group : mapped.groups) {
         std::string error;
         const std::string group_id = state_.draft_workspace.BeginGroup(group.request, accepted, error);
@@ -500,6 +504,7 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
             SetStatus(state_, "AI suggested change could not be staged in the working draft: " + error);
             continue;
         }
+        document_changed = document_changed || into_document;
         if (!state_.draft_workspace.MarkGroupReady(group_id, error)) {
             SetStatus(state_, "AI suggested change was staged but could not be marked ready: " + error);
             continue;
@@ -519,7 +524,8 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         ++staged_count;
     }
 
-    if (into_document && staged_count > 0) {
+    if (document_changed) {
+        state_.tree_needs_rebuild = true;
         std::string save_error;
         if (!state_.draft_document.Save(save_error)) {
             // The suggestions are in the draft; only its recovery copy is not.

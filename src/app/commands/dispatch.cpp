@@ -152,7 +152,14 @@ bool DraftDocumentTakesEdits(const AppRuntimeState& state) {
 }
 
 bool ArgumentDraftsAsDocument(const AppRuntimeState& state) {
-    return state.app_state.library_document != nullptr && !state.draft_document.path().empty();
+    if (state.app_state.library_document == nullptr || state.draft_document.path().empty())
+        return false;
+    // Change groups holding work while no draft document exists predate the
+    // document: their operations were staged, not applied to one. Starting a
+    // document beside them would leave them out of it, and the accept would then
+    // clear them. They stay on the path that can show and accept them.
+    const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
+    return state.draft_document.active() || workspace == nullptr || !workspace->has_active_groups();
 }
 
 const parser::AssuranceCase* DraftDocumentWorkingModel(AppRuntimeState& state) {

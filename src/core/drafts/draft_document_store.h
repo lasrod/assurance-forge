@@ -73,6 +73,10 @@ public:
     // taken from the argument as it stands then. Creating does not write the
     // file: the caller saves once the edit has actually been applied, so a
     // refused edit leaves no unaccepted `.sacm` in the project directory.
+    //
+    // Refuses when `Open` found a draft file it could not read. Starting afresh
+    // there would let the next save overwrite the only copy of that work; the
+    // user discards it deliberately instead.
     bool EnsureDraft(const sacm_adapter::LibraryDocument& accepted, std::string& error);
 
     // Forgets the in-memory draft without touching the file. For closing a
@@ -80,6 +84,10 @@ public:
     void Close();
 
     bool active() const;
+
+    // True when `Open` found a draft file on disk and could not read it. No
+    // draft is active, and none can be started until it is discarded.
+    bool unreadable() const;
 
     // The draft document, for editing through the `sacm_adapter` seams. Null
     // when no draft is open.
