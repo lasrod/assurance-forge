@@ -12,6 +12,10 @@ namespace app {
 struct AppRuntimeState;
 }
 
+namespace review {
+struct SuggestedDraftGroup;
+}
+
 namespace app::actions {
 
 class ProposalActions {
@@ -33,6 +37,13 @@ public:
     void RemoveSelected(core::RemoveMode mode);
 
 private:
+    // Applies one suggested group to the draft document (ADR 0016), with its
+    // provenance, and records it in the group's ledger. False, with `error`,
+    // when the document refuses it; nothing is then applied.
+    bool StageSuggestionInDraftDocument(const review::SuggestedDraftGroup& group,
+                                        const std::string& group_id,
+                                        std::string& error);
+
     AppRuntimeState& state_;
 };
 

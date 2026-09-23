@@ -6,6 +6,8 @@
 #include "app/proposal_ui_state.h"
 #include "app/project_workflow.h"
 #include "core/commands/proposal_commands.h"
+#include "core/drafts/draft_operation_apply.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/element_factory.h"
 #include "core/sacm_argument_sync.h"
 #include "core/project_service.h"
@@ -16,6 +18,7 @@
 #include "review/sccg/suggestion_mapping.h"
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/ui_state.h"
 
@@ -33,6 +36,25 @@
 #include "app/actions/proposal_actions_internal.h"
 
 namespace app::actions {
+
+namespace {
+
+// Which ArgumentPackage an SCCG suggestion's new elements are filed in: the one
+// holding the first existing element it names, which is the element reviewed.
+std::string AnchorForSuggestion(const std::vector<core::reviews::PatchOperation>& operations) {
+    for (const core::reviews::PatchOperation& operation : operations) {
+        for (const std::optional<core::reviews::ElementRef>* candidate :
+             {&operation.element, &operation.source, &operation.target}) {
+            if (candidate->has_value() && candidate->value().existing_id.has_value() &&
+                !candidate->value().existing_id.value().empty()) {
+                return candidate->value().existing_id.value();
+            }
+        }
+    }
+    return {};
+}
+
+} // namespace
 
 using core::NowUtcString;
 using detail::ApplyProposalPreviewVisualState;
@@ -403,16 +425,28 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
     }
 
     const parser::AssuranceCase& accepted = state_.app_state.loaded_case.value();
-    const core::drafts::DraftMaterializationResult& materialized =
-        state_.draft_workspace.Materialize(accepted, state_.app_state.case_revision);
-    if (!materialized.success) {
-        SetStatus(state_,
-                  "AI review completed, but its suggested changes could not be added because the working "
-                  "draft could not be materialized: " +
-                      materialized.error);
-        return;
+    // While the argument drafts as a document (ADR 0016), the document is the
+    // working argument: what the review read, what the canvas draws and what
+    // Accept writes. Staging into the change-group store instead put the
+    // suggestion somewhere Accept never looks, and the accept then cleared it.
+    const bool into_document = commands::ArgumentDraftsAsDocument(state_);
+    const parser::AssuranceCase* working_model = nullptr;
+    if (into_document) {
+        working_model = commands::DraftDocumentWorkingModel(state_);
+    } else {
+        const core::drafts::DraftMaterializationResult& materialized =
+            state_.draft_workspace.Materialize(accepted, state_.app_state.case_revision);
+        if (!materialized.success) {
+            SetStatus(state_,
+                      "AI review completed, but its suggested changes could not be added because the working "
+                      "draft could not be materialized: " +
+                          materialized.error);
+            return;
+        }
+        working_model = &materialized.working_model;
     }
-    const parser::AssuranceCase& working = materialized.working_model;
+    // Copied: staging into the document below refreshes the view this points at.
+    const parser::AssuranceCase working = *working_model;
     if (!event.reviewed_scope_hash.empty() &&
         event.reviewed_scope_hash != core::reviews::ComputeScopeSemanticHash(working, event.reviewed_element_ids)) {
         SetStatus(state_,
@@ -450,6 +484,10 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         SetStatus(state_, refusal);
 
     size_t staged_count = 0;
+    // Tracked apart from `staged_count`. Once a suggestion is in the document it
+    // is there whatever happens to its group afterwards, so the draft has to be
+    // saved and redrawn even when marking the group ready or linking it fails.
+    bool document_changed = false;
     for (const review::SuggestedDraftGroup& group : mapped.groups) {
         std::string error;
         const std::string group_id = state_.draft_workspace.BeginGroup(group.request, accepted, error);
@@ -457,23 +495,43 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
             SetStatus(state_, "AI suggested change could not be added to the working draft: " + error);
             continue;
         }
-        if (!state_.draft_workspace.StageOperations(group_id, group.operations, accepted, error)) {
+        const bool staged = into_document
+                                ? StageSuggestionInDraftDocument(group, group_id, error)
+                                : state_.draft_workspace.StageOperations(group_id, group.operations, accepted, error);
+        if (!staged) {
             std::string reject_error;
             state_.draft_workspace.RejectGroup(group_id, reject_error);
             SetStatus(state_, "AI suggested change could not be staged in the working draft: " + error);
             continue;
         }
+        document_changed = document_changed || into_document;
         if (!state_.draft_workspace.MarkGroupReady(group_id, error)) {
             SetStatus(state_, "AI suggested change was staged but could not be marked ready: " + error);
             continue;
         }
         if (!state_.review_controller->AddDraftGroup(group.review_item_id, group_id)) {
+            SetStatus(state_, "AI suggested change could not be linked to its review finding.");
+            // In the document the change has already landed, and rejecting the
+            // group would only drop its record while the draft kept the edit.
+            if (into_document) {
+                ++staged_count;
+                continue;
+            }
             std::string reject_error;
             state_.draft_workspace.RejectGroup(group_id, reject_error);
-            SetStatus(state_, "AI suggested change could not be linked to its review finding.");
             continue;
         }
         ++staged_count;
+    }
+
+    if (document_changed) {
+        state_.tree_needs_rebuild = true;
+        std::string save_error;
+        if (!state_.draft_document.Save(save_error)) {
+            // The suggestions are in the draft; only its recovery copy is not.
+            SetStatus(state_,
+                      ui::i18n::trf("The edit was made, but the draft could not be written to disk: {0}", save_error));
+        }
     }
 
     if (staged_count > 0) {
@@ -482,6 +540,40 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
                   "AI added " + std::to_string(staged_count) +
                       " suggested change(s) to the working draft. Review them before accepting.");
     }
+}
+
+bool ProposalActions::StageSuggestionInDraftDocument(const review::SuggestedDraftGroup& group,
+                                                     const std::string& group_id,
+                                                     std::string& error) {
+    core::drafts::DraftDocumentStore& document = state_.draft_document;
+    // The first unaccepted change to the argument brings the draft into being,
+    // as MCP staging does.
+    if (!document.active() && !document.EnsureDraft(*state_.app_state.library_document, error))
+        return false;
+
+    core::drafts::DraftProvenance provenance;
+    provenance.contribution_id = group_id;
+    provenance.source = group.request.source;
+    provenance.label = group.request.source_label;
+    provenance.session_id = group.request.source_session_id;
+    provenance.title = group.request.title;
+    provenance.rationale = group.request.rationale;
+
+    const core::drafts::DraftOperationResult applied = core::drafts::ApplyOperationsToDraftDocument(
+        *document.document(), group.operations, AnchorForSuggestion(group.operations), &provenance);
+    if (!applied.applied) {
+        error = applied.error;
+        return false;
+    }
+    document.MarkChanged();
+
+    // The group's ledger, which the Draft Changes panel still reads (#409). The
+    // document already holds the change, so a ledger failure is said rather
+    // than reported as a refusal that would invite staging it twice.
+    std::string ledger_error;
+    if (!state_.draft_workspace.RecordAppliedOperations(group_id, group.operations, ledger_error))
+        SetStatus(state_, "AI suggested change could not be staged in the working draft: " + ledger_error);
+    return true;
 }
 
 void ProposalActions::CancelActive() {

@@ -433,3 +433,38 @@ TEST(DraftDocumentStoreTest, TheDraftIsProjectedTheSameWayTheAcceptedArgumentIs)
         EXPECT_EQ(actual->description, expected.description) << expected.id;
     }
 }
+
+// A draft file that will not load is the only copy of that unaccepted work. A
+// contributor's next change must not start a fresh draft over it, because the
+// save that follows would replace the file with a blank copy of the argument.
+TEST(DraftDocumentStoreTest, AnUnreadableDraftIsNeverReplacedByAFreshOne) {
+    const TempDir root = MakeTempDir("unreadable");
+    const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
+    const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
+    ASSERT_NE(accepted, nullptr);
+
+    const std::filesystem::path draft_path = core::drafts::DraftDocumentPath(root.path, argument);
+    std::error_code ec;
+    std::filesystem::create_directories(draft_path.parent_path(), ec);
+    const std::string damaged = "<not a sacm document";
+    ASSERT_TRUE(core::WriteTextFileAtomic(draft_path, damaged).has_value());
+
+    core::drafts::DraftDocumentStore store;
+    std::string error;
+    EXPECT_FALSE(store.Open(root.path, argument, *accepted, error));
+    EXPECT_TRUE(store.unreadable());
+    EXPECT_FALSE(store.active());
+
+    EXPECT_FALSE(store.EnsureDraft(*accepted, error));
+    EXPECT_NE(error.find("Discard"), std::string::npos) << "the refusal must say how to get out: " << error;
+    EXPECT_FALSE(store.active());
+    EXPECT_EQ(ReadFile(draft_path), damaged) << "the unreadable file must be left exactly as it was";
+
+    // Discard is the way out, and it must work in this state too (ADR 0016).
+    std::string warning;
+    store.Discard(warning);
+    EXPECT_FALSE(std::filesystem::exists(draft_path));
+    ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
+    EXPECT_FALSE(store.unreadable());
+    EXPECT_TRUE(store.EnsureDraft(*accepted, error)) << error;
+}

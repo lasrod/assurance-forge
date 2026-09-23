@@ -151,6 +151,26 @@ bool DraftDocumentTakesEdits(const AppRuntimeState& state) {
     return state.draft_document.active() && state.app_state.library_document != nullptr;
 }
 
+bool ArgumentDraftsAsDocument(const AppRuntimeState& state) {
+    if (state.app_state.library_document == nullptr || state.draft_document.path().empty())
+        return false;
+    // Change groups holding work while no draft document exists predate the
+    // document: their operations were staged, not applied to one. Starting a
+    // document beside them would leave them out of it, and the accept would then
+    // clear them. They stay on the path that can show and accept them.
+    const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
+    return state.draft_document.active() || workspace == nullptr || !workspace->has_active_groups();
+}
+
+const parser::AssuranceCase* DraftDocumentWorkingModel(AppRuntimeState& state) {
+    if (!state.app_state.loaded_case.has_value())
+        return nullptr;
+    if (!state.draft_document.active())
+        return &state.app_state.loaded_case.value();
+    state.RefreshDraftDocumentView();
+    return &state.draft_document_view;
+}
+
 DraftEditOutcome DispatchDraftDocumentEdit(AppRuntimeState& state,
                                            const std::vector<core::reviews::PatchOperation>& operations) {
     DraftEditOutcome outcome;

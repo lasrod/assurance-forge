@@ -44,6 +44,10 @@ struct DraftDocumentStore::Impl {
     std::unique_ptr<sacm_adapter::LibraryDocument> document;
     std::filesystem::path path;
     std::uint64_t revision = 0;
+    // Why the draft file on disk could not be read, when it could not. Kept so
+    // `EnsureDraft` refuses to start a fresh draft over it: the next save would
+    // replace the only copy of that unaccepted work with a blank one.
+    std::string unreadable_error;
 };
 
 DraftDocumentStore::DraftDocumentStore() : impl_(std::make_unique<Impl>()) {}
@@ -61,6 +65,7 @@ bool DraftDocumentStore::Open(const std::filesystem::path& project_root,
     // put one without being told the argument a second time.
     impl_->document.reset();
     impl_->path = draft_path;
+    impl_->unreadable_error.clear();
     ++impl_->revision;
 
     std::error_code exists_error;
@@ -76,6 +81,7 @@ bool DraftDocumentStore::Open(const std::filesystem::path& project_root,
     sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(draft_path);
     if (!loaded.ok || loaded.document == nullptr) {
         error = "The working draft could not be read: " + sacm_adapter::summarize_load_diagnostics(loaded.diagnostics);
+        impl_->unreadable_error = error;
         return false;
     }
     impl_->document = std::move(loaded.document);
@@ -89,6 +95,11 @@ bool DraftDocumentStore::EnsureDraft(const sacm_adapter::LibraryDocument& accept
         return true;
     if (impl_->path.empty()) {
         error = "There is no argument open to draft against.";
+        return false;
+    }
+    if (!impl_->unreadable_error.empty()) {
+        error =
+            impl_->unreadable_error + " A new draft was not started over it. Discard the working draft to start again.";
         return false;
     }
 
@@ -116,11 +127,16 @@ bool DraftDocumentStore::EnsureDraft(const sacm_adapter::LibraryDocument& accept
 void DraftDocumentStore::Close() {
     impl_->document.reset();
     impl_->path.clear();
+    impl_->unreadable_error.clear();
     ++impl_->revision;
 }
 
 bool DraftDocumentStore::active() const {
     return impl_->document != nullptr;
+}
+
+bool DraftDocumentStore::unreadable() const {
+    return !impl_->unreadable_error.empty();
 }
 
 sacm_adapter::LibraryDocument* DraftDocumentStore::document() {
