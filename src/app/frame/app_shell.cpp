@@ -15,6 +15,8 @@ constexpr float kSplitterThickness = 4.0f;
 constexpr float kSplitterHitPadding = 6.0f;
 constexpr float kMinPanelRatio = 0.10f;
 constexpr float kMaxPanelRatio = 0.40f;
+// Minimum section heights in reference pixels at 96 DPI; scaled with
+// ui::gsn::DpiSize where used, because the content they protect is font-sized.
 constexpr float kMinLeftSectionHeight = 120.0f;
 constexpr float kMinCenterSectionHeight = 220.0f;
 constexpr float kMinProblemsPanelHeight = 320.0f;
@@ -58,7 +60,7 @@ void RenderAppSplitters(AppRuntimeState& state,
     if (available_h <= 0.0f)
         return;
 
-    float min_ratio = kMinLeftSectionHeight / available_h;
+    float min_ratio = ui::gsn::DpiSize(kMinLeftSectionHeight) / available_h;
     if (min_ratio > 0.30f)
         min_ratio = 0.30f;
 
@@ -80,8 +82,8 @@ void RenderAppSplitters(AppRuntimeState& state,
     }
 
     auto clamp_problems_height = [&]() {
-        const float min_problems_h = std::min(kMinProblemsPanelHeight, available_h * 0.5f);
-        const float min_center_h = std::min(kMinCenterSectionHeight, available_h - min_problems_h);
+        const float min_problems_h = std::min(ui::gsn::DpiSize(kMinProblemsPanelHeight), available_h * 0.5f);
+        const float min_center_h = std::min(ui::gsn::DpiSize(kMinCenterSectionHeight), available_h - min_problems_h);
         const float max_problems_h = std::max(min_problems_h, available_h - min_center_h);
         state.layout.problems_panel_height =
             std::clamp(state.layout.problems_panel_height, min_problems_h, max_problems_h);

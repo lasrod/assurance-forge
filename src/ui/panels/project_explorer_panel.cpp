@@ -1,6 +1,7 @@
 #include "ui/panels/project_explorer_panel.h"
 
 #include "ui/fonts.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/panel_header.h"
@@ -111,7 +112,7 @@ bool NavigationRow(const char* id,
     ImGui::PushStyleColor(ImGuiCol_Header, ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(ui::GetTheme().accent, 0.22f)));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
                           ImGui::ColorConvertU32ToFloat4(ui::WithAlpha(ui::GetTheme().accent_hover, 0.18f)));
-    const bool clicked = ImGui::Selectable("##row", selected, 0, ImVec2(0.0f, 28.0f));
+    const bool clicked = ImGui::Selectable("##row", selected, 0, ImVec2(0.0f, ui::gsn::DpiSize(28.0f)));
     ImGui::PopStyleColor(2);
 
     const float limit_x = TrailingTextLeft(trailing, 0.0f) - (trailing.empty() ? 0.0f : style.ItemSpacing.x);
@@ -577,22 +578,23 @@ void RenderProjectHeader(const ProjectExplorerPanelModel& model) {
     const core::AssuranceProject& project = *model.project;
     const ui::Theme& theme = ui::GetTheme();
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(theme.surface_2));
-    ImGui::BeginChild("##case_header", ImVec2(0.0f, 66.0f), true, ImGuiWindowFlags_NoScrollbar);
+    ImGui::BeginChild("##case_header", ImVec2(0.0f, ui::gsn::DpiSize(66.0f)), true, ImGuiWindowFlags_NoScrollbar);
 
-    constexpr float kIconSize = 26.0f;
+    const float icon_size = ui::gsn::DpiSize(26.0f);
     const ImVec2 icon_position = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton("##project_icon", ImVec2(kIconSize, kIconSize));
+    ImGui::InvisibleButton("##project_icon", ImVec2(icon_size, icon_size));
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(icon_position,
-                             ImVec2(icon_position.x + kIconSize, icon_position.y + kIconSize),
+                             ImVec2(icon_position.x + icon_size, icon_position.y + icon_size),
                              ui::WithAlpha(theme.accent, 0.14f),
                              theme.rounding_ui);
     const ImVec2 icon_text_size = ImGui::CalcTextSize(ICON_FA_CUBE);
-    draw_list->AddText(ImVec2(std::round(icon_position.x + (kIconSize - icon_text_size.x) * 0.5f),
-                              std::round(icon_position.y + (kIconSize - icon_text_size.y) * 0.5f) - 1.0f),
-                       theme.accent,
-                       ICON_FA_CUBE);
-    ImGui::SameLine(0.0f, 8.0f);
+    draw_list->AddText(
+        ImVec2(std::round(icon_position.x + (icon_size - icon_text_size.x) * 0.5f),
+               std::round(icon_position.y + (icon_size - icon_text_size.y) * 0.5f - ui::gsn::DpiSize(1.0f))),
+        theme.accent,
+        ICON_FA_CUBE);
+    ImGui::SameLine(0.0f, ui::gsn::DpiSize(8.0f));
     ImGui::BeginGroup();
     {
         ui::fonts::Scoped strong(ui::fonts::Role::BodyStrong);

@@ -1,5 +1,6 @@
 #include "ui/panels/sacm_viewer_panel.h"
 
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
@@ -11,8 +12,9 @@
 namespace ui::panels {
 namespace {
 
-constexpr float kOverwriteButtonWidth = 130.0f;
-constexpr float kSummaryStripHeight = 88.0f;
+float SummaryStripHeight() {
+    return ui::gsn::DpiSize(88.0f);
+}
 
 ImVec4 ElementTypeColor(const char* type) {
     const ui::Theme& theme = ui::GetTheme();
@@ -104,12 +106,12 @@ void ShowOverwriteModal(SacmViewerPanelModel& model) {
         ImGui::Text("%s", AF_TR("Are you sure you want to overwrite it?").c_str());
         ImGui::Spacing();
 
-        if (ImGui::Button(AF_TR("Yes, Overwrite").c_str(), ImVec2(kOverwriteButtonWidth, 0))) {
+        if (ImGui::Button(AF_TR("Yes, Overwrite").c_str())) {
             model.app_state.save_file(model.file_path_buf);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(kOverwriteButtonWidth, 0))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -117,7 +119,7 @@ void ShowOverwriteModal(SacmViewerPanelModel& model) {
 }
 
 void ShowProjectSummary(const parser::AssuranceCase& ac) {
-    if (ImGui::BeginChild("ProjectSummary", ImVec2(0, kSummaryStripHeight), true, ImGuiWindowFlags_NoScrollbar)) {
+    if (ImGui::BeginChild("ProjectSummary", ImVec2(0, SummaryStripHeight()), true, ImGuiWindowFlags_NoScrollbar)) {
         ImGui::Text("%s", AF_TR("Project Summary").c_str());
         if (ImGui::BeginTable("ProjectSummaryMetrics", 5, ImGuiTableFlags_SizingStretchSame)) {
             ImGui::TableNextRow();

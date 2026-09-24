@@ -2,6 +2,7 @@
 
 #include "core/perf/frame_profiler.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
@@ -242,14 +243,16 @@ void DrawKpiCard(
     const ImVec2 p1 = ImVec2(p0.x + width, p0.y + height);
 
     // Card fill + status border
-    dl->AddRectFilled(p0, p1, th.surface_2, 6.0f);
-    dl->AddRect(p0, p1, th.border, 6.0f);
+    const float rounding = ui::gsn::DpiSize(6.0f);
+    dl->AddRectFilled(p0, p1, th.surface_2, rounding);
+    dl->AddRect(p0, p1, th.border, rounding);
     // Left accent stripe
-    dl->AddRectFilled(p0, ImVec2(p0.x + 3.0f, p1.y), status_color, 6.0f, ImDrawFlags_RoundCornersLeft);
+    dl->AddRectFilled(
+        p0, ImVec2(p0.x + ui::gsn::DpiSize(3.0f), p1.y), status_color, rounding, ImDrawFlags_RoundCornersLeft);
 
     // Label (small, muted, top-left)
-    const float pad_x = 10.0f;
-    const float pad_y = 6.0f;
+    const float pad_x = ui::gsn::DpiSize(10.0f);
+    const float pad_y = ui::gsn::DpiSize(6.0f);
     ImGui::PushStyleColor(ImGuiCol_Text, th.text_muted);
     dl->AddText(ImVec2(p0.x + pad_x, p0.y + pad_y), th.text_muted, label);
     ImGui::PopStyleColor();
@@ -264,13 +267,13 @@ void DrawKpiCard(
     // Unit (small, muted, after value)
     if (unit && unit[0]) {
         const ImVec2 value_size_vec = font->CalcTextSizeA(value_size, FLT_MAX, 0.0f, value);
-        const ImVec2 unit_pos =
-            ImVec2(value_pos.x + value_size_vec.x + 4.0f, value_pos.y + value_size_vec.y - ImGui::GetTextLineHeight());
+        const ImVec2 unit_pos = ImVec2(value_pos.x + value_size_vec.x + ui::gsn::DpiSize(4.0f),
+                                       value_pos.y + value_size_vec.y - ImGui::GetTextLineHeight());
         dl->AddText(unit_pos, th.text_muted, unit);
     }
 
     // Status dot top-right
-    const float dot_r = 4.0f;
+    const float dot_r = ui::gsn::DpiSize(4.0f);
     dl->AddCircleFilled(ImVec2(p1.x - pad_x, p0.y + pad_y + dot_r), dot_r, status_color);
 
     // Advance ImGui cursor (treat the whole card as a dummy)
@@ -298,8 +301,9 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
     const ImVec2 p1 = ImVec2(p0.x + avail_w, p0.y + graph_height);
 
     // Background + border
-    dl->AddRectFilled(p0, p1, th.canvas_bg, 4.0f);
-    dl->AddRect(p0, p1, th.border, 4.0f);
+    const float rounding = ui::gsn::DpiSize(4.0f);
+    dl->AddRectFilled(p0, p1, th.canvas_bg, rounding);
+    dl->AddRect(p0, p1, th.border, rounding);
 
     // Y range: at least up to 1.2 × 30 FPS budget so the 30 FPS line stays
     // visible even when measurements are excellent; stretches further if a
@@ -335,7 +339,7 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         // budgets compress toward the top of the chart). At that point
         // showing both is misleading — the 30 FPS line is the meaningful
         // boundary to focus on.
-        const float min_line_gap_px = ImGui::GetTextLineHeight() + 4.0f;
+        const float min_line_gap_px = ImGui::GetTextLineHeight() + ui::gsn::DpiSize(4.0f);
         const bool show_60 = (y_30 - y_60) >= min_line_gap_px;
 
         if (show_60) {
@@ -348,14 +352,18 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
         // Because the bands are stacked top-to-bottom, the labels can never
         // collide regardless of how compressed the upper portion of the
         // axis becomes at very low FPS.
+        const float label_inset_x = ui::gsn::DpiSize(8.0f);
+        const float label_offset_y = ui::gsn::DpiSize(2.0f);
         if (show_60) {
             const char* label_60 = "60 FPS";
             const float w_60 = ImGui::CalcTextSize(label_60).x;
-            dl->AddText(ImVec2(p1.x - w_60 - 8.0f, y_60 + 2.0f), ui::WithAlpha(th.warning, 0.9f), label_60);
+            dl->AddText(
+                ImVec2(p1.x - w_60 - label_inset_x, y_60 + label_offset_y), ui::WithAlpha(th.warning, 0.9f), label_60);
         }
         const char* label_30 = "30 FPS";
         const float w_30 = ImGui::CalcTextSize(label_30).x;
-        dl->AddText(ImVec2(p1.x - w_30 - 8.0f, y_30 + 2.0f), ui::WithAlpha(th.danger, 0.9f), label_30);
+        dl->AddText(
+            ImVec2(p1.x - w_30 - label_inset_x, y_30 + label_offset_y), ui::WithAlpha(th.danger, 0.9f), label_30);
     };
 
     if (h.filled < 2) {
@@ -411,7 +419,7 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
     for (int i = 0; i < h.filled; ++i) {
         const float ms = h.samples_ms[(start + i) % kFrameTimeHistorySize];
         if (ms > spike_threshold_ms) {
-            dl->AddCircleFilled(ImVec2(x_for(i), y_for(ms)), 3.0f, th.danger);
+            dl->AddCircleFilled(ImVec2(x_for(i), y_for(ms)), ui::gsn::DpiSize(3.0f), th.danger);
         }
     }
 
@@ -419,8 +427,10 @@ void DrawFrameTimeGraph(const FrameTimeHistory& h, float avg_ms, float spike_thr
     if (avg_ms > 0.0f) {
         const float y_avg = y_for(avg_ms);
         const ImU32 col = ui::WithAlpha(th.text_secondary, 0.6f);
-        for (float x = p0.x + 2.0f; x < p1.x - 6.0f; x += 6.0f)
-            dl->AddLine(ImVec2(x, y_avg), ImVec2(x + 3.0f, y_avg), col, 1.0f);
+        const float dash_step = ui::gsn::DpiSize(6.0f);
+        const float dash_length = ui::gsn::DpiSize(3.0f);
+        for (float x = p0.x + ui::gsn::DpiSize(2.0f); x < p1.x - dash_step; x += dash_step)
+            dl->AddLine(ImVec2(x, y_avg), ImVec2(x + dash_length, y_avg), col, 1.0f);
     }
 
     // Guidelines + labels drawn LAST so they sit on top of the trace.
@@ -439,8 +449,9 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     const ImVec2 p1 = ImVec2(p0.x + avail_w, p0.y + height);
 
-    dl->AddRectFilled(p0, p1, th.surface_1, 6.0f);
-    dl->AddRect(p0, p1, th.border, 6.0f);
+    const float outer_rounding = ui::gsn::DpiSize(6.0f);
+    dl->AddRectFilled(p0, p1, th.surface_1, outer_rounding);
+    dl->AddRect(p0, p1, th.border, outer_rounding);
 
     if (frame_total_ns == 0) {
         ImGui::Dummy(ImVec2(avail_w, height));
@@ -460,7 +471,11 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
     }
     std::sort(views.begin(), views.end(), [](const GroupView& a, const GroupView& b) { return a.ns > b.ns; });
 
-    const float bar_pad = 2.0f;
+    const float bar_pad = ui::gsn::DpiSize(2.0f);
+    const float segment_rounding = ui::gsn::DpiSize(4.0f);
+    const float minimum_segment_width = ui::gsn::DpiSize(2.0f);
+    const float inline_label_minimum_width = ui::gsn::DpiSize(60.0f);
+    const float inline_label_padding = ui::gsn::DpiSize(8.0f);
     const ImVec2 bar_p0 = ImVec2(p0.x + bar_pad, p0.y + bar_pad);
     const ImVec2 bar_p1 = ImVec2(p1.x - bar_pad, p1.y - bar_pad);
     const float bar_w = bar_p1.x - bar_p0.x;
@@ -471,7 +486,7 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
     const int seg_count = static_cast<int>(views.size());
     for (const auto& v : views) {
         const float frac = static_cast<float>(v.ns) / static_cast<float>(frame_total_ns);
-        const float w = std::max(2.0f, frac * bar_w);
+        const float w = std::max(minimum_segment_width, frac * bar_w);
         const ImVec2 s0 = ImVec2(x, bar_p0.y);
         const ImVec2 s1 = ImVec2(x + w, bar_p1.y);
         const ImU32 col = SubsystemColor(v.id);
@@ -481,16 +496,19 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
             flags |= ImDrawFlags_RoundCornersLeft;
         if (seg_idx == seg_count - 1)
             flags |= ImDrawFlags_RoundCornersRight;
-        dl->AddRectFilled(s0, s1, col, 4.0f, flags);
+        dl->AddRectFilled(s0, s1, col, segment_rounding, flags);
         // Subtle highlight at top
-        dl->AddRectFilled(
-            s0, ImVec2(s1.x, s0.y + bar_h * 0.35f), ui::WithAlpha(IM_COL32(255, 255, 255, 255), 0.05f), 4.0f, flags);
+        dl->AddRectFilled(s0,
+                          ImVec2(s1.x, s0.y + bar_h * 0.35f),
+                          ui::WithAlpha(IM_COL32(255, 255, 255, 255), 0.05f),
+                          segment_rounding,
+                          flags);
 
         // Inline label if there's room
-        if (w >= 60.0f) {
+        if (w >= inline_label_minimum_width) {
             const char* lbl = SubsystemLabel(v.id);
             const ImVec2 ts = ImGui::CalcTextSize(lbl);
-            if (ts.x + 8.0f <= w) {
+            if (ts.x + inline_label_padding <= w) {
                 const ImVec2 tp = ImVec2(s0.x + (w - ts.x) * 0.5f, s0.y + (bar_h - ts.y) * 0.5f);
                 dl->AddText(tp, ui::InkOn(col), lbl);
             }
@@ -510,9 +528,12 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
 
     // Legend chips
     ImGui::Spacing();
-    const float chip_pad_x = 8.0f;
-    const float chip_pad_y = 3.0f;
-    const float chip_spacing = 6.0f;
+    const float chip_pad_x = ui::gsn::DpiSize(8.0f);
+    const float chip_pad_y = ui::gsn::DpiSize(3.0f);
+    const float chip_spacing = ui::gsn::DpiSize(6.0f);
+    const float chip_row_gap = ui::gsn::DpiSize(4.0f);
+    const float chip_rounding = ui::gsn::DpiSize(10.0f);
+    const float chip_dot_gap = ui::gsn::DpiSize(6.0f);
     float row_x = ImGui::GetCursorScreenPos().x;
     const float row_x0 = row_x;
     const float row_right = row_x + ImGui::GetContentRegionAvail().x;
@@ -524,23 +545,24 @@ void DrawSubsystemStackedBar(const std::array<SubsystemAccum, static_cast<size_t
     for (const auto& v : views) {
         const std::string label = std::format("{}  {:.2f} ms", SubsystemLabel(v.id), static_cast<float>(v.ns) / 1.0e6f);
         const float lbl_w = ImGui::CalcTextSize(label.c_str()).x;
-        const float dot_r = 4.0f;
-        const float chip_w = chip_pad_x + dot_r * 2.0f + 6.0f + lbl_w + chip_pad_x;
+        const float dot_r = ui::gsn::DpiSize(4.0f);
+        const float chip_w = chip_pad_x + dot_r * 2.0f + chip_dot_gap + lbl_w + chip_pad_x;
         if (row_x + chip_w > row_right) {
             row_x = row_x0;
-            row_y += chip_h + 4.0f;
-            row_max_h += chip_h + 4.0f;
+            row_y += chip_h + chip_row_gap;
+            row_max_h += chip_h + chip_row_gap;
         }
         const ImVec2 c0 = ImVec2(row_x, row_y);
         const ImVec2 c1 = ImVec2(row_x + chip_w, row_y + chip_h);
-        dl2->AddRectFilled(c0, c1, th.surface_2, 10.0f);
-        dl2->AddRect(c0, c1, th.border, 10.0f);
+        dl2->AddRectFilled(c0, c1, th.surface_2, chip_rounding);
+        dl2->AddRect(c0, c1, th.border, chip_rounding);
         dl2->AddCircleFilled(ImVec2(c0.x + chip_pad_x + dot_r, c0.y + chip_h * 0.5f), dot_r, SubsystemColor(v.id));
-        dl2->AddText(
-            ImVec2(c0.x + chip_pad_x + dot_r * 2.0f + 6.0f, c0.y + chip_pad_y), th.text_secondary, label.c_str());
+        dl2->AddText(ImVec2(c0.x + chip_pad_x + dot_r * 2.0f + chip_dot_gap, c0.y + chip_pad_y),
+                     th.text_secondary,
+                     label.c_str());
         row_x += chip_w + chip_spacing;
     }
-    ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, row_max_h + 2.0f));
+    ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, row_max_h + ui::gsn::DpiSize(2.0f)));
 }
 
 // =====================================================================
@@ -606,25 +628,27 @@ void DrawBarInline(float frac, float width, ImU32 color, float height) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     const ImVec2 p1 = ImVec2(p0.x + width, p0.y + height);
-    dl->AddRectFilled(p0, p1, ui::WithAlpha(th.surface_3, 0.6f), 2.0f);
+    const float rounding = ui::gsn::DpiSize(2.0f);
+    dl->AddRectFilled(p0, p1, ui::WithAlpha(th.surface_3, 0.6f), rounding);
     const float fw = std::max(1.0f, std::min(1.0f, frac) * width);
-    dl->AddRectFilled(p0, ImVec2(p0.x + fw, p1.y), color, 2.0f);
+    dl->AddRectFilled(p0, ImVec2(p0.x + fw, p1.y), color, rounding);
     ImGui::Dummy(ImVec2(width, height));
 }
 
-// Shared layout constants for the bucket-tree rows. The section-level
-// setup (which computes the uniform bar geometry once) and DrawTreeNodeRow
-// (which renders each row) both consume these so they cannot drift apart.
+// Shared layout for the bucket-tree rows. The section-level setup (which
+// computes the uniform bar geometry once) and DrawTreeNodeRow (which renders
+// each row) both consume these so they cannot drift apart. Sizes are scaled
+// for the current DPI when the layout is constructed.
 struct BucketRowLayout {
-    static constexpr float kMsW = 78.0f;
-    static constexpr float kPctW = 60.0f;
-    static constexpr float kHitsW = 42.0f;
-    static constexpr float kGap = 8.0f;
-    static constexpr float kRightPad = 4.0f;
-    static constexpr float kMinBarW = 80.0f;
-    static constexpr float kLabelReserve = 120.0f; // min horizontal room reserved for the label column
-    static constexpr float NumericBlock() {
-        return kMsW + kPctW + kHitsW + kGap * 2;
+    float ms_width = ui::gsn::DpiSize(78.0f);
+    float percent_width = ui::gsn::DpiSize(60.0f);
+    float hits_width = ui::gsn::DpiSize(42.0f);
+    float gap = ui::gsn::DpiSize(8.0f);
+    float right_padding = ui::gsn::DpiSize(4.0f);
+    float minimum_bar_width = ui::gsn::DpiSize(80.0f);
+    float label_reserve = ui::gsn::DpiSize(120.0f); // min horizontal room reserved for the label column
+    float NumericBlock() const {
+        return ms_width + percent_width + hits_width + gap * 2.0f;
     }
 };
 
@@ -670,10 +694,10 @@ void DrawTreeNodeRow(const BucketNode& node, std::uint64_t frame_total_ns, int d
     // Numeric columns are anchored at fixed window-local positions to the
     // right of the bar. `bar_x_window` / `bar_w` are uniform across all rows.
     ImGui::SameLine();
-    using L = BucketRowLayout;
-    const float ms_x = bar_x_window + bar_w + L::kGap;
-    const float pct_x = ms_x + L::kMsW + L::kGap;
-    const float hits_x = pct_x + L::kPctW + L::kGap;
+    const BucketRowLayout layout;
+    const float ms_x = bar_x_window + bar_w + layout.gap;
+    const float pct_x = ms_x + layout.ms_width + layout.gap;
+    const float hits_x = pct_x + layout.percent_width + layout.gap;
 
     // bar (drawn first so SameLine cursors flow left-to-right correctly).
     // Classification uses full_name (dotted path) so nested non-leaf nodes
@@ -723,15 +747,18 @@ void DrawPill(const char* text, std::optional<ImU32> leading_dot_col = std::null
     const ui::Theme& th = ui::GetTheme();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 ts = ImGui::CalcTextSize(text);
-    const float pad_x = 8.0f;
-    const float pad_y = 3.0f;
-    const float dot_off = leading_dot_col.has_value() ? 6.0f : 0.0f;
+    const float pad_x = ui::gsn::DpiSize(8.0f);
+    const float pad_y = ui::gsn::DpiSize(3.0f);
+    const float dot_off = leading_dot_col.has_value() ? ui::gsn::DpiSize(6.0f) : 0.0f;
+    const float rounding = ui::gsn::DpiSize(10.0f);
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     const ImVec2 p1 = ImVec2(p0.x + ts.x + pad_x * 2 + dot_off, p0.y + ts.y + pad_y * 2);
-    dl->AddRectFilled(p0, p1, th.surface_2, 10.0f);
-    dl->AddRect(p0, p1, th.border, 10.0f);
+    dl->AddRectFilled(p0, p1, th.surface_2, rounding);
+    dl->AddRect(p0, p1, th.border, rounding);
     if (leading_dot_col.has_value()) {
-        dl->AddCircleFilled(ImVec2(p0.x + pad_x - 1.0f, p0.y + (ts.y + pad_y * 2) * 0.5f), 3.0f, *leading_dot_col);
+        dl->AddCircleFilled(ImVec2(p0.x + pad_x - ui::gsn::DpiSize(1.0f), p0.y + (ts.y + pad_y * 2) * 0.5f),
+                            ui::gsn::DpiSize(3.0f),
+                            *leading_dot_col);
     }
     dl->AddText(ImVec2(p0.x + pad_x + dot_off, p0.y + pad_y), th.text_secondary, text);
     ImGui::Dummy(ImVec2(p1.x - p0.x, p1.y - p0.y));
@@ -843,7 +870,7 @@ void RenderPerfOverlay(bool& open) {
     if (!s_paused)
         PushFrameTime(live_wall_ms, live_render_ms);
 
-    ImGui::SetNextWindowSize(ImVec2(620, 820), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(ui::gsn::DpiSize(620.0f), ui::gsn::DpiSize(820.0f)), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin((AF_TR("Performance") + "###Performance").c_str(), &open)) {
         ImGui::End();
         return;
@@ -900,7 +927,7 @@ void RenderPerfOverlay(bool& open) {
         // hello_imgui re-applies to the backend swap interval every frame.
         if (HelloImGui::RunnerParams* rp = HelloImGui::GetRunnerParams()) {
             ImGui::SameLine();
-            ImGui::Dummy(ImVec2(12.0f, 0.0f));
+            ImGui::Dummy(ImVec2(ui::gsn::DpiSize(12.0f), 0.0f));
             ImGui::SameLine();
             bool vsync = rp->fpsIdling.vsyncToMonitor;
             if (ImGui::Checkbox(AF_TR("VSync").c_str(), &vsync))
@@ -914,7 +941,7 @@ void RenderPerfOverlay(bool& open) {
             // which is why the FPS / wall-clock graph shows long intervals
             // even though render cost is tiny. `isIdling` is updated each frame.
             ImGui::SameLine();
-            ImGui::Dummy(ImVec2(12.0f, 0.0f));
+            ImGui::Dummy(ImVec2(ui::gsn::DpiSize(12.0f), 0.0f));
             ImGui::SameLine();
             bool idling_enabled = rp->fpsIdling.enableIdling;
             if (ImGui::Checkbox(AF_TR("Idling").c_str(), &idling_enabled))
@@ -959,8 +986,8 @@ void RenderPerfOverlay(bool& open) {
             const ImVec2 cp = ImGui::GetCursorScreenPos();
             const float line_h = ImGui::GetTextLineHeight();
             ImGui::GetWindowDrawList()->AddCircleFilled(
-                ImVec2(cp.x + r + 2.0f, cp.y + line_h * 0.5f + 1.0f), r, dot_col);
-            ImGui::Dummy(ImVec2(r * 2.0f + 6.0f, line_h));
+                ImVec2(cp.x + r + ui::gsn::DpiSize(2.0f), cp.y + line_h * 0.5f + ui::gsn::DpiSize(1.0f)), r, dot_col);
+            ImGui::Dummy(ImVec2(r * 2.0f + ui::gsn::DpiSize(6.0f), line_h));
             ImGui::SameLine();
             ImGui::TextColored(status_text_col, "%s", status_label.c_str());
             if (ImGui::IsItemHovered())
@@ -976,12 +1003,13 @@ void RenderPerfOverlay(bool& open) {
     {
         const float avail = ImGui::GetContentRegionAvail().x;
         const int cards = 6;
-        const float spacing = 6.0f;
-        const float card_w = std::max(64.0f, (avail - spacing * (cards - 1)) / cards);
+        const float spacing = ui::gsn::DpiSize(6.0f);
+        const float card_w = std::max(ui::gsn::DpiSize(64.0f), (avail - spacing * (cards - 1)) / cards);
         // Card height scales with font so the label (~font height) + value
         // (1.45x font) + paddings fit cleanly at any DPI.
-        const float pad_y_card = 6.0f;
-        const float card_h = std::max(72.0f, ImGui::GetFontSize() * (1.0f + 1.45f) + pad_y_card * 3.0f);
+        const float pad_y_card = ui::gsn::DpiSize(6.0f);
+        const float card_h =
+            std::max(ui::gsn::DpiSize(72.0f), ImGui::GetFontSize() * (1.0f + 1.45f) + pad_y_card * 3.0f);
 
         // Driven by a small table so all six metrics use identical layout
         // and adding/removing a KPI is a one-line change.
@@ -1017,7 +1045,7 @@ void RenderPerfOverlay(bool& open) {
     {
         const ui::Theme& th_legend = ui::GetTheme();
         ImGui::TextUnformatted(AF_TR("Frame interval (4s) —").c_str());
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
         // Wall-clock swatch — drawn as a gradient (green/warning/danger) to
         // signal that the trace itself is color-coded by FPS thresholds, not
         // always green. This matches FrameTimeStatusColor used by the trace.
@@ -1025,7 +1053,7 @@ void RenderPerfOverlay(bool& open) {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float h_line = ImGui::GetTextLineHeight();
-            const float sw_w = 20.0f;
+            const float sw_w = ui::gsn::DpiSize(20.0f);
             const ImVec2 s0 = ImVec2(p.x, p.y + h_line * 0.35f);
             const ImVec2 s1 = ImVec2(p.x + sw_w, p.y + h_line * 0.65f);
             // Two-stop gradient: green -> warning -> danger across the swatch.
@@ -1036,26 +1064,26 @@ void RenderPerfOverlay(bool& open) {
             const ImVec2 mid1 = ImVec2(p.x + sw_w * 0.5f, s1.y);
             dl->AddRectFilledMultiColor(s0, mid1, c_good, c_warn, c_warn, c_good);
             dl->AddRectFilledMultiColor(mid0, s1, c_warn, c_bad, c_bad, c_warn);
-            ImGui::Dummy(ImVec2(sw_w + 2.0f, h_line));
+            ImGui::Dummy(ImVec2(sw_w + ui::gsn::DpiSize(2.0f), h_line));
         }
-        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(4.0f));
         ImGui::TextDisabled("%s", AF_TR("frame interval (colored by FPS)").c_str());
-        ImGui::SameLine(0.0f, 10.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(10.0f));
         // Render-cost swatch
         {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float h_line = ImGui::GetTextLineHeight();
             dl->AddLine(ImVec2(p.x, p.y + h_line * 0.5f),
-                        ImVec2(p.x + 14.0f, p.y + h_line * 0.5f),
+                        ImVec2(p.x + ui::gsn::DpiSize(14.0f), p.y + h_line * 0.5f),
                         ui::WithAlpha(th_legend.text_secondary, 0.95f),
                         1.4f);
-            ImGui::Dummy(ImVec2(16.0f, h_line));
+            ImGui::Dummy(ImVec2(ui::gsn::DpiSize(16.0f), h_line));
         }
-        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(4.0f));
         ImGui::TextDisabled("%s", AF_TR("render cost only").c_str());
     }
-    DrawFrameTimeGraph(h, avg_ms, spikes.threshold_ms, 130.0f);
+    DrawFrameTimeGraph(h, avg_ms, spikes.threshold_ms, ui::gsn::DpiSize(130.0f));
 
     ImGui::Spacing();
 
@@ -1072,7 +1100,7 @@ void RenderPerfOverlay(bool& open) {
         const auto groups = GroupBySubsystem(samples);
         ImGui::TextUnformatted(
             ui::i18n::trf("This frame: {0:.2f} ms render across {1} buckets", render_ms, samples.size()).c_str());
-        DrawSubsystemStackedBar(groups, total_ns, 28.0f);
+        DrawSubsystemStackedBar(groups, total_ns, ui::gsn::DpiSize(28.0f));
     }
 
     ImGui::Spacing();
@@ -1100,15 +1128,15 @@ void RenderPerfOverlay(bool& open) {
         // column and the numeric block on the right — capped so narrow
         // overlay windows cannot push the bar into the numeric columns.
         {
-            using L = BucketRowLayout;
+            const BucketRowLayout layout;
             const float avail_w = ImGui::GetContentRegionAvail().x;
-            const float ms_x_window = std::max(0.0f, avail_w - L::NumericBlock() - L::kRightPad);
-            const float bar_avail_w = std::max(0.0f, ms_x_window - L::kGap - L::kLabelReserve);
-            const float bar_w_preferred = std::max(L::kMinBarW, avail_w * 0.45f);
+            const float ms_x_window = std::max(0.0f, avail_w - layout.NumericBlock() - layout.right_padding);
+            const float bar_avail_w = std::max(0.0f, ms_x_window - layout.gap - layout.label_reserve);
+            const float bar_w_preferred = std::max(layout.minimum_bar_width, avail_w * 0.45f);
             // Never exceed the space available between the label area and
-            // the numeric block; never drop below kMinBarW (legibility).
-            const float bar_w_uniform = std::max(L::kMinBarW, std::min(bar_w_preferred, bar_avail_w));
-            const float bar_x_window = std::max(0.0f, ms_x_window - L::kGap - bar_w_uniform);
+            // the numeric block; never drop below minimum_bar_width (legibility).
+            const float bar_w_uniform = std::max(layout.minimum_bar_width, std::min(bar_w_preferred, bar_avail_w));
+            const float bar_x_window = std::max(0.0f, ms_x_window - layout.gap - bar_w_uniform);
             for (const BucketNode* n : top)
                 DrawTreeNodeRow(*n, total_ns, 1, bar_x_window, bar_w_uniform);
         }
@@ -1147,29 +1175,30 @@ void RenderPerfOverlay(bool& open) {
     if (ImGui::CollapsingHeader((AF_TR("Canvas render stats") + "###canvas_render_stats_header").c_str(),
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
         const ui::gsn::CanvasRenderStats& stats = s_snapshot.canvas_stats;
+        const float chip_spacing = ui::gsn::DpiSize(6.0f);
 
         DrawCullChip("Nodes", stats.nodes_drawn, stats.nodes_culled);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCullChip("Edges", stats.edges_drawn, stats.edges_culled);
 
         ImGui::Spacing();
         DrawCounterChip("Shadows", stats.shadows_drawn);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("Shading", stats.interior_shading_drawn);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("Glow", stats.selection_glow_drawn);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("ACP", stats.acp_decorators_drawn);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("Terms", stats.terminology_spans_drawn);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("Clips", stats.clip_rect_pushes);
 
         ImGui::Spacing();
         DrawCounterChip("vtx", stats.draw_list_vtx);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("idx", stats.draw_list_idx);
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, chip_spacing);
         DrawCounterChip("cmds", stats.draw_list_cmds);
     }
 

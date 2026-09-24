@@ -1,6 +1,7 @@
 #include "ui/panels/history_timeline_panel.h"
 
 #include "core/audit/audit_diff.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/empty_state.h"
@@ -59,7 +60,7 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v, const HistoryTim
     ImGui::PushID("##transaction_slider_bar");
     const float line_height = ImGui::GetTextLineHeight();
     const float available_width = ImGui::GetContentRegionAvail().x;
-    const float bar_height = std::max(8.0f, line_height * 0.52f);
+    const float bar_height = std::max(ui::gsn::DpiSize(8.0f), line_height * 0.52f);
 
     char value_text[48];
     std::snprintf(value_text, sizeof(value_text), "%d / %d", value, max_v);
@@ -78,7 +79,8 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v, const HistoryTim
     ImGui::TextUnformatted(value_text);
 
     const ImVec2 cursor = ImGui::GetCursorScreenPos();
-    const ImVec2 size(std::max(24.0f, ImGui::GetContentRegionAvail().x), line_height + 2.0f);
+    const ImVec2 size(std::max(ui::gsn::DpiSize(24.0f), ImGui::GetContentRegionAvail().x),
+                      line_height + ui::gsn::DpiSize(2.0f));
     ImGui::InvisibleButton("##bar", size);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
@@ -110,8 +112,9 @@ void DrawTransactionSliderBar(int& value, int min_v, int max_v, const HistoryTim
     const ImU32 color = theme.accent;
     draw_list->AddRectFilled(mn, mx, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
     draw_list->AddRectFilled(mn, ImVec2(fill_x, mx.y), WithAlpha(color, active ? 1.0f : 0.88f), bar_height * 0.5f);
-    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 6.0f : 4.8f, theme.text_primary, 18);
-    draw_list->AddCircleFilled(ImVec2(fill_x, (mn.y + mx.y) * 0.5f), active ? 4.0f : 3.0f, color, 18);
+    const ImVec2 thumb_center(fill_x, (mn.y + mx.y) * 0.5f);
+    draw_list->AddCircleFilled(thumb_center, ui::gsn::DpiSize(active ? 6.0f : 4.8f), theme.text_primary, 18);
+    draw_list->AddCircleFilled(thumb_center, ui::gsn::DpiSize(active ? 4.0f : 3.0f), color, 18);
 
     if (hovered || active)
         ImGui::SetTooltip("%s", AF_TR("Drag to scrub transaction history").c_str());
@@ -148,10 +151,11 @@ void ShowHistoryTimelineTransactions(const HistoryTimelinePanelModel& model,
                                         ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
     if (ImGui::BeginTable("##history_transactions", 5, table_flags)) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 40.0f);
-        ImGui::TableSetupColumn(AF_TR("Timestamp (UTC)").c_str(), ImGuiTableColumnFlags_WidthFixed, 180.0f);
-        ImGui::TableSetupColumn(AF_TR("Author").c_str(), ImGuiTableColumnFlags_WidthFixed, 100.0f);
-        ImGui::TableSetupColumn(AF_TR("Command").c_str(), ImGuiTableColumnFlags_WidthFixed, 180.0f);
+        ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(40.0f));
+        ImGui::TableSetupColumn(
+            AF_TR("Timestamp (UTC)").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(180.0f));
+        ImGui::TableSetupColumn(AF_TR("Author").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(100.0f));
+        ImGui::TableSetupColumn(AF_TR("Command").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(180.0f));
         ImGui::TableSetupColumn(AF_TR("Changes").c_str(), ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 

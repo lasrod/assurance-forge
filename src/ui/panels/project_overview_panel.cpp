@@ -1,6 +1,7 @@
 #include "ui/panels/project_overview_panel.h"
 
 #include "ui/fonts.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
@@ -14,6 +15,8 @@
 
 namespace ui::panels {
 namespace {
+
+using ui::gsn::DpiSize;
 
 struct MetricCard {
     const char* id;
@@ -30,38 +33,38 @@ void DrawText(ImDrawList* draw_list, const ImVec2& position, ImU32 color, std::s
 }
 
 bool DrawMetricCard(const MetricCard& card, float width) {
-    constexpr float kCardHeight = 116.0f;
+    const float card_height = DpiSize(116.0f);
+    const float content_left = DpiSize(16.0f);
     const ui::Theme& theme = ui::GetTheme();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     const ImVec2 position = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton(card.id, ImVec2(width, kCardHeight));
+    ImGui::InvisibleButton(card.id, ImVec2(width, card_height));
     const bool hovered = ImGui::IsItemHovered();
     const bool clicked = ImGui::IsItemClicked();
 
     const ImU32 fill = hovered ? theme.surface_3 : theme.surface_2;
     draw_list->AddRectFilled(
-        position, ImVec2(position.x + width, position.y + kCardHeight), fill, theme.rounding_panel);
+        position, ImVec2(position.x + width, position.y + card_height), fill, theme.rounding_panel);
     draw_list->AddRect(position,
-                       ImVec2(position.x + width, position.y + kCardHeight),
+                       ImVec2(position.x + width, position.y + card_height),
                        hovered ? theme.border_strong : theme.border,
                        theme.rounding_panel);
     draw_list->AddRectFilled(position,
-                             ImVec2(position.x + 4.0f, position.y + kCardHeight),
+                             ImVec2(position.x + DpiSize(4.0f), position.y + card_height),
                              card.accent,
                              theme.rounding_panel,
                              ImDrawFlags_RoundCornersLeft);
 
-    DrawText(draw_list, ImVec2(position.x + 16.0f, position.y + 14.0f), card.accent, card.icon);
-    DrawText(draw_list, ImVec2(position.x + 42.0f, position.y + 14.0f), theme.text_secondary, card.title);
+    DrawText(draw_list, ImVec2(position.x + content_left, position.y + DpiSize(14.0f)), card.accent, card.icon);
+    DrawText(
+        draw_list, ImVec2(position.x + DpiSize(42.0f), position.y + DpiSize(14.0f)), theme.text_secondary, card.title);
+    const ImVec2 value_position(position.x + content_left, position.y + DpiSize(45.0f));
     {
         ui::fonts::Scoped strong(ui::fonts::Role::BodyStrong);
-        draw_list->AddText(ImGui::GetFont(),
-                           ImGui::GetFontSize() * 1.35f,
-                           ImVec2(position.x + 16.0f, position.y + 45.0f),
-                           theme.text_primary,
-                           card.value.c_str());
+        draw_list->AddText(
+            ImGui::GetFont(), ImGui::GetFontSize() * 1.35f, value_position, theme.text_primary, card.value.c_str());
     }
-    DrawText(draw_list, ImVec2(position.x + 16.0f, position.y + 87.0f), theme.text_muted, card.detail);
+    DrawText(draw_list, ImVec2(position.x + content_left, position.y + DpiSize(87.0f)), theme.text_muted, card.detail);
     return clicked;
 }
 
@@ -102,11 +105,11 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
     const core::ProjectSummary& summary = model.summary;
     const ui::Theme& theme = ui::GetTheme();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 18.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(DpiSize(20.0f), DpiSize(18.0f)));
     ImGui::BeginChild("##project_overview_content", ImVec2(0.0f, 0.0f), false);
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(theme.surface_2));
-    ImGui::BeginChild("##project_hero", ImVec2(0.0f, 104.0f), true, ImGuiWindowFlags_NoScrollbar);
+    ImGui::BeginChild("##project_hero", ImVec2(0.0f, DpiSize(104.0f)), true, ImGuiWindowFlags_NoScrollbar);
     {
         ui::fonts::Scoped title(ui::fonts::Role::Title);
         ImGui::TextUnformatted(project.name.c_str());
@@ -122,9 +125,9 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
-    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(10.0f)));
     SectionHeading(ICON_FA_TASKS, AF_TR("Project Readiness"));
-    ImGui::Dummy(ImVec2(0.0f, 6.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(6.0f)));
 
     const std::string argument_detail = summary.undeveloped == 0
                                             ? AF_TR("No undeveloped elements")
@@ -173,7 +176,7 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
 
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float available_width = ImGui::GetContentRegionAvail().x;
-    const int columns = available_width >= 760.0f ? 4 : (available_width >= 380.0f ? 2 : 1);
+    const int columns = available_width >= DpiSize(760.0f) ? 4 : (available_width >= DpiSize(380.0f) ? 2 : 1);
     const float card_width =
         (available_width - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
     for (std::size_t index = 0; index < cards.size(); ++index) {
@@ -183,9 +186,9 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
             cards[index].action();
     }
 
-    ImGui::Dummy(ImVec2(0.0f, 18.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(18.0f)));
     SectionHeading(ICON_FA_EXCLAMATION_CIRCLE, AF_TR("Needs Attention"));
-    ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(4.0f)));
 
     bool has_attention = false;
     if (summary.error_problems > 0) {
@@ -232,7 +235,7 @@ void ShowProjectOverviewPanel(const ProjectOverviewPanelModel& model, const Proj
         AttentionRow(ICON_FA_CHECK_CIRCLE, AF_TR("No open project alerts."), theme.success, {}, "no_attention");
     }
 
-    ImGui::Dummy(ImVec2(0.0f, 18.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(18.0f)));
     SectionHeading(ICON_FA_INFO_CIRCLE, AF_TR("Project Details"));
     ImGui::TextDisabled("%s", ui::i18n::trf("Project files: {0}", project.files.size()).c_str());
     ImGui::TextDisabled("%s", ui::i18n::trf("Generated reports: {0}", summary.exported_reports).c_str());

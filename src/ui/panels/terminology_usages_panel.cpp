@@ -1,9 +1,11 @@
 #include "ui/panels/terminology_usages_panel.h"
 
 #include "imgui.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
+#include <algorithm>
 #include <string>
 
 namespace ui::panels {
@@ -124,12 +126,16 @@ void ShowTerminologyUsagesPanelContent(const TerminologyUsagesPanelModel& model,
                                   ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
     if (ImGui::BeginTable("terminology_usages_table", 6, flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn(AF_TR("Element").c_str(), ImGuiTableColumnFlags_WidthFixed, 150.0f);
-        ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, 96.0f);
-        ImGui::TableSetupColumn(AF_TR("Package").c_str(), ImGuiTableColumnFlags_WidthFixed, 150.0f);
-        ImGui::TableSetupColumn(AF_TR("Status").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn(AF_TR("Element").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(150.0f));
+        ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(96.0f));
+        ImGui::TableSetupColumn(AF_TR("Package").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(150.0f));
+        ImGui::TableSetupColumn(AF_TR("Status").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(120.0f));
         ImGui::TableSetupColumn(AF_TR("Snippet").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 48.0f);
+        // The last column holds the "Go" button; wide enough for its translated label.
+        const float go_column_width =
+            std::max(ui::gsn::DpiSize(48.0f),
+                     ImGui::CalcTextSize(AF_TR("Go").c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, go_column_width);
         ImGui::TableHeadersRow();
 
         for (std::size_t index = 0; index < usages->size(); ++index) {

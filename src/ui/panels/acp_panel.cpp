@@ -5,6 +5,7 @@
 #include "hello_imgui/icons_font_awesome_4.h"
 #include "imgui.h"
 #include "imgui_stdlib.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/danger_button.h"
@@ -78,7 +79,7 @@ bool ElementIdLink(const parser::AssuranceCase& model,
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme.accent_hover);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme.accent_pressed);
     ImGui::PushStyleColor(ImGuiCol_Text, theme.accent);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ui::gsn::DpiSize(2.0f), 0.0f));
     const std::string label = element_id + "##acp_target_" + element_id;
     const bool clicked = ImGui::SmallButton(label.c_str());
     ImGui::PopStyleVar();
@@ -97,7 +98,7 @@ void RenderTargetRow(const parser::AssuranceCase& model,
     ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
     ImGui::TextUnformatted(AF_TR("Target:").c_str());
     ImGui::PopStyleColor();
-    ImGui::SameLine(0.0f, 6.0f);
+    ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
 
     if (acp.target_kind == "relationship") {
         const std::vector<core::acp::AcpRelationshipTarget> targets = core::acp::BuildAcpRelationshipTargets(model);
@@ -106,10 +107,10 @@ void RenderTargetRow(const parser::AssuranceCase& model,
         });
         if (found != targets.end()) {
             ElementIdLink(model, found->parent_id, callbacks);
-            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
             const bool is_context = found->kind == core::acp::AcpRelationshipKind::InContextOf;
             if (is_context) {
-                ImGui::SameLine(0.0f, 3.0f);
+                ImGui::SameLine(0.0f, ui::gsn::DpiSize(3.0f));
             }
             {
                 const float font_size = ImGui::GetFontSize();
@@ -124,7 +125,7 @@ void RenderTargetRow(const parser::AssuranceCase& model,
                 const float head_h = font_size * 0.30f;
                 const float x0 = p.x;
                 const float x1 = p.x + arrow_w;
-                draw_list->AddLine(ImVec2(x0, cy), ImVec2(x1 - head_w * 0.6f, cy), col, 1.5f);
+                draw_list->AddLine(ImVec2(x0, cy), ImVec2(x1 - head_w * 0.6f, cy), col, ui::gsn::DpiSize(1.5f));
                 draw_list->AddTriangleFilled(ImVec2(x1, cy),
                                              ImVec2(x1 - head_w, cy - head_h * 0.5f),
                                              ImVec2(x1 - head_w, cy + head_h * 0.5f),
@@ -133,14 +134,14 @@ void RenderTargetRow(const parser::AssuranceCase& model,
                     ImGui::SetTooltip("InContextOf");
                 }
             }
-            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
             ElementIdLink(model, found->child_id, callbacks);
             if (!found->reasoning_id.empty()) {
-                ImGui::SameLine(0.0f, 6.0f);
+                ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
                 ImGui::TextDisabled("%s", AF_TR("(via").c_str());
-                ImGui::SameLine(0.0f, 4.0f);
+                ImGui::SameLine(0.0f, ui::gsn::DpiSize(4.0f));
                 ElementIdLink(model, found->reasoning_id, callbacks);
-                ImGui::SameLine(0.0f, 2.0f);
+                ImGui::SameLine(0.0f, ui::gsn::DpiSize(2.0f));
                 ImGui::TextDisabled(")");
             }
         } else {
@@ -152,10 +153,10 @@ void RenderTargetRow(const parser::AssuranceCase& model,
     const parser::SacmElement* element = FindElement(model, acp.target_id);
     ElementIdLink(model, acp.target_id, callbacks);
     if (element && !element->name.empty()) {
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
         ImGui::TextWrapped("%s: %s", DisplayType(*element).c_str(), element->name.c_str());
     } else if (element) {
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
         ImGui::TextWrapped("%s", DisplayType(*element).c_str());
     }
 }
@@ -189,7 +190,7 @@ void MetadataRow(const char* label, const std::string& value) {
     ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
     ImGui::TextUnformatted(label);
     ImGui::PopStyleColor();
-    ImGui::SameLine(0.0f, 6.0f);
+    ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
     ImGui::TextWrapped("%s", value.empty() ? "-" : value.c_str());
 }
 
@@ -224,7 +225,7 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
         ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
         ImGui::TextUnformatted(AF_TR("Name:").c_str());
         ImGui::PopStyleColor();
-        ImGui::SameLine(0.0f, 6.0f);
+        ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
         ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::InputText("##acp_name", &edited.name))
             UpsertIfAvailable(callbacks, edited, modified);
@@ -285,7 +286,7 @@ bool ShowAcpPanel(parser::AssuranceCase* model,
             ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
             ImGui::TextUnformatted(AF_TR("Linked:").c_str());
             ImGui::PopStyleColor();
-            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
             ImGui::TextWrapped("%s / %s", edited.argument_package_id.c_str(), edited.top_goal_id.c_str());
             if (ImGui::Button(AF_TR("Open confidence argument tree").c_str())) {
                 if (callbacks && callbacks->open_confidence_argument_tree)

@@ -5,6 +5,7 @@
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "imgui.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
@@ -114,7 +115,7 @@ void RenderTermCategoryPickerForPackage(AppRuntimeState& state, const core::Term
 
     std::vector<std::string> refs = core::SplitNormalizedCategoryRefs(state.terminology.term_categories_buf);
     const float list_height = ImGui::GetTextLineHeightWithSpacing() * 5.0f;
-    if (ImGui::BeginChild("##term_category_picker", ImVec2(460.0f, list_height), true)) {
+    if (ImGui::BeginChild("##term_category_picker", ImVec2(ui::gsn::DpiSize(460.0f), list_height), true)) {
         for (const auto& category : package->categories) {
             const std::string ref = !category.id.empty() ? category.id : category.gid;
             bool selected = ContainsCategoryRef(refs, ref) || ContainsCategoryRef(refs, category.gid);
@@ -131,23 +132,23 @@ void RenderTermCategoryPicker(AppRuntimeState& state) {
 }
 
 void RenderTermTextFields(AppRuntimeState& state) {
-    ImGui::SetNextItemWidth(460.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(460.0f));
     ImGui::InputText((AF_TR("Term") + "##term_value").c_str(),
                      state.terminology.term_value_buf,
                      sizeof(state.terminology.term_value_buf));
-    ImGui::SetNextItemWidth(460.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(460.0f));
     ImGui::InputText((AF_TR("Full Name / Display Name") + "##term_name").c_str(),
                      state.terminology.term_name_buf,
                      sizeof(state.terminology.term_name_buf));
-    ImGui::SetNextItemWidth(460.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(460.0f));
     ImGui::InputTextMultiline((AF_TR("Definition") + "##term_definition").c_str(),
                               state.terminology.term_definition_buf,
                               sizeof(state.terminology.term_definition_buf),
-                              ImVec2(460.0f, 110.0f));
+                              ImVec2(ui::gsn::DpiSize(460.0f), ui::gsn::DpiSize(110.0f)));
 }
 
 void RenderTermExternalReferenceField(AppRuntimeState& state) {
-    ImGui::SetNextItemWidth(460.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(460.0f));
     ImGui::InputText((AF_TR("External Reference") + "##term_external_reference").c_str(),
                      state.terminology.term_external_reference_buf,
                      sizeof(state.terminology.term_external_reference_buf));
@@ -233,21 +234,21 @@ void ModalHost::RenderCreateTerminologyPackageModal() {
     if (ImGui::BeginPopupModal((AF_TR("Create Terminology Package") + "###Create Terminology Package").c_str(),
                                nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SetNextItemWidth(420.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(420.0f));
         ImGui::InputText((AF_TR("Package name") + "##new_package_name").c_str(),
                          state_.terminology.new_package_name_buf,
                          sizeof(state_.terminology.new_package_name_buf));
-        ImGui::SetNextItemWidth(420.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(420.0f));
         ImGui::InputTextMultiline((AF_TR("Package description") + "##new_package_description").c_str(),
                                   state_.terminology.new_package_description_buf,
                                   sizeof(state_.terminology.new_package_description_buf),
-                                  ImVec2(420.0f, 96.0f));
+                                  ImVec2(ui::gsn::DpiSize(420.0f), ui::gsn::DpiSize(96.0f)));
         ImGui::Spacing();
 
         const bool can_create = !TrimWhitespace(state_.terminology.new_package_name_buf).empty();
         if (!can_create)
             ImGui::BeginDisabled();
-        if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Create").c_str())) {
             callbacks_.confirm_add_terminology_package();
             if (!state_.terminology.show_create_package_modal)
                 ImGui::CloseCurrentPopup();
@@ -255,7 +256,7 @@ void ModalHost::RenderCreateTerminologyPackageModal() {
         if (!can_create)
             ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_create_package_modal = false;
             state_.terminology.pending_package_parent_entry.reset();
             ImGui::CloseCurrentPopup();
@@ -276,13 +277,13 @@ void ModalHost::RenderDeleteTerminologyPackageModal() {
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("%s", AF_TR("Delete this terminology package?").c_str());
         ImGui::Spacing();
-        if (ImGui::Button(AF_TR("Delete").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Delete").c_str())) {
             callbacks_.confirm_delete_terminology_package();
             if (!state_.terminology.show_delete_package_modal)
                 ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_delete_package_modal = false;
             ImGui::CloseCurrentPopup();
         }
@@ -304,7 +305,7 @@ void ModalHost::RenderTerminologyTermEditorModal() {
         RenderTermTextFields(state_);
         RenderTermCategoryPicker(state_);
         RenderTermExternalReferenceField(state_);
-        ImGui::SetNextItemWidth(460.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(460.0f));
         ImGui::InputText((AF_TR("Origin") + "##term_origin").c_str(),
                          state_.terminology.term_origin_buf,
                          sizeof(state_.terminology.term_origin_buf));
@@ -321,8 +322,7 @@ void ModalHost::RenderTerminologyTermEditorModal() {
         ImGui::Spacing();
         if (!can_save)
             ImGui::BeginDisabled();
-        if (ImGui::Button((state_.terminology.editing_existing_term ? AF_TR("Save") : AF_TR("Create")).c_str(),
-                          ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button((state_.terminology.editing_existing_term ? AF_TR("Save") : AF_TR("Create")).c_str())) {
             callbacks_.confirm_terminology_term_edit();
             if (!state_.terminology.show_term_editor_modal)
                 ImGui::CloseCurrentPopup();
@@ -330,7 +330,7 @@ void ModalHost::RenderTerminologyTermEditorModal() {
         if (!can_save)
             ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_term_editor_modal = false;
             ImGui::CloseCurrentPopup();
         }
@@ -369,7 +369,7 @@ void ModalHost::RenderQuickDefineTermModal() {
             ImGui::TextColored(ui::GetErrorColor(), "%s", AF_TR("No TerminologyPackage is available.").c_str());
         } else {
             const char* preview = package_choices[static_cast<std::size_t>(selected_package_index)].label.c_str();
-            ImGui::SetNextItemWidth(460.0f);
+            ImGui::SetNextItemWidth(ui::gsn::DpiSize(460.0f));
             if (ImGui::BeginCombo("##quick_define_target_package", preview)) {
                 for (std::size_t index = 0; index < package_choices.size(); ++index) {
                     const bool selected = static_cast<int>(index) == selected_package_index;
@@ -410,13 +410,13 @@ void ModalHost::RenderQuickDefineTermModal() {
         ImGui::Spacing();
         if (!can_create)
             ImGui::BeginDisabled();
-        if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Create").c_str())) {
             callbacks_.confirm_quick_define_terminology_term(false);
             if (!state_.terminology.show_quick_define_term_modal)
                 ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Create + Add as Context").c_str(), ImVec2(185.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Create + Add as Context").c_str())) {
             callbacks_.confirm_quick_define_terminology_term(true);
             if (!state_.terminology.show_quick_define_term_modal)
                 ImGui::CloseCurrentPopup();
@@ -424,7 +424,7 @@ void ModalHost::RenderQuickDefineTermModal() {
         if (!can_create)
             ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_quick_define_term_modal = false;
             state_.terminology.quick_define_element_id.clear();
             state_.terminology.quick_define_source_text.clear();
@@ -496,13 +496,13 @@ void ModalHost::RenderDeleteTerminologyTermModal() {
         }
         RenderTermDeleteReferences();
         ImGui::Spacing();
-        if (ImGui::Button(AF_TR("Delete").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Delete").c_str())) {
             callbacks_.confirm_delete_terminology_term();
             if (!state_.terminology.show_delete_term_modal)
                 ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_delete_term_modal = false;
             ImGui::CloseCurrentPopup();
         }
@@ -522,15 +522,15 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
         (editing_category ? AF_TR("Edit Category") : AF_TR("Create Category")) + "###" + title_key;
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SetNextItemWidth(420.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(420.0f));
         ImGui::InputText((AF_TR("Category name") + "##category_name").c_str(),
                          state_.terminology.category_name_buf,
                          sizeof(state_.terminology.category_name_buf));
-        ImGui::SetNextItemWidth(420.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(420.0f));
         ImGui::InputTextMultiline((AF_TR("Category description") + "##category_description").c_str(),
                                   state_.terminology.category_description_buf,
                                   sizeof(state_.terminology.category_description_buf),
-                                  ImVec2(420.0f, 96.0f));
+                                  ImVec2(ui::gsn::DpiSize(420.0f), ui::gsn::DpiSize(96.0f)));
 
         const bool can_save = !TrimWhitespace(state_.terminology.category_name_buf).empty();
         if (!can_save)
@@ -539,8 +539,7 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
         ImGui::Spacing();
         if (!can_save)
             ImGui::BeginDisabled();
-        if (ImGui::Button((state_.terminology.editing_existing_category ? AF_TR("Save") : AF_TR("Create")).c_str(),
-                          ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button((state_.terminology.editing_existing_category ? AF_TR("Save") : AF_TR("Create")).c_str())) {
             callbacks_.confirm_terminology_category_edit();
             if (!state_.terminology.show_category_editor_modal)
                 ImGui::CloseCurrentPopup();
@@ -548,7 +547,7 @@ void ModalHost::RenderTerminologyCategoryEditorModal() {
         if (!can_save)
             ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_category_editor_modal = false;
             ImGui::CloseCurrentPopup();
         }
@@ -578,7 +577,7 @@ void ModalHost::RenderDeleteTerminologyCategoryModal() {
         ImGui::Spacing();
         if (state_.terminology.pending_delete_category_term_count > 0)
             ImGui::BeginDisabled();
-        if (ImGui::Button(AF_TR("Delete").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Delete").c_str())) {
             callbacks_.confirm_delete_terminology_category();
             if (!state_.terminology.show_delete_category_modal)
                 ImGui::CloseCurrentPopup();
@@ -586,7 +585,7 @@ void ModalHost::RenderDeleteTerminologyCategoryModal() {
         if (state_.terminology.pending_delete_category_term_count > 0)
             ImGui::EndDisabled();
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(100.0f, 0.0f))) {
+        if (ImGui::Button(AF_TR("Cancel").c_str())) {
             state_.terminology.show_delete_category_modal = false;
             ImGui::CloseCurrentPopup();
         }

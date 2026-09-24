@@ -291,7 +291,7 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
         ImGui::TextColored(GetWarningColor(), "%s", ui::i18n::trf("{0} is not defined.", card_state.text).c_str());
         ImGui::TextWrapped("%s", AF_TR("Define this term from the active terminology scope.").c_str());
         if (interactive && actions.define_terminology_term) {
-            if (ImGui::Button(AF_TR("Define term").c_str(), ImVec2(120.0f, 0.0f)))
+            if (ImGui::Button(AF_TR("Define term").c_str()))
                 actions.define_terminology_term(card_state.element_id, card_state.text);
         }
         ImGui::PopTextWrapPos();
@@ -329,8 +329,7 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
             }
         }
         if (interactive) {
-            if (actions.define_terminology_term &&
-                ImGui::Button(AF_TR("Create new meaning").c_str(), ImVec2(165.0f, 0.0f)))
+            if (actions.define_terminology_term && ImGui::Button(AF_TR("Create new meaning").c_str()))
                 actions.define_terminology_term(card_state.element_id, card_state.text);
         }
         ImGui::PopTextWrapPos();
@@ -343,18 +342,17 @@ void RenderTerminologyCardContents(const TerminologyCardState& card_state,
     RenderTermDetails(package, terminology_package, term, card_state);
     if (interactive && term) {
         ImGui::Spacing();
-        if (actions.open_terminology_term && ImGui::Button(AF_TR("Open term").c_str(), ImVec2(100.0f, 0.0f)))
+        if (actions.open_terminology_term && ImGui::Button(AF_TR("Open term").c_str()))
             actions.open_terminology_term(card_state.package_ref, card_state.term_ref);
         ImGui::SameLine();
-        if (actions.edit_terminology_term && ImGui::Button(AF_TR("Edit term").c_str(), ImVec2(95.0f, 0.0f)))
+        if (actions.edit_terminology_term && ImGui::Button(AF_TR("Edit term").c_str()))
             actions.edit_terminology_term(card_state.package_ref, card_state.term_ref);
-        if (actions.add_visible_terminology_term_context &&
-            ImGui::Button(AF_TR("Add as context").c_str(), ImVec2(130.0f, 0.0f))) {
+        if (actions.add_visible_terminology_term_context && ImGui::Button(AF_TR("Add as context").c_str())) {
             actions.add_visible_terminology_term_context(
                 card_state.element_id, card_state.package_ref, card_state.term_ref);
         }
         ImGui::SameLine();
-        if (actions.find_terminology_usages && ImGui::Button(AF_TR("Find usages").c_str(), ImVec2(120.0f, 0.0f)))
+        if (actions.find_terminology_usages && ImGui::Button(AF_TR("Find usages").c_str()))
             actions.find_terminology_usages(card_state.package_ref, card_state.term_ref);
     }
     ImGui::PopTextWrapPos();

@@ -1,6 +1,7 @@
 #include "ui/panels/status_bar_panel.h"
 
 #include "ui/fonts.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/text_ellipsis.h"
@@ -13,8 +14,6 @@
 
 namespace ui::panels {
 namespace {
-
-constexpr float kSegmentGap = 16.0f;
 
 // Draws right-aligned text ending at `right_x`, and returns the x where it
 // starts so the next segment can be placed to its left.
@@ -74,6 +73,10 @@ void ShowStatusBar(const StatusBarModel& model, const StatusBarCallbacks& callba
                                         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
     ImGui::Begin("##status_bar", nullptr, kFlags);
 
+    // Measured in the body font, before the caption font is pushed below.
+    const float segment_gap = ui::gsn::DpiSize(16.0f);
+    const float dot_gap = ui::gsn::DpiSize(6.0f);
+
     // Braced so the font is popped before End(): an ImGui window must be closed
     // with the font stack at the depth it was opened with.
     {
@@ -84,7 +87,7 @@ void ShowStatusBar(const StatusBarModel& model, const StatusBarCallbacks& callba
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         const ImVec2 origin = ImGui::GetWindowPos();
         const float text_y = origin.y + (height - ImGui::GetTextLineHeight()) * 0.5f;
-        const float pad = ImGui::GetStyle().FramePadding.x + kSegmentGap * 0.5f;
+        const float pad = ImGui::GetStyle().FramePadding.x + segment_gap * 0.5f;
 
         // A hairline above separates the bar from the panels; without it the bar
         // reads as more content rather than as chrome.
@@ -100,7 +103,7 @@ void ShowStatusBar(const StatusBarModel& model, const StatusBarCallbacks& callba
                 const std::string warnings =
                     std::string(ICON_FA_EXCLAMATION_TRIANGLE) + " " + std::to_string(model.warning_count);
                 counts_left =
-                    DrawRightAligned(draw_list, counts_left, text_y, theme.warning, warnings) - kSegmentGap * 0.5f;
+                    DrawRightAligned(draw_list, counts_left, text_y, theme.warning, warnings) - segment_gap * 0.5f;
             }
             if (model.error_count > 0) {
                 const std::string errors = std::string(ICON_FA_TIMES_CIRCLE) + " " + std::to_string(model.error_count);
@@ -113,13 +116,13 @@ void ShowStatusBar(const StatusBarModel& model, const StatusBarCallbacks& callba
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && callbacks.open_problems)
                     callbacks.open_problems();
             }
-            right_cursor = counts_left - kSegmentGap;
+            right_cursor = counts_left - segment_gap;
         }
 
         if (!model.selected_element_id.empty()) {
             const std::string selection = ui::i18n::trf("Selected: {0}", model.selected_element_id);
             right_cursor =
-                DrawRightAligned(draw_list, right_cursor, text_y, theme.text_secondary, selection) - kSegmentGap;
+                DrawRightAligned(draw_list, right_cursor, text_y, theme.text_secondary, selection) - segment_gap;
         }
 
         // ===== Left edge outward: document, save state, then the message =====
@@ -131,7 +134,7 @@ void ShowStatusBar(const StatusBarModel& model, const StatusBarCallbacks& callba
             draw_list, ImVec2(document_start, text_y), theme.text_primary, document, right_cursor - document_start);
         if (!model.document_full_path.empty() && HoveredIn(document_start, x, origin.y, origin.y + height))
             ImGui::SetTooltip("%s", model.document_full_path.c_str());
-        x += kSegmentGap;
+        x += segment_gap;
 
         const std::string save_state = SaveStateLabel(model);
         if (!save_state.empty() && x < right_cursor) {
@@ -142,10 +145,10 @@ void ShowStatusBar(const StatusBarModel& model, const StatusBarCallbacks& callba
                 const float radius = ImGui::GetFontSize() * 0.22f;
                 draw_list->AddCircleFilled(
                     ImVec2(x + radius, text_y + ImGui::GetTextLineHeight() * 0.5f), radius, color);
-                x += radius * 2.0f + 6.0f;
+                x += radius * 2.0f + dot_gap;
             }
             draw_list->AddText(ImVec2(x, text_y), color, save_state.c_str());
-            x += ImGui::CalcTextSize(save_state.c_str()).x + kSegmentGap;
+            x += ImGui::CalcTextSize(save_state.c_str()).x + segment_gap;
         }
 
         if (!model.message.empty() && x < right_cursor) {

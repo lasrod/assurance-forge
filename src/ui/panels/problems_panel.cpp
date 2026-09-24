@@ -1,5 +1,6 @@
 #include "ui/panels/problems_panel.h"
 
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/empty_state.h"
@@ -232,7 +233,7 @@ void DrawSeverityBadge(const core::ProblemItem& problem,
     // is barely wider than the word it holds, so a roomier chip would be drawn
     // with its trailing curve sliced off at the column boundary.
     const float pad_x = ImGui::GetStyle().FramePadding.x * 0.45f;
-    const float badge_h = text_size.y + 2.0f;
+    const float badge_h = text_size.y + ui::gsn::DpiSize(2.0f);
     const float badge_y = item_min.y + (item_max.y - item_min.y - badge_h) * 0.5f;
     const float rounding = badge_h * 0.35f;
 
@@ -241,7 +242,7 @@ void DrawSeverityBadge(const core::ProblemItem& problem,
     const ImVec2 badge_max(std::min(item_min.x + text_size.x + pad_x * 2.0f, item_max.x - 1.0f), badge_y + badge_h);
     draw_list->AddRectFilled(badge_min, badge_max, ui::WithAlpha(accent, 0.16f), rounding);
     draw_list->AddRect(badge_min, badge_max, ui::WithAlpha(accent, 0.55f), rounding);
-    draw_list->AddText(ImVec2(badge_min.x + pad_x, badge_y + 1.0f), accent, label.c_str());
+    draw_list->AddText(ImVec2(badge_min.x + pad_x, badge_y + ui::gsn::DpiSize(1.0f)), accent, label.c_str());
 }
 
 void DrawProblemRow(const core::ProblemItem& problem, ui::UiState& ui_state, const ProblemsPanelCallbacks& callbacks) {
@@ -343,13 +344,13 @@ void ShowProblemsPanelContent(ProblemsPanelModel model, const ProblemsPanelCallb
 
     if (ImGui::BeginTable("problems_table", 7, flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn(AF_TR("Severity").c_str(), ImGuiTableColumnFlags_WidthFixed, 86.0f);
-        ImGui::TableSetupColumn(AF_TR("Source").c_str(), ImGuiTableColumnFlags_WidthFixed, 128.0f);
-        ImGui::TableSetupColumn(AF_TR("Element").c_str(), ImGuiTableColumnFlags_WidthFixed, 88.0f);
-        ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, 96.0f);
+        ImGui::TableSetupColumn(AF_TR("Severity").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(86.0f));
+        ImGui::TableSetupColumn(AF_TR("Source").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(128.0f));
+        ImGui::TableSetupColumn(AF_TR("Element").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(88.0f));
+        ImGui::TableSetupColumn(AF_TR("Type").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(96.0f));
         ImGui::TableSetupColumn(AF_TR("Message").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn(AF_TR("Guideline").c_str(), ImGuiTableColumnFlags_WidthFixed, 116.0f);
-        ImGui::TableSetupColumn(AF_TR("Fix").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn(AF_TR("Guideline").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(116.0f));
+        ImGui::TableSetupColumn(AF_TR("Fix").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(120.0f));
         ImGui::TableHeadersRow();
 
         for (const auto& problem : problems) {

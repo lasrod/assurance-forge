@@ -380,12 +380,28 @@ void ApplyAppTheme(AppTheme theme) {
     if (ImGui::GetCurrentContext() == nullptr)
         return;
 
+    // HelloImGui's ImGuiColorsLight/Dark themes recolor the *current* style rather
+    // than building a new one, so every size the runner scaled for DPI at startup
+    // would survive a theme switch, and scaling again below would compound on each
+    // switch (F9 pushed the welcome modal off-screen within four presses). Start from
+    // a default 1x style, then restore the DPI state once: FontScaleDpi for text,
+    // ScaleAllSizes for paddings and roundings. A theme switch changes colors only.
+    const ImGuiStyle previous_style = ImGui::GetStyle();
+    ImGui::GetStyle() = ImGuiStyle();
     if (HelloImGui::IsUsingHelloImGui()) {
         ImGuiTheme::ApplyTheme(base_theme);
     } else {
         ImGui::GetStyle() = ImGuiTheme::ThemeToStyle(base_theme);
     }
     ApplySharedStyle();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.FontSizeBase = previous_style.FontSizeBase;
+    style.FontScaleMain = previous_style.FontScaleMain;
+    style.FontScaleDpi = previous_style.FontScaleDpi;
+    // _MainScale is the product of every ScaleAllSizes call so far; ImGui marks it
+    // internal, but it is the only record of the scale the runner already applied.
+    if (previous_style._MainScale != 1.0f)
+        style.ScaleAllSizes(previous_style._MainScale);
     if (theme == AppTheme::Light) {
         ApplyLightColors();
     } else {
