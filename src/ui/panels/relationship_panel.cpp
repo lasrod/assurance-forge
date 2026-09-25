@@ -2,6 +2,7 @@
 
 #include "core/acp/acp_relationship_index.h"
 #include "imgui.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/danger_button.h"
@@ -47,7 +48,7 @@ void MetadataRow(const char* label, const std::string& value) {
     ImGui::PushStyleColor(ImGuiCol_Text, theme.text_secondary);
     ImGui::TextUnformatted(label);
     ImGui::PopStyleColor();
-    ImGui::SameLine(0.0f, 6.0f);
+    ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));
     ImGui::TextWrapped("%s", value.empty() ? "-" : value.c_str());
 }
 

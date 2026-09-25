@@ -4,6 +4,7 @@
 #include "core/terminology_scope_service.h"
 #include "ui/fonts.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/confidence_panel.h"
 #include "ui/text_edit_session.h"
@@ -181,9 +182,9 @@ void InspectorFieldLabel(std::string_view label) {
 
 void InspectorSection(const char* icon, std::string_view title) {
     const Theme& theme = GetTheme();
-    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+    ImGui::Dummy(ImVec2(0.0f, ui::gsn::DpiSize(5.0f)));
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(theme.accent), "%s", icon);
-    ImGui::SameLine(0.0f, 7.0f);
+    ImGui::SameLine(0.0f, ui::gsn::DpiSize(7.0f));
     {
         fonts::Scoped strong(fonts::Role::BodyStrong);
         ImGui::TextUnformatted(title.data(), title.data() + title.size());
@@ -191,7 +192,7 @@ void InspectorSection(const char* icon, std::string_view title) {
     ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.border, 0.72f)));
     ImGui::Separator();
     ImGui::PopStyleColor();
-    ImGui::Dummy(ImVec2(0.0f, 2.0f));
+    ImGui::Dummy(ImVec2(0.0f, ui::gsn::DpiSize(2.0f)));
 }
 
 static void RenderMetadataRow(const char* label, const std::string& value) {
@@ -204,7 +205,7 @@ static void RenderMetadataRow(const char* label, const std::string& value) {
         ImGui::TextUnformatted(label);
         ImGui::PopStyleColor();
     }
-    ImGui::SameLine(0.0f, 7.0f);
+    ImGui::SameLine(0.0f, ui::gsn::DpiSize(7.0f));
     {
         fonts::Scoped strong(fonts::Role::BodyStrong);
         ImGui::TextWrapped("%s", display_value);
@@ -266,10 +267,10 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
     for (const DraftFieldChangeView& change : detail.field_changes) {
         InspectorFieldLabel(ui::i18n::trf("{0} — accepted", change.field_label));
         ImGui::TextWrapped("%s", change.accepted.empty() ? AF_TR("(empty)").c_str() : change.accepted.c_str());
-        ImGui::Dummy(ImVec2(0.0f, 2.0f));
+        ImGui::Dummy(ImVec2(0.0f, ui::gsn::DpiSize(2.0f)));
         InspectorFieldLabel(ui::i18n::trf("{0} — working draft", change.field_label));
         ImGui::TextWrapped("%s", change.working.empty() ? AF_TR("(empty)").c_str() : change.working.c_str());
-        ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        ImGui::Dummy(ImVec2(0.0f, ui::gsn::DpiSize(4.0f)));
     }
 
     InspectorFieldLabel(AF_TR("Contributions"));
@@ -292,7 +293,7 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
         // Never widen the selection silently. Accepting a reworded claim that
         // another group created has to take that group too, and the user is told
         // so before they press the button, not after.
-        ImGui::Dummy(ImVec2(0.0f, 3.0f));
+        ImGui::Dummy(ImVec2(0.0f, ui::gsn::DpiSize(3.0f)));
         std::string also;
         for (const std::string& title : detail.also_accepts_titles) {
             if (!also.empty())
@@ -304,7 +305,7 @@ static void RenderDraftChangeSection(const std::string& element_id, const Elemen
         ImGui::PopStyleColor();
     }
 
-    ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    ImGui::Dummy(ImVec2(0.0f, ui::gsn::DpiSize(4.0f)));
     const bool blocked = !detail.blocked_reason.empty();
     ImGui::BeginDisabled(blocked || callbacks == nullptr || !callbacks->accept_groups);
     if (ImGui::Button(AF_TR("Accept this change").c_str()) && callbacks && callbacks->accept_groups)
@@ -338,10 +339,14 @@ static void RenderElementMetadata(const parser::SacmElement& elem) {
     // height, shrinks the panel's content extent, and snaps the scroll straight
     // back to the top. That reads as "the scrollbar does not work", and it is
     // the reason this height is computed rather than measured.
+    //
+    // fonts::SizeFor returns the unscaled size handed to PushFont, while the
+    // style fields are already DPI-scaled, so the text part is scaled here.
     const ImGuiStyle& style = ImGui::GetStyle();
-    const float card_height = fonts::SizeFor(fonts::Role::Caption) + fonts::SizeFor(fonts::Role::BodyStrong) +
-                              style.ItemSpacing.y + style.CellPadding.y * 2.0f + style.WindowPadding.y * 2.0f +
-                              style.ChildBorderSize * 2.0f;
+    const float text_height =
+        ui::gsn::DpiSize(fonts::SizeFor(fonts::Role::Caption) + fonts::SizeFor(fonts::Role::BodyStrong));
+    const float card_height = text_height + style.ItemSpacing.y + style.CellPadding.y * 2.0f +
+                              style.WindowPadding.y * 2.0f + style.ChildBorderSize * 2.0f;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.surface_2, 0.76f)));
     ImGui::BeginChild(
         "##element_metadata", ImVec2(0.0f, card_height), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);

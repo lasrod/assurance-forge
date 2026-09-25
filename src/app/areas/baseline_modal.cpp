@@ -2,10 +2,12 @@
 
 #include "core/audit/audit_baseline.h"
 #include "core/string_utils.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 
 #include "imgui.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace app::areas {
@@ -40,10 +42,11 @@ void RenderBaselineModal(BaselineModalState& state,
 
     ImVec2 viewport_center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(viewport_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(480.0f, 0.0f), ImGuiCond_Appearing);
+    const float popup_width = ui::gsn::DpiSize(480.0f);
+    ImGui::SetNextWindowSize(ImVec2(popup_width, 0.0f), ImGuiCond_Appearing);
     // Lock width to prevent the AlwaysAutoResize + GetContentRegionAvail()
     // feedback loop that grows the popup horizontally every frame.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(480.0f, 0.0f), ImVec2(480.0f, FLT_MAX));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, FLT_MAX));
 
     if (!ImGui::BeginPopupModal(popup_id.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
@@ -79,7 +82,14 @@ void RenderBaselineModal(BaselineModalState& state,
 
     ImGui::Spacing();
 
-    const float button_width = 110.0f;
+    const std::string cancel_label = AF_TR("Cancel");
+    const std::string create_label = AF_TR("Create");
+    // Equal widths so the right-aligned pair lines up; wide enough for either
+    // translated label.
+    const float frame_padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float button_width = std::max({ui::gsn::DpiSize(110.0f),
+                                         ImGui::CalcTextSize(cancel_label.c_str()).x + frame_padding,
+                                         ImGui::CalcTextSize(create_label.c_str()).x + frame_padding});
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float used = button_width * 2.0f + spacing;
     const float avail = ImGui::GetContentRegionAvail().x;
@@ -88,7 +98,7 @@ void RenderBaselineModal(BaselineModalState& state,
     ImGui::SameLine();
 
     bool close_requested = false;
-    if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button(cancel_label.c_str(), ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         close_requested = true;
     }
     ImGui::SameLine();
@@ -97,7 +107,7 @@ void RenderBaselineModal(BaselineModalState& state,
     const bool can_create = !trimmed_name.empty();
     if (!can_create)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("Create").c_str(), ImVec2(button_width, 0.0f))) {
+    if (ImGui::Button(create_label.c_str(), ImVec2(button_width, 0.0f))) {
         core::audit::CreateBaselineRequest req;
         req.name = trimmed_name;
         req.description = core::TrimWhitespace(state.description_buf);

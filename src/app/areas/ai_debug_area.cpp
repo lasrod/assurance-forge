@@ -5,6 +5,7 @@
 #include "core/guideline_catalog.h"
 #include "review/sccg/sccg_profile_selector.h"
 #include "review/sccg/sccg_review.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
 
@@ -12,6 +13,7 @@
 #include "imgui_stdlib.h"
 
 #include <algorithm>
+#include <string>
 #include <utility>
 
 namespace app::areas {
@@ -60,11 +62,19 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     }
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
-    const float spacing = ImGui::GetStyle().ItemSpacing.x;
-    const float left_width = 130.0f;
-    const float response_width = std::max(260.0f, available.x * 0.34f);
-    const float prompt_width = std::max(260.0f, available.x - left_width - response_width - spacing * 2.0f);
-    const float panel_height = std::max(120.0f, available.y);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float spacing = style.ItemSpacing.x;
+    // The action column holds one full-width button; it must fit the translated
+    // label inside the child's own padding.
+    const std::string review_label = AF_TR("AI Review");
+    const float left_width = std::max(ui::gsn::DpiSize(130.0f),
+                                      ImGui::CalcTextSize(review_label.c_str()).x + style.FramePadding.x * 2.0f +
+                                          style.WindowPadding.x * 2.0f);
+    const float minimum_column_width = ui::gsn::DpiSize(260.0f);
+    const float response_width = std::max(minimum_column_width, available.x * 0.34f);
+    const float prompt_width =
+        std::max(minimum_column_width, available.x - left_width - response_width - spacing * 2.0f);
+    const float panel_height = std::max(ui::gsn::DpiSize(120.0f), available.y);
 
     ImGui::BeginChild("##ai_debug_actions", ImVec2(left_width, panel_height), true);
     const bool review_enabled = !review_running && loaded_case && selected_element &&
@@ -88,7 +98,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
 
     if (!review_enabled)
         ImGui::BeginDisabled();
-    if (ImGui::Button(AF_TR("AI Review").c_str(), ImVec2(-1.0f, 0.0f)))
+    if (ImGui::Button(review_label.c_str(), ImVec2(-1.0f, 0.0f)))
         actions::AiReviewActions(state).BeginForSelection();
     DrawTooltipIfHovered(review_tooltip);
     if (!review_enabled)
@@ -100,7 +110,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     ImGui::TextUnformatted(AF_TR("Prompt").c_str());
     std::string prompt = ai_review.PendingPrompt();
     const float send_row_height = ImGui::GetFrameHeightWithSpacing();
-    const float prompt_height = std::max(80.0f, ImGui::GetContentRegionAvail().y - send_row_height);
+    const float prompt_height = std::max(ui::gsn::DpiSize(80.0f), ImGui::GetContentRegionAvail().y - send_row_height);
     ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::InputTextMultiline(
             "##ai_debug_prompt", &prompt, ImVec2(-1.0f, prompt_height), ImGuiInputTextFlags_AllowTabInput)) {

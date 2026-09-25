@@ -1,5 +1,6 @@
 #include "ui/widgets/splitter.h"
 
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/theme.h"
 
 namespace ui::widgets {
@@ -80,8 +81,10 @@ void DrawVerticalSplitter(const char* id,
     if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
         float cx = wp.x + ws.x * 0.5f;
-        ImGui::GetWindowDrawList()->AddLine(
-            ImVec2(cx, wp.y), ImVec2(cx, wp.y + ws.y), ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()), 2.0f);
+        ImGui::GetWindowDrawList()->AddLine(ImVec2(cx, wp.y),
+                                            ImVec2(cx, wp.y + ws.y),
+                                            ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()),
+                                            ui::gsn::DpiSize(2.0f));
     }
 
     bool core_drag = item_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f);
@@ -128,8 +131,10 @@ float DrawHorizontalSplitter(
     if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
         float cy = wp.y + ws.y * 0.5f;
-        ImGui::GetWindowDrawList()->AddLine(
-            ImVec2(wp.x, cy), ImVec2(wp.x + ws.x, cy), ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()), 2.0f);
+        ImGui::GetWindowDrawList()->AddLine(ImVec2(wp.x, cy),
+                                            ImVec2(wp.x + ws.x, cy),
+                                            ImGui::ColorConvertFloat4ToU32(SplitterHoverColor()),
+                                            ui::gsn::DpiSize(2.0f));
     }
 
     bool core_drag = item_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f);

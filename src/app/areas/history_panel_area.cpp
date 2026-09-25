@@ -4,6 +4,7 @@
 #include "app/areas/audit_data_cache.h"
 #include "core/audit/audit_diff.h"
 #include "core/audit/event_store.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/history_timeline_panel.h"
 
@@ -92,11 +93,11 @@ void RenderHistoryPanelContent(AppRuntimeState& state, const HistoryPanelAreaCal
         std::snprintf(author_buf, sizeof(author_buf), "%s", state.workbench.history_filter_author.c_str());
         ImGui::Text("%s", AF_TR("Filter:").c_str());
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(160.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(160.0f));
         if (ImGui::InputTextWithHint("##author", AF_TR("author").c_str(), author_buf, sizeof(author_buf)))
             state.workbench.history_filter_author = author_buf;
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(180.0f);
+        ImGui::SetNextItemWidth(ui::gsn::DpiSize(180.0f));
         const std::string any_command = AF_TR("(any command)");
         const char* current_cmd = state.workbench.history_filter_command.empty()
                                       ? any_command.c_str()

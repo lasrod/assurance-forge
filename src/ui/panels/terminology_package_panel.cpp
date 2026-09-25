@@ -3,6 +3,7 @@
 #include "core/string_utils.h"
 #include "core/terminology_text_utils.h"
 #include "imgui.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/danger_button.h"
@@ -226,13 +227,15 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             "##terms_table", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
         return;
 
-    ImGui::TableSetupColumn(AF_TR("Term").c_str(), ImGuiTableColumnFlags_WidthFixed, 130.0f);
-    ImGui::TableSetupColumn(AF_TR("Full Name / Display Name").c_str(), ImGuiTableColumnFlags_WidthFixed, 190.0f);
+    ImGui::TableSetupColumn(AF_TR("Term").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(130.0f));
+    ImGui::TableSetupColumn(
+        AF_TR("Full Name / Display Name").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(190.0f));
     ImGui::TableSetupColumn(AF_TR("Definition").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn(AF_TR("Categories").c_str(), ImGuiTableColumnFlags_WidthFixed, 140.0f);
-    ImGui::TableSetupColumn(AF_TR("External Reference").c_str(), ImGuiTableColumnFlags_WidthFixed, 160.0f);
-    ImGui::TableSetupColumn(AF_TR("Origin").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
-    ImGui::TableSetupColumn(AF_TR("Used In").c_str(), ImGuiTableColumnFlags_WidthFixed, 72.0f);
+    ImGui::TableSetupColumn(AF_TR("Categories").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(140.0f));
+    ImGui::TableSetupColumn(
+        AF_TR("External Reference").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(160.0f));
+    ImGui::TableSetupColumn(AF_TR("Origin").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(120.0f));
+    ImGui::TableSetupColumn(AF_TR("Used In").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(72.0f));
     ImGui::TableHeadersRow();
 
     int visible_rows = 0;
@@ -311,7 +314,7 @@ void RenderCategoryFilter(const TerminologyPackagePanelModel& model,
                           const TerminologyPackagePanelCallbacks& callbacks) {
     const std::string active_filter = model.category_filter_buffer ? model.category_filter_buffer : "";
     const std::string preview = CategoryPreview(model);
-    ImGui::SetNextItemWidth(220.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(220.0f));
     if (ImGui::BeginCombo((AF_TR("Category filter") + "##category_filter").c_str(), preview.c_str())) {
         if (ImGui::Selectable(AF_TR("All categories").c_str(), active_filter.empty()) && callbacks.set_category_filter)
             callbacks.set_category_filter("");
@@ -338,10 +341,10 @@ void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
             "##categories_table", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
         return;
 
-    ImGui::TableSetupColumn(AF_TR("ID").c_str(), ImGuiTableColumnFlags_WidthFixed, 120.0f);
-    ImGui::TableSetupColumn(AF_TR("Name").c_str(), ImGuiTableColumnFlags_WidthFixed, 180.0f);
+    ImGui::TableSetupColumn(AF_TR("ID").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(120.0f));
+    ImGui::TableSetupColumn(AF_TR("Name").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(180.0f));
     ImGui::TableSetupColumn(AF_TR("Description").c_str(), ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn(AF_TR("Used By").c_str(), ImGuiTableColumnFlags_WidthFixed, 80.0f);
+    ImGui::TableSetupColumn(AF_TR("Used By").c_str(), ImGuiTableColumnFlags_WidthFixed, ui::gsn::DpiSize(80.0f));
     ImGui::TableHeadersRow();
 
     for (const auto& category : model.package->categories) {
@@ -428,7 +431,7 @@ void ShowTerminologyPackagePanel(TerminologyPackagePanelModel model,
     if (ImGui::InputTextMultiline((AF_TR("Package description") + "##package_description").c_str(),
                                   model.description_buffer,
                                   model.description_buffer_size,
-                                  ImVec2(-1.0f, 96.0f),
+                                  ImVec2(-1.0f, ui::gsn::DpiSize(96.0f)),
                                   text_flags) &&
         callbacks.apply_changes && !locked) {
         callbacks.apply_changes();

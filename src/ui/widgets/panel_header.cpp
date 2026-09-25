@@ -1,6 +1,7 @@
 #include "ui/widgets/panel_header.h"
 
 #include "ui/fonts.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/theme.h"
 
 #include "imgui.h"
@@ -32,8 +33,8 @@ void PanelHeader(const char* icon, std::string_view title) {
     // Snap the small header geometry to whole framebuffer pixels. At fractional
     // DPI coordinates the icon tile and the 1px rule otherwise look subtly
     // offset even though their mathematical centres match.
-    const float header_height = std::round(ImGui::GetFrameHeight() + 10.0f);
-    const float icon_size = std::round(ImGui::GetFontSize() + 8.0f);
+    const float header_height = std::round(ImGui::GetFrameHeight() + ui::gsn::DpiSize(10.0f));
+    const float icon_size = std::round(ImGui::GetFontSize() + ui::gsn::DpiSize(8.0f));
     const float icon_x = std::round(origin.x);
     const float icon_y = std::round(origin.y + (header_height - icon_size) * 0.5f);
     const float rule_y = std::round(origin.y + header_height) - 1.0f;
@@ -51,15 +52,16 @@ void PanelHeader(const char* icon, std::string_view title) {
     const char* safe_icon = icon != nullptr ? icon : "";
     const ImVec2 icon_text_size = ImGui::CalcTextSize(safe_icon);
     draw_list->AddText(ImVec2(std::round(icon_x + (icon_size - icon_text_size.x) * 0.5f),
-                              std::round(icon_y + (icon_size - icon_text_size.y) * 0.5f) - 1.0f),
+                              std::round(icon_y + (icon_size - icon_text_size.y) * 0.5f - ui::gsn::DpiSize(1.0f))),
                        theme.accent_hover,
                        safe_icon);
 
+    // Measured in the body font, before the strong font is pushed.
+    const float title_x = icon_x + icon_size + ui::gsn::DpiSize(9.0f);
     {
         fonts::Scoped strong(fonts::Role::BodyStrong);
         const float text_y = std::round(origin.y + (header_height - ImGui::GetTextLineHeight()) * 0.5f);
-        draw_list->AddText(
-            ImVec2(icon_x + icon_size + 9.0f, text_y), theme.text_primary, title.data(), title.data() + title.size());
+        draw_list->AddText(ImVec2(title_x, text_y), theme.text_primary, title.data(), title.data() + title.size());
     }
 
     // Reserves the header's height as a real layout item. `Dummy` adds

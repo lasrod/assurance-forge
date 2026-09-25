@@ -1,6 +1,7 @@
 #include "ui/tree_view.h"
 
 #include "hello_imgui/icons_font_awesome_4.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/text_ellipsis.h"
@@ -100,12 +101,12 @@ DrawDropFeedback(const ImVec2& item_min, const ImVec2& item_max, core::TreeDropM
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     if (drop_mode == core::TreeDropMode::AsChild) {
         draw_list->AddRectFilled(item_min, item_max, WithAlpha(GetTheme().accent, 0.18f));
-        draw_list->AddRect(item_min, item_max, color, 0.0f, 0, 1.5f);
+        draw_list->AddRect(item_min, item_max, color, 0.0f, 0, gsn::DpiSize(1.5f));
         return;
     }
 
     const float y = drop_mode == core::TreeDropMode::Before ? item_min.y : item_max.y;
-    draw_list->AddLine(ImVec2(item_min.x, y), ImVec2(item_max.x, y), color, 2.0f);
+    draw_list->AddLine(ImVec2(item_min.x, y), ImVec2(item_max.x, y), color, gsn::DpiSize(2.0f));
 }
 
 static std::string PayloadElementId(const ImGuiPayload* payload) {
@@ -157,9 +158,9 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
     if (state.selected_element_id == node->id)
         flags |= ImGuiTreeNodeFlags_Selected;
 
-    constexpr float kArrowIconGapTightenPx = 6.0f;
+    const float arrow_icon_gap_tighten = gsn::DpiSize(6.0f);
     const float label_x =
-        ImGui::GetCursorScreenPos().x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - kArrowIconGapTightenPx);
+        ImGui::GetCursorScreenPos().x + std::max(0.0f, ImGui::GetTreeNodeToLabelSpacing() - arrow_icon_gap_tighten);
     // Render arrow + selection background only; the visible label is drawn
     // directly onto the draw list so no extra ImGui items are created that
     // could intercept hover / click events on the tree node.
@@ -288,7 +289,8 @@ static bool RenderSingleTreeNode(const core::TreeNode* node,
                 break;
             }
             const float radius = ImGui::GetFontSize() * 0.45f;
-            const ImVec2 button_size(radius * 2.0f + 2.0f, radius * 2.0f + 2.0f);
+            const float button_extent = radius * 2.0f + gsn::DpiSize(2.0f);
+            const ImVec2 button_size(button_extent, button_extent);
             const ImVec2 button_pos = ImGui::GetCursorScreenPos();
             ImGui::PushID(node->id.c_str());
             const bool badge_clicked =
@@ -397,7 +399,7 @@ void ShowTreeViewPanel(const core::AssuranceTree* tree,
 
     const ImVec2 window_padding = ImGui::GetStyle().WindowPadding;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1.0f, window_padding.y));
-    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, gsn::DpiSize(8.0f));
     if (ImGui::BeginChild("TreeViewScroll", ImVec2(0, 0), false)) {
         // Two-column table: stretchy tree column + fixed-width badge column on
         // the right so the alert badge doesn't overlap the node label.

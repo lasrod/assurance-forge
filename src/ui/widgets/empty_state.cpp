@@ -1,5 +1,6 @@
 #include "ui/widgets/empty_state.h"
 
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/theme.h"
 
 #include "imgui.h"
@@ -41,7 +42,7 @@ void EmptyState(const std::string& message, const std::string& detail) {
     const ImVec2 available = ImGui::GetContentRegionAvail();
     // Wrap before centring so a long sentence in a narrow panel measures at the
     // width it will actually occupy rather than as one very long line.
-    const float wrap_width = std::max(120.0f, available.x * 0.8f);
+    const float wrap_width = std::max(ui::gsn::DpiSize(120.0f), available.x * 0.8f);
 
     const ImVec2 message_size = ImGui::CalcTextSize(message.c_str(), nullptr, false, wrap_width);
     float block_height = message_size.y;

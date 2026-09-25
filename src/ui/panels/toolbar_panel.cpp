@@ -1,5 +1,6 @@
 #include "ui/panels/toolbar_panel.h"
 
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
@@ -12,8 +13,11 @@
 namespace ui::panels {
 namespace {
 
-constexpr float kButtonPadding = 8.0f;
-constexpr float kSeparatorPadding = 6.0f;
+using ui::gsn::DpiSize;
+
+float ButtonPadding() {
+    return DpiSize(8.0f);
+}
 
 // Every glyph here was checked against the bundled fontawesome-webfont.ttf
 // cmap, not just against the header: the header carries FontAwesome 5 names
@@ -75,8 +79,9 @@ bool DrawButton(const ToolbarButton& button,
     if (enabled && needs_attention) {
         const ImVec2 item_min = ImGui::GetItemRectMin();
         const ImVec2 item_max = ImGui::GetItemRectMax();
+        const float dot_inset = DpiSize(5.0f);
         ImGui::GetWindowDrawList()->AddCircleFilled(
-            ImVec2(item_max.x - 5.0f, item_min.y + 5.0f), 2.25f, GetTheme().attention);
+            ImVec2(item_max.x - dot_inset, item_min.y + dot_inset), DpiSize(2.25f), GetTheme().attention);
         ImGui::PopStyleColor(3);
     }
 
@@ -98,7 +103,7 @@ bool DrawButton(const ToolbarButton& button,
 // A hairline divider that occupies layout space, so the buttons after it are
 // spaced by it rather than drawn over it.
 void DrawSeparator(float height) {
-    ImGui::SameLine(0.0f, kSeparatorPadding);
+    ImGui::SameLine(0.0f, DpiSize(6.0f));
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float inset = height * 0.25f;
     ImGui::GetWindowDrawList()->AddLine(
@@ -128,7 +133,7 @@ bool IsActionEnabled(const ToolbarModel& model, ToolbarAction action) {
 }
 
 float ToolbarHeight() {
-    return ImGui::GetFrameHeight() + kButtonPadding * 2.0f;
+    return ImGui::GetFrameHeight() + ButtonPadding() * 2.0f;
 }
 
 void ShowToolbar(const ToolbarModel& model, const ToolbarCallbacks& callbacks, float top_y) {
@@ -140,8 +145,8 @@ void ShowToolbar(const ToolbarModel& model, const ToolbarCallbacks& callbacks, f
     ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, height));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kButtonPadding, kButtonPadding));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ButtonPadding(), ButtonPadding()));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(DpiSize(2.0f), 0.0f));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::ColorConvertU32ToFloat4(theme.surface_1));
     // Flat until hovered, so the bar reads as chrome rather than as a row of
     // competing controls.
@@ -164,7 +169,7 @@ void ShowToolbar(const ToolbarModel& model, const ToolbarCallbacks& callbacks, f
         // Buttons sit on one row; without this each would start a new line and
         // only the first would be inside the bar's height.
         if (!first)
-            ImGui::SameLine(0.0f, 2.0f);
+            ImGui::SameLine(0.0f, DpiSize(2.0f));
         first = false;
         if (DrawButton(
                 {action, icon}, IsActionEnabled(model, action), button_height, shortcut, show_label, needs_attention) &&

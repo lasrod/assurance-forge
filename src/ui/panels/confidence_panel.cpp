@@ -3,6 +3,7 @@
 #include "ui/confidence_model.h"
 #include "ui/fonts.h"
 #include "ui/gsn/gsn_canvas.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
@@ -18,9 +19,19 @@ namespace ui::panels {
 
 namespace {
 
-constexpr float kTrianglePadding = 28.0f;
-constexpr float kTriangleMinHeight = 190.0f;
-constexpr float kTriangleMaxHeight = 260.0f;
+using ui::gsn::DpiSize;
+
+float TrianglePadding() {
+    return DpiSize(28.0f);
+}
+
+float TriangleMinHeight() {
+    return DpiSize(190.0f);
+}
+
+float TriangleMaxHeight() {
+    return DpiSize(260.0f);
+}
 
 void ConfidenceFieldLabel(std::string_view label) {
     const Theme& theme = GetTheme();
@@ -32,16 +43,16 @@ void ConfidenceFieldLabel(std::string_view label) {
 
 void ConfidenceMetadataRow(std::string_view label, std::string_view value) {
     ConfidenceFieldLabel(label);
-    ImGui::SameLine(0.0f, 7.0f);
+    ImGui::SameLine(0.0f, DpiSize(7.0f));
     fonts::Scoped strong(fonts::Role::BodyStrong);
     ImGui::TextUnformatted(value.data(), value.data() + value.size());
 }
 
 void ConfidenceSectionHeader() {
     const Theme& theme = GetTheme();
-    ImGui::Dummy(ImVec2(0.0f, 5.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(5.0f)));
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(theme.accent), "%s", ICON_FA_CHECK_CIRCLE);
-    ImGui::SameLine(0.0f, 7.0f);
+    ImGui::SameLine(0.0f, DpiSize(7.0f));
     {
         fonts::Scoped strong(fonts::Role::BodyStrong);
         ImGui::TextUnformatted(AF_TR("Confidence").c_str());
@@ -49,7 +60,7 @@ void ConfidenceSectionHeader() {
     ImGui::PushStyleColor(ImGuiCol_Separator, ImGui::ColorConvertU32ToFloat4(WithAlpha(theme.border, 0.72f)));
     ImGui::Separator();
     ImGui::PopStyleColor();
-    ImGui::Dummy(ImVec2(0.0f, 2.0f));
+    ImGui::Dummy(ImVec2(0.0f, DpiSize(2.0f)));
 }
 
 ImVec2 ToImVec2(ConfidencePoint point) {
@@ -82,7 +93,7 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     const float available_width = ImGui::GetContentRegionAvail().x;
     const float value_width = ImGui::CalcTextSize("0.00").x;
     const float label_width = ImGui::CalcTextSize(display_label.c_str()).x;
-    const float bar_height = std::max(8.0f, line_height * 0.52f);
+    const float bar_height = std::max(DpiSize(8.0f), line_height * 0.52f);
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(display_label.c_str());
@@ -96,7 +107,7 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     ImGui::Text("%.2f", value);
 
     const ImVec2 cursor = ImGui::GetCursorScreenPos();
-    const ImVec2 size(std::max(24.0f, ImGui::GetContentRegionAvail().x), line_height + 2.0f);
+    const ImVec2 size(std::max(DpiSize(24.0f), ImGui::GetContentRegionAvail().x), line_height + DpiSize(2.0f));
     ImGui::InvisibleButton("##bar", size);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
@@ -118,8 +129,9 @@ void DrawOpinionSliderBar(const char* label, SubjectiveOpinion& opinion, Opinion
     draw_list->AddRectFilled(
         min, max, WithAlpha(theme.surface_3, hovered || active ? 0.86f : 0.60f), bar_height * 0.5f);
     draw_list->AddRectFilled(min, ImVec2(fill_x, max.y), WithAlpha(color, active ? 1.0f : 0.88f), bar_height * 0.5f);
-    draw_list->AddCircleFilled(ImVec2(fill_x, (min.y + max.y) * 0.5f), active ? 6.0f : 4.8f, theme.text_primary, 18);
-    draw_list->AddCircleFilled(ImVec2(fill_x, (min.y + max.y) * 0.5f), active ? 4.0f : 3.0f, color, 18);
+    const ImVec2 thumb_center(fill_x, (min.y + max.y) * 0.5f);
+    draw_list->AddCircleFilled(thumb_center, DpiSize(active ? 6.0f : 4.8f), theme.text_primary, 18);
+    draw_list->AddCircleFilled(thumb_center, DpiSize(active ? 4.0f : 3.0f), color, 18);
 
     if (hovered || active)
         ImGui::SetTooltip("%s", ui::i18n::trf("Drag to adjust {0}", display_label).c_str());
@@ -145,17 +157,22 @@ bool DrawSegmentButton(const char* label, bool selected, float width) {
 }
 
 void DrawModeSelector(ElementConfidence& confidence) {
-    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float gap = style.ItemSpacing.x;
     const float available = ImGui::GetContentRegionAvail().x;
-    const float button_width = std::max(92.0f, (available - gap) * 0.5f);
+    const std::string direct_label = AF_TR("Direct value");
+    const std::string triangle_label = AF_TR("Opinion triangle");
+    const float label_width =
+        std::max(ImGui::CalcTextSize(direct_label.c_str()).x, ImGui::CalcTextSize(triangle_label.c_str()).x);
+    const float minimum_width = std::max(DpiSize(92.0f), label_width + style.FramePadding.x * 2.0f);
+    const float button_width = std::max(minimum_width, (available - gap) * 0.5f);
 
-    if (DrawSegmentButton(
-            AF_TR("Direct value").c_str(), confidence.mode == ConfidenceInputMode::DirectValue, button_width)) {
+    if (DrawSegmentButton(direct_label.c_str(), confidence.mode == ConfidenceInputMode::DirectValue, button_width)) {
         confidence.mode = ConfidenceInputMode::DirectValue;
     }
     ImGui::SameLine();
     if (DrawSegmentButton(
-            AF_TR("Opinion triangle").c_str(), confidence.mode == ConfidenceInputMode::OpinionTriangle, button_width)) {
+            triangle_label.c_str(), confidence.mode == ConfidenceInputMode::OpinionTriangle, button_width)) {
         confidence.mode = ConfidenceInputMode::OpinionTriangle;
     }
 }
@@ -190,7 +207,7 @@ void DrawProjectedConfidence(float value) {
     if (ui::gsn::g_BoldFont)
         ImGui::PopFont();
 
-    ImGui::ProgressBar(value, ImVec2(-1.0f, 8.0f), "");
+    ImGui::ProgressBar(value, ImVec2(-1.0f, DpiSize(8.0f)), "");
 }
 
 void DrawFinalConfidence(float value, bool active) {
@@ -209,7 +226,7 @@ void DrawFinalConfidence(float value, bool active) {
     ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
                           ImGui::ColorConvertU32ToFloat4(
                               WithAlpha(active ? theme.accent : theme.text_secondary, active ? 0.90f : 0.22f)));
-    ImGui::ProgressBar(value, ImVec2(-1.0f, 10.0f), "");
+    ImGui::ProgressBar(value, ImVec2(-1.0f, DpiSize(10.0f)), "");
     ImGui::PopStyleColor(2);
 }
 
@@ -218,8 +235,8 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     NormalizeOpinion(opinion);
 
     ImVec2 size = requested_size;
-    size.x = std::max(180.0f, size.x);
-    size.y = std::max(kTriangleMinHeight, size.y);
+    size.x = std::max(DpiSize(180.0f), size.x);
+    size.y = std::max(TriangleMinHeight(), size.y);
 
     ImGui::PushID(id);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -231,10 +248,12 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     const float rounding = theme.rounding_panel;
     const ImVec2 surface_min = origin;
     const ImVec2 surface_max(origin.x + size.x, origin.y + size.y);
-    const float help_radius = 9.0f;
-    const ImVec2 help_center(surface_max.x - help_radius - 10.0f, surface_min.y + help_radius + 10.0f);
-    const ImVec2 help_min(help_center.x - help_radius - 2.0f, help_center.y - help_radius - 2.0f);
-    const ImVec2 help_max(help_center.x + help_radius + 2.0f, help_center.y + help_radius + 2.0f);
+    const float help_radius = DpiSize(9.0f);
+    const float help_inset = DpiSize(10.0f);
+    const float help_hit_margin = DpiSize(2.0f);
+    const ImVec2 help_center(surface_max.x - help_radius - help_inset, surface_min.y + help_radius + help_inset);
+    const ImVec2 help_min(help_center.x - help_radius - help_hit_margin, help_center.y - help_radius - help_hit_margin);
+    const ImVec2 help_max(help_center.x + help_radius + help_hit_margin, help_center.y + help_radius + help_hit_margin);
     const bool help_hovered = ImGui::IsMouseHoveringRect(help_min, help_max, true);
     const ImGuiID suppress_triangle_drag_id = ImGui::GetID("##suppress_triangle_drag");
     if (ImGui::IsItemActivated())
@@ -251,15 +270,16 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
                        WithAlpha(hovered || active ? theme.accent : theme.border, hovered || active ? 0.78f : 0.72f),
                        rounding,
                        0,
-                       hovered || active ? 1.6f : 1.0f);
+                       DpiSize(hovered || active ? 1.6f : 1.0f));
 
-    const float inner_width = std::max(80.0f, size.x - kTrianglePadding * 2.0f);
-    const float inner_height = std::max(80.0f, size.y - kTrianglePadding * 2.0f - 14.0f);
+    const float triangle_padding = TrianglePadding();
+    const float inner_width = std::max(DpiSize(80.0f), size.x - triangle_padding * 2.0f);
+    const float inner_height = std::max(DpiSize(80.0f), size.y - triangle_padding * 2.0f - DpiSize(14.0f));
     const float triangle_height = std::min(inner_height, inner_width * 0.86f);
     const float triangle_width = std::min(inner_width, triangle_height * 1.18f);
     const float left = origin.x + (size.x - triangle_width) * 0.5f;
     const float right = left + triangle_width;
-    const float top = origin.y + kTrianglePadding;
+    const float top = origin.y + triangle_padding;
     const float bottom = top + triangle_height;
 
     const ConfidencePoint uncertainty_vertex{origin.x + size.x * 0.5f, top};
@@ -283,53 +303,55 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
                                      uncertainty_vertex.y * t + disbelief_vertex.y * (1.0f - t)};
         const ConfidencePoint u_right{uncertainty_vertex.x * t + belief_vertex.x * (1.0f - t),
                                       uncertainty_vertex.y * t + belief_vertex.y * (1.0f - t)};
-        draw_list->AddLine(ToImVec2(u_left), ToImVec2(u_right), grid_color, 1.0f);
+        draw_list->AddLine(ToImVec2(u_left), ToImVec2(u_right), grid_color, DpiSize(1.0f));
 
         const ConfidencePoint d_top{disbelief_vertex.x * t + uncertainty_vertex.x * (1.0f - t),
                                     disbelief_vertex.y * t + uncertainty_vertex.y * (1.0f - t)};
         const ConfidencePoint d_bottom{disbelief_vertex.x * t + belief_vertex.x * (1.0f - t),
                                        disbelief_vertex.y * t + belief_vertex.y * (1.0f - t)};
-        draw_list->AddLine(ToImVec2(d_top), ToImVec2(d_bottom), grid_color, 1.0f);
+        draw_list->AddLine(ToImVec2(d_top), ToImVec2(d_bottom), grid_color, DpiSize(1.0f));
 
         const ConfidencePoint b_top{belief_vertex.x * t + uncertainty_vertex.x * (1.0f - t),
                                     belief_vertex.y * t + uncertainty_vertex.y * (1.0f - t)};
         const ConfidencePoint b_bottom{belief_vertex.x * t + disbelief_vertex.x * (1.0f - t),
                                        belief_vertex.y * t + disbelief_vertex.y * (1.0f - t)};
-        draw_list->AddLine(ToImVec2(b_top), ToImVec2(b_bottom), grid_color, 1.0f);
+        draw_list->AddLine(ToImVec2(b_top), ToImVec2(b_bottom), grid_color, DpiSize(1.0f));
     }
 
-    draw_list->AddLine(
-        uncertainty, ImVec2((disbelief.x + belief.x) * 0.5f, bottom), WithAlpha(theme.border_strong, 0.44f), 1.2f);
+    draw_list->AddLine(uncertainty,
+                       ImVec2((disbelief.x + belief.x) * 0.5f, bottom),
+                       WithAlpha(theme.border_strong, 0.44f),
+                       DpiSize(1.2f));
     draw_list->AddLine(disbelief,
                        ImVec2((uncertainty.x + belief.x) * 0.5f, (uncertainty.y + belief.y) * 0.5f),
                        WithAlpha(theme.border_strong, 0.36f),
-                       1.0f);
+                       DpiSize(1.0f));
     draw_list->AddLine(belief,
                        ImVec2((uncertainty.x + disbelief.x) * 0.5f, (uncertainty.y + disbelief.y) * 0.5f),
                        WithAlpha(theme.border_strong, 0.36f),
-                       1.0f);
-    draw_list->AddTriangle(uncertainty, disbelief, belief, WithAlpha(theme.border_strong, 0.95f), 1.8f);
+                       DpiSize(1.0f));
+    draw_list->AddTriangle(uncertainty, disbelief, belief, WithAlpha(theme.border_strong, 0.95f), DpiSize(1.8f));
 
-    const bool labels_fit = size.x >= 230.0f;
+    const bool labels_fit = size.x >= DpiSize(230.0f);
     DrawTextCentered(draw_list,
-                     ImVec2(uncertainty.x, std::max(origin.y + 10.0f, uncertainty.y - 15.0f)),
+                     ImVec2(uncertainty.x, std::max(origin.y + DpiSize(10.0f), uncertainty.y - DpiSize(15.0f))),
                      AF_TR("Uncertainty").c_str(),
                      theme.text_secondary);
     DrawTextCentered(draw_list,
-                     ImVec2(disbelief.x + (labels_fit ? 22.0f : 12.0f), disbelief.y + 16.0f),
+                     ImVec2(disbelief.x + DpiSize(labels_fit ? 22.0f : 12.0f), disbelief.y + DpiSize(16.0f)),
                      AF_TR("Disbelief").c_str(),
                      theme.text_secondary);
     DrawTextCentered(draw_list,
-                     ImVec2(belief.x - (labels_fit ? 16.0f : 8.0f), belief.y + 16.0f),
+                     ImVec2(belief.x - DpiSize(labels_fit ? 16.0f : 8.0f), belief.y + DpiSize(16.0f)),
                      AF_TR("Belief").c_str(),
                      theme.text_secondary);
 
     if (labels_fit) {
-        const auto marker_position = [centroid](ImVec2 vertex) {
+        const float inset = DpiSize(18.0f);
+        const auto marker_position = [centroid, inset](ImVec2 vertex) {
             const float dx = centroid.x - vertex.x;
             const float dy = centroid.y - vertex.y;
             const float length = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
-            constexpr float inset = 18.0f;
             return ImVec2(vertex.x + dx / length * inset, vertex.y + dy / length * inset);
         };
         DrawTextCentered(draw_list, marker_position(uncertainty), "1", WithAlpha(theme.text_muted, 0.80f));
@@ -347,9 +369,11 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
 
     const ConfidencePoint selected_point = OpinionToPoint(opinion, uncertainty_vertex, disbelief_vertex, belief_vertex);
     const ImVec2 marker = ToImVec2(selected_point);
-    const float marker_radius = active ? 7.0f : hovered ? 6.5f : 5.8f;
-    draw_list->AddCircleFilled(marker, marker_radius + 6.0f, WithAlpha(theme.accent_hover, active ? 0.24f : 0.14f), 32);
-    draw_list->AddCircle(marker, marker_radius + 2.0f, WithAlpha(theme.text_primary, 0.88f), 32, 1.2f);
+    const float marker_radius = DpiSize(active ? 7.0f : hovered ? 6.5f : 5.8f);
+    draw_list->AddCircleFilled(
+        marker, marker_radius + DpiSize(6.0f), WithAlpha(theme.accent_hover, active ? 0.24f : 0.14f), 32);
+    draw_list->AddCircle(
+        marker, marker_radius + DpiSize(2.0f), WithAlpha(theme.text_primary, 0.88f), 32, DpiSize(1.2f));
     draw_list->AddCircleFilled(marker, marker_radius, theme.accent_hover, 32);
     draw_list->AddCircleFilled(ImVec2(marker.x - marker_radius * 0.30f, marker.y - marker_radius * 0.34f),
                                marker_radius * 0.35f,
@@ -359,7 +383,7 @@ void DrawOpinionTriangle(const char* id, SubjectiveOpinion& opinion, const ImVec
     const ImU32 help_fill = help_hovered ? WithAlpha(theme.accent, 0.92f) : WithAlpha(theme.surface_3, 0.90f);
     const ImU32 help_border = help_hovered ? theme.accent_hover : WithAlpha(theme.border_strong, 0.82f);
     draw_list->AddCircleFilled(help_center, help_radius, help_fill, 24);
-    draw_list->AddCircle(help_center, help_radius, help_border, 24, 1.2f);
+    draw_list->AddCircle(help_center, help_radius, help_border, 24, DpiSize(1.2f));
     DrawTextCentered(draw_list, help_center, "?", theme.text_primary);
 
     if (help_hovered) {
@@ -390,7 +414,7 @@ void DrawOpinionMode(ElementConfidence& confidence) {
     NormalizeOpinion(confidence.opinion);
 
     const float available_width = ImGui::GetContentRegionAvail().x;
-    const float triangle_height = std::clamp(available_width * 0.78f, kTriangleMinHeight, kTriangleMaxHeight);
+    const float triangle_height = std::clamp(available_width * 0.78f, TriangleMinHeight(), TriangleMaxHeight());
     DrawOpinionTriangle("opinion_triangle", confidence.opinion, ImVec2(available_width, triangle_height));
 
     ImGui::Spacing();

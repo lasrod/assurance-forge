@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/frame/app_shell.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/ui_state.h"
@@ -83,7 +84,7 @@ void RenderMenuBarStats() {
     //     the centering offset ImGui normally applies to menu-bar text).
     //   * Fixed width so it does not jiggle as the numbers change — sized from
     //     a worst-case template, with the live text right-aligned inside it.
-    const float pad_x = 8.0f;
+    const float pad_x = ui::gsn::DpiSize(8.0f);
     const float button_w = ImGui::CalcTextSize("FPS: 999.9  N 9999/9999  E 9999/9999").x + pad_x * 2.0f;
     const float bar_h = ImGui::GetFrameHeight();
 
@@ -106,14 +107,16 @@ void RenderMenuBarStats() {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     if (hovered) {
         const ui::Theme& th = ui::GetTheme();
-        dl->AddRectFilled(ImVec2(p0.x, p0.y + 2.0f),
-                          ImVec2(p0.x + button_w, p0.y + bar_h - 2.0f),
+        const float inset_y = ui::gsn::DpiSize(2.0f);
+        const float rounding = ui::gsn::DpiSize(4.0f);
+        dl->AddRectFilled(ImVec2(p0.x, p0.y + inset_y),
+                          ImVec2(p0.x + button_w, p0.y + bar_h - inset_y),
                           ui::WithAlpha(th.accent, 0.18f),
-                          4.0f);
-        dl->AddRect(ImVec2(p0.x, p0.y + 2.0f),
-                    ImVec2(p0.x + button_w, p0.y + bar_h - 2.0f),
+                          rounding);
+        dl->AddRect(ImVec2(p0.x, p0.y + inset_y),
+                    ImVec2(p0.x + button_w, p0.y + bar_h - inset_y),
                     ui::WithAlpha(th.accent, 0.9f),
-                    4.0f);
+                    rounding);
     }
 
     // Right-align the live text inside the fixed-width button and center it

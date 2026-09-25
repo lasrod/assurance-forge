@@ -63,7 +63,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     }
 
     ImGui::TextUnformatted(AF_TR("Provider").c_str());
-    ImGui::SetNextItemWidth(220.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(220.0f));
     ImGui::BeginDisabled();
     std::string provider_name = model.aiProviderName;
     provider_name.resize(provider_name.size() + 1, '\0');
@@ -71,7 +71,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     ImGui::EndDisabled();
 
     ImGui::TextUnformatted(AF_TR("Model").c_str());
-    ImGui::SetNextItemWidth(280.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(280.0f));
     if (model.modelBuffer && model.modelBufferSize > 0) {
         ImGui::InputText("##ai_model", model.modelBuffer, model.modelBufferSize);
     }
@@ -98,7 +98,7 @@ void RenderAiSection(PreferencesPanelModel model, const PreferencesPanelCallback
     }
 
     ImGuiInputTextFlags key_flags = ImGuiInputTextFlags_Password;
-    ImGui::SetNextItemWidth(360.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(360.0f));
     if (model.apiKeyBuffer && model.apiKeyBufferSize > 0) {
         ImGui::InputText("##openai_key", model.apiKeyBuffer, model.apiKeyBufferSize, key_flags);
     }
@@ -241,7 +241,7 @@ void RenderReviewSection(PreferencesPanelModel model, const PreferencesPanelCall
     ImGui::Separator();
 
     ImGui::TextUnformatted(AF_TR("Reviewer name").c_str());
-    ImGui::SetNextItemWidth(320.0f);
+    ImGui::SetNextItemWidth(ui::gsn::DpiSize(320.0f));
     if (model.reviewerNameBuffer && model.reviewerNameBufferSize > 0) {
         ImGui::InputText("##reviewer_name", model.reviewerNameBuffer, model.reviewerNameBufferSize);
     }
@@ -274,7 +274,7 @@ void ShowPreferencesWindow(bool& open, PreferencesPanelModel model, const Prefer
     }
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(ImVec2(ui::gsn::DpiSize(560.0f), 0.0f), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal(preferences_popup_id.c_str(),
                                &open,
                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {

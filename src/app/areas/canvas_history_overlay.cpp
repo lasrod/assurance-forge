@@ -18,6 +18,7 @@
 #include "ui/element_context_menu.h"
 #include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/gsn/gsn_canvas_renderer.h"
 #include "ui/timeline/timeline_widget.h"
@@ -346,22 +347,28 @@ void RenderCanvasDivergenceBanner(AppRuntimeState& state, const WorkbenchAreaCal
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
 
-        const float button_width = 120.0f;
+        const std::string cancel_label = AF_TR("Cancel");
+        const std::string reconcile_label = AF_TR("Reconcile");
+        // Equal widths so the right-aligned pair lines up; wide enough for either
+        // translated label.
+        const float frame_padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+        const float button_width = std::max({ui::gsn::DpiSize(120.0f),
+                                             ImGui::CalcTextSize(cancel_label.c_str()).x + frame_padding,
+                                             ImGui::CalcTextSize(reconcile_label.c_str()).x + frame_padding});
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
         const float avail = ImGui::GetContentRegionAvail().x;
         const float used = button_width * 2.0f + spacing;
         if (avail > used)
             ImGui::Dummy(ImVec2(avail - used, 0.0f));
         ImGui::SameLine();
-        if (ImGui::Button(AF_TR("Cancel").c_str(), ImVec2(button_width, 0.0f)) ||
-            ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (ImGui::Button(cancel_label.c_str(), ImVec2(button_width, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.20f, 0.20f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.25f, 0.25f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.55f, 0.15f, 0.15f, 1.0f));
-        if (ImGui::Button(AF_TR("Reconcile").c_str(), ImVec2(button_width, 0.0f))) {
+        if (ImGui::Button(reconcile_label.c_str(), ImVec2(button_width, 0.0f))) {
             if (callbacks.reconcile_audit_store)
                 callbacks.reconcile_audit_store();
             ImGui::CloseCurrentPopup();

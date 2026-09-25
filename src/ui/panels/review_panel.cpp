@@ -2,6 +2,7 @@
 
 #include "core/string_utils.h"
 #include "imgui.h"
+#include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/theme.h"
@@ -74,24 +75,24 @@ std::string FieldDisplayLabel(const std::string& field) {
 }
 
 ImVec2 ProposalHoverCardPosition(ImVec2 item_min, ImVec2 item_max) {
-    constexpr float kOffset = 8.0f;
-    constexpr float kEstimatedWidth = 360.0f;
+    const float offset = ui::gsn::DpiSize(8.0f);
+    const float estimated_width = ui::gsn::DpiSize(360.0f);
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const ImVec2 work_min = viewport ? viewport->WorkPos : ImVec2(0.0f, 0.0f);
     const ImVec2 work_max =
         viewport ? ImVec2(viewport->WorkPos.x + viewport->WorkSize.x, viewport->WorkPos.y + viewport->WorkSize.y)
                  : ImVec2(FLT_MAX, FLT_MAX);
 
-    float x = item_max.x + kOffset;
-    if (x + kEstimatedWidth > work_max.x) {
-        x = item_min.x - kEstimatedWidth - kOffset;
+    float x = item_max.x + offset;
+    if (x + estimated_width > work_max.x) {
+        x = item_min.x - estimated_width - offset;
     }
-    x = std::max(work_min.x + kOffset, std::min(x, work_max.x - kEstimatedWidth - kOffset));
+    x = std::max(work_min.x + offset, std::min(x, work_max.x - estimated_width - offset));
 
     float y = item_min.y;
     const float line_height = ImGui::GetTextLineHeightWithSpacing();
     if (y + line_height * 8.0f > work_max.y) {
-        y = std::max(work_min.y + kOffset, work_max.y - line_height * 8.0f);
+        y = std::max(work_min.y + offset, work_max.y - line_height * 8.0f);
     }
     return ImVec2(x, y);
 }
@@ -103,7 +104,8 @@ void RenderProposalOriginalTextHoverCard(const std::vector<ProposalTextChangePre
         return;
 
     ImGui::SetNextWindowPos(ProposalHoverCardPosition(item_min, item_max), ImGuiCond_Always);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 0.0f), ImVec2(420.0f, FLT_MAX));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(ui::gsn::DpiSize(280.0f), 0.0f),
+                                        ImVec2(ui::gsn::DpiSize(420.0f), FLT_MAX));
     const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                    ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar |
@@ -111,7 +113,7 @@ void RenderProposalOriginalTextHoverCard(const std::vector<ProposalTextChangePre
     if (ImGui::Begin("Original Text##proposal_original_text_hover", nullptr, flags)) {
         ImGui::TextUnformatted(AF_TR("Original text").c_str());
         ImGui::Separator();
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ui::gsn::DpiSize(380.0f));
         for (size_t index = 0; index < changes.size(); ++index) {
             if (index > 0)
                 ImGui::Separator();

@@ -64,6 +64,30 @@ TEST(AppTheme, AppliesReadableFloatingWindowAndTreeStyle) {
     ImGui::DestroyContext();
 }
 
+TEST(AppTheme, RepeatedThemeSwitchesKeepDpiScaleWithoutCompounding) {
+    ImGui::CreateContext();
+
+    // Seed the state the runner leaves at 200% DPI: a themed 1x style, then one
+    // ScaleAllSizes call and a matching font DPI scale.
+    ui::ApplyAppTheme(ui::AppTheme::Dark);
+    ImGui::GetStyle().ScaleAllSizes(2.0f);
+    ImGui::GetStyle().FontScaleDpi = 2.0f;
+    const ImGuiStyle scaled = ImGui::GetStyle();
+    ASSERT_FLOAT_EQ(scaled.IndentSpacing, 30.0f);
+
+    for (int switch_index = 0; switch_index < 6; ++switch_index) {
+        ui::ApplyAppTheme(switch_index % 2 == 0 ? ui::AppTheme::Light : ui::AppTheme::Dark);
+        const ImGuiStyle& style = ImGui::GetStyle();
+        EXPECT_FLOAT_EQ(style._MainScale, 2.0f) << "switch " << switch_index;
+        EXPECT_FLOAT_EQ(style.FontScaleDpi, 2.0f) << "switch " << switch_index;
+        EXPECT_FLOAT_EQ(style.IndentSpacing, scaled.IndentSpacing) << "switch " << switch_index;
+        EXPECT_FLOAT_EQ(style.WindowPadding.x, scaled.WindowPadding.x) << "switch " << switch_index;
+        EXPECT_FLOAT_EQ(style.FramePadding.y, scaled.FramePadding.y) << "switch " << switch_index;
+    }
+
+    ImGui::DestroyContext();
+}
+
 TEST(AppTheme, LightThemeSelectedTabIsVisiblyDistinct) {
     ImGui::CreateContext();
 
