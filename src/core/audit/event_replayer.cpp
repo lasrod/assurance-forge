@@ -382,11 +382,19 @@ bool ApplyEvent(ReplayState& state, std::uint64_t tx_seq, const AuditEvent& even
             return false;
         if (!require_string("generated_relationship_id", relationship_id))
             return false;
+        // A `CreateAwayGoal` is replayed without the cited-kind check: logs from
+        // before the kinds were told apart can hold an away goal citing an
+        // assumption or justification, and replay rebuilds what was recorded.
         std::string err;
-        if (!core::AddAwayElementWithIds(
-                state.model, &state.package, parent_id, cited_id, kind, element_id, relationship_id, err)) {
+        const bool installed =
+            type == "CreateAwayGoal"
+                ? core::AddAwayGoalWithIds(
+                      state.model, &state.package, parent_id, cited_id, element_id, relationship_id, err)
+                : core::AddAwayElementWithIds(
+                      state.model, &state.package, parent_id, cited_id, kind, element_id, relationship_id, err);
+        if (!installed) {
             out_error =
-                "AddAwayElementWithIds failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
+                "Away element install failed at " + FormatLocation(tx_seq, event.event_sequence, type) + ": " + err;
             return false;
         }
         return true;

@@ -270,7 +270,9 @@ bool AddAwayElementWithIds(parser::AssuranceCase& ac,
                            std::string& out_error);
 
 // The Away Goal forms of the four above, kept because the Away Goal command,
-// its replay and its tests were written against them.
+// its replay and its tests were written against them. AddAwayGoalWithIds alone
+// differs: it replays a `CreateAwayGoal` event, which may predate the kinds being
+// told apart, so it accepts any cited Claim rather than only a goal.
 bool CanAddAwayGoal(const parser::AssuranceCase& ac,
                     const sacm::AssuranceCasePackage* pkg,
                     const std::string& parent_id,

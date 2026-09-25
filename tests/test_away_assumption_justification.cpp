@@ -298,6 +298,73 @@ TEST(AwayAssumptionJustificationTest, GSN3_MOD_003_AnAwayGoalIsStillRecordedWith
     EXPECT_FALSE(event.payload.contains("kind"));
 }
 
+// An away goal under a strategy joins the strategy's single inference exactly as
+// a local sub-goal does. Before, it got an inference of its own whose target was
+// the strategy -- a different graph from the library path's -- and could not
+// replay the empty relationship id an extending sub-goal records.
+TEST(AwayAssumptionJustificationTest, GSN3_MOD_003_AnAwayGoalUnderAStrategyJoinsItsInference) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string strategy_id;
+    std::string error;
+    ASSERT_TRUE(core::AddChildElement(mc.ac, &mc.pkg, "G1", core::NewElementKind::Strategy, strategy_id, error))
+        << error;
+
+    std::string local_id;
+    std::string materialized_id;
+    ASSERT_TRUE(core::AddChildElement(
+        mc.ac, &mc.pkg, strategy_id, core::NewElementKind::Goal, local_id, materialized_id, error))
+        << error;
+    ASSERT_FALSE(materialized_id.empty());
+
+    std::string away_id;
+    std::string away_relationship_id;
+    ASSERT_TRUE(core::AddAwayGoal(mc.ac, &mc.pkg, strategy_id, "G2", away_id, away_relationship_id, error)) << error;
+    EXPECT_TRUE(away_relationship_id.empty()) << "extending the inference creates no relationship";
+
+    int inferences_of_strategy = 0;
+    for (const parser::SacmElement& element : mc.ac.elements) {
+        if (element.type != "assertedinference")
+            continue;
+        EXPECT_NE(element.target_refs, std::vector<std::string>{strategy_id}) << "no inference may target a strategy";
+        if (element.reasoning_ref == strategy_id) {
+            ++inferences_of_strategy;
+            EXPECT_EQ(element.target_refs, std::vector<std::string>{"G1"});
+            EXPECT_EQ(element.source_refs, (std::vector<std::string>{local_id, away_id}));
+        }
+    }
+    EXPECT_EQ(inferences_of_strategy, 1);
+
+    const parser::SacmElement* away = Find(mc.ac, away_id);
+    ASSERT_NE(away, nullptr);
+    EXPECT_TRUE(away->is_citation);
+    EXPECT_EQ(away->cited_element_id, "G2");
+    EXPECT_TRUE(core::IsAwayGoal(*away));
+
+    // Replaying the recorded event: an empty relationship id is what the live
+    // path wrote, so the replay entry point must accept it.
+    TwoModuleCase replay = MakeTwoModuleCase();
+    ASSERT_TRUE(core::AddChildElementWithIds(
+        replay.ac, &replay.pkg, "G1", core::NewElementKind::Strategy, strategy_id, "", error))
+        << error;
+    ASSERT_TRUE(core::AddChildElementWithIds(
+        replay.ac, &replay.pkg, strategy_id, core::NewElementKind::Goal, local_id, materialized_id, error))
+        << error;
+    EXPECT_TRUE(core::AddAwayGoalWithIds(replay.ac, &replay.pkg, strategy_id, "G2", away_id, "", error)) << error;
+}
+
+// The legacy replay entry point accepts any cited claim, as the menu that wrote
+// `CreateAwayGoal` events did; the live and kind-aware paths do not.
+TEST(AwayAssumptionJustificationTest, GSN3_MOD_003_OnlyTheLegacyReplayAcceptsAnAwayGoalCitingAnAssumption) {
+    TwoModuleCase mc = MakeTwoModuleCase();
+    std::string error;
+    EXPECT_FALSE(
+        core::AddAwayElementWithIds(mc.ac, &mc.pkg, "G1", "A2", core::AwayElementKind::Goal, "AG1", "R1", error));
+    EXPECT_EQ(error, "An away goal must cite a Goal.");
+    EXPECT_TRUE(core::AddAwayGoalWithIds(mc.ac, &mc.pkg, "G1", "A2", "AG1", "R1", error)) << error;
+    EXPECT_FALSE(core::AddAwayGoalWithIds(mc.ac, &mc.pkg, "G1", "G1", "AG2", "R2", error))
+        << "the other citation rules still apply";
+}
+
 // ---------------------------------------------------------------------------
 // Rendering: the SVG export is a separate renderer from the canvas.
 // ---------------------------------------------------------------------------

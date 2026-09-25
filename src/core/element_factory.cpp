@@ -282,15 +282,27 @@ bool InstallStrategy(parser::AssuranceCase& ac,
     return true;
 }
 
+parser::SacmElement NewLocalGoal(const std::string& element_id) {
+    parser::SacmElement goal;
+    goal.id = element_id;
+    goal.gsn_identifier = element_id;
+    goal.type = "claim";
+    goal.name = DefaultNameFor(NewElementKind::Goal);
+    return goal;
+}
+
 // A sub-goal added under a strategy becomes a source of the strategy's single
 // inference. The first sub-goal materializes {target = the goal the strategy
 // supports (its strategyTarget tag), reasoning = strategy, source = sub-goal},
 // consuming the render placeholder; later sub-goals extend that inference's
 // sources. Mirrors the proven seam sacm_adapter::apply_add_subgoal_under_strategy.
+//
+// `goal` is the claim to install -- a new local goal, or an away goal citing one
+// in another module, which joins the inference exactly as a local one would.
 bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
                                  sacm::ArgumentPackage* ap,
                                  const std::string& strategy_id,
-                                 const std::string& element_id,
+                                 parser::SacmElement goal,
                                  const std::string& relationship_id,
                                  std::string& out_error,
                                  std::string* out_created_relationship_id) {
@@ -305,11 +317,7 @@ bool InstallSubGoalUnderStrategy(parser::AssuranceCase& ac,
         }
     }
 
-    parser::SacmElement goal;
-    goal.id = element_id;
-    goal.gsn_identifier = element_id;
-    goal.type = "claim";
-    goal.name = DefaultNameFor(NewElementKind::Goal);
+    const std::string element_id = goal.id;
 
     if (existing != nullptr) {
         // Later sub-goal: extend the existing inference's sources (model + package).
@@ -457,7 +465,7 @@ bool InstallChildElement(parser::AssuranceCase& ac,
         return InstallStrategy(ac, ap, parent_id, element_id);
     if (kind == NewElementKind::Goal && ptype == "argumentreasoning")
         return InstallSubGoalUnderStrategy(
-            ac, ap, parent_id, element_id, relationship_id, out_error, out_created_relationship_id);
+            ac, ap, parent_id, NewLocalGoal(element_id), relationship_id, out_error, out_created_relationship_id);
 
     // Every other child creates its own relationship, which requires an id.
     if (relationship_id.empty()) {
@@ -945,18 +953,39 @@ bool ClaimIsKind(const parser::SacmElement& element, AwayElementKind kind) {
     return false;
 }
 
+// Whether the cited Claim must be the same kind of element as the away element.
+// Only a `CreateAwayGoal` recorded before the kinds were told apart is replayed
+// with `AnyClaim`: the menu then offered every claim, so such a log can hold an
+// away goal citing an assumption, and replay must rebuild what was recorded.
+enum class CitedKindRule {
+    MustMatch,
+    AnyClaim,
+};
+
+bool CheckAwayElement(const parser::AssuranceCase& ac,
+                      const sacm::AssuranceCasePackage* pkg,
+                      const std::string& parent_id,
+                      const std::string& cited_id,
+                      AwayElementKind kind,
+                      CitedKindRule rule,
+                      std::string& out_error);
+
 bool InstallAwayElement(parser::AssuranceCase& ac,
                         sacm::AssuranceCasePackage* pkg,
                         const std::string& parent_id,
                         const std::string& cited_id,
                         AwayElementKind kind,
+                        CitedKindRule rule,
                         const std::string& element_id,
                         const std::string& relationship_id,
-                        std::string& out_error) {
-    if (!CanAddAwayElement(ac, pkg, parent_id, cited_id, kind, out_error))
+                        std::string& out_error,
+                        std::string* out_created_relationship_id = nullptr) {
+    if (out_created_relationship_id)
+        out_created_relationship_id->clear();
+    if (!CheckAwayElement(ac, pkg, parent_id, cited_id, kind, rule, out_error))
         return false;
-    if (element_id.empty() || relationship_id.empty()) {
-        out_error = "Element and relationship ids must be non-empty.";
+    if (element_id.empty()) {
+        out_error = "Element id must be non-empty.";
         return false;
     }
 
@@ -973,6 +1002,22 @@ bool InstallAwayElement(parser::AssuranceCase& ac,
     // statement is written and the two would drift the moment either is edited.
     // Renderers resolve the text through `cited_element_id`.
 
+    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
+
+    // Under a strategy an away goal joins the strategy's single inference, as a
+    // local sub-goal does. An inference whose target is the strategy would be a
+    // different graph from the one the library path builds, and extending the
+    // inference creates no relationship, so its id is recorded empty.
+    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    if (kind == AwayElementKind::Goal && parent != nullptr && parent->type == "argumentreasoning")
+        return InstallSubGoalUnderStrategy(
+            ac, ap, parent_id, std::move(away), relationship_id, out_error, out_created_relationship_id);
+
+    if (relationship_id.empty()) {
+        out_error = "Relationship id must be non-empty.";
+        return false;
+    }
+
     // The away element is the SACM source and the parent the target: premise to
     // conclusion for a goal, context to what it is context for otherwise.
     parser::SacmElement rel;
@@ -981,7 +1026,6 @@ bool InstallAwayElement(parser::AssuranceCase& ac,
     rel.source_refs.push_back(element_id);
     rel.target_refs.push_back(parent_id);
 
-    sacm::ArgumentPackage* ap = FindOwningArgumentPackage(pkg, parent_id);
     if (ap) {
         MirrorClaim(ap, away);
         if (kind == AwayElementKind::Goal)
@@ -992,6 +1036,8 @@ bool InstallAwayElement(parser::AssuranceCase& ac,
 
     ac.elements.push_back(std::move(away));
     ac.elements.push_back(std::move(rel));
+    if (out_created_relationship_id)
+        *out_created_relationship_id = relationship_id;
     return true;
 }
 
@@ -1046,12 +1092,15 @@ bool IsAwayGoal(const parser::SacmElement& element) {
     return AwayElementKindOf(element) == AwayElementKind::Goal;
 }
 
-bool CanAddAwayElement(const parser::AssuranceCase& ac,
-                       const sacm::AssuranceCasePackage* pkg,
-                       const std::string& parent_id,
-                       const std::string& cited_id,
-                       AwayElementKind kind,
-                       std::string& out_error) {
+namespace {
+
+bool CheckAwayElement(const parser::AssuranceCase& ac,
+                      const sacm::AssuranceCasePackage* pkg,
+                      const std::string& parent_id,
+                      const std::string& cited_id,
+                      AwayElementKind kind,
+                      CitedKindRule rule,
+                      std::string& out_error) {
     out_error.clear();
     const std::string noun = NounFor(kind);
     const std::string article = ArticleFor(kind);
@@ -1083,7 +1132,8 @@ bool CanAddAwayElement(const parser::AssuranceCase& ac,
         out_error = "The cited " + noun + " is not in this assurance case.";
         return false;
     }
-    if (!ClaimIsKind(*cited, kind)) {
+    const bool cited_fits = rule == CitedKindRule::AnyClaim ? cited->type == "claim" : ClaimIsKind(*cited, kind);
+    if (!cited_fits) {
         std::string capitalized = noun;
         capitalized[0] = static_cast<char>(capitalized[0] - 'a' + 'A');
         out_error = "An away " + noun + " must cite " + article + " " + capitalized + ".";
@@ -1094,6 +1144,17 @@ bool CanAddAwayElement(const parser::AssuranceCase& ac,
         return false;
     }
     return true;
+}
+
+} // namespace
+
+bool CanAddAwayElement(const parser::AssuranceCase& ac,
+                       const sacm::AssuranceCasePackage* pkg,
+                       const std::string& parent_id,
+                       const std::string& cited_id,
+                       AwayElementKind kind,
+                       std::string& out_error) {
+    return CheckAwayElement(ac, pkg, parent_id, cited_id, kind, CitedKindRule::MustMatch, out_error);
 }
 
 bool PlanAwayElementIds(const parser::AssuranceCase& ac,
@@ -1127,11 +1188,23 @@ bool AddAwayElement(parser::AssuranceCase& ac,
     std::string relationship_id;
     if (!PlanAwayElementIds(ac, pkg, parent_id, cited_id, kind, element_id, relationship_id, out_error))
         return false;
-    if (!InstallAwayElement(ac, pkg, parent_id, cited_id, kind, element_id, relationship_id, out_error))
+    // Extending a strategy's inference creates no relationship, so the event must
+    // record an empty relationship id -- take the id actually created.
+    std::string created_relationship_id;
+    if (!InstallAwayElement(ac,
+                            pkg,
+                            parent_id,
+                            cited_id,
+                            kind,
+                            CitedKindRule::MustMatch,
+                            element_id,
+                            relationship_id,
+                            out_error,
+                            &created_relationship_id))
         return false;
 
     out_new_id = std::move(element_id);
-    out_new_relationship_id = std::move(relationship_id);
+    out_new_relationship_id = std::move(created_relationship_id);
     return true;
 }
 
@@ -1144,7 +1217,8 @@ bool AddAwayElementWithIds(parser::AssuranceCase& ac,
                            const std::string& relationship_id,
                            std::string& out_error) {
     out_error.clear();
-    return InstallAwayElement(ac, pkg, parent_id, cited_id, kind, element_id, relationship_id, out_error);
+    return InstallAwayElement(
+        ac, pkg, parent_id, cited_id, kind, CitedKindRule::MustMatch, element_id, relationship_id, out_error);
 }
 
 bool CanAddAwayGoal(const parser::AssuranceCase& ac,
@@ -1184,8 +1258,16 @@ bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
                         const std::string& element_id,
                         const std::string& relationship_id,
                         std::string& out_error) {
-    return AddAwayElementWithIds(
-        ac, pkg, parent_id, cited_id, AwayElementKind::Goal, element_id, relationship_id, out_error);
+    out_error.clear();
+    return InstallAwayElement(ac,
+                              pkg,
+                              parent_id,
+                              cited_id,
+                              AwayElementKind::Goal,
+                              CitedKindRule::AnyClaim,
+                              element_id,
+                              relationship_id,
+                              out_error);
 }
 
 std::vector<AwayCandidate> ListAwayElementCandidates(const parser::AssuranceCase& ac,
