@@ -11,6 +11,8 @@
 namespace app::frame {
 namespace {
 
+// Splitter sizes in reference pixels at 96 DPI, scaled with ui::gsn::DpiSize where
+// used so the hover stroke drawn inside a splitter stays within its window.
 constexpr float kSplitterThickness = 4.0f;
 constexpr float kSplitterHitPadding = 6.0f;
 constexpr float kMinPanelRatio = 0.10f;
@@ -27,11 +29,12 @@ void RenderAppSplitters(AppRuntimeState& state,
                         float left_w,
                         float center_w,
                         float top_y,
+                        float splitter_thickness,
                         float hit_padding,
                         ImGuiWindowFlags panel_flags) {
     ui::widgets::DrawVerticalSplitter("##left_splitter",
                                       left_w,
-                                      kSplitterThickness,
+                                      splitter_thickness,
                                       content_h,
                                       top_y,
                                       display_w,
@@ -42,10 +45,10 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       hit_padding,
                                       panel_flags);
 
-    const float center_x = left_w + kSplitterThickness;
+    const float center_x = left_w + splitter_thickness;
     ui::widgets::DrawVerticalSplitter("##right_splitter",
                                       center_x + center_w,
-                                      kSplitterThickness,
+                                      splitter_thickness,
                                       content_h,
                                       top_y,
                                       display_w,
@@ -56,7 +59,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                                       hit_padding,
                                       panel_flags);
 
-    const float available_h = content_h - kSplitterThickness;
+    const float available_h = content_h - splitter_thickness;
     if (available_h <= 0.0f)
         return;
 
@@ -75,7 +78,7 @@ void RenderAppSplitters(AppRuntimeState& state,
 
     const float splitter_y = top_y + available_h * state.layout.project_boundary_ratio;
     const float delta = ui::widgets::DrawHorizontalSplitter(
-        "##left_h_splitter_1", 0.0f, splitter_y, left_w, kSplitterThickness, hit_padding, panel_flags);
+        "##left_h_splitter_1", 0.0f, splitter_y, left_w, splitter_thickness, hit_padding, panel_flags);
     if (delta != 0.0f) {
         state.layout.project_boundary_ratio += delta / available_h;
         clamp_boundaries();
@@ -96,7 +99,7 @@ void RenderAppSplitters(AppRuntimeState& state,
                                                                    center_x,
                                                                    center_splitter_y,
                                                                    center_w,
-                                                                   kSplitterThickness,
+                                                                   splitter_thickness,
                                                                    hit_padding,
                                                                    panel_flags);
     if (delta_center != 0.0f) {
@@ -159,28 +162,30 @@ AppLayoutRegions RenderAppShell(AppRuntimeState& state, float menu_height, ImGui
     const float top_y = menu_height + toolbar_height;
     const float content_h = std::max(0.0f, display.y - top_y - status_bar_height);
 
+    const float splitter_thickness = ui::gsn::DpiSize(kSplitterThickness);
     float left_w = display.x * state.layout.left_ratio;
     float right_w = display.x * state.layout.right_ratio;
-    float center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+    float center_w = display.x - left_w - right_w - splitter_thickness * 2.0f;
 
     const float hit_padding = ui::gsn::DpiSize(kSplitterHitPadding);
-    RenderAppSplitters(state, display.x, content_h, left_w, center_w, top_y, hit_padding, panel_flags);
+    RenderAppSplitters(
+        state, display.x, content_h, left_w, center_w, top_y, splitter_thickness, hit_padding, panel_flags);
 
     left_w = display.x * state.layout.left_ratio;
     right_w = display.x * state.layout.right_ratio;
-    center_w = display.x - left_w - right_w - kSplitterThickness * 2.0f;
+    center_w = display.x - left_w - right_w - splitter_thickness * 2.0f;
 
-    const float available_h = std::max(0.0f, content_h - kSplitterThickness);
+    const float available_h = std::max(0.0f, content_h - splitter_thickness);
     const float project_h = available_h * state.layout.project_boundary_ratio;
     const float argument_navigator_h = std::max(0.0f, available_h - project_h);
-    const float argument_navigator_y = top_y + project_h + kSplitterThickness;
+    const float argument_navigator_y = top_y + project_h + splitter_thickness;
 
-    const float center_x = left_w + kSplitterThickness;
-    const float center_available_h = std::max(0.0f, content_h - kSplitterThickness);
+    const float center_x = left_w + splitter_thickness;
+    const float center_available_h = std::max(0.0f, content_h - splitter_thickness);
     const float feedback_h = std::min(state.layout.problems_panel_height, center_available_h);
     const float workbench_h = std::max(0.0f, center_available_h - feedback_h);
-    const float feedback_y = top_y + workbench_h + kSplitterThickness;
-    const float inspector_x = center_x + center_w + kSplitterThickness;
+    const float feedback_y = top_y + workbench_h + splitter_thickness;
+    const float inspector_x = center_x + center_w + splitter_thickness;
 
     AppLayoutRegions regions;
     regions.menu_height = menu_height;
