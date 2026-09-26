@@ -26,7 +26,6 @@
 #include <filesystem>
 #include <map>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -77,7 +76,7 @@ bool ProposalActions::RefreshCreatorPreview() {
     if (!proposals.creator_active)
         return false;
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Load a SACM model before editing proposal drafts.");
+        SetStatus(state_, AF_TR("Load a SACM model before editing proposal drafts."));
         return false;
     }
 
@@ -85,7 +84,7 @@ bool ProposalActions::RefreshCreatorPreview() {
     core::reviews::ProposalPreviewResult preview =
         patch_service.BuildPreviewModel(proposals.draft, state_.app_state.loaded_case.value());
     if (!preview.success) {
-        SetStatus(state_, "Proposal draft preview failed: " + preview.error);
+        SetStatus(state_, ui::i18n::trf("Proposal draft preview failed: {0}", preview.error));
         return false;
     }
 
@@ -131,26 +130,26 @@ void ProposalActions::ProcessPendingCreatorPreviewRefresh() {
 bool ProposalActions::BeginForReviewItem(const core::reviews::ReviewItem& item) {
     auto& proposals = *state_.proposal_controller;
     if (proposals.creator_active) {
-        SetStatus(state_, "Save or discard the active proposal before creating another one.");
+        SetStatus(state_, AF_TR("Save or discard the active proposal before creating another one."));
         return false;
     }
     if (item.status != core::reviews::ReviewItemStatus::Open) {
-        SetStatus(state_, "Resolved review comments cannot create proposed changes.");
+        SetStatus(state_, AF_TR("Resolved review comments cannot create proposed changes."));
         return false;
     }
     if (item.proposal_id.has_value()) {
-        SetStatus(state_, "This review comment already has a proposed change.");
+        SetStatus(state_, AF_TR("This review comment already has a proposed change."));
         return false;
     }
     if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Open a project and SACM file before creating proposed changes.");
+        SetStatus(state_, AF_TR("Open a project and SACM file before creating proposed changes."));
         return false;
     }
 
     const parser::SacmElement* anchor =
         parser::FindElementByIdOrGidValue(state_.app_state.loaded_case.value(), item.element_id);
     if (!anchor) {
-        SetStatus(state_, "The reviewed element no longer exists in the loaded model.");
+        SetStatus(state_, AF_TR("The reviewed element no longer exists in the loaded model."));
         return false;
     }
 
@@ -165,26 +164,28 @@ bool ProposalActions::BeginForReviewItem(const core::reviews::ReviewItem& item) 
     ui_state.selected_element_id = anchor->id;
     ui_state.center_on_selection = true;
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_, "Building proposal " + proposals.draft.id + ". Use the GSN canvas and Save Proposal when ready.");
+    SetStatus(
+        state_,
+        ui::i18n::trf("Building proposal {0}. Use the GSN canvas and Save Proposal when ready.", proposals.draft.id));
     return true;
 }
 
 bool ProposalActions::BeginEditForReviewItem(const core::reviews::ReviewItem& item) {
     auto& proposals = *state_.proposal_controller;
     if (proposals.creator_active) {
-        SetStatus(state_, "Save or discard the active proposal before editing another one.");
+        SetStatus(state_, AF_TR("Save or discard the active proposal before editing another one."));
         return false;
     }
     if (item.status != core::reviews::ReviewItemStatus::Open) {
-        SetStatus(state_, "Resolved review comments cannot edit proposed changes.");
+        SetStatus(state_, AF_TR("Resolved review comments cannot edit proposed changes."));
         return false;
     }
     if (!item.proposal_id.has_value()) {
-        SetStatus(state_, "This review comment has no proposed change to edit.");
+        SetStatus(state_, AF_TR("This review comment has no proposed change to edit."));
         return false;
     }
     if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Open a project and SACM file before editing proposed changes.");
+        SetStatus(state_, AF_TR("Open a project and SACM file before editing proposed changes."));
         return false;
     }
 
@@ -192,11 +193,11 @@ bool ProposalActions::BeginEditForReviewItem(const core::reviews::ReviewItem& it
     std::optional<core::reviews::ReviewProposal> proposal =
         proposals.manager.LoadProposal(item.proposal_id.value(), error);
     if (!proposal.has_value()) {
-        SetStatus(state_, "Proposal edit failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal edit failed: {0}", error));
         return false;
     }
     if (proposal->review_item_id != item.id) {
-        SetStatus(state_, "Proposal edit failed: the proposal belongs to a different review comment.");
+        SetStatus(state_, AF_TR("Proposal edit failed: the proposal belongs to a different review comment."));
         return false;
     }
 
@@ -211,13 +212,13 @@ bool ProposalActions::BeginEditForReviewItem(const core::reviews::ReviewItem& it
     ui_state.selected_element_id = proposals.draft.anchor_element_id;
     ui_state.center_on_selection = !ui_state.selected_element_id.empty();
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_, "Editing proposal " + proposals.draft.id + ". Use Save Proposal to update it.");
+    SetStatus(state_, ui::i18n::trf("Editing proposal {0}. Use Save Proposal to update it.", proposals.draft.id));
     return true;
 }
 
 bool ProposalActions::BeginEditById(const std::string& proposal_id) {
     if (proposal_id.empty()) {
-        SetStatus(state_, "No proposal id was provided.");
+        SetStatus(state_, AF_TR("No proposal id was provided."));
         return false;
     }
 
@@ -225,17 +226,17 @@ bool ProposalActions::BeginEditById(const std::string& proposal_id) {
     std::optional<core::reviews::ReviewProposal> proposal =
         state_.proposal_controller->manager.LoadProposal(proposal_id, error);
     if (!proposal.has_value()) {
-        SetStatus(state_, "Proposal edit failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal edit failed: {0}", error));
         return false;
     }
 
     std::optional<core::reviews::ReviewItem> item = state_.review_controller->GetItemById(proposal->review_item_id);
     if (!item.has_value()) {
-        SetStatus(state_, "Proposal edit failed: the owning review comment was not found.");
+        SetStatus(state_, AF_TR("Proposal edit failed: the owning review comment was not found."));
         return false;
     }
     if (!item->proposal_id.has_value() || item->proposal_id.value() != proposal_id) {
-        SetStatus(state_, "Proposal edit failed: the owning review comment no longer points to this proposal.");
+        SetStatus(state_, AF_TR("Proposal edit failed: the owning review comment no longer points to this proposal."));
         return false;
     }
 
@@ -245,23 +246,23 @@ bool ProposalActions::BeginEditById(const std::string& proposal_id) {
 bool ProposalActions::PreviewById(const std::string& proposal_id) {
     auto& proposals = *state_.proposal_controller;
     if (proposals.creator_active) {
-        SetStatus(state_, "Save or discard the active proposal before viewing another proposal.");
+        SetStatus(state_, AF_TR("Save or discard the active proposal before viewing another proposal."));
         return false;
     }
     if (proposal_id.empty()) {
-        SetStatus(state_, "No proposal id was provided.");
+        SetStatus(state_, AF_TR("No proposal id was provided."));
         return false;
     }
 
     std::string error;
     std::optional<core::reviews::ReviewProposal> proposal = proposals.manager.LoadProposal(proposal_id, error);
     if (!proposal.has_value()) {
-        SetStatus(state_, "Proposal preview failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal preview failed: {0}", error));
         return false;
     }
 
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Load a SACM model before previewing proposals.");
+        SetStatus(state_, AF_TR("Load a SACM model before previewing proposals."));
         return false;
     }
 
@@ -269,7 +270,7 @@ bool ProposalActions::PreviewById(const std::string& proposal_id) {
     core::reviews::ProposalPreviewResult preview =
         patch_service.BuildPreviewModel(*proposal, state_.app_state.loaded_case.value());
     if (!preview.success) {
-        SetStatus(state_, "Proposal preview failed: " + preview.error);
+        SetStatus(state_, ui::i18n::trf("Proposal preview failed: {0}", preview.error));
         return false;
     }
 
@@ -289,25 +290,27 @@ bool ProposalActions::PreviewById(const std::string& proposal_id) {
     state_.workbench.show_gsn_tab = true;
     state_.workbench.force_center_tab_selection = true;
 
-    std::ostringstream status;
-    status << "Previewing proposal " << proposal->id << " with " << proposal->operations.size() << " operation(s). ";
-    status << "The project model has not been changed.";
-    SetStatus(state_, status.str());
+    SetStatus(state_,
+              ui::i18n::trnf("Previewing proposal {0} with {1} operation. The project model has not been changed.",
+                             "Previewing proposal {0} with {1} operations. The project model has not been changed.",
+                             static_cast<int>(proposal->operations.size()),
+                             proposal->id,
+                             proposal->operations.size()));
     return true;
 }
 
 bool ProposalActions::SaveActive(const core::reviews::ReviewItem& item) {
     auto& proposals = *state_.proposal_controller;
     if (!proposals.HasActiveDraftForItem(item.id)) {
-        SetStatus(state_, "No active proposal draft for this review comment.");
+        SetStatus(state_, AF_TR("No active proposal draft for this review comment."));
         return false;
     }
     if (!proposals.CanSaveActiveDraft()) {
-        SetStatus(state_, "Add at least one proposal operation before saving.");
+        SetStatus(state_, AF_TR("Add at least one proposal operation before saving."));
         return false;
     }
     if (!state_.app_state.current_project.has_value()) {
-        SetStatus(state_, "Open a project before saving proposals.");
+        SetStatus(state_, AF_TR("Open a project before saving proposals."));
         return false;
     }
 
@@ -316,35 +319,35 @@ bool ProposalActions::SaveActive(const core::reviews::ReviewItem& item) {
     std::string error;
     if (!core::ProjectService::SaveReviewProposalFile(
             project, proposals.draft.id, core::reviews::SerializeReviewProposal(proposals.draft), entry, error)) {
-        SetStatus(state_, "Proposal save failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal save failed: {0}", error));
         return false;
     }
 
     if (!state_.review_controller->SetProposal(item.id, proposals.draft.id)) {
         std::string cleanup_error;
         core::ProjectService::RemoveTrackedFile(project, entry.relativePath, true, cleanup_error);
-        SetStatus(state_, "Proposal link update failed.");
+        SetStatus(state_, AF_TR("Proposal link update failed."));
         return false;
     }
 
     const std::string saved_id = proposals.draft.id;
     CancelActive();
     core::ProjectService::RefreshFileStatus(project);
-    SetStatus(state_, "Saved proposal " + saved_id + ".");
+    SetStatus(state_, ui::i18n::trf("Saved proposal {0}.", saved_id));
     return true;
 }
 
 bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item) {
     if (state_.proposal_controller->creator_active) {
-        SetStatus(state_, "Save or discard the active proposal before applying another proposal.");
+        SetStatus(state_, AF_TR("Save or discard the active proposal before applying another proposal."));
         return false;
     }
     if (!item.proposal_id.has_value()) {
-        SetStatus(state_, "This review comment has no proposed change to apply.");
+        SetStatus(state_, AF_TR("This review comment has no proposed change to apply."));
         return false;
     }
     if (!state_.app_state.current_project.has_value() || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Open a project and SACM file before applying proposed changes.");
+        SetStatus(state_, AF_TR("Open a project and SACM file before applying proposed changes."));
         return false;
     }
 
@@ -352,21 +355,21 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
     std::optional<core::reviews::ReviewProposal> proposal =
         state_.proposal_controller->manager.LoadProposal(item.proposal_id.value(), error);
     if (!proposal.has_value()) {
-        SetStatus(state_, "Proposal apply failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal apply failed: {0}", error));
         return false;
     }
 
     core::reviews::ProposalValidityResult validity =
         core::reviews::EvaluateReviewProposalValidity(*proposal, state_.app_state.loaded_case.value());
     if (validity.validity != core::reviews::ProposalValidity::Valid) {
-        SetStatus(state_, "Proposal is broken: " + validity.reason);
+        SetStatus(state_, ui::i18n::trf("Proposal is broken: {0}", validity.reason));
         return false;
     }
 
     core::commands::ApplyProposalCommand command(*proposal);
     const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Proposal apply failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Proposal apply failed: {0}", outcome.error));
         return false;
     }
 
@@ -385,12 +388,12 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
     // among the things it does, and this branch says so out loud rather than
     // relying on it.
     if (!state_.app_state.current_project.has_value()) {
-        SetStatus(state_, "Proposal applied, but the project is no longer open.");
+        SetStatus(state_, AF_TR("Proposal applied, but the project is no longer open."));
         return false;
     }
     core::AssuranceProject& project = state_.app_state.current_project.value();
     if (!DeleteProposalPatchFile(state_, item.proposal_id.value(), error)) {
-        SetStatus(state_, "Proposal applied in memory, but proposal file removal failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal applied in memory, but proposal file removal failed: {0}", error));
         return false;
     }
 
@@ -401,18 +404,19 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
     updated.applied_note = "Proposal applied at " + applied_utc + ".";
     updated.updated_utc = applied_utc;
     if (!state_.review_controller->AddOrUpdateItem(std::move(updated))) {
-        SetStatus(state_, "Proposal applied, but review item update failed.");
+        SetStatus(state_, AF_TR("Proposal applied, but review item update failed."));
         return false;
     }
 
     if (!SaveProject(state_)) {
-        SetStatus(state_, "Proposal applied, but project save failed: " + state_.app_state.status_message);
+        SetStatus(state_,
+                  ui::i18n::trf("Proposal applied, but project save failed: {0}", state_.app_state.status_message));
         return false;
     }
 
     core::ProjectService::RefreshFileStatus(project);
     state_.tree_needs_rebuild = true;
-    SetStatus(state_, "Applied proposal " + proposal->id + ".");
+    SetStatus(state_, ui::i18n::trf("Applied proposal {0}.", proposal->id));
     return true;
 }
 
@@ -420,7 +424,7 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
     if (event.suggestions.empty())
         return;
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "AI found suggested text, but no assurance case is open for the working draft.");
+        SetStatus(state_, AF_TR("AI found suggested text, but no assurance case is open for the working draft."));
         return;
     }
 
@@ -438,9 +442,9 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
             state_.draft_workspace.Materialize(accepted, state_.app_state.case_revision);
         if (!materialized.success) {
             SetStatus(state_,
-                      "AI review completed, but its suggested changes could not be added because the working "
-                      "draft could not be materialized: " +
-                          materialized.error);
+                      ui::i18n::trf("AI review completed, but its suggested changes could not be added because the "
+                                    "working draft could not be materialized: {0}",
+                                    materialized.error));
             return;
         }
         working_model = &materialized.working_model;
@@ -450,8 +454,8 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
     if (!event.reviewed_scope_hash.empty() &&
         event.reviewed_scope_hash != core::reviews::ComputeScopeSemanticHash(working, event.reviewed_element_ids)) {
         SetStatus(state_,
-                  "AI review completed, but its suggested changes were not added because the elements it "
-                  "reviewed changed while it was running. Run the review again.");
+                  AF_TR("AI review completed, but its suggested changes were not added because the elements it "
+                        "reviewed changed while it was running. Run the review again."));
         return;
     }
 
@@ -492,7 +496,7 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         std::string error;
         const std::string group_id = state_.draft_workspace.BeginGroup(group.request, accepted, error);
         if (group_id.empty()) {
-            SetStatus(state_, "AI suggested change could not be added to the working draft: " + error);
+            SetStatus(state_, ui::i18n::trf("AI suggested change could not be added to the working draft: {0}", error));
             continue;
         }
         const bool staged = into_document
@@ -501,16 +505,18 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
         if (!staged) {
             std::string reject_error;
             state_.draft_workspace.RejectGroup(group_id, reject_error);
-            SetStatus(state_, "AI suggested change could not be staged in the working draft: " + error);
+            SetStatus(state_,
+                      ui::i18n::trf("AI suggested change could not be staged in the working draft: {0}", error));
             continue;
         }
         document_changed = document_changed || into_document;
         if (!state_.draft_workspace.MarkGroupReady(group_id, error)) {
-            SetStatus(state_, "AI suggested change was staged but could not be marked ready: " + error);
+            SetStatus(state_,
+                      ui::i18n::trf("AI suggested change was staged but could not be marked ready: {0}", error));
             continue;
         }
         if (!state_.review_controller->AddDraftGroup(group.review_item_id, group_id)) {
-            SetStatus(state_, "AI suggested change could not be linked to its review finding.");
+            SetStatus(state_, AF_TR("AI suggested change could not be linked to its review finding."));
             // In the document the change has already landed, and rejecting the
             // group would only drop its record while the draft kept the edit.
             if (into_document) {
@@ -537,8 +543,10 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
     if (staged_count > 0) {
         state_.tree_needs_rebuild = true;
         SetStatus(state_,
-                  "AI added " + std::to_string(staged_count) +
-                      " suggested change(s) to the working draft. Review them before accepting.");
+                  ui::i18n::trnf("AI added {0} suggested change to the working draft. Review it before accepting.",
+                                 "AI added {0} suggested changes to the working draft. Review them before accepting.",
+                                 static_cast<int>(staged_count),
+                                 staged_count));
     }
 }
 
@@ -572,7 +580,8 @@ bool ProposalActions::StageSuggestionInDraftDocument(const review::SuggestedDraf
     // than reported as a refusal that would invite staging it twice.
     std::string ledger_error;
     if (!state_.draft_workspace.RecordAppliedOperations(group_id, group.operations, ledger_error))
-        SetStatus(state_, "AI suggested change could not be staged in the working draft: " + ledger_error);
+        SetStatus(state_,
+                  ui::i18n::trf("AI suggested change could not be staged in the working draft: {0}", ledger_error));
     return true;
 }
 
@@ -592,19 +601,19 @@ void ProposalActions::CancelActive() {
 bool ProposalActions::AddChildToSelected(core::NewElementKind kind) {
     auto& proposals = *state_.proposal_controller;
     if (!proposals.creator_active || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Start a proposal draft before editing proposal changes.");
+        SetStatus(state_, AF_TR("Start a proposal draft before editing proposal changes."));
         return false;
     }
 
     const std::string selected_id = ui::GetUiState().selected_element_id;
     if (selected_id.empty()) {
-        SetStatus(state_, "Select an element before adding proposal nodes.");
+        SetStatus(state_, AF_TR("Select an element before adding proposal nodes."));
         return false;
     }
 
     const parser::SacmElement* parent = parser::FindElementByIdOrGidValue(proposals.preview_model, selected_id);
     if (!parent) {
-        SetStatus(state_, "The selected proposal preview element no longer exists.");
+        SetStatus(state_, AF_TR("The selected proposal preview element no longer exists."));
         return false;
     }
     std::string connection_error;
@@ -616,7 +625,7 @@ bool ProposalActions::AddChildToSelected(core::NewElementKind kind) {
     std::optional<core::reviews::ElementRef> parent_ref =
         ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
     if (!parent_ref.has_value()) {
-        SetStatus(state_, "Could not resolve selected element for proposal operation.");
+        SetStatus(state_, AF_TR("Could not resolve selected element for proposal operation."));
         return false;
     }
 
@@ -639,14 +648,14 @@ bool ProposalActions::AddChildToSelected(core::NewElementKind kind) {
     proposals.creator_preview_refresh_pending = true;
     proposals.creator_pending_select_create_ref = create_ref;
     proposals.creator_pending_clear_selection = false;
-    SetStatus(state_, "Recorded proposal add operation.");
+    SetStatus(state_, AF_TR("Recorded proposal add operation."));
     return true;
 }
 
 bool ProposalActions::AddTopGoal() {
     auto& proposals = *state_.proposal_controller;
     if (!proposals.creator_active || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Start a proposal draft before editing proposal changes.");
+        SetStatus(state_, AF_TR("Start a proposal draft before editing proposal changes."));
         return false;
     }
 
@@ -660,20 +669,20 @@ bool ProposalActions::AddTopGoal() {
     proposals.creator_preview_refresh_pending = true;
     proposals.creator_pending_select_create_ref = create_ref;
     proposals.creator_pending_clear_selection = false;
-    SetStatus(state_, "Recorded proposal top goal operation.");
+    SetStatus(state_, AF_TR("Recorded proposal top goal operation."));
     return true;
 }
 
 void ProposalActions::RemoveSelected(core::RemoveMode mode) {
     auto& proposals = *state_.proposal_controller;
     if (!proposals.creator_active || !state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "Start a proposal draft before editing proposal changes.");
+        SetStatus(state_, AF_TR("Start a proposal draft before editing proposal changes."));
         return;
     }
 
     const std::string selected_id = ui::GetUiState().selected_element_id;
     if (selected_id.empty()) {
-        SetStatus(state_, "Select an element before removing proposal nodes.");
+        SetStatus(state_, AF_TR("Select an element before removing proposal nodes."));
         return;
     }
 
@@ -682,7 +691,7 @@ void ProposalActions::RemoveSelected(core::RemoveMode mode) {
     planned_ids.assign(planned.begin(), planned.end());
     std::sort(planned_ids.begin(), planned_ids.end());
     if (planned_ids.empty()) {
-        SetStatus(state_, "Nothing to remove for this selection.");
+        SetStatus(state_, AF_TR("Nothing to remove for this selection."));
         return;
     }
 
@@ -696,7 +705,7 @@ void ProposalActions::RemoveSelected(core::RemoveMode mode) {
     std::optional<core::reviews::ElementRef> selected_ref =
         ProposalRefForPreviewId(selected_id, proposals.creator_generated_ids);
     if (!selected_ref.has_value()) {
-        SetStatus(state_, "Could not resolve selected element for proposal removal.");
+        SetStatus(state_, AF_TR("Could not resolve selected element for proposal removal."));
         return;
     }
 
@@ -719,7 +728,7 @@ void ProposalActions::RemoveSelected(core::RemoveMode mode) {
     proposals.creator_preview_refresh_pending = true;
     proposals.creator_pending_select_create_ref.reset();
     proposals.creator_pending_clear_selection = true;
-    SetStatus(state_, "Recorded proposal remove operation.");
+    SetStatus(state_, AF_TR("Recorded proposal remove operation."));
 }
 
 } // namespace app::actions

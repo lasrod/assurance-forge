@@ -172,7 +172,7 @@ void TerminologyActions::BeginAddPackage(const core::ProjectFileEntry& entry,
     if (parent_node.type != sacm::SacmPackageNodeType::AssuranceCasePackage)
         return;
     if (!CanSwitchProjectSacmFile(state_.app_state, entry)) {
-        SetStatus(state_, "Save the current SACM file before adding a terminology package.");
+        SetStatus(state_, AF_TR("Save the current SACM file before adding a terminology package."));
         return;
     }
 
@@ -195,13 +195,13 @@ bool TerminologyActions::ConfirmAddPackage() {
 
     const core::ProjectFileEntry entry = state_.terminology.pending_package_parent_entry.value();
     if (!CanSwitchProjectSacmFile(state_.app_state, entry)) {
-        SetStatus(state_, "Save the current SACM file before adding a terminology package.");
+        SetStatus(state_, AF_TR("Save the current SACM file before adding a terminology package."));
         return false;
     }
     if (!EnsureProjectSacmFileOpen(state_, entry, false))
         return false;
     if (!state_.app_state.has_projected_package()) {
-        SetStatus(state_, "Could not load an editable SACM package model.");
+        SetStatus(state_, AF_TR("Could not load an editable SACM package model."));
         return false;
     }
 
@@ -210,7 +210,7 @@ bool TerminologyActions::ConfirmAddPackage() {
         TrimWhitespace(state_.terminology.new_package_description_buf));
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Terminology package create failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Terminology package create failed: {0}", outcome.error));
         return false;
     }
     const core::TerminologyPackageRef created_ref = command.GeneratedRef();
@@ -230,7 +230,7 @@ bool TerminologyActions::ConfirmAddPackage() {
     state_.workbench.show_terminology_package_tab = true;
     ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_, "Added terminology package " + created_ref.id + ".");
+    SetStatus(state_, ui::i18n::trf("Added terminology package {0}.", created_ref.id));
     return true;
 }
 
@@ -245,7 +245,7 @@ bool TerminologyActions::ApplyPackageEdits() {
                                                             TrimWhitespace(state_.terminology.package_description_buf));
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Terminology package update failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Terminology package update failed: {0}", outcome.error));
         return false;
     }
 
@@ -277,8 +277,8 @@ bool TerminologyActions::ConfirmDeletePackage() {
         // Always surface a failure (the modal stays open otherwise); fall back to a
         // generic message if the dispatch reported no error string.
         SetStatus(state_,
-                  "Terminology package delete failed: " +
-                      (outcome.error.empty() ? std::string("the delete could not be completed.") : outcome.error));
+                  outcome.error.empty() ? AF_TR("Terminology package delete failed: the delete could not be completed.")
+                                        : ui::i18n::trf("Terminology package delete failed: {0}", outcome.error));
         return false;
     }
 
@@ -293,7 +293,7 @@ bool TerminologyActions::ConfirmDeletePackage() {
     state_.workbench.show_terminology_package_tab = false;
     ui::GetUiState().center_view = ui::CenterView::PackageDetails;
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_, "Deleted terminology package.");
+    SetStatus(state_, AF_TR("Deleted terminology package."));
     return true;
 }
 
@@ -304,18 +304,18 @@ bool TerminologyActions::OpenTermFromCanvas(const core::TerminologyPackageRef& p
     // read; the tab it opens says whether what it shows is accepted.
     const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
     if (working_package == nullptr) {
-        SetStatus(state_, "Open a SACM model before opening terminology terms.");
+        SetStatus(state_, AF_TR("Open a SACM model before opening terminology terms."));
         return false;
     }
 
     const sacm::TerminologyPackage* terminology_package = core::FindTerminologyPackage(*working_package, package_ref);
     if (!terminology_package) {
-        SetStatus(state_, "Terminology package not found.");
+        SetStatus(state_, AF_TR("Terminology package not found."));
         return false;
     }
     const sacm::Term* term = core::FindTerminologyTerm(*terminology_package, term_ref);
     if (!term) {
-        SetStatus(state_, "Term not found.");
+        SetStatus(state_, AF_TR("Term not found."));
         return false;
     }
 
@@ -329,7 +329,7 @@ bool TerminologyActions::OpenTermFromCanvas(const core::TerminologyPackageRef& p
     state_.workbench.show_terminology_package_tab = true;
     ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_, "Opened term " + term->value + ".");
+    SetStatus(state_, ui::i18n::trf("Opened term {0}.", term->value));
     return true;
 }
 
@@ -353,14 +353,14 @@ bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_i
     if (AcceptedEditRefused(AF_TR("Linking a term to an element")))
         return false;
     if (!state_.app_state.has_projected_package()) {
-        SetStatus(state_, "Open a SACM model before associating terminology.");
+        SetStatus(state_, AF_TR("Open a SACM model before associating terminology."));
         return false;
     }
 
     core::commands::AssociateTerminologyTermWithElementCommand command(element_id, package_ref, term_ref);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Could not associate term with element: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Could not associate term with element: {0}", outcome.error));
         return false;
     }
     const core::TerminologyContextAssociationResult& result = command.Result();
@@ -374,8 +374,8 @@ bool TerminologyActions::AddTermAsContextFromCanvas(const std::string& element_i
         }
     }
     SetStatus(state_,
-              result.already_associated ? "Term is already associated with this element."
-                                        : "Associated term with this element.");
+              result.already_associated ? AF_TR("Term is already associated with this element.")
+                                        : AF_TR("Associated term with this element."));
     return true;
 }
 
@@ -385,7 +385,7 @@ bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& elem
     if (AcceptedEditRefused(AF_TR("Adding a term as context")))
         return false;
     if (!state_.app_state.has_projected_package()) {
-        SetStatus(state_, "Open a SACM model before adding terminology context.");
+        SetStatus(state_, AF_TR("Open a SACM model before adding terminology context."));
         return false;
     }
 
@@ -393,7 +393,7 @@ bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& elem
     core::commands::AddTerminologyTermAsVisibleContextCommand command(element_id, package_ref, term_ref);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Could not add term as context: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Could not add term as context: {0}", outcome.error));
         return false;
     }
     const core::TerminologyContextAssociationResult& result = command.Result();
@@ -413,8 +413,9 @@ bool TerminologyActions::AddVisibleTermContextFromCanvas(const std::string& elem
     if (!result.already_associated || parser_changed)
         state_.events.Emit(TreeDirtyEvent{});
     SetStatus(state_,
-              result.already_associated ? term_label + " is already attached as context to this element."
-                                        : "Added " + term_label + " as context.");
+              result.already_associated
+                  ? ui::i18n::trf("{0} is already attached as context to this element.", term_label)
+                  : ui::i18n::trf("Added {0} as context.", term_label));
     return true;
 }
 
@@ -424,7 +425,7 @@ void TerminologyActions::SelectTerm(const core::TerminologyTermRef& term_ref) {
 
 void TerminologyActions::BeginAddTerm() {
     if (state_.WorkingPackage() == nullptr) {
-        SetStatus(state_, "Open a terminology package before adding terms.");
+        SetStatus(state_, AF_TR("Open a terminology package before adding terms."));
         return;
     }
     if (DraftTakesGlossaryEdits() && DraftCreateTargetRefused(state_.terminology.selected_package_ref))
@@ -437,7 +438,7 @@ void TerminologyActions::BeginAddTerm() {
 bool TerminologyActions::BeginEditTerm(const core::TerminologyTermRef& term_ref) {
     const sacm::Term* term = WorkingTerm(state_.terminology.selected_package_ref, term_ref);
     if (!term) {
-        SetStatus(state_, "Term not found.");
+        SetStatus(state_, AF_TR("Term not found."));
         return false;
     }
     state_.terminology.selected_term_ref = term_ref;
@@ -459,19 +460,19 @@ bool TerminologyActions::ConfirmTermEdit() {
             state_.terminology.selected_package_ref, state_.terminology.selected_term_ref, draft);
         const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_, "Term update failed: " + outcome.error);
+            SetStatus(state_, ui::i18n::trf("Term update failed: {0}", outcome.error));
             return false;
         }
-        SetStatus(state_, "Updated term " + draft.value + ".");
+        SetStatus(state_, ui::i18n::trf("Updated term {0}.", draft.value));
     } else {
         core::commands::CreateTerminologyTermCommand command(state_.terminology.selected_package_ref, draft);
         const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_, "Term create failed: " + outcome.error);
+            SetStatus(state_, ui::i18n::trf("Term create failed: {0}", outcome.error));
             return false;
         }
         state_.terminology.selected_term_ref = command.GeneratedRef();
-        SetStatus(state_, "Added term " + draft.value + ".");
+        SetStatus(state_, ui::i18n::trf("Added term {0}.", draft.value));
     }
 
     state_.events.Emit(DocumentDirtyEvent{});
@@ -534,7 +535,7 @@ bool TerminologyActions::ConfirmTermEditInDraft(const core::TerminologyTermDraft
         const sacm::Term* current =
             WorkingTerm(state_.terminology.selected_package_ref, state_.terminology.selected_term_ref);
         if (current == nullptr) {
-            SetStatus(state_, "Term not found.");
+            SetStatus(state_, AF_TR("Term not found."));
             return false;
         }
         AppendTermFieldUpdates(operations, ExistingRef(current->id), *current, draft);
@@ -550,7 +551,9 @@ bool TerminologyActions::ConfirmTermEditInDraft(const core::TerminologyTermDraft
 
     const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
     if (!outcome.success) {
-        SetStatus(state_, (editing ? "Term update failed: " : "Term create failed: ") + outcome.error);
+        SetStatus(state_,
+                  editing ? ui::i18n::trf("Term update failed: {0}", outcome.error)
+                          : ui::i18n::trf("Term create failed: {0}", outcome.error));
         return false;
     }
     if (!editing) {
@@ -636,7 +639,7 @@ void TerminologyActions::BeginDeleteTerm(const core::TerminologyTermRef& term_re
         return;
     const sacm::Term* term = WorkingTerm(state_.terminology.selected_package_ref, term_ref);
     if (!term) {
-        SetStatus(state_, "Term not found.");
+        SetStatus(state_, AF_TR("Term not found."));
         return;
     }
     state_.terminology.selected_term_ref = term_ref;
@@ -657,7 +660,7 @@ bool TerminologyActions::ConfirmDeleteTermInDraft() {
     const sacm::Term* current =
         WorkingTerm(state_.terminology.selected_package_ref, state_.terminology.selected_term_ref);
     if (current == nullptr) {
-        SetStatus(state_, "Term not found.");
+        SetStatus(state_, AF_TR("Term not found."));
         return false;
     }
     core::reviews::PatchOperation remove;
@@ -667,7 +670,7 @@ bool TerminologyActions::ConfirmDeleteTermInDraft() {
 
     const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, {remove});
     if (!outcome.success) {
-        SetStatus(state_, "Term delete failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Term delete failed: {0}", outcome.error));
         return false;
     }
     state_.terminology.selected_term_ref = core::TerminologyTermRef{};
@@ -693,7 +696,7 @@ bool TerminologyActions::ConfirmDeleteTerm() {
         state_.terminology.selected_package_ref, state_.terminology.selected_term_ref, cascade_references);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Term delete failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Term delete failed: {0}", outcome.error));
         return false;
     }
     const std::size_t also_removed = command.RemovedIds().size() > 1 ? command.RemovedIds().size() - 1 : 0;
@@ -709,7 +712,7 @@ bool TerminologyActions::ConfirmDeleteTerm() {
     // Say what actually went. "Deleted term." after a cascade would understate
     // it, and the count is the one thing a user cannot re-check afterwards.
     SetStatus(state_,
-              also_removed == 0 ? std::string("Deleted term.")
+              also_removed == 0 ? AF_TR("Deleted term.")
                                 : ui::i18n::trnf("Deleted term and {0} element that referenced it.",
                                                  "Deleted term and {0} elements that referenced it.",
                                                  static_cast<int>(also_removed),
@@ -728,7 +731,7 @@ void TerminologyActions::SetCategoryFilter(const std::string& category_filter) {
 
 void TerminologyActions::BeginAddCategory() {
     if (state_.WorkingPackage() == nullptr) {
-        SetStatus(state_, "Open a terminology package before adding categories.");
+        SetStatus(state_, AF_TR("Open a terminology package before adding categories."));
         return;
     }
     if (DraftTakesGlossaryEdits() && DraftCreateTargetRefused(state_.terminology.selected_package_ref))
@@ -741,7 +744,7 @@ void TerminologyActions::BeginAddCategory() {
 bool TerminologyActions::BeginEditCategory(const core::TerminologyCategoryRef& category_ref) {
     const sacm::Category* category = WorkingCategory(state_.terminology.selected_package_ref, category_ref);
     if (!category) {
-        SetStatus(state_, "Category not found.");
+        SetStatus(state_, AF_TR("Category not found."));
         return false;
     }
 
@@ -759,7 +762,7 @@ bool TerminologyActions::ConfirmCategoryEditInDraft(const core::TerminologyCateg
         const sacm::Category* current =
             WorkingCategory(state_.terminology.selected_package_ref, state_.terminology.selected_category_ref);
         if (current == nullptr) {
-            SetStatus(state_, "Category not found.");
+            SetStatus(state_, AF_TR("Category not found."));
             return false;
         }
         const core::reviews::ElementRef ref = ExistingRef(current->id);
@@ -779,7 +782,9 @@ bool TerminologyActions::ConfirmCategoryEditInDraft(const core::TerminologyCateg
 
     const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
     if (!outcome.success) {
-        SetStatus(state_, (editing ? "Category update failed: " : "Category create failed: ") + outcome.error);
+        SetStatus(state_,
+                  editing ? ui::i18n::trf("Category update failed: {0}", outcome.error)
+                          : ui::i18n::trf("Category create failed: {0}", outcome.error));
         return false;
     }
     if (!editing) {
@@ -808,19 +813,19 @@ void TerminologyActions::ConfirmCategoryEdit() {
             state_.terminology.selected_package_ref, state_.terminology.selected_category_ref, draft);
         const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_, "Category update failed: " + outcome.error);
+            SetStatus(state_, ui::i18n::trf("Category update failed: {0}", outcome.error));
             return;
         }
-        SetStatus(state_, "Updated category " + draft.name + ".");
+        SetStatus(state_, ui::i18n::trf("Updated category {0}.", draft.name));
     } else {
         core::commands::CreateTerminologyCategoryCommand command(state_.terminology.selected_package_ref, draft);
         const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_, "Category create failed: " + outcome.error);
+            SetStatus(state_, ui::i18n::trf("Category create failed: {0}", outcome.error));
             return;
         }
         state_.terminology.selected_category_ref = command.GeneratedRef();
-        SetStatus(state_, "Added category " + draft.name + ".");
+        SetStatus(state_, ui::i18n::trf("Added category {0}.", draft.name));
     }
 
     state_.events.Emit(DocumentDirtyEvent{});
@@ -835,12 +840,12 @@ void TerminologyActions::BeginDeleteCategory(const core::TerminologyCategoryRef&
     const sacm::TerminologyPackage* terminology_package =
         core::FindTerminologyPackage(state_.app_state.projected_package(), state_.terminology.selected_package_ref);
     if (!terminology_package) {
-        SetStatus(state_, "Terminology package not found.");
+        SetStatus(state_, AF_TR("Terminology package not found."));
         return;
     }
     const sacm::Category* category = core::FindTerminologyCategory(*terminology_package, category_ref);
     if (!category) {
-        SetStatus(state_, "Category not found.");
+        SetStatus(state_, AF_TR("Category not found."));
         return;
     }
 
@@ -860,7 +865,7 @@ void TerminologyActions::ConfirmDeleteCategory() {
                                                              state_.terminology.selected_category_ref);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Category delete failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Category delete failed: {0}", outcome.error));
         return;
     }
 
@@ -868,13 +873,13 @@ void TerminologyActions::ConfirmDeleteCategory() {
     CopyToBuffer(state_.terminology.category_filter_buf, sizeof(state_.terminology.category_filter_buf), "");
     state_.terminology.show_delete_category_modal = false;
     state_.events.Emit(DocumentDirtyEvent{});
-    SetStatus(state_, "Deleted category.");
+    SetStatus(state_, AF_TR("Deleted category."));
 }
 
 void TerminologyActions::SeedRecommendedCategoriesInDraft(const sacm::TerminologyPackage& terminology_package,
                                                           const std::vector<std::string>& missing_names) {
     if (missing_names.empty()) {
-        SetStatus(state_, "Recommended terminology categories already exist.");
+        SetStatus(state_, AF_TR("Recommended terminology categories already exist."));
         return;
     }
     if (DraftCreateTargetRefused(detail::TerminologyPackageRefFor(terminology_package)))
@@ -889,7 +894,7 @@ void TerminologyActions::SeedRecommendedCategoriesInDraft(const sacm::Terminolog
     }
     const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
     if (!outcome.success) {
-        SetStatus(state_, "Category create failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Category create failed: {0}", outcome.error));
         return;
     }
     SetStatus(state_, AF_TR("Added recommended terminology categories to the working draft."));
@@ -899,7 +904,7 @@ void TerminologyActions::SeedRecommendedCategories() {
     const sacm::TerminologyPackage* terminology_package =
         WorkingTerminologyPackage(state_.terminology.selected_package_ref);
     if (!terminology_package) {
-        SetStatus(state_, "Terminology package not found.");
+        SetStatus(state_, AF_TR("Terminology package not found."));
         return;
     }
 
@@ -934,9 +939,9 @@ void TerminologyActions::SeedRecommendedCategories() {
 
     if (added > 0) {
         state_.events.Emit(DocumentDirtyEvent{});
-        SetStatus(state_, "Added recommended terminology categories.");
+        SetStatus(state_, AF_TR("Added recommended terminology categories."));
     } else {
-        SetStatus(state_, "Recommended terminology categories already exist.");
+        SetStatus(state_, AF_TR("Recommended terminology categories already exist."));
     }
 }
 
@@ -954,7 +959,7 @@ void TerminologyActions::BeginFindUsages(const core::TerminologyPackageRef& pack
     state_.terminology.selected_usage_index = -1;
 
     if (!state_.app_state.has_projected_package()) {
-        state_.terminology.usage_search_error = "Open a SACM model before finding terminology usages.";
+        state_.terminology.usage_search_error = AF_TR("Open a SACM model before finding terminology usages.");
         SetStatus(state_, state_.terminology.usage_search_error);
         return;
     }
@@ -965,7 +970,7 @@ void TerminologyActions::BeginFindUsages(const core::TerminologyPackageRef& pack
     state_.terminology.usage_search_term_name = result.term_name;
     if (!result.success) {
         state_.terminology.usage_search_error = result.error;
-        SetStatus(state_, "Find usages failed: " + result.error);
+        SetStatus(state_, ui::i18n::trf("Find usages failed: {0}", result.error));
         return;
     }
 
@@ -974,9 +979,9 @@ void TerminologyActions::BeginFindUsages(const core::TerminologyPackageRef& pack
         state_.terminology.selected_usage_index = 0;
     const int usage_count = static_cast<int>(state_.terminology.usage_results.size());
     const std::string label =
-        state_.terminology.usage_search_term_value.empty() ? "term" : state_.terminology.usage_search_term_value;
+        state_.terminology.usage_search_term_value.empty() ? AF_TR("term") : state_.terminology.usage_search_term_value;
     SetStatus(state_,
-              "Found " + std::to_string(usage_count) + " usage" + (usage_count == 1 ? "" : "s") + " of " + label + ".");
+              ui::i18n::trnf("Found {0} usage of {1}.", "Found {0} usages of {1}.", usage_count, usage_count, label));
 }
 
 void TerminologyActions::NavigateToUsage(std::size_t usage_index) {
@@ -985,7 +990,7 @@ void TerminologyActions::NavigateToUsage(std::size_t usage_index) {
     state_.terminology.selected_usage_index = static_cast<int>(usage_index);
     const core::TerminologyTermUsage& usage = state_.terminology.usage_results[usage_index];
     if (usage.element_id.empty()) {
-        SetStatus(state_, "The selected usage has no navigable element id.");
+        SetStatus(state_, AF_TR("The selected usage has no navigable element id."));
         return;
     }
     state_.workbench.show_gsn_tab = true;
@@ -1002,7 +1007,7 @@ void TerminologyActions::ChangeMeaningFromCanvas(const std::string& element_id, 
 void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, const std::string& term_value) {
     const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
     if (working_package == nullptr) {
-        SetStatus(state_, "Open a SACM model before defining terms.");
+        SetStatus(state_, AF_TR("Open a SACM model before defining terms."));
         return;
     }
 
@@ -1019,8 +1024,8 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
     }
     if (!HasTerminologyPackageRef(target.package_ref) && !DraftTakesGlossaryEdits()) {
         SetStatus(state_,
-                  target.error.empty() ? "Could not create a TerminologyPackage for the new term."
-                                       : "Terminology package create failed: " + target.error);
+                  target.error.empty() ? AF_TR("Could not create a TerminologyPackage for the new term.")
+                                       : ui::i18n::trf("Terminology package create failed: {0}", target.error));
         return;
     }
     if (target.created) {
@@ -1031,7 +1036,7 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
                 state_.app_state.active_project_file_path, state_.app_state.current_project->rootPath);
             InvalidateSacmPackageTreeCache(state_, relative);
         }
-        SetStatus(state_, "Created a TerminologyPackage for new terms.");
+        SetStatus(state_, AF_TR("Created a TerminologyPackage for new terms."));
     }
 
     const std::string trimmed_term = TrimWhitespace(term_value);
@@ -1060,9 +1065,10 @@ void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, co
     state_.workbench.show_terminology_package_tab = true;
     ui::GetUiState().center_view = ui::CenterView::TerminologyPackage;
     state_.workbench.force_center_tab_selection = true;
-    SetStatus(state_,
-              "Filtered the glossary for " + trimmed_term +
-                  ". Select a term to link when occurrence binding is available.");
+    SetStatus(
+        state_,
+        ui::i18n::trf("Filtered the glossary for {0}. Select a term to link when occurrence binding is available.",
+                      trimmed_term));
 }
 
 bool TerminologyActions::ConfirmQuickDefineTermInDraft(bool add_as_context) {
@@ -1073,7 +1079,7 @@ bool TerminologyActions::ConfirmQuickDefineTermInDraft(bool add_as_context) {
     AppendCreateTerm(operations, kCreatedTermRef, draft);
     const app::commands::DraftEditOutcome outcome = app::commands::DispatchDraftDocumentEdit(state_, operations);
     if (!outcome.success) {
-        SetStatus(state_, "Term create failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Term create failed: {0}", outcome.error));
         return false;
     }
     const auto created = outcome.created_ids.find(kCreatedTermRef);
@@ -1117,7 +1123,7 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
     core::commands::CreateTerminologyTermCommand command(state_.terminology.quick_define_target_package_ref, draft);
     const auto outcome = app::commands::DispatchAuditedCommand(state_, command);
     if (!outcome.success) {
-        SetStatus(state_, "Term create failed: " + outcome.error);
+        SetStatus(state_, ui::i18n::trf("Term create failed: {0}", outcome.error));
         return false;
     }
     const core::TerminologyTermRef new_term_ref = command.GeneratedRef();
@@ -1149,7 +1155,7 @@ bool TerminologyActions::ConfirmQuickDefineTerm(bool add_as_context) {
     state_.terminology.quick_define_element_id.clear();
     state_.terminology.quick_define_source_text.clear();
     if (!add_as_context)
-        SetStatus(state_, "Added term " + draft.value + ".");
+        SetStatus(state_, ui::i18n::trf("Added term {0}.", draft.value));
     return true;
 }
 
@@ -1165,19 +1171,20 @@ void TerminologyActions::HandleProblemQuickFix(const core::ProblemItem& problem)
     if (core::StartsWith(problem.type, "TerminologyTerm")) {
         TerminologyTermQuickFixPayload payload;
         if (!DecodeTerminologyTermQuickFixPayload(problem.quick_fix_payload, payload)) {
-            SetStatus(state_, "Could not decode terminology quick fix target.");
+            SetStatus(state_, AF_TR("Could not decode terminology quick fix target."));
             return;
         }
         if (!OpenTerminologyProblemTerm(state_, payload.package_ref, payload.term_ref, payload.term_value)) {
-            SetStatus(state_, "Terminology quick fix target was not found.");
+            SetStatus(state_, AF_TR("Terminology quick fix target was not found."));
             return;
         }
         if (problem.type == "TerminologyTermDuplicateDefinition") {
-            SetStatus(state_, "Filtered glossary to duplicated term definition " + payload.term_value + ".");
+            SetStatus(state_,
+                      ui::i18n::trf("Filtered glossary to duplicated term definition {0}.", payload.term_value));
             return;
         }
         BeginEditTerm(payload.term_ref);
-        SetStatus(state_, "Opened terminology term editor.");
+        SetStatus(state_, AF_TR("Opened terminology term editor."));
         return;
     }
     if (!problem.element_id.empty()) {
@@ -1192,11 +1199,12 @@ void TerminologyActions::IgnoreSuggestion(const std::string& element_id, const s
     const auto save_result = detail::SaveIgnoredSuggestions(state_);
     if (!save_result.success) {
         SetStatus(state_,
-                  "Ignored terminology suggestion " + trimmed_term +
-                      " for this session, but could not persist: " + save_result.error);
+                  ui::i18n::trf("Ignored terminology suggestion {0} for this session, but could not persist: {1}",
+                                trimmed_term,
+                                save_result.error));
         return;
     }
-    SetStatus(state_, "Ignored terminology suggestion " + trimmed_term + ".");
+    SetStatus(state_, ui::i18n::trf("Ignored terminology suggestion {0}.", trimmed_term));
 }
 
 bool TerminologyActions::IsSuggestionIgnored(const std::string& element_id, const std::string& term_value) const {
@@ -1211,11 +1219,12 @@ void TerminologyActions::RestoreSuggestion(const std::string& element_id, const 
     const auto save_result = detail::SaveIgnoredSuggestions(state_);
     if (!save_result.success) {
         SetStatus(state_,
-                  "Restored terminology suggestion " + trimmed_term +
-                      " for this session, but could not persist: " + save_result.error);
+                  ui::i18n::trf("Restored terminology suggestion {0} for this session, but could not persist: {1}",
+                                trimmed_term,
+                                save_result.error));
         return;
     }
-    SetStatus(state_, "Restored terminology suggestion " + trimmed_term + ".");
+    SetStatus(state_, ui::i18n::trf("Restored terminology suggestion {0}.", trimmed_term));
 }
 
 std::vector<IgnoredSuggestionView> TerminologyActions::ListIgnoredSuggestions() const {
@@ -1248,14 +1257,14 @@ void TerminologyActions::LoadIgnoredSuggestions() {
     std::error_code ec;
     const bool file_exists = std::filesystem::exists(path, ec);
     if (ec) {
-        SetStatus(state_, "Ignored terminology list could not be loaded: " + ec.message());
+        SetStatus(state_, ui::i18n::trf("Ignored terminology list could not be loaded: {0}", ec.message()));
         return;
     }
     if (!file_exists)
         return;
     std::ifstream in(path, std::ios::binary);
     if (!in) {
-        SetStatus(state_, "Ignored terminology list could not be loaded: could not open file.");
+        SetStatus(state_, AF_TR("Ignored terminology list could not be loaded: could not open file."));
         return;
     }
     std::ostringstream buffer;
@@ -1264,7 +1273,7 @@ void TerminologyActions::LoadIgnoredSuggestions() {
     std::vector<core::terminology::IgnoredSuggestion> items;
     std::string error;
     if (!core::terminology::ParseIgnoredSuggestions(buffer.str(), items, error)) {
-        SetStatus(state_, "Ignored terminology list could not be loaded: " + error);
+        SetStatus(state_, ui::i18n::trf("Ignored terminology list could not be loaded: {0}", error));
         return;
     }
     for (const core::terminology::IgnoredSuggestion& item : items)

@@ -259,6 +259,7 @@ subset in about a second):
 | Gate | Fails when |
 |---|---|
 | `i18n_catalog_check` | A source msgid is missing from the `.po`, the committed `.mo` is stale, or a translation carries a printf specifier |
+| `status_message_i18n_check` | A status-bar message in `src/app` is an untranslated literal |
 | `sacm_matrix_check` | A `verified` conformance row has no ID-bearing test, a test names a requirement that does not exist, or a cited path moved |
 | `gsn_matrix_check` | GSN taxonomy, statuses, or cited evidence drift |
 | `feature_matrix_check` | A `supported` capability row cites no existing test, or the exported JSON is stale |

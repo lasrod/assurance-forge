@@ -161,7 +161,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
                                                  const std::string& selected_element_id,
                                                  const std::string& review_profile_id) {
     if (AnyTaskRunning(review_tasks_)) {
-        events_.Emit(StatusMessageEvent{"AI review is already running."});
+        events_.Emit(StatusMessageEvent{AF_TR("AI review is already running.")});
         return;
     }
 
@@ -200,7 +200,7 @@ void AiReviewController::BeginReviewForSelection(const parser::AssuranceCase* as
     last_raw_response_.clear();
     last_parse_error_.clear();
     show_debug_modal_ = false;
-    events_.Emit(StatusMessageEvent{"AI review request is ready in the AI Debug panel."});
+    events_.Emit(StatusMessageEvent{AF_TR("AI review request is ready in the AI Debug panel.")});
 }
 
 // The two failure styles are not interchangeable. A setup problem the user can
@@ -247,7 +247,9 @@ void AiReviewController::ReportPreparationFailure(const review::SccgReviewPrepar
                                               preparation.review_profile_name,
                                               status_message,
                                               NowUtcString());
-        events_.Emit(StatusMessageEvent{status_message});
+        // The outcome above is saved in English; the status bar is not saved,
+        // so it shows the same msgid translated.
+        events_.Emit(StatusMessageEvent{ui::i18n::tr(status_message)});
     };
 
     switch (preparation.failure) {
@@ -271,16 +273,16 @@ void AiReviewController::ReportPreparationFailure(const review::SccgReviewPrepar
             "profile-incompatible", core::ProblemSeverity::Info, selected_element_id, preparation.element_type);
         return;
     case review::SccgReviewPreparationFailure::PayloadFailed:
-        report_as_failed_review("payload-error", "AI review payload could not be created.");
+        report_as_failed_review("payload-error", AF_TR_NOOP("AI review payload could not be created."));
         return;
     case review::SccgReviewPreparationFailure::CatalogUnavailable:
-        report_as_failed_review("guidelines-missing", "SCCG guidelines could not be loaded for AI review.");
+        report_as_failed_review("guidelines-missing", AF_TR_NOOP("SCCG guidelines could not be loaded for AI review."));
         return;
     case review::SccgReviewPreparationFailure::ProfileSelectionFailed:
         report_as_failed_review("guidelines-empty", message);
         return;
     case review::SccgReviewPreparationFailure::DataPackagesFailed:
-        report_as_failed_review("data-package-error", "AI review data packages could not be collected.");
+        report_as_failed_review("data-package-error", AF_TR_NOOP("AI review data packages could not be collected."));
         return;
     }
 }
@@ -344,9 +346,9 @@ void AiReviewController::StartPendingRequest() {
                                           pending_review_profile_name_,
                                           "AI review in progress.",
                                           NowUtcString());
-    events_.Emit(StatusMessageEvent{
-        pending_passes_.size() > 1 ? "AI review sent as " + std::to_string(pending_passes_.size()) + " review passes."
-                                   : std::string("AI review request sent.")});
+    events_.Emit(StatusMessageEvent{pending_passes_.size() > 1
+                                        ? ui::i18n::trf("AI review sent as {0} review passes.", pending_passes_.size())
+                                        : AF_TR("AI review request sent.")});
 }
 
 void AiReviewController::PollTask() {
@@ -428,7 +430,7 @@ void AiReviewController::CompleteSingleRequest(const ai::AiResponse& response) {
                                               pending_review_profile_name_,
                                               "AI review response could not be parsed.",
                                               NowUtcString());
-        events_.Emit(StatusMessageEvent{"AI review response could not be parsed."});
+        events_.Emit(StatusMessageEvent{AF_TR("AI review response could not be parsed.")});
         return;
     }
 
@@ -458,7 +460,7 @@ void AiReviewController::CompleteSingleRequest(const ai::AiResponse& response) {
                                               pending_review_profile_name_,
                                               "AI review response could not be validated.",
                                               NowUtcString());
-        events_.Emit(StatusMessageEvent{"AI review response could not be validated."});
+        events_.Emit(StatusMessageEvent{AF_TR("AI review response could not be validated.")});
         return;
     }
 
@@ -508,7 +510,8 @@ void AiReviewController::ApplyReviewFindings(review::AiReviewParseResult parse_r
     // none. The reviewer is deciding whether to trust this review; an operation
     // it asked for and we dropped is part of that picture.
     for (const std::string& rejected : parse_result.rejectedOperationReasons) {
-        events_.Emit(StatusMessageEvent{"AI review proposed a change that could not be read: " + rejected});
+        events_.Emit(
+            StatusMessageEvent{ui::i18n::trf("AI review proposed a change that could not be read: {0}", rejected)});
     }
 
     if (incomplete) {
@@ -534,7 +537,7 @@ void AiReviewController::ApplyReviewFindings(review::AiReviewParseResult parse_r
                                               pending_review_profile_name_,
                                               "AI review incomplete.",
                                               NowUtcString());
-        events_.Emit(StatusMessageEvent{"AI review incomplete: " + incomplete_reason});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("AI review incomplete: {0}", incomplete_reason)});
     } else {
         EmitReviewVisualEvent(events_,
                               parse_result.problems.empty() ? ElementReviewVisualEventKind::AiNoFindings
@@ -553,10 +556,13 @@ void AiReviewController::ApplyReviewFindings(review::AiReviewParseResult parse_r
                                                                             : "AI review completed with findings.",
                                               NowUtcString());
 
-        events_.Emit(StatusMessageEvent{
-            parse_result.problems.empty() ? "AI review completed with no findings."
-                                          : "AI review completed with " + std::to_string(parse_result.problems.size()) +
-                                                " finding(s) added as review comment(s)."});
+        events_.Emit(
+            StatusMessageEvent{parse_result.problems.empty()
+                                   ? AF_TR("AI review completed with no findings.")
+                                   : ui::i18n::trnf("AI review completed with {0} finding added as a review comment.",
+                                                    "AI review completed with {0} findings added as review comments.",
+                                                    static_cast<int>(parse_result.problems.size()),
+                                                    parse_result.problems.size())});
     }
     if (!proposal_suggestions.empty()) {
         AiReviewProposalSuggestionsEvent event;
@@ -605,7 +611,7 @@ void AiReviewController::CompletePassRequests(std::vector<ai::AiResponse> respon
     for (const std::string& error : merged.pass_errors)
         last_parse_error_ += (last_parse_error_.empty() ? "" : " ") + error;
     for (const std::string& discarded : merged.discarded_findings)
-        events_.Emit(StatusMessageEvent{"AI review: " + discarded});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("AI review: {0}", discarded)});
 
     if (!merged.any_succeeded()) {
         // Reported the way a single request failing the same way would be: a
@@ -747,7 +753,7 @@ void AiReviewController::SetPendingPrompt(std::string prompt) {
     pending_passes_ = {std::move(whole)};
     pending_combined_prompt_.clear();
     events_.Emit(StatusMessageEvent{
-        "The edited prompt no longer separates into its review passes; it will be sent as one request."});
+        AF_TR("The edited prompt no longer separates into its review passes; it will be sent as one request.")});
 }
 
 void AiReviewController::RebuildCombinedPrompt() {

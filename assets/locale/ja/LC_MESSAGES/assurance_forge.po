@@ -127,6 +127,9 @@ msgstr "AI クライアントは接続できません: {0}"
 msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
 msgstr "AI 機能は、選択した安全ケースの内容とプロンプトを構成された AI プロバイダーに送信することがあります。Assurance Forge はプロジェクトデータを自動的には送信しません。データは明示的に AI アクションを使用した場合のみ送信されます。"
 
+msgid "AI found suggested text, but no assurance case is open for the working draft."
+msgstr "AI が提案テキストを見つけましたが、作業ドラフト用の保証ケースが開いていません。"
+
 msgid "AI provider error"
 msgstr "AI プロバイダーのエラー"
 
@@ -136,14 +139,35 @@ msgstr "AI レビュー OK"
 msgid "AI review OK is set by AI review outcomes."
 msgstr "AI レビュー OK は AI レビューの結果によって設定されます。"
 
+msgid "AI review cannot run because the working draft could not be materialized: {0}"
+msgstr "作業ドラフトを具体化できなかったため、AI レビューを実行できません: {0}"
+
 msgid "AI review completed with no findings."
 msgstr "AI レビューが完了し、指摘事項はありませんでした。"
+
+msgid "AI review completed, but its suggested changes could not be added because the working draft could not be materialized: {0}"
+msgstr "AI レビューは完了しましたが、作業ドラフトを具体化できなかったため、提案された変更を追加できませんでした: {0}"
+
+msgid "AI review completed, but its suggested changes were not added because the elements it reviewed changed while it was running. Run the review again."
+msgstr "AI レビューは完了しましたが、実行中にレビュー対象の要素が変更されたため、提案された変更は追加されませんでした。レビューを再実行してください。"
+
+msgid "AI review data packages could not be collected."
+msgstr "AI レビューのデータパッケージを収集できませんでした。"
 
 msgid "AI review in progress."
 msgstr "AI レビューを実行中です。"
 
+msgid "AI review incomplete: {0}"
+msgstr "AI レビューが不完全です: {0}"
+
 msgid "AI review is already running."
 msgstr "AI レビューは既に実行中です。"
+
+msgid "AI review payload could not be created."
+msgstr "AI レビューのペイロードを作成できませんでした。"
+
+msgid "AI review proposed a change that could not be read: {0}"
+msgstr "AI レビューが読み取れない変更を提案しました: {0}"
 
 msgid "AI review request failed."
 msgstr "AI レビューのリクエストに失敗しました。"
@@ -151,14 +175,41 @@ msgstr "AI レビューのリクエストに失敗しました。"
 msgid "AI review request failed: {0}"
 msgstr "AI レビューのリクエストに失敗しました: {0}"
 
+msgid "AI review request is ready in the AI Debug panel."
+msgstr "AI レビューのリクエストを AI デバッグパネルで準備しました。"
+
+msgid "AI review request sent."
+msgstr "AI レビューのリクエストを送信しました。"
+
 msgid "AI review response could not be parsed."
 msgstr "AI レビューの応答を解析できませんでした。"
+
+msgid "AI review response could not be validated."
+msgstr "AI レビューの応答を検証できませんでした。"
+
+msgid "AI review sent as {0} review passes."
+msgstr "AI レビューを {0} 回のレビューパスとして送信しました。"
+
+msgid "AI review: {0}"
+msgstr "AI レビュー: {0}"
 
 msgid "AI settings are unavailable."
 msgstr "AI 設定を使用できません。"
 
 msgid "AI settings saved."
 msgstr "AI 設定を保存しました。"
+
+msgid "AI suggested change could not be added to the working draft: {0}"
+msgstr "AI が提案した変更を作業ドラフトに追加できませんでした: {0}"
+
+msgid "AI suggested change could not be linked to its review finding."
+msgstr "AI が提案した変更をレビューの指摘事項にリンクできませんでした。"
+
+msgid "AI suggested change could not be staged in the working draft: {0}"
+msgstr "AI が提案した変更を作業ドラフトにステージングできませんでした: {0}"
+
+msgid "AI suggested change was staged but could not be marked ready: {0}"
+msgstr "AI が提案した変更をステージングしましたが、準備完了にできませんでした: {0}"
 
 msgid "AI support is disabled"
 msgstr "AI サポートは無効です"
@@ -277,11 +328,23 @@ msgstr "翻訳を追加"
 msgid "Add as context"
 msgstr "コンテキストとして追加"
 
+msgid "Add at least one proposal operation before saving."
+msgstr "保存する前に提案の操作を少なくとも 1 つ追加してください。"
+
+msgid "Add challenge failed: {0}"
+msgstr "チャレンジの追加に失敗しました: {0}"
+
 msgid "Add evidence"
 msgstr "エビデンスを追加"
 
+msgid "Add failed: {0}"
+msgstr "追加に失敗しました: {0}"
+
 msgid "Add fixed confidence"
 msgstr "固定信頼度を追加"
+
+msgid "Added ACP {0}"
+msgstr "ACP {0} を追加しました"
 
 msgid "Added by the working draft; not yet accepted."
 msgstr "作業ドラフトで追加されました。まだ受理されていません。"
@@ -289,14 +352,32 @@ msgstr "作業ドラフトで追加されました。まだ受理されていま
 msgid "Added category {0} to the working draft."
 msgstr "カテゴリ {0} を作業ドラフトに追加しました。"
 
+msgid "Added category {0}."
+msgstr "カテゴリ {0} を追加しました。"
+
 msgid "Added recommended terminology categories to the working draft."
 msgstr "推奨用語カテゴリを作業ドラフトに追加しました。"
+
+msgid "Added recommended terminology categories."
+msgstr "推奨用語カテゴリを追加しました。"
 
 msgid "Added term {0} to the working draft."
 msgstr "用語 {0} を作業ドラフトに追加しました。"
 
 msgid "Added term {0} to the working draft. Adding it as context changes the accepted argument, so do that once the draft is accepted."
 msgstr "用語 {0} を作業ドラフトに追加しました。コンテキストとしての追加は受理済みの論証を変更するため、ドラフトの受理後に行ってください。"
+
+msgid "Added term {0}."
+msgstr "用語 {0} を追加しました。"
+
+msgid "Added terminology package {0}."
+msgstr "用語パッケージ {0} を追加しました。"
+
+msgid "Added {0}"
+msgstr "{0} を追加しました"
+
+msgid "Added {0} as context."
+msgstr "{0} をコンテキストとして追加しました。"
 
 msgid "Adding a term as context"
 msgstr "用語をコンテキストとして追加すること"
@@ -330,6 +411,9 @@ msgstr "ドラフトを開いている間は他モジュールの要素を追加
 
 msgid "Appearance"
 msgstr "外観"
+
+msgid "Applied proposal {0}."
+msgstr "提案 {0} を適用しました。"
 
 msgid "Apply Proposal"
 msgstr "提案を適用"
@@ -375,6 +459,9 @@ msgstr "評価ステータス"
 
 msgid "Assessment workspace available"
 msgstr "評価ワークスペースを利用できます"
+
+msgid "Associated term with this element."
+msgstr "用語をこの要素に関連付けました。"
 
 msgid "Assumption"
 msgstr "仮定"
@@ -469,6 +556,9 @@ msgstr "バケット"
 msgid "Buckets (sorted by cost)"
 msgstr "バケット (コスト順)"
 
+msgid "Building proposal {0}. Use the GSN canvas and Save Proposal when ready."
+msgstr "提案 {0} を作成中です。GSN キャンバスを使用し、準備ができたら「提案を保存」を選択してください。"
+
 msgid "Built on it:"
 msgstr "これを前提とする変更:"
 
@@ -517,6 +607,12 @@ msgstr "ケースエクスプローラー"
 msgid "Categories"
 msgstr "分類"
 
+msgid "Category create failed: {0}"
+msgstr "カテゴリの作成に失敗しました: {0}"
+
+msgid "Category delete failed: {0}"
+msgstr "カテゴリの削除に失敗しました: {0}"
+
 msgid "Category description"
 msgstr "分類の説明"
 
@@ -528,6 +624,12 @@ msgstr "分類名"
 
 msgid "Category name is required."
 msgstr "分類名は必須です。"
+
+msgid "Category not found."
+msgstr "カテゴリが見つかりません。"
+
+msgid "Category update failed: {0}"
+msgstr "カテゴリの更新に失敗しました: {0}"
 
 msgid "Category: {0}"
 msgstr "分類: {0}"
@@ -600,6 +702,12 @@ msgstr "すべてクリア"
 
 msgid "Clear decorator"
 msgstr "装飾を解除"
+
+msgid "Cleared the location of {0}"
+msgstr "{0} の場所をクリアしました"
+
+msgid "Cleared the undeveloped decorator on {0}."
+msgstr "{0} の未展開デコレーターを解除しました。"
 
 msgid "Click to open in the Problems panel."
 msgstr "クリックして問題パネルで開きます。"
@@ -688,14 +796,32 @@ msgstr "作業ドラフトを受理できませんでした: {0}"
 msgid "Could not accept this change: {0}"
 msgstr "この変更を受理できませんでした: {0}"
 
+msgid "Could not add review comment."
+msgstr "レビューコメントを追加できませんでした。"
+
+msgid "Could not add term as context: {0}"
+msgstr "用語をコンテキストとして追加できませんでした: {0}"
+
 msgid "Could not add to the draft: {0}"
 msgstr "ドラフトに追加できませんでした: {0}"
 
 msgid "Could not assign a SACM gid for confidence storage."
 msgstr "信頼度保存用の SACM gid を割り当てられませんでした。"
 
+msgid "Could not associate term with element: {0}"
+msgstr "用語を要素に関連付けられませんでした: {0}"
+
+msgid "Could not create a TerminologyPackage for the new term."
+msgstr "新しい用語用の TerminologyPackage を作成できませんでした。"
+
+msgid "Could not decode terminology quick fix target."
+msgstr "用語クイックフィックスの対象を解析できませんでした。"
+
 msgid "Could not discard the working draft: {0}"
 msgstr "作業ドラフトを破棄できませんでした: {0}"
+
+msgid "Could not find a free GSN identifier for {0}."
+msgstr "{0} に使用できる空き GSN 識別子が見つかりませんでした。"
 
 msgid "Could not link in the draft: {0}"
 msgstr "ドラフトでリンクできませんでした: {0}"
@@ -705,6 +831,9 @@ msgstr "編集可能な SACM パッケージモデルを読み込めませんで
 
 msgid "Could not move assessments into the draft: {0}"
 msgstr "評価をドラフトに移動できませんでした: {0}"
+
+msgid "Could not move the assessments into the SACM document: {0}"
+msgstr "評価を SACM ドキュメントに移動できませんでした: {0}"
 
 msgid "Could not move the assessments: {0}"
 msgstr "評価を移動できませんでした: {0}"
@@ -727,6 +856,12 @@ msgstr "ドラフトに編集を記録できませんでした: {0}"
 msgid "Could not record the evidence attribute in the draft: {0}"
 msgstr "ドラフトにエビデンス属性を記録できませんでした: {0}"
 
+msgid "Could not record the evidence location: {0}"
+msgstr "エビデンスの場所を記録できませんでした: {0}"
+
+msgid "Could not record the evidence {0}: {1}"
+msgstr "エビデンスの {0} を記録できませんでした: {1}"
+
 msgid "Could not record the location in the draft: {0}"
 msgstr "ドラフトに場所を記録できませんでした: {0}"
 
@@ -735,6 +870,15 @@ msgstr "この変更を却下できませんでした: {0}"
 
 msgid "Could not remove in the draft: {0}"
 msgstr "ドラフトで削除できませんでした: {0}"
+
+msgid "Could not resolve review comment."
+msgstr "レビューコメントを解決済みにできませんでした。"
+
+msgid "Could not resolve selected element for proposal operation."
+msgstr "提案操作の対象として選択された要素を特定できませんでした。"
+
+msgid "Could not resolve selected element for proposal removal."
+msgstr "提案の削除対象として選択された要素を特定できませんでした。"
 
 msgid "Could not resolve this preview element for proposal edits."
 msgstr "提案編集のためのこのプレビュー要素を解決できませんでした。"
@@ -793,6 +937,9 @@ msgstr "ベースラインを作成"
 msgid "Create baseline at current state"
 msgstr "現在の状態でベースラインを作成"
 
+msgid "Create confidence argument tree failed: {0}"
+msgstr "信頼度論証ツリーの作成に失敗しました: {0}"
+
 msgid "Create new confidence argument tree"
 msgstr "新しい信頼度論証ツリーを作成"
 
@@ -807,6 +954,12 @@ msgstr "現在の状態でスナップショットを作成"
 
 msgid "Create, inspect, and navigate a safety case"
 msgstr "安全ケースの作成・確認・操作を行います"
+
+msgid "Created a TerminologyPackage for new terms."
+msgstr "新しい用語用の TerminologyPackage を作成しました。"
+
+msgid "Created confidence argument tree {0} for {1}"
+msgstr "{1} の信頼度論証ツリー {0} を作成しました"
 
 msgid "Dark"
 msgstr "ダーク"
@@ -865,8 +1018,26 @@ msgstr "この用語を削除しますか?"
 msgid "Delete this terminology package?"
 msgstr "この用語パッケージを削除しますか?"
 
+msgid "Deleted category."
+msgstr "カテゴリを削除しました。"
+
+msgid "Deleted proposed change {0}."
+msgstr "提案された変更 {0} を削除しました。"
+
+msgid "Deleted review comment and proposed change."
+msgstr "レビューコメントと提案された変更を削除しました。"
+
+msgid "Deleted review comment."
+msgstr "レビューコメントを削除しました。"
+
 msgid "Deleted term {0} in the working draft."
 msgstr "作業ドラフトの用語 {0} を削除しました。"
+
+msgid "Deleted term."
+msgstr "用語を削除しました。"
+
+msgid "Deleted terminology package."
+msgstr "用語パッケージを削除しました。"
 
 msgid "Deleting a category"
 msgstr "カテゴリの削除"
@@ -949,6 +1120,15 @@ msgstr "ドラッグしてトランザクション履歴をスクラブします
 msgid "Drop broken reference"
 msgstr "壊れた参照を削除"
 
+msgid "Drop reference failed: {0}"
+msgstr "参照の削除に失敗しました: {0}"
+
+msgid "Dropped the broken reference {0} from {1}."
+msgstr "壊れた参照 {0} を {1} から削除しました。"
+
+msgid "Dropped {0}, which left relationship {1} with nothing to relate, so it was removed too."
+msgstr "{0} を削除しました。これにより関係 {1} の関連先がなくなったため、その関係も削除しました。"
+
 msgid "Duplicate term value and definition exist in this package."
 msgstr "このパッケージ内に同じ用語と定義の重複があります。"
 
@@ -967,6 +1147,12 @@ msgstr "提案を編集"
 msgid "Edit Term"
 msgstr "用語を編集"
 
+msgid "Edit failed: unknown field '{0}'."
+msgstr "編集に失敗しました: 不明なフィールド '{0}' です。"
+
+msgid "Edit failed: {0}"
+msgstr "編集に失敗しました: {0}"
+
 msgid "Edit term"
 msgstr "用語を編集"
 
@@ -979,6 +1165,9 @@ msgstr "編集可能なエビデンス登録簿の内容は後のワークフロ
 msgid "Editing a terminology package"
 msgstr "用語パッケージの編集"
 
+msgid "Editing proposal {0}. Use Save Proposal to update it."
+msgstr "提案 {0} を編集中です。更新するには「提案を保存」を使用してください。"
+
 msgid "Editing the package or deleting a category"
 msgstr "パッケージの編集またはカテゴリの削除"
 
@@ -990,6 +1179,9 @@ msgstr "要素"
 
 msgid "Element Properties"
 msgstr "要素プロパティ"
+
+msgid "Element marked OK manually."
+msgstr "要素を手動で OK にしました。"
 
 msgid "Element not found in the active model."
 msgstr "アクティブモデルに要素が見つかりません。"
@@ -1008,6 +1200,9 @@ msgstr "AI サポートを有効にする"
 
 msgid "Enable confidence for this element"
 msgstr "この要素の信頼度を有効化"
+
+msgid "Enter a reviewer name before adding review comments."
+msgstr "レビューコメントを追加する前にレビュアー名を入力してください。"
 
 msgid "Enter a reviewer name before changing review status."
 msgstr "レビュー状態を変更する前にレビュー担当者名を入力してください。"
@@ -1090,11 +1285,20 @@ msgstr "SCCG ID またはタイトルでフィルター"
 msgid "Filter:"
 msgstr "フィルター:"
 
+msgid "Filtered glossary to duplicated term definition {0}."
+msgstr "用語集を重複した用語定義 {0} で絞り込みました。"
+
+msgid "Filtered the glossary for {0}. Select a term to link when occurrence binding is available."
+msgstr "用語集を {0} で絞り込みました。出現箇所の紐付けが利用可能になったら、リンクする用語を選択してください。"
+
 msgid "Find Usages"
 msgstr "使用箇所を検索"
 
 msgid "Find usages"
 msgstr "使用箇所を検索"
+
+msgid "Find usages failed: {0}"
+msgstr "使用箇所の検索に失敗しました: {0}"
 
 msgid "Find usages: {0}"
 msgstr "使用箇所検索: {0}"
@@ -1213,6 +1417,18 @@ msgstr "アイドリングは有効ですが、現在スロットルしていま
 msgid "Ignore"
 msgstr "無視"
 
+msgid "Ignored terminology list could not be loaded: could not open file."
+msgstr "無視する用語リストを読み込めませんでした: ファイルを開けませんでした。"
+
+msgid "Ignored terminology list could not be loaded: {0}"
+msgstr "無視する用語リストを読み込めませんでした: {0}"
+
+msgid "Ignored terminology suggestion {0} for this session, but could not persist: {1}"
+msgstr "用語の提案 {0} をこのセッションでは無視しましたが、保存できませんでした: {1}"
+
+msgid "Ignored terminology suggestion {0}."
+msgstr "用語の提案 {0} を無視しました。"
+
 msgid "Ignored terms"
 msgstr "無視された用語"
 
@@ -1279,11 +1495,17 @@ msgstr "ライト"
 msgid "Link existing"
 msgstr "既存にリンク"
 
+msgid "Link failed: {0}"
+msgstr "リンクに失敗しました: {0}"
+
 msgid "Link selected confidence argument tree"
 msgstr "選択した信頼度論証ツリーをリンク"
 
 msgid "Link to"
 msgstr "リンク先"
+
+msgid "Linked {0} to {1}"
+msgstr "{0} を {1} にリンクしました"
 
 msgid "Linked:"
 msgstr "リンク済み:"
@@ -1303,6 +1525,9 @@ msgstr "読み込み"
 msgid "Load a SACM model before editing proposal drafts."
 msgstr "提案ドラフトを編集する前に SACM モデルを読み込んでください。"
 
+msgid "Load a SACM model before previewing proposals."
+msgstr "提案をプレビューする前に SACM モデルを読み込んでください。"
+
 msgid "Location"
 msgstr "場所"
 
@@ -1318,6 +1543,9 @@ msgstr "入力が検出されないため、メインループは現在スロッ
 msgid "Manual review OK"
 msgstr "手動レビュー OK"
 
+msgid "Manual review OK cleared."
+msgstr "手動レビューの OK を解除しました。"
+
 msgid "Mark as reviewed"
 msgstr "レビュー済みとしてマーク"
 
@@ -1329,6 +1557,9 @@ msgstr "レビュー済みにする"
 
 msgid "Mark this element as manually reviewed OK."
 msgstr "この要素を手動でレビュー OK としてマークします。"
+
+msgid "Marked {0} undeveloped."
+msgstr "{0} を未展開にしました。"
 
 msgid "Maturity"
 msgstr "成熟度"
@@ -1363,8 +1594,17 @@ msgstr "モデルを利用できません"
 msgid "Move into SACM"
 msgstr "SACM に移動"
 
+msgid "Move strategy failed: {0}"
+msgstr "戦略の移動に失敗しました: {0}"
+
 msgid "Move to reasoning"
 msgstr "理由付けへ移動"
+
+msgid "Moved {0}"
+msgstr "{0} を移動しました"
+
+msgid "Moved {0} into the reasoning of {1}."
+msgstr "{0} を {1} の推論に移動しました。"
 
 msgid "My edits"
 msgstr "自分の編集"
@@ -1438,17 +1678,29 @@ msgstr "利用可能な TerminologyPackage がありません。"
 msgid "No XML files found"
 msgstr "XML ファイルが見つかりません"
 
+msgid "No active proposal draft for this review comment."
+msgstr "このレビューコメントには有効な提案の下書きがありません。"
+
 msgid "No arguments yet."
 msgstr "議論はまだありません。"
 
+msgid "No assurance case loaded."
+msgstr "保証ケースが読み込まれていません。"
+
 msgid "No away element selected."
 msgstr "他モジュールの要素が選択されていません。"
+
+msgid "No broken reference selected."
+msgstr "壊れた参照が選択されていません。"
 
 msgid "No categories"
 msgstr "分類なし"
 
 msgid "No categories are available in this terminology package."
 msgstr "この用語パッケージには利用可能な分類がありません。"
+
+msgid "No challenge target selected."
+msgstr "チャレンジの対象が選択されていません。"
 
 msgid "No claim rests on this evidence."
 msgstr "このエビデンスに依拠するクレームはありません。"
@@ -1504,6 +1756,9 @@ msgstr "アーギュメント内のサポートに一致するプロジェクト
 msgid "No proposal for resolved comment."
 msgstr "解決済みコメントに対する提案はありません。"
 
+msgid "No proposal id was provided."
+msgstr "提案 ID が指定されていません。"
+
 msgid "No recent projects."
 msgstr "最近のプロジェクトはありません。"
 
@@ -1524,6 +1779,9 @@ msgstr "この要素のレビューコメントはありません。"
 
 msgid "No safety case loaded."
 msgstr "安全ケースが読み込まれていません。"
+
+msgid "No strategy selected."
+msgstr "戦略が選択されていません。"
 
 msgid "No terminology package selected."
 msgstr "用語パッケージが選択されていません。"
@@ -1570,6 +1828,9 @@ msgstr "メモ"
 msgid "Nothing is shared until you allow it. Access lasts while this project stays open, and you can withdraw it at any time by disabling MCP in Preferences."
 msgstr "許可するまで何も共有されません。アクセスはこのプロジェクトが開いている間だけ有効で、環境設定で MCP を無効にすればいつでも取り消せます。"
 
+msgid "Nothing to remove for this selection."
+msgstr "この選択には削除するものがありません。"
+
 msgid "Nothing to undo."
 msgstr "元に戻す操作はありません。"
 
@@ -1606,14 +1867,56 @@ msgstr "最近のプロジェクトを開く"
 msgid "Open a SACM model and use any model-mutating action (add or remove a node) — each command will appear here."
 msgstr "SACM モデルを開いて、モデルを変更するアクション (ノードの追加または削除) を使用してください — 各コマンドがここに表示されます。"
 
+msgid "Open a SACM model before adding terminology context."
+msgstr "用語のコンテキストを追加する前に SACM モデルを開いてください。"
+
+msgid "Open a SACM model before associating terminology."
+msgstr "用語を関連付ける前に SACM モデルを開いてください。"
+
+msgid "Open a SACM model before defining terms."
+msgstr "用語を定義する前に SACM モデルを開いてください。"
+
+msgid "Open a SACM model before finding terminology usages."
+msgstr "用語の使用箇所を検索する前に SACM モデルを開いてください。"
+
+msgid "Open a SACM model before opening terminology terms."
+msgstr "用語を開く前に SACM モデルを開いてください。"
+
+msgid "Open a project and SACM file before applying proposed changes."
+msgstr "提案された変更を適用する前にプロジェクトと SACM ファイルを開いてください。"
+
+msgid "Open a project and SACM file before creating proposed changes."
+msgstr "提案された変更を作成する前にプロジェクトと SACM ファイルを開いてください。"
+
+msgid "Open a project and SACM file before editing proposed changes."
+msgstr "提案された変更を編集する前にプロジェクトと SACM ファイルを開いてください。"
+
+msgid "Open a project before deleting proposed changes."
+msgstr "提案された変更を削除する前にプロジェクトを開いてください。"
+
+msgid "Open a project before deleting review comments."
+msgstr "レビューコメントを削除する前にプロジェクトを開いてください。"
+
 msgid "Open a project before removing files."
 msgstr "ファイルを削除する前にプロジェクトを開いてください。"
+
+msgid "Open a project before resolving review comments."
+msgstr "レビューコメントを解決済みにする前にプロジェクトを開いてください。"
 
 msgid "Open a project before revealing files."
 msgstr "ファイルの場所を表示する前にプロジェクトを開いてください。"
 
+msgid "Open a project before saving proposals."
+msgstr "提案を保存する前にプロジェクトを開いてください。"
+
 msgid "Open a project to see its client configuration."
 msgstr "クライアント設定を表示するにはプロジェクトを開いてください。"
+
+msgid "Open a terminology package before adding categories."
+msgstr "カテゴリを追加する前に用語パッケージを開いてください。"
+
+msgid "Open a terminology package before adding terms."
+msgstr "用語を追加する前に用語パッケージを開いてください。"
 
 msgid "Open an assurance case before marking review status."
 msgstr "レビュー状態を記録する前に保証ケースを開いてください。"
@@ -1627,6 +1930,12 @@ msgstr "既存の Assurance Forge プロジェクトを開きます"
 msgid "Open confidence argument tree"
 msgstr "信頼度論証ツリーを開く"
 
+msgid "Open confidence argument tree failed: ACP is not linked to a tree."
+msgstr "信頼度論証ツリーを開けませんでした: ACP がツリーにリンクされていません。"
+
+msgid "Open confidence argument tree failed: ACP was not found."
+msgstr "信頼度論証ツリーを開けませんでした: ACP が見つかりません。"
+
 msgid "Open duplicates"
 msgstr "重複を開く"
 
@@ -1635,6 +1944,9 @@ msgstr "用語集を開く"
 
 msgid "Open in File Explorer"
 msgstr "ファイルエクスプローラーで開く"
+
+msgid "Open or create a project before adding review comments."
+msgstr "レビューコメントを追加する前にプロジェクトを開くか作成してください。"
 
 msgid "Open or create a project before changing review status."
 msgstr "レビュー状態を変更する前にプロジェクトを開くか作成してください。"
@@ -1668,6 +1980,12 @@ msgstr "SACM ファイルを開きましたが、編集可能なパッケージ�
 
 msgid "Opened argument package; no focusable argument element was found in the package."
 msgstr "議論パッケージを開きましたが、フォーカスできる議論要素が見つかりませんでした。"
+
+msgid "Opened term {0}."
+msgstr "用語 {0} を開きました。"
+
+msgid "Opened terminology term editor."
+msgstr "用語エディターを開きました。"
 
 msgid "Opened {0}"
 msgstr "{0} を開きました"
@@ -1768,6 +2086,12 @@ msgstr "プレビュー: Tx {0} (読み取り専用)"
 msgid "Problem"
 msgstr "問題"
 
+msgid "Problem deleted."
+msgstr "問題を削除しました。"
+
+msgid "Problem resolved."
+msgstr "問題を解決済みにしました。"
+
 msgid "Problems"
 msgstr "問題"
 
@@ -1825,8 +2149,56 @@ msgstr "プロンプト"
 msgid "Proposal Creator"
 msgstr "提案クリエーター"
 
+msgid "Proposal applied in memory, but proposal file removal failed: {0}"
+msgstr "提案をメモリ上で適用しましたが、提案ファイルの削除に失敗しました: {0}"
+
+msgid "Proposal applied, but project save failed: {0}"
+msgstr "提案を適用しましたが、プロジェクトの保存に失敗しました: {0}"
+
+msgid "Proposal applied, but review item update failed."
+msgstr "提案を適用しましたが、レビュー項目の更新に失敗しました。"
+
+msgid "Proposal applied, but the project is no longer open."
+msgstr "提案を適用しましたが、プロジェクトはもう開いていません。"
+
+msgid "Proposal apply failed: {0}"
+msgstr "提案の適用に失敗しました: {0}"
+
+msgid "Proposal delete failed: {0}"
+msgstr "提案の削除に失敗しました: {0}"
+
+msgid "Proposal deleted, but review link update failed."
+msgstr "提案を削除しましたが、レビューのリンクの更新に失敗しました。"
+
+msgid "Proposal draft preview failed: {0}"
+msgstr "提案の下書きのプレビューに失敗しました: {0}"
+
+msgid "Proposal edit failed: the owning review comment no longer points to this proposal."
+msgstr "提案の編集に失敗しました: 所属するレビューコメントがこの提案を参照しなくなっています。"
+
+msgid "Proposal edit failed: the owning review comment was not found."
+msgstr "提案の編集に失敗しました: 所属するレビューコメントが見つかりません。"
+
+msgid "Proposal edit failed: the proposal belongs to a different review comment."
+msgstr "提案の編集に失敗しました: この提案は別のレビューコメントに属しています。"
+
+msgid "Proposal edit failed: {0}"
+msgstr "提案の編集に失敗しました: {0}"
+
+msgid "Proposal is broken: {0}"
+msgstr "提案が壊れています: {0}"
+
+msgid "Proposal link update failed."
+msgstr "提案のリンクの更新に失敗しました。"
+
+msgid "Proposal preview failed: {0}"
+msgstr "提案のプレビューに失敗しました: {0}"
+
 msgid "Proposal preview is active. Exit preview before editing element properties."
 msgstr "提案プレビューが有効です。要素プロパティを編集する前にプレビューを終了してください。"
+
+msgid "Proposal save failed: {0}"
+msgstr "提案の保存に失敗しました: {0}"
 
 msgid "Proposal: {0}"
 msgstr "提案: {0}"
@@ -1864,6 +2236,9 @@ msgstr "推論:"
 msgid "Recency"
 msgstr "新しさ"
 
+msgid "Recommended terminology categories already exist."
+msgstr "推奨用語カテゴリは既に存在します。"
+
 msgid "Reconcile"
 msgstr "再構築"
 
@@ -1876,8 +2251,23 @@ msgstr "監査ログを再構築…"
 msgid "Reconstruction failed: {0}"
 msgstr "再構築に失敗しました: {0}"
 
+msgid "Recorded proposal add operation."
+msgstr "提案の追加操作を記録しました。"
+
 msgid "Recorded proposal property change."
 msgstr "提案プロパティの変更を記録しました。"
+
+msgid "Recorded proposal remove operation."
+msgstr "提案の削除操作を記録しました。"
+
+msgid "Recorded proposal top goal operation."
+msgstr "提案のトップゴール操作を記録しました。"
+
+msgid "Recorded the location of {0}"
+msgstr "{0} の場所を記録しました"
+
+msgid "Recorded the {0} of {1}"
+msgstr "{1} の {0} を記録しました"
 
 msgid "Reference: {0}"
 msgstr "参照: {0}"
@@ -1933,6 +2323,9 @@ msgstr "除去"
 msgid "Remove ACP"
 msgstr "ACP を除去"
 
+msgid "Remove ACP failed: {0}"
+msgstr "ACP の削除に失敗しました: {0}"
+
 msgid "Remove Key"
 msgstr "キーを削除"
 
@@ -1945,11 +2338,17 @@ msgstr "反証を削除"
 msgid "Remove evidence"
 msgstr "エビデンスを削除"
 
+msgid "Remove failed: {0}"
+msgstr "削除に失敗しました: {0}"
+
 msgid "Remove file failed: {0}"
 msgstr "ファイルの削除に失敗しました: {0}"
 
 msgid "Remove relationship"
 msgstr "関係を削除"
+
+msgid "Remove relationship failed: {0}"
+msgstr "関係の削除に失敗しました: {0}"
 
 msgid "Remove the SACM-backed ACP metadata from its target."
 msgstr "対象から SACM ベースの ACP メタデータを除去します。"
@@ -1962,6 +2361,12 @@ msgstr "{0} の削除に失敗しました: {1}"
 
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
+
+msgid "Removed relationship {0}. Its elements were kept; any left unconnected show as orphans."
+msgstr "関係 {0} を削除しました。要素は残してあり、接続がなくなった要素は孤立要素として表示されます。"
+
+msgid "Removed {0}"
+msgstr "{0} を削除しました"
 
 msgid "Removed {0} {1}."
 msgstr "{0} {1} を削除しました。"
@@ -1977,6 +2382,15 @@ msgstr "この種類のパッケージの削除はまだサポートされてい
 
 msgid "Renumber"
 msgstr "採番し直す"
+
+msgid "Renumber failed: {0}"
+msgstr "番号の振り直しに失敗しました: {0}"
+
+msgid "Renumbered {0} to {1}."
+msgstr "{0} を {1} に番号変更しました。"
+
+msgid "Reordered {0}"
+msgstr "{0} を並べ替えました"
 
 msgid "Report Builder"
 msgstr "レポートビルダー"
@@ -1999,11 +2413,23 @@ msgstr "解決"
 msgid "Resolved"
 msgstr "解決済み"
 
+msgid "Resolved review comments cannot create proposed changes."
+msgstr "解決済みのレビューコメントでは提案された変更を作成できません。"
+
+msgid "Resolved review comments cannot edit proposed changes."
+msgstr "解決済みのレビューコメントでは提案された変更を編集できません。"
+
 msgid "Response"
 msgstr "応答"
 
 msgid "Restore"
 msgstr "復元"
+
+msgid "Restored terminology suggestion {0} for this session, but could not persist: {1}"
+msgstr "用語の提案 {0} をこのセッションでは復元しましたが、保存できませんでした: {1}"
+
+msgid "Restored terminology suggestion {0}."
+msgstr "用語の提案 {0} を復元しました。"
 
 msgid "Resume"
 msgstr "再開"
@@ -2025,6 +2451,21 @@ msgstr "変更を確認"
 
 msgid "Review comment"
 msgstr "レビューコメント"
+
+msgid "Review comment added."
+msgstr "レビューコメントを追加しました。"
+
+msgid "Review comment delete failed while deleting proposal: {0}"
+msgstr "提案の削除中にレビューコメントの削除に失敗しました: {0}"
+
+msgid "Review comment is already resolved."
+msgstr "レビューコメントは既に解決済みです。"
+
+msgid "Review comment resolved."
+msgstr "レビューコメントを解決済みにしました。"
+
+msgid "Review comment was already removed."
+msgstr "レビューコメントは既に削除されています。"
 
 msgid "Review element"
 msgstr "要素を確認"
@@ -2089,6 +2530,12 @@ msgstr "SCCG ガイドライン違反"
 msgid "SCCG guidelines are not available."
 msgstr "SCCG ガイドラインは使用できません。"
 
+msgid "SCCG guidelines are not available: {0}"
+msgstr "SCCG ガイドラインを利用できません: {0}"
+
+msgid "SCCG guidelines could not be loaded for AI review."
+msgstr "AI レビュー用の SCCG ガイドラインを読み込めませんでした。"
+
 msgid "SCCG profiles unavailable."
 msgstr "SCCG プロファイルを使用できません。"
 
@@ -2116,8 +2563,35 @@ msgstr "提案を保存"
 msgid "Save Reviewer Name"
 msgstr "レビュー担当者名を保存"
 
+msgid "Save or discard the active proposal before adding more review comments."
+msgstr "レビューコメントをさらに追加する前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before applying another proposal."
+msgstr "別の提案を適用する前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before creating another one."
+msgstr "別の提案を作成する前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before deleting another proposal."
+msgstr "別の提案を削除する前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before deleting review comments."
+msgstr "レビューコメントを削除する前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before editing another one."
+msgstr "別の提案を編集する前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before resolving review comments."
+msgstr "レビューコメントを解決済みにする前に、作業中の提案を保存または破棄してください。"
+
+msgid "Save or discard the active proposal before viewing another proposal."
+msgstr "別の提案を表示する前に、作業中の提案を保存または破棄してください。"
+
 msgid "Save report to file"
 msgstr "レポートをファイルに保存"
+
+msgid "Save the current SACM file before adding a terminology package."
+msgstr "用語パッケージを追加する前に現在の SACM ファイルを保存してください。"
 
 msgid "Save the current SACM file before opening another package."
 msgstr "別のパッケージを開く前に現在の SACM ファイルを保存してください。"
@@ -2127,6 +2601,9 @@ msgstr "パッケージを削除する前に現在の SACM ファイルを保存
 
 msgid "Saved"
 msgstr "保存済み"
+
+msgid "Saved proposal {0}."
+msgstr "提案 {0} を保存しました。"
 
 msgid "Saved: {0}"
 msgstr "保存しました: {0}"
@@ -2158,8 +2635,17 @@ msgstr "SCCG プロファイルレビューを実行する前に GSN/SACM 要素
 msgid "Select a proposal preview element to edit its proposed properties."
 msgstr "提案するプロパティを編集するには、提案プレビュー要素を選択してください。"
 
+msgid "Select an element before adding a review comment."
+msgstr "レビューコメントを追加する前に要素を選択してください。"
+
+msgid "Select an element before adding proposal nodes."
+msgstr "提案ノードを追加する前に要素を選択してください。"
+
 msgid "Select an element before changing manual review status."
 msgstr "手動レビュー状態を変更する前に要素を選択してください。"
+
+msgid "Select an element before removing proposal nodes."
+msgstr "提案ノードを削除する前に要素を選択してください。"
 
 msgid "Select an element to review."
 msgstr "レビューする要素を選択してください。"
@@ -2190,6 +2676,9 @@ msgstr "送信中…"
 
 msgid "Separate confidence argument tree"
 msgstr "個別の信頼度論証ツリー"
+
+msgid "Set undeveloped failed: {0}"
+msgstr "未展開の設定に失敗しました: {0}"
 
 msgid "Settings error"
 msgstr "設定エラー"
@@ -2241,6 +2730,9 @@ msgstr "適合性評価を開始"
 
 msgid "Start a project from a SACM XML assurance case you already have"
 msgstr "手元にある SACM XML 保証ケースからプロジェクトを開始します"
+
+msgid "Start a proposal draft before editing proposal changes."
+msgstr "提案の変更を編集する前に提案の下書きを開始してください。"
 
 msgid "Start with a blank assurance project workspace"
 msgstr "空の保証プロジェクトワークスペースから開始します"
@@ -2308,6 +2800,12 @@ msgstr "用語カード"
 msgid "Term Usages"
 msgstr "用語の使用箇所"
 
+msgid "Term create failed: {0}"
+msgstr "用語の作成に失敗しました: {0}"
+
+msgid "Term delete failed: {0}"
+msgstr "用語の削除に失敗しました: {0}"
+
 msgid "Term has no category."
 msgstr "用語に分類がありません。"
 
@@ -2317,8 +2815,17 @@ msgstr "用語に外部参照/出典がありません。"
 msgid "Term has no value."
 msgstr "用語に値がありません。"
 
+msgid "Term is already associated with this element."
+msgstr "用語は既にこの要素に関連付けられています。"
+
+msgid "Term not found."
+msgstr "用語が見つかりません。"
+
 msgid "Term reference could not be resolved."
 msgstr "用語参照を解決できませんでした。"
+
+msgid "Term update failed: {0}"
+msgstr "用語の更新に失敗しました: {0}"
 
 msgid "Term value is required."
 msgstr "用語の値は必須です。"
@@ -2341,11 +2848,26 @@ msgstr "用語パッケージに用語項目が含まれています。"
 msgid "Terminology package contains terms."
 msgstr "用語パッケージに用語が含まれています。"
 
+msgid "Terminology package create failed: {0}"
+msgstr "用語パッケージの作成に失敗しました: {0}"
+
+msgid "Terminology package delete failed: the delete could not be completed."
+msgstr "用語パッケージの削除に失敗しました: 削除を完了できませんでした。"
+
+msgid "Terminology package delete failed: {0}"
+msgstr "用語パッケージの削除に失敗しました: {0}"
+
 msgid "Terminology package not found."
 msgstr "用語パッケージが見つかりません。"
 
+msgid "Terminology package update failed: {0}"
+msgstr "用語パッケージの更新に失敗しました: {0}"
+
 msgid "Terminology package was not found in the editable model."
 msgstr "編集可能なモデルに用語パッケージが見つかりませんでした。"
+
+msgid "Terminology quick fix target was not found."
+msgstr "用語クイックフィックスの対象が見つかりません。"
 
 msgid "Terminology spans"
 msgstr "用語スパン"
@@ -2428,6 +2950,9 @@ msgstr "ドラフトは受理されましたが、監査ログに記録できま
 msgid "The edit was made, but the draft could not be written to disk: {0}"
 msgstr "編集は適用されましたが、ドラフトをディスクに書き込めませんでした: {0}"
 
+msgid "The edited prompt no longer separates into its review passes; it will be sent as one request."
+msgstr "編集したプロンプトはレビューパスに分割できなくなったため、1 つのリクエストとして送信されます。"
+
 msgid "The external changes could not be recorded as seen, so they will be reported again on the next open: {0}"
 msgstr "外部の変更を確認済みとして記録できなかったため、次にプロジェクトを開いたときにも報告されます: {0}"
 
@@ -2437,8 +2962,14 @@ msgstr "直前の受理は行われませんでした: {0}"
 msgid "The replayed audit history does not reproduce the on-disk SACM. This usually means edits were applied through a path that did not record transactions. Pinned historical views may be inaccurate."
 msgstr "再生された監査履歴がディスク上の SACM を再現できません。通常、これはトランザクションを記録しない経路で編集が適用されたことを意味します。固定された履歴ビューは正確でない可能性があります。"
 
+msgid "The reviewed element no longer exists in the loaded model."
+msgstr "レビュー対象の要素は読み込まれたモデルに存在しなくなりました。"
+
 msgid "The selected proposal preview element no longer exists."
 msgstr "選択された提案プレビュー要素は既に存在しません。"
+
+msgid "The selected usage has no navigable element id."
+msgstr "選択した使用箇所には移動可能な要素 ID がありません。"
 
 msgid "The stored confidence assessment needs review because this element changed. Review the value and reactivate confidence if it is still valid."
 msgstr "この要素が変更されたため、保存された信頼度評価の確認が必要です。値を確認し、まだ有効であれば 信頼度を再アクティブ化してください。"
@@ -2545,6 +3076,21 @@ msgstr "このプロジェクトは別の Assurance Forge インスタンス（�
 msgid "This project does not have an audit store yet."
 msgstr "このプロジェクトにはまだ監査ストアがありません。"
 
+msgid "This review comment already has a proposed change."
+msgstr "このレビューコメントには既に提案された変更があります。"
+
+msgid "This review comment has no proposed change to apply."
+msgstr "このレビューコメントには適用する提案された変更がありません。"
+
+msgid "This review comment has no proposed change to delete."
+msgstr "このレビューコメントには削除する提案された変更がありません。"
+
+msgid "This review comment has no proposed change to edit."
+msgstr "このレビューコメントには編集する提案された変更がありません。"
+
+msgid "This review comment has no proposed change to preview."
+msgstr "このレビューコメントにはプレビューする提案された変更がありません。"
+
 msgid "This strategy develops into nothing. A decomposition step that produces no sub-claims states an inference the argument never makes."
 msgstr "この戦略は何にも展開されていません。サブ主張を生まない分解ステップは、議論が一度も行わない推論を宣言していることになります。"
 
@@ -2580,6 +3126,12 @@ msgstr "トランザクション: {0}   |   現在: Tx {1} / {2}"
 
 msgid "Translation Language"
 msgstr "翻訳言語"
+
+msgid "Tree move failed."
+msgstr "ツリーの移動に失敗しました。"
+
+msgid "Tree move failed: {0}"
+msgstr "ツリーの移動に失敗しました: {0}"
 
 msgid "Type"
 msgstr "種別"
@@ -2620,6 +3172,9 @@ msgstr "元に戻せません: プロジェクトが読み込まれていませ�
 msgid "Unexpected response"
 msgstr "予期しない応答です"
 
+msgid "Unknown SCCG guideline id: {0}"
+msgstr "不明な SCCG ガイドライン ID: {0}"
+
 msgid "Unknown error"
 msgstr "不明なエラー"
 
@@ -2641,14 +3196,23 @@ msgstr "未保存の変更"
 msgid "Untitled change ({0})"
 msgstr "無題の変更 ({0})"
 
+msgid "Update ACP failed: {0}"
+msgstr "ACP の更新に失敗しました: {0}"
+
 msgid "Update Key"
 msgstr "キーを更新"
 
 msgid "Updated category {0} in the working draft."
 msgstr "作業ドラフトのカテゴリ {0} を更新しました。"
 
+msgid "Updated category {0}."
+msgstr "カテゴリ {0} を更新しました。"
+
 msgid "Updated term {0} in the working draft."
 msgstr "作業ドラフトの用語 {0} を更新しました。"
+
+msgid "Updated term {0}."
+msgstr "用語 {0} を更新しました。"
 
 msgid "Usage count: {0}"
 msgstr "使用回数: {0}"
@@ -2932,11 +3496,17 @@ msgstr "{0} 件のエラーに対応が必要です"
 msgid "{0} evidence items are not linked to a claim"
 msgstr "{0} 件のエビデンスが主張にリンクされていません"
 
+msgid "{0} failed: no SACM model loaded."
+msgstr "{0} に失敗しました: SACM モデルが読み込まれていません。"
+
 msgid "{0} has multiple meanings."
 msgstr "{0} には複数の意味があります。"
 
 msgid "{0} has {1} visible meanings. Choose the intended terminology entry."
 msgstr "{0} には {1} 件の表示可能な意味があります。意図する用語項目を選択してください。"
+
+msgid "{0} is already attached as context to this element."
+msgstr "{0} は既にこの要素にコンテキストとして付いています。"
 
 msgid "{0} is an away goal proved in module {1}, but it is also supported here. An away goal shows an argument made elsewhere; developing it here makes two."
 msgstr "{0} はモジュール {1} で立証された他モジュールの目標ですが、ここでも支持されています。他モジュールの目標は他所で構築された論証を示すものであり、ここで展開すると論証が二重になります。"
@@ -2980,6 +3550,9 @@ msgstr "{0} 件未リンク"
 msgid "{0} warnings require review"
 msgstr "{0} 件の警告を確認する必要があります"
 
+msgid "{0} {1}"
+msgstr "{0}{1}"
+
 msgid "{0} — accepted"
 msgstr "{0} — 受理済み"
 
@@ -3004,9 +3577,17 @@ msgstr "{0}: {1}"
 msgid "● PAUSED"
 msgstr "● 一時停止中"
 
+msgid "AI added {0} suggested change to the working draft. Review it before accepting."
+msgid_plural "AI added {0} suggested changes to the working draft. Review them before accepting."
+msgstr[0] "AI が提案された変更 {0} 件を作業ドラフトに追加しました。受理する前に確認してください。"
+
 msgid "AI client connected: {0}"
 msgid_plural "AI clients connected: {0}"
 msgstr[0] "接続中の AI クライアント: {0}"
+
+msgid "AI review completed with {0} finding added as a review comment."
+msgid_plural "AI review completed with {0} findings added as review comments."
+msgstr[0] "AI レビューが完了し、{0} 件の指摘事項をレビューコメントとして追加しました。"
 
 msgid "Accepted {0} draft change."
 msgid_plural "Accepted {0} draft changes."
@@ -3024,9 +3605,17 @@ msgid "Deleting it would also remove {0} element that references it, which the w
 msgid_plural "Deleting it would also remove {0} elements that reference it, which the working draft cannot do. Remove those references first, or accept or discard the draft."
 msgstr[0] "削除すると、それを参照している {0} 個の要素も削除されますが、作業ドラフトではできません。先にその参照を削除するか、ドラフトを受理または破棄してください。"
 
+msgid "Found {0} usage of {1}."
+msgid_plural "Found {0} usages of {1}."
+msgstr[0] "{1} の使用箇所が {0} 件見つかりました。"
+
 msgid "Moved {0} assessment into the SACM document."
 msgid_plural "Moved {0} assessments into the SACM document."
 msgstr[0] "{0} 件の評価を SACM ドキュメントに移動しました。"
+
+msgid "Previewing proposal {0} with {1} operation. The project model has not been changed."
+msgid_plural "Previewing proposal {0} with {1} operations. The project model has not been changed."
+msgstr[0] "提案 {0}（{1} 件の操作）をプレビュー中です。プロジェクトモデルは変更されていません。"
 
 msgid "Proposal draft: {0} operation"
 msgid_plural "Proposal draft: {0} operations"
@@ -3039,6 +3628,10 @@ msgstr[0] "変更 {0} 件を却下しました。"
 msgid "Rejected {0} change. The accepted argument is unchanged."
 msgid_plural "Rejected {0} changes. The accepted argument is unchanged."
 msgstr[0] "変更 {0} 件を却下しました。受理済みの議論は変更されていません。"
+
+msgid "Removed {0} element"
+msgid_plural "Removed {0} elements"
+msgstr[0] "{0} 件の要素を削除しました"
 
 msgid "This category is assigned to {0} term. Remove those assignments before deleting it."
 msgid_plural "This category is assigned to {0} terms. Remove those assignments before deleting it."

@@ -690,6 +690,14 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/check_catalog.py"
     )
 
+    # Status-bar message gate: fails if a status message in src/app is an
+    # untranslated literal. The status bar does no translation of its own, and
+    # src/app drifted back to ~220 raw literals once already (issue #252).
+    add_test(
+        NAME status_message_i18n_check
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/i18n/check_status_messages.py"
+    )
+
     # SACM conformance matrix gate: fails if a `verified` row is not backed by
     # an ID-bearing test, if a test names a requirement the matrix does not
     # define, or if a row cites a path that no longer exists. The matrix is the
@@ -809,6 +817,7 @@ if(Python3_Interpreter_FOUND)
     # it is one.
     set_tests_properties(
         i18n_catalog_check
+        status_message_i18n_check
         sacm_matrix_check
         gsn_matrix_check
         feature_matrix_check
@@ -831,7 +840,7 @@ else()
     # These are compliance gates, not conveniences. A silently absent gate reads
     # as a passing one, so say so loudly rather than skipping in silence.
     message(WARNING
-        "Python3 not found: the i18n_catalog_check, sacm_matrix_check, gsn_matrix_check, "
+        "Python3 not found: the i18n_catalog_check, status_message_i18n_check, sacm_matrix_check, gsn_matrix_check, "
         "feature_matrix_check, no_committed_artifacts_check, documentation_check and "
         "verification_index_check gates will NOT run. "
         "CI installs Python explicitly; a local build without it cannot verify the "

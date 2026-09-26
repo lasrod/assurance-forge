@@ -5,6 +5,7 @@
 #include "app/commands/dispatch.h"
 #include "core/commands/tree_commands.h"
 #include "ui/ui_state.h"
+#include "ui/i18n/localization.h"
 
 namespace app::actions {
 namespace {
@@ -19,7 +20,7 @@ ElementActions::ElementActions(AppRuntimeState& state) : state_(state) {}
 
 bool ElementActions::AddChildToSelected(core::NewElementKind kind) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
@@ -28,7 +29,7 @@ bool ElementActions::AddChildToSelected(core::NewElementKind kind) {
 
 bool ElementActions::AddAwayElementToSelected(core::AwayElementKind kind, const std::string& cited_id) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
@@ -37,7 +38,7 @@ bool ElementActions::AddAwayElementToSelected(core::AwayElementKind kind, const 
 
 bool ElementActions::AddTopGoal() {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     return state_.element_edit_controller->AddTopGoal(state_);
@@ -45,12 +46,12 @@ bool ElementActions::AddTopGoal() {
 
 bool ElementActions::AddChallengeToSelectedElement(core::ChallengeSourceType source_type) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
     if (selected_id.empty()) {
-        SetStatus(state_, "No element selected.");
+        SetStatus(state_, AF_TR("No element selected."));
         return false;
     }
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Element, selected_id};
@@ -60,11 +61,11 @@ bool ElementActions::AddChallengeToSelectedElement(core::ChallengeSourceType sou
 bool ElementActions::AddChallengeToRelationship(const std::string& relationship_id,
                                                 core::ChallengeSourceType source_type) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     if (relationship_id.empty()) {
-        SetStatus(state_, "No relationship selected.");
+        SetStatus(state_, AF_TR("No relationship selected."));
         return false;
     }
     core::ArgumentTarget target{core::ArgumentTarget::Kind::Relationship, relationship_id};
@@ -73,12 +74,12 @@ bool ElementActions::AddChallengeToRelationship(const std::string& relationship_
 
 bool ElementActions::AddAcpToSelectedElement() {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     const std::string selected_id = ui::GetUiState().selected_element_id;
     if (selected_id.empty()) {
-        SetStatus(state_, "No element selected.");
+        SetStatus(state_, AF_TR("No element selected."));
         return false;
     }
     return state_.acp_controller->AddElementAcp(state_, selected_id);
@@ -86,7 +87,7 @@ bool ElementActions::AddAcpToSelectedElement() {
 
 bool ElementActions::AddAcpToRelationship(const std::string& relationship_id) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     return state_.acp_controller->AddRelationshipAcp(state_, relationship_id);
@@ -94,7 +95,7 @@ bool ElementActions::AddAcpToRelationship(const std::string& relationship_id) {
 
 bool ElementActions::RemoveAcp(const std::string& acp_id) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
     return state_.acp_controller->RemoveAcp(state_, acp_id);
@@ -103,7 +104,7 @@ bool ElementActions::RemoveAcp(const std::string& acp_id) {
 void ElementActions::RemoveSelected(core::RemoveMode mode,
                                     controllers::ElementEditController::RemovalConfirmation confirmation) {
     if (!state_.app_state.loaded_case.has_value()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return;
     }
     const std::string& selected_id = ui::GetUiState().selected_element_id;
@@ -138,7 +139,7 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
                                      const std::string& target_id,
                                      core::TreeDropMode drop_mode) {
     if (!state_.app_state.loaded_case.has_value() || !state_.app_state.has_projected_package()) {
-        SetStatus(state_, "No assurance case loaded.");
+        SetStatus(state_, AF_TR("No assurance case loaded."));
         return false;
     }
 
@@ -152,7 +153,9 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
         core::commands::ReorderSiblingsCommand command(dragged_id, target_id, drop_mode);
         const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_, outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
+            SetStatus(state_,
+                      outcome.error.empty() ? AF_TR("Tree move failed.")
+                                            : ui::i18n::trf("Tree move failed: {0}", outcome.error));
             return false;
         }
         // Refresh the transient render-order override immediately so the reorder is
@@ -164,7 +167,9 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
         core::commands::MoveSubtreeCommand command(dragged_id, target_id);
         const app::commands::DispatchOutcome outcome = app::commands::DispatchAuditedCommand(state_, command);
         if (!outcome.success) {
-            SetStatus(state_, outcome.error.empty() ? "Tree move failed." : "Tree move failed: " + outcome.error);
+            SetStatus(state_,
+                      outcome.error.empty() ? AF_TR("Tree move failed.")
+                                            : ui::i18n::trf("Tree move failed: {0}", outcome.error));
             return false;
         }
     }
@@ -172,7 +177,9 @@ bool ElementActions::PerformTreeDrop(const std::string& dragged_id,
     state_.events.Emit(TreeDirtyEvent{});
     state_.events.Emit(SelectionChangedEvent{dragged_id, true});
     state_.events.Emit(DocumentDirtyEvent{});
-    SetStatus(state_, drop_mode == core::TreeDropMode::AsChild ? "Moved " + dragged_id : "Reordered " + dragged_id);
+    SetStatus(state_,
+              drop_mode == core::TreeDropMode::AsChild ? ui::i18n::trf("Moved {0}", dragged_id)
+                                                       : ui::i18n::trf("Reordered {0}", dragged_id));
     return true;
 }
 

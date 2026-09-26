@@ -79,11 +79,11 @@ void AddManualReviewItem(AppRuntimeState& state,
                          const std::string& message,
                          const std::vector<std::string>& guideline_ids) {
     if (state.proposal_controller->creator_active) {
-        SetStatus(callbacks, "Save or discard the active proposal before adding more review comments.");
+        SetStatus(callbacks, AF_TR("Save or discard the active proposal before adding more review comments."));
         return;
     }
     if (!state.app_state.current_project.has_value()) {
-        SetStatus(callbacks, "Open or create a project before adding review comments.");
+        SetStatus(callbacks, AF_TR("Open or create a project before adding review comments."));
         return;
     }
     if (callbacks.ensure_review_item_storage && !callbacks.ensure_review_item_storage()) {
@@ -91,12 +91,12 @@ void AddManualReviewItem(AppRuntimeState& state,
     }
     if (state.reviewer_name.empty()) {
         state.modal_coordinator->show_reviewer_name_prompt = true;
-        SetStatus(callbacks, "Enter a reviewer name before adding review comments.");
+        SetStatus(callbacks, AF_TR("Enter a reviewer name before adding review comments."));
         return;
     }
     const std::string element_id = ui::GetUiState().selected_element_id;
     if (element_id.empty()) {
-        SetStatus(callbacks, "Select an element before adding a review comment.");
+        SetStatus(callbacks, AF_TR("Select an element before adding a review comment."));
         return;
     }
 
@@ -104,7 +104,8 @@ void AddManualReviewItem(AppRuntimeState& state,
     if (!guideline_ids.empty()) {
         EnsureReviewGuidelineCatalogLoaded(state);
         if (!state.guideline_catalog.has_value()) {
-            SetStatus(callbacks, "SCCG guidelines are not available: " + state.guideline_catalog_error);
+            SetStatus(callbacks,
+                      ui::i18n::trf("SCCG guidelines are not available: {0}", state.guideline_catalog_error));
             return;
         }
 
@@ -113,7 +114,7 @@ void AddManualReviewItem(AppRuntimeState& state,
             if (guideline_id.empty() || seen_guideline_ids.count(guideline_id) > 0)
                 continue;
             if (state.guideline_catalog->ids.count(guideline_id) == 0) {
-                SetStatus(callbacks, "Unknown SCCG guideline id: " + guideline_id);
+                SetStatus(callbacks, ui::i18n::trf("Unknown SCCG guideline id: {0}", guideline_id));
                 return;
             }
             validated_guideline_ids.push_back(guideline_id);
@@ -346,7 +347,7 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
     };
     panel_callbacks.preview_proposal = [&callbacks](const core::reviews::ReviewItem& item) {
         if (!item.proposal_id.has_value()) {
-            SetStatus(callbacks, "This review comment has no proposed change to preview.");
+            SetStatus(callbacks, AF_TR("This review comment has no proposed change to preview."));
             return;
         }
         if (callbacks.preview_proposal_by_id)
@@ -378,11 +379,11 @@ void RenderReviewPanelContent(AppRuntimeState& state, const ReviewPanelAreaCallb
         // next sync. Clear the underlying flag instead (same as "Mark reviewed").
         if (problem.type == "TranslationReviewNeeded" && callbacks.accept_translation_review) {
             callbacks.accept_translation_review(problem.element_id);
-            SetStatus(callbacks, "Problem resolved.");
+            SetStatus(callbacks, AF_TR("Problem resolved."));
             return;
         }
         state.problems_manager.RemoveProblem(problem.id);
-        SetStatus(callbacks, "Problem deleted.");
+        SetStatus(callbacks, AF_TR("Problem deleted."));
     };
     panel_callbacks.set_manual_review_ok = [&callbacks, element_id = model.selected_element_id](bool manual_ok) {
         if (callbacks.set_manual_review_ok)

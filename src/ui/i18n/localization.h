@@ -79,3 +79,8 @@ std::string trnf(std::string_view singular, std::string_view plural, int count, 
 
 #define AF_TR(text) ::ui::i18n::tr(text)
 #define AF_TR_CTX(context, text) ::ui::i18n::trc(context, text)
+// Marks an English literal as a msgid without translating it -- gettext's N_().
+// For text stored in English (saved in a project file, say) and translated
+// where it is shown with ui::i18n::tr(value): the extractor needs to see the
+// literal, and AF_TR(variable) is invisible to it.
+#define AF_TR_NOOP(text) (text)
