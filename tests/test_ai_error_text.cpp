@@ -1,5 +1,6 @@
 #include "app/ai_error_text.h"
 
+#include "app/app_runtime_state.h"
 #include "ui/i18n/localization.h"
 
 #include <gtest/gtest.h>
@@ -107,4 +108,21 @@ TEST_F(AiErrorTextTest, TheConnectionTestsOwnProgressAndSuccessTextIsTranslated)
 TEST_F(AiErrorTextTest, AnUnrecognisedSuccessMessageIsLeftAlone) {
     UseLanguage(i18n::Language::Japanese);
     EXPECT_EQ(app::LocalizedAiStatus(ai::SuccessStatus("AI 設定を保存しました。")).message, "AI 設定を保存しました。");
+}
+
+// Startup loads the AI settings before the user's language, so a settings
+// warning is stored while English is still in force. It must be stored as the
+// ai layer wrote it and translated when shown, or it stays English for good.
+TEST_F(AiErrorTextTest, AnAiLayerStatusStoredBeforeTheLanguageLoadsIsShownInIt) {
+    UseLanguage(i18n::Language::English);
+    app::AiUiState state;
+    state.SetAiLayerStatus(ai::ErrorStatus(ai::AiErrorCode::RateLimited, "Rate limit reached"));
+    EXPECT_EQ(state.connection_status.message, "Rate limit reached") << "stored untranslated";
+
+    UseLanguage(i18n::Language::Japanese);
+    ASSERT_TRUE(state.connection_status_from_ai);
+    EXPECT_EQ(app::LocalizedAiStatus(state.connection_status).message, "レート制限に達しました");
+
+    state.SetTranslatedStatus(ai::SuccessStatus("AI 設定を保存しました。"));
+    EXPECT_FALSE(state.connection_status_from_ai) << "an app-built status is shown as stored";
 }

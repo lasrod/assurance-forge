@@ -54,7 +54,7 @@ std::string LocalizedAiErrorCode(ai::AiErrorCode code) {
 }
 
 std::string LocalizedAiErrorMessage(ai::AiErrorCode code, const std::string& message) {
-    const std::string localized_code = LocalizedAiErrorCode(code);
+    std::string localized_code = LocalizedAiErrorCode(code);
     if (message.empty() || WithoutFinalStop(message) == ai::ToString(code))
         return localized_code;
     return ui::i18n::trf("{0}: {1}", localized_code, message);

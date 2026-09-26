@@ -1,5 +1,4 @@
 #include "app/app_runtime_state.h"
-#include "app/ai_error_text.h"
 
 #include "ai/libcurl_http_client.h"
 #include "ai/openai_provider.h"
@@ -90,7 +89,7 @@ void AppRuntimeState::LoadAiSettingsState() {
     ai.secure_store_available = ai.secret_store && ai.secret_store->IsAvailable();
     RefreshStoredAiKeyState();
     if (!warning.empty()) {
-        ai.connection_status = LocalizedAiStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning));
+        ai.SetAiLayerStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning));
     }
 }
 

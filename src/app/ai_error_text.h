@@ -25,8 +25,9 @@ std::string LocalizedAiErrorMessage(ai::AiErrorCode code, const std::string& mes
 
 // A status the `ai` layer produced, with its message localized: a failure by
 // its code as above, and the connection test's own progress and success text.
-// Apply it where such a status is stored, not where it is shown -- statuses
-// `app` builds itself are already translated.
+// Apply it where the status is shown, not where it is stored, so the text
+// follows the language in force; statuses `app` builds itself are already
+// translated and must not pass through here (AiUiState::SetTranslatedStatus).
 ai::AiConnectionStatus LocalizedAiStatus(ai::AiConnectionStatus status);
 
 } // namespace app
