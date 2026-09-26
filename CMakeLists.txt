@@ -122,8 +122,11 @@ if(ENABLE_COVERAGE)
         message(FATAL_ERROR "ENABLE_COVERAGE requires GCC 14 or newer (got ${CMAKE_CXX_COMPILER_VERSION}).")
     endif()
     message(STATUS "Code coverage instrumentation enabled (GCC ${CMAKE_CXX_COMPILER_VERSION})")
-    add_compile_options(--coverage -O0 -fcondition-coverage)
-    add_link_options(--coverage)
+    # Atomic counters: the bridge, task runner and MCP tests run threads, and
+    # racing non-atomic increments left gcov negative hit counts (GCC bug 68080)
+    # that crashed gcovr on some runs and not others.
+    add_compile_options(--coverage -O0 -fcondition-coverage -fprofile-update=atomic)
+    add_link_options(--coverage -fprofile-update=atomic)
 endif()
 
 # Raise the policy floor for fetched and vendored dependencies without patching
