@@ -59,7 +59,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
+          sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libsecret-1-dev
 
       # The evidence-package gate and generator verify the normative OMG
       # sources against the pins carried in the generator. The sources are
@@ -152,10 +152,17 @@ jobs:
           set -euo pipefail
           stage="package/assurance-forge.${{ steps.version.outputs.version }}"
           mkdir -p "$stage"
+          # The MCP server goes where the app looks for it: beside its own
+          # executable, which in a macOS bundle is Contents/MacOS. Without it the
+          # archives could not connect an AI client at all.
+          mcp_server="$(dirname "${{ matrix.binary_path }}")/assurance-forge-mcp"
+          test -f "$mcp_server"
           if [ "$RUNNER_OS" = "macOS" ]; then
             cp -R "${{ matrix.binary_path }}" "$stage/"
+            cp "$mcp_server" "$stage/$(basename "${{ matrix.binary_path }}")/Contents/MacOS/"
           else
             cp "${{ matrix.binary_path }}" "$stage/"
+            cp "$mcp_server" "$stage/"
             cp -R assets "$stage/"
           fi
           cp -R data "$stage/"
@@ -168,6 +175,12 @@ jobs:
             test -f "$runtime_catalogue"
             mkdir -p "$stage/data/sccg/dist"
             cp "$runtime_catalogue" "$stage/data/sccg/dist/"
+            # The example project the welcome screen opens, likewise copied
+            # beside the binary by the build; the macOS bundle carries its own.
+            runtime_example="$(dirname "${{ matrix.binary_path }}")/examples/kitchen-blender"
+            test -f "$runtime_example/af.proj"
+            mkdir -p "$stage/examples"
+            cp -R "$runtime_example" "$stage/examples/"
           fi
           cp README.md "$stage/"
           cp LICENSE.md "$stage/"

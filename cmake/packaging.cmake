@@ -73,6 +73,18 @@ install(FILES ${AF_SAMPLE_CASES}
     COMPONENT ${AF_RUNTIME_COMPONENT}
 )
 
+# The example project the welcome screen opens. Always installed, not tied to
+# the optional samples: the welcome screen's first action depends on it.
+if(EXISTS "${AF_EXAMPLE_PROJECT_DIR}/af.proj")
+    # Without the .af/ audit history a developer's checkout may carry: it
+    # would make the shipped example open with an audit-divergence warning.
+    install(DIRECTORY "${AF_EXAMPLE_PROJECT_DIR}/"
+        DESTINATION examples/kitchen-blender
+        COMPONENT ${AF_RUNTIME_COMPONENT}
+        PATTERN ".af" EXCLUDE
+    )
+endif()
+
 install(FILES "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_SOURCE_DIR}/LICENSE.md"
     DESTINATION .
     COMPONENT ${AF_RUNTIME_COMPONENT}
@@ -163,6 +175,13 @@ set(CPACK_INNOSETUP_SETUP_SetupLogging ON)
 # releases.
 set(CPACK_INNOSETUP_DEFINE_AfUserGuideUrl "https://lasrod.github.io/assurance-forge/user-guide/")
 set(CPACK_INNOSETUP_DEFINE_AfExamplesUrl "https://github.com/lasrod/assurance-forge-examples")
+# Whether the example project was packaged (see the install rule above): the
+# finish page points at "Open the Example Project" only when there is one.
+if(EXISTS "${AF_EXAMPLE_PROJECT_DIR}/af.proj")
+    set(CPACK_INNOSETUP_DEFINE_AfHasExample "1")
+else()
+    set(CPACK_INNOSETUP_DEFINE_AfHasExample "0")
+endif()
 # installer.iss takes the tour page's screenshot from here.
 set(CPACK_INNOSETUP_DEFINE_AfInstallerArtDir "${AF_INSTALLER_DIR}/art")
 if(AF_PACKAGE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+" AND NOT AF_PACKAGE_VERSION MATCHES "-dev")

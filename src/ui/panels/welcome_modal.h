@@ -24,13 +24,16 @@ struct RecentProjectEntry {
 };
 
 struct WelcomeModalCallbacks {
+    // Left empty when no example is bundled with this build; the action is then
+    // not offered rather than offered and failing.
+    std::function<void()> open_example_project;
     std::function<void()> create_empty_project;
-    std::function<void()> create_project_from_template;
     std::function<void()> open_project;
     std::function<void()> create_project_from_sacm;
-    std::function<void()> walkthrough_get_started;
-    std::function<void()> walkthrough_fundamentals;
-    std::function<void()> walkthrough_conformance;
+    // Each opens a user-guide page in the browser.
+    std::function<void()> open_guide_get_started;
+    std::function<void()> open_guide_ai_review;
+    std::function<void()> open_guide_ai_client;
     std::function<void(const RecentProjectEntry&)> open_recent_project;
 };
 

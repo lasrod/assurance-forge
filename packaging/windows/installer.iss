@@ -102,8 +102,8 @@ japanese.AiFooter=Assurance Forge はオープンソース（MIT）です。AI �
 
 english.FinishReady=You're all set! Assurance Forge is ready when you are. Thank you for trying it out.
 japanese.FinishReady=準備が整いました！Assurance Forge はいつでもお使いいただけます。お試しいただきありがとうございます。
-english.FinishSamples=New here? A good first step: choose Create Project from Existing SACM on the welcome screen and open one of the sample cases to look around.
-japanese.FinishSamples=はじめての方は、まずウェルカム画面で「既存の SACM からプロジェクトを作成」を選び、サンプルを開いてみてください。
+english.FinishExample=New here? A good first step: choose Open the Example Project on the welcome screen to look around a complete safety case.
+japanese.FinishExample=はじめての方は、まずウェルカム画面で「サンプルプロジェクトを開く」を選び、完成した安全ケースを見てみてください。
 english.FinishMcpConnected=%1 is connected and can find Assurance Forge. Whenever you want to work on a case together, switch on Edit → Preferences → MCP Server; the app always asks you before a client reads a project.
 japanese.FinishMcpConnected=%1 が接続され、Assurance Forge を利用できるようになりました。一緒にケースに取り組むときは、編集 → 設定 → MCP サーバーで有効にしてください。クライアントがプロジェクトを読む前に、アプリが必ず確認します。
 english.FinishMcpManual=Want to bring in an AI assistant later? Its configuration is waiting under Edit → Preferences → MCP Server.
