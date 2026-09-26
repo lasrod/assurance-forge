@@ -1,4 +1,5 @@
 #include "app/areas/modal_host.h"
+#include "app/ai_error_text.h"
 
 #include "app/mcp_client_config.h"
 #include "core/user_settings.h"
@@ -147,7 +148,7 @@ void ModalHost::RenderPreferencesWindow() {
     if (state_.ai.test_task) {
         ai::AiTaskSnapshot snapshot = state_.ai.test_task->Snapshot();
         test_running = snapshot.state == ai::AiTaskState::Running;
-        state_.ai.connection_status = snapshot.status;
+        state_.ai.connection_status = LocalizedAiStatus(snapshot.status);
         if (!test_running) {
             state_.ai.test_task.reset();
             state_.RefreshStoredAiKeyState();
@@ -213,7 +214,7 @@ void ModalHost::RenderPreferencesWindow() {
             state_.ai.settings.model = ai::kDefaultOpenAiModel;
         std::string error;
         if (!state_.ai.service->SaveSettings(state_.ai.settings, error)) {
-            state_.ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
+            state_.ai.connection_status = LocalizedAiStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, error));
             return;
         }
         CopyToBuffer(state_.ai.model_buf, sizeof(state_.ai.model_buf), state_.ai.settings.model);
@@ -228,15 +229,17 @@ void ModalHost::RenderPreferencesWindow() {
         ai::SecretStoreResult result = state_.ai.service->SaveApiKey(api_key);
         std::memset(state_.ai.api_key_buf, 0, sizeof(state_.ai.api_key_buf));
         state_.RefreshStoredAiKeyState();
-        state_.ai.connection_status = result.success ? ai::SuccessStatus(AF_TR("API key saved securely."))
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
+        state_.ai.connection_status = result.success
+                                          ? ai::SuccessStatus(AF_TR("API key saved securely."))
+                                          : LocalizedAiStatus(ai::ErrorStatus(result.errorCode, result.errorMessage));
     };
     callbacks.remove_api_key = [this]() {
         ai::SecretStoreResult result = state_.ai.service->DeleteApiKey();
         std::memset(state_.ai.api_key_buf, 0, sizeof(state_.ai.api_key_buf));
         state_.RefreshStoredAiKeyState();
-        state_.ai.connection_status = result.success ? ai::SuccessStatus(AF_TR("API key removed."))
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
+        state_.ai.connection_status = result.success
+                                          ? ai::SuccessStatus(AF_TR("API key removed."))
+                                          : LocalizedAiStatus(ai::ErrorStatus(result.errorCode, result.errorMessage));
     };
     callbacks.test_connection = [this]() {
         if (state_.ai.test_task && state_.ai.test_task->IsRunning())
@@ -252,7 +255,7 @@ void ModalHost::RenderPreferencesWindow() {
         }
         std::string error;
         if (!state_.ai.service->SaveSettings(state_.ai.settings, error)) {
-            state_.ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
+            state_.ai.connection_status = LocalizedAiStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, error));
             return;
         }
         std::shared_ptr<ai::AiService> service = state_.ai.service;

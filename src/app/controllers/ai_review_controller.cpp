@@ -1,9 +1,11 @@
 #include "app/controllers/ai_review_controller.h"
 
+#include "app/ai_error_text.h"
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_text_utils.h"
 #include "core/time_utils.h"
 #include "parser/guidelines_parser.h"
+#include "ui/i18n/localization.h"
 
 #include <nlohmann/json.hpp>
 
@@ -387,7 +389,11 @@ void AiReviewController::CompleteSingleRequest(const ai::AiResponse& response) {
                                               pending_review_profile_name_,
                                               "AI review request failed.",
                                               NowUtcString());
-        events_.Emit(StatusMessageEvent{"AI review request failed."});
+        // The status bar is shown and never saved, so it can be translated here;
+        // the review item and outcome above are stored in the project and stay
+        // English (issue #451).
+        events_.Emit(StatusMessageEvent{ui::i18n::trf(
+            "AI review request failed: {0}", LocalizedAiErrorMessage(response.errorCode, response.errorMessage))});
         return;
     }
 
@@ -639,7 +645,19 @@ void AiReviewController::CompletePassRequests(std::vector<ai::AiResponse> respon
                                               pending_review_profile_name_,
                                               outcome_text,
                                               NowUtcString());
-        events_.Emit(StatusMessageEvent{outcome_text});
+        // Passes usually fail together and for one reason -- a rejected key, an
+        // exhausted account -- so the first failed pass names it (issue #451).
+        const auto first_failed =
+            std::find_if(responses.begin(), responses.end(), [](const ai::AiResponse& r) { return !r.success; });
+        if (every_pass_unparseable) {
+            events_.Emit(StatusMessageEvent{AF_TR("AI review response could not be parsed.")});
+        } else if (first_failed != responses.end()) {
+            events_.Emit(StatusMessageEvent{
+                ui::i18n::trf("AI review request failed: {0}",
+                              LocalizedAiErrorMessage(first_failed->errorCode, first_failed->errorMessage))});
+        } else {
+            events_.Emit(StatusMessageEvent{AF_TR("AI review request failed.")});
+        }
         return;
     }
 
