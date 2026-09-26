@@ -1,6 +1,6 @@
 # Releasing
 
-This project uses an automated GitHub Actions workflow (`.github/workflows/release.yml`) to build Windows binaries and publish releases.
+This project uses an automated GitHub Actions workflow (`.github/workflows/release.yml`) to build Windows, Linux and macOS binaries and publish releases.
 
 ## Tag conventions
 
@@ -42,7 +42,14 @@ runtime DLLs, `README.md` and `LICENSE.md`.
 The Windows packages come from the `install()` rules in
 [`cmake/packaging.cmake`](https://github.com/lasrod/assurance-forge/blob/main/cmake/packaging.cmake)
 and CPack; a file the application needs at runtime is added there, not in the
-workflow. Linux and macOS archives are still staged by hand in the workflow.
+workflow. Linux and macOS archives are still staged by hand in the workflow,
+and they differ from the Windows packages: there is no installer, and neither
+archive is signed; the macOS app is not notarized. Each carries the application,
+`assurance-forge-mcp` (inside the bundle's `Contents/MacOS` on macOS, where the
+app looks for it), `data/` with the SCCG catalogue, the example project and, on
+Linux, `assets/`. Up to `0.3.0-alpha.2` they carried no MCP server, and the
+Linux job did not install `libsecret-1-dev`, so that binary could not store an
+AI API key.
 
 The workflow checks both Windows packages before publishing them, with
 `tools/release/check_windows_package.py`: every file the application looks for

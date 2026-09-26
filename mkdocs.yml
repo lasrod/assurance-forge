@@ -6,6 +6,8 @@ repo_name: lasrod/assurance-forge
 
 theme:
   name: material
+  # Open Graph and Twitter card tags for shared links: overrides/main.html.
+  custom_dir: overrides
   features:
     - navigation.tabs
     - navigation.sections

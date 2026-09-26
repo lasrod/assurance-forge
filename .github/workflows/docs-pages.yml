@@ -5,6 +5,7 @@ on:
     paths:
       - docs/**
       - mkdocs.yml
+      - overrides/**
       - requirements-docs.txt
       - .clang-uml
       - src/**
@@ -16,6 +17,7 @@ on:
     paths:
       - docs/**
       - mkdocs.yml
+      - overrides/**
       - requirements-docs.txt
       - .clang-uml
       - src/**
