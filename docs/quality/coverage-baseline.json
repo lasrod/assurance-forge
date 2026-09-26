@@ -33,8 +33,8 @@
     },
     "src/ai": {
       "lines": 620,
-      "covered": 401,
-      "percent": 64.68
+      "covered": 423,
+      "percent": 68.23
     },
     "src/eval": {
       "lines": 598,
@@ -67,9 +67,9 @@
       "percent": 11.09
     },
     "src/app": {
-      "lines": 13749,
-      "covered": 3266,
-      "percent": 23.75
+      "lines": 13819,
+      "covered": 3329,
+      "percent": 24.09
     }
   }
 }
