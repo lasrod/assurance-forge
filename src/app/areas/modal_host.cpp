@@ -1,5 +1,8 @@
 #include "app/areas/modal_host.h"
 #include "app/ai_error_text.h"
+#include "app/example_project.h"
+#include "app/executable_location.h"
+#include "app/native_file_dialogs.h"
 
 #include "app/mcp_client_config.h"
 #include "core/user_settings.h"
@@ -61,6 +64,26 @@ float EqualButtonWidth(std::initializer_list<std::string> labels, float referenc
         width = std::max(width, ImGui::CalcTextSize(label.c_str(), nullptr, true).x + frame_padding);
     }
     return width;
+}
+
+constexpr const char* kUserGuideUrl = "https://lasrod.github.io/assurance-forge/user-guide/";
+
+// Opens a page of the online user guide; `page` is empty for its front page.
+void OpenUserGuidePage(const ModalHostCallbacks& callbacks, const std::string& page) {
+    std::string error;
+    if (!dialogs::OpenPathOrUrl(kUserGuideUrl + page, error))
+        callbacks.set_status(ui::i18n::trf("Could not open the user guide: {0}", error));
+}
+
+// Opens the user's own copy of the bundled example project, making it the first
+// time. True when the project opened.
+bool OpenExampleProject(const std::filesystem::path& bundled, const ModalHostCallbacks& callbacks) {
+    const ExampleCopyResult copy = PrepareExampleProjectCopy(bundled, DefaultExampleCopyRoot());
+    if (!copy.success) {
+        callbacks.set_status(copy.error);
+        return false;
+    }
+    return callbacks.try_open_project_manifest(core::PathToUtf8(copy.manifest));
 }
 
 } // namespace
@@ -475,14 +498,19 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
 }
 
 void ModalHost::RenderStartupProjectWindow() {
+    // Looked up once: the executable does not move while the app runs.
+    static const std::filesystem::path bundled_example = FindBundledExampleProject(ExecutableDirectory());
     ui::panels::WelcomeModalCallbacks callbacks{
+        bundled_example.empty() ? std::function<void()>{} : [this]() {
+            if (OpenExampleProject(bundled_example, callbacks_))
+                state_.project_controller->show_startup_project_window = false;
+        },
         [this]() {
             callbacks_.begin_create_project();
             if (state_.project_controller->show_create_project_modal) {
                 state_.project_controller->show_startup_project_window = false;
             }
         },
-        []() {},
         [this]() { callbacks_.begin_open_project(); },
         [this]() {
             callbacks_.begin_create_project_from_sacm();
@@ -490,9 +518,9 @@ void ModalHost::RenderStartupProjectWindow() {
                 state_.project_controller->show_startup_project_window = false;
             }
         },
-        []() {},
-        []() {},
-        []() {},
+        [this]() { OpenUserGuidePage(callbacks_, ""); },
+        [this]() { OpenUserGuidePage(callbacks_, "review-an-element/"); },
+        [this]() { OpenUserGuidePage(callbacks_, "connect-an-ai-client/"); },
         [this](const ui::panels::RecentProjectEntry& entry) {
             if (!callbacks_.try_open_project_manifest(entry.path)) {
                 state_.project_controller->RemoveRecentProjectByPath(entry.path);

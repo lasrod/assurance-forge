@@ -670,6 +670,9 @@ msgstr "変更は提案ドラフトに記録されています。レビューパ
 msgid "Changes only"
 msgstr "変更のみ"
 
+msgid "Check a claim against the Safety Case Core Guidelines"
+msgstr "主張を Safety Case Core Guidelines に照らして確認する"
+
 msgid "Choose a parent location."
 msgstr "親フォルダーを選んでください。"
 
@@ -757,6 +760,9 @@ msgstr "信頼度の更新に失敗しました: {0}"
 msgid "Conformance"
 msgstr "適合性"
 
+msgid "Connect an AI assistant"
+msgstr "AI アシスタントを接続する"
+
 msgid "Connection successful."
 msgstr "接続に成功しました。"
 
@@ -811,8 +817,17 @@ msgstr "信頼度保存用の SACM gid を割り当てられませんでした�
 msgid "Could not associate term with element: {0}"
 msgstr "用語を要素に関連付けられませんでした: {0}"
 
+msgid "Could not copy the example project to {0}"
+msgstr "サンプルプロジェクトを {0} にコピーできませんでした"
+
+msgid "Could not copy the example project to {0}: {1}"
+msgstr "サンプルプロジェクトを {0} にコピーできませんでした: {1}"
+
 msgid "Could not create a TerminologyPackage for the new term."
 msgstr "新しい用語用の TerminologyPackage を作成できませんでした。"
+
+msgid "Could not create {0}: {1}"
+msgstr "{0} を作成できませんでした: {1}"
 
 msgid "Could not decode terminology quick fix target."
 msgstr "用語クイックフィックスの対象を解析できませんでした。"
@@ -843,6 +858,9 @@ msgstr "エクスプローラーを開けませんでした: {0}"
 
 msgid "Could not open the evidence location: {0}"
 msgstr "エビデンスの場所を開けませんでした: {0}"
+
+msgid "Could not open the user guide: {0}"
+msgstr "ユーザーガイドを開けませんでした: {0}"
 
 msgid "Could not record the assessment in the draft: {0}"
 msgstr "ドラフトに評価を記録できませんでした: {0}"
@@ -1246,6 +1264,9 @@ msgstr "終了"
 msgid "Exit Preview"
 msgstr "プレビューを終了"
 
+msgid "Explore a complete safety case for a kitchen blender"
+msgstr "キッチンブレンダーの完成した安全ケースを見てみる"
+
 msgid "Export"
 msgstr "エクスポート"
 
@@ -1381,6 +1402,9 @@ msgstr "ガイドライン"
 msgid "Guidelines: {0}"
 msgstr "ガイドライン: {0}"
 
+msgid "Guides"
+msgstr "ガイド"
+
 msgid "High culling"
 msgstr "高カリング"
 
@@ -1488,6 +1512,9 @@ msgstr "後で"
 
 msgid "Learn the Fundamentals"
 msgstr "基本を学ぶ"
+
+msgid "Let Claude Code or Codex read the case and draft changes"
+msgstr "Claude Code や Codex にケースを読ませ、変更案を作成させる"
 
 msgid "Light"
 msgstr "ライト"
@@ -1723,6 +1750,9 @@ msgstr "リンク可能な既存の信頼度論証ツリーはありません。
 msgid "No files"
 msgstr "ファイルなし"
 
+msgid "No folder was found to copy the example project into."
+msgstr "サンプルプロジェクトのコピー先フォルダーが見つかりませんでした。"
+
 msgid "No ignored terms."
 msgstr "無視された用語はありません。"
 
@@ -1891,6 +1921,9 @@ msgstr "提案された変更を作成する前にプロジェクトと SACM フ
 msgid "Open a project and SACM file before editing proposed changes."
 msgstr "提案された変更を編集する前にプロジェクトと SACM ファイルを開いてください。"
 
+msgid "Open a project and find your way around an argument"
+msgstr "プロジェクトを開き、議論の中を移動する"
+
 msgid "Open a project before deleting proposed changes."
 msgstr "提案された変更を削除する前にプロジェクトを開いてください。"
 
@@ -1968,6 +2001,9 @@ msgstr "この要素のレビューコメントまたは AI レビュー失敗�
 
 msgid "Open term"
 msgstr "用語を開く"
+
+msgid "Open the Example Project"
+msgstr "サンプルプロジェクトを開く"
 
 msgid "Open the Problems panel"
 msgstr "問題パネルを開く"
@@ -2445,6 +2481,9 @@ msgstr "ライブ表示に戻る"
 
 msgid "Review"
 msgstr "レビュー"
+
+msgid "Review an element with AI"
+msgstr "AI で要素をレビューする"
 
 msgid "Review changes"
 msgstr "変更を確認"
@@ -2952,6 +2991,9 @@ msgstr "編集は適用されましたが、ドラフトをディスクに書き
 
 msgid "The edited prompt no longer separates into its review passes; it will be sent as one request."
 msgstr "編集したプロンプトはレビューパスに分割できなくなったため、1 つのリクエストとして送信されます。"
+
+msgid "The example project is not part of this installation."
+msgstr "このインストールにはサンプルプロジェクトが含まれていません。"
 
 msgid "The external changes could not be recorded as seen, so they will be reported again on the next open: {0}"
 msgstr "外部の変更を確認済みとして記録できなかったため、次にプロジェクトを開いたときにも報告されます: {0}"

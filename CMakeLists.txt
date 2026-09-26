@@ -268,6 +268,23 @@ function(af_copy_sccg_data target_name)
     )
 endfunction()
 
+# The example project the welcome screen opens (app/example_project.h): the
+# kitchen-blender case from the examples submodule, beside the executable at
+# examples/kitchen-blender. A checkout without the submodule builds without it,
+# and the welcome screen then does not offer it.
+set(AF_EXAMPLE_PROJECT_DIR "${CMAKE_SOURCE_DIR}/examples/projects/kitchen-blender")
+function(af_copy_example_project target_name)
+    if(EXISTS "${AF_EXAMPLE_PROJECT_DIR}/af.proj")
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND}
+                -DAF_EXAMPLE_SOURCE=${AF_EXAMPLE_PROJECT_DIR}
+                -DAF_EXAMPLE_DESTINATION=$<TARGET_FILE_DIR:${target_name}>/examples/kitchen-blender
+                -P ${CMAKE_SOURCE_DIR}/cmake/copy_example_project.cmake
+            VERBATIM
+        )
+    endif()
+endfunction()
+
 add_subdirectory(src)
 
 # --- Git hooks ---
@@ -306,6 +323,7 @@ if(WIN32)
     target_link_libraries(assurance-forge PRIVATE bcrypt advapi32 ole32 shell32 dwmapi)
 endif()
 af_copy_sccg_data(assurance-forge)
+af_copy_example_project(assurance-forge)
 
 # --- MCP server ---
 # A headless companion binary an MCP client launches, speaking JSON-RPC 2.0 over
@@ -480,6 +498,7 @@ add_executable(tests
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
     tests/test_ai_error_text.cpp
+    tests/test_example_project.cpp
     tests/test_theme.cpp
     tests/test_element_type_display.cpp
     tests/test_status_bar.cpp

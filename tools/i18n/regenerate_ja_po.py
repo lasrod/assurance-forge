@@ -1329,6 +1329,21 @@ TRANSLATIONS = {
     "Could not record the evidence attribute in the draft: {0}": "ドラフトにエビデンス属性を記録できませんでした: {0}",
     "Could not move assessments into the draft: {0}": "評価をドラフトに移動できませんでした: {0}",
 
+    # ===== Welcome screen and example project =====
+    'Open the Example Project': 'サンプルプロジェクトを開く',
+    'Explore a complete safety case for a kitchen blender': 'キッチンブレンダーの完成した安全ケースを見てみる',
+    'Guides': 'ガイド',
+    'Open a project and find your way around an argument': 'プロジェクトを開き、議論の中を移動する',
+    'Review an element with AI': 'AI で要素をレビューする',
+    'Check a claim against the Safety Case Core Guidelines': '主張を Safety Case Core Guidelines に照らして確認する',
+    'Connect an AI assistant': 'AI アシスタントを接続する',
+    'Let Claude Code or Codex read the case and draft changes': 'Claude Code や Codex にケースを読ませ、変更案を作成させる',
+    'Could not open the user guide: {0}': 'ユーザーガイドを開けませんでした: {0}',
+    'The example project is not part of this installation.': 'このインストールにはサンプルプロジェクトが含まれていません。',
+    'No folder was found to copy the example project into.': 'サンプルプロジェクトのコピー先フォルダーが見つかりませんでした。',
+    'Could not create {0}: {1}': '{0} を作成できませんでした: {1}',
+    'Could not copy the example project to {0}: {1}': 'サンプルプロジェクトを {0} にコピーできませんでした: {1}',
+    'Could not copy the example project to {0}': 'サンプルプロジェクトを {0} にコピーできませんでした',
     # ===== Status bar messages (issue #252) =====
     '{0} {1}': '{0}{1}',
     'Deleted term.': '用語を削除しました。',

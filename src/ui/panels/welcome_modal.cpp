@@ -47,9 +47,6 @@ constexpr const char* kWelcomeLayoutTableId = "WelcomeLayout";
 constexpr const char* kWelcomeStartColumnId = "StartColumn";
 constexpr const char* kWelcomeWalkthroughColumnId = "WalkthroughColumn";
 constexpr const char* kWelcomeTitleIconAsset = "app_settings/icon.png";
-constexpr const char* kTemplatePopupId = "CreateTemplate##not_implemented_popup";
-constexpr const char* kWalkthroughPopupId = "Walkthroughs##not_implemented_popup";
-constexpr float kNotImplementedPopupButtonWidth = 110.0f;
 
 constexpr int kWelcomeStyleVarCount = 2;
 
@@ -287,8 +284,6 @@ void ShowWelcomeModal(bool& is_open,
                                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                                    ImGuiWindowFlags_NoTitleBar)) {
         const ui::Theme& theme = ui::GetTheme();
-        bool show_template_not_implemented = false;
-        bool show_walkthrough_not_implemented = false;
 
         ImDrawList* background = ImGui::GetWindowDrawList();
         background->AddRectFilled(
@@ -378,20 +373,23 @@ void ShowWelcomeModal(bool& is_open,
             ImGui::TableNextColumn();
             SectionTitle(AF_TR("Start"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
+            // First, because it is the one click that shows a newcomer what the
+            // tool does: a complete argument, open and ready to explore.
+            if (callbacks.open_example_project &&
+                ActionLink(ICON_FA_BOOK,
+                           "##open_example",
+                           AF_TR("Open the Example Project"),
+                           AF_TR("Explore a complete safety case for a kitchen blender"))) {
+                // The app closes the welcome screen once the project is open; a
+                // failure leaves it up, with the reason in the status bar.
+                callbacks.open_example_project();
+            }
             if (ActionLink(ICON_FA_PLUS,
                            "##create_empty",
                            AF_TR("Create Empty Assurance Project"),
                            AF_TR("Start with a blank assurance project workspace"))) {
                 if (callbacks.create_empty_project)
                     callbacks.create_empty_project();
-            }
-            if (ActionLink(ICON_FA_FILE_ALT,
-                           "##create_template",
-                           AF_TR("Create Assurance Project from Template"),
-                           AF_TR("Create a project from a predefined assurance case template"))) {
-                if (callbacks.create_project_from_template)
-                    callbacks.create_project_from_template();
-                show_template_not_implemented = true;
             }
             if (ActionLink(ICON_FA_FOLDER_OPEN,
                            "##open_project",
@@ -431,33 +429,32 @@ void ShowWelcomeModal(bool& is_open,
             }
 
             ImGui::TableNextColumn();
-            SectionTitle(AF_TR("Walkthroughs"));
+            // Each opens a user-guide page in the browser, so the section says
+            // so rather than promising something that runs inside the app.
+            SectionTitle(AF_TR("Guides"));
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeSectionTopSpacing)));
             if (WalkthroughCard(ICON_FA_ROCKET,
-                                "##walkthrough_get_started",
+                                "##guide_get_started",
                                 AF_TR("Get started with Assurance Forge"),
-                                AF_TR("Create, inspect, and navigate a safety case"))) {
-                if (callbacks.walkthrough_get_started)
-                    callbacks.walkthrough_get_started();
-                show_walkthrough_not_implemented = true;
-            }
-            ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
-            if (WalkthroughCard(ICON_FA_GRADUATION_CAP,
-                                "##walkthrough_fundamentals",
-                                AF_TR("Learn the Fundamentals"),
-                                AF_TR("GSN structure, SACM imports, evidence, and registers"))) {
-                if (callbacks.walkthrough_fundamentals)
-                    callbacks.walkthrough_fundamentals();
-                show_walkthrough_not_implemented = true;
+                                AF_TR("Open a project and find your way around an argument"))) {
+                if (callbacks.open_guide_get_started)
+                    callbacks.open_guide_get_started();
             }
             ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
             if (WalkthroughCard(ICON_FA_CHECK_CIRCLE,
-                                "##walkthrough_conformance",
-                                AF_TR("Prepare a Conformance Review"),
-                                AF_TR("Trace claims, evidence, and review outputs"))) {
-                if (callbacks.walkthrough_conformance)
-                    callbacks.walkthrough_conformance();
-                show_walkthrough_not_implemented = true;
+                                "##guide_ai_review",
+                                AF_TR("Review an element with AI"),
+                                AF_TR("Check a claim against the Safety Case Core Guidelines"))) {
+                if (callbacks.open_guide_ai_review)
+                    callbacks.open_guide_ai_review();
+            }
+            ImGui::Dummy(ImVec2(0.0f, Px(kWelcomeWalkthroughCardSpacing)));
+            if (WalkthroughCard(ICON_FA_PLUG,
+                                "##guide_ai_client",
+                                AF_TR("Connect an AI assistant"),
+                                AF_TR("Let Claude Code or Codex read the case and draft changes"))) {
+                if (callbacks.open_guide_ai_client)
+                    callbacks.open_guide_ai_client();
             }
 
             ImGui::EndTable();
@@ -466,39 +463,6 @@ void ShowWelcomeModal(bool& is_open,
         ImGui::EndChild();
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(3);
-
-        if (show_template_not_implemented) {
-            ImGui::OpenPopup(kTemplatePopupId);
-        }
-        if (show_walkthrough_not_implemented) {
-            ImGui::OpenPopup(kWalkthroughPopupId);
-        }
-
-        if (ImGui::BeginPopupModal(kTemplatePopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(AF_TR("Create Assurance Project from Template").c_str());
-            ImGui::Separator();
-            ImGui::TextUnformatted(AF_TR("Create Assurance Project from Template is not yet implemented.").c_str());
-            ImGui::Spacing();
-            const float button_width = Px(kNotImplementedPopupButtonWidth);
-            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
-            if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0.0f))) {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
-
-        if (ImGui::BeginPopupModal(kWalkthroughPopupId, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(AF_TR("Walkthroughs").c_str());
-            ImGui::Separator();
-            ImGui::TextUnformatted(AF_TR("Walkthroughs are not yet implemented.").c_str());
-            ImGui::Spacing();
-            const float button_width = Px(kNotImplementedPopupButtonWidth);
-            ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) * 0.5f);
-            if (ImGui::Button(AF_TR("OK").c_str(), ImVec2(button_width, 0.0f))) {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
 
         ImGui::EndPopup();
     }

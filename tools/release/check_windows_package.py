@@ -40,6 +40,10 @@ REQUIRED_FILES = [
     "assets/fonts/fontawesome-webfont.ttf",
     "assets/locale/ja/LC_MESSAGES/assurance_forge.mo",
     "data/sccg/dist/sccg.full.json",
+    # The example project the welcome screen offers first. Without it the
+    # action is simply not shown, so nothing else would notice it missing.
+    "examples/kitchen-blender/af.proj",
+    "examples/kitchen-blender/arguments/main.sacm",
 ]
 
 # DLLs every supported Windows (10 and later) provides. Anything else must be

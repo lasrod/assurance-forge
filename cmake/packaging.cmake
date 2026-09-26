@@ -73,6 +73,18 @@ install(FILES ${AF_SAMPLE_CASES}
     COMPONENT ${AF_RUNTIME_COMPONENT}
 )
 
+# The example project the welcome screen opens. Always installed, not tied to
+# the optional samples: the welcome screen's first action depends on it.
+if(EXISTS "${AF_EXAMPLE_PROJECT_DIR}/af.proj")
+    # Without the .af/ audit history a developer's checkout may carry: it
+    # would make the shipped example open with an audit-divergence warning.
+    install(DIRECTORY "${AF_EXAMPLE_PROJECT_DIR}/"
+        DESTINATION examples/kitchen-blender
+        COMPONENT ${AF_RUNTIME_COMPONENT}
+        PATTERN ".af" EXCLUDE
+    )
+endif()
+
 install(FILES "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_SOURCE_DIR}/LICENSE.md"
     DESTINATION .
     COMPONENT ${AF_RUNTIME_COMPONENT}

@@ -168,6 +168,12 @@ jobs:
             test -f "$runtime_catalogue"
             mkdir -p "$stage/data/sccg/dist"
             cp "$runtime_catalogue" "$stage/data/sccg/dist/"
+            # The example project the welcome screen opens, likewise copied
+            # beside the binary by the build; the macOS bundle carries its own.
+            runtime_example="$(dirname "${{ matrix.binary_path }}")/examples/kitchen-blender"
+            test -f "$runtime_example/af.proj"
+            mkdir -p "$stage/examples"
+            cp -R "$runtime_example" "$stage/examples/"
           fi
           cp README.md "$stage/"
           cp LICENSE.md "$stage/"

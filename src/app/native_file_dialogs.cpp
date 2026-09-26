@@ -9,6 +9,12 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+#include <thread>
+
+extern char** environ;
 #endif
 
 namespace app::dialogs {
@@ -230,8 +236,31 @@ bool OpenPathOrUrl(const std::string& target, std::string& error_message) {
     error_message.clear();
     return true;
 #else
-    error_message = "Opening a location is not supported on this platform.";
-    return false;
+    // The desktop's own opener, started with an argument list rather than
+    // through a shell: `target` may be a location the user typed, and must never
+    // be read as a command.
+#ifdef __APPLE__
+    const char* opener = "open";
+#else
+    const char* opener = "xdg-open";
+#endif
+    std::string argument = target;
+    if (!is_url && argument.front() == '-')
+        argument = "./" + argument; // not an option to the opener
+    char* argv[] = {const_cast<char*>(opener), argument.data(), nullptr};
+    pid_t child = 0;
+    if (posix_spawnp(&child, opener, nullptr, nullptr, argv, environ) != 0) {
+        error_message = "Could not open: " + target;
+        return false;
+    }
+    // Reaped off the UI thread: some openers stay until the application they
+    // started has, and an unreaped child lingers as a zombie.
+    std::thread([child]() {
+        int status = 0;
+        waitpid(child, &status, 0);
+    }).detach();
+    error_message.clear();
+    return true;
 #endif
 }
 
