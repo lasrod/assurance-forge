@@ -262,14 +262,17 @@ void CheckAwayGoals(const parser::AssuranceCase& model, const ElementIndex& inde
             continue;
 
         // A citation that resolves to nothing is the failure that matters most:
-        // the goal reads as proved elsewhere, and there is no elsewhere.
+        // the element reads as stated elsewhere, and there is no elsewhere. Which
+        // requirement that breaks follows from what the citing element is, read
+        // from its own declaration because an unresolved citation has no module
+        // to classify it by.
         if (element.cited_element_id.empty() || index.Resolve(element.cited_element_id) == nullptr) {
-            AddFinding(findings,
-                       GsnRule::AwayGoalCitationUnresolved,
-                       element.id,
-                       std::string(),
-                       std::string(),
-                       element.cited_element_id);
+            GsnRule rule = GsnRule::AwayGoalCitationUnresolved;
+            if (element.assertion_declaration == "assumed")
+                rule = GsnRule::AwayAssumptionCitationUnresolved;
+            else if (element.assertion_declaration == "justification")
+                rule = GsnRule::AwayJustificationCitationUnresolved;
+            AddFinding(findings, rule, element.id, std::string(), std::string(), element.cited_element_id);
             continue;
         }
 
@@ -348,6 +351,10 @@ const char* GsnRequirementId(GsnRule rule) {
     case GsnRule::AwayGoalCitationUnresolved:
     case GsnRule::AwayGoalDevelopedLocally:
         return "GSN3-MOD-003";
+    case GsnRule::AwayAssumptionCitationUnresolved:
+        return "GSN3-MOD-006";
+    case GsnRule::AwayJustificationCitationUnresolved:
+        return "GSN3-MOD-007";
     }
     return "";
 }
@@ -374,6 +381,10 @@ const char* GsnRuleName(GsnRule rule) {
         return "AwayGoalCitationUnresolved";
     case GsnRule::AwayGoalDevelopedLocally:
         return "AwayGoalDevelopedLocally";
+    case GsnRule::AwayAssumptionCitationUnresolved:
+        return "AwayAssumptionCitationUnresolved";
+    case GsnRule::AwayJustificationCitationUnresolved:
+        return "AwayJustificationCitationUnresolved";
     }
     return "";
 }

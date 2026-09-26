@@ -3,6 +3,7 @@
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_model.h"
 
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -164,20 +165,38 @@ bool AddChildElementWithIds(parser::AssuranceCase& ac,
                             std::string& out_error);
 
 // ---------------------------------------------------------------------------
-// GSN v3 Modular Extension: Away Goal (GSN3-MOD-003).
+// GSN v3 Modular Extension: Away Goal, Away Assumption and Away Justification
+// (GSN3-MOD-003, GSN3-MOD-006, GSN3-MOD-007).
 //
-// An Away Goal is a Goal whose definition and supporting argument live in
-// another module, cited here so a local goal can rest on it. The evidenced
+// An away element is a Goal, Assumption or Justification whose definition lives
+// in another module, cited here so this module can rest on it. The evidenced
 // mapping (docs/sacm/sacm-gsn-mapping.md) is a SACM Claim carrying `isCitation`
 // with `citedElement` naming the cited Claim; the module is the
-// `ArgumentPackage` owning that Claim.
+// `ArgumentPackage` owning that Claim. The three differ only in the Claim's
+// declaration, which is how SACM tells a goal, an assumption and a
+// justification apart, and in how they attach: an away goal supports its parent
+// (SupportedBy), the other two are context to it (InContextOf).
 //
-// A citation is therefore only *away* when the cited element sits in a
-// different package. Citing a claim inside your own module is not an away
-// goal -- it is a duplicate of a claim you already have, and drawing it as an
-// away goal would tell a reader another module carries support that nobody
-// carries.
+// A citation is only *away* when the cited element sits in a different
+// package. Citing a claim inside your own module is not an away element -- it
+// is a duplicate of a claim you already have, and drawing it as away would tell
+// a reader another module carries what nobody carries.
+//
+// Away Solution and Away Context are not here. Away Solution cites an
+// ArtifactReference rather than a Claim; Away Context has no agreed SACM
+// supertype and is preserved rather than authored (mapping decision
+// 2026-07-20).
 // ---------------------------------------------------------------------------
+
+enum class AwayElementKind {
+    Goal,
+    Assumption,
+    Justification,
+};
+
+// "goal", "assumption", "justification": the token the audit log records.
+const char* AwayElementKindName(AwayElementKind kind);
+bool AwayElementKindFromName(const std::string& name, AwayElementKind& out_kind);
 
 // The module `cited_id` belongs to, expressed as GSN's module identifier: the
 // owning ArgumentPackage's name, or its id when unnamed. Empty when the
@@ -189,21 +208,76 @@ std::string ResolveAwayModuleIdentifier(const sacm::AssuranceCasePackage* pkg,
                                         const std::string& local_anchor_id,
                                         const std::string& cited_id);
 
-// True when a projected element is an Away Goal. Reads the resolved module
-// identifier rather than re-deriving it, because the POD case is flat.
+// Which away element a projected element is, or nothing when it is not one.
+// Reads the resolved module identifier rather than re-deriving it, because the
+// POD case is flat, and the kind from the element's own declaration.
+std::optional<AwayElementKind> AwayElementKindOf(const parser::SacmElement& element);
+
+// True for any away element. Such an element carries no statement of its own:
+// it IS the cited element, read from this module, and renderers resolve its
+// text through the citation.
+bool IsAwayElement(const parser::SacmElement& element);
+
+// True only for an Away Goal. An Away Assumption is also a citing Claim, and
+// before the kinds were told apart it was classified -- and would have been
+// reported on -- as an away goal.
 bool IsAwayGoal(const parser::SacmElement& element);
 
-// Whether `cited_id` may be cited as an Away Goal supporting `parent_id`.
-// Applies the Core connection rules to the parent, then the modular rules to
-// the citation. On refusal writes a human-readable English reason.
+// Whether `cited_id` may be cited as an away element of `kind` attached to
+// `parent_id`. Applies the Core connection rules for that kind to the parent,
+// then the modular rules to the citation, which must be the same kind of
+// element: an away assumption cites an assumption. On refusal writes a
+// human-readable English reason.
+bool CanAddAwayElement(const parser::AssuranceCase& ac,
+                       const sacm::AssuranceCasePackage* pkg,
+                       const std::string& parent_id,
+                       const std::string& cited_id,
+                       AwayElementKind kind,
+                       std::string& out_error);
+
+// Plans the element + relationship ids the create would mint, performing the
+// same validation the mutator does.
+bool PlanAwayElementIds(const parser::AssuranceCase& ac,
+                        const sacm::AssuranceCasePackage* pkg,
+                        const std::string& parent_id,
+                        const std::string& cited_id,
+                        AwayElementKind kind,
+                        std::string& out_element_id,
+                        std::string& out_relationship_id,
+                        std::string& out_error);
+
+// Cite `cited_id` as an away element of `kind` attached to `parent_id`. Creates
+// the citing Claim plus its relationship, in the direction every other create
+// here uses (the away element is the SACM source, the parent the target), and
+// updates both the parser model and the sacm package.
+bool AddAwayElement(parser::AssuranceCase& ac,
+                    sacm::AssuranceCasePackage* pkg,
+                    const std::string& parent_id,
+                    const std::string& cited_id,
+                    AwayElementKind kind,
+                    std::string& out_new_id,
+                    std::string& out_new_relationship_id,
+                    std::string& out_error);
+
+// Replay-only entrypoint: install an away element using the supplied ids verbatim.
+bool AddAwayElementWithIds(parser::AssuranceCase& ac,
+                           sacm::AssuranceCasePackage* pkg,
+                           const std::string& parent_id,
+                           const std::string& cited_id,
+                           AwayElementKind kind,
+                           const std::string& element_id,
+                           const std::string& relationship_id,
+                           std::string& out_error);
+
+// The Away Goal forms of the four above, kept because the Away Goal command,
+// its replay and its tests were written against them. AddAwayGoalWithIds alone
+// differs: it replays a `CreateAwayGoal` event, which may predate the kinds being
+// told apart, so it accepts any cited Claim rather than only a goal.
 bool CanAddAwayGoal(const parser::AssuranceCase& ac,
                     const sacm::AssuranceCasePackage* pkg,
                     const std::string& parent_id,
                     const std::string& cited_id,
                     std::string& out_error);
-
-// Plans the element + relationship ids an Away Goal create would mint,
-// performing the same validation the mutator does.
 bool PlanAwayGoalIds(const parser::AssuranceCase& ac,
                      const sacm::AssuranceCasePackage* pkg,
                      const std::string& parent_id,
@@ -211,11 +285,6 @@ bool PlanAwayGoalIds(const parser::AssuranceCase& ac,
                      std::string& out_element_id,
                      std::string& out_relationship_id,
                      std::string& out_error);
-
-// Cite `cited_id` as an Away Goal supporting `parent_id`. Creates the citing
-// Claim plus a SupportedBy relationship (SACM AssertedInference whose source is
-// the away goal and whose target is the parent, the direction every other
-// create here uses). Updates both the parser model and the sacm package.
 bool AddAwayGoal(parser::AssuranceCase& ac,
                  sacm::AssuranceCasePackage* pkg,
                  const std::string& parent_id,
@@ -223,8 +292,6 @@ bool AddAwayGoal(parser::AssuranceCase& ac,
                  std::string& out_new_id,
                  std::string& out_new_relationship_id,
                  std::string& out_error);
-
-// Replay-only entrypoint: install an Away Goal using the supplied ids verbatim.
 bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
                         sacm::AssuranceCasePackage* pkg,
                         const std::string& parent_id,
@@ -233,23 +300,27 @@ bool AddAwayGoalWithIds(parser::AssuranceCase& ac,
                         const std::string& relationship_id,
                         std::string& out_error);
 
-// A goal in another module that some element may cite as an Away Goal.
-struct AwayGoalCandidate {
+// An element in another module that some element may cite as an away element.
+struct AwayCandidate {
     std::string id;
-    // The goal's notation identifier and statement, for a menu row.
+    // The element's notation identifier and statement, for a menu row.
     std::string label;
-    // The module it is defined in, so a reader choosing between two goals of
+    // The module it is defined in, so a reader choosing between two elements of
     // the same name can tell them apart.
     std::string module_identifier;
 };
 
-// Goals `parent_id` could cite as an Away Goal: every claim in another module,
-// sorted by module then id so a caller can group them without re-sorting.
-// Elements that are themselves citations are excluded -- cite the goal, not
-// another module's citation of it.
-std::vector<AwayGoalCandidate> ListAwayGoalCandidates(const parser::AssuranceCase& ac,
-                                                      const sacm::AssuranceCasePackage* pkg,
-                                                      const std::string& parent_id);
+// Elements `parent_id` could cite as an away element of `kind`: every element
+// of that kind in another module, sorted by module then id so a caller can
+// group them without re-sorting. Elements that are themselves citations are
+// excluded -- cite the element, not another module's citation of it.
+std::vector<AwayCandidate> ListAwayElementCandidates(const parser::AssuranceCase& ac,
+                                                     const sacm::AssuranceCasePackage* pkg,
+                                                     const std::string& parent_id,
+                                                     AwayElementKind kind);
+std::vector<AwayCandidate> ListAwayGoalCandidates(const parser::AssuranceCase& ac,
+                                                  const sacm::AssuranceCasePackage* pkg,
+                                                  const std::string& parent_id);
 
 // Add a new top-level Goal (root claim) without creating a relationship.
 // Useful for starting a fresh argument from the canvas background.

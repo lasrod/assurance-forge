@@ -310,8 +310,8 @@ msgstr "開いている間許可"
 msgid "An audit log is created automatically the first time a model-mutating command is recorded for a SACM file in this project."
 msgstr "このプロジェクトの SACM ファイルに対してモデル変更コマンドが初めて記録されたとき、監査ログが自動的に作成されます。"
 
-msgid "An away goal cannot be added while a draft is open."
-msgstr "ドラフトを開いている間は他モジュールの目標を追加できません。"
+msgid "An away element cannot be added while a draft is open."
+msgstr "ドラフトを開いている間は他モジュールの要素を追加できません。"
 
 msgid "Appearance"
 msgstr "外観"
@@ -400,8 +400,14 @@ msgstr "自動保存の書き込みに失敗しました"
 msgid "Available in a later release."
 msgstr "後のリリースで利用可能になります。"
 
+msgid "Away Assumption"
+msgstr "他モジュールの仮定"
+
 msgid "Away Goal"
 msgstr "他モジュールの目標"
+
+msgid "Away Justification"
+msgstr "他モジュールの正当化"
 
 msgid "Back up and start new confidence file"
 msgstr "バックアップして新しい信頼度ファイルを開始"
@@ -1402,8 +1408,8 @@ msgstr "XML ファイルが見つかりません"
 msgid "No arguments yet."
 msgstr "議論はまだありません。"
 
-msgid "No away goal selected."
-msgstr "他モジュールの目標が選択されていません。"
+msgid "No away element selected."
+msgstr "他モジュールの要素が選択されていません。"
 
 msgid "No categories"
 msgstr "分類なし"
@@ -2853,6 +2859,12 @@ msgstr "{0}は、作業ドラフトの元になっている受理済みの論証
 
 msgid "{0} cites {1} as a goal proved in another module, but nothing in this case has that id. The goal reads as proved elsewhere and there is no elsewhere."
 msgstr "{0} は {1} を他モジュールで立証された目標として参照していますが、その ID はこのケースに存在しません。他所で立証済みと読めますが、その他所がありません。"
+
+msgid "{0} cites {1} as a justification given in another module, but nothing in this case has that id. The argument rests on a justification nobody gives."
+msgstr "{0} は {1} を他モジュールで示された正当化として参照していますが、その ID はこのケースに存在しません。論証が、誰も示していない正当化に依拠しています。"
+
+msgid "{0} cites {1} as an assumption made in another module, but nothing in this case has that id. The argument rests on an assumption nobody states."
+msgstr "{0} は {1} を他モジュールで置かれた仮定として参照していますが、その ID はこのケースに存在しません。論証が、誰も述べていない仮定に依拠しています。"
 
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"

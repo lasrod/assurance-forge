@@ -278,14 +278,14 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
         node->uninstantiated = element.is_abstract;
         node->away_module_identifier = element.away_module_identifier;
 
-        // An away goal carries no statement of its own. It IS the cited goal,
+        // An away element carries no statement of its own. It IS the cited one,
         // read from this module, so the text is resolved through the citation
         // rather than copied when it was created -- a copy would be a second
         // place the same claim is written and the two would drift on the first
         // edit. When the cited goal is not in this document the away element
         // stands in: a module we cannot see should render blank, not wrong.
         const parser::SacmElement* cited_source = nullptr;
-        if (core::IsAwayGoal(element)) {
+        if (core::IsAwayElement(element)) {
             for (const parser::SacmElement& candidate : ac.elements) {
                 if (candidate.id == element.cited_element_id) {
                     cited_source = &candidate;

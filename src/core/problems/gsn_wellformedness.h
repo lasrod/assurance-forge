@@ -55,6 +55,11 @@ enum class GsnRule {
     UndevelopedElementHasSupport, // GSN3-CORE-009
     AwayGoalCitationUnresolved,   // GSN3-MOD-003
     AwayGoalDevelopedLocally,     // GSN3-MOD-003
+    // An away assumption or justification whose citation resolves to nothing.
+    // Separate rules rather than the away goal's, because the finding names the
+    // requirement it enforces and these are different requirements.
+    AwayAssumptionCitationUnresolved,    // GSN3-MOD-006
+    AwayJustificationCitationUnresolved, // GSN3-MOD-007
 };
 
 struct GsnFinding {

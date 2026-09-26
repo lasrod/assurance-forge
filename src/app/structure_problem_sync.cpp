@@ -118,6 +118,16 @@ std::string DescribeFinding(const core::GsnFinding& finding) {
                              "goal shows an argument made elsewhere; developing it here makes two.",
                              finding.element_id,
                              finding.detail);
+    case core::GsnRule::AwayAssumptionCitationUnresolved:
+        return ui::i18n::trf("{0} cites {1} as an assumption made in another module, but nothing in this case "
+                             "has that id. The argument rests on an assumption nobody states.",
+                             finding.element_id,
+                             finding.detail);
+    case core::GsnRule::AwayJustificationCitationUnresolved:
+        return ui::i18n::trf("{0} cites {1} as a justification given in another module, but nothing in this "
+                             "case has that id. The argument rests on a justification nobody gives.",
+                             finding.element_id,
+                             finding.detail);
     }
     return std::string();
 }
@@ -160,6 +170,8 @@ const char* RepairLabelFor(core::GsnRule rule) {
         return "Clear decorator";
     case core::GsnRule::AwayGoalCitationUnresolved:
     case core::GsnRule::AwayGoalDevelopedLocally:
+    case core::GsnRule::AwayAssumptionCitationUnresolved:
+    case core::GsnRule::AwayJustificationCitationUnresolved:
         // No quick fix. Clearing the citation turns the away goal into an
         // ordinary local goal that asserts what another module was carrying,
         // and deleting the local support throws away an argument someone wrote.

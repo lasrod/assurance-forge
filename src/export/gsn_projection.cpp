@@ -481,12 +481,12 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
         node.display_id = is_visible_terminology_context ? source_id : core::GsnIdentifierFor(element);
         node.source_gid = element.gid;
         node.kind = is_visible_terminology_context ? GsnNodeKind::Context : InitialKindFor(element);
-        // An away goal holds no statement of its own -- it IS the cited goal,
+        // An away element holds no statement of its own -- it IS the cited one,
         // read from this module -- so its text is resolved through the citation
         // exactly as the canvas resolves it. Without this the export draws a
         // node labelled "(no title)" where the argument has a claim.
         const parser::SacmElement* away_text_source = nullptr;
-        if (core::IsAwayGoal(element)) {
+        if (core::IsAwayElement(element)) {
             for (const parser::SacmElement& candidate : model.elements) {
                 if (candidate.id == element.cited_element_id) {
                     away_text_source = &candidate;

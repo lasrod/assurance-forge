@@ -330,29 +330,45 @@ bool CreateChildElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& ou
     return true;
 }
 
-bool CreateAwayGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+sacm_adapter::ChildKind LibraryChildKindFor(AwayElementKind kind) {
+    switch (kind) {
+    case AwayElementKind::Goal:
+        return sacm_adapter::ChildKind::Goal;
+    case AwayElementKind::Assumption:
+        return sacm_adapter::ChildKind::Assumption;
+    case AwayElementKind::Justification:
+        return sacm_adapter::ChildKind::Justification;
+    }
+    return sacm_adapter::ChildKind::Goal;
+}
+
+bool CreateAwayElementCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_event, std::string& out_error) {
+    const std::string what = std::string("the away ") + core::AwayElementKindName(kind_);
     // Validated before anything is created, against the same models the mutator
     // will touch, so a refusal leaves both untouched rather than leaving a bare
-    // goal behind with no citation -- which is an ordinary local goal claiming
-    // support nobody gave it.
-    if (!core::CanAddAwayGoal(ctx.model, &ctx.package, parent_id_, cited_id_, out_error))
+    // element behind with no citation -- which is an ordinary local element
+    // stating what another module was meant to state.
+    if (!core::CanAddAwayElement(ctx.model, &ctx.package, parent_id_, cited_id_, kind_, out_error))
         return false;
 
     std::string planned_element_id;
     std::string planned_relationship_id;
-    if (!core::PlanAwayGoalIds(
-            ctx.model, &ctx.package, parent_id_, cited_id_, planned_element_id, planned_relationship_id, out_error))
+    if (!core::PlanAwayElementIds(ctx.model,
+                                  &ctx.package,
+                                  parent_id_,
+                                  cited_id_,
+                                  kind_,
+                                  planned_element_id,
+                                  planned_relationship_id,
+                                  out_error))
         return false;
 
     bool applied_to_library = false;
     if (ctx.library_document != nullptr) {
-        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_child(*ctx.library_document,
-                                                                                    parent_id_,
-                                                                                    sacm_adapter::ChildKind::Goal,
-                                                                                    planned_element_id,
-                                                                                    planned_relationship_id);
+        const sacm_adapter::AddChildOutcome outcome = sacm_adapter::apply_add_child(
+            *ctx.library_document, parent_id_, LibraryChildKindFor(kind_), planned_element_id, planned_relationship_id);
         if (outcome.supported && !outcome.applied) {
-            out_error = LibraryRejection("the away goal", outcome.diagnostics);
+            out_error = LibraryRejection(what, outcome.diagnostics);
             return false;
         }
         if (outcome.applied) {
@@ -369,7 +385,7 @@ bool CreateAwayGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_ev
                 // re-derived from it at the next frame boundary. The bus does
                 // that only for a command that says it went library-first.
                 ctx.library_primary = true;
-                out_error = LibraryRejection("the away goal citation", citation.diagnostics);
+                out_error = LibraryRejection(what + " citation", citation.diagnostics);
                 return false;
             }
             generated_id_ = outcome.new_element_id;
@@ -382,17 +398,19 @@ bool CreateAwayGoalCommand::Apply(CommandContext& ctx, audit::AuditEvent& out_ev
     if (!applied_to_library) {
         const LibraryBridgeMutator mutate =
             [this](parser::AssuranceCase& model, sacm::AssuranceCasePackage& package, std::string& err) -> bool {
-            return core::AddAwayGoal(
-                model, &package, parent_id_, cited_id_, generated_id_, generated_relationship_id_, err);
+            return core::AddAwayElement(
+                model, &package, parent_id_, cited_id_, kind_, generated_id_, generated_relationship_id_, err);
         };
         if (!ApplyLegacyOrRefuse(ctx, mutate, out_error))
             return false;
     }
 
-    out_event.event_type = "CreateAwayGoal";
+    out_event.event_type = Name();
     out_event.payload = nlohmann::ordered_json::object();
     out_event.payload["parent_id"] = parent_id_;
     out_event.payload["cited_id"] = cited_id_;
+    if (kind_ != AwayElementKind::Goal)
+        out_event.payload["kind"] = core::AwayElementKindName(kind_);
     out_event.payload["generated_id"] = generated_id_;
     out_event.payload["generated_relationship_id"] = generated_relationship_id_;
     return true;

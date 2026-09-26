@@ -168,8 +168,12 @@ ui::ElementContextActions MakeElementContextActions(AppRuntime& runtime) {
     actions.focus_problem = [](const std::string& problem_id, const std::string& element_id) {
         ui::FocusProblemInPanel(ui::GetUiState(), problem_id, element_id);
     };
-    actions.add_away_goal = [&runtime](const std::string& cited_id) { runtime.AddAwayGoalToSelected(cited_id); };
-    actions.away_goal_candidates = runtime.AwayGoalCandidatesForSelection();
+    actions.add_away_element = [&runtime](core::AwayElementKind kind, const std::string& cited_id) {
+        runtime.AddAwayElementToSelected(kind, cited_id);
+    };
+    actions.away_goal_candidates = runtime.AwayCandidatesForSelection(core::AwayElementKind::Goal);
+    actions.away_assumption_candidates = runtime.AwayCandidatesForSelection(core::AwayElementKind::Assumption);
+    actions.away_justification_candidates = runtime.AwayCandidatesForSelection(core::AwayElementKind::Justification);
     actions.add_counter_argument = [&runtime]() { runtime.AddCounterArgumentToSelected(); };
     actions.add_counter_evidence = [&runtime]() { runtime.AddCounterEvidenceToSelected(); };
     actions.add_counter_argument_to_relationship = [&runtime](const std::string& relationship_id) {
@@ -345,26 +349,26 @@ bool AppRuntime::AddTopGoal() {
     return actions::ElementActions(*impl_).AddTopGoal();
 }
 
-bool AppRuntime::AddAwayGoalToSelected(const std::string& cited_id) {
+bool AppRuntime::AddAwayElementToSelected(core::AwayElementKind kind, const std::string& cited_id) {
     // No draft path yet: the patch vocabulary has no operation that sets a
-    // citation, so staging an away goal would drop the very thing that makes it
-    // away and promote an ordinary local goal. Refusing is better than writing
+    // citation, so staging an away element would drop the very thing that makes
+    // it away and promote an ordinary local one. Refusing is better than writing
     // it into the accepted model underneath the draft the canvas is drawing.
     if (DraftEditingActive()) {
-        SetStatus(AF_TR("An away goal cannot be added while a draft is open."));
+        SetStatus(AF_TR("An away element cannot be added while a draft is open."));
         return false;
     }
-    return actions::ElementActions(*impl_).AddAwayGoalToSelected(cited_id);
+    return actions::ElementActions(*impl_).AddAwayElementToSelected(kind, cited_id);
 }
 
-std::vector<core::AwayGoalCandidate> AppRuntime::AwayGoalCandidatesForSelection() const {
+std::vector<core::AwayCandidate> AppRuntime::AwayCandidatesForSelection(core::AwayElementKind kind) const {
     const std::string& selected_id = ui::GetUiState().selected_element_id;
     if (selected_id.empty() || !impl_->app_state.loaded_case.has_value() ||
         !impl_->app_state.sacm_package.has_value()) {
         return {};
     }
-    return core::ListAwayGoalCandidates(
-        impl_->app_state.loaded_case.value(), &impl_->app_state.sacm_package.value(), selected_id);
+    return core::ListAwayElementCandidates(
+        impl_->app_state.loaded_case.value(), &impl_->app_state.sacm_package.value(), selected_id, kind);
 }
 
 bool AppRuntime::AddAcpToSelectedElement() {

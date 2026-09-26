@@ -28,18 +28,22 @@ void RenderAddChildMenuItem(const parser::SacmElement* parent,
         ImGui::SetTooltip("%s", refusal.c_str());
 }
 
-// GSN v3 Modular Extension (GSN3-MOD-003): an Away Goal cites a goal defined
-// in another module. The menu offers the goals that can be cited rather than a
-// free-text id, because a citation that resolves to nothing is not an away
-// goal -- it is a goal claiming support from a module that does not have it.
-// Disabled, with no rows, when the selection has no other module to cite.
-void RenderAwayGoalMenu(const ElementContextActions& actions) {
-    const bool available = static_cast<bool>(actions.add_away_goal) && !actions.away_goal_candidates.empty();
-    if (!ImGui::BeginMenu(AF_TR("Away Goal").c_str(), available))
+// GSN v3 Modular Extension (GSN3-MOD-003/006/007): an away element cites a
+// goal, assumption or justification defined in another module. The menu offers
+// the elements that can be cited rather than a free-text id, because a citation
+// that resolves to nothing is not an away element -- it is an element claiming
+// a module states something that module does not. Disabled, with no rows, when
+// the selection has nothing of that kind in another module to cite.
+void RenderAwayElementMenu(const char* label,
+                           core::AwayElementKind kind,
+                           const std::vector<core::AwayCandidate>& candidates,
+                           const ElementContextActions& actions) {
+    const bool available = static_cast<bool>(actions.add_away_element) && !candidates.empty();
+    if (!ImGui::BeginMenu(label, available))
         return;
 
     std::string current_module;
-    for (const core::AwayGoalCandidate& candidate : actions.away_goal_candidates) {
+    for (const core::AwayCandidate& candidate : candidates) {
         // Candidates arrive sorted by module, so a change of module starts a
         // new group. The module heading is what tells a reader which argument
         // they are reaching into.
@@ -50,7 +54,7 @@ void RenderAwayGoalMenu(const ElementContextActions& actions) {
             ImGui::TextDisabled("%s", current_module.c_str());
         }
         if (ImGui::MenuItem(candidate.label.c_str()))
-            actions.add_away_goal(candidate.id);
+            actions.add_away_element(kind, candidate.id);
     }
     ImGui::EndMenu();
 }
@@ -72,7 +76,16 @@ void RenderAddElementMenu(const parser::AssuranceCase* active_case,
         RenderAddChildMenuItem(parent, AF_TR("Context").c_str(), core::NewElementKind::Context, actions);
         RenderAddChildMenuItem(parent, AF_TR("Assumption").c_str(), core::NewElementKind::Assumption, actions);
         RenderAddChildMenuItem(parent, AF_TR("Justification").c_str(), core::NewElementKind::Justification, actions);
-        RenderAwayGoalMenu(actions);
+        RenderAwayElementMenu(
+            AF_TR("Away Goal").c_str(), core::AwayElementKind::Goal, actions.away_goal_candidates, actions);
+        RenderAwayElementMenu(AF_TR("Away Assumption").c_str(),
+                              core::AwayElementKind::Assumption,
+                              actions.away_assumption_candidates,
+                              actions);
+        RenderAwayElementMenu(AF_TR("Away Justification").c_str(),
+                              core::AwayElementKind::Justification,
+                              actions.away_justification_candidates,
+                              actions);
         ImGui::Separator();
         if (ImGui::MenuItem(
                 AF_TR("ACP").c_str(), nullptr, false, static_cast<bool>(actions.add_acp_to_selected_element)))
