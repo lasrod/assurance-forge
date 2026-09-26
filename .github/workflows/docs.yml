@@ -5,6 +5,7 @@ on:
     paths:
       - docs/**
       - mkdocs.yml
+      - overrides/**
       - requirements-docs.txt
       - .github/workflows/docs.yml
       - .github/workflows/docs-pages.yml

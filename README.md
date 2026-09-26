@@ -2,6 +2,8 @@
 
 Assurance Forge is an open-source tool for safety case development, review, and navigation. It is built around the SACM (Structured Assurance Case Metamodel) standard and designed for safety engineers who need a rigorous, efficient workflow for constructing and maintaining assurance arguments.
 
+<!-- DEMO GIF: the maintainer's recorded demo goes here, above the static screenshot. -->
+
 ![Assurance Forge showing a GSN argument on the canvas, with the case explorer on the left and the element inspector on the right](docs/screenshot/dark.png)
 
 *The GSN canvas, case explorer and element inspector, showing the bundled
@@ -21,8 +23,8 @@ trusting it with a safety argument you care about.
 
 | | |
 |---|---|
-| Maturity | Alpha. Latest release `0.1.0-alpha.8`; every release so far is a prerelease. |
-| Released binaries | Windows x64 only. `main` is substantially ahead of the latest release — build from source for current behaviour. |
+| Maturity | Alpha. Every release so far is a prerelease; the newest is on the [Releases page](https://github.com/lasrod/assurance-forge/releases). |
+| Released binaries | Windows x64 (installer and portable zip) is the primary platform. Linux x64 and macOS (Apple silicon) archives are built and tested by CI with every release but get less hands-on use, and have [further limitations](#-releases). `main` is usually ahead of the latest release — build from source for current behaviour. |
 | CI | Windows, Linux and macOS are built and tested on every change. |
 | Licence | [MIT](LICENSE.md) |
 
@@ -137,7 +139,13 @@ Each example documents its intended behavior and test procedure.
 
 ## 📦 Releases
 
-Pre-built Windows binaries are published on the [Releases page](https://github.com/lasrod/assurance-forge/releases).
+Pre-built binaries are published on the [Releases page](https://github.com/lasrod/assurance-forge/releases).
+Every release is built and its test suite run on Windows, Linux and macOS, and
+nothing is published unless all three pass. Windows is the primary platform: it
+has an installer, and its packages are checked before publishing. The Linux and
+macOS archives are less exercised by hand.
+
+### Windows x64
 
 **Installer (recommended).** Download `assurance-forge.<version>-windows-x64-setup.exe`
 and run it. It installs for your user account only, so it needs no administrator
@@ -161,13 +169,36 @@ nothing else needs installing.
 > *"Windows protected your PC"*. Choose **More info → Run anyway**. The same
 > warning appears for the zip's executable.
 
-Releases are currently Windows x64 only. To build on other platforms, see [Build Instructions](#build-instructions) below.
+### Linux x64 and macOS (Apple silicon)
+
+- **Linux:** `assurance-forge.<version>-linux-x64.tar.gz`. Extract it and run
+  `./assurance-forge` from the extracted folder. The binary is built on GitHub's
+  current Ubuntu runner and links the system GTK 3, OpenGL and OpenSSL 3
+  libraries, so an older distribution may not have what it needs; build from
+  source if it does not start.
+- **macOS:** `assurance-forge.<version>-macos-arm64.zip`, for Apple silicon Macs.
+  Unzip it and open `assurance-forge.app`.
+
+Both archives hold the application, the SCCG guideline catalogue and the sample
+files in `data/`. They do **not** include the `assurance-forge-mcp` server; to
+[connect an AI client](docs/user-guide/connect-an-ai-client.md) on these
+platforms, build from source. The Linux archive is also built without keyring
+support, so the built-in AI review cannot store an API key there; a source build
+with `libsecret-1-dev` installed can.
+
+> **macOS: first open.** The app is not signed or notarized, so Gatekeeper
+> blocks it the first time. Try to open it once, then go to
+> **System Settings → Privacy & Security** and choose **Open Anyway** next to the
+> message about Assurance Forge. On older macOS versions, right-click the app and
+> choose **Open** instead. There is no need to turn Gatekeeper off.
+
+To build on any platform, see [Build Instructions](#build-instructions) below.
 
 ---
 ## Requirements
 
 - Windows 10/11, Linux, or macOS
-- [CMake](https://cmake.org/) 3.20 or newer
+- [CMake](https://cmake.org/) 3.21 or newer
 - A C++23 compiler, such as Visual Studio 2022 (17.8+), GCC 14+, or Clang 17+
 - [Git](https://git-scm.com/download/win)
 
@@ -190,7 +221,7 @@ On Linux or macOS, use a shell where CMake and your C++ compiler are available o
 ### 2. Clone and Initialize Submodules
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/lasrod/assurance-forge.git
 cd assurance-forge
 git submodule update --init --recursive
 ```
@@ -207,7 +238,7 @@ cmake --build --preset release
 **Linux** (install dependencies first):
 
 ```bash
-sudo apt-get install xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
+sudo apt-get install xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libsecret-1-dev
 cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
@@ -278,17 +309,20 @@ rationale behind the gcovr flags and the two report views.
 
 ## Usage
 
-1. Launch the application
-2. Enter the path to a SACM XML file (default: `data/sample.sacm.xml`)
-3. Click "Load" to parse and display the assurance case elements
-4. Elements are color-coded by type:
-   - Green: Claims (Goals)
-   - Blue: Argument Reasoning (Strategies)
-   - Orange: Artifacts and Evidence
+1. Launch the application. It opens on the welcome screen.
+2. Choose **Open Project** to open an existing `af.proj`, or
+   **Create Project from Existing SACM** to start a project from a SACM file
+   (the file is copied into the project; the original is not touched).
+3. The argument opens on the GSN canvas, with the case explorer on the left and
+   the element inspector on the right.
+
+The [user guide](docs/user-guide/index.md) covers each step, starting with
+[opening a project](docs/user-guide/open-a-project.md).
 
 ## Sample Data
 
-A minimal sample file is included at `data/sample.sacm.xml`.
+A minimal sample file is included at `data/sample.sacm.xml`; use
+**Create Project from Existing SACM** to open it.
 
 For a more comprehensive example, download the Open Autonomy Safety Case:
 https://github.com/EdgeCaseResearch/oasc

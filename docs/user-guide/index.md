@@ -21,8 +21,12 @@ tool is built not to lose it, but keep your assurance data in version control
 and keep backups. See
 [Status and limitations](https://github.com/lasrod/assurance-forge#status-and-limitations).
 
-There are no pre-built binaries outside Windows x64, and `main` is usually ahead
-of the latest release — see the
+Pre-built binaries are on the
+[Releases page](https://github.com/lasrod/assurance-forge/releases): a Windows
+x64 installer and zip, and Linux x64 and macOS (Apple silicon) archives, which
+get less hands-on use and have
+[limitations of their own](https://github.com/lasrod/assurance-forge#-releases).
+`main` is usually ahead of the latest release — see the
 [build instructions](https://github.com/lasrod/assurance-forge#build-instructions).
 
 ## The tasks

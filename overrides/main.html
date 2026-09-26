@@ -1,0 +1,40 @@
+{#-
+  Theme override for MkDocs Material (theme.custom_dir in mkdocs.yml).
+
+  Adds Open Graph and Twitter card tags so a link to any page of the site
+  unfurls with a title, a description and the preview image when it is shared.
+  The image is docs/assets/social-preview.png; og:image must be an absolute URL,
+  so it is built from site_url.
+-#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {%- if page.is_homepage or not page.title -%}
+    {%- set social_title = config.site_name -%}
+  {%- else -%}
+    {%- set social_title = page.title ~ " - " ~ config.site_name -%}
+  {%- endif -%}
+  {%- if page.meta and page.meta.description -%}
+    {%- set social_description = page.meta.description -%}
+  {%- else -%}
+    {%- set social_description = config.site_description -%}
+  {%- endif -%}
+  {%- set social_image = config.site_url ~ "assets/social-preview.png" -%}
+  {%- set social_image_alt = "Assurance Forge: a GSN safety argument on the canvas, with the case explorer and element inspector" -%}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ social_title | striptags }}">
+  <meta property="og:description" content="{{ social_description }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ social_image }}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="{{ social_image_alt }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ social_title | striptags }}">
+  <meta name="twitter:description" content="{{ social_description }}">
+  <meta name="twitter:image" content="{{ social_image }}">
+  <meta name="twitter:image:alt" content="{{ social_image_alt }}">
+{% endblock %}
