@@ -115,9 +115,6 @@ msgstr "AI デバッグ"
 msgid "AI Review"
 msgstr "AI レビュー"
 
-msgid "AI added {0} suggested change(s) to the working draft. Review them before accepting."
-msgstr "AI が提案された変更 {0} 件を作業ドラフトに追加しました。受理する前に確認してください。"
-
 msgid "AI client"
 msgstr "AI クライアント"
 
@@ -3490,9 +3487,6 @@ msgstr "{0} は {1} を他モジュールで置かれた仮定として参照し
 msgid "{0} claims · {1} strategies · {2} evidence · {3} undeveloped"
 msgstr "主張 {0} 件 · 戦略 {1} 件 · エビデンス {2} 件 · 未展開 {3} 件"
 
-msgid "{0} confidence assessment(s) were marked inactive because their target elements changed."
-msgstr "対象要素が変更されたため、{0} 件の信頼度評価を無効にしました。"
-
 msgid "{0} discharges a goal through relationship {1}, but it is not a Solution. Only a reference to evidence can discharge a goal."
 msgstr "{0} は関係 {1} を通じてゴールを立証していますが、ソリューションではありません。ゴールを立証できるのは証拠への参照のみです。"
 
@@ -3556,6 +3550,9 @@ msgstr "{0} 件未リンク"
 msgid "{0} warnings require review"
 msgstr "{0} 件の警告を確認する必要があります"
 
+msgid "{0} {1}"
+msgstr "{0}{1}"
+
 msgid "{0} — accepted"
 msgstr "{0} — 受理済み"
 
@@ -3579,6 +3576,10 @@ msgstr "{0}: {1}"
 
 msgid "● PAUSED"
 msgstr "● 一時停止中"
+
+msgid "AI added {0} suggested change to the working draft. Review it before accepting."
+msgid_plural "AI added {0} suggested changes to the working draft. Review them before accepting."
+msgstr[0] "AI が提案された変更 {0} 件を作業ドラフトに追加しました。受理する前に確認してください。"
 
 msgid "AI client connected: {0}"
 msgid_plural "AI clients connected: {0}"

@@ -25,8 +25,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 ROOT = REPO / "src/app"
 
-# `SetStatus(state, <message>)` and `StatusMessageEvent{<message>}`.
-CALL = re.compile(r"(?:\bSetStatus\(\s*[\w.>\-]+\s*,|\bStatusMessageEvent\{)")
+# `SetStatus(state, <message>)`, `AppRuntime::SetStatus(<message>)` and
+# `StatusMessageEvent{<message>}`. For SetStatus the message is the last
+# argument, whichever overload it is.
+CALL = re.compile(r"\b(?:SetStatus\(|StatusMessageEvent\{)")
 TRANSLATING = re.compile(r"\b(?:AF_TR_NOOP|AF_TR_CTX|AF_TR|tr|trc|trn|trf|trcf|trnf)\s*\(")
 
 
@@ -51,6 +53,29 @@ def argument(text: str, start: int) -> str:
                 return text[start:i]
         i += 1
     return text[start:]
+
+
+def last_argument(args: str) -> str:
+    """The text after the last top-level comma of an argument list."""
+    depth, i, in_string, last = 0, 0, False, 0
+    while i < len(args):
+        c = args[i]
+        if in_string:
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                in_string = False
+        elif c == '"':
+            in_string = True
+        elif c in "({[":
+            depth += 1
+        elif c in ")}]":
+            depth -= 1
+        elif c == "," and depth == 0:
+            last = i + 1
+        i += 1
+    return args[last:]
 
 
 def untranslated_literal(arg: str) -> bool:
@@ -78,6 +103,8 @@ def violations(root: Path = ROOT) -> list[str]:
             if text[max(0, m.start() - 12) : m.start()].rstrip().endswith("void"):
                 continue
             arg = argument(text, m.end())
+            if m.group(0).startswith("SetStatus"):
+                arg = last_argument(arg)
             if untranslated_literal(arg):
                 line = text.count("\n", 0, m.start()) + 1
                 found.append(f"{path.relative_to(REPO).as_posix()}:{line}: {' '.join(arg.split())[:120]}")

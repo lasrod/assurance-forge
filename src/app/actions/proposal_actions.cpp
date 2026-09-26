@@ -543,8 +543,10 @@ void ProposalActions::CreateAiGenerated(const AiReviewProposalSuggestionsEvent& 
     if (staged_count > 0) {
         state_.tree_needs_rebuild = true;
         SetStatus(state_,
-                  ui::i18n::trf("AI added {0} suggested change(s) to the working draft. Review them before accepting.",
-                                std::to_string(staged_count)));
+                  ui::i18n::trnf("AI added {0} suggested change to the working draft. Review it before accepting.",
+                                 "AI added {0} suggested changes to the working draft. Review them before accepting.",
+                                 static_cast<int>(staged_count),
+                                 staged_count));
     }
 }
 

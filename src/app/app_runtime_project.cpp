@@ -170,8 +170,10 @@ void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& e
         state.confidence_controller->LastInactivatedCount() > 0) {
         const int count = state.confidence_controller->LastInactivatedCount();
         state.events.Emit(StatusMessageEvent{
-            ui::i18n::trf("{0} confidence assessment(s) were marked inactive because their target elements changed.",
-                          std::to_string(count))});
+            ui::i18n::trnf("{0} confidence assessment was marked inactive because its target element changed.",
+                           "{0} confidence assessments were marked inactive because their target elements changed.",
+                           count,
+                           count)});
     }
 }
 
@@ -2332,7 +2334,9 @@ void AppRuntime::ResolvePendingDraftRejection(DraftRejectionScope scope) {
                                                          "{0} changes now need attention before they can be accepted.",
                                                          static_cast<int>(stranded),
                                                          stranded);
-    SetStatus(rejected_sentence + " " + consequence);
+    // Joined by a translatable pattern: English separates sentences with a
+    // space, Japanese does not.
+    SetStatus(ui::i18n::trf("{0} {1}", rejected_sentence, consequence));
 }
 
 void AppRuntime::CancelPendingDraftRejection() {

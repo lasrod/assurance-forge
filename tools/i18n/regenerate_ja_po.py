@@ -1330,8 +1330,8 @@ TRANSLATIONS = {
     "Could not move assessments into the draft: {0}": "評価をドラフトに移動できませんでした: {0}",
 
     # ===== Status bar messages (issue #252) =====
+    '{0} {1}': '{0}{1}',
     'Deleted term.': '用語を削除しました。',
-    'AI added {0} suggested change(s) to the working draft. Review them before accepting.': 'AI が提案された変更 {0} 件を作業ドラフトに追加しました。受理する前に確認してください。',
     'AI found suggested text, but no assurance case is open for the working draft.': 'AI が提案テキストを見つけましたが、作業ドラフト用の保証ケースが開いていません。',
     'AI review cannot run because the working draft could not be materialized: {0}': '作業ドラフトを具体化できなかったため、AI レビューを実行できません: {0}',
     'AI review completed, but its suggested changes could not be added because the working draft could not be materialized: {0}': 'AI レビューは完了しましたが、作業ドラフトを具体化できなかったため、提案された変更を追加できませんでした: {0}',
@@ -1519,7 +1519,6 @@ TRANSLATIONS = {
     'Update ACP failed: {0}': 'ACP の更新に失敗しました: {0}',
     'Updated category {0}.': 'カテゴリ {0} を更新しました。',
     'Updated term {0}.': '用語 {0} を更新しました。',
-    '{0} confidence assessment(s) were marked inactive because their target elements changed.': '対象要素が変更されたため、{0} 件の信頼度評価を無効にしました。',
     '{0} failed: no SACM model loaded.': '{0} に失敗しました: SACM モデルが読み込まれていません。',
     '{0} is already attached as context to this element.': '{0} は既にこの要素にコンテキストとして付いています。',
 }
@@ -1623,6 +1622,9 @@ PLURAL_TRANSLATIONS = {
     ("Proposal draft: {0} operation", "Proposal draft: {0} operations"):
         ["提案ドラフト: {0} 件の操作"],
     # Status bar messages (issue #252)
+    ("AI added {0} suggested change to the working draft. Review it before accepting.",
+     "AI added {0} suggested changes to the working draft. Review them before accepting."):
+        ["AI が提案された変更 {0} 件を作業ドラフトに追加しました。受理する前に確認してください。"],
     ('AI review completed with {0} finding added as a review comment.',
      'AI review completed with {0} findings added as review comments.'):
         ['AI レビューが完了し、{0} 件の指摘事項をレビューコメントとして追加しました。'],
