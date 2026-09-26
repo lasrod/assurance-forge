@@ -41,11 +41,13 @@ BASELINE_PATH = REPO / "docs/quality/coverage-baseline.json"
 # `libs/sacm` wins over `libs`.
 COMPONENTS = [
     "libs/sacm",
-    "src/sacm",
+    "src/legacy_sacm",
     "src/parser",
     "src/sacm_adapter",
     "src/core",
+    "src/review",
     "src/ai",
+    "src/eval",
     "src/export",
     "src/bridge",
     "src/agent",

@@ -134,7 +134,9 @@ bool ParseArgs(const std::vector<std::string>& arguments, Options& options, std:
 }
 
 int LastRunNumber(const Options& options) {
-    return options.first_run + options.runs - 1;
+    // Parse guarantees runs >= 1 and that the last number fits, but adding runs
+    // to first_run before subtracting one still overflows at --first-run INT_MAX.
+    return options.first_run + (options.runs - 1);
 }
 
 } // namespace eval
