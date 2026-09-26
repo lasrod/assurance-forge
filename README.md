@@ -12,7 +12,7 @@ example case.*
 
 | Light theme | Welcome screen |
 |---|---|
-| [![The same argument view in the light theme](docs/screenshot/light.png)](docs/screenshot/light.png) | [![The welcome screen, offering project creation, SACM import and recent projects](docs/screenshot/welcome.png)](docs/screenshot/welcome.png) |
+| [![The same argument view in the light theme](docs/screenshot/light.png)](docs/screenshot/light.png) | [![The welcome screen, offering the example project, project creation, SACM import, recent projects and guides](docs/screenshot/welcome.png)](docs/screenshot/welcome.png) |
 
 ---
 
