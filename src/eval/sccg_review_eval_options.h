@@ -3,9 +3,10 @@
 // The command line of af-sccg-review-eval.
 //
 // Separate from the harness's `main` so the tests can reach it. The harness
-// calls a paid provider and is never a CTest, but what its arguments mean is
-// plain parsing -- and a sweep started with a misread argument is a sweep paid
-// for and wrong.
+// calls a paid provider, so only its --dry-run is a CTest
+// (SccgEvalDryRunStopsAtTheLastRunNumber), but what its arguments mean is plain
+// parsing -- and a sweep started with a misread argument is a sweep paid for and
+// wrong.
 
 #include <filesystem>
 #include <optional>

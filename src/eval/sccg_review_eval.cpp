@@ -620,7 +620,11 @@ int main(int argc, char** argv) {
 
         std::vector<review::AiReviewParseResult> run_results;
         const int last_run = eval::LastRunNumber(options);
-        for (int run = options.first_run; run <= last_run; ++run) {
+        // Counted by index, not by run number: `++run` past a last run of
+        // INT_MAX overflowed, and the loop went on writing runs numbered from
+        // INT_MIN instead of stopping.
+        for (int run_index = 0; run_index < options.runs; ++run_index) {
+            const int run = options.first_run + run_index;
             json run_record = record;
             run_record["run"] = run;
             run_record["runs_requested"] = options.runs;
