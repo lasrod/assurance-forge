@@ -412,6 +412,27 @@ TRANSLATIONS = {
     "API key saved securely.": "API キーを安全に保存しました。",
     "API key removed.": "API キーを削除しました。",
     "Testing connection...": "接続をテスト中…",
+    "Connection successful.": "接続に成功しました。",
+    # AI provider error codes (app::LocalizedAiErrorCode, issue #451). The
+    # English must stay equal to ai::ToString(AiErrorCode).
+    "None": "なし",
+    "AI support is disabled": "AI サポートは無効です",
+    "Missing API key": "API キーがありません",
+    "Secure storage is unavailable": "セキュアストレージを利用できません",
+    "Authentication failed": "認証に失敗しました",
+    "Network error": "ネットワークエラー",
+    "Connection timed out": "接続がタイムアウトしました",
+    "Rate limit reached": "レート制限に達しました",
+    "The AI provider account has no credit left": "AI プロバイダーのアカウントにクレジットが残っていません",
+    "Model not available": "モデルを利用できません",
+    "Unexpected response": "予期しない応答です",
+    "AI provider error": "AI プロバイダーのエラー",
+    "Settings error": "設定エラー",
+    "Unknown error": "不明なエラー",
+    "{0}: {1}": "{0}: {1}",
+    "AI review request failed.": "AI レビューのリクエストに失敗しました。",
+    "AI review request failed: {0}": "AI レビューのリクエストに失敗しました: {0}",
+    "AI review response could not be parsed.": "AI レビューの応答を解析できませんでした。",
 
     # ===== AI Debug / Review =====
     "AI Debug": "AI デバッグ",

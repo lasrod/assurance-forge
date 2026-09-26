@@ -43,6 +43,7 @@ class CommandBus;
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace app {
@@ -57,7 +58,20 @@ struct AiUiState {
     std::shared_ptr<ai::AiTaskHandle> test_task;
     std::unique_ptr<controllers::AiReviewController> review_controller;
     ai::AiProviderSettings settings;
+    // What Preferences shows about the provider. A status the `ai` layer
+    // produced is English and is translated when shown (app::LocalizedAiStatus),
+    // so it follows the language in force -- including one loaded after startup
+    // set it. A status `app` built is translated already. Set it through these.
     ai::AiConnectionStatus connection_status;
+    bool connection_status_from_ai = false;
+    void SetAiLayerStatus(ai::AiConnectionStatus status) {
+        connection_status = std::move(status);
+        connection_status_from_ai = true;
+    }
+    void SetTranslatedStatus(ai::AiConnectionStatus status) {
+        connection_status = std::move(status);
+        connection_status_from_ai = false;
+    }
     bool key_stored = false;
     bool secure_store_available = false;
     char api_key_buf[256] = {};

@@ -479,6 +479,7 @@ add_executable(tests
     tests/test_guidelines_parser.cpp
     tests/test_guideline_catalog.cpp
     tests/test_localization.cpp
+    tests/test_ai_error_text.cpp
     tests/test_theme.cpp
     tests/test_element_type_display.cpp
     tests/test_status_bar.cpp

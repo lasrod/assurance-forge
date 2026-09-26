@@ -89,7 +89,7 @@ void AppRuntimeState::LoadAiSettingsState() {
     ai.secure_store_available = ai.secret_store && ai.secret_store->IsAvailable();
     RefreshStoredAiKeyState();
     if (!warning.empty()) {
-        ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning);
+        ai.SetAiLayerStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, warning));
     }
 }
 

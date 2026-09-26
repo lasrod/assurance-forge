@@ -1,4 +1,5 @@
 #include "app/areas/modal_host.h"
+#include "app/ai_error_text.h"
 
 #include "app/mcp_client_config.h"
 #include "core/user_settings.h"
@@ -147,7 +148,7 @@ void ModalHost::RenderPreferencesWindow() {
     if (state_.ai.test_task) {
         ai::AiTaskSnapshot snapshot = state_.ai.test_task->Snapshot();
         test_running = snapshot.state == ai::AiTaskState::Running;
-        state_.ai.connection_status = snapshot.status;
+        state_.ai.SetAiLayerStatus(snapshot.status);
         if (!test_running) {
             state_.ai.test_task.reset();
             state_.RefreshStoredAiKeyState();
@@ -182,7 +183,9 @@ void ModalHost::RenderPreferencesWindow() {
     }
     model.testRunning = test_running;
     model.connectionSeverity = ToPanelSeverity(state_.ai.connection_status);
-    model.connectionMessage = state_.ai.connection_status.message;
+    model.connectionMessage = state_.ai.connection_status_from_ai
+                                  ? LocalizedAiStatus(state_.ai.connection_status).message
+                                  : state_.ai.connection_status.message;
     model.apiKeyBuffer = state_.ai.api_key_buf;
     model.apiKeyBufferSize = sizeof(state_.ai.api_key_buf);
     model.modelBuffer = state_.ai.model_buf;
@@ -213,36 +216,40 @@ void ModalHost::RenderPreferencesWindow() {
             state_.ai.settings.model = ai::kDefaultOpenAiModel;
         std::string error;
         if (!state_.ai.service->SaveSettings(state_.ai.settings, error)) {
-            state_.ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
+            state_.ai.SetAiLayerStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, error));
             return;
         }
         CopyToBuffer(state_.ai.model_buf, sizeof(state_.ai.model_buf), state_.ai.settings.model);
-        state_.ai.connection_status = ai::SuccessStatus(AF_TR("AI settings saved."));
+        state_.ai.SetTranslatedStatus(ai::SuccessStatus(AF_TR("AI settings saved.")));
     };
     callbacks.save_api_key = [this](const char* api_key) {
         if (!api_key || api_key[0] == '\0') {
-            state_.ai.connection_status =
-                ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, AF_TR("Enter an API key before saving."));
+            state_.ai.SetTranslatedStatus(
+                ai::ErrorStatus(ai::AiErrorCode::MissingApiKey, AF_TR("Enter an API key before saving.")));
             return;
         }
         ai::SecretStoreResult result = state_.ai.service->SaveApiKey(api_key);
         std::memset(state_.ai.api_key_buf, 0, sizeof(state_.ai.api_key_buf));
         state_.RefreshStoredAiKeyState();
-        state_.ai.connection_status = result.success ? ai::SuccessStatus(AF_TR("API key saved securely."))
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
+        if (result.success)
+            state_.ai.SetTranslatedStatus(ai::SuccessStatus(AF_TR("API key saved securely.")));
+        else
+            state_.ai.SetAiLayerStatus(ai::ErrorStatus(result.errorCode, result.errorMessage));
     };
     callbacks.remove_api_key = [this]() {
         ai::SecretStoreResult result = state_.ai.service->DeleteApiKey();
         std::memset(state_.ai.api_key_buf, 0, sizeof(state_.ai.api_key_buf));
         state_.RefreshStoredAiKeyState();
-        state_.ai.connection_status = result.success ? ai::SuccessStatus(AF_TR("API key removed."))
-                                                     : ai::ErrorStatus(result.errorCode, result.errorMessage);
+        if (result.success)
+            state_.ai.SetTranslatedStatus(ai::SuccessStatus(AF_TR("API key removed.")));
+        else
+            state_.ai.SetAiLayerStatus(ai::ErrorStatus(result.errorCode, result.errorMessage));
     };
     callbacks.test_connection = [this]() {
         if (state_.ai.test_task && state_.ai.test_task->IsRunning())
             return;
-        state_.ai.connection_status =
-            ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, AF_TR("Testing connection..."));
+        state_.ai.SetTranslatedStatus(
+            ai::MakeStatus(ai::AiTaskState::Running, ai::AiErrorCode::None, AF_TR("Testing connection...")));
         state_.ai.settings.model = state_.ai.model_buf;
         if (state_.ai.settings.model.empty()) {
             state_.ai.settings.model = ai::kDefaultOpenAiModel;
@@ -252,7 +259,7 @@ void ModalHost::RenderPreferencesWindow() {
         }
         std::string error;
         if (!state_.ai.service->SaveSettings(state_.ai.settings, error)) {
-            state_.ai.connection_status = ai::ErrorStatus(ai::AiErrorCode::SettingsError, error);
+            state_.ai.SetAiLayerStatus(ai::ErrorStatus(ai::AiErrorCode::SettingsError, error));
             return;
         }
         std::shared_ptr<ai::AiService> service = state_.ai.service;

@@ -633,6 +633,13 @@ TEST(AiReviewControllerTest, RequestFailureEmitsFailedVisualEvent) {
     EXPECT_FALSE(review_state.ai_ok);
     EXPECT_TRUE(review_state.failed);
     EXPECT_EQ(review_state.last_review_message, "AI review request failed.");
+
+    // The status bar says why, not only that it failed (issue #451). It is
+    // built from the translated error, unlike the stored outcome above.
+    ASSERT_FALSE(harness.statuses.empty());
+    const std::string prefix = "AI review request failed: ";
+    EXPECT_EQ(harness.statuses.back().rfind(prefix, 0), 0u) << harness.statuses.back();
+    EXPECT_GT(harness.statuses.back().size(), prefix.size()) << "the reason is missing";
 }
 
 TEST(AiReviewControllerTest, ParseFailureEmitsFailedVisualEvent) {

@@ -127,6 +127,9 @@ msgstr "AI クライアントは接続できません: {0}"
 msgid "AI features may send selected safety case content and prompts to the configured AI provider. Assurance Forge will not send project data automatically; data is sent only when you explicitly use an AI action."
 msgstr "AI 機能は、選択した安全ケースの内容とプロンプトを構成された AI プロバイダーに送信することがあります。Assurance Forge はプロジェクトデータを自動的には送信しません。データは明示的に AI アクションを使用した場合のみ送信されます。"
 
+msgid "AI provider error"
+msgstr "AI プロバイダーのエラー"
+
 msgid "AI review OK"
 msgstr "AI レビュー OK"
 
@@ -142,11 +145,23 @@ msgstr "AI レビューを実行中です。"
 msgid "AI review is already running."
 msgstr "AI レビューは既に実行中です。"
 
+msgid "AI review request failed."
+msgstr "AI レビューのリクエストに失敗しました。"
+
+msgid "AI review request failed: {0}"
+msgstr "AI レビューのリクエストに失敗しました: {0}"
+
+msgid "AI review response could not be parsed."
+msgstr "AI レビューの応答を解析できませんでした。"
+
 msgid "AI settings are unavailable."
 msgstr "AI 設定を使用できません。"
 
 msgid "AI settings saved."
 msgstr "AI 設定を保存しました。"
+
+msgid "AI support is disabled"
+msgstr "AI サポートは無効です"
 
 msgid "API Key"
 msgstr "API キー"
@@ -391,6 +406,9 @@ msgstr "監査ログの整合に失敗しました: {0}"
 msgid "Audit store error: {0}"
 msgstr "監査ストアのエラー: {0}"
 
+msgid "Authentication failed"
+msgstr "認証に失敗しました"
+
 msgid "Author"
 msgstr "作成者"
 
@@ -630,6 +648,12 @@ msgstr "信頼度の更新に失敗しました: {0}"
 
 msgid "Conformance"
 msgstr "適合性"
+
+msgid "Connection successful."
+msgstr "接続に成功しました。"
+
+msgid "Connection timed out"
+msgstr "接続がタイムアウトしました"
 
 msgid "Content"
 msgstr "内容"
@@ -1321,6 +1345,9 @@ msgstr "方式"
 msgid "Method: {0}"
 msgstr "方式: {0}"
 
+msgid "Missing API key"
+msgstr "API キーがありません"
+
 msgid "Missing term"
 msgstr "用語が見つかりません"
 
@@ -1329,6 +1356,9 @@ msgstr "モード"
 
 msgid "Model"
 msgstr "モデル"
+
+msgid "Model not available"
+msgstr "モデルを利用できません"
 
 msgid "Move into SACM"
 msgstr "SACM に移動"
@@ -1359,6 +1389,9 @@ msgstr "ネイティブのテキスト信頼度主張がありません。"
 
 msgid "Needs Attention"
 msgstr "要確認"
+
+msgid "Network error"
+msgstr "ネットワークエラー"
 
 msgid "New"
 msgstr "新規"
@@ -1518,6 +1551,9 @@ msgstr "ノードとその子孫 ({0})"
 
 msgid "Node drop shadows"
 msgstr "ノードのドロップシャドウ"
+
+msgid "None"
+msgstr "なし"
 
 msgid "Not Implemented"
 msgstr "未実装"
@@ -1806,6 +1842,9 @@ msgstr "提案変更: 有効"
 
 msgid "Provider"
 msgstr "プロバイダー"
+
+msgid "Rate limit reached"
+msgstr "レート制限に達しました"
 
 msgid "Rationale:"
 msgstr "根拠:"
@@ -2098,6 +2137,9 @@ msgstr "検索"
 msgid "Search project..."
 msgstr "プロジェクトを検索..."
 
+msgid "Secure storage is unavailable"
+msgstr "セキュアストレージを利用できません"
+
 msgid "Secure storage is unavailable on this platform."
 msgstr "このプラットフォームでは安全な保存を使用できません。"
 
@@ -2148,6 +2190,9 @@ msgstr "送信中…"
 
 msgid "Separate confidence argument tree"
 msgstr "個別の信頼度論証ツリー"
+
+msgid "Settings error"
+msgstr "設定エラー"
 
 msgid "Severity"
 msgstr "重大度"
@@ -2340,6 +2385,9 @@ msgstr "そのリンクは他の要素も支持する関係の一部です。キ
 
 msgid "That register assessment was already discarded."
 msgstr "その登録簿評価は既に破棄されています。"
+
+msgid "The AI provider account has no credit left"
+msgstr "AI プロバイダーのアカウントにクレジットが残っていません"
 
 msgid "The MCP server program was not found next to Assurance Forge."
 msgstr "Assurance Forge の隣に MCP サーバープログラムが見つかりませんでした。"
@@ -2568,6 +2616,12 @@ msgstr "元に戻せません: プロジェクトの監査バスがありませ�
 
 msgid "Undo unavailable: no project loaded."
 msgstr "元に戻せません: プロジェクトが読み込まれていません。"
+
+msgid "Unexpected response"
+msgstr "予期しない応答です"
+
+msgid "Unknown error"
+msgstr "不明なエラー"
 
 msgid "Unlink"
 msgstr "リンク解除"
@@ -2943,6 +2997,9 @@ msgstr "{0} — 作業ドラフト"
 
 msgid "{0} — {1}"
 msgstr "{0} — {1}"
+
+msgid "{0}: {1}"
+msgstr "{0}: {1}"
 
 msgid "● PAUSED"
 msgstr "● 一時停止中"
