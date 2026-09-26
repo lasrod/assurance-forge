@@ -173,9 +173,10 @@ nothing else needs installing.
 
 - **Linux:** `assurance-forge.<version>-linux-x64.tar.gz`. Extract it and run
   `./assurance-forge` from the extracted folder. The binary is built on GitHub's
-  current Ubuntu runner and links the system GTK 3, OpenGL and OpenSSL 3
-  libraries, so an older distribution may not have what it needs; build from
-  source if it does not start.
+  current Ubuntu runner and links the system GTK 3, OpenGL, OpenSSL 3 and
+  libsecret libraries (on Debian and Ubuntu, `libsecret-1-0`), so an older or
+  minimal distribution may not have what it needs; build from source if it does
+  not start.
 - **macOS:** `assurance-forge.<version>-macos-arm64.zip`, for Apple silicon Macs.
   Unzip it and open `assurance-forge.app`.
 
