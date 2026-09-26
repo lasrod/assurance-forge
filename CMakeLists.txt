@@ -122,8 +122,11 @@ if(ENABLE_COVERAGE)
         message(FATAL_ERROR "ENABLE_COVERAGE requires GCC 14 or newer (got ${CMAKE_CXX_COMPILER_VERSION}).")
     endif()
     message(STATUS "Code coverage instrumentation enabled (GCC ${CMAKE_CXX_COMPILER_VERSION})")
-    add_compile_options(--coverage -O0 -fcondition-coverage)
-    add_link_options(--coverage)
+    # Atomic counters: the bridge, task runner and MCP tests run threads, and
+    # racing non-atomic increments left gcov negative hit counts (GCC bug 68080)
+    # that crashed gcovr on some runs and not others.
+    add_compile_options(--coverage -O0 -fcondition-coverage -fprofile-update=atomic)
+    add_link_options(--coverage -fprofile-update=atomic)
 endif()
 
 # Raise the policy floor for fetched and vendored dependencies without patching
@@ -662,6 +665,19 @@ foreach(_mcp_mode granted withheld)
     # process, which is the thing worth excluding when iterating.
     set_tests_properties(McpStdioSmoke_${_mcp_mode} PROPERTIES LABELS "app;contract;slow")
 endforeach()
+
+# The review harness's run loop at the top of the run-number range, as a dry
+# run so no provider is called. See the script for the overflow it guards.
+add_test(
+    NAME SccgEvalDryRunStopsAtTheLastRunNumber
+    COMMAND ${CMAKE_COMMAND}
+        -DAF_EVAL_EXE=$<TARGET_FILE:af-sccg-review-eval>
+        -DAF_EVAL_PROJECT=${CMAKE_SOURCE_DIR}/examples/projects/kitchen-blender
+        -DAF_EVAL_ELEMENT=G1
+        -DAF_EVAL_OUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/sccg_eval_last_run
+        -P ${CMAKE_SOURCE_DIR}/cmake/run_sccg_eval_last_run_test.cmake
+)
+set_tests_properties(SccgEvalDryRunStopsAtTheLastRunNumber PROPERTIES LABELS "app;slow" TIMEOUT 120)
 
 # Localization catalog consistency gate: fails if any source msgid is missing
 # from the .po, or if the committed .mo is out of sync with the .po. Registered

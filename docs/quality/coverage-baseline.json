@@ -2,64 +2,74 @@
   "tolerance_points": 0.2,
   "components": {
     "libs/sacm": {
-      "lines": 6946,
-      "covered": 6103,
-      "percent": 87.86
+      "lines": 8446,
+      "covered": 7620,
+      "percent": 90.22
     },
-    "src/sacm": {
-      "lines": 786,
-      "covered": 652,
-      "percent": 82.95
+    "src/legacy_sacm": {
+      "lines": 797,
+      "covered": 661,
+      "percent": 82.94
     },
     "src/parser": {
-      "lines": 921,
-      "covered": 787,
-      "percent": 85.45
+      "lines": 843,
+      "covered": 724,
+      "percent": 85.88
     },
     "src/sacm_adapter": {
-      "lines": 1482,
-      "covered": 1164,
-      "percent": 78.54
+      "lines": 2426,
+      "covered": 1884,
+      "percent": 77.66
     },
     "src/core": {
-      "lines": 15722,
-      "covered": 12163,
-      "percent": 77.36
+      "lines": 19907,
+      "covered": 15572,
+      "percent": 78.22
+    },
+    "src/review": {
+      "lines": 1246,
+      "covered": 1153,
+      "percent": 92.54
     },
     "src/ai": {
-      "lines": 1027,
-      "covered": 753,
-      "percent": 73.32
+      "lines": 620,
+      "covered": 401,
+      "percent": 64.68
+    },
+    "src/eval": {
+      "lines": 598,
+      "covered": 272,
+      "percent": 45.48
     },
     "src/export": {
-      "lines": 938,
-      "covered": 791,
-      "percent": 84.33
+      "lines": 1089,
+      "covered": 926,
+      "percent": 85.03
     },
     "src/bridge": {
-      "lines": 364,
-      "covered": 309,
-      "percent": 84.89
+      "lines": 458,
+      "covered": 401,
+      "percent": 87.55
     },
     "src/agent": {
-      "lines": 1084,
-      "covered": 648,
-      "percent": 59.78
+      "lines": 1452,
+      "covered": 1035,
+      "percent": 71.28
     },
     "src/mcp": {
-      "lines": 814,
-      "covered": 629,
-      "percent": 77.27
+      "lines": 1201,
+      "covered": 1046,
+      "percent": 87.09
     },
     "src/ui": {
-      "lines": 8678,
-      "covered": 970,
-      "percent": 11.18
+      "lines": 9194,
+      "covered": 1020,
+      "percent": 11.09
     },
     "src/app": {
-      "lines": 11691,
-      "covered": 2363,
-      "percent": 20.21
+      "lines": 13749,
+      "covered": 3266,
+      "percent": 23.75
     }
   }
 }

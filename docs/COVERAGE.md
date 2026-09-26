@@ -73,7 +73,12 @@ Three rules the check follows:
   rather than a number that drifted upward on its own.
 - **A component that vanishes from the report is a failure, not an absence.**
   That is what a build which stopped compiling a subsystem looks like, and it
-  would otherwise read as "nothing to report here".
+  would otherwise read as "nothing to report here". Renaming or splitting a
+  layer looks the same: `src/sacm` became `src/legacy_sacm`, and SCCG review
+  moved out of `src/ai` into `src/review`, and the ratchet stayed red for weeks
+  because this workflow runs after merge. When a layer moves, update
+  `COMPONENTS` in `coverage_components.py` and regenerate the baseline in the
+  same change.
 - **Generate or check, never both in one run.** Checking a baseline generated
   moments earlier is a gate that cannot fail. The workflow generates only when
   no baseline is committed, and says so.
