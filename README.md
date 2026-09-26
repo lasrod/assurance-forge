@@ -179,12 +179,12 @@ nothing else needs installing.
 - **macOS:** `assurance-forge.<version>-macos-arm64.zip`, for Apple silicon Macs.
   Unzip it and open `assurance-forge.app`.
 
-Both archives hold the application, the SCCG guideline catalogue and the sample
-files in `data/`. They do **not** include the `assurance-forge-mcp` server; to
-[connect an AI client](docs/user-guide/connect-an-ai-client.md) on these
-platforms, build from source. The Linux archive is also built without keyring
-support, so the built-in AI review cannot store an API key there; a source build
-with `libsecret-1-dev` installed can.
+Both archives hold the application, the `assurance-forge-mcp` server for
+[connecting an AI client](docs/user-guide/connect-an-ai-client.md), the SCCG
+guideline catalogue and the example project. On Linux the built-in AI review
+keeps its API key in the desktop keyring through libsecret, so it needs a
+running Secret Service (GNOME Keyring, KWallet). Releases up to `0.3.0-alpha.2`
+shipped neither the MCP server nor keyring support in these archives.
 
 > **macOS: first open.** The app is not signed or notarized, so Gatekeeper
 > blocks it the first time. Try to open it once, then go to
@@ -310,7 +310,10 @@ rationale behind the gcovr flags and the two report views.
 ## Usage
 
 1. Launch the application. It opens on the welcome screen.
-2. Choose **Open Project** to open an existing `af.proj`, or
+2. Choose **Open the Example Project** to look around a complete safety case
+   first: it copies the bundled kitchen-blender case to *Assurance Forge Examples*
+   in your Documents folder and opens that copy. Choose **Open Project** to open
+   an existing `af.proj`, or
    **Create Project from Existing SACM** to start a project from a SACM file
    (the file is copied into the project; the original is not touched).
 3. The argument opens on the GSN canvas, with the case explorer on the left and

@@ -43,12 +43,13 @@ The Windows packages come from the `install()` rules in
 [`cmake/packaging.cmake`](https://github.com/lasrod/assurance-forge/blob/main/cmake/packaging.cmake)
 and CPack; a file the application needs at runtime is added there, not in the
 workflow. Linux and macOS archives are still staged by hand in the workflow,
-and they differ from the Windows packages: they carry the application, `data/`
-(with the SCCG catalogue) and, on Linux, `assets/`, but **not**
-`assurance-forge-mcp`. The release job's Linux runner does not install
-`libsecret-1-dev` (CI's does), so the released Linux binary is built without
-keyring support and cannot store an AI API key. Neither archive is signed; the
-macOS app is not notarized.
+and they differ from the Windows packages: there is no installer, and neither
+archive is signed; the macOS app is not notarized. Each carries the application,
+`assurance-forge-mcp` (inside the bundle's `Contents/MacOS` on macOS, where the
+app looks for it), `data/` with the SCCG catalogue, the example project and, on
+Linux, `assets/`. Up to `0.3.0-alpha.2` they carried no MCP server, and the
+Linux job did not install `libsecret-1-dev`, so that binary could not store an
+AI API key.
 
 The workflow checks both Windows packages before publishing them, with
 `tools/release/check_windows_package.py`: every file the application looks for
