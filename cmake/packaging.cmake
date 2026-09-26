@@ -175,6 +175,13 @@ set(CPACK_INNOSETUP_SETUP_SetupLogging ON)
 # releases.
 set(CPACK_INNOSETUP_DEFINE_AfUserGuideUrl "https://lasrod.github.io/assurance-forge/user-guide/")
 set(CPACK_INNOSETUP_DEFINE_AfExamplesUrl "https://github.com/lasrod/assurance-forge-examples")
+# Whether the example project was packaged (see the install rule above): the
+# finish page points at "Open the Example Project" only when there is one.
+if(EXISTS "${AF_EXAMPLE_PROJECT_DIR}/af.proj")
+    set(CPACK_INNOSETUP_DEFINE_AfHasExample "1")
+else()
+    set(CPACK_INNOSETUP_DEFINE_AfHasExample "0")
+endif()
 # installer.iss takes the tour page's screenshot from here.
 set(CPACK_INNOSETUP_DEFINE_AfInstallerArtDir "${AF_INSTALLER_DIR}/art")
 if(AF_PACKAGE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+" AND NOT AF_PACKAGE_VERSION MATCHES "-dev")

@@ -1,6 +1,7 @@
 #include "app/native_file_dialogs.h"
 
 #include "core/string_utils.h"
+#include "ui/i18n/localization.h"
 #include "nfd.hpp"
 
 #include <filesystem>
@@ -169,7 +170,7 @@ BrowseForEvidenceFile(const std::string& default_path, std::string& selected_pat
 bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& error_message) {
     std::error_code ec;
     if (path.empty() || !std::filesystem::exists(path, ec)) {
-        error_message = "File was not found: " + path.generic_string();
+        error_message = ui::i18n::trf("File was not found: {0}", core::PathToUtf8(path));
         return false;
     }
 
@@ -189,26 +190,26 @@ bool RevealPathInFileExplorer(const std::filesystem::path& path, std::string& er
 
     HINSTANCE result = ShellExecuteW(nullptr, L"open", L"explorer.exe", parameters.c_str(), nullptr, SW_SHOWNORMAL);
     if (reinterpret_cast<intptr_t>(result) <= 32) {
-        error_message = "Could not open File Explorer for: " + path.generic_string();
+        error_message = ui::i18n::trf("Could not open File Explorer for: {0}", core::PathToUtf8(path));
         return false;
     }
     error_message.clear();
     return true;
 #else
-    error_message = "Opening File Explorer is not supported on this platform.";
+    error_message = AF_TR("Opening File Explorer is not supported on this platform.");
     return false;
 #endif
 }
 
 bool OpenPathOrUrl(const std::string& target, std::string& error_message) {
     if (target.empty()) {
-        error_message = "No location is recorded.";
+        error_message = AF_TR("No location is recorded.");
         return false;
     }
     const bool is_url = target.find("://") != std::string::npos;
     std::error_code ec;
     if (!is_url && !std::filesystem::exists(core::PathFromUtf8(target), ec)) {
-        error_message = "File was not found: " + target;
+        error_message = ui::i18n::trf("File was not found: {0}", target);
         return false;
     }
 
@@ -230,7 +231,7 @@ bool OpenPathOrUrl(const std::string& target, std::string& error_message) {
     }
     HINSTANCE result = ShellExecuteW(nullptr, L"open", wide.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     if (reinterpret_cast<intptr_t>(result) <= 32) {
-        error_message = "Could not open: " + target;
+        error_message = ui::i18n::trf("Could not open: {0}", target);
         return false;
     }
     error_message.clear();
@@ -250,7 +251,7 @@ bool OpenPathOrUrl(const std::string& target, std::string& error_message) {
     char* argv[] = {const_cast<char*>(opener), argument.data(), nullptr};
     pid_t child = 0;
     if (posix_spawnp(&child, opener, nullptr, nullptr, argv, environ) != 0) {
-        error_message = "Could not open: " + target;
+        error_message = ui::i18n::trf("Could not open: {0}", target);
         return false;
     }
     // Reaped off the UI thread: some openers stay until the application they

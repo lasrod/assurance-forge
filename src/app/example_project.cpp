@@ -50,8 +50,7 @@ std::filesystem::path DocumentsFolder() {
 // Copies a project's files, leaving out the .af/ folder: that is the audit
 // history and draft workspace of wherever the project was last opened, and a
 // fresh copy must start without one or it opens warning that its history does
-// not match its SACM. A file already at the destination -- from a copy an
-// earlier failure left half-done -- is kept, never replaced.
+// not match its SACM.
 void CopyProjectFiles(const std::filesystem::path& from, const std::filesystem::path& to, std::error_code& ec) {
     ec.clear();
     std::filesystem::recursive_directory_iterator it(from, ec);
@@ -66,7 +65,7 @@ void CopyProjectFiles(const std::filesystem::path& from, const std::filesystem::
         if (it->is_directory()) {
             std::filesystem::create_directories(target, ec);
         } else {
-            std::filesystem::copy_file(it->path(), target, std::filesystem::copy_options::skip_existing, ec);
+            std::filesystem::copy_file(it->path(), target, ec);
         }
     }
 }
@@ -98,21 +97,38 @@ ExampleCopyResult PrepareExampleProjectCopy(const std::filesystem::path& bundled
     }
 
     const std::filesystem::path copy = copy_root / bundled_project.filename();
-    if (IsProjectFolder(copy)) {
+    std::error_code ec;
+    if (std::filesystem::exists(copy, ec)) {
+        // Only a complete copy ever has this name (it is renamed into place
+        // below), so an existing project here is the user's, to reopen as is.
+        if (!IsProjectFolder(copy)) {
+            result.error =
+                ui::i18n::trf("{0} already exists and is not an Assurance Forge project.", core::PathToUtf8(copy));
+            return result;
+        }
         result.success = true;
         result.reused_existing = true;
         result.manifest = copy / kManifestName;
         return result;
     }
 
-    std::error_code ec;
-    std::filesystem::create_directories(copy, ec);
+    // Copied under a temporary name and renamed once complete, so an
+    // interrupted copy is never mistaken for a finished one: the next attempt
+    // discards the partial folder and starts again.
+    std::filesystem::path partial = copy;
+    partial += ".partial";
+    std::filesystem::remove_all(partial, ec);
+    std::filesystem::create_directories(partial, ec);
     if (ec) {
-        result.error = ui::i18n::trf("Could not create {0}: {1}", core::PathToUtf8(copy), ec.message());
+        result.error = ui::i18n::trf("Could not create {0}: {1}", core::PathToUtf8(partial), ec.message());
         return result;
     }
-    CopyProjectFiles(bundled_project, copy, ec);
+    CopyProjectFiles(bundled_project, partial, ec);
+    if (!ec && IsProjectFolder(partial))
+        std::filesystem::rename(partial, copy, ec);
     if (ec || !IsProjectFolder(copy)) {
+        std::error_code cleanup;
+        std::filesystem::remove_all(partial, cleanup);
         result.error =
             ec ? ui::i18n::trf("Could not copy the example project to {0}: {1}", core::PathToUtf8(copy), ec.message())
                : ui::i18n::trf("Could not copy the example project to {0}", core::PathToUtf8(copy));

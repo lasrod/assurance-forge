@@ -853,6 +853,9 @@ msgstr "評価を SACM ドキュメントに移動できませんでした: {0}"
 msgid "Could not move the assessments: {0}"
 msgstr "評価を移動できませんでした: {0}"
 
+msgid "Could not open File Explorer for: {0}"
+msgstr "エクスプローラーで開けませんでした: {0}"
+
 msgid "Could not open File Explorer: {0}"
 msgstr "エクスプローラーを開けませんでした: {0}"
 
@@ -861,6 +864,9 @@ msgstr "エビデンスの場所を開けませんでした: {0}"
 
 msgid "Could not open the user guide: {0}"
 msgstr "ユーザーガイドを開けませんでした: {0}"
+
+msgid "Could not open: {0}"
+msgstr "開けませんでした: {0}"
 
 msgid "Could not record the assessment in the draft: {0}"
 msgstr "ドラフトに評価を記録できませんでした: {0}"
@@ -916,12 +922,6 @@ msgstr "作成"
 msgid "Create + Add as Context"
 msgstr "作成してコンテキストに追加"
 
-msgid "Create Assurance Project from Template"
-msgstr "テンプレートから保証プロジェクトを作成"
-
-msgid "Create Assurance Project from Template is not yet implemented."
-msgstr "テンプレートから保証プロジェクトを作成は未実装です。"
-
 msgid "Create Category"
 msgstr "分類を作成"
 
@@ -946,9 +946,6 @@ msgstr "用語パッケージを作成"
 msgid "Create a new SACM argument package and link this ACP to its top goal."
 msgstr "新しい SACM 論証パッケージを作成し、この ACP をそのトップゴールにリンクします。"
 
-msgid "Create a project from a predefined assurance case template"
-msgstr "定義済みの保証ケーステンプレートからプロジェクトを作成します"
-
 msgid "Create baseline"
 msgstr "ベースラインを作成"
 
@@ -969,9 +966,6 @@ msgstr "まずプロジェクトを作成するか開いてください。"
 
 msgid "Create snapshot at current state"
 msgstr "現在の状態でスナップショットを作成"
-
-msgid "Create, inspect, and navigate a safety case"
-msgstr "安全ケースの作成・確認・操作を行います"
 
 msgid "Created a TerminologyPackage for new terms."
 msgstr "新しい用語用の TerminologyPackage を作成しました。"
@@ -1300,6 +1294,9 @@ msgstr "ファイルは既に存在します:\n{0}"
 msgid "File name"
 msgstr "ファイル名"
 
+msgid "File was not found: {0}"
+msgstr "ファイルが見つかりません: {0}"
+
 msgid "Filter SCCG IDs or titles"
 msgstr "SCCG ID またはタイトルでフィルター"
 
@@ -1377,9 +1374,6 @@ msgstr "GSN SVG を警告付きでエクスポートしました。問題／エ�
 
 msgid "GSN identifier"
 msgstr "GSN 識別子"
-
-msgid "GSN structure, SACM imports, evidence, and registers"
-msgstr "GSN 構造、SACM インポート、エビデンス、登録簿を学びます"
 
 msgid "Generated reports: {0}"
 msgstr "生成済みレポート: {0}"
@@ -1509,9 +1503,6 @@ msgstr "最終変更"
 
 msgid "Later"
 msgstr "後で"
-
-msgid "Learn the Fundamentals"
-msgstr "基本を学ぶ"
 
 msgid "Let Claude Code or Codex read the case and draft changes"
 msgstr "Claude Code や Codex にケースを読ませ、変更案を作成させる"
@@ -1755,6 +1746,9 @@ msgstr "サンプルプロジェクトのコピー先フォルダーが見つか
 
 msgid "No ignored terms."
 msgstr "無視された用語はありません。"
+
+msgid "No location is recorded."
+msgstr "場所が記録されていません。"
 
 msgid "No matching SCCG guideline IDs."
 msgstr "一致する SCCG ガイドライン ID がありません。"
@@ -2026,6 +2020,9 @@ msgstr "用語エディターを開きました。"
 msgid "Opened {0}"
 msgstr "{0} を開きました"
 
+msgid "Opening File Explorer is not supported on this platform."
+msgstr "このプラットフォームではエクスプローラーで開く機能はサポートされていません。"
+
 msgid "Opinion triangle"
 msgstr "意見三角形"
 
@@ -2112,9 +2109,6 @@ msgstr "設定"
 
 msgid "Preferences..."
 msgstr "設定…"
-
-msgid "Prepare a Conformance Review"
-msgstr "適合性レビューを準備する"
 
 msgid "Preview: Tx {0} (read-only)"
 msgstr "プレビュー: Tx {0} (読み取り専用)"
@@ -3157,9 +3151,6 @@ msgstr "タイムラインの操作"
 msgid "Timestamp (UTC)"
 msgstr "タイムスタンプ (UTC)"
 
-msgid "Trace claims, evidence, and review outputs"
-msgstr "主張、エビデンス、レビュー出力を追跡します"
-
 msgid "Transaction"
 msgstr "トランザクション"
 
@@ -3291,12 +3282,6 @@ msgstr "要素履歴を表示"
 
 msgid "View Proposal"
 msgstr "提案を表示"
-
-msgid "Walkthroughs"
-msgstr "ウォークスルー"
-
-msgid "Walkthroughs are not yet implemented."
-msgstr "ウォークスルーは未実装です。"
 
 msgid "Warning"
 msgstr "警告"
@@ -3501,6 +3486,9 @@ msgstr "追加 {0}、変更 {1}、削除 {2}"
 
 msgid "{0} added, {1} changed, {2} removed."
 msgstr "追加 {0} 件、変更 {1} 件、削除 {2} 件。"
+
+msgid "{0} already exists and is not an Assurance Forge project."
+msgstr "{0} は既に存在しますが、Assurance Forge のプロジェクトではありません。"
 
 msgid "{0} and {1} both use the GSN identifier {2}, so neither can be referred to unambiguously."
 msgstr "{0} と {1} が同じ GSN 識別子 {2} を使用しているため、どちらも一意に参照できません。"

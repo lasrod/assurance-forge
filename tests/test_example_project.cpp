@@ -80,17 +80,32 @@ TEST_F(ExampleProjectTest, ReopensAnEarlierCopyWithoutOverwritingIt) {
     EXPECT_EQ(ReadFile(edited), "<sacm>my edits</sacm>");
 }
 
-// A folder left without a manifest by an interrupted copy is completed, and a
-// file already in it is kept.
-TEST_F(ExampleProjectTest, CompletesAnInterruptedCopyWithoutReplacingWhatIsThere) {
-    const fs::path partial = copy_root_ / app::kExampleProjectFolderName;
-    WriteFile(partial / "arguments" / "main.sacm", "<sacm>kept</sacm>");
+// A copy interrupted part-way leaves only a ".partial" folder, never one under
+// the final name: the next attempt discards it and copies afresh, rather than
+// reopening a project with files missing.
+TEST_F(ExampleProjectTest, DiscardsAnInterruptedCopyAndStartsAgain) {
+    fs::path partial = copy_root_ / app::kExampleProjectFolderName;
+    partial += ".partial";
+    WriteFile(partial / "af.proj", "{}"); // the manifest made it, the argument did not
 
     const app::ExampleCopyResult result = app::PrepareExampleProjectCopy(bundled_, copy_root_);
     ASSERT_TRUE(result.success) << result.error;
     EXPECT_FALSE(result.reused_existing);
-    EXPECT_TRUE(fs::exists(partial / "af.proj"));
-    EXPECT_EQ(ReadFile(partial / "arguments" / "main.sacm"), "<sacm>kept</sacm>");
+    const fs::path copy = copy_root_ / app::kExampleProjectFolderName;
+    EXPECT_EQ(ReadFile(copy / "arguments" / "main.sacm"), "<sacm/>");
+    EXPECT_FALSE(fs::exists(partial));
+}
+
+// Something else already under the example's name is not ours to replace.
+TEST_F(ExampleProjectTest, RefusesAFolderThatIsNotAProjectAndLeavesItAlone) {
+    const fs::path copy = copy_root_ / app::kExampleProjectFolderName;
+    WriteFile(copy / "notes.txt", "mine");
+
+    const app::ExampleCopyResult result = app::PrepareExampleProjectCopy(bundled_, copy_root_);
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.error.empty());
+    EXPECT_EQ(ReadFile(copy / "notes.txt"), "mine");
+    EXPECT_FALSE(fs::exists(copy / "af.proj"));
 }
 
 // .af/ is the audit history of wherever the project was last opened. Carried

@@ -415,9 +415,10 @@ begin
   Result := (PageID = TourPage.ID) and WasInstalled;
 end;
 
-{ The finish text depends on what was chosen: one line about the AI assistant
-  when the MCP server was installed. The example tip is always shown: the
-  example project ships with every install. }
+{ The finish text depends on what was installed: the example tip when the
+  package carries the example project (it does whenever it was built with the
+  examples submodule), and one line about the AI assistant when the MCP server
+  was installed. }
 procedure CurPageChanged(CurPageID: Integer);
 var
   Text: String;
@@ -425,7 +426,8 @@ begin
   if CurPageID <> wpFinished then
     Exit;
   Text := CustomMessage('FinishReady');
-  Text := Text + #13#10#13#10 + CustomMessage('FinishExample');
+  if '{#AfHasExample}' = '1' then
+    Text := Text + #13#10#13#10 + CustomMessage('FinishExample');
   if ClientsConnected <> '' then
     Text := Text + #13#10#13#10 + FmtMessage(CustomMessage('FinishMcpConnected'), [ClientsConnected]);
   if ClientsFailed <> '' then
