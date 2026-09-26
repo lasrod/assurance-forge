@@ -28,8 +28,8 @@
     },
     "src/review": {
       "lines": 1246,
-      "covered": 1148,
-      "percent": 92.13
+      "covered": 1153,
+      "percent": 92.54
     },
     "src/ai": {
       "lines": 620,
@@ -37,9 +37,9 @@
       "percent": 64.68
     },
     "src/eval": {
-      "lines": 597,
-      "covered": 94,
-      "percent": 15.75
+      "lines": 598,
+      "covered": 272,
+      "percent": 45.48
     },
     "src/export": {
       "lines": 1089,
