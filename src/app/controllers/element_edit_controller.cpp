@@ -34,7 +34,7 @@ bool TryGetWorkingModel(AppRuntimeState& state,
     // was also invisible to static analysis, which cannot see through the
     // accessor to know the guard and the access name the same optional.
     if (!state.app_state.loaded_case.has_value() || !state.app_state.sacm_package.has_value()) {
-        events.Emit(StatusMessageEvent{std::string(action_label) + " failed: no SACM model loaded."});
+        events.Emit(StatusMessageEvent{ui::i18n::trf("{0} failed: no SACM model loaded.", std::string(action_label))});
         return false;
     }
     out_model = &state.app_state.loaded_case.value();
@@ -50,7 +50,7 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
                                                const std::string& selected_id,
                                                core::NewElementKind kind) {
     if (selected_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No element selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No element selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -63,7 +63,7 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
     core::commands::CreateChildElementCommand cmd(selected_id, kind);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Add failed: {0}", outcome.error)});
         return false;
     }
 
@@ -71,7 +71,7 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
     return true;
 }
 
@@ -80,7 +80,7 @@ bool ElementEditController::AddAwayElement(AppRuntimeState& state,
                                            const std::string& cited_id,
                                            core::AwayElementKind kind) {
     if (selected_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No element selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No element selected.")});
         return false;
     }
     if (cited_id.empty()) {
@@ -97,7 +97,7 @@ bool ElementEditController::AddAwayElement(AppRuntimeState& state,
     core::commands::CreateAwayElementCommand cmd(selected_id, cited_id, kind);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Add failed: {0}", outcome.error)});
         return false;
     }
 
@@ -105,7 +105,7 @@ bool ElementEditController::AddAwayElement(AppRuntimeState& state,
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
     return true;
 }
 
@@ -120,7 +120,7 @@ bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
     core::commands::CreateTopGoalCommand cmd;
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Add failed: {0}", outcome.error)});
         return false;
     }
 
@@ -128,7 +128,7 @@ bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
     return true;
 }
 
@@ -136,7 +136,7 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
                                          const core::ArgumentTarget& target,
                                          core::ChallengeSourceType source_type) {
     if (target.id.empty()) {
-        events_.Emit(StatusMessageEvent{"No challenge target selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No challenge target selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -149,7 +149,7 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
     core::commands::CreateChallengeCommand cmd(target, source_type);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Add challenge failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Add challenge failed: {0}", outcome.error)});
         return false;
     }
 
@@ -157,13 +157,13 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
     return true;
 }
 
 bool ElementEditController::RemoveRelationship(AppRuntimeState& state, const std::string& relationship_id) {
     if (relationship_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No relationship selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No relationship selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -174,7 +174,7 @@ bool ElementEditController::RemoveRelationship(AppRuntimeState& state, const std
     core::commands::RemoveRelationshipCommand cmd(relationship_id);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Remove relationship failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Remove relationship failed: {0}", outcome.error)});
         return false;
     }
 
@@ -184,8 +184,8 @@ bool ElementEditController::RemoveRelationship(AppRuntimeState& state, const std
     ui::GetUiState().selected_relationship_edge_key.clear();
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Removed relationship " + relationship_id +
-                                    ". Its elements were kept; any left unconnected show as orphans."});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf(
+        "Removed relationship {0}. Its elements were kept; any left unconnected show as orphans.", relationship_id)});
     return true;
 }
 
@@ -193,7 +193,7 @@ bool ElementEditController::DropRelationshipReference(AppRuntimeState& state,
                                                       const std::string& relationship_id,
                                                       const std::string& reference) {
     if (relationship_id.empty() || reference.empty()) {
-        events_.Emit(StatusMessageEvent{"No broken reference selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No broken reference selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -204,7 +204,7 @@ bool ElementEditController::DropRelationshipReference(AppRuntimeState& state,
     core::commands::DropRelationshipReferenceCommand cmd(relationship_id, reference);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Drop reference failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Drop reference failed: {0}", outcome.error)});
         return false;
     }
 
@@ -216,11 +216,13 @@ bool ElementEditController::DropRelationshipReference(AppRuntimeState& state,
     if (cmd.RemovedRelationship()) {
         ui::GetUiState().selected_relationship_id.clear();
         ui::GetUiState().selected_relationship_edge_key.clear();
-        events_.Emit(StatusMessageEvent{"Dropped " + reference + ", which left relationship " + relationship_id +
-                                        " with nothing to relate, so it was removed too."});
+        events_.Emit(StatusMessageEvent{
+            ui::i18n::trf("Dropped {0}, which left relationship {1} with nothing to relate, so it was removed too.",
+                          reference,
+                          relationship_id)});
     } else {
-        events_.Emit(
-            StatusMessageEvent{"Dropped the broken reference " + reference + " from " + relationship_id + "."});
+        events_.Emit(StatusMessageEvent{
+            ui::i18n::trf("Dropped the broken reference {0} from {1}.", reference, relationship_id)});
     }
     return true;
 }
@@ -229,7 +231,7 @@ bool ElementEditController::MoveStrategyToReasoning(AppRuntimeState& state,
                                                     const std::string& relationship_id,
                                                     const std::string& strategy_id) {
     if (relationship_id.empty() || strategy_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No strategy selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No strategy selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -240,14 +242,15 @@ bool ElementEditController::MoveStrategyToReasoning(AppRuntimeState& state,
     core::commands::MoveStrategyToReasoningCommand cmd(relationship_id, strategy_id);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Move strategy failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Move strategy failed: {0}", outcome.error)});
         return false;
     }
 
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{strategy_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Moved " + strategy_id + " into the reasoning of " + relationship_id + "."});
+    events_.Emit(
+        StatusMessageEvent{ui::i18n::trf("Moved {0} into the reasoning of {1}.", strategy_id, relationship_id)});
     return true;
 }
 
@@ -255,7 +258,7 @@ bool ElementEditController::SetElementUndeveloped(AppRuntimeState& state,
                                                   const std::string& element_id,
                                                   bool undeveloped) {
     if (element_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No element selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No element selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -266,7 +269,7 @@ bool ElementEditController::SetElementUndeveloped(AppRuntimeState& state,
     core::commands::SetElementUndevelopedCommand cmd(element_id, undeveloped);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Set undeveloped failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Set undeveloped failed: {0}", outcome.error)});
         return false;
     }
     if (cmd.WasNoOp())
@@ -274,8 +277,9 @@ bool ElementEditController::SetElementUndeveloped(AppRuntimeState& state,
 
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{undeveloped ? "Marked " + element_id + " undeveloped."
-                                                : "Cleared the undeveloped decorator on " + element_id + "."});
+    events_.Emit(StatusMessageEvent{undeveloped
+                                        ? ui::i18n::trf("Marked {0} undeveloped.", element_id)
+                                        : ui::i18n::trf("Cleared the undeveloped decorator on {0}.", element_id)});
     return true;
 }
 
@@ -287,7 +291,7 @@ bool ElementEditController::SetEvidenceLocation(AppRuntimeState& state,
     core::commands::SetEvidenceLocationCommand command(element_id, location);
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Could not record the evidence location: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Could not record the evidence location: {0}", outcome.error)});
         return false;
     }
     if (command.WasNoOp())
@@ -296,8 +300,8 @@ bool ElementEditController::SetEvidenceLocation(AppRuntimeState& state,
     // the projected element, so the table shows what the document holds.
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{location.empty() ? "Cleared the location of " + element_id
-                                                     : "Recorded the location of " + element_id});
+    events_.Emit(StatusMessageEvent{location.empty() ? ui::i18n::trf("Cleared the location of {0}", element_id)
+                                                     : ui::i18n::trf("Recorded the location of {0}", element_id)});
     return true;
 }
 
@@ -310,16 +314,17 @@ bool ElementEditController::SetEvidenceAttribute(AppRuntimeState& state,
     core::commands::SetEvidenceAttributeCommand command(element_id, attribute, value);
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Could not record the evidence " +
-                                        std::string(core::EvidenceAttributeToken(attribute)) + ": " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Could not record the evidence {0}: {1}",
+                                                      std::string(core::EvidenceAttributeToken(attribute)),
+                                                      outcome.error)});
         return false;
     }
     if (command.WasNoOp())
         return true;
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Recorded the " + std::string(core::EvidenceAttributeToken(attribute)) + " of " +
-                                    element_id});
+    events_.Emit(StatusMessageEvent{
+        ui::i18n::trf("Recorded the {0} of {1}", std::string(core::EvidenceAttributeToken(attribute)), element_id)});
     return true;
 }
 
@@ -332,7 +337,8 @@ bool ElementEditController::ImportEvidenceAssessments(AppRuntimeState& state,
     core::commands::ImportEvidenceAssessmentsCommand command(writes);
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Could not move the assessments into the SACM document: " + outcome.error});
+        events_.Emit(StatusMessageEvent{
+            ui::i18n::trf("Could not move the assessments into the SACM document: {0}", outcome.error)});
         return false;
     }
     out_applied = command.AppliedCount();
@@ -365,14 +371,14 @@ ElementEditController::CreateEvidence(AppRuntimeState& state, const std::string&
     core::commands::CreateEvidenceCommand command(claim_id, text);
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Add failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Add failed: {0}", outcome.error)});
         return {};
     }
     const std::string new_id = command.GeneratedId();
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{new_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Added " + new_id});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
     return new_id;
 }
 
@@ -382,18 +388,18 @@ bool ElementEditController::LinkEvidence(AppRuntimeState& state,
     core::commands::LinkEvidenceCommand command(claim_id, evidence_id);
     const auto outcome = app::commands::DispatchAuditedCommand(state, command);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Link failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Link failed: {0}", outcome.error)});
         return false;
     }
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Linked " + evidence_id + " to " + claim_id});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Linked {0} to {1}", evidence_id, claim_id)});
     return true;
 }
 
 bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const std::string& element_id) {
     if (element_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No element selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No element selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -403,21 +409,21 @@ bool ElementEditController::RenumberGsnIdentifier(AppRuntimeState& state, const 
 
     const std::string next = core::NextFreeGsnIdentifier(*model, element_id);
     if (next.empty()) {
-        events_.Emit(StatusMessageEvent{"Could not find a free GSN identifier for " + element_id + "."});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Could not find a free GSN identifier for {0}.", element_id)});
         return false;
     }
 
     core::commands::UpdateGsnIdentifierCommand cmd(element_id, next);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Renumber failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Renumber failed: {0}", outcome.error)});
         return false;
     }
 
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{element_id, true});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Renumbered " + cmd.OldIdentifier() + " to " + next + "."});
+    events_.Emit(StatusMessageEvent{ui::i18n::trf("Renumbered {0} to {1}.", cmd.OldIdentifier(), next)});
     return true;
 }
 
@@ -426,7 +432,7 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
                                            core::RemoveMode mode,
                                            RemovalConfirmation confirmation) {
     if (selected_id.empty()) {
-        events_.Emit(StatusMessageEvent{"No element selected."});
+        events_.Emit(StatusMessageEvent{AF_TR("No element selected.")});
         return false;
     }
     parser::AssuranceCase* model = nullptr;
@@ -437,7 +443,7 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
 
     auto planned = core::PlanRemoval(*model, selected_id, mode);
     if (planned.empty()) {
-        events_.Emit(StatusMessageEvent{"Nothing to remove for this selection."});
+        events_.Emit(StatusMessageEvent{AF_TR("Nothing to remove for this selection.")});
         return false;
     }
 
@@ -456,13 +462,13 @@ bool ElementEditController::RemoveSelected(AppRuntimeState& state,
         core::commands::RemoveElementCommand cmd(selected_id, mode);
         const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
         if (!outcome.success) {
-            events_.Emit(StatusMessageEvent{"Remove failed: " + outcome.error});
+            events_.Emit(StatusMessageEvent{ui::i18n::trf("Remove failed: {0}", outcome.error)});
             return false;
         }
         events_.Emit(TreeDirtyEvent{});
         events_.Emit(SelectionChangedEvent{});
         events_.Emit(DocumentDirtyEvent{});
-        events_.Emit(StatusMessageEvent{"Removed " + selected_id});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Removed {0}", selected_id)});
         return true;
     }
 
@@ -574,14 +580,15 @@ bool ElementEditController::ConfirmPendingRemoval(AppRuntimeState& state) {
     core::commands::RemoveElementCommand cmd(id, mode);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Remove failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Remove failed: {0}", outcome.error)});
         return false;
     }
 
     events_.Emit(TreeDirtyEvent{});
     events_.Emit(SelectionChangedEvent{});
     events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{"Removed " + std::to_string(count) + " element" + (count == 1 ? "" : "s")});
+    events_.Emit(StatusMessageEvent{
+        ui::i18n::trnf("Removed {0} element", "Removed {0} elements", static_cast<int>(count), count)});
     return true;
 }
 
@@ -631,7 +638,7 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
         std::string discarded;
         std::string revert_error;
         if (!core::SetGsnIdentifier(*model, nullptr, element_id, original_copy, discarded, revert_error)) {
-            events_.Emit(StatusMessageEvent{"Edit failed: " + revert_error});
+            events_.Emit(StatusMessageEvent{ui::i18n::trf("Edit failed: {0}", revert_error)});
             return false;
         }
 
@@ -642,7 +649,7 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
             // rejected identifier is invalid (empty, padded, or a duplicate),
             // so leaving it in the field would show an identifier the document
             // does not have. Model and package both hold the pre-edit value.
-            events_.Emit(StatusMessageEvent{"Edit failed: " + outcome.error});
+            events_.Emit(StatusMessageEvent{ui::i18n::trf("Edit failed: {0}", outcome.error)});
             return false;
         }
         events_.Emit(DocumentDirtyEvent{});
@@ -653,7 +660,7 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
         return false;
     core::ElementTextField field;
     if (!core::ElementTextFieldFromToken(field_token, field)) {
-        events_.Emit(StatusMessageEvent{"Edit failed: unknown field '" + field_token + "'."});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Edit failed: unknown field '{0}'.", field_token)});
         return false;
     }
 
@@ -671,14 +678,14 @@ bool ElementEditController::CommitElementTextEdit(AppRuntimeState& state,
     std::string revert_error;
     if (!core::SetElementTextField(
             *model, package, element_id, field, language, original_copy, discarded, revert_error)) {
-        events_.Emit(StatusMessageEvent{"Edit failed: " + revert_error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Edit failed: {0}", revert_error)});
         return false;
     }
 
     core::commands::UpdateElementTextCommand cmd(element_id, field, language, new_copy);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
     if (!outcome.success) {
-        events_.Emit(StatusMessageEvent{"Edit failed: " + outcome.error});
+        events_.Emit(StatusMessageEvent{ui::i18n::trf("Edit failed: {0}", outcome.error)});
         // Best-effort: restore the value the user just typed so the UI does
         // not jump back to the pre-edit state on failure.
         std::string restore_error;

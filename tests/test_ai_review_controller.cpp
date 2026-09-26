@@ -6,6 +6,7 @@
 #include "core/guideline_catalog.h"
 #include "core/reviews/review_proposal.h"
 #include "review/sccg/sccg_profile_selector.h"
+#include "ui/i18n/localization.h"
 
 #include <atomic>
 #include <cctype>
@@ -499,7 +500,7 @@ TEST(AiReviewControllerTest, CompletedAiFindingsAreAddedAsReviewComments) {
     EXPECT_FALSE(review_state.ai_ok);
     EXPECT_FALSE(review_state.failed);
     EXPECT_EQ(review_state.last_review_message, "AI review completed with findings.");
-    EXPECT_EQ(harness.statuses.back(), "AI review completed with 1 finding(s) added as review comment(s).");
+    EXPECT_EQ(harness.statuses.back(), "AI review completed with 1 finding added as a review comment.");
 }
 
 TEST(AiReviewControllerTest, StrategyReviewEmitsProposalSuggestionFromSuggestedElementText) {
@@ -607,6 +608,31 @@ TEST(AiReviewControllerTest, StartPendingRequestEmitsRunningVisualEvent) {
     EXPECT_FALSE(review_state.ai_ok);
     EXPECT_FALSE(review_state.failed);
     EXPECT_EQ(review_state.last_review_message, "AI review in progress.");
+}
+
+// The status bar does no translation of its own, so a Japanese user sees
+// Japanese only if each message is translated where it is set (issue #252).
+TEST(AiReviewControllerTest, StatusMessagesAreInTheUsersLanguage) {
+    ui::i18n::LocalizationConfig japanese;
+    japanese.localeDirectory = "assets/locale"; // tests run from CMAKE_SOURCE_DIR
+    japanese.language = ui::i18n::Language::Japanese;
+    ui::i18n::Initialize(japanese);
+
+    ControllerHarness harness;
+    parser::AssuranceCase assurance_case = MakeCaseWithElement("claim-1", "claim");
+    core::AssuranceTree tree = core::AssuranceTree::Build(assurance_case);
+    harness.controller.BeginReviewForSelection(&assurance_case, tree, "claim-1");
+    harness.controller.StartPendingRequest();
+    ASSERT_TRUE(harness.controller.WaitForCompletion(std::chrono::seconds(10)));
+    harness.controller.PollTask();
+
+    ui::i18n::LocalizationConfig english = japanese;
+    english.language = ui::i18n::Language::English;
+    ui::i18n::Initialize(english);
+
+    ASSERT_FALSE(harness.statuses.empty());
+    for (const std::string& status : harness.statuses)
+        EXPECT_NE(status.find("AI レビュー"), std::string::npos) << status;
 }
 
 TEST(AiReviewControllerTest, RequestFailureEmitsFailedVisualEvent) {

@@ -76,6 +76,8 @@ HelloImGui provides the platform runner, window/event loop, DPI scaling, and pre
 Every user-visible string goes through `ui::i18n`. Catalog source of truth: `tools/i18n/regenerate_ja_po.py`.
 
 - Wrap with `AF_TR("literal")`, `ui::i18n::trf("{0}/{1}", a, b)` for dynamic, `trn`/`trnf` for plurals. Always a literal — `AF_TR(var)` is invisible to the extractor.
+- Text stored in English and translated where shown (e.g. saved in a project file): mark the literal `AF_TR_NOOP("...")` so the extractor sees it, and translate with `ui::i18n::tr(value)` at display.
+- Status-bar messages are translated where they are set; `status_message_i18n_check` fails on a raw literal passed to `SetStatus` or `StatusMessageEvent` in `src/app`.
 - Use real UTF-8 in source (`"● PAUSED"`, not `"\xe2\x97\x8f PAUSED"`).
 - Window/popup titles double as ImGui IDs — translate visible part, keep ID stable: `(AF_TR("Title") + "###" + kStableEnglishId).c_str()`.
 - Layer rule: `core/sacm/parser/ai` can't include `ui/i18n`. Store English msgids in data; the `ui/` panel translates at display with `AF_TR(field)`. `app/` may use `ui::i18n` directly for dynamic templating (`trf` at sync time).
@@ -157,6 +159,7 @@ All run under `ctest`. A change that trips one is not ready:
 | Gate | Fails when |
 |---|---|
 | `i18n_catalog_check` | A source msgid is missing from the `.po`, or the committed `.mo` is stale |
+| `status_message_i18n_check` | A status-bar message in `src/app` is an untranslated literal |
 | `sacm_matrix_check` | A `verified` row has no ID-bearing test, or a cited path moved |
 | `gsn_matrix_check` | GSN taxonomy, statuses, or cited evidence drift |
 | `feature_matrix_check` | A `supported` row cites no existing test, or the exported JSON is stale |

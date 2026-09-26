@@ -16,10 +16,10 @@ import sys
 from pathlib import Path
 
 
-# Match AF_TR( / AF_TR_CTX( / ui::i18n::tr( / trc( / trn( / trf( / trnf(
+# Match AF_TR( / AF_TR_NOOP( / AF_TR_CTX( / ui::i18n::tr( / trc( / trn( / trf( / trnf(
 # We look at "(" position then consume balanced parens to capture the args.
 CALL_RE = re.compile(
-    r"\b(?:AF_TR_CTX|AF_TR|ui::i18n::trnf|ui::i18n::trcf|ui::i18n::trf|ui::i18n::trn|ui::i18n::trc|ui::i18n::tr)\s*\("
+    r"\b(?:AF_TR_CTX|AF_TR_NOOP|AF_TR|ui::i18n::trnf|ui::i18n::trcf|ui::i18n::trf|ui::i18n::trn|ui::i18n::trc|ui::i18n::tr)\s*\("
 )
 
 

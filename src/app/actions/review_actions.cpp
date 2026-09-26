@@ -8,6 +8,7 @@
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/ui_state.h"
+#include "ui/i18n/localization.h"
 
 #include <filesystem>
 #include <string>
@@ -78,33 +79,33 @@ bool ReviewActions::DeleteReviewItem(const core::reviews::ReviewItem& item) {
 
 bool ReviewActions::DeleteProposalForReviewItem(const core::reviews::ReviewItem& item) {
     if (state_.proposal_controller->creator_active) {
-        SetStatus(state_, "Save or discard the active proposal before deleting another proposal.");
+        SetStatus(state_, AF_TR("Save or discard the active proposal before deleting another proposal."));
         return false;
     }
     if (!item.proposal_id.has_value()) {
-        SetStatus(state_, "This review comment has no proposed change to delete.");
+        SetStatus(state_, AF_TR("This review comment has no proposed change to delete."));
         return false;
     }
     if (!state_.app_state.current_project.has_value()) {
-        SetStatus(state_, "Open a project before deleting proposed changes.");
+        SetStatus(state_, AF_TR("Open a project before deleting proposed changes."));
         return false;
     }
 
     core::AssuranceProject& project = state_.app_state.current_project.value();
     std::string error;
     if (!DeleteProposalPatchFile(item.proposal_id.value(), error)) {
-        SetStatus(state_, "Proposal delete failed: " + error);
+        SetStatus(state_, ui::i18n::trf("Proposal delete failed: {0}", error));
         return false;
     }
 
     if (!state_.review_controller->ClearProposal(item.id)) {
-        SetStatus(state_, "Proposal deleted, but review link update failed.");
+        SetStatus(state_, AF_TR("Proposal deleted, but review link update failed."));
         return false;
     }
     CloseProposalPreviewIfOpen(item.proposal_id.value());
 
     core::ProjectService::RefreshFileStatus(project);
-    SetStatus(state_, "Deleted proposed change " + item.proposal_id.value() + ".");
+    SetStatus(state_, ui::i18n::trf("Deleted proposed change {0}.", item.proposal_id.value()));
     return true;
 }
 

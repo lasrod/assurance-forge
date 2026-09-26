@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
 #include "ui/ui_state.h"
+#include "ui/i18n/localization.h"
 
 #include <optional>
 
@@ -33,8 +34,8 @@ std::optional<AiReviewInput> BuildAiReviewInput(AppRuntimeState& state) {
         const core::drafts::DraftMaterializationResult& result =
             state.draft_workspace.Materialize(state.app_state.loaded_case.value(), state.app_state.case_revision);
         if (!result.success) {
-            state.events.Emit(StatusMessageEvent{
-                "AI review cannot run because the working draft could not be materialized: " + result.error});
+            state.events.Emit(StatusMessageEvent{ui::i18n::trf(
+                "AI review cannot run because the working draft could not be materialized: {0}", result.error)});
             return std::nullopt;
         }
         input.model = &result.working_model;

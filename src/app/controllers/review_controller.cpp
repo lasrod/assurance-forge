@@ -2,6 +2,7 @@
 
 #include "core/project_service.h"
 #include "core/reviews/review_item.h"
+#include "ui/i18n/localization.h"
 
 #include <filesystem>
 #include <string>
@@ -189,10 +190,10 @@ ElementReviewStatus ReviewController::StatusForElement(const std::string& elemen
 
 bool ReviewController::AddManualItem(core::reviews::ReviewItem item) {
     if (!AddOrUpdateItem(std::move(item))) {
-        events_.Emit(StatusMessageEvent{"Could not add review comment."});
+        events_.Emit(StatusMessageEvent{AF_TR("Could not add review comment.")});
         return false;
     }
-    events_.Emit(StatusMessageEvent{"Review comment added."});
+    events_.Emit(StatusMessageEvent{AF_TR("Review comment added.")});
     return true;
 }
 
@@ -246,7 +247,8 @@ bool ReviewController::SetManualReviewOk(const std::string& element_id,
     if (!manager_.SetElementReviewState(element_id, std::move(state)))
         return false;
     MarkDirty();
-    events_.Emit(StatusMessageEvent{manual_ok ? "Element marked OK manually." : "Manual review OK cleared."});
+    events_.Emit(
+        StatusMessageEvent{manual_ok ? AF_TR("Element marked OK manually.") : AF_TR("Manual review OK cleared.")});
     return true;
 }
 
@@ -275,7 +277,7 @@ void ReviewController::BeginDeleteReviewItem(const core::reviews::ReviewItem& it
     pending_delete_item_ = {};
 
     if (proposal_creator_active) {
-        events_.Emit(StatusMessageEvent{"Save or discard the active proposal before deleting review comments."});
+        events_.Emit(StatusMessageEvent{AF_TR("Save or discard the active proposal before deleting review comments.")});
         return;
     }
     if (item.proposal_id.has_value()) {
@@ -290,18 +292,19 @@ bool ReviewController::DeleteReviewItem(const core::reviews::ReviewItem& item,
                                         const DeleteLinkedProposal& delete_linked_proposal,
                                         const CloseProposalPreview& close_preview) {
     if (proposal_creator_active) {
-        events_.Emit(StatusMessageEvent{"Save or discard the active proposal before deleting review comments."});
+        events_.Emit(StatusMessageEvent{AF_TR("Save or discard the active proposal before deleting review comments.")});
         return false;
     }
     if (!has_project) {
-        events_.Emit(StatusMessageEvent{"Open a project before deleting review comments."});
+        events_.Emit(StatusMessageEvent{AF_TR("Open a project before deleting review comments.")});
         return false;
     }
 
     if (item.proposal_id.has_value()) {
         std::string error;
         if (!delete_linked_proposal || !delete_linked_proposal(item.proposal_id.value(), error)) {
-            events_.Emit(StatusMessageEvent{"Review comment delete failed while deleting proposal: " + error});
+            events_.Emit(
+                StatusMessageEvent{ui::i18n::trf("Review comment delete failed while deleting proposal: {0}", error)});
             return false;
         }
         if (close_preview)
@@ -309,13 +312,13 @@ bool ReviewController::DeleteReviewItem(const core::reviews::ReviewItem& item,
     }
 
     if (!manager_.RemoveItem(item.id)) {
-        events_.Emit(StatusMessageEvent{"Review comment was already removed."});
+        events_.Emit(StatusMessageEvent{AF_TR("Review comment was already removed.")});
         return false;
     }
 
     MarkDirty();
-    events_.Emit(StatusMessageEvent{item.proposal_id.has_value() ? "Deleted review comment and proposed change."
-                                                                 : "Deleted review comment."});
+    events_.Emit(StatusMessageEvent{item.proposal_id.has_value() ? AF_TR("Deleted review comment and proposed change.")
+                                                                 : AF_TR("Deleted review comment.")});
     return true;
 }
 
@@ -324,15 +327,16 @@ bool ReviewController::ResolveReviewItem(const core::reviews::ReviewItem& item,
                                          bool has_project,
                                          const std::string& updated_utc) {
     if (proposal_creator_active) {
-        events_.Emit(StatusMessageEvent{"Save or discard the active proposal before resolving review comments."});
+        events_.Emit(
+            StatusMessageEvent{AF_TR("Save or discard the active proposal before resolving review comments.")});
         return false;
     }
     if (item.status == core::reviews::ReviewItemStatus::Resolved) {
-        events_.Emit(StatusMessageEvent{"Review comment is already resolved."});
+        events_.Emit(StatusMessageEvent{AF_TR("Review comment is already resolved.")});
         return true;
     }
     if (!has_project) {
-        events_.Emit(StatusMessageEvent{"Open a project before resolving review comments."});
+        events_.Emit(StatusMessageEvent{AF_TR("Open a project before resolving review comments.")});
         return false;
     }
 
@@ -340,12 +344,12 @@ bool ReviewController::ResolveReviewItem(const core::reviews::ReviewItem& item,
     updated.status = core::reviews::ReviewItemStatus::Resolved;
     updated.updated_utc = updated_utc;
     if (!manager_.AddOrUpdateItem(std::move(updated))) {
-        events_.Emit(StatusMessageEvent{"Could not resolve review comment."});
+        events_.Emit(StatusMessageEvent{AF_TR("Could not resolve review comment.")});
         return false;
     }
 
     MarkDirty();
-    events_.Emit(StatusMessageEvent{"Review comment resolved."});
+    events_.Emit(StatusMessageEvent{AF_TR("Review comment resolved.")});
     return true;
 }
 

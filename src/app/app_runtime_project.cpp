@@ -170,8 +170,8 @@ void SetConfidenceSource(AppRuntimeState& state, const core::ProjectFileEntry& e
         state.confidence_controller->LastInactivatedCount() > 0) {
         const int count = state.confidence_controller->LastInactivatedCount();
         state.events.Emit(StatusMessageEvent{
-            std::to_string(count) +
-            " confidence assessment(s) were marked inactive because their target elements changed."});
+            ui::i18n::trf("{0} confidence assessment(s) were marked inactive because their target elements changed.",
+                          std::to_string(count))});
     }
 }
 
