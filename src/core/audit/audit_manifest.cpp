@@ -1,6 +1,7 @@
 #include "core/audit/audit_manifest.h"
 
 #include "core/audit/audit_paths.h"
+#include "core/audit/json_read.h"
 #include "core/project_file_io.h"
 
 #include <nlohmann/json.hpp>
@@ -10,23 +11,7 @@
 
 namespace core::audit {
 
-namespace {
-
 using nlohmann::json;
-
-template <typename T>
-T ReadOr(const json& j, const char* key, T fallback) {
-    auto it = j.find(key);
-    if (it == j.end() || it->is_null())
-        return fallback;
-    try {
-        return it->get<T>();
-    } catch (const std::exception&) {
-        return fallback;
-    }
-}
-
-} // namespace
 
 std::string SerializeAuditManifest(const AuditManifest& m) {
     json j;
