@@ -29,18 +29,6 @@ bool SameTermRef(const sacm::Term& term, const core::TerminologyTermRef& term_re
     return false;
 }
 
-bool HasTerminologyPackageRef(const core::TerminologyPackageRef& package_ref) {
-    return !package_ref.id.empty() || !package_ref.gid.empty();
-}
-
-bool SameTerminologyPackageRef(const core::TerminologyPackageRef& left, const core::TerminologyPackageRef& right) {
-    if (!left.id.empty() && !right.id.empty() && left.id == right.id)
-        return true;
-    if (!left.gid.empty() && !right.gid.empty() && left.gid == right.gid)
-        return true;
-    return false;
-}
-
 // Every lookup below reads the WORKING package (ADR 0016): while a draft
 // differs from the accepted argument the editors act on the draft's glossary,
 // and a duplicate check or category list read from the accepted one would
@@ -177,10 +165,6 @@ struct TerminologyPackageChoice {
     std::string label;
 };
 
-core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
-    return core::TerminologyPackageRef{package.id, package.gid};
-}
-
 std::string PackageDisplayLabel(const sacm::TerminologyPackage& package, const std::string& scope_label) {
     const std::string fallback = !package.id.empty() ? package.id : package.gid;
     const std::string name = package.name.empty() ? fallback : package.name;
@@ -195,16 +179,16 @@ std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(AppRuntimeS
 
     const sacm::AssuranceCasePackage& package = *working_package;
     for (const auto& terminology_package : package.terminologyPackages) {
-        choices.push_back({TerminologyPackageRefFor(terminology_package),
-                           PackageDisplayLabel(terminology_package, AF_TR("Assurance case"))});
+        choices.push_back(
+            {core::RefFor(terminology_package), PackageDisplayLabel(terminology_package, AF_TR("Assurance case"))});
     }
     for (const auto& argument_package : package.argumentPackages) {
         const std::string argument_label =
             argument_package.name.empty() ? (!argument_package.id.empty() ? argument_package.id : argument_package.gid)
                                           : argument_package.name;
         for (const auto& terminology_package : argument_package.terminologyPackages) {
-            choices.push_back({TerminologyPackageRefFor(terminology_package),
-                               PackageDisplayLabel(terminology_package, argument_label)});
+            choices.push_back(
+                {core::RefFor(terminology_package), PackageDisplayLabel(terminology_package, argument_label)});
         }
     }
     return choices;
@@ -213,7 +197,7 @@ std::vector<TerminologyPackageChoice> BuildTerminologyPackageChoices(AppRuntimeS
 int FindTerminologyPackageChoiceIndex(const std::vector<TerminologyPackageChoice>& choices,
                                       const core::TerminologyPackageRef& package_ref) {
     for (std::size_t index = 0; index < choices.size(); ++index) {
-        if (SameTerminologyPackageRef(choices[index].ref, package_ref))
+        if (core::MatchesRef(choices[index].ref, package_ref))
             return static_cast<int>(index);
     }
     return -1;
@@ -395,8 +379,7 @@ void ModalHost::RenderQuickDefineTermModal() {
         const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage();
         const bool has_target_package =
             draft_creates_glossary ||
-            (HasTerminologyPackageRef(state_.terminology.quick_define_target_package_ref) &&
-             working_package != nullptr &&
+            (core::HasRef(state_.terminology.quick_define_target_package_ref) && working_package != nullptr &&
              core::FindTerminologyPackage(*working_package, state_.terminology.quick_define_target_package_ref));
         const bool can_create = !value.empty() && has_target_package;
         RenderTerminologyTermValidationMessages(

@@ -41,7 +41,6 @@ using detail::CopyTermToEditor;
 using detail::DecodeTerminologyTermQuickFixPayload;
 using detail::EnsureProjectSacmFileOpen;
 using detail::EnsureQuickDefineTargetPackage;
-using detail::HasTerminologyPackageRef;
 using detail::InvalidateSacmPackageTreeCache;
 using detail::OpenTerminologyProblemTerm;
 using detail::QuickDefineTargetPackageResult;
@@ -50,7 +49,6 @@ using detail::ResolveQuickDefineTargetPackage;
 using detail::SetStatus;
 using detail::SyncVisibleTerminologyContextToParser;
 using detail::TermDraftFromEditor;
-using detail::TerminologyPackageRefFor;
 using detail::TerminologySuggestionKey;
 using detail::TerminologyTermQuickFixPayload;
 using detail::TermStatusLabel;
@@ -495,7 +493,7 @@ bool TerminologyActions::AcceptedEditRefused(const std::string& gesture) {
 }
 
 bool TerminologyActions::DraftCreateTargetRefused(const core::TerminologyPackageRef& package_ref) {
-    if (!DraftTakesGlossaryEdits() || !HasTerminologyPackageRef(package_ref))
+    if (!DraftTakesGlossaryEdits() || !core::HasRef(package_ref))
         return false;
     const std::string target = sacm_adapter::resolve_terminology_package_id(*state_.draft_document.document());
     if (target.empty())
@@ -882,7 +880,7 @@ void TerminologyActions::SeedRecommendedCategoriesInDraft(const sacm::Terminolog
         SetStatus(state_, AF_TR("Recommended terminology categories already exist."));
         return;
     }
-    if (DraftCreateTargetRefused(detail::TerminologyPackageRefFor(terminology_package)))
+    if (DraftCreateTargetRefused(core::RefFor(terminology_package)))
         return;
     // One batch, so the glossary gains all of them or none: the same
     // all-or-nothing an MCP client's batch gets.
@@ -1022,7 +1020,7 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
     } else {
         target = EnsureQuickDefineTargetPackage(state_, element_id);
     }
-    if (!HasTerminologyPackageRef(target.package_ref) && !DraftTakesGlossaryEdits()) {
+    if (!core::HasRef(target.package_ref) && !DraftTakesGlossaryEdits()) {
         SetStatus(state_,
                   target.error.empty() ? AF_TR("Could not create a TerminologyPackage for the new term.")
                                        : ui::i18n::trf("Terminology package create failed: {0}", target.error));
@@ -1051,7 +1049,7 @@ void TerminologyActions::BeginQuickDefineTerm(const std::string& element_id, con
 void TerminologyActions::BeginLinkExistingTerm(const std::string& element_id, const std::string& term_value) {
     if (const sacm::AssuranceCasePackage* working_package = state_.WorkingPackage()) {
         const core::TerminologyPackageRef target_package_ref = ResolveQuickDefineTargetPackage(state_, element_id);
-        if (HasTerminologyPackageRef(target_package_ref)) {
+        if (core::HasRef(target_package_ref)) {
             state_.terminology.selected_package_ref = target_package_ref;
             if (const sacm::TerminologyPackage* package =
                     core::FindTerminologyPackage(*working_package, target_package_ref)) {

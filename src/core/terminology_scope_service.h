@@ -16,6 +16,10 @@ struct TerminologyArgumentPackageRef {
     std::string gid;
 };
 
+inline TerminologyArgumentPackageRef RefFor(const sacm::ArgumentPackage& package) {
+    return TerminologyArgumentPackageRef{package.id, package.gid};
+}
+
 enum class TerminologyLookupLayer {
     ExplicitOccurrenceBinding,
     ExplicitElementContext,

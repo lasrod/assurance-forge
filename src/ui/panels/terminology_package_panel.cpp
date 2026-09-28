@@ -15,34 +15,6 @@ namespace {
 
 constexpr const char* kUncategorizedFilter = "__uncategorized";
 
-core::TerminologyTermRef RefFor(const sacm::Term& term) {
-    return core::TerminologyTermRef{term.id, term.gid};
-}
-
-core::TerminologyCategoryRef RefFor(const sacm::Category& category) {
-    return core::TerminologyCategoryRef{category.id, category.gid};
-}
-
-bool SameRef(const core::TerminologyTermRef& left, const core::TerminologyTermRef& right) {
-    if (!left.id.empty() && !right.id.empty() && left.id == right.id)
-        return true;
-    if (!left.gid.empty() && !right.gid.empty() && left.gid == right.gid)
-        return true;
-    return false;
-}
-
-bool SameRef(const core::TerminologyCategoryRef& left, const core::TerminologyCategoryRef& right) {
-    if (!left.id.empty() && !right.id.empty() && left.id == right.id)
-        return true;
-    if (!left.gid.empty() && !right.gid.empty() && left.gid == right.gid)
-        return true;
-    return false;
-}
-
-std::string RefValue(const core::TerminologyCategoryRef& ref) {
-    return !ref.id.empty() ? ref.id : ref.gid;
-}
-
 bool CategoryMatchesRef(const sacm::Category& category, const std::string& ref) {
     return (!category.id.empty() && category.id == ref) || (!category.gid.empty() && category.gid == ref);
 }
@@ -102,7 +74,7 @@ bool MatchesCategoryFilter(const sacm::TerminologyPackage& package,
 int UsageCountFor(const core::TerminologyTermRef& ref,
                   const std::vector<core::TerminologyTermUsageSummary>& summaries) {
     for (const auto& summary : summaries) {
-        if (SameRef(summary.term_ref, ref))
+        if (core::MatchesRef(summary.term_ref, ref))
             return summary.count;
     }
     return 0;
@@ -111,7 +83,7 @@ int UsageCountFor(const core::TerminologyTermRef& ref,
 int UsageCountFor(const core::TerminologyCategoryRef& ref,
                   const std::vector<core::TerminologyCategoryUsageSummary>& summaries) {
     for (const auto& summary : summaries) {
-        if (SameRef(summary.category_ref, ref))
+        if (core::MatchesRef(summary.category_ref, ref))
             return summary.term_count;
     }
     return 0;
@@ -121,7 +93,7 @@ std::vector<core::TerminologyTermIssue> IssuesFor(const core::TerminologyTermRef
                                                   const std::vector<core::TerminologyTermIssue>& issues) {
     std::vector<core::TerminologyTermIssue> result;
     for (const auto& issue : issues) {
-        if (SameRef(issue.term_ref, ref))
+        if (core::MatchesRef(issue.term_ref, ref))
             result.push_back(issue);
     }
     return result;
@@ -248,8 +220,8 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
             continue;
 
         ++visible_rows;
-        const core::TerminologyTermRef ref = RefFor(term);
-        const bool selected = SameRef(ref, model.selected_term_ref);
+        const core::TerminologyTermRef ref = core::RefFor(term);
+        const bool selected = core::MatchesRef(ref, model.selected_term_ref);
         const std::vector<core::TerminologyTermIssue> issues = IssuesFor(ref, model.term_issues);
 
         ImGui::TableNextRow();
@@ -322,8 +294,8 @@ void RenderCategoryFilter(const TerminologyPackagePanelModel& model,
             callbacks.set_category_filter)
             callbacks.set_category_filter(kUncategorizedFilter);
         for (const auto& category : model.package->categories) {
-            const core::TerminologyCategoryRef ref = RefFor(category);
-            const std::string value = RefValue(ref);
+            const core::TerminologyCategoryRef ref = core::RefFor(category);
+            const std::string value = core::RefValue(ref);
             const bool selected = active_filter == value;
             const std::string label = category.name.empty() ? value : category.name;
             if (ImGui::Selectable(label.c_str(), selected) && callbacks.set_category_filter)
@@ -348,9 +320,9 @@ void RenderCategoriesTable(const TerminologyPackagePanelModel& model,
     ImGui::TableHeadersRow();
 
     for (const auto& category : model.package->categories) {
-        const core::TerminologyCategoryRef ref = RefFor(category);
-        const std::string id = RefValue(ref);
-        const bool selected = SameRef(ref, model.selected_category_ref);
+        const core::TerminologyCategoryRef ref = core::RefFor(category);
+        const std::string id = core::RefValue(ref);
+        const bool selected = core::MatchesRef(ref, model.selected_category_ref);
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);

@@ -99,20 +99,6 @@ bool CategoryNameExists(const sacm::TerminologyPackage& package, const std::stri
     });
 }
 
-bool HasTerminologyPackageRef(const core::TerminologyPackageRef& package_ref) {
-    return !package_ref.id.empty() || !package_ref.gid.empty();
-}
-
-bool TerminologyPackageMatchesRef(const sacm::TerminologyPackage& package,
-                                  const core::TerminologyPackageRef& package_ref) {
-    return (!package_ref.id.empty() && package.id == package_ref.id) ||
-           (!package_ref.gid.empty() && package.gid == package_ref.gid);
-}
-
-core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
-    return core::TerminologyPackageRef{package.id, package.gid};
-}
-
 bool ArgumentPackageContainsElement(const sacm::ArgumentPackage& argument_package, const std::string& element_id) {
     if (element_id.empty())
         return false;
@@ -143,7 +129,7 @@ const sacm::ArgumentPackage* FindContainingArgumentPackage(const sacm::Assurance
 bool IsAssuranceCaseTerminologyPackage(const sacm::AssuranceCasePackage& package,
                                        const core::TerminologyPackageRef& package_ref) {
     for (const auto& terminology_package : package.terminologyPackages) {
-        if (TerminologyPackageMatchesRef(terminology_package, package_ref))
+        if (core::MatchesRef(terminology_package, package_ref))
             return true;
     }
     return false;
@@ -152,7 +138,7 @@ bool IsAssuranceCaseTerminologyPackage(const sacm::AssuranceCasePackage& package
 bool IsArgumentTerminologyPackage(const sacm::ArgumentPackage& argument_package,
                                   const core::TerminologyPackageRef& package_ref) {
     for (const auto& terminology_package : argument_package.terminologyPackages) {
-        if (TerminologyPackageMatchesRef(terminology_package, package_ref))
+        if (core::MatchesRef(terminology_package, package_ref))
             return true;
     }
     return false;
@@ -169,7 +155,7 @@ core::TerminologyPackageRef ResolveQuickDefineTargetPackageIn(const AppRuntimeSt
                                                               const sacm::AssuranceCasePackage& package,
                                                               const std::string& element_id) {
     const sacm::ArgumentPackage* containing_argument_package = FindContainingArgumentPackage(package, element_id);
-    if (HasTerminologyPackageRef(state.terminology.selected_package_ref) &&
+    if (core::HasRef(state.terminology.selected_package_ref) &&
         core::FindTerminologyPackage(package, state.terminology.selected_package_ref)) {
         if (IsAssuranceCaseTerminologyPackage(package, state.terminology.selected_package_ref) ||
             (containing_argument_package &&
@@ -179,16 +165,16 @@ core::TerminologyPackageRef ResolveQuickDefineTargetPackageIn(const AppRuntimeSt
     }
 
     if (containing_argument_package && !containing_argument_package->terminologyPackages.empty())
-        return TerminologyPackageRefFor(containing_argument_package->terminologyPackages.front());
+        return core::RefFor(containing_argument_package->terminologyPackages.front());
     if (!package.terminologyPackages.empty())
-        return TerminologyPackageRefFor(package.terminologyPackages.front());
+        return core::RefFor(package.terminologyPackages.front());
     return {};
 }
 
 QuickDefineTargetPackageResult EnsureQuickDefineTargetPackage(AppRuntimeState& state, const std::string& element_id) {
     QuickDefineTargetPackageResult target;
     target.package_ref = ResolveQuickDefineTargetPackage(state, element_id);
-    if (HasTerminologyPackageRef(target.package_ref))
+    if (core::HasRef(target.package_ref))
         return target;
 
     if (!state.app_state.has_projected_package()) {
@@ -329,8 +315,7 @@ bool DecodeTerminologyTermQuickFixPayload(const std::string& payload, Terminolog
     decoded.package_ref = core::TerminologyPackageRef{package_id, package_gid};
     decoded.term_ref = core::TerminologyTermRef{term_id, term_gid};
     decoded.term_value = term_value;
-    return HasTerminologyPackageRef(decoded.package_ref) &&
-           (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
+    return core::HasRef(decoded.package_ref) && (!decoded.term_ref.id.empty() || !decoded.term_ref.gid.empty());
 }
 
 bool OpenTerminologyProblemTerm(AppRuntimeState& state,

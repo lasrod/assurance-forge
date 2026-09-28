@@ -10,8 +10,6 @@ using detail::ApplyCategoryDraft;
 using detail::GenerateUniqueGid;
 using detail::GenerateUniqueId;
 using detail::MatchesCategoryRefString;
-using detail::MatchesRef;
-using detail::RefFor;
 
 sacm::Category* FindTerminologyCategory(sacm::TerminologyPackage& package, const TerminologyCategoryRef& category_ref) {
     for (auto& category : package.categories) {

@@ -48,11 +48,6 @@ void CopyCategoryToEditor(AppRuntimeState& state, const sacm::Category& category
 core::TerminologyCategoryDraft CategoryDraftFromEditor(const AppRuntimeState& state);
 bool CategoryNameExists(const sacm::TerminologyPackage& package, const std::string& name);
 
-bool HasTerminologyPackageRef(const core::TerminologyPackageRef& package_ref);
-bool TerminologyPackageMatchesRef(const sacm::TerminologyPackage& package,
-                                  const core::TerminologyPackageRef& package_ref);
-core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package);
-
 bool ArgumentPackageContainsElement(const sacm::ArgumentPackage& argument_package, const std::string& element_id);
 const sacm::ArgumentPackage* FindContainingArgumentPackage(const sacm::AssuranceCasePackage& package,
                                                            const std::string& element_id);

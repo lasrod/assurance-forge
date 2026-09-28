@@ -1,5 +1,4 @@
 #include "core/string_utils.h"
-#include "core/terminology_internal.h"
 #include "core/terminology_package_service.h"
 #include "core/terminology_scope_service.h"
 
@@ -15,9 +14,6 @@
 namespace core {
 
 namespace {
-
-using detail::MatchesRef;
-using detail::RefFor;
 
 struct ScopedTermRef {
     TerminologyPackageRef package_ref;
