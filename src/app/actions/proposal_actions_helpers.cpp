@@ -282,7 +282,7 @@ void TrackAffectedExistingElement(core::reviews::ReviewProposal& proposal,
         proposal.affected_existing_element_ids.push_back(element_id);
     }
     if (proposal.base_element_hashes.count(element_id) == 0) {
-        if (const parser::SacmElement* element = parser::FindElementByIdOrGidValue(base_model, element_id)) {
+        if (const parser::SacmElement* element = parser::FindElementById(base_model, element_id)) {
             proposal.base_element_hashes[element_id] = core::reviews::ComputeElementSemanticHash(*element);
         }
     }
