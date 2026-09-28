@@ -8,89 +8,44 @@ namespace core::detail {
 
 namespace {
 
-void CollectElementIdsInto(const sacm::AssuranceCasePackage& package, std::unordered_set<std::string>& ids) {
-    auto add_base = [&](const sacm::SacmElement& element) {
-        if (!element.id.empty())
-            ids.insert(element.id);
-    };
-    auto add_terminology_package = [&](const sacm::TerminologyPackage& terminology_package) {
-        add_base(terminology_package);
+// Every element a unique id or gid must not collide with.
+template <typename Visitor>
+void ForEachIdentifiedElement(const sacm::AssuranceCasePackage& package, Visitor visit) {
+    auto visit_terminology_package = [&](const sacm::TerminologyPackage& terminology_package) {
+        visit(terminology_package);
         for (const auto& category : terminology_package.categories)
-            add_base(category);
+            visit(category);
         for (const auto& term : terminology_package.terms)
-            add_base(term);
+            visit(term);
         for (const auto& expression : terminology_package.expressions)
-            add_base(expression);
+            visit(expression);
     };
 
-    add_base(package);
+    visit(package);
     for (const auto& terminology_package : package.terminologyPackages) {
-        add_terminology_package(terminology_package);
+        visit_terminology_package(terminology_package);
     }
     for (const auto& artifact_package : package.artifactPackages) {
-        add_base(artifact_package);
+        visit(artifact_package);
         for (const auto& artifact : artifact_package.artifacts)
-            add_base(artifact);
+            visit(artifact);
     }
     for (const auto& argument_package : package.argumentPackages) {
-        add_base(argument_package);
+        visit(argument_package);
         for (const auto& terminology_package : argument_package.terminologyPackages)
-            add_terminology_package(terminology_package);
+            visit_terminology_package(terminology_package);
         for (const auto& claim : argument_package.claims)
-            add_base(claim);
+            visit(claim);
         for (const auto& reasoning : argument_package.argumentReasonings)
-            add_base(reasoning);
+            visit(reasoning);
         for (const auto& artifact_reference : argument_package.artifactReferences)
-            add_base(artifact_reference);
+            visit(artifact_reference);
         for (const auto& relationship : argument_package.assertedInferences)
-            add_base(relationship);
+            visit(relationship);
         for (const auto& relationship : argument_package.assertedContexts)
-            add_base(relationship);
+            visit(relationship);
         for (const auto& relationship : argument_package.assertedEvidences)
-            add_base(relationship);
-    }
-}
-
-void CollectGidsInto(const sacm::AssuranceCasePackage& package, std::unordered_set<std::string>& gids) {
-    auto add_base = [&](const sacm::SacmElement& element) {
-        if (!element.gid.empty())
-            gids.insert(element.gid);
-    };
-    auto add_terminology_package = [&](const sacm::TerminologyPackage& terminology_package) {
-        add_base(terminology_package);
-        for (const auto& category : terminology_package.categories)
-            add_base(category);
-        for (const auto& term : terminology_package.terms)
-            add_base(term);
-        for (const auto& expression : terminology_package.expressions)
-            add_base(expression);
-    };
-
-    add_base(package);
-    for (const auto& terminology_package : package.terminologyPackages) {
-        add_terminology_package(terminology_package);
-    }
-    for (const auto& artifact_package : package.artifactPackages) {
-        add_base(artifact_package);
-        for (const auto& artifact : artifact_package.artifacts)
-            add_base(artifact);
-    }
-    for (const auto& argument_package : package.argumentPackages) {
-        add_base(argument_package);
-        for (const auto& terminology_package : argument_package.terminologyPackages)
-            add_terminology_package(terminology_package);
-        for (const auto& claim : argument_package.claims)
-            add_base(claim);
-        for (const auto& reasoning : argument_package.argumentReasonings)
-            add_base(reasoning);
-        for (const auto& artifact_reference : argument_package.artifactReferences)
-            add_base(artifact_reference);
-        for (const auto& relationship : argument_package.assertedInferences)
-            add_base(relationship);
-        for (const auto& relationship : argument_package.assertedContexts)
-            add_base(relationship);
-        for (const auto& relationship : argument_package.assertedEvidences)
-            add_base(relationship);
+            visit(relationship);
     }
 }
 
@@ -98,13 +53,19 @@ void CollectGidsInto(const sacm::AssuranceCasePackage& package, std::unordered_s
 
 std::unordered_set<std::string> CollectElementIds(const sacm::AssuranceCasePackage& package) {
     std::unordered_set<std::string> ids;
-    CollectElementIdsInto(package, ids);
+    ForEachIdentifiedElement(package, [&](const sacm::SacmElement& element) {
+        if (!element.id.empty())
+            ids.insert(element.id);
+    });
     return ids;
 }
 
 std::unordered_set<std::string> CollectGids(const sacm::AssuranceCasePackage& package) {
     std::unordered_set<std::string> gids;
-    CollectGidsInto(package, gids);
+    ForEachIdentifiedElement(package, [&](const sacm::SacmElement& element) {
+        if (!element.gid.empty())
+            gids.insert(element.gid);
+    });
     return gids;
 }
 
@@ -129,42 +90,6 @@ std::string GenerateUniqueGid(const sacm::AssuranceCasePackage& package, const s
             return candidate;
     }
     return base + "-x";
-}
-
-bool MatchesRef(const sacm::TerminologyPackage& package, const TerminologyPackageRef& package_ref) {
-    if (!package_ref.id.empty() && package.id == package_ref.id)
-        return true;
-    if (!package_ref.gid.empty() && package.gid == package_ref.gid)
-        return true;
-    return false;
-}
-
-bool MatchesRef(const sacm::Term& term, const TerminologyTermRef& term_ref) {
-    if (!term_ref.id.empty() && term.id == term_ref.id)
-        return true;
-    if (!term_ref.gid.empty() && term.gid == term_ref.gid)
-        return true;
-    return false;
-}
-
-bool MatchesRef(const sacm::Category& category, const TerminologyCategoryRef& category_ref) {
-    if (!category_ref.id.empty() && category.id == category_ref.id)
-        return true;
-    if (!category_ref.gid.empty() && category.gid == category_ref.gid)
-        return true;
-    return false;
-}
-
-TerminologyTermRef RefFor(const sacm::Term& term) {
-    return TerminologyTermRef{term.id, term.gid};
-}
-
-TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package) {
-    return TerminologyPackageRef{package.id, package.gid};
-}
-
-TerminologyCategoryRef RefFor(const sacm::Category& category) {
-    return TerminologyCategoryRef{category.id, category.gid};
 }
 
 std::vector<std::string> NormalizeCategoryRefs(const std::vector<std::string>& refs) {

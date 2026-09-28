@@ -1,6 +1,7 @@
 #include "review/sccg/sccg_review_preparation.h"
 
 #include "core/guideline_catalog.h"
+#include "parser/model_utils.h"
 #include "review/sccg/sccg_profile_selector.h"
 
 #include <optional>
@@ -39,7 +40,7 @@ SccgReviewPreparation PrepareSccgReview(const parser::AssuranceCase* assurance_c
     if (!assurance_case)
         return Fail(SccgReviewPreparationFailure::NoCase, "No assurance case is loaded for AI review.");
 
-    const parser::SacmElement* selected_element = FindSacmElement(*assurance_case, selected_element_id);
+    const parser::SacmElement* selected_element = parser::FindElementById(*assurance_case, selected_element_id);
     if (!selected_element)
         return Fail(SccgReviewPreparationFailure::ElementNotFound, "Selected element was not found.");
 

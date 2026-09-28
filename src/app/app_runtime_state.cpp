@@ -93,6 +93,22 @@ void AppRuntimeState::LoadAiSettingsState() {
     }
 }
 
+void AppRuntimeState::EnsureGuidelineCatalogLoaded() {
+    if (guideline_catalog_load_attempted)
+        return;
+
+    core::GuidelineCatalog catalog;
+    std::string error;
+    if (core::LoadGuidelineCatalog(catalog, error)) {
+        guideline_catalog = std::move(catalog);
+        guideline_catalog_error.clear();
+    } else {
+        guideline_catalog.reset();
+        guideline_catalog_error = error;
+    }
+    guideline_catalog_load_attempted = true;
+}
+
 void AppRuntimeState::LoadMcpSettingsState() {
     mcp_settings = core::LoadMcpUserSettings(ai.settings_store->SettingsPath());
 }

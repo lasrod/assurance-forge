@@ -403,7 +403,7 @@ TerminologyTermReferenceResolution ResolveTerminologyTermReference(const sacm::A
                 continue;
             resolution.resolved = true;
             resolution.package_ref = TerminologyPackageRef{terminology_package.id, terminology_package.gid};
-            resolution.term_ref = detail::RefFor(term);
+            resolution.term_ref = RefFor(term);
             resolution.package = &terminology_package;
             resolution.term = &term;
             return true;

@@ -1190,14 +1190,6 @@ void AppRuntime::RefreshDraftDecorations() {
 
 namespace {
 
-const parser::SacmElement* FindElementById(const parser::AssuranceCase& model, const std::string& element_id) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.id == element_id)
-            return &element;
-    }
-    return nullptr;
-}
-
 // The fields that actually differ, rather than one field chosen in advance.
 //
 // An element has a name, a content and a description, and a draft may touch any
@@ -1209,7 +1201,7 @@ void CollectFieldChanges(const parser::SacmElement* accepted,
                          std::vector<ui::DraftFieldChangeView>& out) {
     struct Field {
         const char* label;
-        std::string parser::SacmElement::* member;
+        std::string parser::SacmElement::*member;
     };
     const Field fields[] = {
         {"Name", &parser::SacmElement::name},
@@ -1251,8 +1243,8 @@ void AppRuntime::RefreshSelectedDraftDetail() {
     detail.present = true;
     detail.element_id = selected;
     detail.change = entry->change;
-    CollectFieldChanges(FindElementById(impl_->app_state.loaded_case.value(), selected),
-                        FindElementById(CurrentArgumentView(), selected),
+    CollectFieldChanges(parser::FindElementById(impl_->app_state.loaded_case.value(), selected),
+                        parser::FindElementById(CurrentArgumentView(), selected),
                         detail.field_changes);
 
     for (const core::drafts::DraftElementContribution& contribution : entry->contributions) {

@@ -19,14 +19,6 @@ std::unordered_set<std::string> CollectGids(const sacm::AssuranceCasePackage& pa
 std::string GenerateUniqueId(const sacm::AssuranceCasePackage& package, const std::string& prefix);
 std::string GenerateUniqueGid(const sacm::AssuranceCasePackage& package, const std::string& id);
 
-bool MatchesRef(const sacm::TerminologyPackage& package, const TerminologyPackageRef& package_ref);
-bool MatchesRef(const sacm::Term& term, const TerminologyTermRef& term_ref);
-bool MatchesRef(const sacm::Category& category, const TerminologyCategoryRef& category_ref);
-
-TerminologyTermRef RefFor(const sacm::Term& term);
-TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package);
-TerminologyCategoryRef RefFor(const sacm::Category& category);
-
 std::vector<std::string> NormalizeCategoryRefs(const std::vector<std::string>& refs);
 
 void ApplyTermDraft(sacm::Term& term, const TerminologyTermDraft& draft);

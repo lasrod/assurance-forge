@@ -175,3 +175,27 @@ TEST(ParserModelUtilsTest, IdentifiesRelationshipElementsAndTerminologyText) {
     EXPECT_TRUE(parser::IsRelationshipElement(context));
     EXPECT_EQ(parser::ElementTerminologyText(context), "Relationship description");
 }
+// The one relationship rule every model traversal shares. A near-miss such as
+// "assertedcustom" must not count: the agent's read operations used to accept
+// any "asserted" prefix, and this pins the three-type rule they now use.
+TEST(ParserModelUtilsTest, RelationshipTypesAreExactlyTheThreeAssertedRelationships) {
+    EXPECT_TRUE(parser::IsRelationshipType("assertedinference"));
+    EXPECT_TRUE(parser::IsRelationshipType("assertedcontext"));
+    EXPECT_TRUE(parser::IsRelationshipType("assertedevidence"));
+
+    EXPECT_FALSE(parser::IsRelationshipType("assertedcustom"));
+    EXPECT_FALSE(parser::IsRelationshipType("asserted"));
+    EXPECT_FALSE(parser::IsRelationshipType("AssertedInference"));
+    EXPECT_FALSE(parser::IsRelationshipType("claim"));
+    EXPECT_FALSE(parser::IsRelationshipType(""));
+
+    parser::SacmElement inference;
+    inference.type = "assertedinference";
+    EXPECT_TRUE(parser::IsRelationshipElement(inference));
+    parser::SacmElement evidence;
+    evidence.type = "assertedevidence";
+    EXPECT_TRUE(parser::IsRelationshipElement(evidence));
+    parser::SacmElement near_miss;
+    near_miss.type = "assertedcustom";
+    EXPECT_FALSE(parser::IsRelationshipElement(near_miss));
+}

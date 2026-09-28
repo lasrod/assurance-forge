@@ -2,6 +2,7 @@
 
 #include "core/reviews/review_proposal_patch_service.h"
 #include "core/sha256.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <nlohmann/json.hpp>
@@ -45,14 +46,6 @@ bool TouchesExistingElement(const ReviewProposal& proposal) {
         }
     }
     return false;
-}
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.id == id)
-            return &element;
-    }
-    return nullptr;
 }
 
 std::string WithHashPrefix(const std::string& digest) {
@@ -658,7 +651,7 @@ ProposalValidityResult EvaluateReviewProposalValidity(const ReviewProposal& prop
         affected_ids.insert(proposal.anchor_element_id);
     }
     for (const std::string& id : affected_ids) {
-        const parser::SacmElement* element = FindElement(current_model, id);
+        const parser::SacmElement* element = parser::FindElementById(current_model, id);
         if (!element) {
             result.reason = "The proposal refers to " + id + ", but that element no longer exists.";
             return result;

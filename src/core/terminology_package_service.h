@@ -2,6 +2,7 @@
 
 #include "legacy_sacm/sacm_model.h"
 
+#include <concepts>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -71,6 +72,45 @@ struct TerminologyCategoryRef {
     std::string id;
     std::string gid;
 };
+
+// Every terminology reference names its target by id, by gid, or by both, and
+// matches on whichever of the two it carries. These helpers serve all the ref
+// types above, TerminologyArgumentPackageRef, and the SACM elements they name.
+template <typename T>
+concept TerminologyIdentified = requires(const T& value) {
+    { value.id } -> std::convertible_to<std::string>;
+    { value.gid } -> std::convertible_to<std::string>;
+};
+
+template <TerminologyIdentified Ref>
+bool HasRef(const Ref& ref) {
+    return !ref.id.empty() || !ref.gid.empty();
+}
+
+// Symmetric when both sides are refs, so it also answers "do these two refs
+// name the same target".
+template <TerminologyIdentified Target, TerminologyIdentified Ref>
+bool MatchesRef(const Target& target, const Ref& ref) {
+    return (!ref.id.empty() && target.id == ref.id) || (!ref.gid.empty() && target.gid == ref.gid);
+}
+
+// The id when there is one, otherwise the gid.
+template <TerminologyIdentified Ref>
+std::string RefValue(const Ref& ref) {
+    return !ref.id.empty() ? ref.id : ref.gid;
+}
+
+inline TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package) {
+    return TerminologyPackageRef{package.id, package.gid};
+}
+
+inline TerminologyTermRef RefFor(const sacm::Term& term) {
+    return TerminologyTermRef{term.id, term.gid};
+}
+
+inline TerminologyCategoryRef RefFor(const sacm::Category& category) {
+    return TerminologyCategoryRef{category.id, category.gid};
+}
 
 struct TerminologyCategoryDraft {
     std::string name;

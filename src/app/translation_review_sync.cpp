@@ -3,6 +3,7 @@
 #include "core/element_factory.h"
 #include "core/problems/problem_item.h"
 #include "core/problems/problem_utils.h"
+#include "parser/model_utils.h"
 #include "ui/i18n/localization.h"
 
 #include <vector>
@@ -11,14 +12,6 @@ namespace app {
 namespace {
 
 constexpr const char* kTranslationReviewProblemPrefix = "translation-review:";
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& element_id) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.id == element_id)
-            return &element;
-    }
-    return nullptr;
-}
 
 } // namespace
 
@@ -34,7 +27,7 @@ void SyncTranslationReviewProblems(core::ProblemsManager& problems_manager,
 
     std::vector<std::string> stale_ids;
     for (const std::string& element_id : pending_ids) {
-        const parser::SacmElement* element = FindElement(*model, element_id);
+        const parser::SacmElement* element = parser::FindElementById(*model, element_id);
         if (!element || !core::ElementHasSecondaryTranslation(*element)) {
             stale_ids.push_back(element_id);
             continue;

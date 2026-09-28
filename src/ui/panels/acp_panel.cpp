@@ -5,6 +5,7 @@
 #include "hello_imgui/icons_font_awesome_4.h"
 #include "imgui.h"
 #include "imgui_stdlib.h"
+#include "parser/model_utils.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
@@ -24,13 +25,6 @@ parser::AcpRecord* FindSelectedAcp(parser::AssuranceCase* model, const std::stri
     auto found = std::find_if(
         model->acps.begin(), model->acps.end(), [&](const parser::AcpRecord& acp) { return acp.id == selected_id; });
     return found == model->acps.end() ? nullptr : &*found;
-}
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
 }
 
 void UpsertIfAvailable(const AcpPanelCallbacks* callbacks, const parser::AcpRecord& acp, bool& modified) {
@@ -65,7 +59,7 @@ bool ElementIdLink(const parser::AssuranceCase& model,
         ImGui::TextDisabled("-");
         return false;
     }
-    const parser::SacmElement* element = FindElement(model, element_id);
+    const parser::SacmElement* element = parser::FindElementById(model, element_id);
     std::string tooltip;
     if (element) {
         tooltip = DisplayType(*element);
@@ -150,7 +144,7 @@ void RenderTargetRow(const parser::AssuranceCase& model,
         return;
     }
 
-    const parser::SacmElement* element = FindElement(model, acp.target_id);
+    const parser::SacmElement* element = parser::FindElementById(model, acp.target_id);
     ElementIdLink(model, acp.target_id, callbacks);
     if (element && !element->name.empty()) {
         ImGui::SameLine(0.0f, ui::gsn::DpiSize(6.0f));

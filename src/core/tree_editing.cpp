@@ -10,10 +10,6 @@
 namespace core {
 namespace {
 
-bool IsRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
-
 bool IsDescendant(const TreeNode* root, const std::string& potential_descendant) {
     if (!root)
         return false;
@@ -107,7 +103,7 @@ bool ContainsValue(const std::vector<std::string>& values, const std::string& va
 }
 
 bool IsParserRelationshipDangling(const parser::SacmElement& relationship) {
-    if (!IsRelationshipType(relationship.type))
+    if (!parser::IsRelationshipType(relationship.type))
         return false;
     if (relationship.target_refs.empty())
         return true;
@@ -155,7 +151,7 @@ struct ConstIncomingRelationship {
 IncomingRelationship
 FindIncomingRelationship(parser::AssuranceCase& model, const std::string& parent_id, const std::string& child_id) {
     for (parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type))
+        if (!parser::IsRelationshipType(relationship.type))
             continue;
 
         if (relationship.type == "assertedinference") {
@@ -179,7 +175,7 @@ ConstIncomingRelationship FindIncomingRelationship(const parser::AssuranceCase& 
                                                    const std::string& parent_id,
                                                    const std::string& child_id) {
     for (const parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type))
+        if (!parser::IsRelationshipType(relationship.type))
             continue;
 
         if (relationship.type == "assertedinference") {
@@ -270,15 +266,15 @@ void ApplyParserSiblingOrder(parser::AssuranceCase& model,
         RelationshipPositionById(model, parent_id, sibling_order);
 
     for (parser::SacmElement& element : model.elements) {
-        if (IsRelationshipType(element.type))
+        if (parser::IsRelationshipType(element.type))
             ApplySourceOrder(element.source_refs, sibling_order);
     }
 
     std::stable_sort(model.elements.begin(),
                      model.elements.end(),
                      [&](const parser::SacmElement& lhs, const parser::SacmElement& rhs) {
-                         const bool lhs_relationship = IsRelationshipType(lhs.type);
-                         const bool rhs_relationship = IsRelationshipType(rhs.type);
+                         const bool lhs_relationship = parser::IsRelationshipType(lhs.type);
+                         const bool rhs_relationship = parser::IsRelationshipType(rhs.type);
                          if (lhs_relationship != rhs_relationship)
                              return false;
                          if (!lhs_relationship)
@@ -512,12 +508,12 @@ void ApplyDisplayOrderToChildren(TreeNode* node, const TreeDisplayOrder& display
 TreeEditIndex BuildTreeEditIndex(const parser::AssuranceCase& model) {
     TreeEditIndex index;
     for (const parser::SacmElement& element : model.elements) {
-        if (!IsRelationshipType(element.type) && !element.id.empty())
+        if (!parser::IsRelationshipType(element.type) && !element.id.empty())
             index.element_ids.insert(element.id);
     }
 
     for (const parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type))
+        if (!parser::IsRelationshipType(relationship.type))
             continue;
 
         for (const std::string& target : relationship.target_refs) {
@@ -686,7 +682,7 @@ MoveSubtreePlan PlanMoveSubtreeFromDiff(const parser::AssuranceCase& before, con
 
     for (const parser::SacmElement& updated : after.elements) {
         const parser::SacmElement* original = parser::FindElementById(before, updated.id);
-        if (!IsRelationshipType(updated.type)) {
+        if (!parser::IsRelationshipType(updated.type)) {
             // A move rewrites relationships only. Anything else differing means the
             // mutator did something this plan does not model, and the caller must
             // not pretend the plan is complete.
@@ -706,7 +702,7 @@ MoveSubtreePlan PlanMoveSubtreeFromDiff(const parser::AssuranceCase& before, con
     for (const parser::SacmElement& original : before.elements) {
         if (parser::FindElementById(after, original.id) != nullptr)
             continue;
-        if (!IsRelationshipType(original.type)) {
+        if (!parser::IsRelationshipType(original.type)) {
             plan.touches_non_relationships = true;
             continue;
         }

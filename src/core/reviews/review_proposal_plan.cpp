@@ -1,6 +1,7 @@
 #include "core/reviews/review_proposal_plan.h"
 
 #include "core/element_factory.h"
+#include "parser/model_utils.h"
 #include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
@@ -40,19 +41,6 @@ bool RelationshipKindFor(const std::string& type, sacm_adapter::RelationshipKind
         return true;
     }
     return false;
-}
-
-bool IsRelationship(const SacmElement& element) {
-    return element.type == "assertedinference" || element.type == "assertedcontext" ||
-           element.type == "assertedevidence";
-}
-
-const SacmElement* Find(const AssuranceCase& model, const std::string& id) {
-    for (const SacmElement& element : model.elements) {
-        if (element.id == id)
-            return &element;
-    }
-    return nullptr;
 }
 
 ProposalPlan::Relationship AsRelationship(const SacmElement& element) {
@@ -233,10 +221,10 @@ ProposalPlan PlanProposalFromDiff(const AssuranceCase& before,
     std::map<std::string, std::string> deferred_strategy_targets;
 
     for (const SacmElement& updated : after.elements) {
-        const SacmElement* original = Find(before, updated.id);
+        const SacmElement* original = parser::FindElementById(before, updated.id);
 
         if (original == nullptr) {
-            if (IsRelationship(updated)) {
+            if (parser::IsRelationshipElement(updated)) {
                 sacm_adapter::RelationshipKind kind = sacm_adapter::RelationshipKind::AssertedInference;
                 if (!RelationshipKindFor(updated.type, kind)) {
                     decline("no seam creates a " + updated.type + " (" + updated.id + ")");
@@ -346,7 +334,7 @@ ProposalPlan PlanProposalFromDiff(const AssuranceCase& before,
             continue;
         }
 
-        if (IsRelationship(updated)) {
+        if (parser::IsRelationshipElement(updated)) {
             // A relationship whose ends moved is a retarget, which this plan does
             // not express -- the proposal vocabulary has no move operation
             // (#261), so an endpoint change here means something unexpected.
@@ -374,7 +362,7 @@ ProposalPlan PlanProposalFromDiff(const AssuranceCase& before,
     }
 
     for (const SacmElement& original : before.elements) {
-        if (Find(after, original.id) == nullptr)
+        if (parser::FindElementById(after, original.id) == nullptr)
             plan.deleted_ids.push_back(original.id);
     }
 

@@ -2,6 +2,7 @@
 
 #include "core/acp/acp_relationship_index.h"
 #include "imgui.h"
+#include "parser/model_utils.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
@@ -17,13 +18,6 @@ namespace {
 
 std::string EdgeKey(const std::string& parent_id, const std::string& child_id) {
     return parent_id + "\x1f" + child_id;
-}
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
 }
 
 const parser::AcpRecord* FindRelationshipAcp(const parser::AssuranceCase& model, const std::string& relationship_id) {
@@ -85,7 +79,7 @@ void ShowRelationshipPanel(parser::AssuranceCase* model, const RelationshipPanel
 
     const std::vector<core::acp::AcpRelationshipTarget> targets = core::acp::BuildAcpRelationshipTargets(*model);
     const core::acp::AcpRelationshipTarget* selected_target = FindSelectedTarget(targets, ui_state);
-    const parser::SacmElement* relationship = FindElement(*model, ui_state.selected_relationship_id);
+    const parser::SacmElement* relationship = parser::FindElementById(*model, ui_state.selected_relationship_id);
     if (!selected_target || !relationship) {
         ImGui::TextDisabled("%s",
                             ui::i18n::trf("Relationship not found: {0}", ui_state.selected_relationship_id).c_str());

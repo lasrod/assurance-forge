@@ -155,7 +155,6 @@ struct AiReviewParseResult {
 
 using ParsedAiReviewResponse = AiReviewParseResult;
 
-const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assurance_case, const std::string& element_id);
 bool IsSupportedAiReviewElement(const parser::SacmElement& element);
 std::string AiReviewElementType(const parser::SacmElement& element, const core::TreeNode* node = nullptr);
 

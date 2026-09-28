@@ -3,6 +3,7 @@
 #include "core/string_utils.h"
 #include "core/element_factory.h"
 #include "core/terminology_package_service.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -14,10 +15,6 @@
 
 namespace export_gsn {
 namespace {
-
-bool IsRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
 
 bool IsSupportedElementType(const std::string& type) {
     return type == "claim" || type == "argumentreasoning" || type == "artifact" || type == "artifactreference" ||
@@ -352,7 +349,7 @@ void ProjectChallenges(const parser::AssuranceCase& model,
                        const std::unordered_map<std::string, size_t>& node_by_ref,
                        EdgeSink& sink) {
     for (const parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type) || !relationship.is_counter)
+        if (!parser::IsRelationshipType(relationship.type) || !relationship.is_counter)
             continue;
 
         const size_t* source_index = FindFirstNodeIndex(node_by_ref, relationship.source_refs);
@@ -415,7 +412,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
     std::unordered_map<std::string, std::vector<std::string>> edge_ids_by_relationship;
 
     for (const parser::SacmElement& element : model.elements) {
-        if (IsRelationshipType(element.type))
+        if (parser::IsRelationshipType(element.type))
             continue;
         AddElementReference(elements_by_ref, element.id, element);
         AddElementReference(elements_by_ref, element.gid, element);
@@ -445,7 +442,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
     }
 
     for (const parser::SacmElement& element : model.elements) {
-        if (IsRelationshipType(element.type))
+        if (parser::IsRelationshipType(element.type))
             continue;
         if (ReferencesElement(visible_terminology_context_refs, element))
             continue;
@@ -456,7 +453,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
     }
 
     for (const parser::SacmElement& element : model.elements) {
-        if (IsRelationshipType(element.type))
+        if (parser::IsRelationshipType(element.type))
             continue;
         if (!IsSupportedElementType(element.type)) {
             result.warnings.push_back("Skipped unsupported element type '" + element.type + "'.");
@@ -522,7 +519,7 @@ GsnProjectionResult BuildGsnProjection(const parser::AssuranceCase& model, const
     // claim it attacks. They are handled in pass 2, once every structural edge
     // exists and can therefore be named as a challenge target.
     for (const parser::SacmElement& relationship : model.elements) {
-        if (!IsRelationshipType(relationship.type) || relationship.is_counter)
+        if (!parser::IsRelationshipType(relationship.type) || relationship.is_counter)
             continue;
 
         std::vector<std::string> edge_acp_labels;

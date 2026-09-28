@@ -1,5 +1,6 @@
 #include "app/areas/proposal_editor_area.h"
 
+#include "app/actions/proposal_actions_internal.h"
 #include "app/app_runtime_state.h"
 #include "core/reviews/review_proposal.h"
 #include "imgui.h"
@@ -17,54 +18,10 @@
 namespace app::areas {
 namespace {
 
+using actions::detail::ProposalRefForPreviewId;
+using actions::detail::SameElementRef;
+using actions::detail::TrackAffectedRef;
 using ui::CopyToBuffer;
-
-core::reviews::ElementRef ExistingElementRef(const std::string& id) {
-    return core::reviews::ElementRef{id, std::nullopt};
-}
-
-core::reviews::ElementRef CreatedElementRef(const std::string& create_ref) {
-    return core::reviews::ElementRef{std::nullopt, create_ref};
-}
-
-bool SameElementRef(const core::reviews::ElementRef& lhs, const core::reviews::ElementRef& rhs) {
-    return lhs.existing_id == rhs.existing_id && lhs.create_ref == rhs.create_ref;
-}
-
-std::optional<core::reviews::ElementRef>
-ProposalRefForPreviewId(const std::string& preview_id, const std::map<std::string, std::string>& generated_ids) {
-    for (const auto& generated : generated_ids) {
-        if (generated.second == preview_id)
-            return CreatedElementRef(generated.first);
-    }
-    if (!preview_id.empty())
-        return ExistingElementRef(preview_id);
-    return std::nullopt;
-}
-
-void TrackAffectedExistingElement(core::reviews::ReviewProposal& proposal,
-                                  const parser::AssuranceCase& base_model,
-                                  const std::string& element_id) {
-    if (element_id.empty())
-        return;
-    if (std::find(proposal.affected_existing_element_ids.begin(),
-                  proposal.affected_existing_element_ids.end(),
-                  element_id) == proposal.affected_existing_element_ids.end()) {
-        proposal.affected_existing_element_ids.push_back(element_id);
-    }
-    if (proposal.base_element_hashes.count(element_id) == 0) {
-        if (const parser::SacmElement* element = parser::FindElementById(base_model, element_id)) {
-            proposal.base_element_hashes[element_id] = core::reviews::ComputeElementSemanticHash(*element);
-        }
-    }
-}
-
-void TrackAffectedRef(core::reviews::ReviewProposal& proposal,
-                      const parser::AssuranceCase& base_model,
-                      const core::reviews::ElementRef& ref) {
-    if (ref.existing_id.has_value())
-        TrackAffectedExistingElement(proposal, base_model, ref.existing_id.value());
-}
 
 bool IsUpdateForElement(const core::reviews::PatchOperation& operation,
                         core::reviews::PatchOperationType type,

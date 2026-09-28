@@ -2,6 +2,7 @@
 
 #include "core/acp/assurance_claim_point.h"
 #include "core/problems/gsn_wellformedness.h"
+#include "parser/model_utils.h"
 #include "sacm_adapter/gsn_role_tag.h"
 
 #include <algorithm>
@@ -105,18 +106,6 @@ std::string ScopedChallengePrefixFor(const sacm::ArgumentPackage* package, Chall
     if (acp_prefix.empty())
         return ChallengePrefixFor(type);
     return acp_prefix + "_" + ChallengePrefixFor(type);
-}
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& ac, const std::string& id) {
-    for (const auto& e : ac.elements) {
-        if (e.id == id)
-            return &e;
-    }
-    return nullptr;
-}
-
-bool IsRelationshipType(const std::string& t) {
-    return t == "assertedinference" || t == "assertedcontext" || t == "assertedevidence";
 }
 
 // Determine which ArgumentPackage in the sacm model owns the parent element,
@@ -446,7 +435,7 @@ bool InstallChildElement(parser::AssuranceCase& ac,
         return false;
     }
 
-    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    const parser::SacmElement* parent = parser::FindElementById(ac, parent_id);
     if (!parent) {
         out_error = "Selected element not found in model.";
         return false;
@@ -592,7 +581,7 @@ bool InstallChallenge(parser::AssuranceCase& ac,
         return false;
     }
 
-    const parser::SacmElement* target_elem = FindElement(ac, target.id);
+    const parser::SacmElement* target_elem = parser::FindElementById(ac, target.id);
     if (!target_elem) {
         out_error = "Challenge target not found in model.";
         return false;
@@ -664,7 +653,7 @@ bool PlanChildElementIds(const parser::AssuranceCase& ac,
         out_error = "No parent element selected.";
         return false;
     }
-    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    const parser::SacmElement* parent = parser::FindElementById(ac, parent_id);
     if (!parent) {
         out_error = "Selected element not found in model.";
         return false;
@@ -709,7 +698,7 @@ bool PlanSupportRelationshipId(const parser::AssuranceCase& ac,
     out_error.clear();
     // "Element", not "Claim": evidence attaches under a Goal or a Strategy, and
     // a Strategy is an ArgumentReasoning.
-    const parser::SacmElement* parent = claim_id.empty() ? nullptr : FindElement(ac, claim_id);
+    const parser::SacmElement* parent = claim_id.empty() ? nullptr : parser::FindElementById(ac, claim_id);
     if (!parent) {
         out_error = "Support target not found in model.";
         return false;
@@ -736,7 +725,7 @@ bool PlanChallengeIds(const parser::AssuranceCase& ac,
         out_error = "No challenge target supplied.";
         return false;
     }
-    const parser::SacmElement* target_elem = FindElement(ac, target.id);
+    const parser::SacmElement* target_elem = parser::FindElementById(ac, target.id);
     if (!target_elem) {
         out_error = "Challenge target not found in model.";
         return false;
@@ -1008,7 +997,7 @@ bool InstallAwayElement(parser::AssuranceCase& ac,
     // local sub-goal does. An inference whose target is the strategy would be a
     // different graph from the one the library path builds, and extending the
     // inference creates no relationship, so its id is recorded empty.
-    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    const parser::SacmElement* parent = parser::FindElementById(ac, parent_id);
     if (kind == AwayElementKind::Goal && parent != nullptr && parent->type == "argumentreasoning")
         return InstallSubGoalUnderStrategy(
             ac, ap, parent_id, std::move(away), relationship_id, out_error, out_created_relationship_id);
@@ -1109,7 +1098,7 @@ bool CheckAwayElement(const parser::AssuranceCase& ac,
         out_error = "No parent element selected.";
         return false;
     }
-    const parser::SacmElement* parent = FindElement(ac, parent_id);
+    const parser::SacmElement* parent = parser::FindElementById(ac, parent_id);
     if (!parent) {
         out_error = "Selected element not found in model.";
         return false;
@@ -1127,7 +1116,7 @@ bool CheckAwayElement(const parser::AssuranceCase& ac,
         out_error = "A goal cannot cite itself as an away " + noun + ".";
         return false;
     }
-    const parser::SacmElement* cited = FindElement(ac, cited_id);
+    const parser::SacmElement* cited = parser::FindElementById(ac, cited_id);
     if (!cited) {
         out_error = "The cited " + noun + " is not in this assurance case.";
         return false;
@@ -1369,7 +1358,7 @@ void AddEdge(TreeIndex& idx, const std::string& parent, const std::string& child
 std::unordered_set<std::string> BuildNodeIdSet(const parser::AssuranceCase& ac) {
     std::unordered_set<std::string> ids;
     for (const auto& e : ac.elements) {
-        if (!IsRelationshipType(e.type) && !e.id.empty())
+        if (!parser::IsRelationshipType(e.type) && !e.id.empty())
             ids.insert(e.id);
     }
     return ids;
@@ -1537,7 +1526,7 @@ int CountDescendants(const parser::AssuranceCase& ac, const std::string& id) {
 
 std::unordered_set<std::string> PlanRemoval(const parser::AssuranceCase& ac, const std::string& id, RemoveMode mode) {
     std::unordered_set<std::string> result;
-    if (id.empty() || !FindElement(ac, id))
+    if (id.empty() || !parser::FindElementById(ac, id))
         return result;
     auto idx = BuildTreeIndex(ac);
 
@@ -1619,7 +1608,7 @@ bool RemoveElement(parser::AssuranceCase& ac,
         out_error = "No element id supplied.";
         return false;
     }
-    if (!FindElement(ac, id)) {
+    if (!parser::FindElementById(ac, id)) {
         out_error = "Element not found in model.";
         return false;
     }
@@ -1639,7 +1628,7 @@ bool RemoveElement(parser::AssuranceCase& ac,
 
     // ---- Parser model: scrub references then drop dead/empty relationships -
     for (auto& e : ac.elements) {
-        if (IsRelationshipType(e.type)) {
+        if (parser::IsRelationshipType(e.type)) {
             ScrubParserRelationshipRefs(e, removed_ids);
         }
         if (e.type == "term" && !e.origin_ref.empty() && removed_ids.count(e.origin_ref) > 0) {
@@ -1649,7 +1638,7 @@ bool RemoveElement(parser::AssuranceCase& ac,
     std::erase_if(ac.elements, [&](const parser::SacmElement& e) {
         if (removed_ids.count(e.id))
             return true;
-        if (!IsRelationshipType(e.type))
+        if (!parser::IsRelationshipType(e.type))
             return false;
         return IsParserRelationshipDangling(e);
     });
@@ -2015,13 +2004,13 @@ bool ValidateGsnIdentifierChange(const parser::AssuranceCase& ac,
         out_error = "Element not found: " + element_id;
         return false;
     }
-    if (IsRelationshipType(target->type)) {
+    if (parser::IsRelationshipType(target->type)) {
         out_error = "GSN notation identifiers can only be edited on nodes.";
         return false;
     }
 
     for (const parser::SacmElement& element : ac.elements) {
-        if (&element == target || IsRelationshipType(element.type))
+        if (&element == target || parser::IsRelationshipType(element.type))
             continue;
         if (GsnIdentifierFor(element) == normalized_identifier) {
             out_error = "GSN identifier '" + normalized_identifier + "' is already used by element " + element.id + ".";
@@ -2061,7 +2050,7 @@ bool SetGsnIdentifier(parser::AssuranceCase& ac,
 }
 
 std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::string& element_id) {
-    const parser::SacmElement* target = FindElement(ac, element_id);
+    const parser::SacmElement* target = parser::FindElementById(ac, element_id);
     if (!target)
         return std::string();
 
@@ -2079,7 +2068,7 @@ std::string NextFreeGsnIdentifier(const parser::AssuranceCase& ac, const std::st
 
     std::unordered_set<std::string> taken;
     for (const parser::SacmElement& element : ac.elements) {
-        if (&element != target && !IsRelationshipType(element.type))
+        if (&element != target && !parser::IsRelationshipType(element.type))
             taken.insert(GsnIdentifierFor(element));
     }
 

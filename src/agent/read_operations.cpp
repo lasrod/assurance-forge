@@ -64,13 +64,6 @@ std::string StringArgument(const nlohmann::json& arguments, const char* key) {
     return found->get<std::string>();
 }
 
-// The SACM relationship element kinds the POD projection carries. A relationship
-// is an element like any other here, which is why membership is tested by type
-// rather than by a flag.
-bool IsRelationship(const parser::SacmElement& element) {
-    return element.type.rfind("asserted", 0) == 0;
-}
-
 // The non-primary languages this element actually carries text in. Returned so
 // an agent asked to translate a case can tell which elements still need it
 // instead of re-translating what a human already wrote. Absent when the element
@@ -601,7 +594,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
     nlohmann::json outgoing = nlohmann::json::array();
     std::unordered_set<std::string> touching_relationship_ids;
     for (const parser::SacmElement& candidate : model.elements) {
-        if (!IsRelationship(candidate)) {
+        if (!parser::IsRelationshipElement(candidate)) {
             continue;
         }
         const bool is_source =

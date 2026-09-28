@@ -30,18 +30,6 @@ std::string TerminologyUndefinedProblemId(const core::TermOccurrence& occurrence
            std::to_string(occurrence.start_offset) + ":" + std::to_string(occurrence.end_offset);
 }
 
-core::TerminologyPackageRef TerminologyPackageRefFor(const sacm::TerminologyPackage& package) {
-    return core::TerminologyPackageRef{package.id, package.gid};
-}
-
-std::string RefValue(const core::TerminologyPackageRef& ref) {
-    return ref.id.empty() ? ref.gid : ref.id;
-}
-
-std::string RefValue(const core::TerminologyTermRef& ref) {
-    return ref.id.empty() ? ref.gid : ref.id;
-}
-
 const char* TermIssueKindCode(core::TerminologyTermIssueKind kind) {
     switch (kind) {
     case core::TerminologyTermIssueKind::MissingValue:
@@ -89,7 +77,7 @@ const char* TermIssueQuickFixLabel(core::TerminologyTermIssueKind kind) {
 
 std::string TerminologyTermProblemId(const core::TerminologyPackageRef& package_ref,
                                      const core::TerminologyTermIssue& issue) {
-    return "terminology-term:" + RefValue(package_ref) + ":" + RefValue(issue.term_ref) + ":" +
+    return "terminology-term:" + core::RefValue(package_ref) + ":" + core::RefValue(issue.term_ref) + ":" +
            TermIssueKindCode(issue.kind);
 }
 
@@ -128,7 +116,7 @@ core::ProblemSeverity ProblemSeverityFor(core::TerminologyTermIssueSeverity seve
 
 std::vector<core::ProblemItem> BuildTerminologyTermProblems(const sacm::TerminologyPackage& terminology_package) {
     std::vector<core::ProblemItem> problems;
-    const core::TerminologyPackageRef package_ref = TerminologyPackageRefFor(terminology_package);
+    const core::TerminologyPackageRef package_ref = core::RefFor(terminology_package);
     for (const core::TerminologyTermIssue& issue : core::ValidateTerminologyTerms(terminology_package)) {
         const sacm::Term* term = core::FindTerminologyTerm(terminology_package, issue.term_ref);
         const std::string term_value = term ? term->value : std::string{};
@@ -136,7 +124,7 @@ std::vector<core::ProblemItem> BuildTerminologyTermProblems(const sacm::Terminol
         problem.id = TerminologyTermProblemId(package_ref, issue);
         problem.severity = ProblemSeverityFor(issue.severity);
         problem.source = core::ProblemSource::ModelValidation;
-        problem.element_id = RefValue(issue.term_ref);
+        problem.element_id = core::RefValue(issue.term_ref);
         problem.type = TermIssueProblemType(issue.kind);
         problem.message = issue.message;
         problem.quick_fix_label = TermIssueQuickFixLabel(issue.kind);

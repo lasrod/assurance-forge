@@ -1,6 +1,7 @@
 #include "core/terminology_scope_service.h"
 
 #include "core/string_utils.h"
+#include "core/terminology_internal.h"
 
 #include <algorithm>
 #include <cctype>
@@ -11,6 +12,8 @@
 
 namespace core {
 namespace {
+
+using detail::MatchesRawRef;
 
 bool IsWordChar(char c) {
     const unsigned char ch = static_cast<unsigned char>(c);
@@ -93,47 +96,6 @@ std::vector<IndexedTermValue> BuildTermValueIndex(const std::vector<TerminologyS
     return term_values;
 }
 
-bool RefMatches(const std::string& raw_ref, const std::string& id, const std::string& gid) {
-    const std::string ref = NormalizeRef(raw_ref);
-    if (ref.empty())
-        return false;
-    return (!id.empty() && ref == id) || (!gid.empty() && ref == gid);
-}
-
-bool MatchesRef(const sacm::TerminologyPackage& package, const TerminologyPackageRef& package_ref) {
-    return (!package_ref.id.empty() && package.id == package_ref.id) ||
-           (!package_ref.gid.empty() && package.gid == package_ref.gid);
-}
-
-bool MatchesRef(const sacm::ArgumentPackage& package, const TerminologyArgumentPackageRef& package_ref) {
-    return (!package_ref.id.empty() && package.id == package_ref.id) ||
-           (!package_ref.gid.empty() && package.gid == package_ref.gid);
-}
-
-bool HasRef(const TerminologyTermRef& ref) {
-    return !ref.id.empty() || !ref.gid.empty();
-}
-
-bool HasRef(const TerminologyPackageRef& ref) {
-    return !ref.id.empty() || !ref.gid.empty();
-}
-
-bool HasRef(const TerminologyArgumentPackageRef& ref) {
-    return !ref.id.empty() || !ref.gid.empty();
-}
-
-TerminologyPackageRef RefFor(const sacm::TerminologyPackage& package) {
-    return TerminologyPackageRef{package.id, package.gid};
-}
-
-TerminologyTermRef RefFor(const sacm::Term& term) {
-    return TerminologyTermRef{term.id, term.gid};
-}
-
-TerminologyArgumentPackageRef RefFor(const sacm::ArgumentPackage& package) {
-    return TerminologyArgumentPackageRef{package.id, package.gid};
-}
-
 std::string TermKey(const sacm::Term& term) {
     if (!term.id.empty())
         return "id:" + term.id;
@@ -181,17 +143,17 @@ const sacm::ArgumentPackage* FindContainingArgumentPackage(const sacm::Assurance
                                                            const std::string& element_gid) {
     for (const auto& argument_package : package.argumentPackages) {
         for (const auto& claim : argument_package.claims) {
-            if (RefMatches(element_id, claim.id, claim.gid) || RefMatches(element_gid, claim.id, claim.gid))
+            if (MatchesRawRef(element_id, claim.id, claim.gid) || MatchesRawRef(element_gid, claim.id, claim.gid))
                 return &argument_package;
         }
         for (const auto& reasoning : argument_package.argumentReasonings) {
-            if (RefMatches(element_id, reasoning.id, reasoning.gid) ||
-                RefMatches(element_gid, reasoning.id, reasoning.gid))
+            if (MatchesRawRef(element_id, reasoning.id, reasoning.gid) ||
+                MatchesRawRef(element_gid, reasoning.id, reasoning.gid))
                 return &argument_package;
         }
         for (const auto& artifact_reference : argument_package.artifactReferences) {
-            if (RefMatches(element_id, artifact_reference.id, artifact_reference.gid) ||
-                RefMatches(element_gid, artifact_reference.id, artifact_reference.gid))
+            if (MatchesRawRef(element_id, artifact_reference.id, artifact_reference.gid) ||
+                MatchesRawRef(element_gid, artifact_reference.id, artifact_reference.gid))
                 return &argument_package;
         }
     }
@@ -207,7 +169,7 @@ const sacm::ArgumentPackage* ResolveArgumentPackage(const sacm::AssuranceCasePac
 
 const sacm::ArtifactReference* FindArtifactReference(const sacm::ArgumentPackage& package, const std::string& raw_ref) {
     for (const auto& artifact_reference : package.artifactReferences) {
-        if (RefMatches(raw_ref, artifact_reference.id, artifact_reference.gid))
+        if (MatchesRawRef(raw_ref, artifact_reference.id, artifact_reference.gid))
             return &artifact_reference;
     }
     return nullptr;
@@ -215,7 +177,7 @@ const sacm::ArtifactReference* FindArtifactReference(const sacm::ArgumentPackage
 
 bool RelationshipTargetsElement(const sacm::AssertedContext& context, const TerminologyScopeContext& scope) {
     for (const auto& target : context.targets) {
-        if (RefMatches(target, scope.element_id, scope.element_gid))
+        if (MatchesRawRef(target, scope.element_id, scope.element_gid))
             return true;
     }
     return false;
@@ -227,7 +189,7 @@ bool FindTermByRefInPackage(const sacm::TerminologyPackage& package,
                             int& out_term_order) {
     for (std::size_t index = 0; index < package.terms.size(); ++index) {
         const sacm::Term& term = package.terms[index];
-        if (RefMatches(raw_ref, term.id, term.gid)) {
+        if (MatchesRawRef(raw_ref, term.id, term.gid)) {
             out_term = &term;
             out_term_order = static_cast<int>(index);
             return true;
