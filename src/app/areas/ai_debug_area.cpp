@@ -9,6 +9,7 @@
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
+#include "ui/widgets/hover_tooltip.h"
 
 #include "imgui.h"
 #include "imgui_stdlib.h"
@@ -18,14 +19,6 @@
 #include <utility>
 
 namespace app::areas {
-namespace {
-
-void DrawTooltipIfHovered(const std::string& text) {
-    if (!text.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s", text.c_str());
-}
-
-} // namespace
 
 void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     auto& ai_review = *state.ai.review_controller;
@@ -85,7 +78,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
         ImGui::BeginDisabled();
     if (ImGui::Button(review_label.c_str(), ImVec2(-1.0f, 0.0f)))
         actions::AiReviewActions(state).BeginForSelection();
-    DrawTooltipIfHovered(review_tooltip);
+    ui::widgets::TooltipOnHover(review_tooltip);
     if (!review_enabled)
         ImGui::EndDisabled();
     ImGui::EndChild();
