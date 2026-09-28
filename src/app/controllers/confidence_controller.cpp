@@ -1,30 +1,14 @@
 #include "app/controllers/confidence_controller.h"
 
+#include "core/project_file_io.h"
 #include "core/project_service.h"
 #include "core/time_utils.h"
 
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 
 namespace app::controllers {
 namespace {
-
-std::string ReadTextFile(const std::filesystem::path& path, std::string& error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        error = "Could not open " + path.string();
-        return {};
-    }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    if (!file.good() && !file.eof()) {
-        error = "Could not read " + path.string();
-        return {};
-    }
-    return buffer.str();
-}
 
 std::string BackupTimestamp() {
     std::string timestamp = core::NowUtcString();
@@ -98,15 +82,14 @@ bool ConfidenceController::ConfigureStorage(const std::filesystem::path& confide
     if (!std::filesystem::exists(file_path_, ec))
         return true;
 
-    std::string read_error;
-    std::string content = ReadTextFile(file_path_, read_error);
-    if (!read_error.empty()) {
-        storage_error_ = read_error;
-        error = read_error;
+    const std::expected<std::string, std::string> content = core::ReadTextFile(file_path_);
+    if (!content) {
+        storage_error_ = content.error();
+        error = content.error();
         return false;
     }
 
-    if (!core::confidence::DeserializeConfidenceStore(content, store_, error)) {
+    if (!core::confidence::DeserializeConfidenceStore(*content, store_, error)) {
         storage_error_ = error;
         store_ = core::confidence::ConfidenceStore{};
         store_.projectId = project_id;

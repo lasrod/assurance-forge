@@ -18,6 +18,7 @@
 // command bus exists -- which is to say, only in the application.
 
 #include "core/app_state.h"
+#include "core/assurance_tree.h"
 #include "core/changesets/change_set_store.h"
 #include "core/drafts/draft_document_store.h"
 #include "core/drafts/draft_workspace.h"
@@ -218,6 +219,10 @@ Result UnstageDraftOperations(const DraftContext& context, const nlohmann::json&
 bool ParsePatchOperations(const nlohmann::json& source,
                           std::vector<core::reviews::PatchOperation>& out,
                           std::string& error);
+
+// The GSN name an agent sees for a tree role ("Goal", "Strategy", ...). Shared
+// so the case reads and the placement suggestions name a role the same way.
+const char* GsnRoleName(core::NodeRole role);
 
 // The operation type names an agent may use, in schema order.
 const std::vector<std::string>& PatchOperationTypeNames();

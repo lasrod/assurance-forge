@@ -42,6 +42,7 @@ add_library(af_ui OBJECT
     widgets/danger_button.cpp
     widgets/empty_state.cpp
     widgets/panel_header.cpp
+    widgets/proposal_text_card.cpp
     widgets/splitter.cpp
     widgets/text_ellipsis.cpp
 )

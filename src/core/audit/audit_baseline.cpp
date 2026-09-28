@@ -2,6 +2,7 @@
 
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
+#include "core/audit/json_read.h"
 #include "core/project_file_io.h"
 #include "core/time_utils.h"
 
@@ -17,18 +18,6 @@ namespace core::audit {
 namespace {
 
 using nlohmann::json;
-
-template <typename T>
-T ReadOr(const json& j, const char* key, T fallback) {
-    auto it = j.find(key);
-    if (it == j.end() || it->is_null())
-        return fallback;
-    try {
-        return it->get<T>();
-    } catch (const std::exception&) {
-        return fallback;
-    }
-}
 
 std::string MakeBaselineId(std::uint64_t transaction_sequence) {
     char buf[32];

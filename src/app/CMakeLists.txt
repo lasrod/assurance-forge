@@ -17,7 +17,6 @@ add_library(af_app OBJECT
     app_runtime_project.cpp
     app_runtime_state.cpp
     example_project.cpp
-    executable_location.cpp
     ai_error_text.cpp
     app_runtime_undo.cpp
     app_ui_bootstrap.cpp

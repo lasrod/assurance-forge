@@ -196,6 +196,18 @@ TEST(ReviewProposalManagerTest, SavesListsLoadsAndDeletesProposalFiles) {
     ASSERT_TRUE(manager.DeleteProposal(proposal.id, error)) << error;
     EXPECT_TRUE(manager.ListProposals(&model).empty());
 }
+
+// A proposal that cannot be read reports the read failure. It used to fall
+// through to the JSON parser, so a missing file was reported as a malformed one.
+TEST(ReviewProposalManagerTest, AMissingProposalReportsTheReadErrorNotAParseError) {
+    TempDir temp(MakeTempDir());
+    core::reviews::ReviewProposalManager manager(temp.path);
+
+    std::string error;
+    EXPECT_FALSE(manager.LoadProposal("proposal-missing", error).has_value());
+    EXPECT_EQ(error.rfind("Could not open ", 0), 0u) << error;
+    EXPECT_NE(error.find(manager.ProposalPath("proposal-missing").string()), std::string::npos) << error;
+}
 // ---------------------------------------------------------------------------
 // Unanchored proposals
 //

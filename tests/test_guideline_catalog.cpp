@@ -1,5 +1,7 @@
 #include "core/guideline_catalog.h"
 
+#include "core/executable_location.h"
+
 #include <cstdlib>
 #include <filesystem>
 #include <gtest/gtest.h>
@@ -114,4 +116,19 @@ TEST(GuidelineCatalogTest, AnOverrideNamingNoDirectoryFailsInsteadOfLoadingTheSh
     EXPECT_FALSE(core::LoadGuidelineCatalog(catalog, error));
     EXPECT_NE(error.find("AF_SCCG_DIST_DIR"), std::string::npos) << error;
     EXPECT_TRUE(catalog.entries.empty());
+}
+
+// The build copies the catalogue beside every executable, this test binary
+// included, and discovery must prefer that copy. On Linux and macOS it used to
+// look in the working directory instead -- the source tree under ctest -- so it
+// fell through to the source checkout and never saw the shipped copy.
+TEST(GuidelineCatalogTest, PrefersTheCatalogueBesideTheExecutable) {
+    const ScopedEnvironment no_override("AF_SCCG_DIST_DIR", "");
+    const std::filesystem::path beside = core::ExecutableDirectory() / "data" / "sccg" / "dist";
+    std::error_code ec;
+    ASSERT_TRUE(std::filesystem::exists(beside / "sccg.full.json", ec))
+        << "the build should have copied the catalogue to " << beside;
+
+    const std::filesystem::path found = core::FindSccgDistDirectory();
+    EXPECT_TRUE(std::filesystem::equivalent(found, beside, ec)) << found << " is not " << beside;
 }

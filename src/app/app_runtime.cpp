@@ -49,6 +49,7 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "ui/gsn/gsn_adapter.h"
+#include "ui/gsn/gsn_hit_tester.h"
 #include "ui/i18n/localization.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/imgui_buffer_utils.h"
@@ -1184,7 +1185,7 @@ void AppRuntime::RefreshDraftDecorations() {
         const std::string child = !element->source_refs.empty() ? element->source_refs.front() : element->reasoning_ref;
         if (child.empty() || element->target_refs.empty())
             continue;
-        ui_state.draft_edge_status.emplace(element->target_refs.front() + "\x1f" + child, edge);
+        ui_state.draft_edge_status.emplace(ui::gsn::EdgeKey(element->target_refs.front(), child), edge);
     }
 }
 

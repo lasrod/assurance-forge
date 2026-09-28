@@ -3,6 +3,7 @@
 #include "core/assurance_tree.h"
 #include "core/guideline_catalog.h"
 #include "core/problems/argument_cycles.h"
+#include "core/string_utils.h"
 
 #include <algorithm>
 #include <format>
@@ -183,14 +184,6 @@ std::vector<std::string> ConcatenatedTerms(const std::vector<std::string>& first
     std::vector<std::string> terms = first;
     terms.insert(terms.end(), second.begin(), second.end());
     return terms;
-}
-
-std::string Lowercased(const std::string& text) {
-    std::string lowered = text;
-    for (char& character : lowered) {
-        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-    }
-    return lowered;
 }
 
 // Whole-word match. Without it "all" fires on "install" and "safe" on
@@ -537,7 +530,7 @@ std::vector<StagedFinding> CheckStagedArgument(const parser::AssuranceCase& prev
         // wrong, so every one of them is advisory, quotes what it matched, and
         // reports at most once per element. The reviewer judges the words; the
         // check only points at them.
-        const std::string text = Lowercased(ElementText(*element));
+        const std::string text = ToLower(ElementText(*element));
 
         if (node->role == NodeRole::Claim) {
             // CL.5: an unbounded evaluative or universal qualifier, unless the

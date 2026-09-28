@@ -18,26 +18,6 @@
 
 namespace app {
 
-namespace {
-
-// Look up the active argument-package canvas tab and decide if it is
-// scrubbed into the history preview. Undo is blocked while previewing
-// because the canvas the user is looking at does not reflect the live
-// model. Mirrors the dispatch-layer guard in `app::commands::dispatch`.
-bool ActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
-    const std::string& active = state.workbench.active_argument_package_canvas_key;
-    if (active.empty())
-        return false;
-    for (const auto& tab : state.workbench.argument_package_canvas_tabs) {
-        if (tab.key == active) {
-            return tab.timeline.preview_sequence.has_value();
-        }
-    }
-    return false;
-}
-
-} // namespace
-
 bool AppRuntime::CanUndo() const {
     const AppRuntimeState& state = *impl_;
     // Draft edits are not commands and are not in the audit log, so they need
@@ -54,7 +34,7 @@ bool AppRuntime::CanUndo() const {
         return false;
     if (!state.app_state.has_projected_package())
         return false;
-    if (ActiveCanvasInHistoricalPreview(state))
+    if (commands::IsActiveCanvasInHistoricalPreview(state))
         return false;
 
     const auto& transactions = state.command_bus->Store().Transactions();
@@ -110,7 +90,7 @@ bool AppRuntime::Undo() {
         state.app_state.status_message = AF_TR("Undo unavailable: no project loaded.");
         return false;
     }
-    if (ActiveCanvasInHistoricalPreview(state)) {
+    if (commands::IsActiveCanvasInHistoricalPreview(state)) {
         state.app_state.status_message = AF_TR("Cannot undo while viewing history. Return to Latest to make changes.");
         return false;
     }

@@ -8,20 +8,13 @@
 #include "review/sccg/sccg_review.h"
 #include "ui/i18n/localization.h"
 #include "ui/ui_state.h"
+#include "ui/widgets/hover_tooltip.h"
 
 #include "imgui.h"
 
 #include <utility>
 
 namespace app {
-namespace {
-
-void DrawTooltipIfHovered(const std::string& text) {
-    if (!text.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s", text.c_str());
-}
-
-} // namespace
 
 void AppRuntime::BeginAiReviewForSelection() {
     actions::AiReviewActions(*impl_).BeginForSelection();
@@ -74,7 +67,7 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
 
     if (ImGui::MenuItem(AF_TR("AI Review").c_str(), nullptr, false, ai_review_enabled))
         RunAiReviewForSelection();
-    DrawTooltipIfHovered(ai_review_tooltip);
+    ui::widgets::TooltipOnHover(ai_review_tooltip);
 
     const bool has_project = impl_->app_state.current_project.has_value();
     const bool manual_ok_enabled = !review_running && has_project && loaded_case && selected_element;
@@ -93,7 +86,7 @@ void AppRuntime::RenderAiReviewContextMenuForSelected() {
     if (ImGui::MenuItem(AF_TR("Mark review OK manually").c_str(), nullptr, false, manual_ok_enabled)) {
         SetManualReviewOk(ui_state.selected_element_id, true);
     }
-    DrawTooltipIfHovered(manual_ok_tooltip);
+    ui::widgets::TooltipOnHover(manual_ok_tooltip);
 }
 
 void AppRuntime::StartPendingAiReviewRequest() {

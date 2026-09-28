@@ -3,6 +3,7 @@
 #include "core/reviews/review_item.h"
 #include "core/reviews/review_proposal.h"
 #include "core/problems/problem_item.h"
+#include "ui/ui_state.h"
 
 #include <cstddef>
 #include <functional>
@@ -18,11 +19,7 @@ struct ReviewGuidelineOption {
     std::string title;
 };
 
-struct ProposalTextChangePreview {
-    std::string field;
-    std::string old_value;
-    std::string new_value;
-};
+using ProposalTextChangePreview = ui::ProposalTextChangePreview;
 
 // One change an AI client is building or has submitted, as the reviewer sees it.
 struct AgentChangeSetRow {

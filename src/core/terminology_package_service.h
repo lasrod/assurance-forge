@@ -375,6 +375,9 @@ int CountTermsUsingCategory(const sacm::TerminologyPackage& package, const Termi
 std::vector<TerminologyCategoryUsageSummary>
 BuildTerminologyCategoryUsageSummaries(const sacm::TerminologyPackage& package);
 std::string CategoryDisplayName(const sacm::TerminologyPackage& package, const std::string& category_ref);
+// The display names of `category_refs`, comma-separated, skipping empty refs.
+std::string JoinCategoryDisplayNames(const sacm::TerminologyPackage& package,
+                                     const std::vector<std::string>& category_refs);
 
 std::vector<TerminologyTermIssue> ValidateTerminologyTerms(const sacm::TerminologyPackage& package);
 int CountTerminologyTermUsage(const sacm::AssuranceCasePackage& package, const sacm::Term& term);

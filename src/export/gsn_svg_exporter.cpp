@@ -1,5 +1,6 @@
 #include "export/gsn_svg_exporter.h"
 
+#include "core/project_file_io.h"
 #include "core/string_utils.h"
 #include "export/gsn_projection.h"
 #include "export/gsn_svg_layout.h"
@@ -8,7 +9,6 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <system_error>
@@ -26,20 +26,6 @@ std::string CleanFileStem(const std::string& stem) {
             ch = '_';
     }
     return clean;
-}
-
-bool WriteTextFile(const std::filesystem::path& path, const std::string& content, std::string& error_message) {
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
-    if (!file.is_open()) {
-        error_message = "Could not write " + path.string();
-        return false;
-    }
-    file << content;
-    if (!file.good()) {
-        error_message = "Could not finish writing " + path.string();
-        return false;
-    }
-    return true;
 }
 
 void AppendWarnings(std::vector<std::string>& target, const std::vector<std::string>& source) {
@@ -219,8 +205,8 @@ GsnSvgExportResult ExportCurrentSafetyCaseToGsnSvg(const parser::AssuranceCase& 
     }
 
     const std::filesystem::path output_path = MakeGsnSvgExportPath(exports_dir, source_file_stem);
-    if (!WriteTextFile(output_path, svg, error)) {
-        result.error_message = error;
+    if (const std::expected<void, std::string> written = core::WriteTextFile(output_path, svg); !written) {
+        result.error_message = written.error();
         return result;
     }
 

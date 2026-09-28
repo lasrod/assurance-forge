@@ -24,6 +24,11 @@
 namespace core {
 
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path& path) {
+    // POSIX opens a directory for reading and then yields no bytes and no error,
+    // which would read as an empty file.
+    std::error_code ec;
+    if (std::filesystem::is_directory(path, ec))
+        return std::unexpected("Could not read " + path.string() + ": it is a directory");
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open())
         return std::unexpected("Could not open " + path.string());
@@ -42,6 +47,15 @@ std::expected<void, std::string> WriteTextFile(const std::filesystem::path& path
     if (!file.good())
         return std::unexpected("Could not finish writing " + path.string());
     return {};
+}
+
+std::expected<void, std::string> WriteTextFileCreatingParents(const std::filesystem::path& path,
+                                                              std::string_view content) {
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec)
+        return std::unexpected("Could not create " + path.parent_path().string() + ": " + ec.message());
+    return WriteTextFile(path, content);
 }
 
 namespace {

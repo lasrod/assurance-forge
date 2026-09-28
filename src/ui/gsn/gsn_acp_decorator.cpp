@@ -1,6 +1,7 @@
 #include "ui/gsn/gsn_acp_decorator.h"
 
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/gsn/gsn_hit_tester.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 
@@ -10,10 +11,6 @@
 namespace ui::gsn {
 
 namespace {
-
-std::string EdgeKey(const std::string& parent_id, const std::string& child_id) {
-    return parent_id + "\x1f" + child_id;
-}
 
 std::string AcpIncompleteReason(const parser::AcpRecord& acp) {
     if (acp.resolution_kind == "text") {

@@ -9,15 +9,6 @@
 
 namespace app::commands {
 
-namespace {
-
-// Phase 4.3 — single chokepoint read-only enforcement. When the active
-// canvas tab is scrubbed to a historical sequence, any mutating command
-// must be refused: the canvas the user is looking at is a reconstruction
-// of a past model, while `state.app_state.loaded_case` still points at
-// the LATEST model. Letting a command through would silently mutate the
-// live model from a view of historical data — exactly the data-loss
-// hazard the inspector read-only guard already prevents for text fields.
 bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
     const std::string& active = state.workbench.active_argument_package_canvas_key;
     if (active.empty())
@@ -29,8 +20,6 @@ bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state) {
     }
     return false;
 }
-
-} // namespace
 
 DispatchOutcome DispatchAuditedCommand(AppRuntimeState& state,
                                        core::commands::ICommand& command,

@@ -1,51 +1,11 @@
 #include "core/reviews/review_item_manager.h"
 
+#include "core/project_file_io.h"
+
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 
 namespace core::reviews {
-
-namespace {
-
-std::string ReadTextFile(const std::filesystem::path& path, std::string& error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        error = "Could not open " + path.string();
-        return {};
-    }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    if (!file.good() && !file.eof()) {
-        error = "Could not read " + path.string();
-        return {};
-    }
-    return buffer.str();
-}
-
-bool WriteTextFile(const std::filesystem::path& path, const std::string& content, std::string& error) {
-    std::error_code ec;
-    std::filesystem::create_directories(path.parent_path(), ec);
-    if (ec) {
-        error = "Could not create " + path.parent_path().string() + ": " + ec.message();
-        return false;
-    }
-
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
-    if (!file.is_open()) {
-        error = "Could not write " + path.string();
-        return false;
-    }
-    file << content;
-    if (!file.good()) {
-        error = "Could not finish writing " + path.string();
-        return false;
-    }
-    return true;
-}
-
-} // namespace
 
 void ReviewItemManager::SetFilePath(std::filesystem::path file_path) {
     file_path_ = std::move(file_path);
@@ -73,7 +33,12 @@ bool ReviewItemManager::Load(std::string& error) {
 
     std::vector<ReviewItem> items;
     ElementReviewStateMap element_states;
-    if (!DeserializeReviewItems(ReadTextFile(file_path_, error), items, element_states, error)) {
+    const std::expected<std::string, std::string> text = ReadTextFile(file_path_);
+    if (!text) {
+        error = text.error();
+        return false;
+    }
+    if (!DeserializeReviewItems(*text, items, element_states, error)) {
         return false;
     }
     items_ = std::move(items);
@@ -86,7 +51,13 @@ bool ReviewItemManager::Save(std::string& error) const {
         error = "Review item file path is not set.";
         return false;
     }
-    return WriteTextFile(file_path_, SerializeReviewItems(items_, element_states_), error);
+    const std::expected<void, std::string> written =
+        WriteTextFileCreatingParents(file_path_, SerializeReviewItems(items_, element_states_));
+    if (!written) {
+        error = written.error();
+        return false;
+    }
+    return true;
 }
 
 void ReviewItemManager::Clear() {

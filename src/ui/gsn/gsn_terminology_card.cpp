@@ -226,18 +226,6 @@ const sacm::Term* ResolveCardTerm(const sacm::AssuranceCasePackage* package,
     return core::FindTerminologyTerm(*terminology_package, term_ref);
 }
 
-std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += core::CategoryDisplayName(package, ref);
-    }
-    return result;
-}
-
 std::string CandidateSummary(const sacm::TerminologyPackage* package, const sacm::Term* term) {
     if (!term)
         return AF_TR("Missing term");
@@ -245,7 +233,7 @@ std::string CandidateSummary(const sacm::TerminologyPackage* package, const sacm
     if (!term->name.empty() && core::TrimWhitespace(term->name) != core::TrimWhitespace(term->value))
         result += " - " + term->name;
     if (package && !term->category_refs.empty()) {
-        const std::string categories = JoinCategoryNames(*package, term->category_refs);
+        const std::string categories = core::JoinCategoryDisplayNames(*package, term->category_refs);
         if (!categories.empty())
             result += " (" + categories + ")";
     }
@@ -269,7 +257,7 @@ void RenderTermDetails(const sacm::AssuranceCasePackage* package,
         ImGui::TextWrapped("%s", term->description.c_str());
     }
     if (terminology_package && !term->category_refs.empty()) {
-        const std::string categories = JoinCategoryNames(*terminology_package, term->category_refs);
+        const std::string categories = core::JoinCategoryDisplayNames(*terminology_package, term->category_refs);
         if (!categories.empty())
             ImGui::TextDisabled("%s", ui::i18n::trf("Category: {0}", categories).c_str());
     }

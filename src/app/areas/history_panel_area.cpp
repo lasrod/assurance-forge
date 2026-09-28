@@ -4,6 +4,7 @@
 #include "app/areas/audit_data_cache.h"
 #include "core/audit/audit_diff.h"
 #include "core/audit/event_store.h"
+#include "core/string_utils.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
 #include "ui/panels/history_timeline_panel.h"
@@ -41,16 +42,10 @@ void SetPreviewSequenceOnActiveTab(AppRuntimeState& state, std::optional<std::ui
     tab->selected_transaction_sequence = seq;
 }
 
-std::string ToLower(std::string s) {
-    for (char& c : s)
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
 bool ContainsCaseInsensitive(const std::string& haystack, const std::string& needle) {
     if (needle.empty())
         return true;
-    return ToLower(haystack).find(ToLower(needle)) != std::string::npos;
+    return core::ToLower(haystack).find(core::ToLower(needle)) != std::string::npos;
 }
 
 } // namespace

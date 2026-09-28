@@ -4,6 +4,7 @@
 #include "imgui.h"
 #include "parser/model_utils.h"
 #include "ui/gsn/gsn_dpi.h"
+#include "ui/gsn/gsn_hit_tester.h"
 #include "ui/i18n/localization.h"
 #include "ui/theme.h"
 #include "ui/widgets/danger_button.h"
@@ -15,10 +16,6 @@
 
 namespace ui::panels {
 namespace {
-
-std::string EdgeKey(const std::string& parent_id, const std::string& child_id) {
-    return parent_id + "\x1f" + child_id;
-}
 
 const parser::AcpRecord* FindRelationshipAcp(const parser::AssuranceCase& model, const std::string& relationship_id) {
     auto found = std::find_if(model.acps.begin(), model.acps.end(), [&](const parser::AcpRecord& acp) {
@@ -53,7 +50,7 @@ const core::acp::AcpRelationshipTarget* FindSelectedTarget(const std::vector<cor
     if (!ui_state.selected_relationship_edge_key.empty()) {
         auto found = std::find_if(targets.begin(), targets.end(), [&](const core::acp::AcpRelationshipTarget& target) {
             return target.relationship_id == ui_state.selected_relationship_id &&
-                   EdgeKey(target.parent_id, target.child_id) == ui_state.selected_relationship_edge_key;
+                   gsn::EdgeKey(target.parent_id, target.child_id) == ui_state.selected_relationship_edge_key;
         });
         if (found != targets.end())
             return &*found;

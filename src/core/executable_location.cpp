@@ -1,16 +1,22 @@
-#include "app/executable_location.h"
+#include "core/executable_location.h"
 
 #include <cstdint>
 #include <system_error>
 #include <vector>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
 #endif
 
-namespace app {
+namespace core {
 namespace {
 
 // Full path of the running executable, or empty when the platform cannot say.
@@ -78,4 +84,4 @@ std::filesystem::path ExecutableDirectory() {
     return ec ? std::filesystem::path{} : working;
 }
 
-} // namespace app
+} // namespace core

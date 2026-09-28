@@ -42,6 +42,22 @@ bool TryGetWorkingModel(AppRuntimeState& state,
     return true;
 }
 
+// The same guard for callers that only dispatch a command and never touch the
+// model or package themselves.
+bool RequireWorkingModel(AppRuntimeState& state, const char* action_label, AppEvents& events) {
+    parser::AssuranceCase* model = nullptr;
+    sacm::AssuranceCasePackage* package = nullptr;
+    return TryGetWorkingModel(state, action_label, events, model, package);
+}
+
+// Rebuilds the views, selects the element a command just created, and says so.
+void AnnounceCreatedElement(AppEvents& events, const std::string& new_id) {
+    events.Emit(TreeDirtyEvent{});
+    events.Emit(SelectionChangedEvent{new_id, true});
+    events.Emit(DocumentDirtyEvent{});
+    events.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
+}
+
 } // namespace
 
 ElementEditController::ElementEditController(AppEvents& events) : events_(events) {}
@@ -53,12 +69,8 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{AF_TR("No element selected.")});
         return false;
     }
-    parser::AssuranceCase* model = nullptr;
-    sacm::AssuranceCasePackage* package = nullptr;
-    if (!TryGetWorkingModel(state, "Add", events_, model, package))
+    if (!RequireWorkingModel(state, "Add", events_))
         return false;
-    (void)model;
-    (void)package;
 
     core::commands::CreateChildElementCommand cmd(selected_id, kind);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
@@ -67,11 +79,7 @@ bool ElementEditController::AddChildToSelected(AppRuntimeState& state,
         return false;
     }
 
-    const std::string& new_id = cmd.GeneratedId();
-    events_.Emit(TreeDirtyEvent{});
-    events_.Emit(SelectionChangedEvent{new_id, true});
-    events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
+    AnnounceCreatedElement(events_, cmd.GeneratedId());
     return true;
 }
 
@@ -87,12 +95,8 @@ bool ElementEditController::AddAwayElement(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{AF_TR("No away element selected.")});
         return false;
     }
-    parser::AssuranceCase* model = nullptr;
-    sacm::AssuranceCasePackage* package = nullptr;
-    if (!TryGetWorkingModel(state, "Add", events_, model, package))
+    if (!RequireWorkingModel(state, "Add", events_))
         return false;
-    (void)model;
-    (void)package;
 
     core::commands::CreateAwayElementCommand cmd(selected_id, cited_id, kind);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
@@ -101,21 +105,13 @@ bool ElementEditController::AddAwayElement(AppRuntimeState& state,
         return false;
     }
 
-    const std::string& new_id = cmd.GeneratedId();
-    events_.Emit(TreeDirtyEvent{});
-    events_.Emit(SelectionChangedEvent{new_id, true});
-    events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
+    AnnounceCreatedElement(events_, cmd.GeneratedId());
     return true;
 }
 
 bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
-    parser::AssuranceCase* model = nullptr;
-    sacm::AssuranceCasePackage* package = nullptr;
-    if (!TryGetWorkingModel(state, "Add", events_, model, package))
+    if (!RequireWorkingModel(state, "Add", events_))
         return false;
-    (void)model;
-    (void)package;
 
     core::commands::CreateTopGoalCommand cmd;
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
@@ -124,11 +120,7 @@ bool ElementEditController::AddTopGoal(AppRuntimeState& state) {
         return false;
     }
 
-    const std::string& new_id = cmd.GeneratedId();
-    events_.Emit(TreeDirtyEvent{});
-    events_.Emit(SelectionChangedEvent{new_id, true});
-    events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
+    AnnounceCreatedElement(events_, cmd.GeneratedId());
     return true;
 }
 
@@ -139,12 +131,8 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
         events_.Emit(StatusMessageEvent{AF_TR("No challenge target selected.")});
         return false;
     }
-    parser::AssuranceCase* model = nullptr;
-    sacm::AssuranceCasePackage* package = nullptr;
-    if (!TryGetWorkingModel(state, "Add challenge", events_, model, package))
+    if (!RequireWorkingModel(state, "Add challenge", events_))
         return false;
-    (void)model;
-    (void)package;
 
     core::commands::CreateChallengeCommand cmd(target, source_type);
     const auto outcome = app::commands::DispatchAuditedCommand(state, cmd);
@@ -153,11 +141,7 @@ bool ElementEditController::AddChallenge(AppRuntimeState& state,
         return false;
     }
 
-    const std::string& new_id = cmd.GeneratedId();
-    events_.Emit(TreeDirtyEvent{});
-    events_.Emit(SelectionChangedEvent{new_id, true});
-    events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
+    AnnounceCreatedElement(events_, cmd.GeneratedId());
     return true;
 }
 
@@ -375,10 +359,7 @@ ElementEditController::CreateEvidence(AppRuntimeState& state, const std::string&
         return {};
     }
     const std::string new_id = command.GeneratedId();
-    events_.Emit(TreeDirtyEvent{});
-    events_.Emit(SelectionChangedEvent{new_id, true});
-    events_.Emit(DocumentDirtyEvent{});
-    events_.Emit(StatusMessageEvent{ui::i18n::trf("Added {0}", new_id)});
+    AnnounceCreatedElement(events_, new_id);
     return new_id;
 }
 
