@@ -11,6 +11,8 @@ SacmElement* FindElementById(AssuranceCase& model, const std::string& id);
 const SacmElement* FindElementByIdOrGidValue(const AssuranceCase& model, const std::string& id_or_gid);
 SacmElement* FindElementByIdOrGid(AssuranceCase& model, const std::string& id, const std::string& gid);
 const SacmElement* FindElementByIdOrGid(const AssuranceCase& model, const std::string& id, const std::string& gid);
+// The three SACM asserted-relationship element types.
+bool IsRelationshipType(const std::string& type);
 bool IsRelationshipElement(const SacmElement& element);
 std::string ElementTerminologyText(const SacmElement& element);
 

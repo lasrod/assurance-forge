@@ -2,6 +2,7 @@
 
 #include "core/acp/acp_relationship_index.h"
 #include "core/acp/assurance_claim_point.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -163,15 +164,8 @@ bool ParserTargetExists(const parser::AssuranceCase& model,
     return false;
 }
 
-const parser::SacmElement* FindParserElement(const parser::AssuranceCase& model, const std::string& element_id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == element_id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
-
 bool ElementEligibleForAcp(const parser::AssuranceCase& model, const std::string& element_id) {
-    const parser::SacmElement* element = FindParserElement(model, element_id);
+    const parser::SacmElement* element = parser::FindElementById(model, element_id);
     return element && element->type == "artifactreference";
 }
 

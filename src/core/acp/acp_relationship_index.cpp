@@ -1,5 +1,7 @@
 #include "core/acp/acp_relationship_index.h"
 
+#include "parser/model_utils.h"
+
 #include <algorithm>
 #include <string>
 #include <unordered_map>
@@ -13,14 +15,10 @@ constexpr const char* kStrategyChildBlockedReason =
 constexpr const char* kUnsupportedRelationshipBlockedReason =
     "ACP is only supported for GSN SupportedBy and InContextOf relationships between the eligible element types.";
 
-bool IsRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
-
 std::unordered_map<std::string, const parser::SacmElement*> BuildElementLookup(const parser::AssuranceCase& model) {
     std::unordered_map<std::string, const parser::SacmElement*> elements;
     for (const parser::SacmElement& element : model.elements) {
-        if (!element.id.empty() && !IsRelationshipType(element.type))
+        if (!element.id.empty() && !parser::IsRelationshipType(element.type))
             elements[element.id] = &element;
     }
     return elements;

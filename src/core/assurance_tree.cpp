@@ -2,6 +2,8 @@
 
 #include "core/element_factory.h"
 
+#include "parser/model_utils.h"
+
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
@@ -38,10 +40,6 @@ ElementGroup group_for_role(NodeRole role) {
     default:
         return ElementGroup::Group1;
     }
-}
-
-bool is_relationship(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
 }
 
 // ===== Relationship processing helpers =====
@@ -259,7 +257,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
             cited_assets.insert(element.evidence.artifact_id);
     }
     for (const auto& element : ac.elements) {
-        if (is_relationship(element.type))
+        if (parser::IsRelationshipType(element.type))
             continue;
         if (element.type == "term" || element.type == "category")
             continue;
@@ -353,7 +351,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
     std::unordered_map<std::string, std::string> rel_first_target;
     std::unordered_map<std::string, std::string> rel_source;
     for (const auto& element : ac.elements) {
-        if (!is_relationship(element.type) || element.id.empty())
+        if (!parser::IsRelationshipType(element.type) || element.id.empty())
             continue;
         if (!element.target_refs.empty())
             rel_first_target[element.id] = element.target_refs.front();
@@ -363,7 +361,7 @@ AssuranceTree AssuranceTree::Build(const parser::AssuranceCase& ac, const std::s
 
     // Step 2: Wire the tree using relationship elements
     for (const auto& element : ac.elements) {
-        if (!is_relationship(element.type))
+        if (!parser::IsRelationshipType(element.type))
             continue;
 
         // Counter relationships are dialectic challenges, not structural support.

@@ -2,6 +2,7 @@
 
 #include "core/element_factory.h"
 #include "core/string_utils.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <map>
@@ -14,10 +15,6 @@
 
 namespace core {
 namespace {
-
-bool IsRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
 
 bool IsSupportRelationship(const parser::SacmElement& relationship) {
     return relationship.type == "assertedinference" || relationship.type == "assertedevidence";
@@ -186,7 +183,7 @@ void CheckEvidenceSources(const parser::SacmElement& relationship,
 void CheckIdentifiers(const parser::AssuranceCase& model, std::vector<GsnFinding>& findings) {
     std::map<std::string, const parser::SacmElement*> first_by_identifier;
     for (const parser::SacmElement& element : model.elements) {
-        if (IsRelationshipType(element.type))
+        if (parser::IsRelationshipType(element.type))
             continue;
         const std::string identifier = GsnIdentifierFor(element);
         if (identifier.empty())
@@ -305,7 +302,7 @@ SortKey(const GsnFinding& finding) {
 } // namespace
 
 GsnElementKind GsnKindOf(const parser::SacmElement& element) {
-    if (IsRelationshipType(element.type))
+    if (parser::IsRelationshipType(element.type))
         return GsnElementKind::Relationship;
     if (element.type == "claim") {
         // Matches core::classify_role, which is what the canvas draws. The
@@ -394,7 +391,7 @@ std::vector<GsnFinding> CheckGsnWellFormedness(const parser::AssuranceCase& mode
     std::vector<GsnFinding> findings;
 
     for (const parser::SacmElement& element : model.elements) {
-        if (!IsRelationshipType(element.type))
+        if (!parser::IsRelationshipType(element.type))
             continue;
         CheckEndpoints(element, index, findings);
         CheckConnectionRules(element, index, findings);

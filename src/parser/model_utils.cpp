@@ -39,9 +39,12 @@ const SacmElement* FindElementByIdOrGid(const AssuranceCase& model, const std::s
     return found == model.elements.end() ? nullptr : &*found;
 }
 
+bool IsRelationshipType(const std::string& type) {
+    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
+}
+
 bool IsRelationshipElement(const SacmElement& element) {
-    return element.type == "assertedinference" || element.type == "assertedcontext" ||
-           element.type == "assertedevidence";
+    return IsRelationshipType(element.type);
 }
 
 std::string ElementTerminologyText(const SacmElement& element) {

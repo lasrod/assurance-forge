@@ -3,6 +3,7 @@
 #include "app/actions/ai_review_actions.h"
 #include "app/app_runtime_state.h"
 #include "core/guideline_catalog.h"
+#include "parser/model_utils.h"
 #include "review/sccg/sccg_profile_selector.h"
 #include "review/sccg/sccg_review.h"
 #include "ui/gsn/gsn_dpi.h"
@@ -52,7 +53,7 @@ void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
         state.app_state.loaded_case.has_value() ? &state.app_state.loaded_case.value() : nullptr;
     const parser::SacmElement* selected_element =
         loaded_case && !ui_state.selected_element_id.empty()
-            ? review::FindSacmElement(*loaded_case, ui_state.selected_element_id)
+            ? parser::FindElementById(*loaded_case, ui_state.selected_element_id)
             : nullptr;
     const core::TreeNode* selected_node = core::FindTreeNode(state.current_tree, ui_state.selected_element_id);
     review::AiReviewGuidelineSelection profile_selection;

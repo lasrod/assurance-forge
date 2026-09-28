@@ -4,6 +4,7 @@
 #include "core/evidence_attributes.h"
 
 #include "core/element_factory.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -15,10 +16,6 @@
 
 namespace core::reviews {
 namespace {
-
-bool IsRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
 
 const char* PrefixFor(PatchOperationType type) {
     switch (type) {
@@ -110,22 +107,6 @@ std::vector<std::string> SplitRefList(const std::string& value) {
     return refs;
 }
 
-parser::SacmElement* FindElement(parser::AssuranceCase& model, const std::string& id) {
-    for (parser::SacmElement& element : model.elements) {
-        if (element.id == id)
-            return &element;
-    }
-    return nullptr;
-}
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    for (const parser::SacmElement& element : model.elements) {
-        if (element.id == id)
-            return &element;
-    }
-    return nullptr;
-}
-
 std::unordered_set<std::string> CollectIds(const parser::AssuranceCase& model) {
     std::unordered_set<std::string> ids;
     ids.reserve(model.elements.size() * 2);
@@ -184,7 +165,7 @@ bool ResolveRef(const ElementRef& ref,
         return false;
     }
     if (has_existing) {
-        if (!FindElement(model, ref.existing_id.value())) {
+        if (!parser::FindElementById(model, ref.existing_id.value())) {
             error = "Operation references missing existing element " + ref.existing_id.value() + ".";
             return false;
         }
@@ -273,7 +254,7 @@ bool ApplyCreateOperation(const PatchOperation& operation,
         error = "Create operation references unknown create_ref " + operation.create_ref.value() + ".";
         return false;
     }
-    if (FindElement(model, id_it->second)) {
+    if (parser::FindElementById(model, id_it->second)) {
         error = "Generated element id already exists: " + id_it->second;
         return false;
     }
@@ -385,7 +366,7 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
     std::string element_id;
     if (!ResolveOptionalElementRef(operation.element, model, generated_ids, "element", element_id, error))
         return false;
-    parser::SacmElement* element = FindElement(model, element_id);
+    parser::SacmElement* element = parser::FindElementById(model, element_id);
     if (!element) {
         error = "Operation references missing element " + element_id + ".";
         return false;
@@ -445,7 +426,7 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
             // impossible one, so removing a category has to be expressible.
             std::vector<std::string> categories;
             for (const std::string& candidate : SplitRefList(operation.new_value)) {
-                const parser::SacmElement* category = FindElement(model, candidate);
+                const parser::SacmElement* category = parser::FindElementById(model, candidate);
                 if (category == nullptr) {
                     error = "UpdateTerm names category " + candidate +
                             ", which does not exist. Create it with a "
@@ -475,7 +456,7 @@ bool ApplyUpdateOperation(const PatchOperation& operation,
             // not free text -- the library refuses one that does not resolve, so
             // catching it here turns an acceptance-time failure into a staging
             // message the agent can act on.
-            if (!operation.new_value.empty() && FindElement(model, operation.new_value) == nullptr) {
+            if (!operation.new_value.empty() && parser::FindElementById(model, operation.new_value) == nullptr) {
                 error = "UpdateTerm names origin " + operation.new_value +
                         ", which does not exist. An origin is the id of the element the definition comes from; "
                         "use \"external_reference\" for a citation string such as a URL or standard clause.";
@@ -613,8 +594,8 @@ bool ApplyAddRelationshipOperation(const PatchOperation& operation,
         return false;
     }
 
-    const parser::SacmElement* source = FindElement(model, source_id);
-    const parser::SacmElement* target = FindElement(model, target_id);
+    const parser::SacmElement* source = parser::FindElementById(model, source_id);
+    const parser::SacmElement* target = parser::FindElementById(model, target_id);
     if (!source || !target) {
         error = "Relationship operation references an element that does not exist.";
         return false;
@@ -673,7 +654,7 @@ bool RelationshipMatches(const parser::SacmElement& relationship,
 }
 
 bool IsDanglingRelationship(const parser::SacmElement& relationship) {
-    if (!IsRelationshipType(relationship.type))
+    if (!parser::IsRelationshipType(relationship.type))
         return false;
     if (relationship.target_refs.empty())
         return true;
@@ -731,7 +712,7 @@ bool ApplyRemoveTermOperation(const PatchOperation& operation,
     std::string element_id;
     if (!ResolveOptionalElementRef(operation.element, model, generated_ids, "element", element_id, error))
         return false;
-    const parser::SacmElement* element = FindElement(model, element_id);
+    const parser::SacmElement* element = parser::FindElementById(model, element_id);
     if (element == nullptr) {
         error = "RemoveTerm references missing element " + element_id + ".";
         return false;
@@ -755,7 +736,7 @@ bool ApplyRemoveElementOperation(const PatchOperation& operation,
     std::string element_id;
     if (!ResolveOptionalElementRef(operation.element, model, generated_ids, "element", element_id, error))
         return false;
-    if (!FindElement(model, element_id)) {
+    if (!parser::FindElementById(model, element_id)) {
         error = "RemoveElement references missing element " + element_id + ".";
         return false;
     }
@@ -773,7 +754,7 @@ bool ApplyRemoveElementOperation(const PatchOperation& operation,
                        [&](const parser::SacmElement& element) {
                            if (element.id == element_id)
                                return true;
-                           if (!IsRelationshipType(element.type))
+                           if (!parser::IsRelationshipType(element.type))
                                return false;
                            return std::find(element.source_refs.begin(), element.source_refs.end(), element_id) !=
                                       element.source_refs.end() ||

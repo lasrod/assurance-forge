@@ -1,6 +1,7 @@
 #include "review/sccg/sccg_review.h"
 
 #include "core/string_utils.h"
+#include "parser/model_utils.h"
 #include "review/sccg/suggestion_mapping.h"
 
 #include <algorithm>
@@ -43,7 +44,7 @@ void AddChildIfPresent(const parser::AssuranceCase& assurance_case,
                        std::vector<AiReviewElement>& children) {
     if (!child_node)
         return;
-    const parser::SacmElement* child = FindSacmElement(assurance_case, child_node->id);
+    const parser::SacmElement* child = parser::FindElementById(assurance_case, child_node->id);
     if (!child)
         return;
     children.push_back(MakeReviewElement(*child, "child", child_node));
@@ -280,7 +281,7 @@ ElementDataToJson(const parser::SacmElement& element, const std::string& role, c
 }
 
 const parser::SacmElement* ElementForNode(const parser::AssuranceCase& assurance_case, const core::TreeNode* node) {
-    return node ? FindSacmElement(assurance_case, node->id) : nullptr;
+    return node ? parser::FindElementById(assurance_case, node->id) : nullptr;
 }
 
 void AddPackage(AiReviewDataPackageBundle& packages, const std::string& id, const nlohmann::json& data) {
@@ -402,14 +403,6 @@ std::string BuildProblemMessage(const nlohmann::json& finding) {
 }
 
 } // namespace
-
-const parser::SacmElement* FindSacmElement(const parser::AssuranceCase& assurance_case, const std::string& element_id) {
-    for (const parser::SacmElement& element : assurance_case.elements) {
-        if (element.id == element_id)
-            return &element;
-    }
-    return nullptr;
-}
 
 bool IsSupportedAiReviewElement(const parser::SacmElement& element) {
     return element.type == "claim" || element.type == "argumentreasoning" || element.type == "artifact" ||
@@ -534,7 +527,7 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
                           const std::string& selected_element_id,
                           AiReviewPayload& out_payload,
                           std::string& out_error) {
-    const parser::SacmElement* selected = FindSacmElement(assurance_case, selected_element_id);
+    const parser::SacmElement* selected = parser::FindElementById(assurance_case, selected_element_id);
     if (!selected) {
         out_error = "Selected element was not found.";
         return false;
@@ -549,7 +542,7 @@ bool BuildAiReviewPayload(const parser::AssuranceCase& assurance_case,
     payload.selected = MakeReviewElement(*selected, "selected", selected_node);
 
     if (selected_node && selected_node->parent) {
-        const parser::SacmElement* parent = FindSacmElement(assurance_case, selected_node->parent->id);
+        const parser::SacmElement* parent = parser::FindElementById(assurance_case, selected_node->parent->id);
         if (parent)
             payload.parent = MakeReviewElement(*parent, "parent", selected_node->parent);
     }
@@ -770,7 +763,7 @@ bool CollectAiReviewDataPackages(const parser::AssuranceCase& assurance_case,
     out_packages = {};
     out_packages.when_unavailable = catalog.when_unavailable;
     out_packages.availability_states = catalog.availability_states;
-    const parser::SacmElement* selected = FindSacmElement(assurance_case, selected_element_id);
+    const parser::SacmElement* selected = parser::FindElementById(assurance_case, selected_element_id);
     if (!selected) {
         out_error = "Selected element was not found.";
         return false;

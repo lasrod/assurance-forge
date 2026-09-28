@@ -1,6 +1,7 @@
 #include "core/drafts/draft_change_index.h"
 
 #include "core/reviews/review_proposal.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -158,11 +159,6 @@ void FinalizeChangeIndex(DraftChangeIndex& index,
 
 namespace {
 
-bool IsRelationship(const core::SacmElement& element) {
-    return element.type == "assertedinference" || element.type == "assertedcontext" ||
-           element.type == "assertedevidence";
-}
-
 // Every endpoint a relationship touches: SACM puts the premise in `source_refs`,
 // the conclusion in `target_refs`, and a strategy in `reasoning_ref`.
 std::vector<std::string> Endpoints(const core::SacmElement& relationship) {
@@ -190,7 +186,7 @@ core::AssuranceCase BuildChangesOnlyView(const core::AssuranceCase& working, con
     while (grew) {
         grew = false;
         for (const core::SacmElement& element : working.elements) {
-            if (!IsRelationship(element))
+            if (!parser::IsRelationshipElement(element))
                 continue;
             const bool from_included = std::any_of(element.source_refs.begin(),
                                                    element.source_refs.end(),
@@ -211,7 +207,7 @@ core::AssuranceCase BuildChangesOnlyView(const core::AssuranceCase& working, con
     view.description = working.description;
     view.acps = working.acps;
     for (const core::SacmElement& element : working.elements) {
-        if (IsRelationship(element)) {
+        if (parser::IsRelationshipElement(element)) {
             const std::vector<std::string> endpoints = Endpoints(element);
             const bool all_present =
                 !endpoints.empty() && std::all_of(endpoints.begin(), endpoints.end(), [&](const std::string& id) {

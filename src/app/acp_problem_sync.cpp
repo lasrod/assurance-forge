@@ -3,6 +3,7 @@
 #include "core/acp/acp_relationship_index.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/problems/problem_utils.h"
+#include "parser/model_utils.h"
 
 #include <algorithm>
 #include <string>
@@ -14,17 +15,6 @@ namespace app {
 namespace {
 
 constexpr const char* kAcpProblemPrefix = "acp:";
-
-bool IsRelationshipType(const std::string& type) {
-    return type == "assertedinference" || type == "assertedcontext" || type == "assertedevidence";
-}
-
-const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
-    auto found = std::find_if(model.elements.begin(), model.elements.end(), [&](const parser::SacmElement& element) {
-        return element.id == id;
-    });
-    return found == model.elements.end() ? nullptr : &*found;
-}
 
 const sacm::ArgumentPackage* FindArgumentPackage(const sacm::AssuranceCasePackage& package,
                                                  const std::string& package_id) {
@@ -101,7 +91,7 @@ void SyncAcpProblems(core::ProblemsManager& problems_manager,
         ++id_counts[acp.id];
 
     for (const parser::AcpRecord& acp : model->acps) {
-        const parser::SacmElement* target = FindElement(*model, acp.target_id);
+        const parser::SacmElement* target = parser::FindElementById(*model, acp.target_id);
 
         if (id_counts[acp.id] > 1) {
             problems_manager.AddOrUpdateProblem(
@@ -120,13 +110,13 @@ void SyncAcpProblems(core::ProblemsManager& problems_manager,
             continue;
         }
 
-        if (acp.target_kind == "relationship" && !IsRelationshipType(target->type)) {
+        if (acp.target_kind == "relationship" && !parser::IsRelationshipType(target->type)) {
             problems_manager.AddOrUpdateProblem(MakeProblem(
                 acp,
                 core::ProblemSeverity::Error,
                 "WrongTargetKind",
                 "ACP " + acp.id + " is marked as a relationship ACP but targets a non-relationship element."));
-        } else if (acp.target_kind == "element" && IsRelationshipType(target->type)) {
+        } else if (acp.target_kind == "element" && parser::IsRelationshipType(target->type)) {
             problems_manager.AddOrUpdateProblem(
                 MakeProblem(acp,
                             core::ProblemSeverity::Error,
@@ -150,7 +140,7 @@ void SyncAcpProblems(core::ProblemsManager& problems_manager,
                             "ACP " + acp.id + " is attached to an element that is not an artefact reference."));
         }
 
-        if (acp.target_kind == "relationship" && IsRelationshipType(target->type) &&
+        if (acp.target_kind == "relationship" && parser::IsRelationshipType(target->type) &&
             !RelationshipEligibleForAcp(*model, acp.target_id)) {
             problems_manager.AddOrUpdateProblem(
                 MakeProblem(acp,
