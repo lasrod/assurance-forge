@@ -3,6 +3,7 @@ add_library(af_core OBJECT
     acp/acp_relationship_index.cpp
     acp/assurance_claim_point.cpp
     app_state.cpp
+    executable_location.cpp
     guideline_catalog.cpp
     sccg/staged_checks.cpp
     changesets/change_set.cpp

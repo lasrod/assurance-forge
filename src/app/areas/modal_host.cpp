@@ -1,7 +1,7 @@
 #include "app/areas/modal_host.h"
 #include "app/ai_error_text.h"
 #include "app/example_project.h"
-#include "app/executable_location.h"
+#include "core/executable_location.h"
 #include "app/native_file_dialogs.h"
 
 #include "app/mcp_client_config.h"
@@ -499,7 +499,7 @@ void ModalHost::RenderDeleteReviewItemConfirmModal() {
 
 void ModalHost::RenderStartupProjectWindow() {
     // Looked up once: the executable does not move while the app runs.
-    static const std::filesystem::path bundled_example = FindBundledExampleProject(ExecutableDirectory());
+    static const std::filesystem::path bundled_example = FindBundledExampleProject(core::ExecutableDirectory());
     ui::panels::WelcomeModalCallbacks callbacks{
         bundled_example.empty() ? std::function<void()>{} : [this]() {
             if (OpenExampleProject(bundled_example, callbacks_))

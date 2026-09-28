@@ -2,17 +2,8 @@
 
 #include <cstdlib>
 
+#include "core/executable_location.h"
 #include "parser/sccg_dist_parser.h"
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#endif
 
 #include <filesystem>
 #include <format>
@@ -23,17 +14,6 @@
 
 namespace core {
 namespace {
-
-std::filesystem::path ExecutableDirectory() {
-#ifdef _WIN32
-    char path[MAX_PATH] = {};
-    DWORD length = GetModuleFileNameA(nullptr, path, MAX_PATH);
-    if (length > 0 && length < MAX_PATH) {
-        return std::filesystem::path(path).parent_path();
-    }
-#endif
-    return std::filesystem::current_path();
-}
 
 // An explicit SCCG distribution, when one is named.
 //

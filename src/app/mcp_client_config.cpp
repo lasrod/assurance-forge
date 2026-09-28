@@ -1,6 +1,6 @@
 #include "app/mcp_client_config.h"
 
-#include "app/executable_location.h"
+#include "core/executable_location.h"
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
@@ -20,7 +20,7 @@ const char* ServerExecutableName() {
 } // namespace
 
 std::filesystem::path McpServerExecutablePath() {
-    const std::filesystem::path directory = ExecutableDirectory();
+    const std::filesystem::path directory = core::ExecutableDirectory();
     if (directory.empty()) {
         return {};
     }

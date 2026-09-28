@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-namespace app {
+namespace core {
 
 // The directory the running executable lives in: where the build and every
 // package put the files that ship beside it (the MCP server, the bundled
@@ -10,4 +10,4 @@ namespace app {
 // cannot say; empty if even that fails.
 std::filesystem::path ExecutableDirectory();
 
-} // namespace app
+} // namespace core
