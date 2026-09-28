@@ -58,6 +58,19 @@ std::string ReportSummary(const core::ProjectLoadReport& report) {
 
 } // namespace
 
+// A directory is not a text file. POSIX lets one be opened for reading and then
+// yields nothing, so it used to read back as empty text and reach a parser as
+// if a file had been emptied.
+TEST(ProjectFileIoTest, ReadingADirectoryIsAnErrorNotEmptyText) {
+    TempDir temp(MakeTempParent());
+    const std::filesystem::path directory = temp.path / "not-a-file.json";
+    std::filesystem::create_directories(directory);
+
+    const std::expected<std::string, std::string> text = core::ReadTextFile(directory);
+    ASSERT_FALSE(text.has_value()) << "read a directory as \"" << *text << "\"";
+    EXPECT_NE(text.error().find(directory.string()), std::string::npos) << text.error();
+}
+
 // The rule the create dialog asks while the user types, and the one the create
 // itself refuses on. One rule with two callers: a dialog that offers a Create
 // the create would reject is how "nothing happens when I press it" is built.

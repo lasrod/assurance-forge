@@ -219,6 +219,23 @@ TEST(ReviewItemManagerTest, KeepsWhatItHasWhenALoadFails) {
     EXPECT_EQ(manager.GetItemsForElement("G1").size(), 1u);
 }
 
+// A review file that exists but cannot be read reports the read failure. It
+// used to fall through to the JSON parser, so the user was told the file was
+// malformed rather than that it could not be read. A directory stands in for
+// the unreadable file: it exists, so Load gets past its existence check.
+TEST(ReviewItemManagerTest, AnUnreadableFileReportsTheReadErrorNotAParseError) {
+    TempDir temp(MakeTempDir());
+    const std::filesystem::path review_path = temp.path / "review-items.af.json";
+    std::filesystem::create_directories(review_path);
+
+    core::reviews::ReviewItemManager manager;
+    manager.SetFilePath(review_path);
+    std::string error;
+    EXPECT_FALSE(manager.Load(error));
+    EXPECT_EQ(error.rfind("Could not ", 0), 0u) << error;
+    EXPECT_NE(error.find(review_path.string()), std::string::npos) << error;
+}
+
 TEST(ReviewItemManagerTest, UpdatesAndRemovesItems) {
     core::reviews::ReviewItemManager manager;
     ASSERT_TRUE(manager.AddOrUpdateItem(MakeItem("review-1", "G1")));

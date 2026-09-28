@@ -24,6 +24,11 @@
 namespace core {
 
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path& path) {
+    // POSIX opens a directory for reading and then yields no bytes and no error,
+    // which would read as an empty file.
+    std::error_code ec;
+    if (std::filesystem::is_directory(path, ec))
+        return std::unexpected("Could not read " + path.string() + ": it is a directory");
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open())
         return std::unexpected("Could not open " + path.string());
