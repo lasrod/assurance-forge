@@ -4,6 +4,7 @@
 #include "export/svg_writer.h"
 #include "core/terminology_package_service.h"
 #include "parser/xml_parser.h"
+#include "support/temp_files.h"
 
 #include <algorithm>
 #include <chrono>
@@ -15,22 +16,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path MakeTempDir() {
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_gsn_svg_export_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 parser::SacmElement Element(std::string id, std::string type, std::string name, std::string text = {}) {
     parser::SacmElement element;
@@ -142,7 +128,7 @@ bool RectanglesOverlap(const export_gsn::GsnNode& first, const export_gsn::GsnNo
 } // namespace
 
 TEST(GsnSvgExporterTest, EnsureExportsFolderCreatesDirectory) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("gsn_svg_exporter"));
     std::string error;
 
     std::filesystem::path exports_dir = export_gsn::EnsureExportsFolder(temp.path, error);
@@ -153,7 +139,7 @@ TEST(GsnSvgExporterTest, EnsureExportsFolderCreatesDirectory) {
 }
 
 TEST(GsnSvgExporterTest, UniqueExportPathDoesNotOverwriteExistingFiles) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("gsn_svg_exporter"));
     std::filesystem::create_directories(temp.path / "exports");
     std::ofstream(temp.path / "exports" / "main_gsn.svg") << "first";
     std::ofstream(temp.path / "exports" / "main_gsn_001.svg") << "second";
@@ -778,7 +764,7 @@ TEST(GsnSvgExporterTest, NodeCarryingBothDecoratorsKeepsThemApart) {
 }
 
 TEST(GsnSvgExporterTest, ExportWritesStandaloneSvgAndUsesUniqueNames) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("gsn_svg_exporter"));
     parser::AssuranceCase model = BuildRepresentativeCase();
 
     export_gsn::GsnSvgExportResult first = export_gsn::ExportCurrentSafetyCaseToGsnSvg(model, temp.path, "main");
@@ -846,7 +832,7 @@ TEST(GsnSvgExporterTest, EvidenceLocationBecomesALinkOnTheNode) {
 // A location that would be read as script must never reach an exported
 // diagram: the file is a document people open and pass on.
 TEST(GsnSvgExporterTest, ExportLinkTargetKeepsOnlySafeSchemes) {
-    const std::filesystem::path root = MakeTempDir();
+    const std::filesystem::path root = test_support::UniqueTempDirectory("gsn_svg_exporter");
     const std::filesystem::path exports = root / "exports";
 
     EXPECT_EQ(export_gsn::LinkTargetForExport("https://example.org/a.pdf", root, exports), "https://example.org/a.pdf");
@@ -863,7 +849,7 @@ TEST(GsnSvgExporterTest, ExportLinkTargetKeepsOnlySafeSchemes) {
 // against the document -- so a project-relative location has to climb out of
 // that folder or it points at nothing.
 TEST(GsnSvgExporterTest, ExportLinkTargetRebasesAProjectRelativePath) {
-    const std::filesystem::path root = MakeTempDir();
+    const std::filesystem::path root = test_support::UniqueTempDirectory("gsn_svg_exporter");
     const std::filesystem::path exports = root / "exports";
     std::filesystem::create_directories(exports);
 
@@ -886,7 +872,7 @@ TEST(GsnSvgExporterTest, ExportLinkTargetRebasesAProjectRelativePath) {
 // written, and a location the export will not link to is reported rather than
 // silently dropped.
 TEST(GsnSvgExporterTest, ExportedFileLinksEvidenceAndWarnsAboutAnUnsafeLocation) {
-    const std::filesystem::path root = MakeTempDir();
+    const std::filesystem::path root = test_support::UniqueTempDirectory("gsn_svg_exporter");
     parser::AssuranceCase model;
     model.elements.push_back(Element("G1", "claim", "Top goal", "The system is safe."));
     parser::SacmElement report = Element("Sn1", "artifactreference", "Test report", "Report RA-001.");

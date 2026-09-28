@@ -1,6 +1,7 @@
 #include "core/reviews/review_proposal.h"
 #include "core/reviews/review_proposal_manager.h"
 #include "core/reviews/review_proposal_patch_service.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -8,23 +9,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() {
-        std::filesystem::remove_all(path);
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-};
-
-std::filesystem::path MakeTempDir() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_review_proposal_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 parser::AssuranceCase MakeCase() {
     parser::AssuranceCase model;
@@ -174,7 +159,7 @@ TEST(ReviewProposalTest, AProposalThatOnlyRemovesAnExistingElementIsValid) {
 }
 
 TEST(ReviewProposalManagerTest, SavesListsLoadsAndDeletesProposalFiles) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_proposal"));
     parser::AssuranceCase model = MakeCase();
     core::reviews::ReviewProposal proposal = MakeProposal(model);
     core::reviews::ReviewProposalManager manager(temp.path);
@@ -200,7 +185,7 @@ TEST(ReviewProposalManagerTest, SavesListsLoadsAndDeletesProposalFiles) {
 // A proposal that cannot be read reports the read failure. It used to fall
 // through to the JSON parser, so a missing file was reported as a malformed one.
 TEST(ReviewProposalManagerTest, AMissingProposalReportsTheReadErrorNotAParseError) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_proposal"));
     core::reviews::ReviewProposalManager manager(temp.path);
 
     std::string error;

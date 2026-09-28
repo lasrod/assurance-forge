@@ -7,6 +7,7 @@
 #include "bridge/protocol.h"
 #include "bridge/transport.h"
 #include "core/app_state.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -36,22 +37,7 @@ namespace {
 
 constexpr const char* kFakeVersion = "fake-app-9.9";
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_mcp_reconnect_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 std::filesystem::path WriteSettings(const std::filesystem::path& directory, bool consent) {
     const std::filesystem::path path = directory / "settings.json";
@@ -225,7 +211,7 @@ struct Fixture {
 };
 
 std::unique_ptr<Fixture> MakeProject(const std::string& stem) {
-    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{UniqueTempPath(stem)}, {}});
+    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{test_support::UniqueTempDirectory(stem)}, {}});
     core::AppState builder;
     if (!builder.create_empty_project("Project", fixture->workspace.path.string())) {
         ADD_FAILURE() << "could not create project: " << builder.status_message;

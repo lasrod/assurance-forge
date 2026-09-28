@@ -1,22 +1,13 @@
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
 
-namespace {
-
-std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
-
-} // namespace
+namespace {} // namespace
 
 TEST(AuditManifest, RoundTripJson) {
     core::audit::AuditManifest m;
@@ -50,7 +41,7 @@ TEST(AuditManifest, RoundTripJson) {
 }
 
 TEST(AuditManifest, WriteAndReadFromDisk) {
-    auto root = MakeTempProjectRoot("manifest_io");
+    auto root = test_support::TestTempDirectory("manifest_io");
     core::audit::AuditManifest m;
     m.project_id = "p";
     m.current_sacm = "x.sacm";

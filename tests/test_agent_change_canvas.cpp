@@ -8,6 +8,7 @@
 #include "core/argument_package_projection.h"
 #include "core/changesets/change_set_store.h"
 #include "parser/model_utils.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -32,22 +33,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_agent_canvas_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 struct Fixture {
     TempDir workspace;
@@ -56,7 +42,7 @@ struct Fixture {
 };
 
 std::unique_ptr<Fixture> MakeFixture(const std::string& stem) {
-    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{UniqueTempPath(stem)}, {}, {}});
+    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{test_support::UniqueTempDirectory(stem)}, {}, {}});
     if (!fixture->state.create_empty_project("Project", fixture->workspace.path.string())) {
         ADD_FAILURE() << "could not create project: " << fixture->state.status_message;
         return nullptr;
@@ -251,7 +237,7 @@ TEST(AgentChangeCanvas, ShowsTheReviewerTheSameSccgFindingsTheAgentGot) {
 // drawing text an accepted change had already replaced, while the inspector --
 // which reads `loaded_case` directly -- showed the new text beside it.
 TEST(AgentChangeCanvas, TheDeferredLibraryRederiveAnnouncesItselfAsAModelChange) {
-    TempDir workspace{UniqueTempPath("rederive_revision")};
+    TempDir workspace{test_support::UniqueTempDirectory("rederive_revision")};
     app::AppRuntimeState state;
     ASSERT_TRUE(state.app_state.create_empty_project("Project", workspace.path.string()))
         << state.app_state.status_message;

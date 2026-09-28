@@ -1,6 +1,7 @@
 #include "core/audit/audit_paths.h"
 #include "core/audit/event_store.h"
 #include "core/project_file_io.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -9,14 +10,6 @@
 #include <string_view>
 
 namespace {
-
-std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
 
 core::audit::AuditTransaction MakeTransaction(const std::string& command) {
     core::audit::AuditTransaction tx;
@@ -33,7 +26,7 @@ core::audit::AuditTransaction MakeTransaction(const std::string& command) {
 } // namespace
 
 TEST(EventStoreJsonl, AppendAssignsMonotonicSequencesAndPersistsLines) {
-    auto root = MakeTempProjectRoot("evstore_append");
+    auto root = test_support::TestTempDirectory("evstore_append");
     std::string error;
     auto store = core::audit::EventStore::Open(root, error);
     ASSERT_TRUE(store) << error;
@@ -65,7 +58,7 @@ TEST(EventStoreJsonl, AppendAssignsMonotonicSequencesAndPersistsLines) {
 }
 
 TEST(EventStoreJsonl, DetectsTamperedLog) {
-    auto root = MakeTempProjectRoot("evstore_tamper");
+    auto root = test_support::TestTempDirectory("evstore_tamper");
     std::string error;
     auto store = core::audit::EventStore::Open(root, error);
     ASSERT_TRUE(store) << error;
@@ -95,7 +88,7 @@ TEST(EventStoreJsonl, DetectsTamperedLog) {
 }
 
 TEST(EventStoreJsonl, RefusesEmptyTransaction) {
-    auto root = MakeTempProjectRoot("evstore_empty");
+    auto root = test_support::TestTempDirectory("evstore_empty");
     std::string error;
     auto store = core::audit::EventStore::Open(root, error);
     ASSERT_TRUE(store) << error;
@@ -111,7 +104,7 @@ TEST(EventStoreJsonl, RefusesEmptyTransaction) {
 // written and never terminated by '\n'. Open must truncate the torn tail,
 // surface a diagnostic, and leave the store appendable.
 TEST(EventStoreJsonl, RecoversFromTornFinalLine) {
-    auto root = MakeTempProjectRoot("evstore_torn");
+    auto root = test_support::TestTempDirectory("evstore_torn");
     std::string error;
     auto store = core::audit::EventStore::Open(root, error);
     ASSERT_TRUE(store) << error;
@@ -160,7 +153,7 @@ TEST(EventStoreJsonl, RecoversFromTornFinalLine) {
 // even when an old `.tmp` sidecar already exists (leftover from a prior
 // crash) — a stale temp should not block the next save.
 TEST(EventStoreJsonl, WriteTextFileAtomicReplacesExistingAndCleansStaleTemp) {
-    auto root = MakeTempProjectRoot("atomic_write");
+    auto root = test_support::TestTempDirectory("atomic_write");
     auto target = root / "data.txt";
     auto tmp = root / "data.txt.tmp";
 

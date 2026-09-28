@@ -7,6 +7,7 @@
 #include "core/project_file_io.h"
 #include "parser/model_utils.h"
 #include "sacm_adapter/case_projection.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -26,22 +27,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_agent_draft_doc_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 bridge::Request MakeRequest(const std::string& op, const nlohmann::json& args = {}) {
     bridge::Request request;
@@ -61,7 +47,7 @@ struct ConnectedProject {
     core::drafts::DraftDocumentStore document;
 
     bool Open(const std::string& stem) {
-        workspace.path = UniqueTempPath(stem);
+        workspace.path = test_support::UniqueTempDirectory(stem);
         if (!state.create_empty_project("Project", workspace.path.string())) {
             ADD_FAILURE() << "could not create project: " << state.status_message;
             return false;

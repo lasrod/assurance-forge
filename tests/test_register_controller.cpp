@@ -10,6 +10,7 @@
 #include "app/controllers/register_controller.h"
 #include "core/project_service.h"
 #include "core/registers/register_model.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -19,36 +20,8 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() noexcept {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-};
-
-std::filesystem::path MakeTempDir() {
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-
-    std::error_code ec;
-    const std::filesystem::path temp_root = std::filesystem::temp_directory_path(ec);
-    if (ec) {
-        ADD_FAILURE() << "Failed to obtain temporary directory path: " << ec.message();
-        return {};
-    }
-
-    const std::filesystem::path path =
-        temp_root / ("assurance_forge_register_controller_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path, ec);
-    if (ec) {
-        ADD_FAILURE() << "Failed to create temporary directory '" << path.string() << "': " << ec.message();
-        return {};
-    }
-    return path;
-}
+using test_support::ReadFile;
+using test_support::TempDir;
 
 struct RegisterHarness {
     app::AppEvents events;
@@ -84,15 +57,10 @@ void TypeCseAssessment(app::controllers::RegisterController& controller,
     controller.MarkDirty();
 }
 
-std::string ReadFile(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-}
-
 } // namespace
 
 TEST(RegisterControllerTest, TypedAssessmentsSurviveClosingAndReopeningTheProject) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -131,7 +99,7 @@ TEST(RegisterControllerTest, TypedAssessmentsSurviveClosingAndReopeningTheProjec
 }
 
 TEST(RegisterControllerTest, SavedAssessmentsAreTrackedInTheProjectManifest) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -157,7 +125,7 @@ TEST(RegisterControllerTest, SavedAssessmentsAreTrackedInTheProjectManifest) {
 }
 
 TEST(RegisterControllerTest, UnreadableStoreIsReportedAndNeverOverwritten) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -187,7 +155,7 @@ TEST(RegisterControllerTest, UnreadableStoreIsReportedAndNeverOverwritten) {
 }
 
 TEST(RegisterControllerTest, ForeignFormatIsRefusedRatherThanReadIntoAssessmentFields) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -206,7 +174,7 @@ TEST(RegisterControllerTest, ForeignFormatIsRefusedRatherThanReadIntoAssessmentF
 }
 
 TEST(RegisterControllerTest, ReconfiguringTheSamePathKeepsUnsavedAssessments) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -229,7 +197,7 @@ TEST(RegisterControllerTest, ReconfiguringTheSamePathKeepsUnsavedAssessments) {
 }
 
 TEST(RegisterControllerTest, StoreDoesNotFollowTheControllerIntoAnotherProject) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject first;
     core::AssuranceProject second;
     core::ProjectLoadReport report;
@@ -254,7 +222,7 @@ TEST(RegisterControllerTest, StoreDoesNotFollowTheControllerIntoAnotherProject) 
 }
 
 TEST(RegisterControllerTest, DiscardingAnAssessmentRemovesItAndOnlyReachesDiskOnSave) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("register_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;

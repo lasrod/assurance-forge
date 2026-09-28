@@ -5,6 +5,7 @@
 
 #include "core/app_state.h"
 #include "core/project_service.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -26,22 +27,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_mcp_modes_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 std::filesystem::path WriteConsentingSettings(const std::filesystem::path& directory) {
     const std::filesystem::path path = directory / "settings.json";
@@ -60,7 +46,7 @@ struct Fixture {
 // offline even when the developer running it happens to have the same project
 // open in Assurance Forge.
 std::unique_ptr<Fixture> MakeOfflineFixture(const std::string& stem) {
-    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{UniqueTempPath(stem)}, {}, {}});
+    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{test_support::UniqueTempDirectory(stem)}, {}, {}});
 
     core::AppState builder;
     if (!builder.create_empty_project("Project", fixture->workspace.path.string())) {

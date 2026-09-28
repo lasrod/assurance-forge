@@ -14,6 +14,7 @@
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_parser.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -45,14 +46,6 @@ constexpr const char* kTwoModuleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
-std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_replay_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
-
 void WriteFile(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
@@ -68,7 +61,7 @@ struct ProjectFixture {
 
 ProjectFixture MakeFixture(const std::string& tag, const char* sacm = kSampleSacm) {
     ProjectFixture f;
-    const auto root = MakeTempProjectRoot(tag);
+    const auto root = test_support::TestTempDirectory(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, sacm);
 
@@ -496,7 +489,7 @@ TEST(ReplayVerifier, SkipsProjectWithoutAuditStore) {
     core::AssuranceProject project;
     project.id = "x";
     project.name = "no audit";
-    project.rootPath = MakeTempProjectRoot("verifier_skip");
+    project.rootPath = test_support::TestTempDirectory("verifier_skip");
     const auto result = core::audit::VerifyProject(project);
     EXPECT_TRUE(result.success);
     EXPECT_FALSE(result.ran);

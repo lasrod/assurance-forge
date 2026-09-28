@@ -11,6 +11,7 @@
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_snapshot.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -21,8 +22,7 @@
 namespace {
 
 std::filesystem::path MakeTempProjectRoot(const std::string& suffix) {
-    auto root = std::filesystem::temp_directory_path() / ("af_user_snapshot_test_" + suffix);
-    std::filesystem::remove_all(root);
+    const std::filesystem::path root = test_support::TestTempDirectory("user_snapshot_" + suffix);
     std::filesystem::create_directories(core::audit::AfDir(root));
     return root;
 }

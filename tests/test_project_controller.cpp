@@ -1,5 +1,6 @@
 #include "app/controllers/project_controller.h"
 
+#include "support/temp_files.h"
 #include "ui/imgui_buffer_utils.h"
 
 #include <chrono>
@@ -12,22 +13,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path MakeTempDir() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_project_controller_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 } // namespace
 
@@ -58,7 +44,7 @@ TEST(ProjectControllerTest, RecentProjectsPreferenceRoundTrips) {
 }
 
 TEST(ProjectControllerTest, ScanDirectoryFindsXmlAndSelectsCurrentFile) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("project_controller"));
     const std::filesystem::path selected = temp.path / "b.xml";
     std::ofstream(temp.path / "a.xml") << "<a/>";
     std::ofstream(selected) << "<b/>";

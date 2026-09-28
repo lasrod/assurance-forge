@@ -6,6 +6,7 @@
 #include "core/project_file_io.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -24,16 +25,6 @@
 // model, drawn as pending, and refused later by a seam nothing consulted.
 
 namespace {
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_draft_ops_" + stem + "_" + std::to_string(++counter));
-    std::error_code ec;
-    std::filesystem::remove_all(path, ec);
-    std::filesystem::create_directories(path);
-    return path;
-}
 
 std::unique_ptr<sacm_adapter::LibraryDocument> NewDocument(const std::filesystem::path& path) {
     const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi("Blender");
@@ -119,7 +110,7 @@ struct Fixture {
 
 std::unique_ptr<Fixture> MakeFixture(const std::string& stem) {
     auto fixture = std::make_unique<Fixture>();
-    fixture->root = UniqueTempPath(stem);
+    fixture->root = test_support::UniqueTempDirectory(stem);
     fixture->argument = fixture->root / "arguments" / "main.sacm";
     fixture->accepted = NewDocument(fixture->argument);
     if (fixture->accepted == nullptr)

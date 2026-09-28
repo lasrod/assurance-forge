@@ -22,6 +22,7 @@
 #include "core/project_model.h"
 #include "parser/xml_parser.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -40,14 +41,6 @@ constexpr const char* kEmptyPackageSacm = R"(<?xml version="1.0" encoding="UTF-8
 </sacm:AssuranceCasePackage>
 )";
 
-std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_strategy_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
-
 void WriteFile(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
@@ -65,7 +58,7 @@ struct EditFixture {
 
 std::unique_ptr<EditFixture> MakeFixture(const std::string& tag) {
     auto fixture = std::make_unique<EditFixture>();
-    const auto root = MakeTempProjectRoot(tag);
+    const auto root = test_support::TestTempDirectory(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, kEmptyPackageSacm);
 
