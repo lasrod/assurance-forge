@@ -153,6 +153,9 @@ TEST(TerminologyPackageService, CategoryDeletionIsBlockedWhenAssignedToTerm) {
     ASSERT_EQ(summaries.size(), 1u);
     EXPECT_EQ(summaries.front().term_count, 1);
     EXPECT_EQ(core::CategoryDisplayName(*terms, category.category_ref.id), "Hazard / Risk");
+    EXPECT_EQ(core::JoinCategoryDisplayNames(*terms, {category.category_ref.id, "", "unknown-category"}),
+              "Hazard / Risk, unknown-category");
+    EXPECT_EQ(core::JoinCategoryDisplayNames(*terms, {}), "");
 
     std::string error;
     EXPECT_FALSE(

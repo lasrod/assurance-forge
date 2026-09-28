@@ -172,4 +172,17 @@ std::string CategoryDisplayName(const sacm::TerminologyPackage& package, const s
     return ref;
 }
 
+std::string JoinCategoryDisplayNames(const sacm::TerminologyPackage& package,
+                                     const std::vector<std::string>& category_refs) {
+    std::string result;
+    for (const std::string& ref : category_refs) {
+        if (ref.empty())
+            continue;
+        if (!result.empty())
+            result += ", ";
+        result += CategoryDisplayName(package, ref);
+    }
+    return result;
+}
+
 } // namespace core

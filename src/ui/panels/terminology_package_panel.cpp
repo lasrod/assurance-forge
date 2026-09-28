@@ -33,18 +33,6 @@ bool TermHasCategoryRef(const sacm::TerminologyPackage& package,
     return false;
 }
 
-std::string JoinCategoryNames(const sacm::TerminologyPackage& package, const std::vector<std::string>& refs) {
-    std::string result;
-    for (const auto& ref : refs) {
-        if (ref.empty())
-            continue;
-        if (!result.empty())
-            result += ", ";
-        result += core::CategoryDisplayName(package, ref);
-    }
-    return result;
-}
-
 bool ContainsInsensitive(const std::string& haystack, const std::string& needle) {
     if (needle.empty())
         return true;
@@ -56,7 +44,7 @@ bool MatchesFilter(const sacm::TerminologyPackage& package, const sacm::Term& te
         return true;
     return ContainsInsensitive(term.value, filter) || ContainsInsensitive(term.name, filter) ||
            ContainsInsensitive(term.description, filter) ||
-           ContainsInsensitive(JoinCategoryNames(package, term.category_refs), filter) ||
+           ContainsInsensitive(core::JoinCategoryDisplayNames(package, term.category_refs), filter) ||
            ContainsInsensitive(core::JoinCategoryRefs(term.category_refs), filter) ||
            ContainsInsensitive(term.externalReference, filter) || ContainsInsensitive(term.origin, filter);
 }
@@ -244,7 +232,7 @@ void RenderTermsTable(const TerminologyPackagePanelModel& model, const Terminolo
         ImGui::TableSetColumnIndex(2);
         ImGui::TextUnformatted(term.description.c_str());
         ImGui::TableSetColumnIndex(3);
-        const std::string categories = JoinCategoryNames(*model.package, term.category_refs);
+        const std::string categories = core::JoinCategoryDisplayNames(*model.package, term.category_refs);
         ImGui::TextUnformatted(categories.c_str());
         ImGui::TableSetColumnIndex(4);
         ImGui::TextUnformatted(term.externalReference.c_str());
