@@ -1,6 +1,7 @@
 #include "core/acp/assurance_claim_point.h"
 
 #include "core/sacm_model.h"
+#include "core/string_utils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -21,12 +22,6 @@ constexpr const char* kArgumentPackageIdField = ".argumentPackageId";
 constexpr const char* kTopGoalIdField = ".topGoalId";
 constexpr const char* kPackagePurposeKey = core::kArgumentPackagePurposeTagKey;
 constexpr const char* kPackagePurposeConfidence = core::kArgumentPackagePurposeConfidence;
-
-std::string ToLower(std::string value) {
-    std::transform(
-        value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
 
 std::string FieldKey(const std::string& acp_id, const char* field) {
     return std::string(kAcpFieldPrefix) + acp_id + field;

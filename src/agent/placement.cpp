@@ -1,6 +1,7 @@
 #include "agent/operations.h"
 
 #include "core/assurance_tree.h"
+#include "core/string_utils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -16,20 +17,12 @@ namespace {
 constexpr int kDefaultSuggestions = 5;
 constexpr int kMaxSuggestions = 20;
 
-std::string Lowercased(const std::string& text) {
-    std::string lowered = text;
-    for (char& character : lowered) {
-        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-    }
-    return lowered;
-}
-
 // Words worth matching on. Dropping the short ones keeps "of" and "the" from
 // scoring every claim in the argument equally, which is the failure that makes
 // a ranking useless.
 std::vector<std::string> Keywords(const std::string& topic) {
     std::vector<std::string> words;
-    std::istringstream stream(Lowercased(topic));
+    std::istringstream stream(core::ToLower(topic));
     std::string word;
     while (stream >> word) {
         std::string cleaned;
@@ -46,7 +39,7 @@ std::vector<std::string> Keywords(const std::string& topic) {
 }
 
 std::string ElementText(const parser::SacmElement& element) {
-    return Lowercased(element.name + " " + element.content + " " + element.description);
+    return core::ToLower(element.name + " " + element.content + " " + element.description);
 }
 
 // The path from the root down to a node, which is the single most useful thing
@@ -59,26 +52,6 @@ std::vector<std::string> PathToRoot(const core::TreeNode& node) {
     }
     std::reverse(path.begin(), path.end());
     return path;
-}
-
-const char* RoleName(core::NodeRole role) {
-    switch (role) {
-    case core::NodeRole::Claim:
-        return "Goal";
-    case core::NodeRole::Strategy:
-        return "Strategy";
-    case core::NodeRole::Solution:
-        return "Solution";
-    case core::NodeRole::Context:
-        return "Context";
-    case core::NodeRole::Assumption:
-        return "Assumption";
-    case core::NodeRole::Justification:
-        return "Justification";
-    case core::NodeRole::Other:
-        break;
-    }
-    return "Other";
 }
 
 struct Candidate {
@@ -173,13 +146,13 @@ Result SuggestPlacement(const ReadContext& context, const nlohmann::json& argume
         for (const core::TreeNode* attachment : candidate.node->group2_attachments) {
             if (attachment != nullptr) {
                 in_scope.push_back(nlohmann::json{
-                    {"id", attachment->id}, {"role", RoleName(attachment->role)}, {"label", attachment->label}});
+                    {"id", attachment->id}, {"role", GsnRoleName(attachment->role)}, {"label", attachment->label}});
             }
         }
 
         suggestions.push_back(nlohmann::json{
             {"id", candidate.element->id},
-            {"role", RoleName(candidate.node->role)},
+            {"role", GsnRoleName(candidate.node->role)},
             {"label", candidate.node->label},
             {"content", candidate.element->content},
             {"undeveloped", candidate.element->undeveloped},

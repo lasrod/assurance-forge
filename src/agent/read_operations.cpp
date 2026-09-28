@@ -6,6 +6,7 @@
 #include "core/acp/assurance_claim_point.h"
 #include "core/assurance_tree.h"
 #include "core/reviews/review_proposal.h"
+#include "core/string_utils.h"
 #include "parser/model_utils.h"
 
 #include <algorithm>
@@ -19,34 +20,6 @@
 
 namespace agent {
 namespace {
-
-std::string Lowercased(std::string_view text) {
-    std::string lowered(text);
-    for (char& character : lowered) {
-        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-    }
-    return lowered;
-}
-
-const char* RoleName(core::NodeRole role) {
-    switch (role) {
-    case core::NodeRole::Claim:
-        return "Goal";
-    case core::NodeRole::Strategy:
-        return "Strategy";
-    case core::NodeRole::Solution:
-        return "Solution";
-    case core::NodeRole::Context:
-        return "Context";
-    case core::NodeRole::Assumption:
-        return "Assumption";
-    case core::NodeRole::Justification:
-        return "Justification";
-    case core::NodeRole::Other:
-        break;
-    }
-    return "Other";
-}
 
 int ClampedInt(const nlohmann::json& arguments, const char* key, int fallback, int maximum) {
     const nlohmann::json::const_iterator found = arguments.find(key);
@@ -89,7 +62,7 @@ bool MatchesTranslation(const parser::SacmElement& element, const std::string& q
         for (const std::pair<const std::string, std::string>& entry : texts) {
             if (entry.first == core::reviews::kPatchPrimaryLanguage)
                 continue;
-            if (Lowercased(entry.second).find(query) != std::string::npos)
+            if (core::ToLower(entry.second).find(query) != std::string::npos)
                 return true;
         }
         return false;
@@ -242,7 +215,7 @@ nlohmann::json AcpJson(const parser::AcpRecord& record) {
 }
 
 nlohmann::json TreeNodeJson(const core::TreeNode& node, int remaining_depth) {
-    nlohmann::json serialized{{"id", node.id}, {"role", RoleName(node.role)}};
+    nlohmann::json serialized{{"id", node.id}, {"role", GsnRoleName(node.role)}};
     if (!node.label.empty()) {
         serialized["label"] = node.label;
     }
@@ -303,6 +276,26 @@ std::string ArgumentFile(const ReadContext& context) {
 }
 
 } // namespace
+
+const char* GsnRoleName(core::NodeRole role) {
+    switch (role) {
+    case core::NodeRole::Claim:
+        return "Goal";
+    case core::NodeRole::Strategy:
+        return "Strategy";
+    case core::NodeRole::Solution:
+        return "Solution";
+    case core::NodeRole::Context:
+        return "Context";
+    case core::NodeRole::Assumption:
+        return "Assumption";
+    case core::NodeRole::Justification:
+        return "Justification";
+    case core::NodeRole::Other:
+        break;
+    }
+    return "Other";
+}
 
 Result Result::Ok(nlohmann::json payload) {
     return Result{std::move(payload), false};
@@ -370,21 +363,21 @@ Result FindElements(const ReadContext& context, const nlohmann::json& arguments)
         return NoCase();
     }
 
-    const std::string query = Lowercased(StringArgument(arguments, "query"));
-    const std::string type = Lowercased(StringArgument(arguments, "type"));
+    const std::string query = core::ToLower(StringArgument(arguments, "query"));
+    const std::string type = core::ToLower(StringArgument(arguments, "type"));
     const int limit = ClampedInt(arguments, "limit", kDefaultResultLimit, kMaxResultLimit);
 
     nlohmann::json matches = nlohmann::json::array();
     int total = 0;
     for (const parser::SacmElement& element : context.argument()->elements) {
-        if (!type.empty() && Lowercased(element.type) != type) {
+        if (!type.empty() && core::ToLower(element.type) != type) {
             continue;
         }
         if (!query.empty()) {
-            const bool hit = Lowercased(element.id).find(query) != std::string::npos ||
-                             Lowercased(element.name).find(query) != std::string::npos ||
-                             Lowercased(element.content).find(query) != std::string::npos ||
-                             Lowercased(element.description).find(query) != std::string::npos ||
+            const bool hit = core::ToLower(element.id).find(query) != std::string::npos ||
+                             core::ToLower(element.name).find(query) != std::string::npos ||
+                             core::ToLower(element.content).find(query) != std::string::npos ||
+                             core::ToLower(element.description).find(query) != std::string::npos ||
                              // A bilingual case is searchable in either language.
                              // Searching only the primary would report that a
                              // claim does not exist because the user asked for it
@@ -638,7 +631,7 @@ Result GetElement(const ReadContext& context, const nlohmann::json& arguments) {
 
     const core::AssuranceTree tree = core::AssuranceTree::Build(model);
     if (const core::TreeNode* node = core::FindTreeNode(tree, id)) {
-        result["gsn_role"] = RoleName(node->role);
+        result["gsn_role"] = GsnRoleName(node->role);
         if (node->parent != nullptr) {
             result["parent_id"] = node->parent->id;
         }
