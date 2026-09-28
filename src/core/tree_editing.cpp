@@ -1,5 +1,6 @@
 #include "core/tree_editing.h"
 
+#include "core/element_factory.h"
 #include "parser/model_utils.h"
 
 #include <algorithm>
@@ -100,16 +101,6 @@ bool RemoveValue(std::vector<std::string>& values, const std::string& value) {
 
 bool ContainsValue(const std::vector<std::string>& values, const std::string& value) {
     return std::find(values.begin(), values.end(), value) != values.end();
-}
-
-bool IsParserRelationshipDangling(const parser::SacmElement& relationship) {
-    if (!parser::IsRelationshipType(relationship.type))
-        return false;
-    if (relationship.target_refs.empty())
-        return true;
-    if (relationship.type == "assertedinference")
-        return relationship.source_refs.empty() && relationship.reasoning_ref.empty();
-    return relationship.source_refs.empty();
 }
 
 bool IsSacmInferenceDangling(const sacm::AssertedInference& relationship) {
@@ -784,11 +775,13 @@ bool MoveSubtree(parser::AssuranceCase& model,
 
     RemoveValue(incoming.relationship->source_refs, command.dragged_element_id);
     RemoveSourceFromSacmRelationship(package, old_relationship_id, command.dragged_element_id);
-    model.elements.erase(
-        std::remove_if(model.elements.begin(),
-                       model.elements.end(),
-                       [](const parser::SacmElement& element) { return IsParserRelationshipDangling(element); }),
-        model.elements.end());
+    model.elements.erase(std::remove_if(model.elements.begin(),
+                                        model.elements.end(),
+                                        [](const parser::SacmElement& element) {
+                                            return parser::IsRelationshipType(element.type) &&
+                                                   IsParserRelationshipDangling(element);
+                                        }),
+                         model.elements.end());
 
     parser::SacmElement new_relationship;
     new_relationship.id = new_relationship_id;

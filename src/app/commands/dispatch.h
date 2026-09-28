@@ -41,6 +41,16 @@ struct DispatchOutcome {
     std::uint64_t transaction_sequence = 0;
 };
 
+// Phase 4.3 — single chokepoint read-only enforcement. When the active
+// canvas tab is scrubbed to a historical sequence, any mutating command
+// must be refused: the canvas the user is looking at is a reconstruction
+// of a past model, while `state.app_state.loaded_case` still points at
+// the LATEST model. Letting a command through would silently mutate the
+// live model from a view of historical data — exactly the data-loss
+// hazard the inspector read-only guard already prevents for text fields.
+// Undo and redo are refused on the same test.
+bool IsActiveCanvasInHistoricalPreview(const AppRuntimeState& state);
+
 // Run `command` through the project's audit bus. Returns failure if no
 // bus or no loaded model is available. Emits `AutosaveFailedEvent` to
 // surface (or clear) the autosave banner; does NOT emit DocumentDirty /
