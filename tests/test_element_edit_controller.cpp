@@ -14,6 +14,7 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
 #include "legacy_sacm/sacm_parser.h"
+#include "support/temp_files.h"
 #include "ui/text_edit_session.h"
 
 #include <gtest/gtest.h>
@@ -152,10 +153,7 @@ TEST(ElementEditControllerTest, CommitElementTextEditHandlesAliasedNewValueRefer
   </argumentPackage>
 </sacm:AssuranceCasePackage>
 )";
-    const fs::path root = fs::temp_directory_path() /
-                          ("af_text_alias_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    fs::remove_all(root);
-    fs::create_directories(root);
+    const fs::path root = test_support::TestTempDirectory("text_alias");
     const fs::path sacm_rel = "argument.sacm";
     {
         std::ofstream out(root / sacm_rel, std::ios::binary);
@@ -256,10 +254,7 @@ TEST(ElementEditControllerTest, FlushPendingTextEditsCommitsUncommittedEditWitho
   </argumentPackage>
 </sacm:AssuranceCasePackage>
 )";
-    const fs::path root = fs::temp_directory_path() /
-                          ("af_flush_pending_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    fs::remove_all(root);
-    fs::create_directories(root);
+    const fs::path root = test_support::TestTempDirectory("flush_pending");
     const fs::path sacm_rel = "argument.sacm";
     {
         std::ofstream out(root / sacm_rel, std::ios::binary);
@@ -607,11 +602,7 @@ TEST(ElementEditControllerTest, SACM23_INT_002_ConfirmedRemovalMatchesThePreview
 // So this asserts the round trip rather than the in-memory flag: mark, save,
 // reload from disk, and expect it back.
 TEST(ElementEditControllerTest, SetElementUndevelopedSurvivesSaveAndReload) {
-    const std::filesystem::path root =
-        std::filesystem::temp_directory_path() /
-        ("af_undeveloped_roundtrip_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
+    const std::filesystem::path root = test_support::TestTempDirectory("undeveloped_roundtrip");
     const std::filesystem::path sacm_absolute = root / "argument.sacm";
     {
         std::ofstream out(sacm_absolute, std::ios::binary);
