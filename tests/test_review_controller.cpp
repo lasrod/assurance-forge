@@ -1,5 +1,6 @@
 #include "app/controllers/review_controller.h"
 #include "core/project_service.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -9,42 +10,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() noexcept {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-};
-
-std::filesystem::path MakeTempDir() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-
-    std::error_code ec;
-    std::filesystem::path temp_root = std::filesystem::temp_directory_path(ec);
-    if (ec) {
-        ADD_FAILURE() << "Failed to obtain temporary directory path: " << ec.message();
-        return {};
-    }
-
-    std::filesystem::path path = temp_root / ("assurance_forge_review_controller_test_" + std::to_string(stamp));
-
-    std::filesystem::create_directories(path, ec);
-    if (ec) {
-        ADD_FAILURE() << "Failed to create temporary directory '" << path.string() << "': " << ec.message();
-        return {};
-    }
-
-    if (!std::filesystem::is_directory(path)) {
-        ADD_FAILURE() << "Temporary directory was not created: '" << path.string() << "'";
-        return {};
-    }
-
-    return path;
-}
+using test_support::TempDir;
 
 struct ReviewHarness {
     app::AppEvents events;
@@ -188,7 +154,7 @@ TEST(ReviewControllerTest, DeleteReviewItemDeletesLinkedProposalAndItem) {
 }
 
 TEST(ReviewControllerTest, SavingAndAddingAnotherCommentKeepsEarlierCommentOpen) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -219,7 +185,7 @@ TEST(ReviewControllerTest, SavingAndAddingAnotherCommentKeepsEarlierCommentOpen)
 }
 
 TEST(ReviewControllerTest, ConfigureStorageSamePathDoesNotReloadAndClobberInMemoryState) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_controller"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;

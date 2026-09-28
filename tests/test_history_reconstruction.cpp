@@ -14,6 +14,7 @@
 #include "legacy_sacm/sacm_parser.h"
 #include "sacm_adapter/gsn_role_tag.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -34,14 +35,6 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
-std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_history_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
-
 void WriteFile(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
@@ -60,7 +53,7 @@ struct ProjectFixture {
 
 ProjectFixture MakeFixture(const std::string& tag) {
     ProjectFixture f;
-    const auto root = MakeTempProjectRoot(tag);
+    const auto root = test_support::TestTempDirectory(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, kSampleSacm);
 
@@ -304,7 +297,7 @@ TEST(HistoryReconstruction, SACM23_LIB_002_ReconstructionCarriesBareStrategyPlac
 
 TEST(HistoryReconstruction, FailsForProjectWithoutAuditStore) {
     core::AssuranceProject project;
-    project.rootPath = MakeTempProjectRoot("no_store");
+    project.rootPath = test_support::TestTempDirectory("no_store");
     auto state = core::audit::ReconstructAtSequence(project, 0);
     ASSERT_FALSE(state.has_value());
     EXPECT_NE(state.error().find("audit store"), std::string::npos);

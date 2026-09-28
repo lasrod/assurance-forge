@@ -3,6 +3,7 @@
 #include "core/confidence/confidence_store.h"
 #include "core/project_service.h"
 #include "core/sacm_identity.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -44,23 +45,7 @@ core::confidence::ConfidenceAssessment MakeFixedAssessment(const parser::SacmEle
     return assessment;
 }
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() {
-        std::filesystem::remove_all(path);
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-};
-
-std::filesystem::path MakeTempParent() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_confidence_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 bool ContainsFileWithRole(const core::AssuranceProject& project,
                           const char* relative_path,
@@ -280,7 +265,7 @@ TEST(ConfidenceStoreTest, NextAssessmentIdIgnoresANumberTooLargeToBeAnId) {
 }
 
 TEST(ConfidenceControllerTest, RefreshStaleFlagsDoesNotEmitDirtyEvent) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("confidence_store"));
     const std::filesystem::path confidence_path = tmp.path / "confidence.af.json";
 
     parser::SacmElement original = MakeClaim("G1", "Original claim text");
@@ -333,7 +318,7 @@ TEST(ConfidenceStoreTest, SetElementGidGeneratesAndMirrorsToSacmPackage) {
 }
 
 TEST(ConfidenceStoreTest, SaveConfidenceFileCreatesAnalysisSidecarAndTracksManifestRole) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("confidence_store"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;

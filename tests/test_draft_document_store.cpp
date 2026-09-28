@@ -6,6 +6,7 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -23,23 +24,8 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-TempDir MakeTempDir(const std::string& stem) {
-    static int counter = 0;
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_draft_doc_" + stem + "_" + std::to_string(++counter));
-    std::error_code ec;
-    std::filesystem::remove_all(path, ec);
-    std::filesystem::create_directories(path);
-    return TempDir{std::move(path)};
-}
+using test_support::ReadFile;
+using test_support::TempDir;
 
 // A real document produced by the real writer, rather than a hand-written XMI
 // literal: the draft is a copy of whatever the application actually holds, so a
@@ -69,15 +55,10 @@ std::string FirstClaimId(const core::AssuranceCase& model) {
     return {};
 }
 
-std::string ReadFile(const std::filesystem::path& path) {
-    const std::expected<std::string, std::string> content = core::ReadTextFile(path);
-    return content.has_value() ? content.value() : std::string{};
-}
-
 } // namespace
 
 TEST(DraftDocumentStoreTest, ANewDraftIsACopyOfTheAcceptedArgumentAndChangesNothing) {
-    const TempDir root = MakeTempDir("fresh");
+    const TempDir root(test_support::UniqueTempDirectory("fresh"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -97,7 +78,7 @@ TEST(DraftDocumentStoreTest, ANewDraftIsACopyOfTheAcceptedArgumentAndChangesNoth
 // text sitting in the project directory; creating one for every argument a user
 // merely opened would put it there without anyone proposing anything.
 TEST(DraftDocumentStoreTest, OpeningADraftDoesNotWriteAFileUntilItIsSaved) {
-    const TempDir root = MakeTempDir("nofile");
+    const TempDir root(test_support::UniqueTempDirectory("nofile"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -113,7 +94,7 @@ TEST(DraftDocumentStoreTest, OpeningADraftDoesNotWriteAFileUntilItIsSaved) {
 }
 
 TEST(DraftDocumentStoreTest, AnEditToTheDraftLeavesTheAcceptedFileByteIdentical) {
-    const TempDir root = MakeTempDir("bytestable");
+    const TempDir root(test_support::UniqueTempDirectory("bytestable"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -136,7 +117,7 @@ TEST(DraftDocumentStoreTest, AnEditToTheDraftLeavesTheAcceptedFileByteIdentical)
 }
 
 TEST(DraftDocumentStoreTest, AnEditShowsUpAsExactlyOneModifiedElement) {
-    const TempDir root = MakeTempDir("diff");
+    const TempDir root(test_support::UniqueTempDirectory("diff"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -164,7 +145,7 @@ TEST(DraftDocumentStoreTest, AnEditShowsUpAsExactlyOneModifiedElement) {
 // document would be simpler and would silently destroy every unaccepted change,
 // which is the one thing a recovery file exists to prevent.
 TEST(DraftDocumentStoreTest, ReopeningRestoresTheDraftRatherThanRederivingIt) {
-    const TempDir root = MakeTempDir("reopen");
+    const TempDir root(test_support::UniqueTempDirectory("reopen"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -201,7 +182,7 @@ TEST(DraftDocumentStoreTest, ReopeningRestoresTheDraftRatherThanRederivingIt) {
 }
 
 TEST(DraftDocumentStoreTest, AcceptReplacesTheAcceptedArgumentAndClearsTheDraft) {
-    const TempDir root = MakeTempDir("accept");
+    const TempDir root(test_support::UniqueTempDirectory("accept"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -240,7 +221,7 @@ TEST(DraftDocumentStoreTest, AcceptReplacesTheAcceptedArgumentAndClearsTheDraft)
 // safety case carries the argument, not the record of who was still proposing
 // it, so accept strips every draft tag on the way out.
 TEST(DraftDocumentStoreTest, AcceptStripsDraftProvenanceFromTheAcceptedFile) {
-    const TempDir root = MakeTempDir("provenance");
+    const TempDir root(test_support::UniqueTempDirectory("provenance"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -271,7 +252,7 @@ TEST(DraftDocumentStoreTest, AcceptStripsDraftProvenanceFromTheAcceptedFile) {
 // state offering neither accept, nor edit, nor discard, whose only exit was
 // hand-editing a file.
 TEST(DraftDocumentStoreTest, DiscardIsAvailableAndLeavesTheAcceptedArgumentUntouched) {
-    const TempDir root = MakeTempDir("discard");
+    const TempDir root(test_support::UniqueTempDirectory("discard"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -296,7 +277,7 @@ TEST(DraftDocumentStoreTest, DiscardIsAvailableAndLeavesTheAcceptedArgumentUntou
 }
 
 TEST(DraftDocumentStoreTest, DiscardingWhenThereIsNothingToDiscardSucceeds) {
-    const TempDir root = MakeTempDir("discardnothing");
+    const TempDir root(test_support::UniqueTempDirectory("discardnothing"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -316,7 +297,7 @@ TEST(DraftDocumentStoreTest, DiscardingWhenThereIsNothingToDiscardSucceeds) {
 // for a caller to read as "the draft is still there". A leftover file comes back
 // as a note, and the draft is gone from the session regardless.
 TEST(DraftDocumentStoreTest, DiscardDropsTheDraftEvenWhenTheFileCannotBeDeleted) {
-    const TempDir root = MakeTempDir("discardlocked");
+    const TempDir root(test_support::UniqueTempDirectory("discardlocked"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -342,7 +323,7 @@ TEST(DraftDocumentStoreTest, DiscardDropsTheDraftEvenWhenTheFileCannotBeDeleted)
 // Two arguments in one project legitimately reuse ids such as `G1`. Their drafts
 // must not be able to reach each other.
 TEST(DraftDocumentStoreTest, EachArgumentGetsItsOwnDraft) {
-    const TempDir root = MakeTempDir("perargument");
+    const TempDir root(test_support::UniqueTempDirectory("perargument"));
     const std::filesystem::path first = root.path / "arguments" / "main.sacm";
     const std::filesystem::path second = root.path / "arguments" / "subsystem.sacm";
 
@@ -350,7 +331,7 @@ TEST(DraftDocumentStoreTest, EachArgumentGetsItsOwnDraft) {
 }
 
 TEST(DraftDocumentStoreTest, AcceptingADraftThatChangedNothingIsHarmless) {
-    const TempDir root = MakeTempDir("noop");
+    const TempDir root(test_support::UniqueTempDirectory("noop"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -376,7 +357,7 @@ TEST(DraftDocumentStoreTest, AcceptingADraftThatChangedNothingIsHarmless) {
 // canvas as though it had none -- and stayed that way until a restart re-ran
 // the passes through `load_file`.
 TEST(DraftDocumentStoreTest, TheDraftIsProjectedTheSameWayTheAcceptedArgumentIs) {
-    const TempDir root = MakeTempDir("render_passes");
+    const TempDir root(test_support::UniqueTempDirectory("render_passes"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);
@@ -438,7 +419,7 @@ TEST(DraftDocumentStoreTest, TheDraftIsProjectedTheSameWayTheAcceptedArgumentIs)
 // contributor's next change must not start a fresh draft over it, because the
 // save that follows would replace the file with a blank copy of the argument.
 TEST(DraftDocumentStoreTest, AnUnreadableDraftIsNeverReplacedByAFreshOne) {
-    const TempDir root = MakeTempDir("unreadable");
+    const TempDir root(test_support::UniqueTempDirectory("unreadable"));
     const std::filesystem::path argument = root.path / "arguments" / "main.sacm";
     const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Kettle");
     ASSERT_NE(accepted, nullptr);

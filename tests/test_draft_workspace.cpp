@@ -10,6 +10,7 @@
 #include "core/project_file_io.h"
 #include "core/project_service.h"
 #include "core/reviews/review_proposal.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -29,14 +30,6 @@
 // says so about itself rather than leaving a half-applied argument on screen.
 
 namespace {
-
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
 
 // Makes a fixture's project root unwritable in a platform-independent way: the
 // path becomes a regular file while the original directory is kept beside it.
@@ -61,14 +54,7 @@ struct TemporarilyUnavailableProjectRoot {
     }
 };
 
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_drafts_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 core::SacmElement Claim(const std::string& id, const std::string& text, bool undeveloped = false) {
     core::SacmElement element;
@@ -162,7 +148,7 @@ core::drafts::DraftGroupRequest McpRequest(const std::string& title, const std::
 // A store opened on a real project directory, which is what exercises the
 // persistence path rather than only the in-memory one.
 struct Fixture {
-    TempDir dir{UniqueTempPath("store")};
+    TempDir dir{test_support::UniqueTempDirectory("store")};
     core::AssuranceCase accepted = BaselineCase();
     core::drafts::DraftWorkspaceStore store;
     std::filesystem::path argument_file;
@@ -1613,7 +1599,7 @@ TEST(DraftWorkspace, APromotionFromAnotherArgumentIsNotRestoredHere) {
 // --------------------------------------------------------------------------
 
 TEST(DraftWorkspace, ANewProjectIgnoresItsInternalDirectory) {
-    TempDir dir{UniqueTempPath("scaffold")};
+    TempDir dir{test_support::UniqueTempDirectory("scaffold")};
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;

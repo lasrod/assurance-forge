@@ -1,4 +1,5 @@
 #include "app/example_project.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -13,10 +14,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-void WriteFile(const fs::path& path, const std::string& text) {
-    fs::create_directories(path.parent_path());
-    std::ofstream(path, std::ios::binary) << text;
-}
+using test_support::WriteFile;
 
 std::string ReadFile(const fs::path& path) {
     std::ifstream in(path, std::ios::binary);

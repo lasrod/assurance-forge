@@ -1,5 +1,6 @@
 #include "core/reviews/review_item.h"
 #include "core/reviews/review_item_manager.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -9,23 +10,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() {
-        std::filesystem::remove_all(path);
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-};
-
-std::filesystem::path MakeTempDir() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_review_item_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 core::reviews::ReviewItem MakeItem(const std::string& id, const std::string& element_id) {
     core::reviews::ReviewItem item;
@@ -145,7 +130,7 @@ TEST(ReviewItemTest, RejectsUnsupportedReviewItemFormat) {
 }
 
 TEST(ReviewItemManagerTest, SavesLoadsAndFiltersItemsByElement) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_item"));
     std::filesystem::path review_path = temp.path / "reviews" / "review-items.af.json";
 
     core::reviews::ReviewItemManager manager;
@@ -167,7 +152,7 @@ TEST(ReviewItemManagerTest, SavesLoadsAndFiltersItemsByElement) {
 }
 
 TEST(ReviewItemManagerTest, SavesLoadsElementReviewStates) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_item"));
     std::filesystem::path review_path = temp.path / "reviews" / "review-items.af.json";
 
     core::reviews::ReviewItemManager manager;
@@ -200,7 +185,7 @@ TEST(ReviewItemManagerTest, SavesLoadsElementReviewStates) {
 // from the panel because of a read, and stayed gone until the next poll that
 // happened to succeed. Nothing on disk had changed.
 TEST(ReviewItemManagerTest, KeepsWhatItHasWhenALoadFails) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_item"));
     const std::filesystem::path review_path = temp.path / "reviews" / "review-items.af.json";
 
     core::reviews::ReviewItemManager manager;
@@ -224,7 +209,7 @@ TEST(ReviewItemManagerTest, KeepsWhatItHasWhenALoadFails) {
 // malformed rather than that it could not be read. A directory stands in for
 // the unreadable file: it exists, so Load gets past its existence check.
 TEST(ReviewItemManagerTest, AnUnreadableFileReportsTheReadErrorNotAParseError) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("review_item"));
     const std::filesystem::path review_path = temp.path / "review-items.af.json";
     std::filesystem::create_directories(review_path);
 

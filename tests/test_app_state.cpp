@@ -4,6 +4,7 @@
 #include "core/terminology_package_service.h"
 #include "core/acp/assurance_claim_point.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -13,22 +14,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path MakeTempDir() {
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_app_state_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 const parser::SacmElement* FindElement(const parser::AssuranceCase& model, const std::string& id) {
     for (const parser::SacmElement& element : model.elements) {
@@ -57,7 +43,7 @@ std::string ReadTextFile(const std::filesystem::path& path) {
 } // namespace
 
 TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSolutions) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     const std::filesystem::path sacm_path = temp.path / "case.sacm";
     std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
@@ -106,7 +92,7 @@ TEST(AppStateTest, LoadFileHidesTerminologyArtifactReferencesButKeepsEvidenceSol
 // including the statement surfacing in `content` (slice 1b: statement =
 // Description).
 TEST(AppStateTest, LoadFileUsesTheLibraryDocumentAsTheSourceOfTruth) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     const std::filesystem::path sacm_path = temp.path / "case.sacm";
     std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" id="CASE" name="Case">
@@ -135,7 +121,7 @@ TEST(AppStateTest, LoadFileUsesTheLibraryDocumentAsTheSourceOfTruth) {
 // triggers the library's XXE rejection, so such a file now fails to open cleanly
 // instead of being accepted by a less-strict legacy parser.
 TEST(AppStateTest, LoadFileRejectsDoctypeFileLibraryOnly) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     const std::filesystem::path sacm_path = temp.path / "doctype.sacm";
     std::ofstream(sacm_path) << R"(<?xml version="1.0"?>
 <!DOCTYPE AssuranceCasePackage>
@@ -159,7 +145,7 @@ TEST(AppStateTest, LoadFileRejectsDoctypeFileLibraryOnly) {
 }
 
 TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     std::filesystem::create_directories(temp.path / "arguments");
     const std::filesystem::path relative_path = std::filesystem::path("arguments") / "main.sacm";
     const std::filesystem::path sacm_path = temp.path / relative_path;
@@ -197,7 +183,7 @@ TEST(AppStateTest, OpenProjectSacmFilePreservesActiveProjectFile) {
 // frozen mid-promotion. Found from a project whose `.af` held a zero-byte
 // transaction log, no manifest and no snapshots at all.
 TEST(AppStateTest, ACreatedProjectIsAuditableInTheSessionThatCreatedIt) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     core::AppState state;
     ASSERT_TRUE(state.create_empty_project("Project", temp.path.string())) << state.status_message;
     ASSERT_TRUE(state.current_project.has_value());
@@ -224,7 +210,7 @@ TEST(AppStateTest, ACreatedProjectIsAuditableInTheSessionThatCreatedIt) {
 // The same first-session guarantee for a project created from an existing
 // SACM file: the imported argument is snapshot 0 and the bus opens over it.
 TEST(AppStateTest, AProjectCreatedFromSacmIsAuditableInTheSessionThatCreatedIt) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     core::AppState donor;
     ASSERT_TRUE(donor.create_empty_project("Donor", temp.path.string())) << donor.status_message;
     const std::filesystem::path source = temp.path / "existing-case.xml";
@@ -263,7 +249,7 @@ TEST(AppStateTest, AProjectCreatedFromSacmIsAuditableInTheSessionThatCreatedIt) 
 // File > Import SACM File: the copy is tracked, opens as the active argument,
 // and has its own audit store so it is auditable from the first edit.
 TEST(AppStateTest, ImportedSacmFileIsTrackedAndOpensAsTheActiveArgument) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     core::AppState donor;
     ASSERT_TRUE(donor.create_empty_project("Donor", temp.path.string())) << donor.status_message;
     const std::filesystem::path source = donor.current_project->rootPath / "arguments" / "main.sacm";
@@ -289,7 +275,7 @@ TEST(AppStateTest, ImportedSacmFileIsTrackedAndOpensAsTheActiveArgument) {
 }
 
 TEST(AppStateTest, FailedProjectSacmOpenPreservesCurrentDocument) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     core::AppState state;
     ASSERT_TRUE(state.create_empty_project("Project", temp.path.string())) << state.status_message;
     ASSERT_TRUE(state.current_project.has_value());
@@ -316,7 +302,7 @@ TEST(AppStateTest, FailedProjectSacmOpenPreservesCurrentDocument) {
 }
 
 TEST(AppStateTest, SaveProjectKeepsSacmTargetAfterOpeningNonSacmFile) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     core::AppState state;
     ASSERT_TRUE(state.create_empty_project("Project", temp.path.string())) << state.status_message;
     ASSERT_TRUE(state.current_project.has_value());
@@ -357,7 +343,7 @@ TEST(AppStateTest, SaveProjectKeepsSacmTargetAfterOpeningNonSacmFile) {
 }
 
 TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     const std::filesystem::path sacm_path = temp.path / "case.sacm";
     std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
@@ -403,7 +389,7 @@ TEST(AppStateTest, LoadFileKeepsVisibleTerminologyContextOnCanvas) {
 }
 
 TEST(AppStateTest, LoadFileKeepsBrokenVisibleTerminologyContextRepairable) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     const std::filesystem::path sacm_path = temp.path / "case.sacm";
     std::ofstream(sacm_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="urn:test" id="T" name="T">
@@ -441,7 +427,7 @@ TEST(AppStateTest, LoadFileKeepsBrokenVisibleTerminologyContextRepairable) {
 // from the library instead must reconstruct it fully -- including vendor tags
 // (ACP) -- or terminology display, ACP, and re-save (data loss) break.
 TEST(AppStateTest, LoadFileFromLibraryXmiPopulatesSacmPackageWithTags) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
 
     // Save fixture_acp_parity as library XMI (the format Stage 6 writes).
     const std::filesystem::path src =
@@ -489,7 +475,7 @@ TEST(AppStateTest, LoadFileFromLibraryXmiPopulatesSacmPackageWithTags) {
 // round-tripped through save + reload must come back as two argument packages,
 // with the confidence marker intact.
 TEST(AppStateTest, LoadFileFromLibraryXmiPreservesMultipleArgumentPackages) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("app_state"));
     const std::filesystem::path source_path = temp.path / "two_packages.sacm";
     std::ofstream(source_path) << R"(<?xml version="1.0" encoding="UTF-8"?>
 <sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" id="CASE" name="Case">

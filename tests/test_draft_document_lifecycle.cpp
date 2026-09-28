@@ -2,6 +2,7 @@
 
 #include "core/app_state.h"
 #include "core/drafts/draft_document_store.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -20,22 +21,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_draft_lifecycle_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 bool OpenProjectWithArgument(core::AppState& state, const std::filesystem::path& workspace) {
     if (!state.create_empty_project("Project", workspace.string())) {
@@ -63,7 +49,7 @@ core::SacmElement Strategy(const std::string& id) {
 // Opening an argument is not drafting against it. A draft is unaccepted work,
 // and there is none until somebody makes some.
 TEST(DraftDocumentLifecycle, OpeningAnArgumentNobodyHasDraftedAgainstCreatesNoDraft) {
-    TempDir workspace{UniqueTempPath("no-draft")};
+    TempDir workspace{test_support::UniqueTempDirectory("no-draft")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
     ASSERT_NE(state.library_document, nullptr);
@@ -79,7 +65,7 @@ TEST(DraftDocumentLifecycle, OpeningAnArgumentNobodyHasDraftedAgainstCreatesNoDr
 // The reported defect, at the level that produced it: the user right-clicked a
 // goal and added a strategy, and the banner said the draft removed two things.
 TEST(DraftDocumentLifecycle, AnElementTheUserJustAddedIsNotReportedAsADraftRemoval) {
-    TempDir workspace{UniqueTempPath("added-not-removed")};
+    TempDir workspace{test_support::UniqueTempDirectory("added-not-removed")};
     app::AppRuntimeState state;
     ASSERT_TRUE(OpenProjectWithArgument(state.app_state, workspace.path));
     ASSERT_NE(state.app_state.library_document, nullptr);
@@ -104,7 +90,7 @@ TEST(DraftDocumentLifecycle, AnElementTheUserJustAddedIsNotReportedAsADraftRemov
 // re-derived from the accepted argument -- that would silently destroy the
 // unaccepted work the file exists to protect.
 TEST(DraftDocumentLifecycle, AnExistingDraftIsStillOpenedAndStillNotRederived) {
-    TempDir workspace{UniqueTempPath("existing")};
+    TempDir workspace{test_support::UniqueTempDirectory("existing")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
     ASSERT_NE(state.library_document, nullptr);
@@ -127,7 +113,7 @@ TEST(DraftDocumentLifecycle, AnExistingDraftIsStillOpenedAndStillNotRederived) {
 // that is already there rather than replace it with a fresh copy of the
 // accepted argument.
 TEST(DraftDocumentLifecycle, CreatingADraftThatAlreadyExistsLeavesItAlone) {
-    TempDir workspace{UniqueTempPath("idempotent")};
+    TempDir workspace{test_support::UniqueTempDirectory("idempotent")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
     ASSERT_NE(state.library_document, nullptr);

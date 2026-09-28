@@ -22,6 +22,7 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -46,15 +47,6 @@ constexpr const char* kSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
   </argumentPackage>
 </sacm:AssuranceCasePackage>
 )";
-
-std::filesystem::path MakeTempRoot(const std::string& tag) {
-    const std::filesystem::path root =
-        std::filesystem::temp_directory_path() /
-        ("af_evidence_location_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
 
 void WriteFile(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
@@ -84,7 +76,7 @@ int CountElementsOfType(const core::AssuranceCase& model, const std::string& typ
 }
 
 TEST(EvidenceLocation, SeamCreatesTheResourceTheFirstTimeAndReusesItAfter) {
-    const std::filesystem::path root = MakeTempRoot("seam");
+    const std::filesystem::path root = test_support::TestTempDirectory("seam");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -127,7 +119,7 @@ TEST(EvidenceLocation, SeamCreatesTheResourceTheFirstTimeAndReusesItAfter) {
 }
 
 TEST(EvidenceLocation, SeamRefusesAnythingThatIsNotAnArtifactReference) {
-    const std::filesystem::path root = MakeTempRoot("refuse");
+    const std::filesystem::path root = test_support::TestTempDirectory("refuse");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -164,7 +156,7 @@ struct BusFixture {
 
 std::unique_ptr<BusFixture> MakeBusFixture(const std::string& tag, bool library_backed) {
     auto fixture = std::make_unique<BusFixture>();
-    const std::filesystem::path root = MakeTempRoot(tag);
+    const std::filesystem::path root = test_support::TestTempDirectory(tag);
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, kSacm);
 
@@ -273,7 +265,7 @@ core::reviews::PatchOperation SetLocationOp(const std::string& element_id, const
 }
 
 TEST(EvidenceLocation, DraftOperationRecordsTheLocationOrIsRefusedInTheCallThatMadeIt) {
-    const std::filesystem::path root = MakeTempRoot("draft");
+    const std::filesystem::path root = test_support::TestTempDirectory("draft");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -314,7 +306,7 @@ TEST(EvidenceRecord, AttributeTokensRoundTrip) {
 }
 
 TEST(EvidenceRecord, SeamCreatesTheArtifactOnceAndRecordsEachColumn) {
-    const std::filesystem::path root = MakeTempRoot("record");
+    const std::filesystem::path root = test_support::TestTempDirectory("record");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -400,7 +392,7 @@ TEST(EvidenceRecord, SeamCreatesTheArtifactOnceAndRecordsEachColumn) {
 }
 
 TEST(EvidenceRecord, SeamRefusesNonEvidenceAndCreatesNothingForAClear) {
-    const std::filesystem::path root = MakeTempRoot("record_refuse");
+    const std::filesystem::path root = test_support::TestTempDirectory("record_refuse");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -481,7 +473,7 @@ SetAttributeOp(const std::string& element_id, const std::string& column, const s
 }
 
 TEST(EvidenceRecord, DraftOperationRecordsAColumnOrRefusesAnUnknownOne) {
-    const std::filesystem::path root = MakeTempRoot("record_draft");
+    const std::filesystem::path root = test_support::TestTempDirectory("record_draft");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -506,7 +498,7 @@ TEST(EvidenceRecord, DraftOperationRecordsAColumnOrRefusesAnUnknownOne) {
 }
 
 TEST(EvidenceRecord, APickedFileInsideTheProjectIsRecordedRelativeToIt) {
-    const std::filesystem::path root = MakeTempRoot("picked");
+    const std::filesystem::path root = test_support::TestTempDirectory("picked");
     std::filesystem::create_directories(root / "evidence" / "reports");
     WriteFile(root / "evidence" / "reports" / "ra-001.pdf", "pdf");
     EXPECT_EQ(core::EvidenceLocationForPickedFile(root, root / "evidence" / "reports" / "ra-001.pdf"),
@@ -514,7 +506,7 @@ TEST(EvidenceRecord, APickedFileInsideTheProjectIsRecordedRelativeToIt) {
 
     // Outside the project, the absolute path is kept: a relative one that
     // climbs out would break as soon as the project moved.
-    const std::filesystem::path elsewhere = MakeTempRoot("picked_elsewhere");
+    const std::filesystem::path elsewhere = test_support::TestTempDirectory("picked_elsewhere");
     WriteFile(elsewhere / "shared.pdf", "pdf");
     const std::string outside = core::EvidenceLocationForPickedFile(root, elsewhere / "shared.pdf");
     EXPECT_EQ(outside.rfind("..", 0), std::string::npos) << outside;
@@ -629,7 +621,7 @@ SupportOp(core::reviews::PatchOperationType type, const std::string& evidence_id
 // AssertedInference and so could never find the AssertedEvidence a solution
 // attaches by.
 TEST(EvidenceAuthoring, DraftRemoveSupportedByWithdrawsEvidenceAndAddSupportedByRestoresIt) {
-    const std::filesystem::path root = MakeTempRoot("author_draft");
+    const std::filesystem::path root = test_support::TestTempDirectory("author_draft");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
     ASSERT_NE(SupportLink(sacm_adapter::project_case(*document), "G1", "Sn1"), nullptr);
@@ -669,7 +661,7 @@ TEST(CseAssessment, AttributeTokensRoundTrip) {
 }
 
 TEST(CseAssessment, SeamRecordsEachColumnOnTheSupportRelationship) {
-    const std::filesystem::path root = MakeTempRoot("cse_seam");
+    const std::filesystem::path root = test_support::TestTempDirectory("cse_seam");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 
@@ -774,7 +766,7 @@ SetCseOp(const std::string& relationship_id, const std::string& column, const st
 }
 
 TEST(CseAssessment, DraftOperationRecordsAColumnOrRefusesAnUnknownOne) {
-    const std::filesystem::path root = MakeTempRoot("cse_draft");
+    const std::filesystem::path root = test_support::TestTempDirectory("cse_draft");
     std::unique_ptr<sacm_adapter::LibraryDocument> document = LoadSample(root);
     ASSERT_NE(document, nullptr);
 

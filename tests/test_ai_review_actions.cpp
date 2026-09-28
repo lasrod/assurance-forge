@@ -9,6 +9,7 @@
 #include "parser/model_utils.h"
 #include "review/sccg/suggestion_mapping.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 #include "ui/ui_state.h"
 
 #include <gtest/gtest.h>
@@ -22,23 +23,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-
-    explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() {
-        std::error_code error;
-        std::filesystem::remove_all(path, error);
-    }
-};
-
-TempDir MakeTempDir(const std::string& stem) {
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_ai_review_actions_" + stem + "_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return TempDir(path);
-}
+using test_support::TempDir;
 
 parser::AssuranceCase MakeAcceptedCase() {
     parser::AssuranceCase model;
@@ -160,7 +145,7 @@ TEST(AiReviewActionsTest, DoesNotBuildReviewInputWithoutALoadedCase) {
 }
 
 TEST(AiReviewActionsTest, BuildsReviewFromTheMaterializedWorkingDraft) {
-    TempDir temp = MakeTempDir("working_view");
+    TempDir temp(test_support::UniqueTempDirectory("working_view"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCase();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -179,7 +164,7 @@ TEST(AiReviewActionsTest, BuildsReviewFromTheMaterializedWorkingDraft) {
 }
 
 TEST(AiReviewActionsTest, SuggestedTextBecomesAReadySccgDraftGroupAgainstTheReviewedWorkingModel) {
-    TempDir temp = MakeTempDir("suggestion");
+    TempDir temp(test_support::UniqueTempDirectory("suggestion"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCase();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -233,7 +218,7 @@ TEST(AiReviewActionsTest, SuggestedTextBecomesAReadySccgDraftGroupAgainstTheRevi
 // whole-model hash discards nearly every completed review -- including reviews
 // of branches nothing touched (ADR 0013).
 TEST(AiReviewActionsTest, StagesSuggestionsWhenOnlyAnUnreviewedElementChanged) {
-    TempDir temp = MakeTempDir("unrelated_edit");
+    TempDir temp(test_support::UniqueTempDirectory("unrelated_edit"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -264,7 +249,7 @@ TEST(AiReviewActionsTest, StagesSuggestionsWhenOnlyAnUnreviewedElementChanged) {
 // The other direction: an edit to an element the review actually read does
 // invalidate it, because the suggestion answers text that no longer stands.
 TEST(AiReviewActionsTest, RefusesSuggestionsWhenAReviewedElementChanged) {
-    TempDir temp = MakeTempDir("in_scope_edit");
+    TempDir temp(test_support::UniqueTempDirectory("in_scope_edit"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -300,7 +285,7 @@ TEST(AiReviewActionsTest, RefusesSuggestionsWhenAReviewedElementChanged) {
 // the mapper's own tests: the draft document refuses an operation the SACM model
 // cannot hold, in the call that makes it (ADR 0016).
 TEST(AiReviewActionsTest, AnAr2FindingStagesACreatedStrategyAndItsAttachments) {
-    TempDir temp = MakeTempDir("structural");
+    TempDir temp(test_support::UniqueTempDirectory("structural"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -359,7 +344,7 @@ TEST(AiReviewActionsTest, AnAr2FindingStagesACreatedStrategyAndItsAttachments) {
 // The scope rule reaches the application surface, not only the mapper: an
 // operation naming an element this review never read stages nothing.
 TEST(AiReviewActionsTest, RefusesAStructuralRepairReachingOutsideTheReviewedScope) {
-    TempDir temp = MakeTempDir("out_of_scope");
+    TempDir temp(test_support::UniqueTempDirectory("out_of_scope"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCaseWithASecondBranch();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -397,7 +382,7 @@ TEST(AiReviewActionsTest, RefusesAStructuralRepairReachingOutsideTheReviewedScop
 }
 
 TEST(AiReviewActionsTest, RefusesToStageSuggestionsWhenTheWorkingDraftChangedAfterReview) {
-    TempDir temp = MakeTempDir("stale");
+    TempDir temp(test_support::UniqueTempDirectory("stale"));
     app::AppRuntimeState state;
     state.app_state.loaded_case = MakeAcceptedCase();
     OpenDraftStore(state, temp, *state.app_state.loaded_case);
@@ -422,7 +407,7 @@ TEST(AiReviewActionsTest, RefusesToStageSuggestionsWhenTheWorkingDraftChangedAft
 // it is what the canvas draws and what Accept writes. A suggestion staged
 // anywhere else is shown to nobody and accepted by nothing.
 TEST(AiReviewActionsTest, WithADraftDocumentASuggestionReachesTheDocumentAndSurvivesAccept) {
-    TempDir temp = MakeTempDir("document_backed");
+    TempDir temp(test_support::UniqueTempDirectory("document_backed"));
     const std::filesystem::path argument = temp.path / "argument.sacm";
     const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi("Kettle");
     ASSERT_TRUE(seed.ok);
@@ -505,7 +490,7 @@ TEST(AiReviewActionsTest, WithADraftDocumentASuggestionReachesTheDocumentAndSurv
 // records it -- so a review reading the change-group materialization judged the
 // accepted wording the user had already replaced.
 TEST(AiReviewActionsTest, WithADraftDocumentTheReviewReadsTheUsersDraftEdits) {
-    TempDir temp = MakeTempDir("document_review_input");
+    TempDir temp(test_support::UniqueTempDirectory("document_review_input"));
     const std::filesystem::path argument = temp.path / "argument.sacm";
     const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi("Kettle");
     ASSERT_TRUE(seed.ok);
@@ -556,7 +541,7 @@ TEST(AiReviewActionsTest, WithADraftDocumentTheReviewReadsTheUsersDraftEdits) {
 // accept would then clear it -- so a suggestion joins them on the path that can
 // still show and accept them.
 TEST(AiReviewActionsTest, SuggestionsJoinLegacyChangeGroupsRatherThanStartADocumentBesideThem) {
-    TempDir temp = MakeTempDir("legacy_groups");
+    TempDir temp(test_support::UniqueTempDirectory("legacy_groups"));
     const std::filesystem::path argument = temp.path / "argument.sacm";
     const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi("Kettle");
     ASSERT_TRUE(seed.ok);

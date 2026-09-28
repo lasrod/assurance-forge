@@ -3,6 +3,7 @@
 #include "app/app_runtime_state.h"
 #include "core/drafts/draft_workspace_store.h"
 #include "core/reviews/review_proposal.h"
+#include "support/temp_files.h"
 #include "ui/ui_state.h"
 
 #include <gtest/gtest.h>
@@ -23,22 +24,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_draftpanel_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 core::SacmElement Claim(const std::string& id, const std::string& text) {
     core::SacmElement element;
@@ -83,7 +69,7 @@ core::reviews::PatchOperation UpdateTextOp(const std::string& element_id, const 
 // An `AppRuntimeState` with a project, an accepted argument and a draft store
 // open on it -- everything `BuildDraftChangesPanelModel` reads.
 struct Fixture {
-    TempDir dir{UniqueTempPath("state")};
+    TempDir dir{test_support::UniqueTempDirectory("state")};
     app::AppRuntimeState state;
     std::filesystem::path argument_file;
 

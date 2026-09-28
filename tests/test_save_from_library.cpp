@@ -33,6 +33,7 @@
 #include "core/project_model.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -101,49 +102,13 @@ constexpr const char* kCounterArgumentSacm = R"(<?xml version="1.0" encoding="UT
 </sacm:AssuranceCasePackage>
 )";
 
-// Movable so a fixture can be returned by value; the moved-from instance clears
-// its path and therefore removes nothing.
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    TempDir(TempDir&& other) noexcept : path(std::move(other.path)) {
-        other.path.clear();
-    }
-    TempDir& operator=(TempDir&& other) noexcept {
-        path = std::move(other.path);
-        other.path.clear();
-        return *this;
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    ~TempDir() {
-        if (path.empty())
-            return;
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path MakeTempDir(const std::string& tag) {
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_save_from_library_" + tag + "_" + std::to_string(stamp));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::ReadFile;
+using test_support::TempDir;
 
 void WriteFile(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
     out.write(content.data(), static_cast<std::streamsize>(content.size()));
-}
-
-std::string ReadFile(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    std::ostringstream buffer;
-    buffer << in.rdbuf();
-    return buffer.str();
 }
 
 bool Contains(const std::string& haystack, std::string_view needle) {
@@ -170,7 +135,7 @@ std::size_t CountOccurrences(std::string_view haystack, std::string_view needle)
 }
 
 ProjectFixture MakeProject(const std::string& tag, const char* sacm_xml = kVendorExtendedSacm) {
-    ProjectFixture fixture{TempDir(MakeTempDir(tag))};
+    ProjectFixture fixture{TempDir(test_support::UniqueTempDirectory(tag))};
     WriteFile(fixture.temp.path / fixture.sacm_relative, sacm_xml);
 
     fixture.project.id = "p";
@@ -432,7 +397,7 @@ TEST(SaveFromLibrary, SACM23_LIB_002_RepeatedSavesAreByteStableForRepositoryCase
         "tests/data/fixture_roundtrip_open_autonomy.sacm.xml",
     };
 
-    TempDir temp(MakeTempDir("repo_cases"));
+    TempDir temp(test_support::UniqueTempDirectory("repo_cases"));
     for (const std::string& relative : cases) {
         SCOPED_TRACE(relative);
         const std::filesystem::path source = std::filesystem::path(AF_REPO_ROOT) / relative;

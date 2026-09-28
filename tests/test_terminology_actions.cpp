@@ -5,6 +5,7 @@
 #include "core/audit/audit_paths.h"
 #include "core/audit/audit_store.h"
 #include "core/project_model.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -73,11 +74,7 @@ struct ActionFixture {
 
 std::unique_ptr<ActionFixture> MakeActionFixture(const std::string& tag, std::string_view content) {
     auto fixture = std::make_unique<ActionFixture>();
-    fixture->root =
-        std::filesystem::temp_directory_path() /
-        ("af_term_actions_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(fixture->root);
-    std::filesystem::create_directories(fixture->root);
+    fixture->root = test_support::TestTempDirectory("term_actions_" + tag);
 
     const std::filesystem::path relative = "argument.sacm";
     fixture->sacm_absolute = fixture->root / relative;

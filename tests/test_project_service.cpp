@@ -6,6 +6,7 @@
 #include "sacm/metadata/namespaces.h"
 #include "sacm/model/document.h"
 #include "sacm/validation/validate.h"
+#include "support/temp_files.h"
 
 #include <algorithm>
 #include <chrono>
@@ -17,23 +18,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path p) : path(std::move(p)) {}
-    ~TempDir() {
-        std::filesystem::remove_all(path);
-    }
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-};
-
-std::filesystem::path MakeTempParent() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_project_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 bool ContainsFileWithRole(const core::AssuranceProject& project,
                           const char* relative_path,
@@ -62,7 +47,7 @@ std::string ReportSummary(const core::ProjectLoadReport& report) {
 // yields nothing, so it used to read back as empty text and reach a parser as
 // if a file had been emptied.
 TEST(ProjectFileIoTest, ReadingADirectoryIsAnErrorNotEmptyText) {
-    TempDir temp(MakeTempParent());
+    TempDir temp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path directory = temp.path / "not-a-file.json";
     std::filesystem::create_directories(directory);
 
@@ -75,7 +60,7 @@ TEST(ProjectFileIoTest, ReadingADirectoryIsAnErrorNotEmptyText) {
 // itself refuses on. One rule with two callers: a dialog that offers a Create
 // the create would reject is how "nothing happens when I press it" is built.
 TEST(ProjectServiceTest, TheCreateObstacleAndTheCreateItselfAgree) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path& parent = tmp.path;
 
     EXPECT_EQ(core::ProjectService::FindCreateProjectObstacle("MySafetyCase", parent),
@@ -113,7 +98,7 @@ TEST(ProjectServiceTest, TheCreateObstacleAndTheCreateItselfAgree) {
 }
 
 TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -156,7 +141,7 @@ TEST(ProjectServiceTest, CreateEmptyProjectCreatesRequiredStructureAndManifest) 
 // dialect. Asserted through a STRICT load, which is what makes the difference
 // visible -- a tolerant load passes either way.
 TEST(ProjectServiceTest, SACM23_LIB_002_NewProjectSeedIsStrictSacm23Xmi) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     std::string error;
@@ -195,7 +180,7 @@ TEST(ProjectServiceTest, SACM23_LIB_002_NewProjectSeedIsStrictSacm23Xmi) {
 }
 
 TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -228,7 +213,7 @@ TEST(ProjectServiceTest, AddProjectFilesNormalizesNamesAndTracksManifestEntries)
 }
 
 TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -258,7 +243,7 @@ TEST(ProjectServiceTest, AddAndRemoveReviewProposalTracksManifestEntry) {
 }
 
 TEST(ProjectServiceTest, TrackExistingExportedReportAddsExportsManifestEntry) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -286,7 +271,7 @@ TEST(ProjectServiceTest, TrackExistingExportedReportAddsExportsManifestEntry) {
 }
 
 TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -333,7 +318,7 @@ TEST(ProjectServiceTest, SaveReviewProposalFileRefreshesTrackedHash) {
 }
 
 TEST(ProjectServiceTest, SaveReviewItemsFileRefreshesTrackedHash) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -366,7 +351,7 @@ TEST(ProjectServiceTest, SaveReviewItemsFileRefreshesTrackedHash) {
 }
 
 TEST(ProjectServiceTest, OpenProjectReportsExternallyModifiedAndMissingFiles) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     auto& parent = tmp.path;
     core::AssuranceProject project;
     core::ProjectLoadReport report;
@@ -427,7 +412,7 @@ core::ProjectFileState EvidenceRegisterState(const core::AssuranceProject& proje
 // not reported again -- and acknowledging does not rewrite af.proj, whose
 // recorded hash is the evidence that the file was edited outside the tool.
 TEST(ProjectServiceTest, AnAcknowledgedExternalChangeIsNotReportedAgainAndTheManifestKeepsItsHash) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     core::ProjectFileEntry entry;
@@ -478,7 +463,7 @@ TEST(ProjectServiceTest, AnAcknowledgedExternalChangeIsNotReportedAgainAndTheMan
 // case is the control: the same entry in the written format does acknowledge, so
 // each refusal below is about the shape and not about a hash that never matched.
 TEST(ProjectServiceTest, AnAcknowledgementFileNotInTheWrittenFormatAcknowledgesNothing) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     core::ProjectFileEntry entry;
@@ -542,7 +527,7 @@ TEST(ProjectServiceTest, AnAcknowledgementFileNotInTheWrittenFormatAcknowledgesN
 // and acknowledged, then to B and acknowledged, then back to A is back at a change
 // already acknowledged.
 TEST(ProjectServiceTest, AReturnToAnAcknowledgedChangeIsNotReportedAgain) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     core::ProjectFileEntry entry;
@@ -578,7 +563,7 @@ TEST(ProjectServiceTest, AReturnToAnAcknowledgedChangeIsNotReportedAgain) {
 // An acknowledged change must not hide a missing file in the load report: the
 // missing file is what keeps the popup open, so the message has to name it.
 TEST(ProjectServiceTest, AnAcknowledgedChangeDoesNotHideAMissingFileInTheLoadReport) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     core::AssuranceProject project;
     core::ProjectLoadReport report;
     core::ProjectFileEntry entry;
@@ -658,7 +643,7 @@ TEST(ProjectServiceTest, DefaultImportedSacmFileNameKeepsTheStemAndNormalizesThe
 // project unchanged, tracked under its role, and be there when the manifest is
 // read back.
 TEST(ProjectServiceTest, ImportSacmFileCopiesTheArgumentByteForByteAndTracksIt) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.xml");
 
     core::AssuranceProject project;
@@ -696,7 +681,7 @@ TEST(ProjectServiceTest, ImportSacmFileCopiesTheArgumentByteForByteAndTracksIt) 
 // the disk let an import add a second manifest entry for the same path, so the
 // project reported the file missing and fresh at once.
 TEST(ProjectServiceTest, ImportSacmFileRefusesAPathTheManifestTracksEvenWhenTheFileIsMissing) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.xml");
 
     core::AssuranceProject project;
@@ -722,7 +707,7 @@ TEST(ProjectServiceTest, ImportSacmFileRefusesAPathTheManifestTracksEvenWhenTheF
 // The project must never track an argument it cannot open. A file the library
 // refuses is refused here, with the library's reason, and nothing changes.
 TEST(ProjectServiceTest, ImportSacmFileRefusesAFileTheLibraryCannotLoad) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path bogus = tmp.path / "not-a-case.sacm";
     {
         std::ofstream out(bogus);
@@ -750,7 +735,7 @@ TEST(ProjectServiceTest, ImportSacmFileRefusesAFileTheLibraryCannotLoad) {
 // project's first (and only) argument, the review file is there as for an empty
 // create, and the report says the project is healthy.
 TEST(ProjectServiceTest, CreateProjectFromSacmMakesTheCopyTheFirstArgument) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path source = WriteLoadableSacm(tmp.path, "existing-case.xml");
 
     core::AssuranceProject project;
@@ -780,7 +765,7 @@ TEST(ProjectServiceTest, CreateProjectFromSacmMakesTheCopyTheFirstArgument) {
 // attempt with the same name would then be told the folder already exists,
 // for a project that was never made.
 TEST(ProjectServiceTest, CreateProjectFromSacmRefusesBeforeScaffolding) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
     const std::filesystem::path bogus = tmp.path / "not-a-case.sacm";
     {
         std::ofstream out(bogus);
@@ -804,7 +789,7 @@ TEST(ProjectServiceTest, CreateProjectFromSacmRefusesBeforeScaffolding) {
 
 // success with the buffer's tail left as zeros.
 TEST(ProjectFileIoTest, ReadFileBytesReturnsEveryByteOrSaysWhyNot) {
-    TempDir tmp(MakeTempParent());
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
 
     const std::filesystem::path empty_path = tmp.path / "empty.bin";
     { std::ofstream out(empty_path, std::ios::binary); }

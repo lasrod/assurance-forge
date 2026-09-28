@@ -15,6 +15,7 @@
 #include "core/element_factory.h"
 #include "core/project_model.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -56,11 +57,7 @@ constexpr const char* kAcceptedSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
-void WriteFile(const std::filesystem::path& path, std::string_view content) {
-    std::filesystem::create_directories(path.parent_path());
-    std::ofstream out(path, std::ios::binary);
-    out.write(content.data(), static_cast<std::streamsize>(content.size()));
-}
+using test_support::WriteFile;
 
 struct AcceptFixture {
     std::filesystem::path root;
@@ -83,11 +80,7 @@ struct AcceptFixture {
 // state the application is in when the user presses Accept.
 std::unique_ptr<AcceptFixture> OpenFixture(const std::string& tag) {
     auto fixture = std::make_unique<AcceptFixture>();
-    fixture->root =
-        std::filesystem::temp_directory_path() /
-        ("af_audit_accept_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(fixture->root);
-    std::filesystem::create_directories(fixture->root);
+    fixture->root = test_support::TestTempDirectory("audit_accept_" + tag);
     WriteFile(fixture->sacm_absolute(), kSampleSacm);
 
     fixture->project.id = "p";

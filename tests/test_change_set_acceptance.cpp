@@ -15,6 +15,7 @@
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -42,11 +43,7 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
-void WriteFile(const std::filesystem::path& path, std::string_view content) {
-    std::filesystem::create_directories(path.parent_path());
-    std::ofstream out(path, std::ios::binary);
-    out.write(content.data(), static_cast<std::streamsize>(content.size()));
-}
+using test_support::WriteFile;
 
 struct ProjectFixture {
     core::AssuranceProject project;
@@ -57,11 +54,7 @@ struct ProjectFixture {
 
 ProjectFixture MakeFixture(const std::string& tag, std::string_view sacm_content = kSampleSacm) {
     ProjectFixture f;
-    const std::filesystem::path root =
-        std::filesystem::temp_directory_path() /
-        ("af_changeset_accept_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
+    const std::filesystem::path root = test_support::TestTempDirectory("changeset_accept_" + tag);
 
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, sacm_content);

@@ -1,4 +1,5 @@
 #include "ai/ai_service.h"
+#include "support/temp_files.h"
 
 #include <chrono>
 #include <filesystem>
@@ -9,21 +10,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    explicit TempDir(std::filesystem::path value) : path(std::move(value)) {}
-    ~TempDir() {
-        std::filesystem::remove_all(path);
-    }
-};
-
-std::filesystem::path MakeTempDir() {
-    auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("assurance_forge_ai_service_test_" + std::to_string(stamp));
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 class FakeSecretStore final : public ai::ISecretStore {
 public:
@@ -95,7 +82,7 @@ struct TestAiEnvironment {
 } // namespace
 
 TEST(AiServiceTest, DisabledSettingsBlockConnectionTest) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("ai_service"));
     TestAiEnvironment env(temp.path / "settings.json");
 
     ai::AiConnectionStatus status = env.service.TestConnection();
@@ -104,7 +91,7 @@ TEST(AiServiceTest, DisabledSettingsBlockConnectionTest) {
 }
 
 TEST(AiServiceTest, MissingKeyIsReportedWithoutProviderCall) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("ai_service"));
     TestAiEnvironment env(temp.path / "settings.json");
     ai::AiProviderSettings settings;
     settings.enabled = true;
@@ -117,7 +104,7 @@ TEST(AiServiceTest, MissingKeyIsReportedWithoutProviderCall) {
 }
 
 TEST(AiServiceTest, StoredKeyAllowsConnectionTest) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("ai_service"));
     TestAiEnvironment env(temp.path / "settings.json");
     ai::AiProviderSettings settings;
     settings.enabled = true;
@@ -131,7 +118,7 @@ TEST(AiServiceTest, StoredKeyAllowsConnectionTest) {
 }
 
 TEST(AiServiceTest, DeleteApiKeyRemovesStoredKey) {
-    TempDir temp(MakeTempDir());
+    TempDir temp(test_support::UniqueTempDirectory("ai_service"));
     TestAiEnvironment env(temp.path / "settings.json");
     ASSERT_TRUE(env.service.SaveApiKey("sk-test").success);
     ASSERT_TRUE(env.service.HasStoredApiKey());

@@ -16,6 +16,7 @@
 #include "legacy_sacm/sacm_model.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/library_load.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -39,14 +40,6 @@ std::string ReadFileText(const std::filesystem::path& path) {
     return buffer.str();
 }
 
-std::filesystem::path MakeTempProjectRoot() {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_acpctl_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
-
 // Wires an AppRuntimeState to an audited project loaded from the ACP fixture,
 // mirroring how AppState::load_file retains the library document and how the app
 // opens the command bus -- so a controller call takes the real DispatchAuditedCommand
@@ -55,7 +48,7 @@ void SetUpAuditedState(app::AppRuntimeState& state) {
     const std::filesystem::path fixture = repo_root() / "tests" / "data" / "fixture_acp_edit.sacm.xml";
     ASSERT_TRUE(std::filesystem::exists(fixture)) << fixture.string();
 
-    const std::filesystem::path root = MakeTempProjectRoot();
+    const std::filesystem::path root = test_support::TestTempDirectory("acp_controller");
     const std::filesystem::path sacm_rel = "argument.sacm";
     const std::filesystem::path sacm_abs = root / sacm_rel;
     {

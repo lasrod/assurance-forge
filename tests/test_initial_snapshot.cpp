@@ -6,6 +6,7 @@
 #include "core/library_package_projection.h"
 #include "core/project_model.h"
 #include "legacy_sacm/sacm_parser.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -23,14 +24,6 @@ constexpr const char* kSampleSacm = R"(<?xml version="1.0" encoding="UTF-8"?>
 </sacm:AssuranceCasePackage>
 )";
 
-std::filesystem::path MakeTempProjectRoot(const std::string& tag) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("af_test_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root);
-    return root;
-}
-
 void WriteFile(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
@@ -45,7 +38,7 @@ std::string ReadAllBytes(const std::filesystem::path& path) {
 } // namespace
 
 TEST(InitialSnapshot, EnsureAuditStoreCreatesManifestSnapshotAndEmptyLog) {
-    auto root = MakeTempProjectRoot("init_snap");
+    auto root = test_support::TestTempDirectory("init_snap");
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, kSampleSacm);
 
@@ -91,7 +84,7 @@ TEST(InitialSnapshot, EnsureAuditStoreCreatesManifestSnapshotAndEmptyLog) {
 }
 
 TEST(InitialSnapshot, EnsureAuditStoreIsIdempotent) {
-    auto root = MakeTempProjectRoot("init_snap_idem");
+    auto root = test_support::TestTempDirectory("init_snap_idem");
     const std::filesystem::path sacm_rel = "argument.sacm";
     WriteFile(root / sacm_rel, kSampleSacm);
 

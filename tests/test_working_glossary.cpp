@@ -11,6 +11,7 @@
 #include "core/drafts/draft_provenance.h"
 #include "core/reviews/review_proposal.h"
 #include "core/terminology_package_service.h"
+#include "support/temp_files.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/terminology_package_panel.h"
 
@@ -115,11 +116,7 @@ struct GlossaryFixture {
 
 std::unique_ptr<GlossaryFixture> MakeFixture(const std::string& tag, std::string_view content) {
     auto fixture = std::make_unique<GlossaryFixture>();
-    fixture->root =
-        std::filesystem::temp_directory_path() /
-        ("af_working_glossary_" + tag + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
-    std::filesystem::remove_all(fixture->root);
-    std::filesystem::create_directories(fixture->root);
+    fixture->root = test_support::TestTempDirectory("working_glossary_" + tag);
 
     const std::filesystem::path relative = "argument.sacm";
     fixture->sacm_absolute = fixture->root / relative;

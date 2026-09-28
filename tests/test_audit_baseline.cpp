@@ -9,6 +9,7 @@
 #include "core/audit/audit_baseline.h"
 #include "core/audit/audit_manifest.h"
 #include "core/audit/audit_paths.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -22,8 +23,7 @@ using core::audit::ParseBaselineMetadata;
 using core::audit::SerializeBaselineMetadata;
 
 std::filesystem::path MakeTempProjectRoot(const std::string& suffix) {
-    auto root = std::filesystem::temp_directory_path() / ("af_baseline_test_" + suffix);
-    std::filesystem::remove_all(root);
+    const std::filesystem::path root = test_support::TestTempDirectory("baseline_" + suffix);
     std::filesystem::create_directories(core::audit::AfDir(root));
     return root;
 }

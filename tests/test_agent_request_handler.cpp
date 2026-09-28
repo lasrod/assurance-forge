@@ -2,6 +2,7 @@
 
 #include "core/app_state.h"
 #include "parser/model_utils.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -18,22 +19,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_agent_handler_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 // Creating a project writes its files but loads none of them, so a state built
 // that way has no case at all. The application opens an argument on project
@@ -64,7 +50,7 @@ bridge::Request MakeRequest(const std::string& op, const nlohmann::json& args = 
 } // namespace
 
 TEST(AgentRequestHandler, AnswersAnOverviewFromTheLoadedModel) {
-    TempDir workspace{UniqueTempPath("overview")};
+    TempDir workspace{test_support::UniqueTempDirectory("overview")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -81,7 +67,7 @@ TEST(AgentRequestHandler, AnswersAnOverviewFromTheLoadedModel) {
 // grant, a revocation. A mutation computed before such a change must not land
 // after it, and every read names the generation so a client can comply.
 TEST(AgentRequestHandler, MutationsNameTheContextGenerationTheyRead) {
-    TempDir workspace{UniqueTempPath("context-generation")};
+    TempDir workspace{test_support::UniqueTempDirectory("context-generation")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -132,7 +118,7 @@ TEST(AgentRequestHandler, MutationsNameTheContextGenerationTheyRead) {
 }
 
 TEST(AgentRequestHandler, ConnectedReadsUseAndIdentifyTheIntegratedWorkingDraft) {
-    TempDir workspace{UniqueTempPath("working-draft")};
+    TempDir workspace{test_support::UniqueTempDirectory("working-draft")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -164,7 +150,7 @@ TEST(AgentRequestHandler, ConnectedReadsUseAndIdentifyTheIntegratedWorkingDraft)
 }
 
 TEST(AgentRequestHandler, ConnectedAcceptedReadReportsTheRevisionNeededToStartTheFirstGroup) {
-    TempDir workspace{UniqueTempPath("connected-accepted")};
+    TempDir workspace{test_support::UniqueTempDirectory("connected-accepted")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -181,7 +167,7 @@ TEST(AgentRequestHandler, ConnectedAcceptedReadReportsTheRevisionNeededToStartTh
 }
 
 TEST(AgentRequestHandler, McpDraftGroupsAreRevisionCheckedAndVisibleToSubsequentReads) {
-    TempDir workspace{UniqueTempPath("draft-group")};
+    TempDir workspace{test_support::UniqueTempDirectory("draft-group")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -310,7 +296,7 @@ TEST(AgentRequestHandler, McpDraftGroupsAreRevisionCheckedAndVisibleToSubsequent
 // term is visible to reads in the working-draft view, revision-checked, and
 // never touches the accepted model until a human promotes it.
 TEST(AgentRequestHandler, TermsStageThroughChangeGroupsAndListTermsSeesThem) {
-    TempDir workspace{UniqueTempPath("term-draft")};
+    TempDir workspace{test_support::UniqueTempDirectory("term-draft")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -381,7 +367,7 @@ TEST(AgentRequestHandler, TermsStageThroughChangeGroupsAndListTermsSeesThem) {
 }
 
 TEST(AgentRequestHandler, HumanDraftMutationMakesAnMcpRevisionStale) {
-    TempDir workspace{UniqueTempPath("cross-source-stale")};
+    TempDir workspace{test_support::UniqueTempDirectory("cross-source-stale")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -419,7 +405,7 @@ TEST(AgentRequestHandler, HumanDraftMutationMakesAnMcpRevisionStale) {
 }
 
 TEST(AgentRequestHandler, LegacyListChangeSetsReturnsChangeSetsAlias) {
-    TempDir workspace{UniqueTempPath("legacy-list-change-sets")};
+    TempDir workspace{test_support::UniqueTempDirectory("legacy-list-change-sets")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -448,7 +434,7 @@ TEST(AgentRequestHandler, LegacyListChangeSetsReturnsChangeSetsAlias) {
 // failure. The distinction matters: a model that sees a faulted connection stops,
 // where one that sees a tool error corrects itself and tries again.
 TEST(AgentRequestHandler, ReportsAnUnknownElementAsAToolErrorNotATransportError) {
-    TempDir workspace{UniqueTempPath("unknown")};
+    TempDir workspace{test_support::UniqueTempDirectory("unknown")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -463,7 +449,7 @@ TEST(AgentRequestHandler, ReportsAnUnknownElementAsAToolErrorNotATransportError)
 // An unknown operation is a genuine protocol failure, and its message has to
 // point at the likely cause: two binaries from different builds.
 TEST(AgentRequestHandler, RefusesAnUnknownOperationWithAVersionHint) {
-    TempDir workspace{UniqueTempPath("unknownop")};
+    TempDir workspace{test_support::UniqueTempDirectory("unknownop")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -479,7 +465,7 @@ TEST(AgentRequestHandler, RefusesAnUnknownOperationWithAVersionHint) {
 // handler must refuse rather than pretend when the caller supplied no way to do
 // it.
 TEST(AgentRequestHandler, RefusesToSwitchFilesWithoutACallback) {
-    TempDir workspace{UniqueTempPath("noswitch")};
+    TempDir workspace{test_support::UniqueTempDirectory("noswitch")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -492,7 +478,7 @@ TEST(AgentRequestHandler, RefusesToSwitchFilesWithoutACallback) {
 }
 
 TEST(AgentRequestHandler, PassesTheRequestedPathToTheRuntime) {
-    TempDir workspace{UniqueTempPath("switch")};
+    TempDir workspace{test_support::UniqueTempDirectory("switch")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -510,7 +496,7 @@ TEST(AgentRequestHandler, PassesTheRequestedPathToTheRuntime) {
 }
 
 TEST(AgentRequestHandler, RequiresAPathToSwitchFiles) {
-    TempDir workspace{UniqueTempPath("nopath")};
+    TempDir workspace{test_support::UniqueTempDirectory("nopath")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -531,7 +517,7 @@ TEST(AgentRequestHandler, RequiresAPathToSwitchFiles) {
 // path here is the whole one: JSON arguments to a persisted draft group to a
 // materialized working model to the JSON the next read returns.
 TEST(AgentRequestHandler, StagesAndReadsBackAClaimInTwoLanguages) {
-    TempDir workspace{UniqueTempPath("bilingual")};
+    TempDir workspace{test_support::UniqueTempDirectory("bilingual")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -599,7 +585,7 @@ TEST(AgentRequestHandler, StagesAndReadsBackAClaimInTwoLanguages) {
 }
 
 TEST(AgentRequestHandler, RefusesAnOperationWhoseTranslationsAreNotAMapOfText) {
-    TempDir workspace{UniqueTempPath("bad-translations")};
+    TempDir workspace{test_support::UniqueTempDirectory("bad-translations")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -637,7 +623,7 @@ TEST(AgentRequestHandler, RefusesAnOperationWhoseTranslationsAreNotAMapOfText) {
 // staging. The findings are the ones staging would return; the store, the
 // revision and the user's canvas are untouched.
 TEST(AgentRequestHandler, CheckOperationsRehearsesWithoutStoringAnything) {
-    TempDir workspace{UniqueTempPath("check-ops")};
+    TempDir workspace{test_support::UniqueTempDirectory("check-ops")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -686,7 +672,7 @@ TEST(AgentRequestHandler, CheckOperationsRehearsesWithoutStoringAnything) {
 // until its author fixes them or explicitly acknowledges them, and the
 // acknowledgment is recorded on the group for the reviewer.
 TEST(AgentRequestHandler, SubmitRefusesStandingProblemFindingsUntilAcknowledged) {
-    TempDir workspace{UniqueTempPath("submit-gate")};
+    TempDir workspace{test_support::UniqueTempDirectory("submit-gate")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -762,7 +748,7 @@ TEST(AgentRequestHandler, SubmitRefusesStandingProblemFindingsUntilAcknowledged)
 // rule. A reviewer is never asked to accept that, and an agent proposing
 // changes to a safety argument should not be either.
 TEST(AgentRequestHandler, EverySccgFindingCarriesTheRuleAndAPointerToIt) {
-    TempDir workspace{UniqueTempPath("finding-rule")};
+    TempDir workspace{test_support::UniqueTempDirectory("finding-rule")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -825,7 +811,7 @@ TEST(AgentRequestHandler, EverySccgFindingCarriesTheRuleAndAPointerToIt) {
 // a key the parser does not read, and staging reported success over the drop.
 // The batch is refused now, and the refusal says where a definition belongs.
 TEST(AgentRequestHandler, StagingATermWhoseDefinitionUsesAnUnreadKeyIsRefused) {
-    TempDir workspace{UniqueTempPath("term-definition-key")};
+    TempDir workspace{test_support::UniqueTempDirectory("term-definition-key")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 
@@ -889,7 +875,7 @@ TEST(AgentRequestHandler, StagingATermWhoseDefinitionUsesAnUnreadKeyIsRefused) {
 // `EPB (Electronic Parking Brake)` for text that says `EPB`, and the glossary
 // looked right while resolving for no occurrence in the argument.
 TEST(AgentRequestHandler, ListTermsReportsATermWhoseValueAppearsNowhere) {
-    TempDir workspace{UniqueTempPath("term-matches-nothing")};
+    TempDir workspace{test_support::UniqueTempDirectory("term-matches-nothing")};
     core::AppState state;
     ASSERT_TRUE(OpenProjectWithArgument(state, workspace.path));
 

@@ -5,6 +5,7 @@
 #include "core/assurance_tree.h"
 #include "core/project_service.h"
 #include "parser/model_utils.h"
+#include "support/temp_files.h"
 
 #include <gtest/gtest.h>
 
@@ -20,22 +21,7 @@
 
 namespace {
 
-struct TempDir {
-    std::filesystem::path path;
-    ~TempDir() {
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
-    }
-};
-
-std::filesystem::path UniqueTempPath(const std::string& stem) {
-    static int counter = 0;
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_change_sets_" + stem + "_" + std::to_string(++counter));
-    std::filesystem::remove_all(path);
-    std::filesystem::create_directories(path);
-    return path;
-}
+using test_support::TempDir;
 
 bool OpenProjectWithArgument(core::AppState& state, const std::filesystem::path& workspace) {
     if (!state.create_empty_project("Project", workspace.string())) {
@@ -87,7 +73,7 @@ struct Fixture {
 };
 
 std::unique_ptr<Fixture> MakeFixture(const std::string& stem) {
-    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{UniqueTempPath(stem)}, {}, {}});
+    std::unique_ptr<Fixture> fixture(new Fixture{TempDir{test_support::UniqueTempDirectory(stem)}, {}, {}});
     if (!OpenProjectWithArgument(fixture->state, fixture->workspace.path)) {
         return nullptr;
     }
