@@ -1,47 +1,21 @@
 #include "core/reviews/review_proposal_manager.h"
 
+#include "core/project_file_io.h"
+
 #include <algorithm>
-#include <fstream>
-#include <sstream>
 
 namespace core::reviews {
 
 namespace {
 
-std::string ReadTextFile(const std::filesystem::path& path, std::string& error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        error = "Could not open " + path.string();
-        return {};
-    }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    if (!file.good() && !file.eof()) {
-        error = "Could not read " + path.string();
-        return {};
-    }
-    return buffer.str();
-}
-
-bool WriteTextFile(const std::filesystem::path& path, const std::string& content, std::string& error) {
-    std::error_code ec;
-    std::filesystem::create_directories(path.parent_path(), ec);
-    if (ec) {
-        error = "Could not create " + path.parent_path().string() + ": " + ec.message();
+// Reads and parses one proposal file. `error` says whether reading or parsing failed.
+bool ReadReviewProposal(const std::filesystem::path& path, ReviewProposal& proposal, std::string& error) {
+    const std::expected<std::string, std::string> text = ReadTextFile(path);
+    if (!text) {
+        error = text.error();
         return false;
     }
-
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
-    if (!file.is_open()) {
-        error = "Could not write " + path.string();
-        return false;
-    }
-    file << content;
-    if (!file.good()) {
-        error = "Could not finish writing " + path.string();
-        return false;
-    }
-    return true;
+    return DeserializeReviewProposal(*text, proposal, error);
 }
 
 std::string ProposalIdFromPath(const std::filesystem::path& path) {
@@ -162,7 +136,7 @@ ReviewProposalManager::ListProposals(const parser::AssuranceCase* current_model)
 
         std::string error;
         ReviewProposal proposal;
-        if (!DeserializeReviewProposal(ReadTextFile(entry.path(), error), proposal, error)) {
+        if (!ReadReviewProposal(entry.path(), proposal, error)) {
             ReviewProposalSummary summary;
             summary.id = ProposalIdFromPath(entry.path());
             summary.title = summary.id;
@@ -201,7 +175,7 @@ ReviewProposalManager::ListProposals(const parser::AssuranceCase* current_model)
 std::optional<ReviewProposal> ReviewProposalManager::LoadProposal(const std::string& proposal_id,
                                                                   std::string& error) const {
     ReviewProposal proposal;
-    if (!DeserializeReviewProposal(ReadTextFile(ProposalPath(proposal_id), error), proposal, error)) {
+    if (!ReadReviewProposal(ProposalPath(proposal_id), proposal, error)) {
         return std::nullopt;
     }
     return proposal;
@@ -215,8 +189,12 @@ bool ReviewProposalManager::SaveProposal(const ReviewProposal& proposal,
         return false;
     }
     const std::filesystem::path absolute_path = ProposalPath(proposal.id);
-    if (!WriteTextFile(absolute_path, SerializeReviewProposal(proposal), error))
+    const std::expected<void, std::string> written =
+        WriteTextFileCreatingParents(absolute_path, SerializeReviewProposal(proposal));
+    if (!written) {
+        error = written.error();
         return false;
+    }
     if (relative_path) {
         std::error_code ec;
         *relative_path = std::filesystem::relative(absolute_path, project_root_, ec);

@@ -12,6 +12,9 @@ namespace core {
 
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path& path);
 std::expected<void, std::string> WriteTextFile(const std::filesystem::path& path, std::string_view content);
+// WriteTextFile, after creating any parent directories that do not exist yet.
+std::expected<void, std::string> WriteTextFileCreatingParents(const std::filesystem::path& path,
+                                                              std::string_view content);
 // Crash-safe write: writes `content` to `<path>.tmp`, fsyncs that file, then
 // atomically renames it over `path`. On Windows uses `MoveFileExW` with
 // MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH; on POSIX uses

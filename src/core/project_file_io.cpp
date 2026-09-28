@@ -44,6 +44,15 @@ std::expected<void, std::string> WriteTextFile(const std::filesystem::path& path
     return {};
 }
 
+std::expected<void, std::string> WriteTextFileCreatingParents(const std::filesystem::path& path,
+                                                              std::string_view content) {
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec)
+        return std::unexpected("Could not create " + path.parent_path().string() + ": " + ec.message());
+    return WriteTextFile(path, content);
+}
+
 namespace {
 
 #if defined(_WIN32)
