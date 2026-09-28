@@ -10,8 +10,8 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
-#include <functional>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -50,6 +50,17 @@ inline std::filesystem::path UniqueTempDirectory(std::string_view tag) {
     return path;
 }
 
+// FNV-1a over `text`. The directory a test reuses has to have the same name on
+// every run and every platform, which `std::hash` does not promise.
+inline std::uint64_t StableHash(std::string_view text) {
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const char character : text) {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
 // An empty directory under the system temp directory that belongs to the running
 // test: named af_<tag>_<hash of the test's full name>, so the same test gets the
 // same directory on every run -- emptied here first, so nothing accumulates --
@@ -60,9 +71,8 @@ inline std::filesystem::path TestTempDirectory(std::string_view tag) {
     const std::string test_name =
         test != nullptr ? std::string(test->test_suite_name()) + "." + test->name() : std::string("no_test");
     char hash[17];
-    std::snprintf(hash, sizeof(hash), "%016zx", std::hash<std::string>{}(test_name));
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / ("af_" + std::string(tag) + "_" + std::string(hash, 8));
+    std::snprintf(hash, sizeof(hash), "%016llx", static_cast<unsigned long long>(StableHash(test_name)));
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / ("af_" + std::string(tag) + "_" + hash);
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
