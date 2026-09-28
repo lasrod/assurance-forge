@@ -32,22 +32,6 @@ std::string GenerateReviewItemId() {
     return out.str();
 }
 
-void EnsureReviewGuidelineCatalogLoaded(AppRuntimeState& state) {
-    if (state.guideline_catalog_load_attempted)
-        return;
-
-    core::GuidelineCatalog catalog;
-    std::string error;
-    if (core::LoadGuidelineCatalog(catalog, error)) {
-        state.guideline_catalog = std::move(catalog);
-        state.guideline_catalog_error.clear();
-    } else {
-        state.guideline_catalog.reset();
-        state.guideline_catalog_error = error;
-    }
-    state.guideline_catalog_load_attempted = true;
-}
-
 void SetStatus(const ReviewPanelAreaCallbacks& callbacks, const std::string& message) {
     if (callbacks.set_status)
         callbacks.set_status(message);
@@ -102,7 +86,7 @@ void AddManualReviewItem(AppRuntimeState& state,
 
     std::vector<std::string> validated_guideline_ids;
     if (!guideline_ids.empty()) {
-        EnsureReviewGuidelineCatalogLoaded(state);
+        state.EnsureGuidelineCatalogLoaded();
         if (!state.guideline_catalog.has_value()) {
             SetStatus(callbacks,
                       ui::i18n::trf("SCCG guidelines are not available: {0}", state.guideline_catalog_error));
@@ -205,7 +189,7 @@ ui::panels::ReviewPanelModel BuildReviewPanelModel(AppRuntimeState& state) {
         }
         model.agent_change_sets.push_back(std::move(row));
     }
-    EnsureReviewGuidelineCatalogLoaded(state);
+    state.EnsureGuidelineCatalogLoaded();
     if (state.guideline_catalog.has_value()) {
         for (const core::GuidelineCatalogEntry& entry : state.guideline_catalog->entries) {
             model.guideline_options.push_back(ui::panels::ReviewGuidelineOption{

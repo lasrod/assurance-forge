@@ -436,6 +436,8 @@ struct AppRuntimeState {
     std::optional<core::GuidelineCatalog> guideline_catalog;
     bool guideline_catalog_load_attempted = false;
     std::string guideline_catalog_error;
+    // Loads the SCCG catalog on first use; later calls keep the first outcome.
+    void EnsureGuidelineCatalogLoaded();
     bool document_dirty = false;
 
     // Set by DispatchAuditedCommand when the command bus confirmed it wrote the

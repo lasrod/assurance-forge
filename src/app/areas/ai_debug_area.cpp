@@ -20,22 +20,6 @@
 namespace app::areas {
 namespace {
 
-void EnsureGuidelineCatalogLoaded(::app::AppRuntimeState& state) {
-    if (state.guideline_catalog_load_attempted)
-        return;
-
-    core::GuidelineCatalog catalog;
-    std::string error;
-    if (core::LoadGuidelineCatalog(catalog, error)) {
-        state.guideline_catalog = std::move(catalog);
-        state.guideline_catalog_error.clear();
-    } else {
-        state.guideline_catalog.reset();
-        state.guideline_catalog_error = error;
-    }
-    state.guideline_catalog_load_attempted = true;
-}
-
 void DrawTooltipIfHovered(const std::string& text) {
     if (!text.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", text.c_str());
@@ -46,7 +30,7 @@ void DrawTooltipIfHovered(const std::string& text) {
 void RenderAiDebugPanelContent(::app::AppRuntimeState& state) {
     auto& ai_review = *state.ai.review_controller;
     const bool review_running = ai_review.IsReviewRunning();
-    EnsureGuidelineCatalogLoaded(state);
+    state.EnsureGuidelineCatalogLoaded();
 
     const ui::UiState& ui_state = ui::GetUiState();
     const parser::AssuranceCase* loaded_case =
