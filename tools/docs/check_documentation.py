@@ -37,6 +37,7 @@ REACHABILITY_EXCEPTIONS = {
 # appear somewhere in the page, naming what regenerates it.
 GENERATED_DOCUMENTS = {
     "docs/sacm/sacm-2.3-metamodel-inventory.md": "tools/sacm/generate_metamodel_inventory.py",
+    "docs/sacm/sacm-2.4-beta1-metamodel-inventory.md": "tools/sacm/diff_sacm24_metamodel.py",
     "docs/sacm/verification/README.md": "tools/docs/generate_verification_index.py",
     "docs/quality/repository-baseline.md": "tools/quality/collect_baseline.py",
 }

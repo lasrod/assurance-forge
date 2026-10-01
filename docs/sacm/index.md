@@ -4,7 +4,7 @@ Everything the project maintains about OMG SACM 2.3: what the standard requires,
 what `libs/sacm` implements, what has been verified, and the working material
 behind those decisions.
 
-Twenty-one pages live in this section. Before this index existed, four were
+Twenty-four pages live in this section. Before this index existed, four were
 reachable from the site and the rest could only be found by browsing the
 repository tree — which meant a normative project policy and a superseded plan
 were equally hard to find, and equally easy to mistake for each other.
@@ -53,7 +53,10 @@ Binding on new work in and around the SACM library.
 | [GSN to SACM 2.3 mapping](sacm-gsn-mapping.md) | Normative | Evidence-backed mappings. Never invent one in code. |
 | [GSN / SACM metamodel gaps](sacm-gsn-metamodel-gaps.md) | Reference | Analysis prepared for the SCSC ACWG and the OMG SACM RTF. |
 | [SACM 2.3 specification defects](sacm-23-specification-defects.md) | Reference | Defects in the published SACM 2.3 text and model, found by writing validators against the clauses. Input to the OMG submission. |
-| [SACM 2.4 watch](sacm-2.4-watch.md) | Reference | Draft-only tracking. Nothing in it is normative or implementable. |
+| [SACM 2.4 Beta 1 impact analysis](sacm-2.4-beta1-impact.md) | Reference | What OMG published in September 2026, how it differs from 2.3, why it cannot be implemented yet, and when to revisit. |
+| [SACM 2.4 Beta 1 specification defects](sacm-24-beta1-specification-defects.md) | Reference | Contradictions and gaps in the beta's text and model, written to be filed with OMG while finalization is open. |
+| [SACM 2.4 Beta 1 metamodel inventory](sacm-2.4-beta1-metamodel-inventory.md) | Generated | Every classifier in the beta's model, as published. A baseline for comparing later versions; not a conformance requirement. |
+| [SACM 2.4 watch](sacm-2.4-watch.md) | Historical | Tracking written from draft RTF issues before the beta existed. Overtaken by the impact analysis. |
 | [Research notes](sacm-research-notes.md) | Reference | Official references and where they came from. |
 
 ## Library design
