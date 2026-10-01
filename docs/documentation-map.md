@@ -122,6 +122,7 @@ fails if the committed copy is stale.
 | Document | Generator | Gate |
 |---|---|---|
 | [SACM metamodel inventory](sacm/sacm-2.3-metamodel-inventory.md) | `tools/sacm/generate_metamodel_inventory.py` | — |
+| [SACM 2.4 Beta 1 metamodel inventory](sacm/sacm-2.4-beta1-metamodel-inventory.md) | `tools/sacm/diff_sacm24_metamodel.py --inventory` | Deliberately ungated — it is a baseline of a beta, kept fixed so later versions can be compared against it |
 | [Verification record index](sacm/verification/README.md) (table only) | `tools/docs/generate_verification_index.py` | `documentation_check` |
 | `docs/features/feature-matrix.json` | `tools/features/export_feature_matrix.py` | `feature_matrix_check` |
 | [Quality baseline](quality/repository-baseline.md) | `tools/quality/collect_baseline.py` | Deliberately ungated — it is a snapshot, and going stale is correct |

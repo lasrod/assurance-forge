@@ -4,7 +4,7 @@ Everything the project maintains about OMG SACM 2.3: what the standard requires,
 what `libs/sacm` implements, what has been verified, and the working material
 behind those decisions.
 
-Twenty-four pages live in this section. Before this index existed, four were
+Twenty-seven pages live in this section, besides this index. Before this index existed, four were
 reachable from the site and the rest could only be found by browsing the
 repository tree — which meant a normative project policy and a superseded plan
 were equally hard to find, and equally easy to mistake for each other.
