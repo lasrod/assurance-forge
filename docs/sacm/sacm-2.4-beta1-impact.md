@@ -94,13 +94,12 @@ mapping packages, and 35 under `NonNormative`.
   `ArtifactReference`. `SACMModel`, the base of every package and group, is a
   `ModelElement`, an `Assertion` and an `Assessment`. The library's model is a
   single-inheritance C++ hierarchy that mirrors 2.3.
-- **The normative packages depend on the non-normative ones.** Seventeen
-  features of normative classes are typed by `NonNormative` classifiers, and one
-  normative class specializes a non-normative one. `SACMElement`
-  carries `changeType`, `consistencyStatus` and `validityDuration`; `Assertion`
-  carries `assertionValue` and `assertionDeclarationRule`; `SACMModel`
-  specializes `Assessment`. An implementation of the mandatory point alone still
-  has to parse those types.
+- **Optional capabilities are added onto the core classes.** Clause 15 defines
+  seven optional capabilities as "additions to the existing items". In the model
+  they are already merged in: seventeen features of core classes are typed by
+  `NonNormative` classifiers, and `SACMModel` specializes `Assessment`. This is
+  the authors' design, not an error. For an implementer it means the core
+  classes cannot be read from the model file without also meeting those types.
 
 ### Removed and renamed
 
@@ -149,10 +148,11 @@ Further changes the watch list did not have:
 
 Annex G is titled "Transformation from SACM 2.3 to SACM 2.4" and marked
 normative. It is two pages of numbered remarks ("TagValue is renamed
-NamedValue"), not a mapping. It does not say what becomes of a `metaClaim`, of a
-`needsSupport` or `asCited` declaration, of a `gid`, or of a per-domain binding
-package. A 2.3-to-2.4 converter would be our own design, and the specification
-gives no way to check it.
+NamedValue"). It covers most renames and merges, but it does not mention
+`metaClaim`, `gid`, `AssertedRelationship.reasoning`, `participantPackage`,
+`Property` or `Description`, all of which are removed. For those, a 2.3-to-2.4
+converter would be our own design, and the specification gives no way to check
+it.
 
 ## Why Beta 1 cannot be implemented yet
 
@@ -194,29 +194,30 @@ other.
 | Subject | Specification text | `SACM2.4_Metamodel.xml` |
 |---|---|---|
 | Element identity | 9.2 lists `gid : String[0..1]` | `elementId : UID[1]`; no `gid` |
-| Declaration literals | 13.6: `axiomatic`, `assumed`, `asserted`, `needsSupport` | `axiomatic`, `assumed`, `asserted`, `byRule` |
-| Same, in Annex G | "one of axiomatic, assumed, asserted" | four literals |
+| Declaration literals | 13.6: `axiomatic`, `assumed`, `asserted`, `needsSupport` | `axiomatic`, `assumed`, `asserted`, plus `byRule` from clause 15; no `needsSupport` |
 | `AssertedEvidence.evidence` | 13.13: `[0..*]` | `[1..*]` |
 | `Claim.value` | 13.9: `MultiLangString` | `ExpressionLangString` |
 | `BindingPackage` superclass | 10.5: `SACMPackageWithBinding`, `ScopedPackage`; 11.3: `ModelElement` | `ScopedPackage`, `SACMPackageWithBinding` |
-| `GSNContext` superclass | A.1.11: `GSNAsset`, `Artifact` | `Context` only |
-| `SACMModel` superclass | 9.10: `ModelElement` | `ModelElement`, `Assertion`, `Assessment` |
-| Features from clause 15 on core classes | not listed in clauses 9 or 13 | present on `SACMElement`, `Assertion`, `ArgumentConcept`, `AssertedInference` |
+| `SACMElement.abstraction` | 9.2: `[0..1]` | `[0..*]` |
+| `AssertedRelationship.isCounter` | 13.11: `Boolean [1]` | `Boolean [0..1]` |
 
 Other signs that the text has not been through editing:
 
 - Clause 2.1 announces "eleven compliance points". Clause 2 then numbers them
   2.2 to 2.5 and 6.6 to 6.12.
 - Six compliance points require conformance to a "non-normative MOF metamodel
-  defined in the informative" clause 15. The watch list flagged this
-  contradiction in the draft; it was published unresolved.
+  defined in the informative" clause 15, so it is unclear whether that clause
+  binds a tool claiming one of them.
 - Annex C still gives concrete syntax for `needsSupport`, `defeated` and
   `asCited` claims and relationships. The model has none of the three as a
   declaration.
 - 13.4 describes `ArgumentPackageInterface`, `ArgumentPackageBinding` and
   `ArgumentationElement`, which are the 2.3 names.
 
-These are written up for OMG in [Beta 1 specification defects](sacm-24-beta1-specification-defects.md).
+The full list, limited to what can be checked from the documents alone, is in
+[Beta 1 inconsistencies to report](sacm-24-beta1-specification-defects.md).
+It was reviewed a second time on 2026-10-02 to remove anything that reflected
+our GSN-only use of SACM or that the authors plainly intended.
 
 ## Effect on GSN support
 
@@ -314,7 +315,7 @@ parts has been:
 | Pinned copies of the four beta documents | `scripts/fetch-sacm24-beta1-references.sh` | Detects a republished beta |
 | Class-level comparison with 2.3 | `tools/sacm/diff_sacm24_metamodel.py` | Re-run against a Beta 2 or the formal version |
 | Baseline of the beta model | [metamodel inventory](sacm-2.4-beta1-metamodel-inventory.md) | A later version is diffed against this page |
-| Submission-ready defect list | [Beta 1 specification defects](sacm-24-beta1-specification-defects.md) | Input to OMG while finalization is open |
+| List of inconsistencies for OMG | [Beta 1 inconsistencies to report](sacm-24-beta1-specification-defects.md) | Input to OMG while finalization is open |
 | Where 2.3 vocabulary sits in our code | [below](#where-the-23-vocabulary-sits-today) | Scope of the eventual migration |
 
 Not prepared, deliberately:
@@ -383,7 +384,7 @@ these happens:
    it with `byRule`. `needsDevelopment` appears to be the intended replacement.
 2. Is Annex A's GSN mapping meant to supersede the SCSC metamodel's? The two
    disagree on Strategy, Solution and Context.
-3. Are the clause 15 features on core classes part of the mandatory point? The
-   model says yes and the text says no.
+3. Does clause 15 bind a tool that claims one of its compliance points? It is
+   headed informative, and clause 2 uses "shall" about it.
 4. Will the formal version define a native XMI namespace, or is the UML Profile
    the intended interchange?
