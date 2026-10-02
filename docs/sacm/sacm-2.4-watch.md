@@ -1,8 +1,14 @@
 # SACM 2.4 watch list
 
+> **Overtaken on 2026-10-02.** OMG published SACM 2.4 Beta 1 in September 2026
+> and closed all 59 RTF issues. This page was written from draft issue text in
+> July 2026 and is kept for its reasoning. Every row in the table below landed
+> in the beta. For what was actually published and what it means for this
+> project, read the [SACM 2.4 Beta 1 impact analysis](sacm-2.4-beta1-impact.md).
+
 **Nothing here is normative, and nothing here is implementable.** SACM 2.3
-(`formal/23-05-08`) is the only published SACM. Every row below is *draft* text
-from an *open* OMG RTF issue and may change or be dropped.
+(`formal/23-05-08`) is the only formal SACM. Every row below was written from
+*draft* text in an OMG RTF issue that was *open* at the time.
 
 **These rows must never appear in `sacm-conformance-matrix.md`.** That matrix
 records 2.3 compliance; mixing in speculative 2.4 rows would let an unbuilt,
@@ -19,6 +25,9 @@ we now know SACM 2.4 removes `metaClaim`, so building Assurance Claim Point
 support on it would have been building on sand.
 
 ## Status of the revision
+
+*As of 2026-07-20. Superseded: the beta now exists at
+`omg.org/spec/SACM/2.4/Beta1` and every issue below is closed.*
 
 - Issue list: https://issues.omg.org/issues/spec/SACM/2.3 — 59 issues, **all
   status `open`**, all against "SACM 2.3b1" (checked 2026-07-20).
@@ -109,6 +118,11 @@ pairs, because that is the shape `SACMDiagramElement` takes.
   draft would break 2.3 conformance to chase a moving target.
 
 ## Open questions
+
+*Answered, as far as Beta 1 answers them, in the
+[impact analysis](sacm-2.4-beta1-impact.md). Questions 1 and 3 were published
+unresolved: the text and the model disagree. On §15.3 above, Beta 1 does define
+geometry (`Bounds`, `Point`, `waypoint`), which this page said it would not.*
 
 1. Does `needsSupport` survive? Annex G says "AssertionDeclaration is one of
    axiomatic, assumed, asserted", omitting it — but SACM24-12's stated scope

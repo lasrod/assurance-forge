@@ -286,7 +286,7 @@
       "status": "candidate",
       "evidence": [],
       "tests": [],
-      "notes": "Tracked in docs/sacm/sacm-2.4-watch.md. RTF active; `metaClaim` and `defeated` removal would affect AF-ACP-* and AF-DIA-*."
+      "notes": "SACM 2.4 Beta 1 was published in September 2026 and is analysed in docs/sacm/sacm-2.4-beta1-impact.md. Not implementable yet: the beta defines no XMI namespace or schema, and its text and normative model disagree. `metaClaim` and the `defeated` literal are removed in it, which would affect AF-ACP-* and AF-DIA-*. SACM 2.3 remains the supported version."
     },
     {
       "id": "AF-STD-016",
