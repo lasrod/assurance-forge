@@ -54,7 +54,7 @@ Binding on new work in and around the SACM library.
 | [GSN / SACM metamodel gaps](sacm-gsn-metamodel-gaps.md) | Reference | Analysis prepared for the SCSC ACWG and the OMG SACM RTF. |
 | [SACM 2.3 specification defects](sacm-23-specification-defects.md) | Reference | Defects in the published SACM 2.3 text and model, found by writing validators against the clauses. Input to the OMG submission. |
 | [SACM 2.4 Beta 1 impact analysis](sacm-2.4-beta1-impact.md) | Reference | What OMG published in September 2026, how it differs from 2.3, why it cannot be implemented yet, and when to revisit. |
-| [SACM 2.4 Beta 1 inconsistencies to report](sacm-24-beta1-specification-defects.md) | Reference | Places where the beta's documents contradict each other, for OMG. Limited to what can be checked from the documents alone; no design opinions and nothing GSN-specific. |
+| [SACM 2.4 Beta 1 inconsistencies to report](sacm-24-beta1-specification-defects.md) | Reference | Places where the beta's documents contradict each other, for OMG. Preliminary. Limited to what can be checked from the documents alone, with a locator for each fact about the model; no design opinions and nothing GSN-specific. |
 | [SACM 2.4 Beta 1 metamodel inventory](sacm-2.4-beta1-metamodel-inventory.md) | Generated | Every classifier in the beta's model, as published. A baseline for comparing later versions; not a conformance requirement. |
 | [SACM 2.4 watch](sacm-2.4-watch.md) | Historical | Tracking written from draft RTF issues before the beta existed. Overtaken by the impact analysis. |
 | [Research notes](sacm-research-notes.md) | Reference | Official references and where they came from. |
