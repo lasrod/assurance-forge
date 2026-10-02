@@ -25,9 +25,13 @@ items 2 to 4 were also read from page images, not only from extracted text. No
 person has yet read every cited passage, because the PDFs cannot be searched
 (item 10). Corrections are welcome.
 
-Facts about the model can be checked in the XML file itself.
-[The last section](#where-to-find-each-model-fact) gives the package path, the
-`xmi:id` and the line number for each one.
+Facts about the model can be checked in the XML file itself, using
+[the last section](#where-to-find-each-model-fact). It locates them in two ways:
+
+- **Something that is in the model** has a package path, an `xmi:id` and a line
+  number.
+- **Something that is absent** has no location. It is checked by searching the
+  whole file for the name given, which finds nothing.
 
 | Called here | Document |
 |---|---|
@@ -178,9 +182,9 @@ Line numbers are for `SACM2.4_Metamodel.xml` as published (SHA-256
 
 | Item | Fact | Path | `xmi:id` ends | Line of the `xmi:id` |
 |---|---|---|---|---|
-| 1 | No `URI` attribute and no `nsURI` anywhere | whole file; also the profile file | | |
+| 1 | Absent: search for `URI=` and `nsURI` | whole file; also the profile file | | |
 | 2 | `elementId : UID [1]` | `Base::SACMElement` | `814687_2677` | 4203 |
-| 2 | No attribute named `gid` | whole file | | |
+| 2 | Absent: search for `name="gid"` | whole file | | |
 | 3 | Literals `axiomatic`, `assumed`, `asserted`, `byRule` | `Argument::AssertionDeclarationKind` | `908763_2427` | 5876 |
 | 4 | `abstraction [0..*]` | `Base::SACMElement` | `102939_2678` | 4275 |
 | 4 | `evidence [1..*]` | `Argument::AssertedEvidence` | `813853_2790` | 5606 |
@@ -199,6 +203,15 @@ Line numbers are for `SACM2.4_Metamodel.xml` as published (SHA-256
 For item 5, the three profile names are at lines 1112, 1133 and 1172 of
 `ptc/26-05-21`.
 
-For item 8, the six features are in the SACM 2.3 model (`ptc/22-03-13`) under
-these names, and no element with any of these names exists in the 2.4 model:
-`metaClaim`, `gid`, `reasoning`, `participantPackage`, `Property`, `Description`.
+For item 8, each feature is absent from the 2.4 model: searching it for the
+`name="…"` in the first column finds nothing. Each is present in the SACM 2.3
+model (`ptc/22-03-13`) at the line given.
+
+| Search for | First line in the 2.3 model |
+|---|---|
+| `name="metaClaim"` | 900 |
+| `name="gid"` | 29 |
+| `name="reasoning"` | 864 |
+| `name="participantPackage"` | 394 |
+| `name="Property"` | 554 |
+| `name="Description"` | 101 |
