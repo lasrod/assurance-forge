@@ -19,9 +19,19 @@ Left out on purpose:
   classes, so they are not listed as conflicts.
 - **Anything specific to GSN** or to how Assurance Forge stores arguments.
 
-Each item was checked twice, the second time by a reviewer instructed to refute
-it. The rows in items 2 to 4 were also read from page images, not only from
-extracted text.
+**Status: preliminary.** The findings were produced by AI agents and checked
+twice, the second time by a reviewer instructed to refute each one. The rows in
+items 2 to 4 were also read from page images, not only from extracted text. No
+person has yet read every cited passage, because the PDFs cannot be searched
+(item 10). Corrections are welcome.
+
+Facts about the model can be checked in the XML file itself, using
+[the last section](#where-to-find-each-model-fact). It locates them in two ways:
+
+- **Something that is in the model** has a package path, an `xmi:id` and a line
+  number.
+- **Something that is absent** has no location. It is checked by searching the
+  whole file for the name given, which finds nothing.
 
 | Called here | Document |
 |---|---|
@@ -42,8 +52,8 @@ SACM XML Schema produced by applying XMI rules to the normative MOF metamodel"
 - The Annex B example takes its stereotypes from
   `http://www.magicdraw.com/schemas/Profile.xmi`, a tool vendor's namespace.
 
-**Question.** Which namespace URIs should the metamodel and the profile carry,
-and will the schema be published?
+**Question.** Which namespace URIs are authoritative for the metamodel and the
+profile, and how is the schema meant to be generated or published?
 
 ## 2. Element identity: `gid` in the text, `elementId` in the model
 
@@ -63,9 +73,13 @@ and will the schema be published?
 | Annex G.6, item 6 | `axiomatic`, `assumed`, `asserted` |
 | The model | `axiomatic`, `assumed`, `asserted`, and `byRule` (added by 15.2.1) |
 
-Annex C still gives concrete syntax for `needsSupport`, `defeated` and `asCited`
-claims and relationships (Figures C5, C7, C8, C13, C15, C16, C21, C23, C24, C29,
-C31, C32). None of the three is a literal in the model.
+Annex C also still gives concrete syntax for a `needsSupport` claim and
+relationship (Figures C5, C13, C21, C29).
+
+**Question.** Annex C presents `defeated` and `asCited` in the same series as the
+declaration states (Figures C7, C8, C15, C16, C23, C24, C31, C32). In the model
+they are no longer declaration literals. Are those figures now meant to depict
+`isDefeated` and `isCitation`?
 
 ## 4. Clause text that differs from the model
 
@@ -135,17 +149,69 @@ covers most renames and merges. It does not mention these, which are in the
 
 **Question.** What should a tool do with each when it reads a 2.3 document?
 
-## 9. Clause 15 is informative but carries requirements
+## 9. Is clause 15 normative once an optional point is claimed?
 
 Clause 15 is headed "(informative)" and its classes are in a model package named
-`NonNormative`. Six compliance points in clause 2 say that software "shall be
-able to import and export" documents conforming to that "non‒normative MOF
-metamodel".
+`NonNormative`. Six optional compliance points in clause 2 say that software
+"shall be able to import and export" documents conforming to that
+"non‒normative MOF metamodel".
 
-**Question.** Is clause 15 normative for a tool that claims one of those points?
+An optional capability can carry mandatory requirements once a tool claims it,
+so this is not a contradiction in itself. The wording leaves it open.
 
-## 10. The PDFs have no usable text layer
+**Question.** Does the relevant part of clause 15 become normative for a tool
+that claims one of those points?
 
-A note for the document editors, not about SACM itself. Both PDFs embed their
-fonts without a Unicode mapping, so the text cannot be searched or copied, and a
-screen reader cannot read it.
+## 10. The text in the PDFs cannot be searched or copied
+
+A note for the document editors, not about SACM itself.
+
+Both published PDFs render correctly on screen, but text extraction produces
+garbled characters and text search does not work in the tools tested. For
+example, "Copyright" on page 2 extracts as `IJSLCABN`: the capital is lost and
+every other letter is replaced. In the files,
+the fonts are embedded without a character mapping (no `ToUnicode` entry).
+Assistive technology was not tested.
+
+**Request.** Please provide versions with correctly encoded, searchable text.
+
+## Where to find each model fact
+
+Line numbers are for `SACM2.4_Metamodel.xml` as published (SHA-256
+`0581dfa0…23db110830`). All paths start at `SACM2.4::Metamodel`.
+
+| Item | Fact | Path | `xmi:id` ends | Line of the `xmi:id` |
+|---|---|---|---|---|
+| 1 | Absent: search for `URI=` and `nsURI` | whole file; also the profile file | | |
+| 2 | `elementId : UID [1]` | `Base::SACMElement` | `814687_2677` | 4203 |
+| 2 | Absent: search for `name="gid"` | whole file | | |
+| 3 | Literals `axiomatic`, `assumed`, `asserted`, `byRule` | `Argument::AssertionDeclarationKind` | `908763_2427` | 5876 |
+| 4 | `abstraction [0..*]` | `Base::SACMElement` | `102939_2678` | 4275 |
+| 4 | `evidence [1..*]` | `Argument::AssertedEvidence` | `813853_2790` | 5606 |
+| 4 | `isCounter [0..1]` | `Argument::AssertedRelationship` | `872801_2795` | 5714 |
+| 4 | `value : ExpressionLangString` | `Argument::Claim` | `407753_2800` | 5842 |
+| 4 | Generalizations `ScopedPackage`, `SACMPackageWithBinding` | `Packaging::BindingPackage` | `973164_2091` | 2993 |
+| 4 | Generalizations `ModelElement`, `Assertion`, `Assessment` | `Base::SACMModel` | `390054_2340` | 4423 |
+| 4 | Generalizations `DirectedRelationship`, `BaseElement` | `Base::SACMDependency` | `657213_2330` | 4014 |
+| 4 | Generalizations `ModelElement`, `BaseElement` | `NonNormative::Rule` | `442249_2189` | 38 |
+| 5 | Package named `Asssessment` | `NonNormative` | `200657_4355` | 1765 |
+| 5 | `DefeationtMechanismKind` | `NonNormative::Asssessment` | `336823_2193` | 2011 |
+| 5 | `StructuredAssuraceArtifactDiagram` | `NonNormative::SACMView` | `786415_2275` | 608 |
+| 5 | `RealNameValue` | `NonNormative::NamedValueTypes` | `596689_2320` | 366 |
+| 5 | `name="GSNContext&#xA;"` | `Mapping::GSN` | `767598_3597` | 6630 |
+
+For item 5, the three profile names are at lines 1112, 1133 and 1172 of
+`ptc/26-05-21`.
+
+For item 8, each feature is absent from the 2.4 model: searching it for the
+`name="…"` in the first column finds nothing. Each is present in the SACM 2.3
+model (`ptc/22-03-13`) at the line given.
+
+| Search for | First line in the 2.3 model |
+|---|---|
+| `name="metaClaim"` | 900 |
+| `name="gid"` | 29 |
+| `name="reasoning"` | 864 |
+| `name="participantPackage"` | 394 |
+| `name="Property"` | 554 |
+| `name="Description"` | 101 |
