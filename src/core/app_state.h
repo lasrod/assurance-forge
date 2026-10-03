@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/project_model.h"
+#include "core/status_text.h"
 #include "parser/xml_parser.h"
 #include "legacy_sacm/sacm_model.h"
 #include "sacm_adapter/library_load.h"
@@ -54,8 +55,26 @@ struct AppState {
     std::filesystem::path loaded_file_path;
     bool has_unsaved_changes = false;
 
-    // Status message for UI display
+    // The last status message, as text. Messages `core` sets are English here,
+    // which is what the MCP server, the eval tool and logs read; `app` writes
+    // text it has already translated. To show it to the user, call
+    // `ui::LocalizedStatusMessage`, not this field.
     std::string status_message;
+
+    // What `core` last said, as a msgid plus arguments, so the layer that shows
+    // it can translate it (#252). Written only by `set_status`. Anything that
+    // assigns `status_message` directly leaves this behind, which is why a
+    // reader must ask `status_source_is_current` before trusting it.
+    StatusText status_source;
+
+    // Reports a status message from `core`: fills `status_message` with the
+    // English text and records the msgid and arguments in `status_source`.
+    // Wrap the msgid literal in AF_TR_NOOP so the catalogue extractor sees it.
+    void set_status(std::string_view msgid, std::vector<std::string> arguments = {});
+
+    // True while `status_source` still describes `status_message` -- false once
+    // something else has overwritten the message.
+    bool status_source_is_current() const;
 
     // Warning-and-above diagnostics from the last successful load, as display
     // lines. A load can succeed and still have something the user must know --

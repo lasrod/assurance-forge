@@ -2,6 +2,7 @@
 
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
+#include "ui/localized_status.h"
 #include "ui/register_views.h"
 #include "ui/theme.h"
 
@@ -215,7 +216,7 @@ void ShowSacmViewerPanel(float width,
     ShowOverwriteModal(model);
 
     if (!model.app_state.status_message.empty()) {
-        ImGui::TextWrapped("%s", model.app_state.status_message.c_str());
+        ImGui::TextWrapped("%s", ui::LocalizedStatusMessage(model.app_state).c_str());
     }
 
     ImGui::Separator();

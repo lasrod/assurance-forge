@@ -51,6 +51,7 @@
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/gsn/gsn_hit_tester.h"
 #include "ui/i18n/localization.h"
+#include "ui/localized_status.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/sacm_viewer_panel.h"
@@ -866,10 +867,10 @@ void AppRuntime::SetStatus(const std::string& message) {
     impl_->events.Emit(StatusMessageEvent{message});
 }
 
-// Status text is TRANSLATED AT ITS SOURCE and stored translated, so it bakes the
-// language in force at the moment it was set. A message already on screen when
-// the user switches language therefore stays in the old one until the next
-// action replaces it.
+// Status text set in `app` is TRANSLATED AT ITS SOURCE and stored translated, so
+// it bakes the language in force at the moment it was set. A message already on
+// screen when the user switches language therefore stays in the old one until
+// the next action replaces it.
 //
 // That is a decision, not an oversight (#252). The alternative is the hook
 // `AppRuntime::RenderFrame` already runs for `ui::i18n::LanguageEpoch()` changes,
@@ -880,10 +881,10 @@ void AppRuntime::SetStatus(const std::string& message) {
 // overwrites it in the new language.
 //
 // The other option -- storing the msgid plus its arguments and translating at
-// display -- is what `core` would need, since the layer rule keeps `ui/i18n` out
-// of it. That is why the 27 sites in `core::AppState` (file and project
-// load/save reporting) are still English and are tracked on #252 rather than
-// converted here: `app/` may call `ui::i18n` directly, and `core/` may not.
+// display -- is what `core` uses, since the layer rule keeps `ui/i18n` out of
+// it: `core::AppState::set_status` records the msgid and arguments of the file
+// and project load/save messages, and `ui::LocalizedStatusMessage` translates
+// them when they are shown. Those messages do follow a language switch.
 
 void AppRuntime::ShowNotImplementedModal(const std::string& feature) {
     impl_->events.Emit(ModalRequestEvent{ModalKind::NotImplemented, true, feature});
@@ -1202,7 +1203,7 @@ void CollectFieldChanges(const parser::SacmElement* accepted,
                          std::vector<ui::DraftFieldChangeView>& out) {
     struct Field {
         const char* label;
-        std::string parser::SacmElement::*member;
+        std::string parser::SacmElement::* member;
     };
     const Field fields[] = {
         {"Name", &parser::SacmElement::name},
@@ -1786,7 +1787,8 @@ void AppRuntime::RequestExit(bool& done) {
     // instead of silently losing data.
     if (impl_->app_state.has_unsaved_changes) {
         if (!SaveProject()) {
-            impl_->last_autosave_error = "Auto-flush on close failed: " + impl_->app_state.status_message;
+            impl_->last_autosave_error =
+                ui::i18n::trf("Auto-flush on close failed: {0}", ui::LocalizedStatusMessage(impl_->app_state));
             impl_->modal_coordinator->show_save_before_exit_modal = true;
             return;
         }

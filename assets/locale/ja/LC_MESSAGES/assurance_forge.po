@@ -499,6 +499,9 @@ msgstr "認証に失敗しました"
 msgid "Author"
 msgstr "作成者"
 
+msgid "Auto-flush on close failed: {0}"
+msgstr "終了時の自動保存に失敗しました: {0}"
+
 msgid "Autosave write failed"
 msgstr "自動保存の書き込みに失敗しました"
 
@@ -973,6 +976,18 @@ msgstr "新しい用語用の TerminologyPackage を作成しました。"
 msgid "Created confidence argument tree {0} for {1}"
 msgstr "{1} の信頼度論証ツリー {0} を作成しました"
 
+msgid "Created project: {0}"
+msgstr "プロジェクトを作成しました: {0}"
+
+msgid "Created project: {0} from {1}"
+msgstr "{1} からプロジェクトを作成しました: {0}"
+
+msgid "Created: {0}"
+msgstr "作成しました: {0}"
+
+msgid "Created: {0} (audit store init failed: {1})"
+msgstr "作成しました: {0}（監査ストアの初期化に失敗しました: {1}）"
+
 msgid "Dark"
 msgstr "ダーク"
 
@@ -1228,6 +1243,30 @@ msgstr "レビューコメントに使用する名前を入力してください
 msgid "Error"
 msgstr "エラー"
 
+msgid "Error: Could not determine which file to save."
+msgstr "エラー: 保存するファイルを特定できませんでした。"
+
+msgid "Error: Failed to write {0}"
+msgstr "エラー: {0} に書き込めませんでした"
+
+msgid "Error: No SACM data to save"
+msgstr "エラー: 保存する SACM データがありません"
+
+msgid "Error: No file path available for save."
+msgstr "エラー: 保存先のファイルパスがありません。"
+
+msgid "Error: failed to load this file ({0})."
+msgstr "エラー: このファイルを読み込めませんでした（{0}）。"
+
+msgid "Error: ran out of memory while loading this file. It may be too large to open."
+msgstr "エラー: このファイルの読み込み中にメモリが不足しました。ファイルが大きすぎて開けない可能性があります。"
+
+msgid "Error: the SACM library could not read this file."
+msgstr "エラー: SACM ライブラリがこのファイルを読み込めませんでした。"
+
+msgid "Error: the SACM library could not read this file: {0}"
+msgstr "エラー: SACM ライブラリがこのファイルを読み込めませんでした: {0}"
+
 msgid "Evidence"
 msgstr "エビデンス"
 
@@ -1245,6 +1284,9 @@ msgstr "エビデンス登録簿"
 
 msgid "Evidence Rows"
 msgstr "エビデンス行"
+
+msgid "Evidence register create failed: {0}"
+msgstr "エビデンス登録簿の作成に失敗しました: {0}"
 
 msgid "Evidence register file: {0}"
 msgstr "エビデンス登録簿ファイル: {0}"
@@ -1459,6 +1501,12 @@ msgstr "SACM ファイルをインポート"
 msgid "Import SACM File..."
 msgstr "SACM ファイルをインポート..."
 
+msgid "Imported: {0}"
+msgstr "インポートしました: {0}"
+
+msgid "Imported: {0} (audit store init failed: {1})"
+msgstr "インポートしました: {0}（監査ストアの初期化に失敗しました: {1}）"
+
 msgid "Inactive"
 msgstr "非アクティブ"
 
@@ -1473,6 +1521,9 @@ msgstr "インターフェース"
 
 msgid "Interior shading"
 msgstr "内部シェーディング"
+
+msgid "J3377 CAE register create failed: {0}"
+msgstr "J3377 CAE 登録簿の作成に失敗しました: {0}"
 
 msgid "J3377 CAE register file: {0}"
 msgstr "J3377 CAE 登録簿ファイル: {0}"
@@ -1545,6 +1596,15 @@ msgstr "提案ドラフトを編集する前に SACM モデルを読み込んで
 
 msgid "Load a SACM model before previewing proposals."
 msgstr "提案をプレビューする前に SACM モデルを読み込んでください。"
+
+msgid "Loaded: {0} ({1} elements)"
+msgstr "読み込みました: {0}（{1} 要素）"
+
+msgid "Loaded: {0} ({1} elements) -- {2} warning kinds: {3}"
+msgstr "読み込みました: {0}（{1} 要素） -- 警告 {2} 種類: {3}"
+
+msgid "Loaded: {0} ({1} elements) -- {2} warning: {3}"
+msgstr "読み込みました: {0}（{1} 要素） -- 警告 {2} 件: {3}"
 
 msgid "Location"
 msgstr "場所"
@@ -2011,6 +2071,9 @@ msgstr "SACM ファイルを開きましたが、編集可能なパッケージ�
 msgid "Opened argument package; no focusable argument element was found in the package."
 msgstr "議論パッケージを開きましたが、フォーカスできる議論要素が見つかりませんでした。"
 
+msgid "Opened project: {0}"
+msgstr "プロジェクトを開きました: {0}"
+
 msgid "Opened term {0}."
 msgstr "用語 {0} を開きました。"
 
@@ -2019,6 +2082,9 @@ msgstr "用語エディターを開きました。"
 
 msgid "Opened {0}"
 msgstr "{0} を開きました"
+
+msgid "Opened: {0}"
+msgstr "開きました: {0}"
 
 msgid "Opening File Explorer is not supported on this platform."
 msgstr "このプラットフォームではエクスプローラーで開く機能はサポートされていません。"
@@ -2146,14 +2212,26 @@ msgstr "プロジェクトの準備状況"
 msgid "Project Summary"
 msgstr "プロジェクト概要"
 
+msgid "Project create failed: {0}"
+msgstr "プロジェクトの作成に失敗しました: {0}"
+
 msgid "Project files: {0}"
 msgstr "プロジェクトファイル: {0}"
 
 msgid "Project name"
 msgstr "プロジェクト名"
 
+msgid "Project open failed: {0}"
+msgstr "プロジェクトを開けませんでした: {0}"
+
 msgid "Project opened, but no SACM file could be loaded."
 msgstr "プロジェクトを開きましたが、SACM ファイルを読み込めませんでした。"
+
+msgid "Project save failed: no project is open."
+msgstr "プロジェクトの保存に失敗しました: 開いているプロジェクトがありません。"
+
+msgid "Project save failed: {0}"
+msgstr "プロジェクトの保存に失敗しました: {0}"
 
 msgid "Project saved: {0}"
 msgstr "プロジェクトを保存しました: {0}"
@@ -2542,8 +2620,14 @@ msgstr "SACM ビューア"
 msgid "SACM file"
 msgstr "SACM ファイル"
 
+msgid "SACM file create failed: {0}"
+msgstr "SACM ファイルの作成に失敗しました: {0}"
+
 msgid "SACM file is already open: {0}"
 msgstr "SACM ファイルは既に開かれています: {0}"
+
+msgid "SACM import failed: {0}"
+msgstr "SACM のインポートに失敗しました: {0}"
 
 msgid "SACM relationship: {0}"
 msgstr "SACM 関係: {0}"
@@ -2637,6 +2721,18 @@ msgstr "保存済み"
 
 msgid "Saved proposal {0}."
 msgstr "提案 {0} を保存しました。"
+
+msgid "Saved to: {0}"
+msgstr "保存しました: {0}"
+
+msgid "Saved to: {0} (warning: saved a projection because the SACM library document could not be serialized; unknown or vendor-specific content was not preserved)"
+msgstr "保存しました: {0}（警告: SACM ライブラリのドキュメントをシリアライズできなかったため、投影を保存しました。不明な内容やベンダー固有の内容は保持されていません）"
+
+msgid "Saved, but the project manifest could not be updated: {0}"
+msgstr "保存しましたが、プロジェクトマニフェストを更新できませんでした: {0}"
+
+msgid "Saved, but the project manifest could not be written: {0}"
+msgstr "保存しましたが、プロジェクトマニフェストを書き込めませんでした: {0}"
 
 msgid "Saved: {0}"
 msgstr "保存しました: {0}"

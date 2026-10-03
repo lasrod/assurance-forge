@@ -40,6 +40,7 @@
 #include "legacy_sacm/sacm_serializer.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/i18n/localization.h"
+#include "ui/localized_status.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/ui_state.h"
 
@@ -1585,7 +1586,7 @@ bool AppRuntime::ReloadAcceptedArgumentAfterAccept(std::string& error) {
     if (!reloaded) {
         error = impl_->app_state.status_message.empty()
                     ? std::string("The accepted argument was written but could not be read back.")
-                    : impl_->app_state.status_message;
+                    : ui::LocalizedStatusMessage(impl_->app_state);
         return false;
     }
 

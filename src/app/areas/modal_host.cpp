@@ -18,6 +18,7 @@
 #include "ai/secret_store.h"
 #include "ui/gsn/gsn_dpi.h"
 #include "ui/i18n/localization.h"
+#include "ui/localized_status.h"
 #include "ui/imgui_buffer_utils.h"
 #include "ui/panels/preferences_panel.h"
 #include "ui/panels/welcome_modal.h"
@@ -619,7 +620,7 @@ void ModalHost::RenderCreateProjectModal() {
                 // the real reason is kept in front of the user instead of going
                 // to the status bar, which this very dialog is covering.
                 state_.project_controller->RefreshCreateProjectObstacle();
-                state_.project_controller->create_project_error = state_.app_state.status_message;
+                state_.project_controller->create_project_error = ui::LocalizedStatusMessage(state_.app_state);
             }
         }
         ImGui::EndDisabled();
@@ -708,7 +709,7 @@ void ModalHost::RenderProjectFileNameModal() {
                 // The same silence the create-project dialog had: a name that
                 // is already taken refused, said so to a status bar this dialog
                 // covers, and left the button looking broken.
-                state_.project_controller->create_project_file_error = state_.app_state.status_message;
+                state_.project_controller->create_project_file_error = ui::LocalizedStatusMessage(state_.app_state);
             }
         }
         ImGui::SameLine();
