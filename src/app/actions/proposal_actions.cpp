@@ -19,6 +19,7 @@
 #include "parser/xml_parser.h"
 #include "ui/gsn/gsn_adapter.h"
 #include "ui/i18n/localization.h"
+#include "ui/localized_status.h"
 #include "ui/gsn/gsn_canvas.h"
 #include "ui/ui_state.h"
 
@@ -410,7 +411,8 @@ bool ProposalActions::ApplyReviewProposal(const core::reviews::ReviewItem& item)
 
     if (!SaveProject(state_)) {
         SetStatus(state_,
-                  ui::i18n::trf("Proposal applied, but project save failed: {0}", state_.app_state.status_message));
+                  ui::i18n::trf("Proposal applied, but project save failed: {0}",
+                                ui::LocalizedStatusMessage(state_.app_state)));
         return false;
     }
 

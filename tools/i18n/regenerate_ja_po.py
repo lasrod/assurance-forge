@@ -1093,6 +1093,75 @@ TRANSLATIONS = {
     'session {0}': 'セッション {0}',
     'unknown': '不明',
 
+    # ===== File and project load/save messages set in core::AppState (#252) =====
+    # `core` cannot call ui::i18n, so it records the msgid and its arguments
+    # (AppState::set_status) and ui::LocalizedStatusMessage translates them
+    # where they are shown.
+    "Error: the SACM library could not read this file.":
+        "エラー: SACM ライブラリがこのファイルを読み込めませんでした。",
+    "Error: the SACM library could not read this file: {0}":
+        "エラー: SACM ライブラリがこのファイルを読み込めませんでした: {0}",
+    "Loaded: {0} ({1} elements)":
+        "読み込みました: {0}（{1} 要素）",
+    "Loaded: {0} ({1} elements) -- {2} warning: {3}":
+        "読み込みました: {0}（{1} 要素） -- 警告 {2} 件: {3}",
+    "Loaded: {0} ({1} elements) -- {2} warning kinds: {3}":
+        "読み込みました: {0}（{1} 要素） -- 警告 {2} 種類: {3}",
+    "Error: ran out of memory while loading this file. It may be too large to open.":
+        "エラー: このファイルの読み込み中にメモリが不足しました。ファイルが大きすぎて開けない可能性があります。",
+    "Error: failed to load this file ({0}).":
+        "エラー: このファイルを読み込めませんでした（{0}）。",
+    "Error: No SACM data to save":
+        "エラー: 保存する SACM データがありません",
+    "Saved to: {0}":
+        "保存しました: {0}",
+    "Saved to: {0} (warning: saved a projection because the SACM library document could not be serialized; unknown or vendor-specific content was not preserved)":
+        "保存しました: {0}（警告: SACM ライブラリのドキュメントをシリアライズできなかったため、投影を保存しました。不明な内容やベンダー固有の内容は保持されていません）",
+    "Error: Failed to write {0}":
+        "エラー: {0} に書き込めませんでした",
+    "Error: No file path available for save.":
+        "エラー: 保存先のファイルパスがありません。",
+    "Saved, but the project manifest could not be updated: {0}":
+        "保存しましたが、プロジェクトマニフェストを更新できませんでした: {0}",
+    "Saved, but the project manifest could not be written: {0}":
+        "保存しましたが、プロジェクトマニフェストを書き込めませんでした: {0}",
+    "Error: Could not determine which file to save.":
+        "エラー: 保存するファイルを特定できませんでした。",
+    "Project save failed: no project is open.":
+        "プロジェクトの保存に失敗しました: 開いているプロジェクトがありません。",
+    "Project save failed: {0}":
+        "プロジェクトの保存に失敗しました: {0}",
+    "Project create failed: {0}":
+        "プロジェクトの作成に失敗しました: {0}",
+    "Created project: {0}":
+        "プロジェクトを作成しました: {0}",
+    "Created project: {0} from {1}":
+        "{1} からプロジェクトを作成しました: {0}",
+    "Project open failed: {0}":
+        "プロジェクトを開けませんでした: {0}",
+    "Opened project: {0}":
+        "プロジェクトを開きました: {0}",
+    "SACM file create failed: {0}":
+        "SACM ファイルの作成に失敗しました: {0}",
+    "Created: {0}":
+        "作成しました: {0}",
+    "Created: {0} (audit store init failed: {1})":
+        "作成しました: {0}（監査ストアの初期化に失敗しました: {1}）",
+    "SACM import failed: {0}":
+        "SACM のインポートに失敗しました: {0}",
+    "Imported: {0}":
+        "インポートしました: {0}",
+    "Imported: {0} (audit store init failed: {1})":
+        "インポートしました: {0}（監査ストアの初期化に失敗しました: {1}）",
+    "Evidence register create failed: {0}":
+        "エビデンス登録簿の作成に失敗しました: {0}",
+    "J3377 CAE register create failed: {0}":
+        "J3377 CAE 登録簿の作成に失敗しました: {0}",
+    "Opened: {0}":
+        "開きました: {0}",
+    "Auto-flush on close failed: {0}":
+        "終了時の自動保存に失敗しました: {0}",
+
     # ===== Status-bar messages (#252) =====
     # The status line was the one user-visible surface that bypassed ui::i18n:
     # 65 sites in src/app, exactly one of them localized, so a Japanese user got

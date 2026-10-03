@@ -23,6 +23,17 @@
 
 namespace core {
 
+void AppState::set_status(std::string_view msgid, std::vector<std::string> arguments) {
+    status_source.msgid = std::string(msgid);
+    status_source.arguments = std::move(arguments);
+    status_message = FormatStatusText(status_source.msgid, status_source.arguments);
+}
+
+bool AppState::status_source_is_current() const {
+    return !status_source.msgid.empty() &&
+           FormatStatusText(status_source.msgid, status_source.arguments) == status_message;
+}
+
 bool AppState::load_file(const std::string& file_path) {
     try {
         // The SACM library is the SOLE load path: the projected POD model is what
@@ -44,8 +55,10 @@ bool AppState::load_file(const std::string& file_path) {
             sacm_package.reset();
             ++case_revision;
             const std::string detail = sacm_adapter::summarize_load_diagnostics(outcome.diagnostics);
-            status_message =
-                "Error: the SACM library could not read this file" + (detail.empty() ? "." : ": " + detail);
+            if (detail.empty())
+                set_status(AF_TR_NOOP("Error: the SACM library could not read this file."));
+            else
+                set_status(AF_TR_NOOP("Error: the SACM library could not read this file: {0}"), {detail});
             return false;
         }
         library_document = std::move(outcome.document);
@@ -64,8 +77,6 @@ bool AppState::load_file(const std::string& file_path) {
         SynthesizeBareStrategyPlacements(loaded_case.value(), sacm_package.value());
         HideTerminologyArtifactReferences(loaded_case.value(), sacm_package.value());
         RefreshVisibleTerminologyContextDisplay(loaded_case.value(), sacm_package.value());
-        status_message =
-            "Loaded: " + loaded_case->name + " (" + std::to_string(loaded_case->elements.size()) + " elements)";
 
         // A load that SUCCEEDS can still have told us something the user must
         // know -- most sharply, that the file is not a conformant SACM
@@ -105,9 +116,15 @@ bool AppState::load_file(const std::string& file_path) {
         if (not_conformant != load_warnings.end())
             std::rotate(load_warnings.begin(), not_conformant, not_conformant + 1);
 
-        if (!load_warnings.empty()) {
-            status_message += " -- " + std::to_string(load_warnings.size()) +
-                              (load_warnings.size() == 1 ? " warning: " : " warning kinds: ") + load_warnings.front();
+        const std::string element_count = std::to_string(loaded_case->elements.size());
+        if (load_warnings.empty()) {
+            set_status(AF_TR_NOOP("Loaded: {0} ({1} elements)"), {loaded_case->name, element_count});
+        } else if (load_warnings.size() == 1) {
+            set_status(AF_TR_NOOP("Loaded: {0} ({1} elements) -- {2} warning: {3}"),
+                       {loaded_case->name, element_count, std::to_string(load_warnings.size()), load_warnings.front()});
+        } else {
+            set_status(AF_TR_NOOP("Loaded: {0} ({1} elements) -- {2} warning kinds: {3}"),
+                       {loaded_case->name, element_count, std::to_string(load_warnings.size()), load_warnings.front()});
         }
 
         return true;
@@ -118,7 +135,7 @@ bool AppState::load_file(const std::string& file_path) {
         sacm_package.reset();
         library_document.reset();
         ++case_revision;
-        status_message = "Error: ran out of memory while loading this file. It may be too large to open.";
+        set_status(AF_TR_NOOP("Error: ran out of memory while loading this file. It may be too large to open."));
         return false;
     } catch (const std::exception& error) {
         loaded_file_path.clear();
@@ -127,14 +144,14 @@ bool AppState::load_file(const std::string& file_path) {
         sacm_package.reset();
         library_document.reset();
         ++case_revision;
-        status_message = std::string("Error: failed to load this file (") + error.what() + ").";
+        set_status(AF_TR_NOOP("Error: failed to load this file ({0})."), {std::string(error.what())});
         return false;
     }
 }
 
 bool AppState::save_file(const std::string& file_path) {
     if (!sacm_package.has_value()) {
-        status_message = "Error: No SACM data to save";
+        set_status(AF_TR_NOOP("Error: No SACM data to save"));
         return false;
     }
 
@@ -165,24 +182,26 @@ bool AppState::save_file(const std::string& file_path) {
     if (WriteTextFileAtomic(file_path, bytes)) {
         loaded_file_path = std::filesystem::path(file_path);
         has_unsaved_changes = false;
-        status_message = "Saved to: " + file_path;
         // The package fallback cannot carry unknown/foreign content the document
         // preserved, so a degraded save must be visible rather than silent.
-        if (!serialized_from_library) {
-            status_message += " (warning: saved a projection because the SACM library "
-                              "document could not be serialized; unknown or vendor-specific "
-                              "content was not preserved)";
+        if (serialized_from_library) {
+            set_status(AF_TR_NOOP("Saved to: {0}"), {file_path});
+        } else {
+            set_status(AF_TR_NOOP("Saved to: {0} (warning: saved a projection because the SACM library "
+                                  "document could not be serialized; unknown or vendor-specific "
+                                  "content was not preserved)"),
+                       {file_path});
         }
         return true;
     } else {
-        status_message = "Error: Failed to write " + file_path;
+        set_status(AF_TR_NOOP("Error: Failed to write {0}"), {file_path});
         return false;
     }
 }
 
 bool AppState::save_current_document() {
     if (loaded_file_path.empty()) {
-        status_message = "Error: No file path available for save.";
+        set_status(AF_TR_NOOP("Error: No file path available for save."));
         return false;
     }
     if (!save_file(loaded_file_path.string()))
@@ -221,13 +240,13 @@ bool AppState::refresh_tracked_file_hashes(const std::filesystem::path& file_pat
         return true;
 
     if (std::expected<void, std::string> refreshed = RefreshEntryHashes(project, *tracked, false); !refreshed) {
-        status_message = "Saved, but the project manifest could not be updated: " + refreshed.error();
+        set_status(AF_TR_NOOP("Saved, but the project manifest could not be updated: {0}"), {refreshed.error()});
         return false;
     }
 
     std::string error;
     if (!ProjectService::WriteManifestSafely(project, error)) {
-        status_message = "Saved, but the project manifest could not be written: " + error;
+        set_status(AF_TR_NOOP("Saved, but the project manifest could not be written: {0}"), {error});
         return false;
     }
     return true;
@@ -235,7 +254,7 @@ bool AppState::refresh_tracked_file_hashes(const std::filesystem::path& file_pat
 
 bool AppState::save_project() {
     if (!current_project.has_value()) {
-        status_message = "Create or open a project first.";
+        set_status(AF_TR_NOOP("Create or open a project first."));
         return false;
     }
 
@@ -244,7 +263,7 @@ bool AppState::save_project() {
         if (save_path.empty() && active_project_file_role == ProjectFileRole::SacmArgument)
             save_path = active_project_file_path;
         if (save_path.empty()) {
-            status_message = "Error: Could not determine which file to save.";
+            set_status(AF_TR_NOOP("Error: Could not determine which file to save."));
             return false;
         }
         if (!save_file(save_path.string())) {
@@ -259,7 +278,7 @@ bool AppState::save_project() {
     // dereference, and the only thing keeping it true is that somebody read
     // `save_file` recently. One branch is cheaper than that assumption.
     if (!current_project.has_value()) {
-        status_message = "Project save failed: no project is open.";
+        set_status(AF_TR_NOOP("Project save failed: no project is open."));
         return false;
     }
     AssuranceProject& project = current_project.value();
@@ -268,11 +287,11 @@ bool AppState::save_project() {
 
     std::string error;
     if (!ProjectService::WriteManifestSafely(project, error)) {
-        status_message = "Project save failed: " + error;
+        set_status(AF_TR_NOOP("Project save failed: {0}"), {error});
         return false;
     }
 
-    status_message = "Project saved: " + project.name;
+    set_status(AF_TR_NOOP("Project saved: {0}"), {project.name});
     return true;
 }
 
@@ -286,13 +305,13 @@ bool AppState::create_empty_project(const std::string& project_name, const std::
     ProjectLoadReport report;
     std::string error;
     if (!ProjectService::CreateEmptyProject(project_name, parent_location, project, report, error)) {
-        status_message = "Project create failed: " + error;
+        set_status(AF_TR_NOOP("Project create failed: {0}"), {error});
         last_project_load_report = report;
         return false;
     }
     current_project = std::move(project);
     last_project_load_report = std::move(report);
-    status_message = "Created project: " + current_project->name;
+    set_status(AF_TR_NOOP("Created project: {0}"), {current_project->name});
 
     // A new project needs its audit store as much as an opened one. Opening ran
     // this and creating did not, so a project was auditable only from its SECOND
@@ -312,13 +331,14 @@ bool AppState::create_project_from_sacm(const std::string& project_name,
     std::string error;
     if (!ProjectService::CreateProjectFromSacm(
             project_name, parent_location, source_sacm_path, project, report, error)) {
-        status_message = "Project create failed: " + error;
+        set_status(AF_TR_NOOP("Project create failed: {0}"), {error});
         last_project_load_report = report;
         return false;
     }
     current_project = std::move(project);
     last_project_load_report = std::move(report);
-    status_message = "Created project: " + current_project->name + " from " + source_sacm_path.filename().string();
+    set_status(AF_TR_NOOP("Created project: {0} from {1}"),
+               {current_project->name, source_sacm_path.filename().string()});
 
     // The same first-session audit store the empty create needs: the imported
     // argument is snapshot 0, so its history starts at the file as imported.
@@ -349,13 +369,13 @@ bool AppState::open_project(const std::string& project_or_manifest_path) {
     ProjectLoadReport report;
     std::string error;
     if (!ProjectService::OpenProject(project_or_manifest_path, project, report, error)) {
-        status_message = "Project open failed: " + error;
+        set_status(AF_TR_NOOP("Project open failed: {0}"), {error});
         last_project_load_report = std::move(report);
         return false;
     }
     current_project = std::move(project);
     last_project_load_report = std::move(report);
-    status_message = "Opened project: " + current_project->name;
+    set_status(AF_TR_NOOP("Opened project: {0}"), {current_project->name});
 
     // Auto-migrate existing projects: ensure an audit store exists so the
     // history-timeline subsystem has a starting snapshot. The first
@@ -367,25 +387,27 @@ bool AppState::open_project(const std::string& project_or_manifest_path) {
 
 bool AppState::create_project_sacm_file(const std::string& file_name, ProjectFileEntry* created_entry) {
     if (!current_project.has_value()) {
-        status_message = "Create or open a project first.";
+        set_status(AF_TR_NOOP("Create or open a project first."));
         return false;
     }
     ProjectFileEntry entry;
     std::string error;
     if (!ProjectService::AddSacmFile(current_project.value(), file_name, entry, error)) {
-        status_message = "SACM file create failed: " + error;
+        set_status(AF_TR_NOOP("SACM file create failed: {0}"), {error});
         return false;
     }
     if (created_entry)
         *created_entry = entry;
-    status_message = "Created: " + entry.relativePath.generic_string();
 
     // Ensure the audit store is initialized using the newly-created SACM as
     // snapshot 0. Failure here is non-fatal: the file is already on disk.
     audit::EnsureAuditStoreResult audit_result;
     std::string audit_error;
-    if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
-        status_message += " (audit store init failed: " + audit_error + ")";
+    if (audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
+        set_status(AF_TR_NOOP("Created: {0}"), {entry.relativePath.generic_string()});
+    } else {
+        set_status(AF_TR_NOOP("Created: {0} (audit store init failed: {1})"),
+                   {entry.relativePath.generic_string(), audit_error});
     }
     return true;
 }
@@ -394,73 +416,75 @@ bool AppState::import_sacm_file(const std::filesystem::path& source_sacm_path,
                                 const std::string& file_name,
                                 ProjectFileEntry* created_entry) {
     if (!current_project.has_value()) {
-        status_message = "Create or open a project first.";
+        set_status(AF_TR_NOOP("Create or open a project first."));
         return false;
     }
     ProjectFileEntry entry;
     std::string error;
     if (!ProjectService::ImportSacmFile(current_project.value(), source_sacm_path, file_name, entry, error)) {
-        status_message = "SACM import failed: " + error;
+        set_status(AF_TR_NOOP("SACM import failed: {0}"), {error});
         return false;
     }
     if (created_entry)
         *created_entry = entry;
-    status_message = "Imported: " + entry.relativePath.generic_string();
 
     // As for a created SACM file: the imported argument becomes its own
     // snapshot 0. Non-fatal, the file is already on disk and tracked.
     audit::EnsureAuditStoreResult audit_result;
     std::string audit_error;
-    if (!audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
-        status_message += " (audit store init failed: " + audit_error + ")";
+    if (audit::EnsureAuditStore(current_project.value(), entry.relativePath, audit_result, audit_error)) {
+        set_status(AF_TR_NOOP("Imported: {0}"), {entry.relativePath.generic_string()});
+    } else {
+        set_status(AF_TR_NOOP("Imported: {0} (audit store init failed: {1})"),
+                   {entry.relativePath.generic_string(), audit_error});
     }
     return true;
 }
 
 bool AppState::create_project_evidence_register(const std::string& file_name, ProjectFileEntry* created_entry) {
     if (!current_project.has_value()) {
-        status_message = "Create or open a project first.";
+        set_status(AF_TR_NOOP("Create or open a project first."));
         return false;
     }
     ProjectFileEntry entry;
     std::string error;
     if (!ProjectService::AddEvidenceRegister(current_project.value(), file_name, entry, error)) {
-        status_message = "Evidence register create failed: " + error;
+        set_status(AF_TR_NOOP("Evidence register create failed: {0}"), {error});
         return false;
     }
     if (created_entry)
         *created_entry = entry;
-    status_message = "Created: " + entry.relativePath.generic_string();
+    set_status(AF_TR_NOOP("Created: {0}"), {entry.relativePath.generic_string()});
     return true;
 }
 
 bool AppState::create_project_j3377_cae_register(const std::string& file_name, ProjectFileEntry* created_entry) {
     if (!current_project.has_value()) {
-        status_message = "Create or open a project first.";
+        set_status(AF_TR_NOOP("Create or open a project first."));
         return false;
     }
     ProjectFileEntry entry;
     std::string error;
     if (!ProjectService::AddJ3377CaeRegister(current_project.value(), file_name, entry, error)) {
-        status_message = "J3377 CAE register create failed: " + error;
+        set_status(AF_TR_NOOP("J3377 CAE register create failed: {0}"), {error});
         return false;
     }
     if (created_entry)
         *created_entry = entry;
-    status_message = "Created: " + entry.relativePath.generic_string();
+    set_status(AF_TR_NOOP("Created: {0}"), {entry.relativePath.generic_string()});
     return true;
 }
 
 bool AppState::open_project_file(const ProjectFileEntry& entry) {
     if (!current_project.has_value()) {
-        status_message = "Create or open a project first.";
+        set_status(AF_TR_NOOP("Create or open a project first."));
         return false;
     }
     const std::filesystem::path project_file_path = current_project->rootPath / entry.relativePath;
     if (entry.role != ProjectFileRole::SacmArgument) {
         active_project_file_role = entry.role;
         active_project_file_path = project_file_path;
-        status_message = "Opened: " + entry.relativePath.generic_string();
+        set_status(AF_TR_NOOP("Opened: {0}"), {entry.relativePath.generic_string()});
         return true;
     }
 

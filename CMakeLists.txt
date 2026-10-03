@@ -456,6 +456,7 @@ add_executable(tests
     tests/test_away_goal.cpp
     tests/test_tree_editing.cpp
     tests/test_app_state.cpp
+    tests/test_status_text.cpp
     tests/test_project_service.cpp
     tests/test_project_controller.cpp
     tests/test_proposal_controller.cpp

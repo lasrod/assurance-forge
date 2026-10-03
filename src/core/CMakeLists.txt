@@ -85,6 +85,7 @@ add_library(af_core OBJECT
     sacm_argument_sync.cpp
     sacm_identity.cpp
     sha256.cpp
+    status_text.cpp
     string_utils.cpp
     terminology_category_service.cpp
     terminology_context_projection.cpp

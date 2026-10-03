@@ -1,6 +1,7 @@
 #include "app/areas/status_bar_area.h"
 
 #include "app/app_runtime_state.h"
+#include "ui/localized_status.h"
 #include "ui/panels/status_bar_panel.h"
 #include "ui/ui_state.h"
 
@@ -40,7 +41,7 @@ void RenderStatusBarArea(AppRuntimeState& state) {
         model.message = state.last_autosave_error;
         model.message_is_error = true;
     } else {
-        model.message = state.app_state.status_message;
+        model.message = ui::LocalizedStatusMessage(state.app_state);
     }
 
     for (const core::ProblemItem& problem : state.problems_manager.GetProblems()) {

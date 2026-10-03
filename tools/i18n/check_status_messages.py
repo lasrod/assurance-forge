@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when a status-bar message in src/app is an untranslated literal (issue #252).
+"""Fail when a status-bar message in src/app or src/core is an untranslated literal (issue #252).
 
 The status bar shows whatever `StatusMessageEvent{...}` carries, and it does no
 translation of its own, so every message must be translated where it is set.
@@ -11,6 +11,11 @@ AF_TR / AF_TR_NOOP / ui::i18n::tr* -- `"Added " + id` or `"Saved."`. An argument
 with no literal at all (a variable, a value built elsewhere) is left alone: the
 text came from somewhere this check cannot follow, and lower layers that cannot
 translate are tracked separately.
+
+`src/core` cannot translate, so it reports through `AppState::set_status` with
+the msgid marked AF_TR_NOOP, and the layer that shows the message translates it.
+There the check flags a `set_status(` call with an unmarked literal, and any
+literal assigned straight to `status_message`.
 
 Usage:
     python tools/i18n/check_status_messages.py
@@ -24,11 +29,15 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 ROOT = REPO / "src/app"
+CORE_ROOT = REPO / "src/core"
 
 # `SetStatus(state, <message>)`, `AppRuntime::SetStatus(<message>)` and
 # `StatusMessageEvent{<message>}`. For SetStatus the message is the last
 # argument, whichever overload it is.
 CALL = re.compile(r"\b(?:SetStatus\(|StatusMessageEvent\{)")
+# In `core`: `set_status(<msgid>, {<arguments>})`, and a direct write to the field.
+CORE_CALL = re.compile(r"\bset_status\(")
+CORE_ASSIGNMENT = re.compile(r"\bstatus_message\s*\+?=(?!=)")
 TRANSLATING = re.compile(r"\b(?:AF_TR_NOOP|AF_TR_CTX|AF_TR|tr|trc|trn|trf|trcf|trnf)\s*\(")
 
 
@@ -111,8 +120,32 @@ def violations(root: Path = ROOT) -> list[str]:
     return found
 
 
+def core_violations(root: Path = CORE_ROOT) -> list[str]:
+    found = []
+    for path in sorted(root.rglob("*")):
+        if path.suffix not in (".cpp", ".h"):
+            continue
+        text = path.read_text(encoding="utf-8")
+        candidates = []
+        for m in CORE_CALL.finditer(text):
+            # The declaration and the definition: `void set_status(`, `AppState::set_status(`.
+            before = text[max(0, m.start() - 12) : m.start()].rstrip()
+            if before.endswith("void") or before.endswith("::"):
+                continue
+            candidates.append((m.start(), argument(text, m.end())))
+        for m in CORE_ASSIGNMENT.finditer(text):
+            end = text.find(";", m.end())
+            candidates.append((m.start(), text[m.end() : end if end != -1 else len(text)]))
+        for start, arg in sorted(candidates):
+            if untranslated_literal(arg):
+                line = text.count("\n", 0, start) + 1
+                found.append(f"{path.relative_to(REPO).as_posix()}:{line}: {' '.join(arg.split())[:120]}")
+    return found
+
+
 def main() -> int:
     found = violations()
+    core_found = core_violations()
     if found:
         print(f"{len(found)} status message(s) in src/app reach the status bar untranslated:\n")
         for row in found:
@@ -121,8 +154,17 @@ def main() -> int:
             "\n  -> Wrap the text: AF_TR(\"...\") for a fixed message, ui::i18n::trf(\"... {0}\", value)\n"
             "     for one with runtime parts. Then add the msgid to tools/i18n/regenerate_ja_po.py."
         )
+    if core_found:
+        print(f"{len(core_found)} status message(s) in src/core cannot be translated where they are shown:\n")
+        for row in core_found:
+            print(f"  {row}")
+        print(
+            "\n  -> Report it with set_status(AF_TR_NOOP(\"... {0}\"), {value}) rather than writing\n"
+            "     status_message. Then add the msgid to tools/i18n/regenerate_ja_po.py."
+        )
+    if found or core_found:
         return 1
-    print("OK: every literal status message in src/app is translated.")
+    print("OK: every literal status message in src/app and src/core is translated.")
     return 0
 
 
