@@ -5,6 +5,7 @@
 
 #include "core/app_state.h"
 #include "core/status_text.h"
+#include "support/temp_files.h"
 #include "ui/i18n/localization.h"
 #include "ui/localized_status.h"
 
@@ -91,7 +92,10 @@ TEST(AppStateStatusTest, CoreOperationsReportThroughSetStatus) {
     EXPECT_EQ(state.status_message, "Create or open a project first.");
     EXPECT_TRUE(state.status_source_is_current());
 
-    const std::filesystem::path missing = std::filesystem::temp_directory_path() / "af_status_text_no_such_dir";
+    // A child of a directory this test owns, so nothing else can have put a
+    // project there.
+    const test_support::TempDir temp(test_support::UniqueTempDirectory("status_text"));
+    const std::filesystem::path missing = temp.path / "no_such_project";
     EXPECT_FALSE(state.open_project(missing.string()));
     EXPECT_EQ(state.status_source.msgid, "Project open failed: {0}");
     EXPECT_TRUE(state.status_message.starts_with("Project open failed: ")) << state.status_message;
