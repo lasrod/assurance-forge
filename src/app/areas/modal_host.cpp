@@ -653,9 +653,31 @@ void ModalHost::RenderProjectFileNameModal() {
         if (ImGui::InputText("##project_file_name",
                              state_.project_controller->project_file_name_buf,
                              sizeof(state_.project_controller->project_file_name_buf))) {
-            // The next keystroke is the user answering the refusal.
-            state_.project_controller->create_project_file_error.clear();
+            // The next keystroke is the user answering the refusal; the refresh
+            // clears it and re-asks whether the new name can be used.
+            state_.project_controller->RefreshProjectFileObstacle(state_.app_state.current_project);
         }
+        // Said while the name is being typed, not after a press that could only
+        // fail -- the same rule the create-project dialog follows.
+        const core::ProjectFileObstacle obstacle = state_.project_controller->project_file_obstacle;
+        const std::string planned_path = state_.project_controller->planned_project_file_path.generic_string();
+        if (obstacle == core::ProjectFileObstacle::AlreadyTracked) {
+            ImGui::TextColored(
+                ui::GetWarningColor(),
+                "%s",
+                ui::i18n::trf("The project already has \"{0}\". Choose another name.", planned_path).c_str());
+        } else if (obstacle == core::ProjectFileObstacle::FileExists) {
+            ImGui::TextColored(
+                ui::GetWarningColor(),
+                "%s",
+                ui::i18n::trf("A file named \"{0}\" is already in the project folder. Choose another name.",
+                              planned_path)
+                    .c_str());
+        } else if (obstacle == core::ProjectFileObstacle::InvalidPath) {
+            ImGui::TextColored(ui::GetWarningColor(), "%s", AF_TR("This file name cannot be used.").c_str());
+        }
+        // An add that was attempted and refused anyway, for a reason the check
+        // above cannot see.
         if (!state_.project_controller->create_project_file_error.empty()) {
             ImGui::TextColored(ui::GetErrorColor(), "%s", state_.project_controller->create_project_file_error.c_str());
         }
@@ -668,7 +690,10 @@ void ModalHost::RenderProjectFileNameModal() {
             ImGui::TextDisabled("%s", state_.project_controller->pending_import_sacm_source.string().c_str());
             ImGui::Spacing();
         }
-        if (ImGui::Button((is_import ? AF_TR("Import") : AF_TR("Create")).c_str())) {
+        ImGui::BeginDisabled(obstacle != core::ProjectFileObstacle::None);
+        const bool confirm_pressed = ImGui::Button((is_import ? AF_TR("Import") : AF_TR("Create")).c_str());
+        ImGui::EndDisabled();
+        if (confirm_pressed) {
             bool created = false;
             core::ProjectFileEntry imported_entry;
             if (state_.project_controller->pending_project_file_kind == ProjectFileCreateKind::Sacm) {
@@ -709,6 +734,9 @@ void ModalHost::RenderProjectFileNameModal() {
                 // The same silence the create-project dialog had: a name that
                 // is already taken refused, said so to a status bar this dialog
                 // covers, and left the button looking broken.
+                // Re-asked first (the refresh clears any previous refusal): the
+                // name may have been taken between the check and the press.
+                state_.project_controller->RefreshProjectFileObstacle(state_.app_state.current_project);
                 state_.project_controller->create_project_file_error = ui::LocalizedStatusMessage(state_.app_state);
             }
         }
@@ -721,6 +749,9 @@ void ModalHost::RenderProjectFileNameModal() {
         }
         ImGui::EndPopup();
     } else if (state_.project_controller->show_project_file_name_modal) {
+        // Asked once as the dialog opens, so a name that is already taken is
+        // reported before a key is pressed rather than after a dead press.
+        state_.project_controller->RefreshProjectFileObstacle(state_.app_state.current_project);
         ImGui::OpenPopup(title.c_str());
     }
 }
