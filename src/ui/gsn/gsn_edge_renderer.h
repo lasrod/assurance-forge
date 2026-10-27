@@ -8,7 +8,7 @@
 //
 // "Group1" edges are structural (parent -> child) — solid Bezier with a filled
 // arrowhead, drawn top-to-bottom between node bodies.
-// "Group2" edges are contextual (parent -> side-attached node) — dashed Bezier
+// "Group2" edges are contextual (parent -> side-attached node) — solid Bezier
 // with a hollow arrowhead, drawn horizontally to the attachment.
 //
 // All draw functions take screen-space coordinates and a zoom factor; endpoint

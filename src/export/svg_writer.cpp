@@ -378,7 +378,9 @@ void WriteEdgePath(std::ostringstream& out, const GsnEdge& edge, Point start, Po
         out << "stroke=\"black\" stroke-width=\"1.2\" marker-end=\"url(#supportedByArrow)\"";
         break;
     case GsnEdgeKind::InContextOf:
-        out << "stroke=\"black\" stroke-width=\"1.2\" stroke-dasharray=\"6,4\" marker-end=\"url(#contextArrow)\"";
+        // GSN v3 draws InContextOf solid; only the hollow arrowhead tells it
+        // apart from SupportedBy. A dashed line is not GSN notation.
+        out << "stroke=\"black\" stroke-width=\"1.2\" marker-end=\"url(#contextArrow)\"";
         break;
     case GsnEdgeKind::Challenges:
         out << "stroke=\"" << kChallengeColor
@@ -442,9 +444,12 @@ std::string GenerateGsnSvg(const GsnDiagram& diagram) {
            "orient=\"auto\" markerUnits=\"strokeWidth\">\n";
     out << "    <path d=\"M 0 0 L 10 5 L 0 10 Z\" fill=\"black\"/>\n";
     out << "  </marker>\n";
-    out << "  <marker id=\"contextArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" "
+    out << "  <marker id=\"contextArrow\" markerWidth=\"13\" markerHeight=\"13\" refX=\"11\" refY=\"6.5\" "
            "orient=\"auto\" markerUnits=\"strokeWidth\">\n";
-    out << "    <path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\" stroke=\"black\" stroke-width=\"1\"/>\n";
+    // A closed hollow triangle, filled white so the line does not show through
+    // it. An open chevron is not the GSN InContextOf arrowhead. The box is wider
+    // than the triangle so its outline is not clipped at the marker's edge.
+    out << "    <path d=\"M 1 1.5 L 11 6.5 L 1 11.5 Z\" fill=\"white\" stroke=\"black\" stroke-width=\"1\"/>\n";
     out << "  </marker>\n";
     // Hollow (open) arrowhead, matching the canvas's challenge edge.
     out << "  <marker id=\"challengeArrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"5\" "

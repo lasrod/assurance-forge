@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include <regex>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -123,6 +124,27 @@ bool RectanglesOverlap(const export_gsn::GsnNode& first, const export_gsn::GsnNo
     const double second_right = second.x + second.width;
     const double second_bottom = second.y + second.height;
     return first.x < second_right && first_right > second.x && first.y < second_bottom && first_bottom > second.y;
+}
+
+// Every `<tag .../>` element in `svg` whose opening text contains `needle`.
+std::vector<std::string> SvgElementsContaining(const std::string& svg, const std::string& needle) {
+    std::vector<std::string> found;
+    for (size_t at = svg.find(needle); at != std::string::npos; at = svg.find(needle, at + 1)) {
+        const size_t open = svg.rfind('<', at);
+        const size_t close = svg.find('>', at);
+        if (open != std::string::npos && close != std::string::npos)
+            found.push_back(svg.substr(open, close - open + 1));
+    }
+    return found;
+}
+
+// The marker definition with `id`, up to its closing tag.
+std::string SvgMarker(const std::string& svg, const std::string& id) {
+    const size_t open = svg.find("<marker id=\"" + id + "\"");
+    if (open == std::string::npos)
+        return {};
+    const size_t close = svg.find("</marker>", open);
+    return close == std::string::npos ? std::string{} : svg.substr(open, close - open);
 }
 
 } // namespace
@@ -494,6 +516,47 @@ TEST(GsnSvgExporterTest, SvgContainsNamespaceMarkersAndPublicationStyle) {
     EXPECT_NE(svg.find("fill=\"white\""), std::string::npos);
     EXPECT_NE(svg.find("stroke=\"black\""), std::string::npos);
     EXPECT_NE(svg.find("class=\"gsn-solution\""), std::string::npos);
+}
+
+// ===== GSN v3 relationship notation =====
+
+TEST(GsnSvgExporterTest, SupportedByIsASolidLineWithAFilledArrowhead) {
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    const std::vector<std::string> edges = SvgElementsContaining(svg, "class=\"gsn-supportedby\"");
+    ASSERT_FALSE(edges.empty());
+    for (const std::string& edge : edges) {
+        EXPECT_EQ(edge.find("stroke-dasharray"), std::string::npos) << edge;
+        EXPECT_NE(edge.find("marker-end=\"url(#supportedByArrow)\""), std::string::npos) << edge;
+    }
+    const std::string marker = SvgMarker(svg, "supportedByArrow");
+    EXPECT_NE(marker.find("Z\""), std::string::npos) << marker;
+    EXPECT_NE(marker.find("fill=\"black\""), std::string::npos) << marker;
+}
+
+TEST(GsnSvgExporterTest, InContextOfIsASolidLineWithAHollowClosedArrowhead) {
+    // GSN v3 Table 1: InContextOf is "a line with a hollow arrowhead". It was
+    // exported dashed with an open chevron, which reviewers of published
+    // diagrams rejected as non-standard notation.
+    export_gsn::GsnProjectionResult projection = export_gsn::BuildGsnProjection(BuildRepresentativeCase());
+    export_gsn::LayoutGsnSvgDiagram(projection.diagram);
+    const std::string svg = export_gsn::GenerateGsnSvg(projection.diagram);
+
+    const std::vector<std::string> edges = SvgElementsContaining(svg, "class=\"gsn-incontextof\"");
+    ASSERT_EQ(edges.size(), 3u); // C1, A1 and J1
+    for (const std::string& edge : edges) {
+        EXPECT_EQ(edge.find("stroke-dasharray"), std::string::npos) << edge;
+        EXPECT_NE(edge.find("marker-end=\"url(#contextArrow)\""), std::string::npos) << edge;
+    }
+    const std::string marker = SvgMarker(svg, "contextArrow");
+    ASSERT_FALSE(marker.empty());
+    // Closed, so it reads as a triangle rather than a chevron; filled with the
+    // background, so it is hollow and the line does not show through it.
+    EXPECT_NE(marker.find("Z\""), std::string::npos) << marker;
+    EXPECT_NE(marker.find("fill=\"white\""), std::string::npos) << marker;
+    EXPECT_NE(marker.find("stroke=\"black\""), std::string::npos) << marker;
 }
 
 // ===== AF-ENG-015: the exported SVG must not understate the argument =====
