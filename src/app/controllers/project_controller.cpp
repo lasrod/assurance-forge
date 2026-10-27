@@ -69,6 +69,28 @@ void ProjectController::RefreshCreateProjectObstacle() {
     create_project_error.clear();
 }
 
+void ProjectController::RefreshProjectFileObstacle(const std::optional<core::AssuranceProject>& project) {
+    project_file_obstacle = core::ProjectFileObstacle::None;
+    planned_project_file_path.clear();
+    create_project_file_error.clear();
+    if (!project.has_value())
+        return;
+
+    switch (pending_project_file_kind) {
+    case ProjectFileCreateKind::Sacm:
+        planned_project_file_path = core::ProjectService::PlanSacmFilePath(project_file_name_buf);
+        break;
+    case ProjectFileCreateKind::ImportedSacm:
+        planned_project_file_path =
+            core::ProjectService::PlanImportedSacmFilePath(pending_import_sacm_source, project_file_name_buf);
+        break;
+    case ProjectFileCreateKind::EvidenceRegister:
+    case ProjectFileCreateKind::J3377CaeRegister:
+        return;
+    }
+    project_file_obstacle = core::ProjectService::FindProjectFileObstacle(*project, planned_project_file_path);
+}
+
 void ProjectController::LoadRecentProjectsPreference(const std::string& content) {
     recent_projects = app::LoadRecentProjectsPreference(content);
 }

@@ -704,6 +704,80 @@ TEST(ProjectServiceTest, ImportSacmFileRefusesAPathTheManifestTracksEvenWhenTheF
     EXPECT_EQ(project.files.size(), files_before);
 }
 
+// The dialog asks the same rule the add refuses on, so each obstacle must be
+// the one the add would hit for that path.
+TEST(ProjectServiceTest, FindProjectFileObstacleNamesWhyAPathCannotBeAdded) {
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Target", tmp.path, project, report, error)) << error;
+
+    EXPECT_EQ(core::ProjectService::FindProjectFileObstacle(project, "arguments/main.sacm"),
+              core::ProjectFileObstacle::AlreadyTracked);
+    EXPECT_EQ(core::ProjectService::FindProjectFileObstacle(project, "arguments/free.sacm"),
+              core::ProjectFileObstacle::None);
+    EXPECT_EQ(core::ProjectService::FindProjectFileObstacle(project, "../outside.sacm"),
+              core::ProjectFileObstacle::InvalidPath);
+
+    // Untracked, but on disk: writing there would destroy a file the project
+    // does not know it owns.
+    std::ofstream(project.rootPath / "arguments" / "stray.sacm") << "stray";
+    EXPECT_EQ(core::ProjectService::FindProjectFileObstacle(project, "arguments/stray.sacm"),
+              core::ProjectFileObstacle::FileExists);
+}
+
+TEST(ProjectServiceTest, PlannedSacmPathsAreThePathsTheAddsWrite) {
+    EXPECT_EQ(core::ProjectService::PlanSacmFilePath("second").generic_string(), "arguments/second.sacm");
+    EXPECT_EQ(core::ProjectService::PlanSacmFilePath("").generic_string(), "arguments/main.sacm");
+    EXPECT_EQ(core::ProjectService::PlanImportedSacmFilePath("C:/elsewhere/case.xml", "").generic_string(),
+              "arguments/case.sacm");
+    EXPECT_EQ(core::ProjectService::PlanImportedSacmFilePath("C:/elsewhere/case.xml", "renamed").generic_string(),
+              "arguments/renamed.sacm");
+}
+
+TEST(ProjectServiceTest, FreeSacmFileNameSkipsNamesThatAreTakenOnDiskOrInTheManifest) {
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Target", tmp.path, project, report, error)) << error;
+
+    EXPECT_EQ(core::ProjectService::FreeSacmFileName(project, "case.sacm").generic_string(), "case.sacm")
+        << "a free name is offered as it is";
+    EXPECT_EQ(core::ProjectService::FreeSacmFileName(project, "main.sacm").generic_string(), "main-2.sacm");
+
+    std::ofstream(project.rootPath / "arguments" / "main-2.sacm") << "untracked";
+    EXPECT_EQ(core::ProjectService::FreeSacmFileName(project, "main.sacm").generic_string(), "main-3.sacm")
+        << "an untracked file on disk takes its name too";
+}
+
+// The reported defect: every project's first argument is `main.sacm`, so
+// importing another project's argument always clashed, and the dialog offered
+// only the name that clashed. The offered name must import.
+TEST(ProjectServiceTest, AnotherProjectsMainArgumentImportsUnderTheOfferedFreeName) {
+    TempDir tmp(test_support::UniqueTempDirectory("project_service"));
+    std::filesystem::create_directories(tmp.path / "other" / "arguments");
+    const std::filesystem::path source = WriteLoadableSacm(tmp.path / "other" / "arguments", "main.sacm");
+
+    core::AssuranceProject project;
+    core::ProjectLoadReport report;
+    std::string error;
+    ASSERT_TRUE(core::ProjectService::CreateEmptyProject("Target", tmp.path, project, report, error)) << error;
+    const std::string seed_before = ReadWholeFile(project.rootPath / "arguments" / "main.sacm");
+
+    const std::filesystem::path offered =
+        core::ProjectService::FreeSacmFileName(project, core::ProjectService::DefaultImportedSacmFileName(source));
+    EXPECT_EQ(offered.generic_string(), "main-2.sacm");
+
+    core::ProjectFileEntry entry;
+    ASSERT_TRUE(core::ProjectService::ImportSacmFile(project, source, offered.string(), entry, error)) << error;
+    EXPECT_EQ(entry.relativePath.generic_string(), "arguments/main-2.sacm");
+    EXPECT_EQ(ReadWholeFile(project.rootPath / entry.relativePath), ReadWholeFile(source));
+    EXPECT_EQ(ReadWholeFile(project.rootPath / "arguments" / "main.sacm"), seed_before)
+        << "the project's own main argument is untouched";
+}
+
 // The project must never track an argument it cannot open. A file the library
 // refuses is refused here, with the library's reason, and nothing changes.
 TEST(ProjectServiceTest, ImportSacmFileRefusesAFileTheLibraryCannotLoad) {

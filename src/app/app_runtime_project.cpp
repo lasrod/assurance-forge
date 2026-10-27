@@ -316,8 +316,11 @@ void AppRuntime::BeginImportSacmFile() {
 
     const std::filesystem::path source(source_path);
     impl_->project_controller->pending_import_sacm_source = source;
-    impl_->project_controller->BeginProjectFileCreate(
-        ProjectFileCreateKind::ImportedSacm, core::ProjectService::DefaultImportedSacmFileName(source).string());
+    // Offered free: another project's argument is usually `main.sacm` too, and a
+    // name that can only be refused is no suggestion at all.
+    const std::filesystem::path offered = core::ProjectService::FreeSacmFileName(
+        *impl_->app_state.current_project, core::ProjectService::DefaultImportedSacmFileName(source));
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::ImportedSacm, offered.string());
 }
 
 void AppRuntime::BeginOpenProject() {
@@ -348,7 +351,9 @@ void AppRuntime::BeginCreateProjectSacmFile() {
         SetStatus(AF_TR("Create or open a project first."));
         return;
     }
-    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::Sacm, "main.sacm");
+    const std::filesystem::path offered =
+        core::ProjectService::FreeSacmFileName(*impl_->app_state.current_project, "main.sacm");
+    impl_->project_controller->BeginProjectFileCreate(ProjectFileCreateKind::Sacm, offered.string());
 }
 
 void AppRuntime::BeginCreateProjectEvidenceRegister() {

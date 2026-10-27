@@ -31,6 +31,7 @@ namespace {
 // The format name and version constants live in project_manifest.cpp, which is
 // what reads and validates them. The copies here were never referenced.
 constexpr const char* kManifestFileName = "af.proj";
+constexpr const char* kArgumentsDirectory = "arguments";
 
 const std::array<const char*, 11> kProjectDirectories = {
     "arguments",
@@ -368,33 +369,24 @@ bool AddTrackedFile(AssuranceProject& project,
                     ProjectFileEntry& entry,
                     std::string& error) {
     std::filesystem::path relative_path = folder / file_name;
-    if (!IsSafeRelativePath(relative_path)) {
+    switch (ProjectService::FindProjectFileObstacle(project, relative_path)) {
+    case ProjectFileObstacle::InvalidPath:
         error = "Invalid project file path";
         return false;
-    }
-
-    // The manifest is asked before the disk is: a tracked file that is missing
-    // on disk (deleted outside the tool, on a share that is offline) is still
-    // that entry's path, and adding a second entry for it would leave the
-    // manifest with two rows claiming one file -- one of them reporting it
-    // missing and the other reporting it fresh.
-    const bool already_tracked =
-        std::any_of(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
-            return candidate.relativePath.generic_string() == relative_path.generic_string();
-        });
-    if (already_tracked) {
+    case ProjectFileObstacle::AlreadyTracked:
         error = "File already tracked: " + relative_path.generic_string();
         return false;
+    case ProjectFileObstacle::FileExists:
+        error = "File already exists: " + relative_path.generic_string();
+        return false;
+    case ProjectFileObstacle::None:
+        break;
     }
 
     std::filesystem::path absolute_path = project.rootPath / relative_path;
     std::error_code ec;
     if (!std::filesystem::create_directories(absolute_path.parent_path(), ec) && ec) {
         error = "Could not create project directory: " + absolute_path.parent_path().string();
-        return false;
-    }
-    if (std::filesystem::exists(absolute_path, ec)) {
-        error = "File already exists: " + relative_path.generic_string();
         return false;
     }
 
@@ -623,13 +615,19 @@ bool ProjectService::AddSacmFile(AssuranceProject& project,
                                  const std::string& requested_file_name,
                                  ProjectFileEntry& entry,
                                  std::string& error) {
-    std::filesystem::path file_name = NormalizeFileName(requested_file_name, "main.sacm", ".sacm");
+    const std::filesystem::path relative_path = PlanSacmFilePath(requested_file_name);
     const std::string seed = MinimalSacmXml(project.name);
     if (seed.empty()) {
         error = "Could not generate a SACM 2.3 seed document";
         return false;
     }
-    return AddTrackedFile(project, "arguments", file_name, ProjectFileRole::SacmArgument, seed, entry, error);
+    return AddTrackedFile(project,
+                          relative_path.parent_path(),
+                          relative_path.filename(),
+                          ProjectFileRole::SacmArgument,
+                          seed,
+                          entry,
+                          error);
 }
 
 std::filesystem::path ProjectService::DefaultImportedSacmFileName(const std::filesystem::path& source_sacm_path) {
@@ -648,10 +646,67 @@ bool ProjectService::ImportSacmFile(AssuranceProject& project,
     if (!ReadValidatedSacm(source_sacm_path, content, error))
         return false;
 
-    const std::filesystem::path file_name = TrimWhitespace(requested_file_name).empty()
-                                                ? DefaultImportedSacmFileName(source_sacm_path)
-                                                : NormalizeFileName(requested_file_name, "main.sacm", ".sacm");
-    return AddTrackedFile(project, "arguments", file_name, ProjectFileRole::SacmArgument, content, entry, error);
+    const std::filesystem::path relative_path = PlanImportedSacmFilePath(source_sacm_path, requested_file_name);
+    return AddTrackedFile(project,
+                          relative_path.parent_path(),
+                          relative_path.filename(),
+                          ProjectFileRole::SacmArgument,
+                          content,
+                          entry,
+                          error);
+}
+
+std::filesystem::path ProjectService::PlanSacmFilePath(const std::string& requested_file_name) {
+    return std::filesystem::path(kArgumentsDirectory) / NormalizeFileName(requested_file_name, "main.sacm", ".sacm");
+}
+
+std::filesystem::path ProjectService::PlanImportedSacmFilePath(const std::filesystem::path& source_sacm_path,
+                                                               const std::string& requested_file_name) {
+    if (TrimWhitespace(requested_file_name).empty())
+        return std::filesystem::path(kArgumentsDirectory) / DefaultImportedSacmFileName(source_sacm_path);
+    return PlanSacmFilePath(requested_file_name);
+}
+
+ProjectFileObstacle ProjectService::FindProjectFileObstacle(const AssuranceProject& project,
+                                                            const std::filesystem::path& relative_path) {
+    if (!IsSafeRelativePath(relative_path))
+        return ProjectFileObstacle::InvalidPath;
+
+    // The manifest is asked before the disk is: a tracked file that is missing
+    // on disk (deleted outside the tool, on a share that is offline) is still
+    // that entry's path, and adding a second entry for it would leave the
+    // manifest with two rows claiming one file -- one of them reporting it
+    // missing and the other reporting it fresh.
+    const bool already_tracked =
+        std::any_of(project.files.begin(), project.files.end(), [&](const ProjectFileEntry& candidate) {
+            return candidate.relativePath.generic_string() == relative_path.generic_string();
+        });
+    if (already_tracked)
+        return ProjectFileObstacle::AlreadyTracked;
+
+    std::error_code ec;
+    if (std::filesystem::exists(project.rootPath / relative_path, ec))
+        return ProjectFileObstacle::FileExists;
+    return ProjectFileObstacle::None;
+}
+
+std::filesystem::path ProjectService::FreeSacmFileName(const AssuranceProject& project,
+                                                       const std::filesystem::path& preferred_file_name) {
+    const std::filesystem::path arguments(kArgumentsDirectory);
+    if (FindProjectFileObstacle(project, arguments / preferred_file_name) == ProjectFileObstacle::None)
+        return preferred_file_name;
+
+    const std::string stem = preferred_file_name.stem().string();
+    const std::string extension = preferred_file_name.extension().string();
+    // Bounded so a pathological folder cannot hang the dialog. Past the bound
+    // the preferred name comes back, and the dialog says why it cannot be used.
+    constexpr int kMaxSuffix = 999;
+    for (int suffix = 2; suffix <= kMaxSuffix; ++suffix) {
+        const std::filesystem::path candidate = stem + "-" + std::to_string(suffix) + extension;
+        if (FindProjectFileObstacle(project, arguments / candidate) == ProjectFileObstacle::None)
+            return candidate;
+    }
+    return preferred_file_name;
 }
 
 bool ProjectService::AddEvidenceRegister(AssuranceProject& project,
