@@ -702,7 +702,8 @@ std::filesystem::path ProjectService::FreeSacmFileName(const AssuranceProject& p
     // the preferred name comes back, and the dialog says why it cannot be used.
     constexpr int kMaxSuffix = 999;
     for (int suffix = 2; suffix <= kMaxSuffix; ++suffix) {
-        const std::filesystem::path candidate = stem + "-" + std::to_string(suffix) + extension;
+        std::string candidate = stem;
+        candidate.append("-").append(std::to_string(suffix)).append(extension);
         if (FindProjectFileObstacle(project, arguments / candidate) == ProjectFileObstacle::None)
             return candidate;
     }
