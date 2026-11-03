@@ -76,6 +76,9 @@ msgstr "この変更が前提としていた変更が却下されたため、現
 msgid "A change this one was built on was rejected, so it no longer applies."
 msgstr "この変更が前提としていた変更が却下されたため、適用できません。"
 
+msgid "A file named \"{0}\" is already in the project folder. Choose another name."
+msgstr "プロジェクトフォルダーには「{0}」という名前のファイルが既にあります。別の名前を選んでください。"
+
 msgid "A full editor for this SACM package type will be added in a later workflow."
 msgstr "この SACM パッケージ種別の完全なエディターは後のワークフローで追加されます。"
 
@@ -3091,6 +3094,9 @@ msgstr "外部の変更を確認済みとして記録できなかったため、
 msgid "The last accept did not happen: {0}"
 msgstr "直前の受理は行われませんでした: {0}"
 
+msgid "The project already has \"{0}\". Choose another name."
+msgstr "プロジェクトには既に「{0}」があります。別の名前を選んでください。"
+
 msgid "The replayed audit history does not reproduce the on-disk SACM. This usually means edits were applied through a path that did not record transactions. Pinned historical views may be inaccurate."
 msgstr "再生された監査履歴がディスク上の SACM を再現できません。通常、これはトランザクションを記録しない経路で編集が適用されたことを意味します。固定された履歴ビューは正確でない可能性があります。"
 
@@ -3189,6 +3195,9 @@ msgstr "このエビデンスは成果物を示していますが、その一部
 
 msgid "This evidence reference carries no owner, version, date, or status, so a reviewer cannot tell which artifact was assessed or whether it has changed since. Cite the controlled version."
 msgstr "このエビデンス参照には所有者・バージョン・日付・ステータスのいずれもないため、レビュー担当者はどの成果物が評価されたのか、その後変更されていないかを判断できません。管理されたバージョンを引用してください。"
+
+msgid "This file name cannot be used."
+msgstr "このファイル名は使用できません。"
 
 msgid "This frame: {0:.2f} ms render across {1} buckets"
 msgstr "このフレーム: {0:.2f} ms ({1} バケット)"

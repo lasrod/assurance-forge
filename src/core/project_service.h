@@ -23,6 +23,21 @@ enum class CreateProjectObstacle {
     FolderExists,
 };
 
+// Why a file cannot be added to a project at a planned relative path. The same
+// contract as `CreateProjectObstacle`: the add refuses on these, and the
+// add-a-file dialog asks the same question while the name is typed.
+enum class ProjectFileObstacle {
+    None,
+    // Absolute, or climbing out of the project root.
+    InvalidPath,
+    // The manifest already has an entry for that path, whether or not its file
+    // is on disk.
+    AlreadyTracked,
+    // Untracked, but something is at that path. Writing over it would destroy a
+    // file the project does not know it owns.
+    FileExists,
+};
+
 class ProjectService {
 public:
     // The obstacle to creating this project, or `None` when there is none.
@@ -81,6 +96,24 @@ public:
     // The file name `ImportSacmFile` uses for `source_sacm_path` when none is
     // requested, so a dialog can offer it before the import is made.
     static std::filesystem::path DefaultImportedSacmFileName(const std::filesystem::path& source_sacm_path);
+
+    // The project-relative paths `AddSacmFile` and `ImportSacmFile` write for a
+    // requested name, so a dialog can check the very path the add will use.
+    static std::filesystem::path PlanSacmFilePath(const std::string& requested_file_name);
+    static std::filesystem::path PlanImportedSacmFilePath(const std::filesystem::path& source_sacm_path,
+                                                          const std::string& requested_file_name);
+
+    // The obstacle to adding a file at `relative_path`, or `None`. Cheap enough
+    // to ask while the user types, and the single place the rule lives.
+    static ProjectFileObstacle FindProjectFileObstacle(const AssuranceProject& project,
+                                                       const std::filesystem::path& relative_path);
+
+    // `preferred_file_name` when `arguments/` has room for it, otherwise the
+    // first free `<stem>-2.sacm`, `<stem>-3.sacm`, ... Every project's first
+    // argument is `main.sacm`, so importing another project's argument would
+    // otherwise always open the dialog on a name that can only be refused.
+    static std::filesystem::path FreeSacmFileName(const AssuranceProject& project,
+                                                  const std::filesystem::path& preferred_file_name);
 
     static bool AddEvidenceRegister(AssuranceProject& project,
                                     const std::string& requested_file_name,

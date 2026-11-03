@@ -54,10 +54,17 @@ public:
     // The same, for the add-a-file-to-the-project dialog, which had the same
     // silence: a name already in the project refused and said nothing.
     std::string create_project_file_error;
+    // Whether the name in the add-a-file dialog can be used, and the path it
+    // would land at. Asked for the SACM kinds only; a register name that is
+    // taken is still refused on the press and reported then.
+    core::ProjectFileObstacle project_file_obstacle = core::ProjectFileObstacle::None;
+    std::filesystem::path planned_project_file_path;
 
     // Re-asks the obstacle for what is currently typed. Called when the dialog
     // opens and on every edit of the name.
     void RefreshCreateProjectObstacle();
+    // The same for the add-a-file dialog, against `project`'s manifest and folder.
+    void RefreshProjectFileObstacle(const std::optional<core::AssuranceProject>& project);
 
     void ScanDirectory();
     void BeginProjectFileCreate(ProjectFileCreateKind kind, const std::string& default_name);
