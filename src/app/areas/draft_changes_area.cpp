@@ -321,6 +321,35 @@ std::string ElementLabel(const core::SacmElement& element) {
     return element.id;
 }
 
+// Where a click on `element_id` should go, given the element as the draft view
+// holds it. Null when neither the draft nor the accepted argument has it.
+DraftGroupFocus
+FocusOnElement(const AppRuntimeState& state, const core::SacmElement* element, const std::string& element_id) {
+    DraftGroupFocus focus;
+    if (element != nullptr && element->type == "term") {
+        if (state.app_state.has_projected_package() &&
+            FindAcceptedTerm(state.app_state.projected_package(), element_id, focus.package_ref, focus.term_ref)) {
+            focus.kind = DraftGroupFocusKind::Terminology;
+            focus.element_id = element_id;
+        }
+        // Otherwise the term exists only in the draft, and the row is the only
+        // place it can be read. Leave the user on it.
+        return focus;
+    }
+    if (element != nullptr && element->type == "category") {
+        // A category is glossary structure with no view of its own until it is
+        // accepted; the row names it.
+        return focus;
+    }
+
+    // A removed element is not on the canvas to be centred on, but the
+    // presentation view keeps it as a tombstone, so selecting it still lands
+    // somewhere the user can see.
+    focus.kind = DraftGroupFocusKind::Canvas;
+    focus.element_id = element_id;
+    return focus;
+}
+
 // Who touched each element, from the provenance tags on the draft. A removed
 // element is not in the draft to carry a tag, so it is absent from this map.
 std::map<std::string, std::vector<ui::panels::DraftContributionLine>>
@@ -342,7 +371,9 @@ ContributionLinesByElement(const sacm_adapter::LibraryDocument& draft) {
 // One changed element per row, from the comparison and the element's own
 // provenance (ADR 0016). No group is consulted: hand edits have none, and this
 // is the list that has to keep working when the workspace store is deleted.
-std::vector<ui::panels::DraftElementRow> BuildDraftElementRows(AppRuntimeState& state) {
+void BuildDraftElementRows(AppRuntimeState& state,
+                           std::vector<ui::panels::DraftElementRow>& rows,
+                           std::vector<std::string>& other_findings) {
     const core::drafts::DraftDocumentDiff& diff = state.DraftDocumentChanges();
     const parser::AssuranceCase& draft = state.draft_document_view;
 
@@ -363,7 +394,8 @@ std::vector<ui::panels::DraftElementRow> BuildDraftElementRows(AppRuntimeState& 
     std::map<std::string, std::vector<ui::panels::DraftContributionLine>> contributions =
         ContributionLinesByElement(*state.draft_document.document());
 
-    std::vector<ui::panels::DraftElementRow> rows;
+    rows.clear();
+    other_findings.clear();
     for (const core::drafts::DraftDocumentChange& change : diff.changes) {
         const core::SacmElement* element = parser::FindElementById(draft, change.element_id);
         if (element == nullptr)
@@ -377,8 +409,10 @@ std::vector<ui::panels::DraftElementRow> BuildDraftElementRows(AppRuntimeState& 
             row.changed_fields.push_back(ChangedFieldLabel(field));
         if (const auto found = contributions.find(change.element_id); found != contributions.end())
             row.contributions = std::move(found->second);
-        if (const auto found = findings_by_element.find(change.element_id); found != findings_by_element.end())
-            row.findings = found->second;
+        if (const auto found = findings_by_element.find(change.element_id); found != findings_by_element.end()) {
+            row.findings = std::move(found->second);
+            findings_by_element.erase(found);
+        }
         rows.push_back(std::move(row));
     }
 
@@ -393,33 +427,39 @@ std::vector<ui::panels::DraftElementRow> BuildDraftElementRows(AppRuntimeState& 
         row.change_label = ChangeLabel(core::drafts::DraftElementChange::Removed);
         rows.push_back(std::move(row));
     }
-    return rows;
+
+    // What is left is about an element with no row. The checks look past what
+    // changed on purpose: a parent gains a child without being changed itself,
+    // and a cycle runs through untouched elements. The draft still caused them.
+    for (const auto& [element_id, findings] : findings_by_element) {
+        const core::SacmElement* element = parser::FindElementById(draft, element_id);
+        for (const std::string& finding : findings)
+            other_findings.push_back(element != nullptr ? ElementLabel(*element) + ": " + finding : finding);
+    }
 }
 
 // The panel model is rebuilt every frame while its tab is showing, so the rows
 // are kept until the draft, the accepted argument or the language moves. The
 // comparison is keyed the same way; `selected` is not part of the rows, because
 // it changes without any of those moving.
-const std::vector<ui::panels::DraftElementRow>& CurrentDraftElementRows(AppRuntimeState& state) {
+void RefreshDraftElementRows(AppRuntimeState& state) {
     const unsigned language_epoch = ui::i18n::LanguageEpoch();
     if (state.draft_element_rows_revision != state.draft_document_view_revision ||
         state.draft_element_rows_case_revision != state.draft_document_view_case_revision ||
         state.draft_element_rows_language_epoch != language_epoch) {
-        state.draft_element_rows = BuildDraftElementRows(state);
+        BuildDraftElementRows(state, state.draft_element_rows, state.draft_other_findings);
         state.draft_element_rows_revision = state.draft_document_view_revision;
         state.draft_element_rows_case_revision = state.draft_document_view_case_revision;
         state.draft_element_rows_language_epoch = language_epoch;
     }
-    return state.draft_element_rows;
 }
 
 } // namespace
 
 DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::string& group_id) {
-    DraftGroupFocus focus;
     const core::drafts::DraftMaterializationResult* materialization = state.draft_frame_materialization.get();
     if (materialization == nullptr)
-        return focus;
+        return {};
 
     // In materialization order, so "the first element this group changed" is
     // stable between frames rather than whichever the map happened to yield.
@@ -427,32 +467,31 @@ DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::
         const std::vector<std::string> contributors = materialization->change_index.ContributingGroupIds(element_id);
         if (std::find(contributors.begin(), contributors.end(), group_id) == contributors.end())
             continue;
+        return FocusOnElement(state, FindElementInGroupView(*materialization, element_id), element_id);
+    }
+    return {};
+}
 
-        const core::SacmElement* element = FindElementInGroupView(*materialization, element_id);
-        if (element != nullptr && element->type == "term") {
-            if (state.app_state.has_projected_package() &&
-                FindAcceptedTerm(state.app_state.projected_package(), element_id, focus.package_ref, focus.term_ref)) {
-                focus.kind = DraftGroupFocusKind::Terminology;
-                focus.element_id = element_id;
-            }
-            // Otherwise the term exists only in the draft, and the row is the
-            // only place it can be read. Leave the user on it.
-            return focus;
-        }
-        if (element != nullptr && element->type == "category") {
-            // A category is glossary structure with no view of its own until it
-            // is accepted; the row names it.
-            return focus;
-        }
-
-        // A removed element is not on the canvas to be centred on, but the
-        // presentation view keeps it as a tombstone, so selecting it still lands
-        // somewhere the user can see.
+DraftGroupFocus ResolveDraftElementFocus(AppRuntimeState& state, const std::string& element_id) {
+    const core::drafts::DraftDocumentDiff& diff = state.DraftDocumentChanges();
+    const core::SacmElement* element = parser::FindElementById(state.draft_document_view, element_id);
+    if (element == nullptr) {
+        const auto removed = std::find_if(
+            diff.removed.begin(), diff.removed.end(), [&](const core::SacmElement& e) { return e.id == element_id; });
+        if (removed != diff.removed.end())
+            element = &*removed;
+    }
+    if (element != nullptr && parser::IsRelationshipElement(*element)) {
+        DraftGroupFocus focus;
         focus.kind = DraftGroupFocusKind::Canvas;
-        focus.element_id = element_id;
+        focus.relationship_id = element_id;
+        if (!element->source_refs.empty())
+            focus.element_id = element->source_refs.front();
+        else if (!element->target_refs.empty())
+            focus.element_id = element->target_refs.front();
         return focus;
     }
-    return focus;
+    return FocusOnElement(state, element, element_id);
 }
 
 bool DraftChangesTabVisible(AppRuntimeState& state) {
@@ -470,8 +509,14 @@ ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& 
     // ledger while the change stayed in the draft.
     if (state.DraftDocumentHasChanges()) {
         model.has_workspace = true;
-        model.element_rows = CurrentDraftElementRows(state);
-        const std::string& selected = ui::GetUiState().selected_element_id;
+        RefreshDraftElementRows(state);
+        model.element_rows = state.draft_element_rows;
+        model.other_findings = state.draft_other_findings;
+        const ui::UiState& ui_state = ui::GetUiState();
+        // A relationship selection stands in front of the endpoint it left
+        // selected, as it does in the inspector.
+        const std::string& selected = ui_state.selected_relationship_id.empty() ? ui_state.selected_element_id
+                                                                                : ui_state.selected_relationship_id;
         for (ui::panels::DraftElementRow& row : model.element_rows)
             row.selected = row.element_id == selected;
         model.accept_error = ui::DraftAcceptError(ui::GetUiState(), state.draft_document.revision());
@@ -588,12 +633,9 @@ void RenderDraftChangesAreaContent(AppRuntimeState& state, const DraftChangesAre
         if (callbacks.focus_group)
             callbacks.focus_group(group_id);
     };
-    // Selecting an element row is an ordinary canvas selection: there is no
-    // group to focus, and the element is the thing the reviewer asked to see.
-    panel_callbacks.select_element = [](const std::string& element_id) {
-        ui::UiState& ui_state = ui::GetUiState();
-        ui_state.selected_element_id = element_id;
-        ui_state.center_on_selection = true;
+    panel_callbacks.select_element = [&callbacks](const std::string& element_id) {
+        if (callbacks.focus_element)
+            callbacks.focus_element(element_id);
     };
     panel_callbacks.accept_group = callbacks.accept_group;
     panel_callbacks.reject_group = callbacks.reject_group;

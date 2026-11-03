@@ -2373,6 +2373,24 @@ void AppRuntime::FocusDraftGroup(const std::string& group_id) {
     }
 }
 
+void AppRuntime::FocusDraftElement(const std::string& element_id) {
+    const areas::DraftGroupFocus focus = areas::ResolveDraftElementFocus(*impl_, element_id);
+    switch (focus.kind) {
+    case areas::DraftGroupFocusKind::Canvas:
+        // Through the locate, not a bare selection: it opens the package that
+        // holds the element and clears the ACP and relationship selections that
+        // would otherwise keep the inspector on something else.
+        LocateElementOnCanvas(focus.element_id);
+        ui::GetUiState().selected_relationship_id = focus.relationship_id;
+        return;
+    case areas::DraftGroupFocusKind::Terminology:
+        OpenTerminologyTermFromCanvas(focus.package_ref, focus.term_ref);
+        return;
+    case areas::DraftGroupFocusKind::None:
+        return;
+    }
+}
+
 bool AppRuntime::DiscardWorkingDraft(std::string& error) {
     error.clear();
     if (impl_->draft_document.active()) {

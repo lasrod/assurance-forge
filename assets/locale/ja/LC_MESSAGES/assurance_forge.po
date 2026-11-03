@@ -1381,6 +1381,9 @@ msgstr "使用箇所検索: {0}  {1}"
 msgid "Findings (advisory):"
 msgstr "指摘 (参考):"
 
+msgid "Findings on elements this draft did not change:"
+msgstr "このドラフトが変更していない要素への指摘:"
+
 msgid "Fit to view"
 msgstr "全体を表示"
 

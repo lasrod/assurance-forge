@@ -144,6 +144,10 @@ struct DraftChangesPanelModel {
     // other: this one whenever the draft document differs from the accepted
     // argument. The group list goes when the workspace store does.
     std::vector<DraftElementRow> element_rows;
+    // Findings the draft caused on elements it did not change, which so have no
+    // row of their own: a parent that gained a child, a cycle through untouched
+    // elements. Each names its element.
+    std::vector<std::string> other_findings;
     // Set when the whole draft is held back rather than any single row -- the
     // argument moved underneath it, a promotion is awaiting durable completion,
     // or materialization failed. Rendered above the rows, because in that state
@@ -164,7 +168,7 @@ struct DraftChangesPanelCallbacks {
     // May raise the dependent-scope choice rather than rejecting immediately.
     std::function<void(const std::string& group_id)> reject_group;
     std::function<void()> accept_all;
-    // Focuses one changed element on the canvas and selects it.
+    // Takes the user to one changed element, in whichever view can show it.
     std::function<void(const std::string& element_id)> select_element;
 };
 

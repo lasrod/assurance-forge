@@ -1065,6 +1065,7 @@ TRANSLATIONS = {
     'Removed': '削除',
     'Changed: {0}': '変更箇所: {0}',
     'Contributor not recorded': '変更者の記録なし',
+    'Findings on elements this draft did not change:': 'このドラフトが変更していない要素への指摘:',
     'by {0}': '{0} による',
     'connections': '接続',
     'declaration': '宣言',

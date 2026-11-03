@@ -27,6 +27,8 @@ struct DraftChangesAreaCallbacks {
     std::function<void()> accept_all;
     // Takes the user to what the group changed, in whichever view can show it.
     std::function<void(const std::string& group_id)> focus_group;
+    // The same for one changed element of a document draft.
+    std::function<void(const std::string& element_id)> focus_element;
 };
 
 // Where clicking a group's row should take the user.
@@ -47,6 +49,8 @@ enum class DraftGroupFocusKind {
 struct DraftGroupFocus {
     DraftGroupFocusKind kind = DraftGroupFocusKind::None;
     std::string element_id;
+    // Set when the change is a relationship: `element_id` is then its endpoint.
+    std::string relationship_id;
     core::TerminologyPackageRef package_ref;
     core::TerminologyTermRef term_ref;
 };
@@ -62,6 +66,11 @@ struct DraftGroupFocus {
 // Separate from the runtime so it can be tested without a window: which view
 // shows a change is a decision, not a rendering detail.
 DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::string& group_id);
+
+// The same question for one changed element of a document draft. A relationship
+// is not a node to centre on, so it answers with the relationship to select and
+// an endpoint the canvas can go to.
+DraftGroupFocus ResolveDraftElementFocus(AppRuntimeState& state, const std::string& element_id);
 
 // Derives the panel model. Separate from the render so it can be tested without
 // an ImGui context -- the promotability of a change to a safety argument is not

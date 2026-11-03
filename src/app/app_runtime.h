@@ -437,6 +437,7 @@ public:
     // this draft created is not in the accepted glossary the terminology view
     // reads, so moving the user would land them where it cannot be seen.
     void FocusDraftGroup(const std::string& group_id);
+    void FocusDraftElement(const std::string& element_id);
 
     // Deletes promotion snapshots the undo stack can no longer reach.
     //

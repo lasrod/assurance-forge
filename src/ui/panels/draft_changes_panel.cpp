@@ -281,6 +281,16 @@ void RenderDraftChangesPanel(const DraftChangesPanelModel& model, const DraftCha
     ImGui::EndDisabled();
     ImGui::Separator();
 
+    if (!model.other_findings.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        ImGui::TextUnformatted(AF_TR("Findings on elements this draft did not change:").c_str());
+        for (const std::string& finding : model.other_findings) {
+            ImGui::Bullet();
+            ImGui::TextWrapped("%s", finding.c_str());
+        }
+        ImGui::PopStyleColor();
+        ImGui::Separator();
+    }
     for (const DraftElementRow& row : model.element_rows)
         RenderElementRow(row, callbacks);
     for (const DraftChangeRow& row : model.rows)

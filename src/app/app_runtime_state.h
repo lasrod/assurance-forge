@@ -308,6 +308,7 @@ struct AppRuntimeState {
     // The Draft Changes panel's rows for the same comparison. Localized, so
     // keyed on the language as well.
     std::vector<ui::panels::DraftElementRow> draft_element_rows;
+    std::vector<std::string> draft_other_findings;
     std::uint64_t draft_element_rows_revision = ~std::uint64_t{0};
     std::uint64_t draft_element_rows_case_revision = ~std::uint64_t{0};
     unsigned draft_element_rows_language_epoch = 0;

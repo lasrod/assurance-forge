@@ -800,6 +800,103 @@ TEST(DraftChangesPanelElementRows, AChangeTheDraftUndoesItselfIsNotARow) {
     EXPECT_EQ(RowFor(model, claim_id), nullptr) << "a claim the draft created and then removed was offered for review";
 }
 
+// The checks look past what changed on purpose, so a finding can land on an
+// element with no row. The draft caused it, and the reviewer still has to see it.
+TEST(DraftChangesPanelElementRows, AFindingOnAnUnchangedElementIsNotDropped) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created = f.Apply({CreateClaimOp("$one", "The blade guard is fitted."),
+                                                                SupportOp("$one", top),
+                                                                CreateClaimOp("$two", "The cutoff switch works."),
+                                                                SupportOp("$two", top)},
+                                                               top,
+                                                               FromAgent("two reasons, no strategy"));
+    ASSERT_TRUE(created.applied) << created.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    EXPECT_EQ(RowFor(model, top), nullptr) << "the case under test needs the parent to have no row";
+    ASSERT_FALSE(model.other_findings.empty()) << "a finding the draft caused was dropped";
+    const core::SacmElement* parent = parser::FindElementById(f.state.draft_document_view, top);
+    ASSERT_NE(parent, nullptr);
+    const std::string parent_words = parent->content.empty() ? parent->name : parent->content;
+    EXPECT_EQ(model.other_findings.front().rfind(parent_words + ": ", 0), 0u)
+        << "the finding does not name its element";
+}
+
+TEST(DraftChangesPanelElementRows, ANodeRowFocusesTheNodeOnTheCanvas) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+    ASSERT_TRUE(f.Apply({UpdateTextOp(top, "Reworded.")}, top, FromReviewer({})).applied);
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftElementFocus(f.state, top);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(focus.element_id, top);
+    EXPECT_TRUE(focus.relationship_id.empty());
+}
+
+// A relationship is not a node, so centring on its id finds nothing and selecting
+// it as an element shows nothing in the inspector.
+TEST(DraftChangesPanelElementRows, ARelationshipRowSelectsTheRelationshipAndGoesToAnEndpoint) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created = f.Apply(
+        {CreateClaimOp("$sub", "Blade hazards are controlled."), SupportOp("$sub", top)}, top, FromAgent("why"));
+    ASSERT_TRUE(created.applied) << created.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    std::string relationship_id;
+    for (const ui::panels::DraftElementRow& row : model.element_rows) {
+        const core::SacmElement* element = parser::FindElementById(f.state.draft_document_view, row.element_id);
+        if (element != nullptr && parser::IsRelationshipElement(*element))
+            relationship_id = row.element_id;
+    }
+    ASSERT_FALSE(relationship_id.empty()) << "the new support relationship has no row";
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftElementFocus(f.state, relationship_id);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(focus.relationship_id, relationship_id);
+    EXPECT_TRUE(focus.element_id == created.created_ids.at("$sub") || focus.element_id == top)
+        << "the canvas was sent somewhere that is not an endpoint: " << focus.element_id;
+
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.selected_relationship_id = relationship_id;
+    const ui::panels::DraftChangesPanelModel selected = app::areas::BuildDraftChangesPanelModel(f.state);
+    ui_state.selected_relationship_id.clear();
+    ASSERT_NE(RowFor(selected, relationship_id), nullptr);
+    EXPECT_TRUE(RowFor(selected, relationship_id)->selected);
+}
+
+// A relationship the draft removes is no longer in the draft view, so finding out
+// that it is a relationship at all has to come from the accepted side. Treated as
+// a plain node, the row would centre on an id no canvas draws.
+TEST(DraftChangesPanelElementRows, ARemovedRelationshipStillSelectsTheRelationship) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    core::SacmElement relationship;
+    relationship.id = "R-only-accepted";
+    relationship.type = "assertedinference";
+    relationship.source_refs = {top};
+    relationship.target_refs = {"elsewhere"};
+    f.state.app_state.loaded_case->elements.push_back(relationship);
+    ++f.state.app_state.case_revision;
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftElementFocus(f.state, relationship.id);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(focus.relationship_id, relationship.id);
+    EXPECT_EQ(focus.element_id, top);
+}
+
 TEST(DraftChangesPanelElementRows, AnUntouchedDraftListsNothing) {
     DocumentFixture f;
     ASSERT_TRUE(f.Ready());

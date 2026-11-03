@@ -241,12 +241,18 @@ bool DraftDocumentStore::AcceptInto(const std::filesystem::path& accepted_path, 
         return false;
     }
 
-    // Stripped first, and on the draft itself rather than on a copy: if this
-    // fails, nothing has been written and the draft is still there to retry or
-    // discard. The accepted argument is not touched until the strip has already
-    // succeeded.
+    // Stripped from a copy, not from the draft: the write below can still fail,
+    // and a draft left without its tags would have lost who wrote it, with the
+    // retry recording nobody. The accepted argument is not touched until the
+    // strip has already succeeded.
+    const sacm_adapter::SaveOutcome draft_xml = sacm_adapter::save_document(*impl_->document);
+    sacm_adapter::LibraryDocument accepted;
+    if (!draft_xml.ok || !sacm_adapter::reload_document(accepted, draft_xml.xml)) {
+        error = "The draft could not be prepared for accepting.";
+        return false;
+    }
     const sacm_adapter::EditOutcome stripped =
-        sacm_adapter::apply_remove_tagged_values_with_prefix(*impl_->document, kDraftProvenanceTagPrefix);
+        sacm_adapter::apply_remove_tagged_values_with_prefix(accepted, kDraftProvenanceTagPrefix);
     if (!stripped.supported || !stripped.applied) {
         error = "The draft's provenance could not be removed, so it was not accepted";
         if (!stripped.diagnostics.empty())
@@ -255,9 +261,8 @@ bool DraftDocumentStore::AcceptInto(const std::filesystem::path& accepted_path, 
             error += ".";
         return false;
     }
-    ++impl_->revision;
 
-    const sacm_adapter::SaveOutcome serialized = sacm_adapter::save_document(*impl_->document);
+    const sacm_adapter::SaveOutcome serialized = sacm_adapter::save_document(accepted);
     if (!serialized.ok) {
         error = "The accepted argument could not be serialized: " +
                 sacm_adapter::summarize_load_diagnostics(serialized.diagnostics);
