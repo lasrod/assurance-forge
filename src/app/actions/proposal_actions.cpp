@@ -68,7 +68,6 @@ using detail::ProposalRefForPreviewId;
 using detail::RemoveModeField;
 using detail::SameElementRef;
 using detail::SaveProject;
-using detail::SetStatus;
 using detail::TrackAffectedRef;
 ProposalActions::ProposalActions(AppRuntimeState& state) : state_(state) {}
 

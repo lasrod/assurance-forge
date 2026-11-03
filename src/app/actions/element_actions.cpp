@@ -1,5 +1,6 @@
 #include "app/actions/element_actions.h"
 
+#include "app/actions/action_status.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "app/commands/dispatch.h"
@@ -8,14 +9,6 @@
 #include "ui/i18n/localization.h"
 
 namespace app::actions {
-namespace {
-
-void SetStatus(AppRuntimeState& state, const std::string& message) {
-    state.events.Emit(StatusMessageEvent{message});
-}
-
-} // namespace
-
 ElementActions::ElementActions(AppRuntimeState& state) : state_(state) {}
 
 bool ElementActions::AddChildToSelected(core::NewElementKind kind) {

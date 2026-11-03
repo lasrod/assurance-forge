@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/actions/action_status.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "core/element_factory.h"
@@ -19,10 +20,6 @@ struct AppRuntimeState;
 }
 
 namespace app::actions::detail {
-
-inline void SetStatus(AppRuntimeState& state, const std::string& message) {
-    state.events.Emit(StatusMessageEvent{message});
-}
 
 core::reviews::PatchOperationType CreateOperationFor(core::NewElementKind kind);
 bool IsContextLike(core::NewElementKind kind);
