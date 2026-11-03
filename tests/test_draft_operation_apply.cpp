@@ -639,6 +639,39 @@ TEST(DraftOperationApplyTest, ProvenanceIsWrittenOnExactlyWhatTheBatchAddedOrCha
     EXPECT_EQ(read.front().element_ids, expected);
 }
 
+// A hand edit has no change group, so these tags are the only record of it that
+// reaches the audit transaction. Run after the groups have reported, it must add
+// what they could not know and repeat nothing they already said.
+TEST(DraftOperationApplyTest, ContributionsAddToAnAttributionWithoutRepeatingIt) {
+    core::drafts::DraftContribution agent;
+    agent.provenance.contribution_id = "group-1";
+    agent.provenance.source = core::drafts::DraftSource::Mcp;
+    agent.provenance.label = "Claude Code";
+    agent.provenance.title = "Develop the top goal";
+    agent.provenance.rationale = "The top goal had no support.";
+
+    core::drafts::DraftContribution reviewer;
+    reviewer.provenance.contribution_id = "human-1";
+    reviewer.provenance.source = core::drafts::DraftSource::Human;
+    reviewer.provenance.label = "A Reviewer";
+
+    core::drafts::DraftContribution unnamed;
+    unnamed.provenance.contribution_id = "group-2";
+    unnamed.provenance.source = core::drafts::DraftSource::Mcp;
+    unnamed.provenance.rationale = "No title was given.";
+
+    std::vector<std::string> source_labels{"Claude Code"};
+    std::vector<std::string> rationales{"Develop the top goal: The top goal had no support."};
+    core::drafts::AddDraftContributions({agent, reviewer, unnamed}, source_labels, rationales);
+
+    const std::vector<std::string> expected_labels{
+        "Claude Code", "A Reviewer", core::drafts::DraftSourceToString(core::drafts::DraftSource::Mcp)};
+    EXPECT_EQ(source_labels, expected_labels);
+    const std::vector<std::string> expected_rationales{"Develop the top goal: The top goal had no support.",
+                                                       "group-2: No title was given."};
+    EXPECT_EQ(rationales, expected_rationales);
+}
+
 // The reason the contribution is in the tag KEY. Had the second contributor
 // overwritten the first, the claim would read as the reviewer's alone, and the
 // agent that wrote it would vanish from the record of its own sentence.

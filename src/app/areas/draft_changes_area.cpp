@@ -3,9 +3,13 @@
 #include "app/app_runtime_state.h"
 #include "app/areas/staged_finding_text.h"
 #include "core/drafts/draft_dependency_graph.h"
+#include "core/drafts/draft_document_diff.h"
 #include "core/drafts/draft_promotion_service.h"
+#include "core/drafts/draft_provenance.h"
+#include "core/sccg/staged_checks.h"
 #include "parser/model_utils.h"
 #include "ui/i18n/localization.h"
+#include "ui/panels/element_panel.h"
 #include "ui/ui_state.h"
 
 #include <algorithm>
@@ -271,6 +275,143 @@ bool FindAcceptedTerm(const sacm::AssuranceCasePackage& package,
     return false;
 }
 
+// The change, as a word rather than an enum.
+std::string ChangeLabel(core::drafts::DraftElementChange change) {
+    switch (change) {
+    case core::drafts::DraftElementChange::Added:
+        return AF_TR("Added");
+    case core::drafts::DraftElementChange::Modified:
+        return AF_TR("Changed");
+    case core::drafts::DraftElementChange::Removed:
+        return AF_TR("Removed");
+    case core::drafts::DraftElementChange::Unchanged:
+        break;
+    }
+    return {};
+}
+
+// The POD field names the comparison reports, in the words the rest of the UI
+// uses for them. An unknown name is shown as it came rather than dropped: a new
+// field nobody translated yet is still information the reviewer can act on.
+std::string ChangedFieldLabel(const std::string& field) {
+    if (field == "content")
+        return AF_TR("statement");
+    if (field == "name")
+        return AF_TR("name");
+    if (field == "description")
+        return AF_TR("note");
+    if (field == "undeveloped")
+        return AF_TR("undeveloped");
+    if (field == "source_refs" || field == "target_refs")
+        return AF_TR("connections");
+    if (field == "assertion_declaration")
+        return AF_TR("declaration");
+    if (field == "gsn_identifier")
+        return AF_TR("identifier");
+    return field;
+}
+
+// What a reviewer scanning the list reads first: the element's own words, or its
+// name where it has no statement.
+std::string ElementLabel(const core::SacmElement& element) {
+    if (!element.content.empty())
+        return element.content;
+    if (!element.name.empty())
+        return element.name;
+    return element.id;
+}
+
+// Who touched each element, from the provenance tags on the draft. A removed
+// element is not in the draft to carry a tag, so it is absent from this map.
+std::map<std::string, std::vector<ui::panels::DraftContributionLine>>
+ContributionLinesByElement(const sacm_adapter::LibraryDocument& draft) {
+    std::map<std::string, std::vector<ui::panels::DraftContributionLine>> lines_by_element;
+    for (const core::drafts::DraftContribution& contribution : core::drafts::ReadDraftProvenance(draft)) {
+        ui::panels::DraftContributionLine line;
+        // The contributor's own label where it gave one; otherwise the kind of
+        // source it was, which is the most the tags can say.
+        line.source_label = contribution.provenance.label.empty() ? SourceKindLabel(contribution.provenance.source)
+                                                                  : contribution.provenance.label;
+        line.rationale = contribution.provenance.rationale;
+        for (const std::string& element_id : contribution.element_ids)
+            lines_by_element[element_id].push_back(line);
+    }
+    return lines_by_element;
+}
+
+// One changed element per row, from the comparison and the element's own
+// provenance (ADR 0016). No group is consulted: hand edits have none, and this
+// is the list that has to keep working when the workspace store is deleted.
+std::vector<ui::panels::DraftElementRow> BuildDraftElementRows(AppRuntimeState& state) {
+    const core::drafts::DraftDocumentDiff& diff = state.DraftDocumentChanges();
+    const parser::AssuranceCase& draft = state.draft_document_view;
+
+    // Findings are computed over the whole draft and filed by element, so a row
+    // shows what is wrong with the element it is about rather than everything
+    // the draft has to answer for.
+    std::map<std::string, std::vector<std::string>> findings_by_element;
+    std::vector<std::string> changed_ids;
+    for (const core::drafts::DraftDocumentChange& change : diff.changes)
+        changed_ids.push_back(change.element_id);
+    for (const core::sccg::StagedFinding& finding : core::sccg::CheckStagedArgument(draft, changed_ids)) {
+        const std::string text = StagedFindingText(finding);
+        findings_by_element[finding.element_id].push_back(
+            finding.guideline_id.empty() ? text : finding.guideline_id + ": " + text);
+    }
+
+    std::map<std::string, std::vector<ui::panels::DraftContributionLine>> contributions =
+        ContributionLinesByElement(*state.draft_document.document());
+
+    std::vector<ui::panels::DraftElementRow> rows;
+    for (const core::drafts::DraftDocumentChange& change : diff.changes) {
+        const core::SacmElement* element = parser::FindElementById(draft, change.element_id);
+        if (element == nullptr)
+            continue;
+        ui::panels::DraftElementRow row;
+        row.element_id = change.element_id;
+        row.label = ElementLabel(*element);
+        row.kind_label = ui::panels::ElementTypeDisplayName(element->type);
+        row.change_label = ChangeLabel(change.change);
+        for (const std::string& field : change.fields)
+            row.changed_fields.push_back(ChangedFieldLabel(field));
+        if (const auto found = contributions.find(change.element_id); found != contributions.end())
+            row.contributions = std::move(found->second);
+        if (const auto found = findings_by_element.find(change.element_id); found != findings_by_element.end())
+            row.findings = found->second;
+        rows.push_back(std::move(row));
+    }
+
+    // Removed elements are absent from the draft, so their words come from the
+    // accepted argument. Who removed them is not recorded (ADR 0016), and the
+    // panel says so rather than leaving the row looking anonymous by accident.
+    for (const core::SacmElement& removed : diff.removed) {
+        ui::panels::DraftElementRow row;
+        row.element_id = removed.id;
+        row.label = ElementLabel(removed);
+        row.kind_label = ui::panels::ElementTypeDisplayName(removed.type);
+        row.change_label = ChangeLabel(core::drafts::DraftElementChange::Removed);
+        rows.push_back(std::move(row));
+    }
+    return rows;
+}
+
+// The panel model is rebuilt every frame while its tab is showing, so the rows
+// are kept until the draft, the accepted argument or the language moves. The
+// comparison is keyed the same way; `selected` is not part of the rows, because
+// it changes without any of those moving.
+const std::vector<ui::panels::DraftElementRow>& CurrentDraftElementRows(AppRuntimeState& state) {
+    const unsigned language_epoch = ui::i18n::LanguageEpoch();
+    if (state.draft_element_rows_revision != state.draft_document_view_revision ||
+        state.draft_element_rows_case_revision != state.draft_document_view_case_revision ||
+        state.draft_element_rows_language_epoch != language_epoch) {
+        state.draft_element_rows = BuildDraftElementRows(state);
+        state.draft_element_rows_revision = state.draft_document_view_revision;
+        state.draft_element_rows_case_revision = state.draft_document_view_case_revision;
+        state.draft_element_rows_language_epoch = language_epoch;
+    }
+    return state.draft_element_rows;
+}
+
 } // namespace
 
 DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::string& group_id) {
@@ -313,8 +454,29 @@ DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::
     return focus;
 }
 
+bool DraftChangesTabVisible(AppRuntimeState& state) {
+    return state.draft_workspace.has_workspace() || state.DraftDocumentHasChanges();
+}
+
 ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& state) {
     ui::panels::DraftChangesPanelModel model;
+
+    // The draft document first, and not gated on the workspace: a hand edit has
+    // no change group, so gating on one told a reviewer with unaccepted changes
+    // that there were none. The group rows stop here too. They describe the same
+    // draft a second time, and a document draft is accepted whole (ADR 0016), so
+    // a row's Accept could not select anything and its Reject would clear the
+    // ledger while the change stayed in the draft.
+    if (state.DraftDocumentHasChanges()) {
+        model.has_workspace = true;
+        model.element_rows = CurrentDraftElementRows(state);
+        const std::string& selected = ui::GetUiState().selected_element_id;
+        for (ui::panels::DraftElementRow& row : model.element_rows)
+            row.selected = row.element_id == selected;
+        model.accept_error = ui::DraftAcceptError(ui::GetUiState(), state.draft_document.revision());
+        return model;
+    }
+
     const core::drafts::DraftWorkspace* workspace = state.draft_workspace.workspace();
     if (workspace == nullptr)
         return model;
@@ -424,6 +586,13 @@ void RenderDraftChangesAreaContent(AppRuntimeState& state, const DraftChangesAre
         ui_state.center_on_draft_group_pending = true;
         if (callbacks.focus_group)
             callbacks.focus_group(group_id);
+    };
+    // Selecting an element row is an ordinary canvas selection: there is no
+    // group to focus, and the element is the thing the reviewer asked to see.
+    panel_callbacks.select_element = [](const std::string& element_id) {
+        ui::UiState& ui_state = ui::GetUiState();
+        ui_state.selected_element_id = element_id;
+        ui_state.center_on_selection = true;
     };
     panel_callbacks.accept_group = callbacks.accept_group;
     panel_callbacks.reject_group = callbacks.reject_group;

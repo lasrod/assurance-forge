@@ -91,10 +91,59 @@ struct DraftChangeRow {
     bool selected = false;
 };
 
+// One contributor's touch on an element, as the reviewer reads it.
+struct DraftContributionLine {
+    // Who: the contributor's own label where it has one, otherwise the kind of
+    // source it was. Already localized by the caller.
+    std::string source_label;
+    // Why, in the author's own words. Often empty -- a human edit carries no
+    // rationale unless one was asked for -- and the panel omits the line then
+    // rather than showing an empty quote.
+    std::string rationale;
+};
+
+// One CHANGED ELEMENT in a document-backed working draft (ADR 0016).
+//
+// The unit differs from `DraftChangeRow` because the draft does: a document has
+// no change groups, so there is no "several operations one author submitted
+// together" to be a row. The reviewable thing is the element, and who touched it
+// is read from its own provenance rather than from the group that carried it.
+//
+// It carries no dependency or per-row accept fields on purpose. Accepting a
+// document-backed draft accepts all of it, and selective review is the inverse
+// gesture -- rejecting individual changes in the draft and accepting what
+// remains -- which is not yet built.
+struct DraftElementRow {
+    std::string element_id;
+    // The element's own words, for a reviewer scanning the list.
+    std::string label;
+    // "Claim", "Strategy", ... and "Added" / "Changed" / "Removed". Localized by
+    // the caller, because `core` stores no display text.
+    std::string kind_label;
+    std::string change_label;
+    // Which parts of the element differ, named rather than counted: "modified"
+    // alone does not distinguish a reworded claim from a re-pointed
+    // relationship. Localized field names.
+    std::vector<std::string> changed_fields;
+    // Every contributor that touched it, in the order the tags give (document
+    // order, not time). More than one is the ordinary case once an agent has
+    // drafted something a person then edits. Empty for a removed element, which
+    // is not in the draft to carry a tag.
+    std::vector<DraftContributionLine> contributions;
+    // Findings against this element. Advisory, as everywhere else here.
+    std::vector<std::string> findings;
+    bool selected = false;
+};
+
 struct DraftChangesPanelModel {
     // False when there is no draft at all, which is the ordinary state.
     bool has_workspace = false;
+    // Group rows, from the pre-ADR-0016 workspace store.
     std::vector<DraftChangeRow> rows;
+    // Element rows, from the draft document. A model carries one list or the
+    // other: this one whenever the draft document differs from the accepted
+    // argument. The group list goes when the workspace store does.
+    std::vector<DraftElementRow> element_rows;
     // Set when the whole draft is held back rather than any single row -- the
     // argument moved underneath it, a promotion is awaiting durable completion,
     // or materialization failed. Rendered above the rows, because in that state
@@ -115,6 +164,8 @@ struct DraftChangesPanelCallbacks {
     // May raise the dependent-scope choice rather than rejecting immediately.
     std::function<void(const std::string& group_id)> reject_group;
     std::function<void()> accept_all;
+    // Focuses one changed element on the canvas and selects it.
+    std::function<void(const std::string& element_id)> select_element;
 };
 
 void RenderDraftChangesPanel(const DraftChangesPanelModel& model, const DraftChangesPanelCallbacks& callbacks);

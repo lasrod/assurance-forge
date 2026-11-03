@@ -5,6 +5,7 @@
 
 #include "imgui.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -193,10 +194,62 @@ void RenderRow(const DraftChangeRow& row, const DraftChangesPanelCallbacks& call
     ImGui::PopID();
 }
 
+// One changed element of a document-backed draft.
+//
+// Flatter than a group row deliberately: there is no accept, no reject and no
+// dependency closure to explain, so a collapsible header would hide the two
+// lines that matter -- what changed and who changed it -- behind a click.
+void RenderElementRow(const DraftElementRow& row, const DraftChangesPanelCallbacks& callbacks) {
+    const ui::Theme& theme = ui::GetTheme();
+    ImGui::PushID(row.element_id.c_str());
+
+    // Drawn as text rather than passed as the selectable's label: this is the
+    // author's own wording, and ImGui would treat a "##" in it as the end of what
+    // to show. One line, clipped at the panel's edge; the full text is on the
+    // canvas and in the inspector.
+    const ImVec2 heading_position = ImGui::GetCursorScreenPos();
+    if (ImGui::Selectable("##element", row.selected, 0, ImVec2(0.0F, ImGui::GetTextLineHeight())) &&
+        callbacks.select_element)
+        callbacks.select_element(row.element_id);
+    std::string heading = row.label.empty() ? row.element_id : row.label;
+    std::replace(heading.begin(), heading.end(), '\n', ' ');
+    std::replace(heading.begin(), heading.end(), '\r', ' ');
+    ImGui::GetWindowDrawList()->AddText(
+        heading_position, ImGui::GetColorU32(ImGuiCol_Text), heading.data(), heading.data() + heading.size());
+
+    ImGui::Indent();
+    // The kind and what happened to it, on one line: "Claim - Changed".
+    ImGui::TextDisabled("%s", ui::i18n::trf("{0} - {1}", row.kind_label, row.change_label).c_str());
+
+    if (!row.changed_fields.empty())
+        ImGui::TextDisabled("%s", ui::i18n::trf("Changed: {0}", JoinIds(row.changed_fields)).c_str());
+
+    if (row.contributions.empty())
+        ImGui::TextDisabled("%s", AF_TR("Contributor not recorded").c_str());
+    for (const DraftContributionLine& contribution : row.contributions) {
+        ImGui::TextUnformatted(ui::i18n::trf("by {0}", contribution.source_label).c_str());
+        if (!contribution.rationale.empty()) {
+            ImGui::Indent();
+            ImGui::TextWrapped("%s", contribution.rationale.c_str());
+            ImGui::Unindent();
+        }
+    }
+
+    if (!row.findings.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(theme.attention));
+        for (const std::string& finding : row.findings)
+            ImGui::TextWrapped("%s", finding.c_str());
+        ImGui::PopStyleColor();
+    }
+    ImGui::Unindent();
+    ImGui::Separator();
+    ImGui::PopID();
+}
+
 } // namespace
 
 void RenderDraftChangesPanel(const DraftChangesPanelModel& model, const DraftChangesPanelCallbacks& callbacks) {
-    if (!model.has_workspace || model.rows.empty()) {
+    if (!model.has_workspace || (model.rows.empty() && model.element_rows.empty())) {
         ImGui::TextDisabled("%s", AF_TR("No unaccepted changes. The argument on screen is the accepted one.").c_str());
         return;
     }
@@ -217,7 +270,8 @@ void RenderDraftChangesPanel(const DraftChangesPanelModel& model, const DraftCha
         ImGui::Spacing();
     }
 
-    const std::size_t count = model.rows.size();
+    // One list or the other is empty: a model carries element rows or group rows.
+    const std::size_t count = model.rows.size() + model.element_rows.size();
     ImGui::TextUnformatted(
         ui::i18n::trnf("{0} unaccepted change", "{0} unaccepted changes", static_cast<int>(count), count).c_str());
     ImGui::SameLine();
@@ -227,6 +281,8 @@ void RenderDraftChangesPanel(const DraftChangesPanelModel& model, const DraftCha
     ImGui::EndDisabled();
     ImGui::Separator();
 
+    for (const DraftElementRow& row : model.element_rows)
+        RenderElementRow(row, callbacks);
     for (const DraftChangeRow& row : model.rows)
         RenderRow(row, callbacks);
 }

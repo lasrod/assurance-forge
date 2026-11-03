@@ -68,6 +68,11 @@ DraftGroupFocus ResolveDraftGroupFocus(const AppRuntimeState& state, const std::
 // a rendering detail.
 ui::panels::DraftChangesPanelModel BuildDraftChangesPanelModel(AppRuntimeState& state);
 
+// Whether there is a draft for the tab to show. Either store can hold one: a
+// hand edit reaches only the document, so asking the workspace alone hid the
+// tab from a reviewer with unaccepted changes.
+bool DraftChangesTabVisible(AppRuntimeState& state);
+
 void RenderDraftChangesAreaContent(AppRuntimeState& state, const DraftChangesAreaCallbacks& callbacks);
 
 } // namespace app::areas

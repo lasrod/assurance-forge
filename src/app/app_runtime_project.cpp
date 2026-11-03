@@ -18,6 +18,7 @@
 #include "core/translation_review_store.h"
 #include "core/drafts/draft_dependency_graph.h"
 #include "core/drafts/draft_promotion_service.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/element_factory.h"
 #include "core/acp/assurance_claim_point.h"
 #include "core/audit/replay_verifier.h"
@@ -1479,9 +1480,15 @@ bool AppRuntime::AcceptDraftDocument(std::string& summary, std::string& error) {
     const std::string approver = impl_->reviewer_name.empty() ? std::string("Working draft") : impl_->reviewer_name;
     const std::string author =
         workspace != nullptr ? core::drafts::DraftPromotionAuthor(*workspace, group_ids, approver) : approver;
-    const core::audit::DraftPromotionRecord attribution = workspace != nullptr
-                                                              ? DraftPromotionAttribution(*workspace, group_ids, {})
-                                                              : core::audit::DraftPromotionRecord{};
+    core::audit::DraftPromotionRecord attribution = workspace != nullptr
+                                                        ? DraftPromotionAttribution(*workspace, group_ids, {})
+                                                        : core::audit::DraftPromotionRecord{};
+    // The tags as well as the groups: a hand edit has no group, and the accept
+    // below strips every tag, so this is the last chance to read them. The
+    // guidelines and review items above still come from the groups alone.
+    core::drafts::AddDraftContributions(core::drafts::ReadDraftProvenance(*impl_->draft_document.document()),
+                                        attribution.source_labels,
+                                        attribution.rationales);
 
     if (!impl_->draft_document.AcceptInto(accepted_path, error)) {
         RecordDraftAcceptOutcome(false, error);

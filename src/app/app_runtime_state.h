@@ -29,6 +29,7 @@
 #include "core/terminology_package_service.h"
 #include "core/tree_editing.h"
 #include "legacy_sacm/sacm_package_tree.h"
+#include "ui/panels/draft_changes_panel.h"
 #include "ui/timeline/timeline_state.h"
 #include "ui/ui_state.h"
 
@@ -304,6 +305,12 @@ struct AppRuntimeState {
     core::drafts::DraftChangeIndex draft_document_index;
     std::uint64_t draft_document_index_revision = ~std::uint64_t{0};
     std::uint64_t draft_document_index_case_revision = ~std::uint64_t{0};
+    // The Draft Changes panel's rows for the same comparison. Localized, so
+    // keyed on the language as well.
+    std::vector<ui::panels::DraftElementRow> draft_element_rows;
+    std::uint64_t draft_element_rows_revision = ~std::uint64_t{0};
+    std::uint64_t draft_element_rows_case_revision = ~std::uint64_t{0};
+    unsigned draft_element_rows_language_epoch = 0;
 
     // How far the working draft has moved, whichever half of it moved.
     //
