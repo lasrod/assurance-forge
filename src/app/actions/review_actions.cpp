@@ -1,5 +1,6 @@
 #include "app/actions/review_actions.h"
 
+#include "app/actions/action_status.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "app/proposal_ui_state.h"
@@ -25,10 +26,6 @@ void RestoreBaseCanvas(AppRuntimeState& state) {
     } else {
         state.tree_needs_rebuild = true;
     }
-}
-
-void SetStatus(AppRuntimeState& state, const std::string& message) {
-    state.events.Emit(StatusMessageEvent{message});
 }
 
 } // namespace
