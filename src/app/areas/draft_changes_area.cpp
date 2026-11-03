@@ -351,6 +351,7 @@ std::vector<ui::panels::DraftElementRow> BuildDraftElementRows(AppRuntimeState& 
     // the draft has to answer for.
     std::map<std::string, std::vector<std::string>> findings_by_element;
     std::vector<std::string> changed_ids;
+    changed_ids.reserve(diff.changes.size());
     for (const core::drafts::DraftDocumentChange& change : diff.changes)
         changed_ids.push_back(change.element_id);
     for (const core::sccg::StagedFinding& finding : core::sccg::CheckStagedArgument(draft, changed_ids)) {
