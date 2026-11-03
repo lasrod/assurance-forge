@@ -577,9 +577,10 @@ bool ProposalActions::StageSuggestionInDraftDocument(const review::SuggestedDraf
     }
     document.MarkChanged();
 
-    // The group's ledger, which the Draft Changes panel still reads (#409). The
-    // document already holds the change, so a ledger failure is said rather
-    // than reported as a refusal that would invite staging it twice.
+    // The group's ledger, the only record of the guidelines and review items a
+    // change answers (#409). The document already holds the change, so a ledger
+    // failure is said rather than reported as a refusal that would invite
+    // staging it twice.
     std::string ledger_error;
     if (!state_.draft_workspace.RecordAppliedOperations(group_id, group.operations, ledger_error))
         SetStatus(state_,

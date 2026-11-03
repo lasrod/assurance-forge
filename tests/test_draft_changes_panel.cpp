@@ -1,8 +1,15 @@
 #include "app/areas/draft_changes_area.h"
 
 #include "app/app_runtime_state.h"
+#include "core/drafts/draft_document_store.h"
+#include "core/drafts/draft_operation_apply.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/drafts/draft_workspace_store.h"
+#include "core/project_file_io.h"
+#include "sacm_adapter/case_projection.h"
+#include "sacm_adapter/library_load.h"
 #include "core/reviews/review_proposal.h"
+#include "parser/model_utils.h"
 #include "support/temp_files.h"
 #include "ui/ui_state.h"
 
@@ -10,6 +17,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -494,4 +502,404 @@ TEST(DraftChangesPanel, ARefusedAcceptIsStillExplainedAfterTheStatusLineIsGone) 
 
     ui_state.draft_accept_error.clear();
     ui_state.draft_accept_error_revision = 0;
+}
+
+// --- Element rows: a document-backed draft (ADR 0016) -----------------------
+//
+// In a draft that is a SACM document the reviewable unit is the element, and a
+// hand edit has no change group at all. These rows are what has to keep working
+// when the workspace store is deleted, so they are built from the comparison and
+// the elements' own provenance and consult no group.
+
+namespace {
+
+// A second fixture, because the group fixture's accepted case is an in-memory
+// POD and the document path needs a real SACM file the library can load.
+struct DocumentFixture {
+    TempDir dir{test_support::UniqueTempDirectory("document")};
+    app::AppRuntimeState state;
+    std::filesystem::path argument_file;
+    std::unique_ptr<sacm_adapter::LibraryDocument> accepted;
+
+    bool Ready() const {
+        return accepted != nullptr;
+    }
+
+    DocumentFixture() {
+        argument_file = dir.path / "arguments" / "main.sacm";
+        std::filesystem::create_directories(argument_file.parent_path());
+        const sacm_adapter::SaveOutcome seed = sacm_adapter::new_case_document_xmi("Blender");
+        if (!seed.ok || !core::WriteTextFileAtomic(argument_file, seed.xml).has_value())
+            return;
+        sacm_adapter::LoadOutcome loaded = sacm_adapter::load_document(argument_file);
+        if (!loaded.ok)
+            return;
+        accepted = std::move(loaded.document);
+        state.app_state.loaded_case = sacm_adapter::project_case(*accepted);
+        std::string error;
+        if (!state.draft_document.Open(dir.path, argument_file, *accepted, error))
+            accepted = nullptr;
+        else if (!state.draft_document.EnsureDraft(*accepted, error))
+            accepted = nullptr;
+    }
+
+    std::string TopClaimId() const {
+        for (const core::SacmElement& element : state.app_state.loaded_case.value().elements) {
+            if (element.type == "claim")
+                return element.id;
+        }
+        return {};
+    }
+
+    core::drafts::DraftOperationResult Apply(const std::vector<core::reviews::PatchOperation>& operations,
+                                             const std::string& anchor,
+                                             const core::drafts::DraftProvenance& provenance) {
+        core::drafts::DraftOperationResult result = core::drafts::ApplyOperationsToDraftDocument(
+            *state.draft_document.document(), operations, anchor, &provenance);
+        if (result.applied)
+            state.draft_document.MarkChanged();
+        return result;
+    }
+};
+
+core::drafts::DraftProvenance
+By(core::drafts::DraftSource source, const std::string& label, const std::string& why = {}) {
+    core::drafts::DraftProvenance provenance;
+    provenance.contribution_id = label == "Jesper" ? "human-jesper" : "group-1";
+    provenance.source = source;
+    provenance.label = label;
+    provenance.rationale = why;
+    return provenance;
+}
+
+core::drafts::DraftProvenance FromAgent(const std::string& why) {
+    return By(core::drafts::DraftSource::Mcp, "Claude Desktop", why);
+}
+
+core::drafts::DraftProvenance FromReviewer(const std::string& why) {
+    return By(core::drafts::DraftSource::Human, "Jesper", why);
+}
+
+const ui::panels::DraftElementRow* RowFor(const ui::panels::DraftChangesPanelModel& model, const std::string& id) {
+    for (const ui::panels::DraftElementRow& row : model.element_rows) {
+        if (row.element_id == id)
+            return &row;
+    }
+    return nullptr;
+}
+
+core::reviews::PatchOperation RemoveSubtreeOp(const std::string& element_id) {
+    core::reviews::PatchOperation operation;
+    operation.type = core::reviews::PatchOperationType::RemoveElement;
+    core::reviews::ElementRef target;
+    target.existing_id = element_id;
+    operation.element = target;
+    operation.field = "subtree";
+    return operation;
+}
+
+} // namespace
+
+TEST(DraftChangesPanelElementRows, ADocumentBackedDraftListsItsChangedElements) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created =
+        f.Apply({CreateClaimOp("$sub", "Blade hazards are controlled."), SupportOp("$sub", top)},
+                top,
+                FromAgent("hazard branch"));
+    ASSERT_TRUE(created.applied) << created.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    EXPECT_TRUE(model.has_workspace) << "the panel reported no draft at all";
+
+    const ui::panels::DraftElementRow* row = RowFor(model, created.created_ids.at("$sub"));
+    ASSERT_NE(row, nullptr) << "the created claim is not listed";
+    EXPECT_EQ(row->label, "Blade hazards are controlled.");
+    EXPECT_FALSE(row->kind_label.empty());
+    EXPECT_FALSE(row->change_label.empty());
+}
+
+// The reported shape: a reviewer's own edit has no change group and no workspace
+// holds it, so the tab was hidden and the panel said there was nothing to accept
+// while the draft held an unaccepted change.
+TEST(DraftChangesPanelElementRows, AHandEditWithNoChangeGroupIsStillShown) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+    ASSERT_FALSE(app::areas::DraftChangesTabVisible(f.state)) << "a draft that changes nothing needs no tab";
+
+    const core::drafts::DraftOperationResult edited =
+        f.Apply({UpdateTextOp(top, "The mower is safe to operate.")}, top, FromReviewer({}));
+    ASSERT_TRUE(edited.applied) << edited.error;
+    ASSERT_EQ(f.state.draft_workspace.workspace(), nullptr) << "the case under test has no change group";
+
+    EXPECT_TRUE(app::areas::DraftChangesTabVisible(f.state)) << "the changes are in a tab that does not exist";
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    const ui::panels::DraftElementRow* row = RowFor(model, top);
+    ASSERT_NE(row, nullptr) << "an unaccepted hand edit is not listed";
+    EXPECT_EQ(row->contributions.size(), 1u);
+}
+
+// The rows are cached across frames, so what has to be pinned is that the cache
+// does not outlive the draft it describes, and that selecting a row is seen
+// without the draft changing at all.
+TEST(DraftChangesPanelElementRows, RowsFollowTheDraftAndTheSelection) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    ASSERT_TRUE(f.Apply({UpdateTextOp(top, "First wording.")}, top, FromReviewer({})).applied);
+    const ui::panels::DraftChangesPanelModel first = app::areas::BuildDraftChangesPanelModel(f.state);
+    ASSERT_NE(RowFor(first, top), nullptr);
+    EXPECT_EQ(RowFor(first, top)->label, "First wording.");
+
+    ui::UiState& ui_state = ui::GetUiState();
+    const std::string selection_before = ui_state.selected_element_id;
+    ui_state.selected_element_id = top;
+    const ui::panels::DraftChangesPanelModel selected = app::areas::BuildDraftChangesPanelModel(f.state);
+    ui_state.selected_element_id = selection_before;
+    ASSERT_NE(RowFor(selected, top), nullptr);
+    EXPECT_TRUE(RowFor(selected, top)->selected) << "the selection was frozen with the cached rows";
+
+    ASSERT_TRUE(f.Apply({UpdateTextOp(top, "Second wording.")}, top, FromReviewer({})).applied);
+    const ui::panels::DraftChangesPanelModel second = app::areas::BuildDraftChangesPanelModel(f.state);
+    ASSERT_NE(RowFor(second, top), nullptr);
+    EXPECT_EQ(RowFor(second, top)->label, "Second wording.") << "the panel kept describing the previous draft";
+}
+
+// The element rows and the group rows would describe one draft twice, and a
+// group row's Accept and Reject mean nothing on a draft that is accepted whole.
+TEST(DraftChangesPanelElementRows, ADocumentDraftIsNotListedASecondTimeAsGroups) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    core::drafts::DraftGroupRequest request;
+    request.source = core::drafts::DraftSource::Mcp;
+    request.source_label = "Claude Desktop";
+    request.title = "Reword the top claim";
+    std::string error;
+    const core::AssuranceCase& accepted = f.state.app_state.loaded_case.value();
+    ASSERT_TRUE(f.state.draft_workspace.Open(f.argument_file, accepted, error)) << error;
+    ASSERT_FALSE(f.state.draft_workspace.BeginGroup(request, accepted, error).empty()) << error;
+
+    ASSERT_TRUE(f.Apply({UpdateTextOp(top, "Reworded.")}, top, FromAgent("clearer")).applied);
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    EXPECT_FALSE(model.element_rows.empty());
+    EXPECT_TRUE(model.rows.empty()) << "the same draft was listed twice";
+}
+
+// The row says who proposed it. A contributor who is missing from this list has
+// been dropped from what the reviewer is approving.
+TEST(DraftChangesPanelElementRows, ARowNamesEveryContributor) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created =
+        f.Apply({CreateClaimOp("$sub", "Blade hazards are controlled."), SupportOp("$sub", top)},
+                top,
+                FromAgent("hazard branch"));
+    ASSERT_TRUE(created.applied) << created.error;
+    const std::string claim_id = created.created_ids.at("$sub");
+
+    const core::drafts::DraftOperationResult reworded =
+        f.Apply({UpdateTextOp(claim_id, "Blade hazards are controlled during normal operation.")},
+                top,
+                FromReviewer("bounded the qualifier"));
+    ASSERT_TRUE(reworded.applied) << reworded.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    const ui::panels::DraftElementRow* row = RowFor(model, claim_id);
+    ASSERT_NE(row, nullptr);
+    ASSERT_EQ(row->contributions.size(), 2u) << "a contributor is missing from the row";
+    const auto named = [&](const std::string& label, const std::string& rationale) {
+        return std::any_of(row->contributions.begin(), row->contributions.end(), [&](const auto& contribution) {
+            return contribution.source_label == label && contribution.rationale == rationale;
+        });
+    };
+    EXPECT_TRUE(named("Claude Desktop", "hazard branch"));
+    EXPECT_TRUE(named("Jesper", "bounded the qualifier"));
+}
+
+// A contributor that gave no label is still named by what kind of source it was.
+TEST(DraftChangesPanelElementRows, AContributorWithNoLabelIsNamedByItsSource) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    core::drafts::DraftProvenance unnamed = FromAgent("clearer");
+    unnamed.label.clear();
+    ASSERT_TRUE(f.Apply({UpdateTextOp(top, "Reworded.")}, top, unnamed).applied);
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    const ui::panels::DraftElementRow* row = RowFor(model, top);
+    ASSERT_NE(row, nullptr);
+    ASSERT_EQ(row->contributions.size(), 1u);
+    EXPECT_FALSE(row->contributions.front().source_label.empty());
+}
+
+// A removed element is not in the draft to be listed from, so its words come
+// from the accepted argument. It is not in the draft to carry a tag either, so
+// nobody is named (ADR 0016); the panel shows that gap, and the test pins that
+// the row is not given an author it does not have. A reviewer who cannot see
+// what a draft deletes is being asked to approve a deletion they were never shown.
+//
+// The element removed here is one the ACCEPTED argument holds. A claim the draft
+// both creates and removes is deliberately not a row: its net effect on the
+// accepted argument is nothing, and there is nothing for a reviewer to decide.
+TEST(DraftChangesPanelElementRows, ARemovedElementIsListedWithNoContributor) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+    const core::SacmElement* accepted = parser::FindElementById(f.state.app_state.loaded_case.value(), top);
+    ASSERT_NE(accepted, nullptr);
+    const std::string accepted_words = accepted->content.empty() ? accepted->name : accepted->content;
+
+    const core::drafts::DraftOperationResult removed =
+        f.Apply({RemoveSubtreeOp(top)}, top, FromReviewer("superseded by the hazard branch"));
+    ASSERT_TRUE(removed.applied) << removed.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    const ui::panels::DraftElementRow* row = RowFor(model, top);
+    ASSERT_NE(row, nullptr) << "a deletion the reviewer must approve is not on the list";
+    EXPECT_EQ(row->label, accepted_words) << "the row must say what is being deleted";
+    EXPECT_TRUE(row->contributions.empty()) << "the row names a contributor no tag recorded";
+}
+
+// The counterpart, stated so the behaviour above is a decision rather than an
+// accident of the comparison.
+TEST(DraftChangesPanelElementRows, AChangeTheDraftUndoesItselfIsNotARow) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created =
+        f.Apply({CreateClaimOp("$sub", "Blade hazards are controlled."), SupportOp("$sub", top)},
+                top,
+                FromAgent("hazard branch"));
+    ASSERT_TRUE(created.applied) << created.error;
+    const std::string claim_id = created.created_ids.at("$sub");
+
+    const core::drafts::DraftOperationResult removed =
+        f.Apply({RemoveSubtreeOp(claim_id)}, top, FromReviewer("duplicated an existing claim"));
+    ASSERT_TRUE(removed.applied) << removed.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    EXPECT_EQ(RowFor(model, claim_id), nullptr) << "a claim the draft created and then removed was offered for review";
+}
+
+// The checks look past what changed on purpose, so a finding can land on an
+// element with no row. The draft caused it, and the reviewer still has to see it.
+TEST(DraftChangesPanelElementRows, AFindingOnAnUnchangedElementIsNotDropped) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created = f.Apply({CreateClaimOp("$one", "The blade guard is fitted."),
+                                                                SupportOp("$one", top),
+                                                                CreateClaimOp("$two", "The cutoff switch works."),
+                                                                SupportOp("$two", top)},
+                                                               top,
+                                                               FromAgent("two reasons, no strategy"));
+    ASSERT_TRUE(created.applied) << created.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    EXPECT_EQ(RowFor(model, top), nullptr) << "the case under test needs the parent to have no row";
+    ASSERT_FALSE(model.other_findings.empty()) << "a finding the draft caused was dropped";
+    const core::SacmElement* parent = parser::FindElementById(f.state.draft_document_view, top);
+    ASSERT_NE(parent, nullptr);
+    const std::string parent_words = parent->content.empty() ? parent->name : parent->content;
+    EXPECT_EQ(model.other_findings.front().rfind(parent_words + ": ", 0), 0u)
+        << "the finding does not name its element";
+}
+
+TEST(DraftChangesPanelElementRows, ANodeRowFocusesTheNodeOnTheCanvas) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+    ASSERT_TRUE(f.Apply({UpdateTextOp(top, "Reworded.")}, top, FromReviewer({})).applied);
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftElementFocus(f.state, top);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(focus.element_id, top);
+    EXPECT_TRUE(focus.relationship_id.empty());
+}
+
+// A relationship is not a node, so centring on its id finds nothing and selecting
+// it as an element shows nothing in the inspector.
+TEST(DraftChangesPanelElementRows, ARelationshipRowSelectsTheRelationshipAndGoesToAnEndpoint) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    const core::drafts::DraftOperationResult created = f.Apply(
+        {CreateClaimOp("$sub", "Blade hazards are controlled."), SupportOp("$sub", top)}, top, FromAgent("why"));
+    ASSERT_TRUE(created.applied) << created.error;
+
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    std::string relationship_id;
+    for (const ui::panels::DraftElementRow& row : model.element_rows) {
+        const core::SacmElement* element = parser::FindElementById(f.state.draft_document_view, row.element_id);
+        if (element != nullptr && parser::IsRelationshipElement(*element))
+            relationship_id = row.element_id;
+    }
+    ASSERT_FALSE(relationship_id.empty()) << "the new support relationship has no row";
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftElementFocus(f.state, relationship_id);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(focus.relationship_id, relationship_id);
+    EXPECT_TRUE(focus.element_id == created.created_ids.at("$sub") || focus.element_id == top)
+        << "the canvas was sent somewhere that is not an endpoint: " << focus.element_id;
+
+    ui::UiState& ui_state = ui::GetUiState();
+    ui_state.selected_relationship_id = relationship_id;
+    const ui::panels::DraftChangesPanelModel selected = app::areas::BuildDraftChangesPanelModel(f.state);
+    ui_state.selected_relationship_id.clear();
+    ASSERT_NE(RowFor(selected, relationship_id), nullptr);
+    EXPECT_TRUE(RowFor(selected, relationship_id)->selected);
+}
+
+// A relationship the draft removes is no longer in the draft view, so finding out
+// that it is a relationship at all has to come from the accepted side. Treated as
+// a plain node, the row would centre on an id no canvas draws.
+TEST(DraftChangesPanelElementRows, ARemovedRelationshipStillSelectsTheRelationship) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const std::string top = f.TopClaimId();
+    ASSERT_FALSE(top.empty());
+
+    core::SacmElement relationship;
+    relationship.id = "R-only-accepted";
+    relationship.type = "assertedinference";
+    relationship.source_refs = {top};
+    relationship.target_refs = {"elsewhere"};
+    f.state.app_state.loaded_case->elements.push_back(relationship);
+    ++f.state.app_state.case_revision;
+
+    const app::areas::DraftGroupFocus focus = app::areas::ResolveDraftElementFocus(f.state, relationship.id);
+    EXPECT_EQ(focus.kind, app::areas::DraftGroupFocusKind::Canvas);
+    EXPECT_EQ(focus.relationship_id, relationship.id);
+    EXPECT_EQ(focus.element_id, top);
+}
+
+TEST(DraftChangesPanelElementRows, AnUntouchedDraftListsNothing) {
+    DocumentFixture f;
+    ASSERT_TRUE(f.Ready());
+    const ui::panels::DraftChangesPanelModel model = app::areas::BuildDraftChangesPanelModel(f.state);
+    EXPECT_TRUE(model.element_rows.empty()) << "a draft that changes nothing reported changes";
 }

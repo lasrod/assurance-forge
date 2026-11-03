@@ -343,6 +343,9 @@ msgstr "追加に失敗しました: {0}"
 msgid "Add fixed confidence"
 msgstr "固定信頼度を追加"
 
+msgid "Added"
+msgstr "追加"
+
 msgid "Added ACP {0}"
 msgstr "ACP {0} を追加しました"
 
@@ -658,11 +661,17 @@ msgstr "変更を却下できませんでした: {0}"
 msgid "Change rejected."
 msgstr "変更を却下しました。"
 
+msgid "Changed"
+msgstr "変更"
+
 msgid "Changed by the working draft ({0}); not yet accepted."
 msgstr "作業ドラフトで変更されました（{0}）。まだ受理されていません。"
 
 msgid "Changed since baseline"
 msgstr "ベースライン以降に変更"
+
+msgid "Changed: {0}"
+msgstr "変更箇所: {0}"
 
 msgid "Changes"
 msgstr "変更"
@@ -786,6 +795,9 @@ msgstr "続行しますか?"
 
 msgid "Contributions"
 msgstr "提案の内訳"
+
+msgid "Contributor not recorded"
+msgstr "変更者の記録なし"
 
 msgid "Controlled Environment"
 msgstr "管理環境"
@@ -1368,6 +1380,9 @@ msgstr "使用箇所検索: {0}  {1}"
 
 msgid "Findings (advisory):"
 msgstr "指摘 (参考):"
+
+msgid "Findings on elements this draft did not change:"
+msgstr "このドラフトが変更していない要素への指摘:"
 
 msgid "Fit to view"
 msgstr "全体を表示"
@@ -2470,6 +2485,9 @@ msgstr "{0} の削除に失敗しました: {1}"
 msgid "Remove {0}?"
 msgstr "{0} を除去しますか?"
 
+msgid "Removed"
+msgstr "削除"
+
 msgid "Removed relationship {0}. Its elements were kept; any left unconnected show as orphans."
 msgstr "関係 {0} を削除しました。要素は残してあり、接続がなくなった要素は孤立要素として表示されます。"
 
@@ -3460,8 +3478,17 @@ msgstr "作成者"
 msgid "being written"
 msgstr "作成中"
 
+msgid "by {0}"
+msgstr "{0} による"
+
 msgid "categories"
 msgstr "カテゴリ"
+
+msgid "connections"
+msgstr "接続"
+
+msgid "declaration"
+msgstr "宣言"
 
 msgid "definition"
 msgstr "定義"
@@ -3487,6 +3514,9 @@ msgstr "フレーム間隔 (FPS で色分け)"
 msgid "hello_imgui FpsIdling: when the UI is quiet, throttle to {0:.0f} FPS to save power.\nUncheck to keep the app running at full speed even when idle."
 msgstr "hello_imgui FpsIdling: UI が静かなときに {0:.0f} FPS にスロットルして電力を節約します。\nアイドル時もフルスピードで動作させるにはオフにしてください。"
 
+msgid "identifier"
+msgstr "識別子"
+
 msgid "imported proposal"
 msgstr "取り込んだ提案"
 
@@ -3504,6 +3534,9 @@ msgstr "要対応"
 
 msgid "not recorded"
 msgstr "未記録"
+
+msgid "note"
+msgstr "注記"
 
 msgid "nothing is ready to accept -- {0} being written, {1} needing your attention"
 msgstr "受理できる変更がありません -- 作成中 {0} 件、要確認 {1} 件"
@@ -3535,6 +3568,9 @@ msgstr "再生={0}  ディスク={1}"
 msgid "session {0}"
 msgstr "セッション {0}"
 
+msgid "statement"
+msgstr "記述"
+
 msgid "term"
 msgstr "用語"
 
@@ -3552,6 +3588,9 @@ msgstr "このノードとその子孫"
 
 msgid "throttled"
 msgstr "スロットル中"
+
+msgid "undeveloped"
+msgstr "未展開"
 
 msgid "unknown"
 msgstr "不明"
@@ -3576,6 +3615,9 @@ msgstr "{0}（削除）"
 
 msgid "{0} ({1})"
 msgstr "{0} ({1})"
+
+msgid "{0} - {1}"
+msgstr "{0} - {1}"
 
 msgid "{0} added, {1} changed, {2} removed"
 msgstr "追加 {0}、変更 {1}、削除 {2}"

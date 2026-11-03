@@ -430,6 +430,10 @@ void AppRuntime::LocateElementOnCanvas(const std::string& element_id) {
     std::string package_id;
     if (document != nullptr)
         package_id = sacm_adapter::resolve_argument_package_id(*document, element_id);
+    // An element the draft removes is only in the accepted document, and the
+    // canvas keeps it as a tombstone in that package.
+    if (package_id.empty() && impl_->app_state.library_document != nullptr)
+        package_id = sacm_adapter::resolve_argument_package_id(*impl_->app_state.library_document, element_id);
 
     std::string package_gid;
     std::string title;
