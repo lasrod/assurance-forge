@@ -54,16 +54,24 @@ Frame interval while panning, on a 120 Hz display (8.3 ms is a perfect frame):
 
 | Nodes | Renderer | First paint | Frame interval, mean | Worst frame |
 |---:|---|---:|---:|---:|
-| 87 | Canvas 2D | 2 to 12 ms | 8.3 ms | 17 ms |
+| 87 | Canvas 2D | 2 to 12 ms | 8.3 to 9.0 ms | 17 ms |
 | 87 | SVG elements | 16 to 42 ms | 8.3 to 11 ms | 109 ms |
+| 1,496 | Canvas 2D | 6 to 10 ms | 8.3 ms | 10 ms |
+| 1,496 | SVG elements | 133 to 213 ms | 8.8 to 17 ms | 200 ms |
 | 7,496 | Canvas 2D | 10 to 19 ms | 8.3 ms | 17 ms |
-| 7,496 | SVG elements | 0.7 to 1.4 s | 20 to 138 ms | 701 ms |
+| 7,496 | SVG elements | 0.7 to 1.5 s | 20 to 138 ms | 701 ms |
 
-Ranges cover Chrome (headless and visible), Edge and Firefox.
+Ranges cover two sets of runs in Chrome (headless and visible), Edge and
+Firefox.
 
-At the size of today's real cases both are smooth. At thousands of nodes the
-canvas stays at full frame rate, because it draws only what is in view, while
-SVG elements drop to between 7 and 50 frames per second.
+At the size of today's real cases both are smooth. The canvas stays at full
+frame rate at every size, because it draws only what is in view. SVG elements
+stutter at 1,496 nodes and drop to between 7 and 50 frames per second at 7,496.
+
+These numbers come from a scripted pan at a fixed zoom, which is the easy case
+for SVG. Tried by hand at 1,496 nodes, with zooming, the canvas was smooth and
+the SVG renderer was noticeably slow: changing the zoom makes the browser draw
+every text element again.
 
 ### 3. Layout is fast enough, if measurements are kept
 
