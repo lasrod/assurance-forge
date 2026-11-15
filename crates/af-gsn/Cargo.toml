@@ -1,0 +1,12 @@
+[package]
+name = "af-gsn"
+description = "Goal Structuring Notation as a view of, and a set of edits on, a SACM document."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true

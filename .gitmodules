@@ -1,21 +1,3 @@
-[submodule "external/pugixml"]
-	path = external/pugixml
-	url = https://github.com/zeux/pugixml.git
-[submodule "external/hello_imgui"]
-	path = external/hello_imgui
-	url = https://github.com/pthom/hello_imgui.git
-	# hello_imgui vendors Android/Gradle templates whose tooling drops build
-	# caches (.gradle/) inside the checkout. We never edit this submodule, so
-	# untracked files in it are always foreign build output -- reporting them
-	# leaves `git status` permanently dirty. A changed commit pointer or a
-	# modified tracked file is still reported.
-	ignore = untracked
-[submodule "external/nativefiledialog-extended"]
-	path = external/nativefiledialog-extended
-	url = https://github.com/btzy/nativefiledialog-extended.git
-[submodule "external/picosha2"]
-	path = external/picosha2
-	url = https://github.com/okdshin/PicoSHA2.git
 [submodule "external/safety-case-core-guidelines"]
 	path = external/safety-case-core-guidelines
 	url = https://github.com/lasrod/safety-case-core-guidelines.git

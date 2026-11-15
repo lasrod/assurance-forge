@@ -1,182 +1,54 @@
 # CLAUDE.md
 
-## Build Commands
+Assurance Forge is a desktop tool for safety case engineering: GSN for the user,
+SACM 2.3 XMI underneath. It is being rebuilt in Rust; almost nothing is built
+yet.
 
-**Windows** (run from Developer Command Prompt for VS 2022):
+Read first: [`ARCHITECTURE.md`](ARCHITECTURE.md) (shape and rules) and
+[`docs/roadmap/rust-rebuild-phase-0.md`](docs/roadmap/rust-rebuild-phase-0.md)
+(what was decided and what comes next).
+
+## Commands
+
 ```bash
-git submodule update --init --recursive
-cmake --preset default
-cmake --build --preset release
-cmake --build --preset debug
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo build -p af-gsn --target wasm32-unknown-unknown
 ```
 
-**Run the app:**
-```bash
-build\Release\assurance-forge.exe
-```
+Test only what you changed while working (`cargo test -p <crate>`); run the
+workspace before pushing.
 
-## Architecture
+## Rules that are easy to break
 
-Assurance Forge is a C++23 ImGui desktop application for safety case engineering. It parses and produces **SACM 2.3 XML** and visualizes assurance arguments using **Goal Structuring Notation (GSN)**.
+- **One model.** The libSACM `Document` is the only model. Never add a second,
+  editable representation of the argument. Views are derived and read-only;
+  every change is a SACM operation.
+- **Pure crates do no I/O.** Everything down to `af-api` must build for
+  `wasm32-unknown-unknown`: no file system, network, threads or clock. Those come
+  in through traits implemented by the shells.
+- **`af-review` and `af-ai` never depend on each other.**
+- **The core sends codes, not sentences.** Text for users is produced and
+  translated in the frontend.
+- **Never invent a GSN to SACM mapping.** Mappings are recorded with their
+  evidence in `docs/standards/sacm-gsn-mapping.md`. Load the `gsn-expert` skill
+  before GSN work.
+- **Never silently change an argument.** Reading and writing a file must
+  preserve its meaning; a change that cannot be made correctly is refused.
+- **No data leaves the machine without the user's explicit consent.**
 
-### Layers (low → high, no upward dependencies)
+## Working here
 
-> **Canonical source:** `docs/architecture/layers-and-ownership.md`. The table
-> below is a convenience copy; where they disagree, that page wins.
+- Keep crates small and isolated. Add a crate when it can be built and tested
+  without the rest.
+- Changes to reading, writing, GSN to SACM mapping or edit commands need tests.
+- Interface changes are checked in the running application, not only by tests.
+- `ARCHITECTURE.md` is the living description. Update it in the same change
+  that alters the shape of the code, including its "Built" column.
+- Do not edit `external/` or `examples/`; they are submodules.
+- The C++ application is on the `cpp` branch. Use it as a reference for
+  behaviour, not as code to port line by line.
 
-| Layer | Owns |
-|-------|------|
-| `libs/sacm` | The reusable SACM 2.3 library: model, XMI I/O, validation, commands. Independent of Assurance Forge |
-| `sacm` | Legacy SACM model types, parsing, serialization, predating `libs/sacm` |
-| `parser` | XML parsing, SACM model building, SCCG guideline catalog loading |
-| `sacm_adapter` | The seam between `libs/sacm` and the app: projection, library-backed edits, library load |
-| `core` | UI-independent domain behavior (tree building, add/remove logic, project model, drafts, audit) |
-| `review` | Review methods: SCCG profile selection, data packaging, prompt and result contracts, result validation. Never calls a provider |
-| `ai` | AI settings, provider calls, normalized responses, background task execution. Inference only — never parses a review result |
-| `export` | SVG export of GSN diagrams — its own projection and renderer, separate from the canvas |
-| `ui` | ImGui rendering, transient UI state, GSN canvas, panels, widgets |
-| `bridge` | Local transport between the MCP adapter and the running application |
-| `agent` | Operations an external agent can request, independent of transport |
-| `mcp` | The MCP server: JSON-RPC, session, tools. Its own executable |
-| `app` | Runtime orchestration, controllers, project workflow, modal state, command handling |
-
-**The dependency rule is enforced at build time** by `cmake/check_layer_gates.cmake`. `core`, `parser`, and `sacm` must never include ImGui or `app` headers. `ui` must not depend on `app` directly — panels receive action objects passed in from `AppRuntime`. `bridge` and `agent` must not include each other's transport or `mcp`.
-
-
-### Frame & Interaction Flow
-
-```
-AppRuntime::RenderFrame
- → rebuild derived views if model is dirty
- → render splitters and panels
- → panels update UiState or invoke action callbacks
- → AppRuntime command handlers mutate AppState / core model
- → AppRuntime sets tree_needs_rebuild
- → next frame: RebuildDerivedViewsIfNeeded refreshes AssuranceTree, registers, canvas
-```
-
-User interaction → `UiState` (visual/selection) or `ElementContextActions` (model mutations) → `AppRuntime` handles command → `core` mutates `parser::AssuranceCase` → derived views rebuilt next frame.
-
-### State Ownership
-
-- `core::AppState` — loaded project data, file load/save
-- `ui::UiState` — selected element, language toggle, active center view, transient canvas navigation
-- `AppRuntime::Impl` — application workflow state (modals, animations) that shouldn't live in reusable UI components
-
-### SCCG / AI Guidelines
-
-Safety Case Core Guidelines live in `external/safety-case-core-guidelines` (git submodule). Assurance Forge reads one file of its distribution, `dist/sccg.full.json` (SCCG contract 3.x; `parser::SccgDistParser` refuses another major). The build copies it into each target runtime directory as `data/sccg/dist/sccg.full.json`; runtime discovery tries `AF_SCCG_DIST_DIR`, then that copy, then a source checkout. If `dist/sccg.full.json` is missing after cloning, regenerate it in the SCCG submodule before configuring.
-
-### HelloImGui Scope
-
-HelloImGui provides the platform runner, window/event loop, DPI scaling, and preferences persistence. Assurance Forge keeps its own `NoDefaultWindow` layout and does not use HelloImGui's docking layouts, status bars, logging windows, or theme tweak windows. The two valid app themes are `Dark` and `Light` (defined in `ui::AppTheme`). Domain colors must flow through `ui::GetTheme()` or semantic color helpers — not local hardcoded `ImVec4` values.
-
-## UI Localization
-
-Every user-visible string goes through `ui::i18n`. Catalog source of truth: `tools/i18n/regenerate_ja_po.py`.
-
-- Wrap with `AF_TR("literal")`, `ui::i18n::trf("{0}/{1}", a, b)` for dynamic, `trn`/`trnf` for plurals. Always a literal — `AF_TR(var)` is invisible to the extractor.
-- Text stored in English and translated where shown (e.g. saved in a project file): mark the literal `AF_TR_NOOP("...")` so the extractor sees it, and translate with `ui::i18n::tr(value)` at display.
-- Status-bar messages set in `src/app` are translated where they are set. `core` cannot translate: it reports with `AppState::set_status(AF_TR_NOOP("... {0}"), {value})`, and anything that shows the message calls `ui::LocalizedStatusMessage`. `status_message_i18n_check` fails on a raw literal passed to `SetStatus` or `StatusMessageEvent` in `src/app`, or to `set_status` or `status_message` in `src/core`.
-- Use real UTF-8 in source (`"● PAUSED"`, not `"\xe2\x97\x8f PAUSED"`).
-- Window/popup titles double as ImGui IDs — translate visible part, keep ID stable: `(AF_TR("Title") + "###" + kStableEnglishId).c_str()`.
-- Layer rule: `core/sacm/parser/ai` can't include `ui/i18n`. Store English msgids in data; the `ui/` panel translates at display with `AF_TR(field)`. `app/` may use `ui::i18n` directly for dynamic templating (`trf` at sync time).
-- After adding/removing strings: add (or remove) the entry in `regenerate_ja_po.py`, then `python tools/i18n/regenerate_ja_po.py && cmake --build --preset release`.
-- Caches that bake translations (e.g. `ProblemItem::message` built via `trf`) must refresh on language change. Use `ui::i18n::LanguageEpoch()` — see the existing hook in `AppRuntime::RenderFrame`.
-- For runtime-formatted text use `trf("Name: {0}", value)` / `trnf(...)` with positional placeholders — never `AF_TR("Name: %s")` as a printf format string (translators can't manage `%`-specifiers or reorder them). Pass the result to ImGui as `"%s"` or `TextUnformatted`.
-- CI enforces catalog consistency via the `i18n_catalog_check` CTest (runs `tools/i18n/check_catalog.py`): fails if a source msgid is missing from the `.po`, the committed `.mo` is out of sync, or a translated msgid contains a printf specifier (`%s`/`%d`/…). Run `python tools/i18n/check_catalog.py` before pushing.
-
-## C++ Style
-
-- C++23, standard library. Column limit: 120. Formatting is applied on commit by the `.githooks/pre-commit` hook, which `cmake --preset default` installs via `core.hooksPath`. There is no CI format gate. A file staged with unstaged changes alongside it is reported rather than rewritten, so formatting never sweeps work-in-progress into a commit.
-- Prefer explicit types over `auto` unless the type is noisy or impractical to spell.
-- Prefer named helper functions over non-trivial lambdas.
-- Full words for names; abbreviations only for established domain terms (SACM, GSN, SCCG, ACP).
-- In `.cpp` files: matching header first, then project headers, then third-party/system headers. **`SortIncludes` is disabled** — preserve include order manually (Windows headers and some third-party headers have order dependencies).
-- Do not reformat files under `external/`.
-- Prefer result structs or `bool` + error string for recoverable errors.
-
-## SACM 2.3 library conformance (`libs/sacm`)
-
-`libs/sacm` is an independent, reusable SACM 2.3 library; Assurance Forge is (to
-become) one of its clients. Its compliance claims live in
-`docs/sacm/sacm-conformance-matrix.md`, which is the canonical source of
-requirement IDs — test names embed them.
-
-- **Any change under `libs/sacm/include/` or `libs/sacm/src/` requires a matrix
-  update or a verification record.** A behavioural change that leaves the matrix
-  untouched silently invalidates whatever the matrix claims.
-- **A row reaches `verified` only with a test whose name embeds its requirement
-  ID** (e.g. `SACM23_XMI_004_...`) and a `sacm-conformance-verifier` pass
-  recorded under `docs/sacm/verification/`. Prose evidence and "manual" steps do
-  not count.
-- Run `python tools/sacm/check_conformance_matrix.py` before pushing. CI enforces
-  it via the `sacm_matrix_check` CTest, which fails on matrix rot: a verified row
-  with no ID-bearing test, a test naming a requirement that does not exist, or a
-  cited path that has moved.
-- The library must stay independent — no Assurance Forge headers, no ImGui, no
-  GSN/layout vocabulary in its public API. `cmake/check_layer_gates.cmake`
-  enforces this at configure time.
-- **SACM 2.3 does not determine an instance-document namespace URI** (the
-  normative MOF model declares no `nsURI`). Ours is a project choice, and the EMF
-  reference implementation uses a different one per package. Import accepts both
-  dialects; strict export normalizes to our pin. Do not treat the pinned URI as
-  normative.
-
-## Capability matrix (`docs/features/feature-matrix.md`)
-
-The canonical record of what Assurance Forge can actually do, and the source the
-documentation site renders. It is separate from the SACM conformance matrix:
-that one answers "does the library implement the standard", this one answers
-"can a user do the thing".
-
-- **Any user-visible capability change requires a matrix row change.** A new
-  feature adds a row; a finished feature raises a status; a discovered
-  limitation goes in Notes. Overstated rows are read by people deciding whether
-  to trust the tool with a safety argument.
-- **`supported` requires a cited test that exists.** `planned`, `candidate` and
-  `not-planned` rows must cite no tests — a planned row with tests is the
-  signature of a status reality has overtaken.
-- After editing, run `python tools/features/export_feature_matrix.py` (the
-  committed `feature-matrix.json` must stay in sync) and
-  `python tools/features/check_feature_matrix.py`. CI enforces both via the
-  `feature_matrix_check` CTest.
-- For a judgement-level audit — overstatement, silent caveats, missing rows —
-  use the `feature-matrix-steward` agent. The CTest only checks mechanics.
-
-## GSN work
-
-Load the `gsn-expert` skill before implementing, reviewing, or reasoning about
-any GSN feature. GSN→SACM mappings are evidence-backed and recorded in
-`docs/sacm/sacm-gsn-mapping.md`; never invent one in code. Note that the canvas
-(`src/ui/gsn/`) and the SVG export (`src/export/`) are separate renderers with
-separate models — a decorator added to one is absent from the other.
-
-## Repository gates
-
-All run under `ctest`. A change that trips one is not ready:
-
-| Gate | Fails when |
-|---|---|
-| `i18n_catalog_check` | A source msgid is missing from the `.po`, or the committed `.mo` is stale |
-| `status_message_i18n_check` | A status-bar message in `src/app` or `src/core` is an untranslated literal |
-| `sacm_matrix_check` | A `verified` row has no ID-bearing test, or a cited path moved |
-| `gsn_matrix_check` | GSN taxonomy, statuses, or cited evidence drift |
-| `feature_matrix_check` | A `supported` row cites no existing test, or the exported JSON is stale |
-| `no_committed_artifacts_check` | A build log, test output or scratch file is tracked by git |
-| `documentation_check` | A broken internal link, an unreachable page, an unmarked generated doc, or an architecture page missing a subsystem |
-| `verification_index_check` | The verification index no longer matches the records' front matter |
-| `evidence_package_check` | The release evidence package cannot be generated from this checkout — matrix unparseable, spec pins mismatch, or a frozen doc missing |
-
-Documentation authority — which page is canonical for which policy — is
-`docs/documentation-map.md`. Neither this file nor `AGENTS.md` is canonical for
-anything listed there; on conflict, the canonical page wins. A change to a policy
-agents must follow goes into **both** files, or into neither.
-
-## Key Constraints
-
-- **Keep `core` small.** Add to it only when behavior is reusable domain logic with no UI, file-dialog, or provider dependency. Do not add helpers there for a single `ui` or `app` caller.
-- **Changes to parsing, serialization, model mutation, or AI response handling require tests.**
-- **Round-trip integrity** (import → export) must be preserved for assurance-case data.
-- SACM XML is the source of truth; the tool must never silently modify or reinterpret safety arguments.
-- No data is sent externally without explicit user consent — AI integrations are transparent and user-controlled.
+`AGENTS.md` carries the same instructions for other tools. A change to one goes
+into both.

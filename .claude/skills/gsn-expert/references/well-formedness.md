@@ -7,8 +7,8 @@ Two different things live here and should not be conflated:
 - **Argument-quality problems** — the diagram is valid GSN but the argument is
   weak or misleading. A tool can *flag* these; only a human can settle them.
 
-Assurance Forge reports both through `core::problems` (see
-`src/core/problems/problems_manager.cpp`). Keep the distinction visible in the
+Assurance Forge reports both through the problem list (the `af-problems` crate;
+`src/core/problems/problems_manager.cpp` on the `cpp` branch). Keep the distinction visible in the
 message: a structural violation is a defect, a quality flag is a prompt.
 
 ## Structural rules
@@ -94,7 +94,7 @@ For each `SupportedBy` fan-out, ask the two questions in order:
    where the missing set-defining Context shows up.
 2. **Is each child actually established?** (Soundness.)
 
-The Safety Case Core Guidelines catalog (`src/parser/sccg_dist_parser.cpp`,
+The Safety Case Core Guidelines catalog (the `af-sccg` crate,
 loaded from the `external/safety-case-core-guidelines` submodule) is the
 project's structured form of this review guidance and is what the AI review
 path uses. Prefer adding a guideline there over hardcoding a new check.

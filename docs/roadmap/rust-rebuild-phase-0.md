@@ -2,8 +2,8 @@
 
 **Authority: planning record.** This page records what was decided in Phase 0 of
 rebuilding Assurance Forge in Rust, and what remains before implementation
-starts. It describes the tool that is planned. The C++ application, and every
-other page of this site, describe what exists today.
+starts. It describes the tool that is planned. What is built so far is stated in
+[`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md).
 
 ## What is changing
 
@@ -15,9 +15,11 @@ conversion of the C++ code.
   Rust SACM 2.3 library.
 - **User interface:** React with the DATUM design system, packaged as a desktop
   application with Tauri.
-- **Repository:** this one, at the same URL. `main` switches to the Rust
-  workspace when the Rust tool is in a usable state; the C++ code stays
-  available on a branch and a tag.
+- **Repository:** this one, at the same URL. `main` holds the Rust workspace.
+  The C++ application is on the
+  [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp), and its
+  last release is
+  [0.3.0-alpha.3](https://github.com/lasrod/assurance-forge/releases/tag/0.3.0-alpha.3).
 - **Licence:** MIT, unchanged.
 
 The product principle does not change: users work in GSN, SACM stays underneath,
@@ -51,7 +53,8 @@ How it works with files:
 
 ## Lessons from the C++ architecture
 
-A review of the 16 architecture decision records gave these verdicts.
+A review of the [16 architecture decision records](https://github.com/lasrod/assurance-forge/tree/cpp/docs/architecture/decisions) of the C++
+application gave these verdicts.
 
 | ADR | Verdict for the rebuild |
 |---|---|
@@ -180,8 +183,10 @@ Commands go in, views come out. The frontend never holds the document.
 
 ## How the architecture is documented
 
-- One short, living `ARCHITECTURE.md`: crate map, rules, data flow and two
-  diagrams. Each rule names the check that enforces it.
+- One short, living
+  [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md):
+  crate map, rules, data flow and two diagrams. Each rule names the check that
+  enforces it.
 - ADRs record why. They are amended in place and never superseded in part. The
   Rust tool starts a new series.
 - Each crate's own documentation says what it owns and what it must not do.
@@ -204,6 +209,37 @@ Commands go in, views come out. The frontend never holds the document.
 None blocks a start; the application can work around each until the library
 provides it.
 
+## Releases
+
+The capabilities of the C++ application
+([capability matrix](../reference/cpp-capability-matrix.md)) arrive in five
+milestones. Each gives a tool that can be used, and each waits only on libSACM
+work that exists by then.
+
+| Milestone | What a user can do | Needs from libSACM |
+|---|---|---|
+| **1. View** | Open a SACM file, see the GSN diagram with automatic layout, browse the tree and packages, read element details, see well-formedness and cycle problems, export SVG. English and Japanese, dark and light. | What exists now |
+| **2. Edit** | Create, change and delete elements and relationships, with menus that offer only valid edits. Undo, explicit save, recovery copy. Assurance claim points, challenges, defect repair, dual-language content. | Delete operations |
+| **3. Registers and guidance** | Evidence and CSE registers, per-case terminology with term detection, the SCCG guideline catalogue, the full problem list. | Artifact and Terminology models |
+| **4. AI review** | Provider profiles with keys in the system secret store, SCCG review, suggested changes in a working draft, accept and reject, consensus review. | Serialisable operations helps |
+| **5. External agents** | The MCP server: read a case, propose changes into the draft, SCCG guidance and checks, consent and session binding to the open file. | Nothing new |
+
+Some capabilities change shape instead of being ported:
+
+| In the C++ application | In the Rust tool |
+|---|---|
+| Project model, project explorer, creating a project from a SACM file | Opening and saving a single file |
+| Recent projects | Recent files |
+| Crash-resilient project recovery | The recovery copy |
+| Layered architecture enforced at build time | The crate rules in `ARCHITECTURE.md` |
+| Projectless MCP sessions | A session bound to an open file |
+| Windows installer | Packages from the Tauri bundler, from milestone 1 |
+
+GSN v3 features that are planned and not yet in the C++ application (pattern
+decorators and choice, modules and contracts, defeat states, the guided
+development methods) follow after milestone 5. The layout and render model
+allows for them from milestone 1.
+
 ## What remains in Phase 0
 
 - [ ] **Spike: desktop shell.** Tauri and DATUM, opening a SACM file through
@@ -212,13 +248,12 @@ provides it.
       Text measurement in Rust, including Japanese, is the first thing to test.
 - [ ] **Spike: one core, two targets.** The same crate running natively and as
       WebAssembly.
-- [ ] **Parity list.** Which capabilities of the current matrix are in the first
-      Rust release.
+- [x] **Release plan.** The five milestones above.
 - [ ] **Remaining decisions:** draft storage and acceptance, MCP consent and
       session binding for a file-based tool, and the shared layout model.
-- [ ] **Repository setup:** workspace, CI with test selection, `xtask`, the C++
-      branch and tag.
-- [ ] **Milestone plan** for Phase 1.
+- [x] **Repository setup:** `main` cleared for the Rust workspace, with CI that
+      checks only what a change touches.
+- [ ] **Milestone plan** for milestone 1.
 
-Phase 0 ends when the spikes have run with their findings written down, the
-parity list is agreed, and the first ADRs of the new series are accepted.
+Phase 0 ends when the spikes have run with their findings written down and the
+first decision records of the new series are accepted.

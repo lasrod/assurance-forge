@@ -2,336 +2,99 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
-# Cancel superseded runs: when a PR branch gets a new push, the in-progress run
-# for the previous commit is no longer interesting. main pushes are keyed by SHA
-# so they never cancel each other.
+permissions:
+  contents: read
+
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  build-and-test:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
+jobs:
+  # Decides which parts of the repository a change touches, so a docs-only
+  # change builds no Rust and a Rust-only change builds no docs.
+  changes:
+    name: Changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: filter
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "$changed"
+          rust=false
+          docs=false
+          if echo "$changed" | grep -qE '^(crates/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|rustfmt\.toml$|testdata/|\.github/workflows/ci\.yml$)'; then rust=true; fi
+          if echo "$changed" | grep -qE '^(docs/|mkdocs\.yml$|requirements-docs\.txt$|overrides/|\.github/workflows/)'; then docs=true; fi
+          echo "rust=$rust" >> "$GITHUB_OUTPUT"
+          echo "docs=$docs" >> "$GITHUB_OUTPUT"
+
+  rust:
+    name: Rust (fmt, clippy, test, wasm)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      # The pure crates must build for the browser. Add each new pure crate here.
+      - run: cargo build -p af-gsn --target wasm32-unknown-unknown
+
+  # The other operating systems run on main only, so a pull request is not
+  # held up by them. A failure here is a failure of main and must be fixed.
+  rust-platforms:
+    name: Rust tests (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Windows
-            os: windows-latest
-            # NINJA, not the Visual Studio generator. `CMAKE_<LANG>_COMPILER_LAUNCHER`
-            # is silently IGNORED by the VS generator -- the first attempt at this
-            # (#378) configured sccache, started it, and compiled 0 requests
-            # through it. Ninja honours the launcher, and Multi-Config keeps
-            # `--config Debug` and `ctest -C Debug` working exactly as before.
-            #
-            # MSVC output is only cacheable with debug info EMBEDDED in the object
-            # (/Z7). CMake's Debug default is /Zi, which writes a shared .pdb the
-            # compiler mutates outside the object, so nothing can cache it.
-            # `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT` needs CMP0141, which this
-            # project's `cmake_minimum_required(3.21)` leaves OLD, so the policy
-            # default is set here rather than raising the floor for everyone.
-            #
-            # Verified locally end to end before pushing: 20/20 calls cacheable,
-            # then a wiped build directory rebuilt in 2s with 20 hits.
-            #
-            # ccache rather than #378's sccache, deliberately, despite ccache's
-            # MSVC support carrying an "experimental" label: this exact ccache
-            # configuration is the one measured working above, while sccache is
-            # the tool that was never actually exercised here. What guards
-            # against either tool going silently dead again is not the tool
-            # choice but the assertion step after Build.
-            configure: >-
-              cmake -B build -G "Ninja Multi-Config" -DAF_WARNINGS_AS_ERRORS=ON
-              -DCMAKE_POLICY_DEFAULT_CMP0141=NEW
-              -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
-              -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-            build: cmake --build build --config Debug
-            test: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
-            cache_variant: ccache
-          - name: Linux
-            os: ubuntu-latest
-            configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-            build: cmake --build build
-            test: ctest --test-dir build --output-on-failure --no-tests=error
-            cache_variant: ccache
-          - name: macOS
-            os: macos-latest
-            configure: cmake -B build -DAF_WARNINGS_AS_ERRORS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-            build: cmake --build build
-            test: ctest --test-dir build --output-on-failure --no-tests=error
-            cache_variant: ccache
-
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          submodules: recursive
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo test --workspace
 
-      # Ninja invokes cl.exe directly, so the MSVC environment has to be on PATH.
-      # The Visual Studio generator located the toolchain itself, which is the one
-      # convenience given up by moving off it.
-      - name: Set up MSVC environment (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1.13.0
-        with:
-          arch: x64
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libsecret-1-dev
-
-      # The catalog and SACM/GSN/capability matrix gates only register when CMake
-      # finds a Python interpreter. Pin one explicitly rather than relying on the
-      # runner image shipping it, so the gates cannot silently disappear.
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-
-      # Caches compiled objects across runs, including the FetchContent
-      # dependencies (curl, hello_imgui, googletest) which are pinned
-      # and rarely change — that rebuild is most of the build time. The cache is
-      # keyed per OS by the action.
-      #
-      # Windows was the critical path at ~15 min because it alone built from
-      # scratch: 11 of those minutes were compilation the other two platforms
-      # were already reusing. Note the cache is per-branch on GitHub: a pull
-      # request cannot read a cache another branch created, so the first run
-      # after this lands is still cold and the saving shows on the run after.
-      - name: Set up compiler cache
-        uses: hendrikmuhs/ccache-action@v1.2.24
-        with:
-          variant: ${{ matrix.cache_variant }}
-          key: ${{ matrix.name }}
-          max-size: 500M
-
-      - name: Configure CMake
-        run: ${{ matrix.configure }}
-
-      # Statistics live inside the cache directory and survive the cache
-      # restore, so without an explicit reset a run can inherit nonzero
-      # numbers from an earlier run and the assertion below would prove
-      # nothing about THIS build.
-      - name: Reset compiler-cache statistics
-        shell: bash
-        run: ccache --zero-stats
-
-      - name: Build
-        run: ${{ matrix.build }}
-
-      # The failure #378 shipped: a launcher the generator silently ignored, a
-      # cache that processed zero calls, and a green run -- a cache that does
-      # nothing breaks nothing. This step makes it break the build instead, on
-      # every platform, whichever cache tool is in front of the compiler.
-      - name: Assert the compiler cache saw the build
-        shell: bash
-        run: |
-          ccache --show-stats
-          total=$(ccache --print-stats | awk -F'\t' '$1=="direct_cache_hit" || $1=="preprocessed_cache_hit" || $1=="cache_miss" {sum+=$2} END {print sum+0}')
-          echo "cacheable compile calls this run: $total"
-          if [ "$total" -eq 0 ]; then
-            echo "::error::The compiler cache processed zero compile calls; the launcher is not engaged."
-            exit 1
-          fi
-
-      - name: Run tests
-        run: ${{ matrix.test }}
-
-      # The libsecret path would otherwise be COMPILED but never EXECUTED.
-      # A GitHub Linux runner has no keyring, so SecretStore's round trip
-      # skips there and the save/lookup/delete calls go untested on the one
-      # platform that needed them written (#53). macOS runs them against the
-      # real Keychain in the step above; this gives Linux the same evidence
-      # by starting a keyring rather than by lowering the bar.
-      #
-      # Deliberately its own step rather than wrapping `matrix.test`:
-      # putting all 1281 tests inside a dbus session to serve six of them
-      # changes the environment of everything else for no reason.
-      - name: Secret store against a real keyring (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get install -y gnome-keyring dbus-x11
-          # Create the login keyring ON DISK rather than letting the daemon do
-          # it. Both --unlock and --login route creation through gcr-prompter,
-          # which is a GTK application: headlessly it dies with "cannot open
-          # display", the collection is never created, and the first save fails
-          # with "Object does not exist at path
-          # /org/freedesktop/secrets/collection/login". A password-less keyring
-          # is a plain text file the daemon reads directly, so no prompter is
-          # involved at all.
-          #
-          # A keyring with no password is acceptable here and nowhere else: it
-          # is a throwaway runner keyring holding one test value for the length
-          # of one job, on a machine that is destroyed afterwards.
-          mkdir -p ~/.local/share/keyrings
-          printf '[keyring]\ndisplay-name=login\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n' > ~/.local/share/keyrings/login.keyring
-          printf 'login' > ~/.local/share/keyrings/default
-          dbus-run-session -- bash -c '
-            eval "$(printf "\n" | gnome-keyring-daemon --unlock --components=secrets)"
-            ./build/tests --gtest_filter=SecretStore.* 2>&1 | tee /tmp/secret-store.log
-            exit ${PIPESTATUS[0]}
-          '
-          # gtest exits 0 on a SKIP, so a green step would otherwise prove only
-          # that the keyring package installed. The round trip is the whole
-          # point of this step: if it skipped, the keyring did not come up and
-          # the libsecret calls are still unexecuted.
-          if ! grep -q 'OK \] SecretStore.RoundTripsThroughThePlatformStore' /tmp/secret-store.log; then
-            echo '::error::the round trip did not RUN - the keyring did not come up, so libsecret is still untested'
-            exit 1
-          fi
-
-  # The repository gates are Python scripts that read the tree. They are ALSO
-  # registered as ctest tests, which is what makes them run against the same
-  # checkout the build used — but reaching them that way costs a full configure,
-  # build and test run first. A mistyped documentation link or an over-length
-  # matrix notes cell then failed after ~15 minutes.
-  #
-  # This job runs the same scripts directly and fails in under a minute. It does
-  # NOT replace the ctest registration: that stays the authoritative run, and it
-  # is what `ctest_label_check` proves is complete. This is an early warning that
-  # happens to catch the errors most often made.
-  gates:
-    name: Repository gates (fast)
+  docs:
+    name: Docs (strict build)
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-
-      # Every gate runs even after one fails, because being told about one
-      # broken link at a time is how a five-minute fix becomes five round trips.
-      - name: Run the gates
-        shell: bash
-        run: |
-          status=0
-          run() {
-            echo "::group::$1"
-            if ! python "$@"; then
-              echo "::error::$1 failed"
-              status=1
-            fi
-            echo "::endgroup::"
-          }
-          run tools/i18n/check_catalog.py
-          run tools/sacm/check_conformance_matrix.py
-          run tools/gsn/check_conformance_matrix.py
-          run tools/features/check_feature_matrix.py
-          run tools/repo/check_no_committed_artifacts.py
-          run tools/docs/check_documentation.py
-          run tools/docs/generate_verification_index.py --check
-          run tools/sacm/generate_evidence_package.py --check
-          exit $status
-
-  # Static analysis runs as its own job rather than inside the build matrix.
-  # It needs no test run, and its result is a ratchet against a committed
-  # baseline rather than a pass/fail property of the build.
-  #
-  # Windows, because the baseline is generated there. Analysing a different
-  # platform than the baseline records would compare two different sets of
-  # #ifdef branches and report the difference as new findings.
-  #
-  # Scope differs by trigger, because a full sweep is far too slow to sit in
-  # front of every pull request. The first attempt at this job ran all 255
-  # translation units on a 4-core runner and was still going after 30 minutes,
-  # against a repository whose median CI wall clock is 12.7 minutes.
-  #
-  #   pull_request -> only the .cpp files the branch touched
-  #   push to main -> the full sweep, which is the authoritative one
-  #
-  # The gap that leaves is real and worth naming: a pull request that edits a
-  # header can add findings in .cpp files it did not touch, and those are not
-  # analysed until the full sweep runs after the merge. Catching it before the
-  # merge would mean resolving the include graph, which this does not do.
-  static-analysis:
-    name: Static analysis
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v7
-        with:
-          submodules: recursive
-          # Need the base commit to diff against on a pull request.
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-
-      # Pinned to the exact version the baseline was generated with. Using the
-      # LLVM the runner image happens to ship meant the ratchet compared one
-      # tool against another, and #317 records both ways that went wrong: a
-      # pull request failed on a finding the baseline's version does not report,
-      # and a real finding reached main because the runner's version does not
-      # implement that check the same way.
-      #
-      # Chocolatey has no package at this granularity -- that is what defeated
-      # the first attempt -- but PyPI publishes LLVM's own binaries as wheels,
-      # pinnable to the patch and identical on all three platforms.
-      #
-      # The version lives in the baseline, so there is one place to change it:
-      # regenerate the baseline with a new clang-tidy and this installs it.
-      - name: Install the clang-tidy the baseline records
-        shell: bash
-        run: |
-          pinned=$(python -c "import json;print(json.load(open('docs/quality/clang-tidy-baseline.json'))['tool_version'])")
-          echo "baseline was generated by clang-tidy $pinned"
-          python -m pip install --disable-pip-version-check "clang-tidy==$pinned"
-          # The image's own LLVM is also on PATH and may come first, so the
-          # runner is pointed at the pinned binary rather than trusting order.
-          # `get_executable` is the wheel's own resolver and knows the platform
-          # suffix, which differs across the three runners.
-          resolved=$(python -c "import clang_tidy;print(clang_tidy.get_executable('clang-tidy'))")
-          echo "CLANG_TIDY=$resolved" >> "$GITHUB_ENV"
-          "$resolved" --version
-
-      # Configure only. The analysis needs the FetchContent dependency headers
-      # under build/_deps, not compiled objects, so the build itself is skipped.
-      - name: Configure CMake
-        run: cmake -B build -A x64
-
-      - name: Check changed sources (pull request)
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          base="origin/${{ github.base_ref }}"
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" || true
-          mapfile -t changed < <(git diff --name-only --diff-filter=d "$base"...HEAD -- '*.cpp')
-          if [ ${#changed[@]} -eq 0 ]; then
-            echo "no .cpp files changed; the full sweep on main covers the rest"
-            exit 0
-          fi
-          echo "changed .cpp files:"
-          for f in "${changed[@]}"; do echo "  $f"; done
-          python tools/quality/run_clang_tidy.py --check --jobs 4 --paths "${changed[@]}"
-
-      - name: Check every source (main)
-        if: github.event_name != 'pull_request'
-        run: python tools/quality/run_clang_tidy.py --check --jobs 4
-
-      # Complexity is REPORT MODE, deliberately (#343). It measures and prints;
-      # it does not gate. `--check` exists and is tested, so turning the ratchet
-      # on later is this line gaining four characters rather than a project --
-      # but the policy says report before ratchet, and 172 functions over the
-      # threshold is a number to triage, not to freeze by accident.
-      - name: Measure complexity (report only)
-        shell: bash
-        run: |
-          pinned=$(python -c "import json;print(json.load(open('docs/quality/complexity-baseline.json'))['tool_version'])")
-          python -m pip install --disable-pip-version-check "lizard==$pinned"
-          python tools/quality/run_complexity.py --report
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+      - run: pip install -r requirements-docs.txt
+      - run: mkdocs build --strict

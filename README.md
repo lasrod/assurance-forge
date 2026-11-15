@@ -1,375 +1,57 @@
-# Assurance Forge — Safety Case Engineering Tool
+# Assurance Forge
 
-Assurance Forge is an open-source tool for safety case development, review, and navigation. It is built around the SACM (Structured Assurance Case Metamodel) standard and designed for safety engineers who need a rigorous, efficient workflow for constructing and maintaining assurance arguments.
+Assurance Forge is an open-source tool for building, reviewing and navigating
+safety cases. Engineers work in Goal Structuring Notation (GSN); the case is
+stored as standard SACM 2.3 XMI, so it is never locked into the tool.
 
-<!-- DEMO GIF: the maintainer's recorded demo goes here, above the static screenshot. -->
+## Status
 
-![Assurance Forge showing a GSN argument on the canvas, with the case explorer on the left and the element inspector on the right](docs/screenshot/dark.png)
-
-*The GSN canvas, case explorer and element inspector, showing the bundled
-[`kitchen-blender`](https://github.com/lasrod/assurance-forge-examples/tree/main/projects/kitchen-blender)
-example case.*
-
-| Light theme | Welcome screen |
-|---|---|
-| [![The same argument view in the light theme](docs/screenshot/light.png)](docs/screenshot/light.png) | [![The welcome screen, offering the example project, project creation, SACM import, recent projects and guides](docs/screenshot/welcome.png)](docs/screenshot/welcome.png) |
-
----
-
-## Status and limitations
-
-**Assurance Forge is alpha software under active development.** Read this before
-trusting it with a safety argument you care about.
+**Assurance Forge is being rebuilt in Rust, and `main` is where that happens.**
+There is nothing to run here yet.
 
 | | |
 |---|---|
-| Maturity | Alpha. Every release so far is a prerelease; the newest is on the [Releases page](https://github.com/lasrod/assurance-forge/releases). |
-| Released binaries | Windows x64 (installer and portable zip) is the primary platform. Linux x64 and macOS (Apple silicon) archives are built and tested by CI with every release but get less hands-on use, and have [further limitations](#-releases). `main` is usually ahead of the latest release — build from source for current behaviour. |
-| CI | Windows, Linux and macOS are built and tested on every change. |
+| This branch | The Rust rebuild, in its first phase. See the [plan](docs/roadmap/rust-rebuild-phase-0.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md). |
+| A tool you can use today | The C++ application: download [release 0.3.0-alpha.3](https://github.com/lasrod/assurance-forge/releases/tag/0.3.0-alpha.3), or read its source and documentation on the [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp). It is alpha software. |
 | Licence | [MIT](LICENSE.md) |
 
-### What is claimed
+## What the tool does
 
-Capability claims are recorded per feature in the
-[capability matrix](docs/features/feature-matrix.md), which distinguishes
-`supported` (available, backed by code and tests) from `prototype`,
-`in-development`, `planned` and `candidate`. A `supported` row must cite a test
-that exists; CI enforces this. If a capability is not in that matrix, treat it as
-not claimed.
+- **GSN on top of SACM.** Goals, strategies, solutions, context, assumptions and
+  justifications, with patterns, modules, assurance claim points and challenges,
+  read from and written to SACM 2.3 XMI.
+- **Checks as you work.** GSN well-formedness, circular arguments, and the
+  [Safety Case Core Guidelines](https://github.com/lasrod/safety-case-core-guidelines).
+- **Registers and terminology.** Evidence and CSE registers, and a controlled
+  vocabulary for each case.
+- **AI on your terms.** Review with your own provider key, and an MCP server so
+  your own assistant can read a case and propose changes. Nothing leaves your
+  machine without your consent, and an AI never changes the argument by itself.
+- **Local.** A desktop application that opens a file, edits it and saves it.
 
-Standards support is recorded separately:
+The [plan](docs/roadmap/rust-rebuild-phase-0.md) says which of these arrive in
+which release.
 
-- [SACM 2.3 conformance matrix](docs/sacm/sacm-conformance-matrix.md)
-- [GSN v3 conformance matrix](docs/gsn/gsn-v3-conformance-matrix.md)
+## How it is built
 
-The repository's own engineering quality is argued the way the tool argues
-safety cases: a [repository-quality assurance case](docs/quality/assurance-case.md)
-— written in SACM, challenges included — with an
-[evidence index](docs/quality/evidence-index.md) for reviewers who want the
-evidence chain without the full argument.
+- A Rust core on [libSACM](https://github.com/lasrod/libSACM), the SACM 2.3
+  library.
+- A React interface, packaged as a desktop application with Tauri.
 
-### On SACM conformance
+[`ARCHITECTURE.md`](ARCHITECTURE.md) describes the shape of the code and the
+rules it follows.
 
-Assurance Forge implements the SACM 2.3 metamodel and has extensive automated
-evidence covering the Assurance Case, Argumentation, Artifact and Terminology
-Model compliance points. **A release-bound conformance assessment is being
-finalized** ([#295](https://github.com/lasrod/assurance-forge/issues/295)), and
-the SACM UML Profile compliance point is **not claimed**.
-
-Until that assessment is published, please read "implements and tests SACM 2.3"
-rather than "is a conformant SACM 2.3 implementation".
-
-### What is not claimed
-
-- **No certification or qualification.** Assurance Forge is not certified,
-  assessed, or approved for use in any regulatory, functional-safety or
-  tool-qualification process. Nothing in this repository constitutes evidence of
-  tool qualification under ISO 26262, UL 4600, DO-330 or any comparable scheme.
-- **No safety judgement.** The tool cannot tell you whether your safety case is
-  adequate. AI-assisted review surfaces suggestions against the Safety Case Core
-  Guidelines; it does not validate an argument, and its output requires human
-  review.
-- **No guarantee against data loss.** SACM XML is treated as the source of truth
-  and preserving it is a primary design constraint, but this is alpha software.
-  Keep your assurance data in version control and keep backups.
-
-Known limitations and open questions are tracked as
-[GitHub issues](https://github.com/lasrod/assurance-forge/issues). If you find a
-case where the tool loses or reinterprets assurance content, please
-[report it](SUPPORT.md) — that is the most serious class of bug this project has.
-
----
-
-## ✨ Vision
-
-Safety cases are critical artifacts in safety-critical systems engineering, yet the tooling available today is often heavyweight, expensive, or disconnected from the engineering lifecycle. Assurance Forge aims to change that.
-
-The vision is to make safety cases **easier to develop, review, and navigate** — and to connect them to the broader engineering context through open standards.
-
-### What Assurance Forge delivers today
-
-- **Automatic layout** — Assurance arguments are visualized automatically. Engineers focus on content, not diagram maintenance. No manual positioning of nodes.
-- **GSN visualization** — Safety arguments are rendered using Goal Structuring Notation (GSN), including pattern, dialectic and assurance-claim-point notation, and exported to SVG.
-- **Manual and AI-assisted reviews** — Integrated AI assistance evaluates arguments against the Safety Case Core Guidelines (SCCG), helping teams identify weaknesses and improve argument quality. Mechanical SCCG checks run without any AI at all.
-- **SACM-first** — The tool consumes and produces SACM 2.3 XML through an independent, reusable SACM library, and an edit the standard cannot express is refused rather than approximated. See [Status and limitations](#status-and-limitations) for what is and is not claimed about conformance.
-- **Audited by construction** — Every edit is a replayable transaction, with undo boundaries, baselines, snapshots, and a timeline that reconstructs the argument as it stood.
-- **Evidence and CSE registers** — Derived views over the SACM document, with their columns and assessments stored in that document rather than a sidecar.
-- **Two languages, reviewed** — Arguments carry a second language end to end; machine-translated text is held for an explicit reviewer acceptance.
-- **Your own AI client, over MCP** — An MCP client you run yourself can read the case and propose changes, behind an explicit consent gate. Proposals land in a working draft a human accepts; nothing is applied behind your back.
-- **Fully open source** — MIT licensed with no vendor lock-in for AI providers.
-
-New to the application? The [user guide](docs/user-guide/index.md) walks through
-opening a project, navigating and editing the argument, reviewing it, and
-connecting an AI client.
-
-### Future direction
-
-Assurance Forge is designed to grow alongside the evolving safety engineering landscape. Planned integrations include:
-
-- **RAAML** — Hazard and risk model integration to connect hazard analysis directly to safety arguments
-- **ReqIF** — Requirements interchange for traceability between requirements and assurance claims
-- **OSLC RM/QM** — Live lifecycle links to requirements management and quality management tools, and SPI (Safety Performance Indicators) support
-- **GSN extensions** — completing what is partially delivered: defeat semantics and in-doubt state on top of the existing challenge structures, pattern authoring and a pattern catalogue on top of the existing pattern notation, and the Modular Extension (contracts and away elements), which has not started
-- **CAE** — Claim Argument Evidence notation
-- **Safety Case Report** — Produce your own safety case report as LaTeX and PDF
-- **Standard Conformance** — Conduct conformance assessment for UL 4600, ISO 26262 or other standards
-- **J3377 Assessment process** — Conduct assessment in accordance with J3377 or ASCV CSE.
-- And much more, driven by community needs and safety engineering standards
-
-Feel free to drop an idea in the [Discussion forum](https://github.com/lasrod/assurance-forge/discussions/categories/ideas) if there is anything you would like to see in the tool.
-
----
-
-## Example Projects
-
-Versioned demonstration and manual-test projects live in the
-[`assurance-forge-examples`](https://github.com/lasrod/assurance-forge-examples)
-repository, pinned here as the `examples` submodule.
-
-Initialize the submodule, then open any `examples/projects/<name>/af.proj` file
-from **File → Open Project**:
+## Building
 
 ```bash
-git submodule update --init examples
-```
-
-Each example documents its intended behavior and test procedure.
-
----
-
-## 📦 Releases
-
-Pre-built binaries are published on the [Releases page](https://github.com/lasrod/assurance-forge/releases).
-Every release is built and its test suite run on Windows, Linux and macOS, and
-nothing is published unless all three pass. Windows is the primary platform: it
-has an installer, and its packages are checked before publishing. The Linux and
-macOS archives are less exercised by hand.
-
-### Windows x64
-
-**Installer (recommended).** Download `assurance-forge.<version>-windows-x64-setup.exe`
-and run it. It installs for your user account only, so it needs no administrator
-rights, adds Assurance Forge to the Start menu, and upgrades an earlier version in
-place. It runs in English or Japanese and follows Windows' light or dark mode.
-The sample cases and the MCP server are optional, and if Claude Code or Codex is
-installed it offers to register Assurance Forge's MCP server with it (nothing is
-shared until you switch MCP on in Preferences and allow the client).
-Uninstall from *Settings → Apps*; it asks whether to keep your settings and saved
-API key, and keeps them unless you choose otherwise.
-
-**Portable zip.** Download `assurance-forge.<version>-windows-x64.zip`, unzip it
-anywhere, and run `assurance-forge.exe` from the extracted folder.
-
-Both contain the application, the `assurance-forge-mcp` server for
-[connecting an AI client](docs/user-guide/connect-an-ai-client.md), the SCCG
-guideline catalogue, the sample files in `data/`, and the Visual C++ runtime, so
-nothing else needs installing.
-
-> **The downloads are not code-signed yet.** Windows SmartScreen will say
-> *"Windows protected your PC"*. Choose **More info → Run anyway**. The same
-> warning appears for the zip's executable.
-
-### Linux x64 and macOS (Apple silicon)
-
-- **Linux:** `assurance-forge.<version>-linux-x64.tar.gz`. Extract it and run
-  `./assurance-forge` from the extracted folder. The binary is built on GitHub's
-  current Ubuntu runner and links the system GTK 3, OpenGL, OpenSSL 3 and
-  libsecret libraries (on Debian and Ubuntu, `libsecret-1-0`), so an older or
-  minimal distribution may not have what it needs; build from source if it does
-  not start.
-- **macOS:** `assurance-forge.<version>-macos-arm64.zip`, for Apple silicon Macs.
-  Unzip it and open `assurance-forge.app`.
-
-Both archives hold the application, the `assurance-forge-mcp` server for
-[connecting an AI client](docs/user-guide/connect-an-ai-client.md), the SCCG
-guideline catalogue and the example project. On Linux the built-in AI review
-keeps its API key in the desktop keyring through libsecret, so it needs a
-running Secret Service (GNOME Keyring, KWallet). Releases up to `0.3.0-alpha.2`
-shipped neither the MCP server nor keyring support in these archives.
-
-> **macOS: first open.** The app is not signed or notarized, so Gatekeeper
-> blocks it the first time. Try to open it once, then go to
-> **System Settings → Privacy & Security** and choose **Open Anyway** next to the
-> message about Assurance Forge. On older macOS versions, right-click the app and
-> choose **Open** instead. There is no need to turn Gatekeeper off.
-
-To build on any platform, see [Build Instructions](#build-instructions) below.
-
----
-## Requirements
-
-- Windows 10/11, Linux, or macOS
-- [CMake](https://cmake.org/) 3.21 or newer
-- A C++23 compiler, such as Visual Studio 2022 (17.8+), GCC 14+, or Clang 17+
-- [Git](https://git-scm.com/download/win)
-
-The application uses `hello_imgui` with GLFW/OpenGL as its UI backend and Native File Dialog Extended for OS-native file and folder pickers.
-
-## Build Instructions
-
-### 1. Prepare a C++ Build Environment
-
-On Windows, launch "Developer Command Prompt for VS 2022" from the Start menu.
-
-Or in cmd:
-
-```cmd
-"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-```
-
-On Linux or macOS, use a shell where CMake and your C++ compiler are available on `PATH`.
-
-### 2. Clone and Initialize Submodules
-
-```bash
-git clone https://github.com/lasrod/assurance-forge.git
+git clone --recurse-submodules https://github.com/lasrod/assurance-forge.git
 cd assurance-forge
-git submodule update --init --recursive
+cargo test --workspace
 ```
 
-### 3. Configure and Build
+Rust stable is required; `rust-toolchain.toml` selects it.
 
-**Windows** (Visual Studio):
+## Contributing
 
-```bash
-cmake --preset default
-cmake --build --preset release
-```
-
-**Linux** (install dependencies first):
-
-```bash
-sudo apt-get install xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libsecret-1-dev
-cmake -B build -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
-**macOS**:
-
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
-### 4. Run the Application
-
-**Windows**:
-
-```bash
-build\Release\assurance-forge.exe
-```
-
-**Linux**:
-
-```bash
-./build/assurance-forge
-```
-
-**macOS**:
-
-```bash
-open build/assurance-forge.app
-```
-
-### 5. Run Tests
-
-**Windows**:
-
-```bash
-ctest --preset release
-```
-
-**Linux / macOS**:
-
-```bash
-ctest --test-dir build --output-on-failure
-```
-
-Or run the test executable directly:
-
-**Windows**:
-
-```bash
-build\Release\tests.exe
-```
-
-**Linux / macOS**:
-
-```bash
-./build/tests
-```
-
-### 6. Code Coverage (Linux)
-
-A dedicated GitHub Actions workflow (`.github/workflows/coverage.yml`)
-generates HTML coverage reports for the Linux build using `gcovr` and
-GCC 14. To produce the same reports locally, configure with
-`-DENABLE_COVERAGE=ON` and use a GCC 14 toolchain. See
-[docs/COVERAGE.md](docs/COVERAGE.md) for the full procedure and the
-rationale behind the gcovr flags and the two report views.
-
-## Usage
-
-1. Launch the application. It opens on the welcome screen.
-2. Choose **Open the Example Project** to look around a complete safety case
-   first: it copies the bundled kitchen-blender case to *Assurance Forge Examples*
-   in your Documents folder and opens that copy. Choose **Open Project** to open
-   an existing `af.proj`, or
-   **Create Project from Existing SACM** to start a project from a SACM file
-   (the file is copied into the project; the original is not touched).
-3. The argument opens on the GSN canvas, with the case explorer on the left and
-   the element inspector on the right.
-
-The [user guide](docs/user-guide/index.md) covers each step, starting with
-[opening a project](docs/user-guide/open-a-project.md).
-
-## Sample Data
-
-A minimal sample file is included at `data/sample.sacm.xml`; use
-**Create Project from Existing SACM** to open it.
-
-For a more comprehensive example, download the Open Autonomy Safety Case:
-https://github.com/EdgeCaseResearch/oasc
-
-## Troubleshooting
-
-**"The CXX compiler identification is unknown"**
-- Run from Developer Command Prompt for VS 2022, not regular PowerShell/cmd
-
-**Build fails on Linux with missing OpenGL or X11 headers**
-- Install the OpenGL/X11 development packages shown in the Linux build example
-
-**Application starts but window is blank**
-- Ensure your GPU and drivers support OpenGL
-
-**Tests fail to build**
-- GoogleTest is fetched automatically; ensure internet connection during first build
-
-## Dependencies
-
-- [hello_imgui](https://github.com/pthom/hello_imgui) - Cross-platform Dear ImGui application runner (MIT License)
-- [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI, supplied by hello_imgui (MIT License)
-- [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended) - Native file and folder dialogs (Zlib License)
-- [PicoSHA2](https://github.com/okdshin/PicoSHA2) - Header-only SHA-256 implementation (MIT License)
-- [pugixml](https://github.com/zeux/pugixml) - XML parser (MIT License)
-- [GoogleTest](https://github.com/google/googletest) - Testing framework, fetched via CMake (BSD-3-Clause)
-- [Noto Sans JP](https://github.com/notofonts/noto-cjk) - Bundled font for Latin and Japanese rendering (SIL Open Font License 1.1)
-
-
-## Project documentation and governance
-
-| | |
-|---|---|
-| Documentation site | <https://lasrod.github.io/assurance-forge/> |
-| What the tool can do | [Capability matrix](docs/features/feature-matrix.md) |
-| Standards support | [SACM 2.3](docs/sacm/sacm-conformance-matrix.md) · [GSN v3](docs/gsn/gsn-v3-conformance-matrix.md) · [SACM–GSN mapping](docs/sacm/sacm-gsn-mapping.md) |
-| Architecture and decisions | [Architecture](docs/architecture/index.md) · [ADRs](docs/architecture/decisions/index.md) |
-| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Getting help | [SUPPORT.md](SUPPORT.md) |
-| Reporting a vulnerability | [SECURITY.md](SECURITY.md) |
-| Community expectations | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
-| Releases and release notes | [Releasing](docs/RELEASING.md) · [Releases page](https://github.com/lasrod/assurance-forge/releases) |
-| Roadmap | [Product roadmap](docs/roadmap/public.md) |
-
-## Copyright and license
-Code and documentation copyright 2026 Jesper Brännström. Code released under the [MIT License](LICENSE.md)
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports go through
+[SECURITY.md](SECURITY.md); questions through [SUPPORT.md](SUPPORT.md).

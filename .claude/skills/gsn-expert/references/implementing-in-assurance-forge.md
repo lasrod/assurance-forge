@@ -1,111 +1,66 @@
-# Implementing GSN features in Assurance Forge
+# Implementing GSN in Assurance Forge
 
-Where GSN actually lives, and the seams a change has to pass through. Paths are
-current as of this file's writing — verify before relying on one.
+Assurance Forge is being rebuilt in Rust. `ARCHITECTURE.md` at the repository
+root is the description of the code; this page says where GSN work goes in it.
 
-## The two renderers
+## Where GSN lives
 
-This is the fact that most often causes an incomplete GSN feature.
+| Concern | Crate |
+|---|---|
+| GSN view of a SACM document, GSN commands, identifiers, well-formedness checks | `af-gsn` |
+| Layout, the positioned render model and SVG export | `af-layout` |
+| The problem list that reports well-formedness and quality findings | `af-problems` |
+| SCCG guideline catalogue and checks | `af-sccg` |
 
-| | Interactive canvas | SVG export |
-|---|---|---|
-| Model | `ui::gsn::CanvasElement` / `LayoutNode` (`src/ui/gsn/gsn_model.h`) | `export_gsn::GsnNode` / `GsnEdge` (`src/export/gsn_diagram.h`) |
-| Node vocabulary | `ElementRole` — 9 roles | `GsnNodeKind` — 6 kinds |
-| Edge vocabulary | SupportedBy, InContextOf, Challenges | `GsnEdgeKind` — SupportedBy, InContextOf, Challenges |
-| Decorators | undeveloped, ACP | undeveloped, ACP |
-| Layout | `src/ui/gsn/gsn_layout.cpp`, `src/core/gsn_layout.cpp` | `src/export/gsn_svg_layout.cpp` (reuses `core::LayoutGsnGraph`) |
-| Drawing | `src/ui/gsn/gsn_shapes.cpp`, `gsn_canvas_renderer.cpp`, `gsn_edge_renderer.cpp` | `src/export/gsn_svg_exporter.cpp`, `svg_writer.cpp` |
+Most crates are planned and not yet built. Check the "Built" column in
+`ARCHITECTURE.md` before assuming one exists.
 
-They share no drawing code. Anything added to one is absent from the other until
-added separately, and the failure is silent — the export simply omits it.
+## Rules for GSN code
 
-This has already cost the project once (AF-ENG-015): the SVG projection ignored
-`is_counter`, so a challenge relationship was exported as an ordinary
-`SupportedBy` edge and **counter-evidence was drawn as support for the claim it
-attacks**. Note the shape of that bug — it was not a missing feature but a wrong
-one, and nothing in the diagram looked broken.
+- **There is no GSN model.** The SACM document (libSACM's `Document`) is the
+  only model. A GSN view is derived from it by a pure function and never written
+  back. Do not add a struct that holds editable GSN state.
+- **A GSN edit is a recipe of SACM operations.** "Add a Strategy under this
+  Goal" expands into libSACM operations and is applied all or not at all. The
+  recipe is where a mapping decision becomes code, so it must match a row in
+  `docs/standards/sacm-gsn-mapping.md`.
+- **Only offer what the library accepts.** The interface asks the core what is
+  allowed at a selection. A GSN construct with no SACM representation is refused
+  with a code, not approximated.
+- **One geometry for canvas and export.** Layout produces positioned shapes that
+  both the canvas and the SVG export draw. A decorator is added once, in
+  `af-layout`. The C++ application had two renderers, and a decorator added to
+  one was silently missing from the other; do not reintroduce a second.
+- **Codes, not sentences.** A finding is a code with arguments. The frontend
+  produces the text and translates it.
+- **`af-gsn` does no I/O** and must build for `wasm32-unknown-unknown`.
 
-**When adding anything visible, decide explicitly whether it goes in both — and
-if not, say so in the matrix row rather than leaving it implied.**
+## The C++ application as a reference
 
-## Adding a GSN element kind
+The `cpp` branch holds a working implementation of the current GSN feature set.
+Use it to learn how a case behaved, and read its tests for edge cases. Do not
+port it line by line: its flat parser model and its projections are what the
+rebuild removes.
 
-Follow the layering rule: `core`/`parser`/`sacm` never include ImGui or `app`
-headers, and `ui` never depends on `app`.
+Useful places on that branch:
 
-1. **Library** — `libs/sacm/src/io/name_tables.cpp` maps GSN `xsi:type` names to
-   SACM classes on import. All three GSN namespaces are accepted; watch the
-   inverted version numbering (`scsc.acwg.gsn/2.0` is *current*).
-2. **Mapping decision** — add a row to `docs/sacm/sacm-gsn-mapping.md` with its
-   evidence class (`[M]`/`[N]`/`[G]`). No code before the row.
-3. **Model** — `src/core/sacm_model.h` (`SacmElement.type` is a lowercased
-   local-name string).
-4. **Creation** — `src/core/element_factory.cpp`.
-5. **Tree and editing** — `src/core/assurance_tree.cpp`, `src/core/tree_editing.cpp`.
-6. **Canvas role** — `ElementRole` in `src/ui/gsn/gsn_model.h`, mapped in
-   `MapType()` in `src/ui/gsn/gsn_adapter.cpp`. `ElementRole` is switched on in
-   `gsn_layout.cpp` and `gsn_canvas_renderer.cpp` — both need a case.
-7. **Shape** — `src/ui/gsn/gsn_shapes.cpp`. Colors come from `ui::GetTheme()` or
-   a semantic helper, never a local `ImVec4`.
-8. **Export** — `GsnNodeKind` in `src/export/gsn_diagram.h`, plus
-   `gsn_projection.cpp`, `gsn_svg_layout.cpp`, `gsn_svg_exporter.cpp`.
-9. **Strings** — every user-visible literal through `AF_TR(...)`, then
-   `python tools/i18n/regenerate_ja_po.py`.
-10. **Tests** — parsing, serialization, model mutation and layout changes all
-    require them (`tests/test_element_factory.cpp`, `test_layout.cpp`,
-    `test_tree_editing.cpp`, `test_gsn_svg_exporter.cpp`).
-11. **Matrices** — a row in `docs/features/feature-matrix.md`, and a row in
-    `docs/sacm/sacm-conformance-matrix.md` if a SACM obligation is involved.
-    Then `python tools/features/export_feature_matrix.py` and run both checkers.
+| There | What to learn from it |
+|---|---|
+| `src/core/element_factory.cpp` | Identifier generation and what each GSN element creates in SACM |
+| `src/core/problems/gsn_wellformedness.cpp` | The well-formedness rules as implemented, with requirement IDs |
+| `src/core/problems/argument_cycles.cpp` | Circular-argument detection |
+| `src/ui/gsn/` | Shapes, decorators and layout as drawn |
+| `libs/sacm/tests/data/` | SACM fixtures, including GSN-profiled files |
 
-## Adding a decorator
+The capability and GSN conformance matrices of that version are kept under
+`docs/reference/`.
 
-Decorators are usually cheaper: a flag on the element, a badge at draw time.
+## Before you finish a GSN change
 
-- Flag on `core::SacmElement` (`undeveloped` is the existing example) or, for
-  GSN attributes SACM has no feature for, a reserved TaggedValue — the pattern
-  already used for `sacm.import.name`.
-- Carry it through `CanvasElement` → `LayoutNode` in `gsn_adapter.cpp`; layout
-  may need to reserve space.
-- Draw in `src/ui/gsn/gsn_badges.cpp` or `gsn_shapes.cpp`.
-- **And in `src/export/`**, or record the gap.
-
-## Adding a relationship kind
-
-The dialectic Challenge edge is the worked example — read it before designing a
-new one. `LayoutNode` carries `is_counter_source`, `challenge_target_id`,
-`challenge_target_is_relationship`, `challenge_relationship_id` and
-`challenge_anchor_id`, because a challenge can target a *relationship* as well as
-an element and can itself be challenged. Rendering is in
-`src/ui/gsn/gsn_edge_renderer.cpp`; the layout reserves a side stack and uses
-`child_edge_drop` to clear it.
-
-Be explicit about direction. GSN relationships run conclusion→premise and the
-SACM equivalents run the other way; the reader swaps on import.
-
-## Where the argument-quality path lives
-
-- Problems: `src/core/problems/` → `src/ui/panels/problems_panel.cpp`.
-- Guidelines: `src/parser/sccg_dist_parser.cpp` reads `sccg.full.json` from
-  the `external/safety-case-core-guidelines` submodule, copied to
-  `data/sccg/dist/` at build time.
-- AI review: `src/ai/ai_claim_review.cpp`; proposals and patches in
-  `src/core/reviews/`.
-
-Prefer a new SCCG guideline over a hardcoded check — it is data, it is
-translatable, and it is reviewable by the safety community rather than only by
-the compiler.
-
-## Things that will bite you
-
-- **`ElementRole::Other` is a silent fallback.** `MapType()` returns it for any
-  unmapped type string, so a new element kind renders as a nondescript box with
-  no error. Add the mapping and a test in the same change.
-- **Layout is deterministic and tested.** `tests/test_layout.cpp` will fail on
-  incidental geometry changes; that is the point (`docs/sacm/sacm-layout-policy.md`).
-- **Layout metadata must never reach strict SACM output.** Enforced by
-  `cmake/check_layer_gates.cmake` at configure time.
-- **Save comes from the library model**, not the projection. Adding a field the
-  projection carries but the library does not means it is lost on save — and
-  `tests/test_projection_coverage.cpp` / SACM23-LIB-002 exist because of exactly
-  this class of bug.
+- Does the change make or alter a mapping decision? Then
+  `docs/standards/sacm-gsn-mapping.md` needs a row with its evidence.
+- Does it meet a limit of the standards? Record it in
+  `docs/standards/sacm-gsn-metamodel-gaps.md`.
+- Is there a test that reads a file, applies the change, writes it and reads it
+  back with the same meaning?
+- Is `ARCHITECTURE.md` still accurate?
