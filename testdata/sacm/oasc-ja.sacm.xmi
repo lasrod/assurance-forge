@@ -1,0 +1,3205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="OASC">
+  <name lang="en" content="Open Autonomy Safety Case" />
+  <description xmi:id="generated_2">
+    <content>
+      <value lang="en" content="A safety case template for autonomous vehicle deployment based on Positive Trust Balance" />
+      <value lang="ja" content="ポジティブ・トラスト・バランスに基づく自動運転車導入のためのセーフティケーステンプレート" />
+    </content>
+  </description>
+  <taggedValue xmi:id="generated_1">
+    <key>
+      <value content="sacm.import.name" />
+    </key>
+    <content>
+      <value lang="ja" content="オープン自律安全ケース" />
+    </content>
+  </taggedValue>
+  <argumentPackage xmi:id="ARG_Main">
+    <name lang="en" content="Open Autonomy Safety Case - Main Argument" />
+    <taggedValue xmi:id="generated_57">
+      <key>
+        <value content="sacm.import.name" />
+      </key>
+      <content>
+        <value lang="ja" content="オープン自律安全ケース - 主要論証" />
+      </content>
+    </taggedValue>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1">
+      <name lang="en" content="Goal 1" />
+      <description xmi:id="generated_60">
+        <content>
+          <value lang="en" content="The autonomous vehicle is safe enough to deploy." />
+          <value lang="ja" content="自動運転車は導入するのに十分安全である。" />
+        </content>
+      </description>
+      <description xmi:id="generated_59">
+        <content>
+          <value lang="en" content="Top-level safety claim for the autonomous vehicle deployment" />
+          <value lang="ja" content="自動運転車の導入に関する最上位の安全主張" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_58">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標1" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3">
+      <name lang="en" content="Goal 3" />
+      <description xmi:id="generated_63">
+        <content>
+          <value lang="en" content="The organization is trustworthy." />
+          <value lang="ja" content="組織は信頼に値する。" />
+        </content>
+      </description>
+      <description xmi:id="generated_62">
+        <content>
+          <value lang="en" content="Organizational trustworthiness claim - &quot;Live It Right&quot;" />
+          <value lang="ja" content="組織の信頼性に関する主張 - 「正しく実践する」" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_61">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標3" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G4">
+      <name lang="en" content="Goal 4" />
+      <description xmi:id="generated_66">
+        <content>
+          <value lang="en" content="The vehicle is safe to operate." />
+          <value lang="ja" content="車両は安全に運用できる。" />
+        </content>
+      </description>
+      <description xmi:id="generated_65">
+        <content>
+          <value lang="en" content="Vehicle safety claim - &quot;Build It Right&quot;" />
+          <value lang="ja" content="車両安全に関する主張 - 「正しく構築する」" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_64">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標4" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G5">
+      <name lang="en" content="Goal 5" />
+      <description xmi:id="generated_69">
+        <content>
+          <value lang="en" content="We operate the vehicle safely." />
+          <value lang="ja" content="私たちは車両を安全に運用している。" />
+        </content>
+      </description>
+      <description xmi:id="generated_68">
+        <content>
+          <value lang="en" content="Operational safety claim - &quot;Operate It Right&quot;" />
+          <value lang="ja" content="運用安全に関する主張 - 「正しく運用する」" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_67">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標5" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S2">
+      <name lang="en" content="Strategy 2" />
+      <description xmi:id="generated_72">
+        <content>
+          <value lang="en" content="Appeal to Positive Trust Balance." />
+          <value lang="ja" content="ポジティブ・トラスト・バランスへの訴え。" />
+        </content>
+      </description>
+      <description xmi:id="generated_71">
+        <content>
+          <value lang="en" content="The argument strategy based on achieving a positive trust balance through organizational trustworthiness, vehicle safety, and safe operations" />
+          <value lang="ja" content="組織の信頼性、車両の安全性、および安全な運用を通じてポジティブ・トラスト・バランスを達成することに基づく論証戦略" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_70">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略2" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_VehicleOps" referencedArtifactElement="ART_VehicleDescription">
+      <name lang="en" content="Vehicle Operations Context" />
+      <description xmi:id="generated_74">
+        <content>
+          <value lang="en" content="Description of vehicle, operations, and stakeholder requirements" />
+          <value lang="ja" content="車両、運用、およびステークホルダー要求事項の説明" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_73">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="車両運用の文脈" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_TopLevel" reasoning="S2" source="G3 G4 G5" target="G1">
+      <name lang="en" content="Top-Level Inference" />
+      <description xmi:id="generated_76">
+        <content>
+          <value lang="en" content="The top-level claim is supported by organizational trustworthiness, vehicle safety, and operational safety through positive trust balance" />
+          <value lang="ja" content="最上位の主張は、ポジティブ・トラスト・バランスを通じて、組織の信頼性、車両の安全性、および運用安全によって支持される" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_75">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="最上位推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_TopLevel" source="CTX_VehicleOps" target="S2">
+      <name lang="en" content="Top-Level Context" />
+      <description xmi:id="generated_78">
+        <content>
+          <value lang="en" content="Vehicle and operations context informs the positive trust balance strategy" />
+          <value lang="ja" content="車両および運用の文脈はポジティブ・トラスト・バランス戦略に情報を与える" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_77">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="最上位の文脈" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ARG_OrgTrust">
+    <name lang="en" content="Organization Trustworthiness" />
+    <taggedValue xmi:id="generated_79">
+      <key>
+        <value content="sacm.import.name" />
+      </key>
+      <content>
+        <value lang="ja" content="組織の信頼性" />
+      </content>
+    </taggedValue>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G8">
+      <name lang="en" content="Goal 8" />
+      <description xmi:id="generated_82">
+        <content>
+          <value content="We regularly share results of independent safety assessments with stakeholders." />
+        </content>
+      </description>
+      <description xmi:id="generated_81">
+        <content>
+          <value lang="en" content="Transparency through sharing assessment results" />
+          <value lang="ja" content="評価結果の共有による透明性" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_80">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標8" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G9">
+      <name lang="en" content="Goal 9" />
+      <description xmi:id="generated_85">
+        <content>
+          <value content="Assessor independence satisfies requirements of UL 4600." />
+        </content>
+      </description>
+      <description xmi:id="generated_84">
+        <content>
+          <value lang="en" content="Independent assessor qualification per UL 4600" />
+          <value lang="ja" content="UL 4600に基づく独立評価者の資格" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_83">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標9" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G10">
+      <name lang="en" content="Goal 10" />
+      <description xmi:id="generated_88">
+        <content>
+          <value content="SMS safety policies are aligned with stakeholder requirements." />
+        </content>
+      </description>
+      <description xmi:id="generated_87">
+        <content>
+          <value lang="en" content="Safety Management System policies meet stakeholder needs" />
+          <value lang="ja" content="安全マネジメントシステムの方針はステークホルダーのニーズを満たす" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_86">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標10" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G11">
+      <name lang="en" content="Goal 11" />
+      <description xmi:id="generated_91">
+        <content>
+          <value content="SMS processes are in use." />
+        </content>
+      </description>
+      <description xmi:id="generated_90">
+        <content>
+          <value lang="en" content="Safety Management System processes are actively implemented" />
+          <value lang="ja" content="安全マネジメントシステムのプロセスが積極的に実施されている" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_89">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標11" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G12">
+      <name lang="en" content="Goal 12" />
+      <description xmi:id="generated_94">
+        <content>
+          <value content="Our safety case is monitored &amp; improved." />
+        </content>
+      </description>
+      <description xmi:id="generated_93">
+        <content>
+          <value lang="en" content="Continuous monitoring and improvement of the safety case" />
+          <value lang="ja" content="セーフティケースの継続的な監視と改善" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_92">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標12" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G21">
+      <name lang="en" content="Goal 21" />
+      <description xmi:id="generated_97">
+        <content>
+          <value content="SRCs are approved by our safety advisory board." />
+        </content>
+      </description>
+      <description xmi:id="generated_96">
+        <content>
+          <value lang="en" content="Safety-related claims approved by safety advisory board" />
+          <value lang="ja" content="安全関連主張は安全諮問委員会により承認されている" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_95">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標21" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G22">
+      <name lang="en" content="Goal 22" />
+      <description xmi:id="generated_100">
+        <content>
+          <value content="Our SRCs satisfy regulations in our operational area." />
+        </content>
+      </description>
+      <description xmi:id="generated_99">
+        <content>
+          <value lang="en" content="Safety-related claims satisfy applicable regulations" />
+          <value lang="ja" content="安全関連主張は適用される規制を満たす" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_98">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標22" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G23">
+      <name lang="en" content="Goal 23" />
+      <description xmi:id="generated_103">
+        <content>
+          <value content="Our SRCs satisfy report guidelines." />
+        </content>
+      </description>
+      <description xmi:id="generated_102">
+        <content>
+          <value lang="en" content="Safety-related claims satisfy German Ethics Commission guidelines" />
+          <value lang="ja" content="安全関連主張はドイツ倫理委員会指針を満たす" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_101">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標23" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G24">
+      <name lang="en" content="Goal 24" />
+      <description xmi:id="generated_106">
+        <content>
+          <value content="Our SMS conforms with 14 CFR part 5." />
+        </content>
+      </description>
+      <description xmi:id="generated_105">
+        <content>
+          <value lang="en" content="Safety Management System conformance with aviation SMS standards" />
+          <value lang="ja" content="航空SMS規格への安全マネジメントシステムの適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_104">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標24" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G25">
+      <name lang="en" content="Goal 25" />
+      <description xmi:id="generated_109">
+        <content>
+          <value content="Our safety case is continuously improved in conformance with relevant sections of UL 4600." />
+        </content>
+      </description>
+      <description xmi:id="generated_108">
+        <content>
+          <value lang="en" content="Continuous improvement per UL 4600 requirements" />
+          <value lang="ja" content="UL 4600要求事項に基づく継続的改善" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_107">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標25" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G26">
+      <name lang="en" content="Goal 26" />
+      <description xmi:id="generated_112">
+        <content>
+          <value content="Our organization conforms with IATF 16949." />
+        </content>
+      </description>
+      <description xmi:id="generated_111">
+        <content>
+          <value lang="en" content="Automotive quality management system conformance" />
+          <value lang="ja" content="自動車品質マネジメントシステムへの適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_110">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標26" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S6">
+      <name lang="en" content="Strategy 6" />
+      <description xmi:id="generated_115">
+        <content>
+          <value content="Transparency enables trust." />
+        </content>
+      </description>
+      <description xmi:id="generated_114">
+        <content>
+          <value lang="en" content="Argument that transparency through sharing assessments builds stakeholder trust" />
+          <value lang="ja" content="評価結果の共有による透明性がステークホルダーの信頼を構築するという論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_113">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略6" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S7">
+      <name lang="en" content="Strategy 7" />
+      <description xmi:id="generated_118">
+        <content>
+          <value content="An SMS is a best practice for managing system safety." />
+        </content>
+      </description>
+      <description xmi:id="generated_117">
+        <content>
+          <value lang="en" content="Argument that a Safety Management System represents best practice" />
+          <value lang="ja" content="安全マネジメントシステムがベストプラクティスであるという論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_116">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略7" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S16">
+      <name lang="en" content="Strategy 16" />
+      <description xmi:id="generated_121">
+        <content>
+          <value content="Appeal to relevant regulation." />
+        </content>
+      </description>
+      <description xmi:id="generated_120">
+        <content>
+          <value lang="en" content="Argument based on regulatory compliance" />
+          <value lang="ja" content="規制適合に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_119">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略16" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S17">
+      <name lang="en" content="Strategy 17" />
+      <description xmi:id="generated_124">
+        <content>
+          <value content="Appeal to German Ethics Commission report." />
+        </content>
+      </description>
+      <description xmi:id="generated_123">
+        <content>
+          <value lang="en" content="Argument based on ethical guidelines for automated driving" />
+          <value lang="ja" content="自動運転に関する倫理指針に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_122">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略17" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S18">
+      <name lang="en" content="Strategy 18" />
+      <description xmi:id="generated_127">
+        <content>
+          <value content="Appeal to 14 CFR part 5." />
+        </content>
+      </description>
+      <description xmi:id="generated_126">
+        <content>
+          <value lang="en" content="Argument based on aviation safety management standards" />
+          <value lang="ja" content="航空安全マネジメント規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_125">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略18" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S19">
+      <name lang="en" content="Strategy 19" />
+      <description xmi:id="generated_130">
+        <content>
+          <value content="Appeal to UL 4600." />
+        </content>
+      </description>
+      <description xmi:id="generated_129">
+        <content>
+          <value lang="en" content="Argument based on autonomous products evaluation standard" />
+          <value lang="ja" content="自律製品評価規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_128">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略19" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S20">
+      <name lang="en" content="Strategy 20" />
+      <description xmi:id="generated_133">
+        <content>
+          <value content="Appeal to IATF 16949." />
+        </content>
+      </description>
+      <description xmi:id="generated_132">
+        <content>
+          <value lang="en" content="Argument based on automotive quality management standard" />
+          <value lang="ja" content="自動車品質マネジメント規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_131">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略20" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_15" referencedArtifactElement="ART_SafetyAdvisoryBoard">
+      <name lang="en" content="Context 15" />
+      <description xmi:id="generated_135">
+        <content>
+          <value lang="en" content="Our safety advisory board includes a full set of stakeholder responsibilities" />
+          <value lang="ja" content="当社の安全諮問委員会はステークホルダーの責任一式を含んでいる" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_134">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="文脈15" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_13" referencedArtifactElement="ART_Assessment_13">
+      <name lang="en" content="Evidence 13" />
+      <description xmi:id="generated_137">
+        <content>
+          <value lang="en" content="Results of independent assessment - Transparency" />
+          <value lang="ja" content="独立評価結果 - 透明性" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_136">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠13" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_14" referencedArtifactElement="ART_Assessment_14">
+      <name lang="en" content="Evidence 14" />
+      <description xmi:id="generated_139">
+        <content>
+          <value lang="en" content="Results of independent assessment - Assessor independence" />
+          <value lang="ja" content="独立評価結果 - 評価者の独立性" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_138">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠14" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_27" referencedArtifactElement="ART_Assessment_27">
+      <name lang="en" content="Evidence 27" />
+      <description xmi:id="generated_141">
+        <content>
+          <value lang="en" content="Results of independent assessment - Safety advisory board" />
+          <value lang="ja" content="独立評価結果 - 安全諮問委員会" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_140">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠27" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_28" referencedArtifactElement="ART_Assessment_28">
+      <name lang="en" content="Evidence 28" />
+      <description xmi:id="generated_143">
+        <content>
+          <value lang="en" content="Results of independent assessment - Regulatory compliance" />
+          <value lang="ja" content="独立評価結果 - 規制適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_142">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠28" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_29" referencedArtifactElement="ART_Assessment_29">
+      <name lang="en" content="Evidence 29" />
+      <description xmi:id="generated_145">
+        <content>
+          <value lang="en" content="Results of independent assessment - Ethics guidelines" />
+          <value lang="ja" content="独立評価結果 - 倫理指針" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_144">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠29" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_30" referencedArtifactElement="ART_Assessment_30">
+      <name lang="en" content="Evidence 30" />
+      <description xmi:id="generated_147">
+        <content>
+          <value lang="en" content="Results of independent assessment - 14 CFR Part 5" />
+          <value lang="ja" content="独立評価結果 - 14 CFR Part 5" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_146">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠30" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_31" referencedArtifactElement="ART_Assessment_31">
+      <name lang="en" content="Evidence 31" />
+      <description xmi:id="generated_149">
+        <content>
+          <value lang="en" content="Results of independent assessment - UL 4600 improvement" />
+          <value lang="ja" content="独立評価結果 - UL 4600改善" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_148">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠31" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_32" referencedArtifactElement="ART_Assessment_32">
+      <name lang="en" content="Evidence 32" />
+      <description xmi:id="generated_151">
+        <content>
+          <value lang="en" content="Results of independent assessment - IATF 16949" />
+          <value lang="ja" content="独立評価結果 - IATF 16949" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_150">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠32" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_OrgTrust_Transparency" reasoning="S6" source="G8 G9" target="G3">
+      <name lang="en" content="Transparency Inference" />
+      <description xmi:id="generated_153">
+        <content>
+          <value lang="en" content="Transparency and assessor independence support organizational trustworthiness" />
+          <value lang="ja" content="透明性および評価者の独立性は組織の信頼性を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_152">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="透明性推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_OrgTrust_SMS" reasoning="S7" source="G10 G11 G12" target="G3">
+      <name lang="en" content="SMS Inference" />
+      <description xmi:id="generated_155">
+        <content>
+          <value lang="en" content="SMS policies, processes, and monitoring support organizational trustworthiness" />
+          <value lang="ja" content="SMSの方針、プロセス、および監視は組織の信頼性を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_154">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="SMS推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G21_G10" source="G21" target="G10">
+      <name lang="en" content="Advisory Board Approval Inference" />
+      <description xmi:id="generated_157">
+        <content>
+          <value lang="en" content="Safety advisory board approval supports SMS policy alignment" />
+          <value lang="ja" content="安全諮問委員会の承認はSMS方針の整合を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_156">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="諮問委員会承認推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G22_G10" reasoning="S16" source="G22" target="G10">
+      <name lang="en" content="Regulatory Compliance Inference" />
+      <description xmi:id="generated_159">
+        <content>
+          <value lang="en" content="Regulatory compliance supports SMS policy alignment" />
+          <value lang="ja" content="規制適合はSMS方針の整合を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_158">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="規制適合推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G23_G10" reasoning="S17" source="G23" target="G10">
+      <name lang="en" content="Ethics Guidelines Inference" />
+      <description xmi:id="generated_161">
+        <content>
+          <value lang="en" content="Ethics guidelines compliance supports SMS policy alignment" />
+          <value lang="ja" content="倫理指針への適合はSMS方針の整合を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_160">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="倫理指針推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G24_G11" reasoning="S18" source="G24" target="G11">
+      <name lang="en" content="14 CFR Part 5 Inference" />
+      <description xmi:id="generated_163">
+        <content>
+          <value lang="en" content="14 CFR Part 5 conformance supports SMS processes" />
+          <value lang="ja" content="14 CFR Part 5への適合はSMSプロセスを支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_162">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="14 CFR Part 5推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G25_G12" reasoning="S19" source="G25" target="G12">
+      <name lang="en" content="UL 4600 Improvement Inference" />
+      <description xmi:id="generated_165">
+        <content>
+          <value lang="en" content="UL 4600 continuous improvement supports safety case monitoring" />
+          <value lang="ja" content="UL 4600に基づく継続的改善はセーフティケースの監視を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_164">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="UL 4600改善推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G26_G12" reasoning="S20" source="G26" target="G12">
+      <name lang="en" content="IATF 16949 Inference" />
+      <description xmi:id="generated_167">
+        <content>
+          <value lang="en" content="IATF 16949 conformance supports safety case monitoring" />
+          <value lang="ja" content="IATF 16949への適合はセーフティケースの監視を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_166">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="IATF 16949推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_G21_CTX15" source="CTX_15" target="G21">
+      <name lang="en" content="Advisory Board Context" />
+      <description xmi:id="generated_169">
+        <content>
+          <value lang="en" content="Safety advisory board context for SRC approval" />
+          <value lang="ja" content="SRC承認のための安全諮問委員会の文脈" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_168">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="諮問委員会の文脈" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G8_EV13" source="EV_13" target="G8">
+      <name lang="en" content="Transparency Evidence" />
+      <description xmi:id="generated_171">
+        <content>
+          <value lang="en" content="Assessment results support transparency claim" />
+          <value lang="ja" content="評価結果は透明性の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_170">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="透明性の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G9_EV14" source="EV_14" target="G9">
+      <name lang="en" content="Assessor Independence Evidence" />
+      <description xmi:id="generated_173">
+        <content>
+          <value lang="en" content="Assessment results support assessor independence claim" />
+          <value lang="ja" content="評価結果は評価者の独立性に関する主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_172">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="評価者独立性の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G21_EV27" source="EV_27" target="G21">
+      <name lang="en" content="Advisory Board Approval Evidence" />
+      <description xmi:id="generated_175">
+        <content>
+          <value lang="en" content="Assessment results support safety advisory board approval claim" />
+          <value lang="ja" content="評価結果は安全諮問委員会の承認に関する主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_174">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="諮問委員会承認の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G22_EV28" source="EV_28" target="G22">
+      <name lang="en" content="Regulatory Compliance Evidence" />
+      <description xmi:id="generated_177">
+        <content>
+          <value lang="en" content="Assessment results support regulatory compliance claim" />
+          <value lang="ja" content="評価結果は規制適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_176">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="規制適合の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G23_EV29" source="EV_29" target="G23">
+      <name lang="en" content="Ethics Guidelines Evidence" />
+      <description xmi:id="generated_179">
+        <content>
+          <value lang="en" content="Assessment results support ethics guidelines compliance claim" />
+          <value lang="ja" content="評価結果は倫理指針適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_178">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="倫理指針の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G24_EV30" source="EV_30" target="G24">
+      <name lang="en" content="14 CFR Part 5 Evidence" />
+      <description xmi:id="generated_181">
+        <content>
+          <value lang="en" content="Assessment results support 14 CFR Part 5 conformance claim" />
+          <value lang="ja" content="評価結果は14 CFR Part 5適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_180">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="14 CFR Part 5の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G25_EV31" source="EV_31" target="G25">
+      <name lang="en" content="UL 4600 Improvement Evidence" />
+      <description xmi:id="generated_183">
+        <content>
+          <value lang="en" content="Assessment results support UL 4600 continuous improvement claim" />
+          <value lang="ja" content="評価結果はUL 4600に基づく継続的改善の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_182">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="UL 4600改善の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G26_EV32" source="EV_32" target="G26">
+      <name lang="en" content="IATF 16949 Evidence" />
+      <description xmi:id="generated_185">
+        <content>
+          <value lang="en" content="Assessment results support IATF 16949 conformance claim" />
+          <value lang="ja" content="評価結果はIATF 16949適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_184">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="IATF 16949の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ARG_VehicleSafety">
+    <name lang="en" content="Vehicle Safety" />
+    <taggedValue xmi:id="generated_186">
+      <key>
+        <value content="sacm.import.name" />
+      </key>
+      <content>
+        <value lang="ja" content="車両安全性" />
+      </content>
+    </taggedValue>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G37">
+      <name lang="en" content="Goal 37" />
+      <description xmi:id="generated_189">
+        <content>
+          <value content="We have analyzed all hazards posed by the vehicle." />
+        </content>
+      </description>
+      <description xmi:id="generated_188">
+        <content>
+          <value lang="en" content="Comprehensive hazard analysis completion" />
+          <value lang="ja" content="包括的なハザード分析の完了" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_187">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標37" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G38">
+      <name lang="en" content="Goal 38" />
+      <description xmi:id="generated_192">
+        <content>
+          <value content="The vehicle conforms with vehicle safety standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_191">
+        <content>
+          <value lang="en" content="Conformance with vehicle safety standards" />
+          <value lang="ja" content="車両安全規格への適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_190">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標38" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G39">
+      <name lang="en" content="Goal 39" />
+      <description xmi:id="generated_195">
+        <content>
+          <value content="The vehicle conforms with functional safety standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_194">
+        <content>
+          <value lang="en" content="Conformance with functional safety standards" />
+          <value lang="ja" content="機能安全規格への適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_193">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標39" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G40">
+      <name lang="en" content="Goal 40" />
+      <description xmi:id="generated_198">
+        <content>
+          <value content="The vehicle conforms with AI engineering rigor standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_197">
+        <content>
+          <value lang="en" content="Conformance with AI/ML engineering standards" />
+          <value lang="ja" content="AI/MLエンジニアリング規格への適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_196">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標40" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G41">
+      <name lang="en" content="Goal 41" />
+      <description xmi:id="generated_201">
+        <content>
+          <value content="The vehicle's intended functions are safe." />
+        </content>
+      </description>
+      <description xmi:id="generated_200">
+        <content>
+          <value lang="en" content="Safety of intended functionality (SOTIF)" />
+          <value lang="ja" content="意図した機能の安全性（SOTIF）" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_199">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標41" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G42">
+      <name lang="en" content="Goal 42" />
+      <description xmi:id="generated_204">
+        <content>
+          <value content="The vehicle conforms with security standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_203">
+        <content>
+          <value lang="en" content="Conformance with cybersecurity standards" />
+          <value lang="ja" content="サイバーセキュリティ規格への適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_202">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標42" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G43">
+      <name lang="en" content="Goal 43" />
+      <description xmi:id="generated_207">
+        <content>
+          <value content="We follow configuration management standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_206">
+        <content>
+          <value lang="en" content="Configuration management practices" />
+          <value lang="ja" content="構成管理の実践" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_205">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標43" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G44">
+      <name lang="en" content="Goal 44" />
+      <description xmi:id="generated_210">
+        <content>
+          <value content="The vehicle conforms with data recording best practices." />
+        </content>
+      </description>
+      <description xmi:id="generated_209">
+        <content>
+          <value lang="en" content="Forensic data recording capabilities" />
+          <value lang="ja" content="フォレンジックデータ記録能力" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_208">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標44" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G53">
+      <name lang="en" content="Goal 53" />
+      <description xmi:id="generated_213">
+        <content>
+          <value content="We completed a hazard analysis according to this standard." />
+        </content>
+      </description>
+      <description xmi:id="generated_212">
+        <content>
+          <value lang="en" content="Hazard analysis per SAE J3307 STPA" />
+          <value lang="ja" content="SAE J3307 STPAに基づくハザード分析" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_211">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標53" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G54">
+      <name lang="en" content="Goal 54" />
+      <description xmi:id="generated_216">
+        <content>
+          <value content="Our vehicle conforms with FMVSS." />
+        </content>
+      </description>
+      <description xmi:id="generated_215">
+        <content>
+          <value lang="en" content="Federal Motor Vehicle Safety Standards conformance" />
+          <value lang="ja" content="連邦自動車安全基準への適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_214">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標54" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G55">
+      <name lang="en" content="Goal 55" />
+      <description xmi:id="generated_219">
+        <content>
+          <value content="We developed our system according to ISO 26262." />
+        </content>
+      </description>
+      <description xmi:id="generated_218">
+        <content>
+          <value lang="en" content="Functional safety development per ISO 26262" />
+          <value lang="ja" content="ISO 26262に基づく機能安全開発" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_217">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標55" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G56">
+      <name lang="en" content="Goal 56" />
+      <description xmi:id="generated_222">
+        <content>
+          <value content="We developed our system according to ISO/PAS 8800." />
+        </content>
+      </description>
+      <description xmi:id="generated_221">
+        <content>
+          <value lang="en" content="AI safety development per ISO/PAS 8800" />
+          <value lang="ja" content="ISO/PAS 8800に基づくAI安全開発" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_220">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標56" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G57">
+      <name lang="en" content="Goal 57" />
+      <description xmi:id="generated_225">
+        <content>
+          <value content="We developed our system according to ISO 21448." />
+        </content>
+      </description>
+      <description xmi:id="generated_224">
+        <content>
+          <value lang="en" content="SOTIF development per ISO 21448" />
+          <value lang="ja" content="ISO 21448に基づくSOTIF開発" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_223">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標57" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G58">
+      <name lang="en" content="Goal 58" />
+      <description xmi:id="generated_228">
+        <content>
+          <value content="We developed our system according to ISO 21434." />
+        </content>
+      </description>
+      <description xmi:id="generated_227">
+        <content>
+          <value lang="en" content="Cybersecurity engineering per ISO 21434" />
+          <value lang="ja" content="ISO 21434に基づくサイバーセキュリティエンジニアリング" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_226">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標58" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G59">
+      <name lang="en" content="Goal 59" />
+      <description xmi:id="generated_231">
+        <content>
+          <value content="We manage these risks according to ISO 10007." />
+        </content>
+      </description>
+      <description xmi:id="generated_230">
+        <content>
+          <value lang="en" content="Configuration management per ISO 10007" />
+          <value lang="ja" content="ISO 10007に基づく構成管理" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_229">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標59" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G60">
+      <name lang="en" content="Goal 60" />
+      <description xmi:id="generated_234">
+        <content>
+          <value content="Our system and operations conform with all recommendations in SAE AVSC 00004." />
+        </content>
+      </description>
+      <description xmi:id="generated_233">
+        <content>
+          <value lang="en" content="Data recording per SAE AVSC 00004" />
+          <value lang="ja" content="SAE AVSC 00004に基づくデータ記録" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_232">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標60" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S33">
+      <name lang="en" content="Strategy 33" />
+      <description xmi:id="generated_237">
+        <content>
+          <value content="Appeal to safety hazard analysis standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_236">
+        <content>
+          <value lang="en" content="Argument based on hazard analysis methodologies" />
+          <value lang="ja" content="ハザード分析手法に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_235">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略33" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S34">
+      <name lang="en" content="Strategy 34" />
+      <description xmi:id="generated_240">
+        <content>
+          <value content="Appeal to safety risk mitigation standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_239">
+        <content>
+          <value lang="en" content="Argument based on risk mitigation through standards conformance" />
+          <value lang="ja" content="規格適合によるリスク低減に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_238">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略34" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S35">
+      <name lang="en" content="Strategy 35" />
+      <description xmi:id="generated_243">
+        <content>
+          <value content="Appeal to config mgmt standards." />
+        </content>
+      </description>
+      <description xmi:id="generated_242">
+        <content>
+          <value lang="en" content="Argument based on configuration management standards" />
+          <value lang="ja" content="構成管理規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_241">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略35" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S36">
+      <name lang="en" content="Strategy 36" />
+      <description xmi:id="generated_246">
+        <content>
+          <value content="Appeal to forensic data recording best practices." />
+        </content>
+      </description>
+      <description xmi:id="generated_245">
+        <content>
+          <value lang="en" content="Argument based on data recording for incident investigation" />
+          <value lang="ja" content="インシデント調査のためのデータ記録に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_244">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略36" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S45">
+      <name lang="en" content="Strategy 45" />
+      <description xmi:id="generated_249">
+        <content>
+          <value content="Appeal to SAE J3307 (STPA)." />
+        </content>
+      </description>
+      <description xmi:id="generated_248">
+        <content>
+          <value lang="en" content="Argument based on STPA hazard analysis methodology" />
+          <value lang="ja" content="STPAハザード分析手法に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_247">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略45" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S46">
+      <name lang="en" content="Strategy 46" />
+      <description xmi:id="generated_252">
+        <content>
+          <value content="Appeal to FMVSS." />
+        </content>
+      </description>
+      <description xmi:id="generated_251">
+        <content>
+          <value lang="en" content="Argument based on Federal Motor Vehicle Safety Standards" />
+          <value lang="ja" content="連邦自動車安全基準に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_250">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略46" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S47">
+      <name lang="en" content="Strategy 47" />
+      <description xmi:id="generated_255">
+        <content>
+          <value content="Appeal to ISO 26262." />
+        </content>
+      </description>
+      <description xmi:id="generated_254">
+        <content>
+          <value lang="en" content="Argument based on functional safety standard" />
+          <value lang="ja" content="機能安全規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_253">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略47" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S48">
+      <name lang="en" content="Strategy 48" />
+      <description xmi:id="generated_258">
+        <content>
+          <value content="Appeal to ISO/PAS 8800." />
+        </content>
+      </description>
+      <description xmi:id="generated_257">
+        <content>
+          <value lang="en" content="Argument based on AI safety standard" />
+          <value lang="ja" content="AI安全規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_256">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略48" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S49">
+      <name lang="en" content="Strategy 49" />
+      <description xmi:id="generated_261">
+        <content>
+          <value content="Appeal to ISO 21448." />
+        </content>
+      </description>
+      <description xmi:id="generated_260">
+        <content>
+          <value lang="en" content="Argument based on SOTIF standard" />
+          <value lang="ja" content="SOTIF規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_259">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略49" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S50">
+      <name lang="en" content="Strategy 50" />
+      <description xmi:id="generated_264">
+        <content>
+          <value content="Appeal to ISO 21434." />
+        </content>
+      </description>
+      <description xmi:id="generated_263">
+        <content>
+          <value lang="en" content="Argument based on cybersecurity engineering standard" />
+          <value lang="ja" content="サイバーセキュリティエンジニアリング規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_262">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略50" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S51">
+      <name lang="en" content="Strategy 51" />
+      <description xmi:id="generated_267">
+        <content>
+          <value content="Appeal to ISO 10007." />
+        </content>
+      </description>
+      <description xmi:id="generated_266">
+        <content>
+          <value lang="en" content="Argument based on configuration management standard" />
+          <value lang="ja" content="構成管理規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_265">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略51" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S52">
+      <name lang="en" content="Strategy 52" />
+      <description xmi:id="generated_270">
+        <content>
+          <value content="Appeal to SAE AVSC 00004." />
+        </content>
+      </description>
+      <description xmi:id="generated_269">
+        <content>
+          <value lang="en" content="Argument based on data recording standard" />
+          <value lang="ja" content="データ記録規格に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_268">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略52" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_61" referencedArtifactElement="ART_Assessment_61">
+      <name lang="en" content="Evidence 61" />
+      <description xmi:id="generated_272">
+        <content>
+          <value lang="en" content="Results of independent assessment - STPA hazard analysis" />
+          <value lang="ja" content="独立評価結果 - STPAハザード分析" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_271">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠61" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_62" referencedArtifactElement="ART_Assessment_62">
+      <name lang="en" content="Evidence 62" />
+      <description xmi:id="generated_274">
+        <content>
+          <value lang="en" content="Results of independent assessment - FMVSS" />
+          <value lang="ja" content="独立評価結果 - FMVSS" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_273">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠62" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_63" referencedArtifactElement="ART_Assessment_63">
+      <name lang="en" content="Evidence 63" />
+      <description xmi:id="generated_276">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 26262" />
+          <value lang="ja" content="独立評価結果 - ISO 26262" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_275">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠63" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_64" referencedArtifactElement="ART_Assessment_64">
+      <name lang="en" content="Evidence 64" />
+      <description xmi:id="generated_278">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO/PAS 8800" />
+          <value lang="ja" content="独立評価結果 - ISO/PAS 8800" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_277">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠64" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_65" referencedArtifactElement="ART_Assessment_65">
+      <name lang="en" content="Evidence 65" />
+      <description xmi:id="generated_280">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 21448" />
+          <value lang="ja" content="独立評価結果 - ISO 21448" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_279">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠65" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_66" referencedArtifactElement="ART_Assessment_66">
+      <name lang="en" content="Evidence 66" />
+      <description xmi:id="generated_282">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 21434" />
+          <value lang="ja" content="独立評価結果 - ISO 21434" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_281">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠66" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_67" referencedArtifactElement="ART_Assessment_67">
+      <name lang="en" content="Evidence 67" />
+      <description xmi:id="generated_284">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 10007" />
+          <value lang="ja" content="独立評価結果 - ISO 10007" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_283">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠67" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_68" referencedArtifactElement="ART_Assessment_68">
+      <name lang="en" content="Evidence 68" />
+      <description xmi:id="generated_286">
+        <content>
+          <value lang="en" content="Results of independent assessment - SAE AVSC 00004" />
+          <value lang="ja" content="独立評価結果 - SAE AVSC 00004" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_285">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠68" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G37_G4" reasoning="S33" source="G37" target="G4">
+      <name lang="en" content="Hazard Analysis Inference" />
+      <description xmi:id="generated_288">
+        <content>
+          <value lang="en" content="Hazard analysis supports vehicle safety" />
+          <value lang="ja" content="ハザード分析は車両安全性を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_287">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ハザード分析推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_RiskMitigation_G4" reasoning="S34" source="G38 G39 G40 G41 G42" target="G4">
+      <name lang="en" content="Risk Mitigation Inference" />
+      <description xmi:id="generated_290">
+        <content>
+          <value lang="en" content="Standards conformance supports vehicle safety through risk mitigation" />
+          <value lang="ja" content="規格適合はリスク低減を通じて車両安全性を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_289">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="リスク低減推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G43_G4" reasoning="S35" source="G43" target="G4">
+      <name lang="en" content="Configuration Management Inference" />
+      <description xmi:id="generated_292">
+        <content>
+          <value lang="en" content="Configuration management supports vehicle safety" />
+          <value lang="ja" content="構成管理は車両安全性を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_291">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="構成管理推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G44_G4" reasoning="S36" source="G44" target="G4">
+      <name lang="en" content="Data Recording Inference" />
+      <description xmi:id="generated_294">
+        <content>
+          <value lang="en" content="Data recording supports vehicle safety through incident investigation capability" />
+          <value lang="ja" content="データ記録はインシデント調査能力を通じて車両安全性を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_293">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="データ記録推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G53_G37" reasoning="S45" source="G53" target="G37">
+      <name lang="en" content="STPA Inference" />
+      <description xmi:id="generated_296">
+        <content>
+          <value lang="en" content="STPA hazard analysis supports hazard identification claim" />
+          <value lang="ja" content="STPAハザード分析はハザード特定の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_295">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="STPA推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G54_G38" reasoning="S46" source="G54" target="G38">
+      <name lang="en" content="FMVSS Inference" />
+      <description xmi:id="generated_298">
+        <content>
+          <value lang="en" content="FMVSS conformance supports vehicle safety standards claim" />
+          <value lang="ja" content="FMVSSへの適合は車両安全規格適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_297">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="FMVSS推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G55_G39" reasoning="S47" source="G55" target="G39">
+      <name lang="en" content="ISO 26262 Inference" />
+      <description xmi:id="generated_300">
+        <content>
+          <value lang="en" content="ISO 26262 development supports functional safety claim" />
+          <value lang="ja" content="ISO 26262に基づく開発は機能安全の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_299">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 26262推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G56_G40" reasoning="S48" source="G56" target="G40">
+      <name lang="en" content="ISO/PAS 8800 Inference" />
+      <description xmi:id="generated_302">
+        <content>
+          <value lang="en" content="ISO/PAS 8800 development supports AI engineering rigor claim" />
+          <value lang="ja" content="ISO/PAS 8800に基づく開発はAIエンジニアリングの厳格性に関する主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_301">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO/PAS 8800推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G57_G41" reasoning="S49" source="G57" target="G41">
+      <name lang="en" content="ISO 21448 Inference" />
+      <description xmi:id="generated_304">
+        <content>
+          <value lang="en" content="ISO 21448 development supports intended functions safety claim" />
+          <value lang="ja" content="ISO 21448に基づく開発は意図した機能の安全性に関する主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_303">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 21448推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G58_G42" reasoning="S50" source="G58" target="G42">
+      <name lang="en" content="ISO 21434 Inference" />
+      <description xmi:id="generated_306">
+        <content>
+          <value lang="en" content="ISO 21434 development supports security standards claim" />
+          <value lang="ja" content="ISO 21434に基づく開発はセキュリティ規格適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_305">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 21434推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G59_G43" reasoning="S51" source="G59" target="G43">
+      <name lang="en" content="ISO 10007 Inference" />
+      <description xmi:id="generated_308">
+        <content>
+          <value lang="en" content="ISO 10007 risk management supports configuration management claim" />
+          <value lang="ja" content="ISO 10007に基づくリスク管理は構成管理の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_307">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 10007推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G60_G44" reasoning="S52" source="G60" target="G44">
+      <name lang="en" content="SAE AVSC 00004 Inference" />
+      <description xmi:id="generated_310">
+        <content>
+          <value lang="en" content="SAE AVSC 00004 conformance supports data recording claim" />
+          <value lang="ja" content="SAE AVSC 00004への適合はデータ記録の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_309">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="SAE AVSC 00004推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G53_EV61" source="EV_61" target="G53">
+      <name lang="en" content="STPA Evidence" />
+      <description xmi:id="generated_312">
+        <content>
+          <value lang="en" content="Assessment results support STPA hazard analysis claim" />
+          <value lang="ja" content="評価結果はSTPAハザード分析の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_311">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="STPAの証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G54_EV62" source="EV_62" target="G54">
+      <name lang="en" content="FMVSS Evidence" />
+      <description xmi:id="generated_314">
+        <content>
+          <value lang="en" content="Assessment results support FMVSS conformance claim" />
+          <value lang="ja" content="評価結果はFMVSS適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_313">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="FMVSSの証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G55_EV63" source="EV_63" target="G55">
+      <name lang="en" content="ISO 26262 Evidence" />
+      <description xmi:id="generated_316">
+        <content>
+          <value lang="en" content="Assessment results support ISO 26262 development claim" />
+          <value lang="ja" content="評価結果はISO 26262に基づく開発の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_315">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 26262の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G56_EV64" source="EV_64" target="G56">
+      <name lang="en" content="ISO/PAS 8800 Evidence" />
+      <description xmi:id="generated_318">
+        <content>
+          <value lang="en" content="Assessment results support ISO/PAS 8800 development claim" />
+          <value lang="ja" content="評価結果はISO/PAS 8800に基づく開発の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_317">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO/PAS 8800の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G57_EV65" source="EV_65" target="G57">
+      <name lang="en" content="ISO 21448 Evidence" />
+      <description xmi:id="generated_320">
+        <content>
+          <value lang="en" content="Assessment results support ISO 21448 development claim" />
+          <value lang="ja" content="評価結果はISO 21448に基づく開発の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_319">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 21448の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G58_EV66" source="EV_66" target="G58">
+      <name lang="en" content="ISO 21434 Evidence" />
+      <description xmi:id="generated_322">
+        <content>
+          <value lang="en" content="Assessment results support ISO 21434 development claim" />
+          <value lang="ja" content="評価結果はISO 21434に基づく開発の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_321">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 21434の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G59_EV67" source="EV_67" target="G59">
+      <name lang="en" content="ISO 10007 Evidence" />
+      <description xmi:id="generated_324">
+        <content>
+          <value lang="en" content="Assessment results support ISO 10007 risk management claim" />
+          <value lang="ja" content="評価結果はISO 10007に基づくリスク管理の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_323">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ISO 10007の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G60_EV68" source="EV_68" target="G60">
+      <name lang="en" content="SAE AVSC 00004 Evidence" />
+      <description xmi:id="generated_326">
+        <content>
+          <value lang="en" content="Assessment results support SAE AVSC 00004 conformance claim" />
+          <value lang="ja" content="評価結果はSAE AVSC 00004適合の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_325">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="SAE AVSC 00004の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ARG_OpSafety">
+    <name lang="en" content="Operational Safety" />
+    <taggedValue xmi:id="generated_327">
+      <key>
+        <value content="sacm.import.name" />
+      </key>
+      <content>
+        <value lang="ja" content="運用安全" />
+      </content>
+    </taggedValue>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G72">
+      <name lang="en" content="Goal 72" />
+      <description xmi:id="generated_330">
+        <content>
+          <value content="Our operations support trip interruptions IAW all recommendations in SAE AVSC 00003." />
+        </content>
+      </description>
+      <description xmi:id="generated_329">
+        <content>
+          <value lang="en" content="Trip interruption operations per SAE AVSC 00003" />
+          <value lang="ja" content="SAE AVSC 00003に基づく運行中断対応" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_328">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標72" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G73">
+      <name lang="en" content="Goal 73" />
+      <description xmi:id="generated_333">
+        <content>
+          <value content="Our post-crash operations conform with all recommendations in SAE AVSC-I-05." />
+        </content>
+      </description>
+      <description xmi:id="generated_332">
+        <content>
+          <value lang="en" content="Post-crash operations per SAE AVSC-I-05" />
+          <value lang="ja" content="SAE AVSC-I-05に基づく事故後運用" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_331">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標73" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G74">
+      <name lang="en" content="Goal 74" />
+      <description xmi:id="generated_336">
+        <content>
+          <value content="Our remote operations conform with all recommendations in SAE AVSC-I-04." />
+        </content>
+      </description>
+      <description xmi:id="generated_335">
+        <content>
+          <value lang="en" content="Remote operations per SAE AVSC-I-04" />
+          <value lang="ja" content="SAE AVSC-I-04に基づく遠隔運用" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_334">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標74" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G75">
+      <name lang="en" content="Goal 75" />
+      <description xmi:id="generated_339">
+        <content>
+          <value content="Our first responder interactions conform with all recommendations in SAE AVSC-I-01." />
+        </content>
+      </description>
+      <description xmi:id="generated_338">
+        <content>
+          <value lang="en" content="First responder interaction procedures per SAE AVSC-I-01" />
+          <value lang="ja" content="SAE AVSC-I-01に基づくファーストレスポンダー対応手順" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_337">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標75" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G76">
+      <name lang="en" content="Goal 76" />
+      <description xmi:id="generated_342">
+        <content>
+          <value content="Our safety inspections conform with all recommendations in SAE AVSC-D-03." />
+        </content>
+      </description>
+      <description xmi:id="generated_341">
+        <content>
+          <value lang="en" content="Safety inspection procedures per SAE AVSC-D-03" />
+          <value lang="ja" content="SAE AVSC-D-03に基づく安全点検手順" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_340">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標76" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G77">
+      <name lang="en" content="Goal 77" />
+      <description xmi:id="generated_345">
+        <content>
+          <value content="We monitor metrics in operations IAW all recommendations in SAE AVSC 00006." />
+        </content>
+      </description>
+      <description xmi:id="generated_344">
+        <content>
+          <value lang="en" content="Operational metrics monitoring per SAE AVSC 00006" />
+          <value lang="ja" content="SAE AVSC 00006に基づく運用指標の監視" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_343">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標77" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G78">
+      <name lang="en" content="Goal 78" />
+      <description xmi:id="generated_348">
+        <content>
+          <value content="Our operating procedures mitigate all hazards without technical mitigations." />
+        </content>
+      </description>
+      <description xmi:id="generated_347">
+        <content>
+          <value lang="en" content="Procedural mitigations for residual hazards" />
+          <value lang="ja" content="残留ハザードに対する手順的緩和策" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_346">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="目標78" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S69">
+      <name lang="en" content="Strategy 69" />
+      <description xmi:id="generated_351">
+        <content>
+          <value content="Appeal to all relevant operational safety best practices." />
+        </content>
+      </description>
+      <description xmi:id="generated_350">
+        <content>
+          <value lang="en" content="Argument based on operational safety best practices" />
+          <value lang="ja" content="運用安全のベストプラクティスに基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_349">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略69" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S70">
+      <name lang="en" content="Strategy 70" />
+      <description xmi:id="generated_354">
+        <content>
+          <value content="Argument over procedural mitigations." />
+        </content>
+      </description>
+      <description xmi:id="generated_353">
+        <content>
+          <value lang="en" content="Argument that operating procedures address residual hazards" />
+          <value lang="ja" content="運用手順が残留ハザードに対処するという論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_352">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略70" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S71">
+      <name lang="en" content="Strategy 71" />
+      <description xmi:id="generated_357">
+        <content>
+          <value content="Appeal to effective safety management." />
+        </content>
+      </description>
+      <description xmi:id="generated_356">
+        <content>
+          <value lang="en" content="Argument based on safety management effectiveness" />
+          <value lang="ja" content="安全マネジメントの有効性に基づく論証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_355">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="戦略71" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_79" referencedArtifactElement="ART_SMSClaims">
+      <name lang="en" content="Context 79" />
+      <description xmi:id="generated_359">
+        <content>
+          <value lang="en" content="Relevant SMS claims providing context for operational safety" />
+          <value lang="ja" content="運用安全の文脈を提供する関連SMS主張" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_358">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="文脈79" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_80" referencedArtifactElement="ART_Assessment_80">
+      <name lang="en" content="Evidence 80" />
+      <description xmi:id="generated_361">
+        <content>
+          <value lang="en" content="Results of independent assessment - Trip interruptions" />
+          <value lang="ja" content="独立評価結果 - 運行中断" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_360">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠80" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_81" referencedArtifactElement="ART_Assessment_81">
+      <name lang="en" content="Evidence 81" />
+      <description xmi:id="generated_363">
+        <content>
+          <value lang="en" content="Results of independent assessment - Post-crash operations" />
+          <value lang="ja" content="独立評価結果 - 事故後運用" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_362">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠81" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_82" referencedArtifactElement="ART_Assessment_82">
+      <name lang="en" content="Evidence 82" />
+      <description xmi:id="generated_365">
+        <content>
+          <value lang="en" content="Results of independent assessment - Remote operations" />
+          <value lang="ja" content="独立評価結果 - 遠隔運用" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_364">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠82" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_83" referencedArtifactElement="ART_Assessment_83">
+      <name lang="en" content="Evidence 83" />
+      <description xmi:id="generated_367">
+        <content>
+          <value lang="en" content="Results of independent assessment - First responder interactions" />
+          <value lang="ja" content="独立評価結果 - ファーストレスポンダー対応" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_366">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠83" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_84" referencedArtifactElement="ART_Assessment_84">
+      <name lang="en" content="Evidence 84" />
+      <description xmi:id="generated_369">
+        <content>
+          <value lang="en" content="Results of independent assessment - Safety inspections" />
+          <value lang="ja" content="独立評価結果 - 安全点検" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_368">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠84" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_85" referencedArtifactElement="ART_Assessment_85">
+      <name lang="en" content="Evidence 85" />
+      <description xmi:id="generated_371">
+        <content>
+          <value lang="en" content="Results of independent assessment - Metrics monitoring" />
+          <value lang="ja" content="独立評価結果 - 指標監視" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_370">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠85" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_86" referencedArtifactElement="ART_Assessment_86">
+      <name lang="en" content="Evidence 86" />
+      <description xmi:id="generated_373">
+        <content>
+          <value lang="en" content="Results of independent assessment - Procedural mitigations" />
+          <value lang="ja" content="独立評価結果 - 手順的緩和策" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_372">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="証拠86" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_OpBestPractices_G5" reasoning="S69" source="G72 G73 G74 G75 G76 G77" target="G5">
+      <name lang="en" content="Operational Best Practices Inference" />
+      <description xmi:id="generated_375">
+        <content>
+          <value lang="en" content="Operational best practices conformance supports safe vehicle operation" />
+          <value lang="ja" content="運用ベストプラクティスへの適合は安全な車両運用を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_374">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="運用ベストプラクティス推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G78_G5" reasoning="S70" source="G78" target="G5">
+      <name lang="en" content="Procedural Mitigations Inference" />
+      <description xmi:id="generated_377">
+        <content>
+          <value lang="en" content="Procedural mitigations support safe vehicle operation" />
+          <value lang="ja" content="手順的緩和策は安全な車両運用を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_376">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="手順的緩和策推論" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_SMS_S71" source="CTX_79" target="S71">
+      <name lang="en" content="SMS Context for Safety Management" />
+      <description xmi:id="generated_379">
+        <content>
+          <value lang="en" content="SMS claims provide context for effective safety management strategy" />
+          <value lang="ja" content="SMS主張は有効な安全マネジメント戦略の文脈を提供する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_378">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="安全マネジメントのためのSMS文脈" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G72_EV80" source="EV_80" target="G72">
+      <name lang="en" content="Trip Interruption Evidence" />
+      <description xmi:id="generated_381">
+        <content>
+          <value lang="en" content="Assessment results support trip interruption operations claim" />
+          <value lang="ja" content="評価結果は運行中断対応の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_380">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="運行中断の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G73_EV81" source="EV_81" target="G73">
+      <name lang="en" content="Post-Crash Evidence" />
+      <description xmi:id="generated_383">
+        <content>
+          <value lang="en" content="Assessment results support post-crash operations claim" />
+          <value lang="ja" content="評価結果は事故後運用の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_382">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="事故後の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G74_EV82" source="EV_82" target="G74">
+      <name lang="en" content="Remote Operations Evidence" />
+      <description xmi:id="generated_385">
+        <content>
+          <value lang="en" content="Assessment results support remote operations claim" />
+          <value lang="ja" content="評価結果は遠隔運用の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_384">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="遠隔運用の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G75_EV83" source="EV_83" target="G75">
+      <name lang="en" content="First Responder Evidence" />
+      <description xmi:id="generated_387">
+        <content>
+          <value lang="en" content="Assessment results support first responder interactions claim" />
+          <value lang="ja" content="評価結果はファーストレスポンダー対応の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_386">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="ファーストレスポンダーの証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G76_EV84" source="EV_84" target="G76">
+      <name lang="en" content="Safety Inspections Evidence" />
+      <description xmi:id="generated_389">
+        <content>
+          <value lang="en" content="Assessment results support safety inspections claim" />
+          <value lang="ja" content="評価結果は安全点検の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_388">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="安全点検の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G77_EV85" source="EV_85" target="G77">
+      <name lang="en" content="Metrics Monitoring Evidence" />
+      <description xmi:id="generated_391">
+        <content>
+          <value lang="en" content="Assessment results support metrics monitoring claim" />
+          <value lang="ja" content="評価結果は指標監視の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_390">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="指標監視の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G78_EV86" source="EV_86" target="G78">
+      <name lang="en" content="Procedural Mitigations Evidence" />
+      <description xmi:id="generated_393">
+        <content>
+          <value lang="en" content="Assessment results support procedural mitigations claim" />
+          <value lang="ja" content="評価結果は手順的緩和策の主張を支持する" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_392">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="手順的緩和策の証拠" />
+        </content>
+      </taggedValue>
+    </argumentElement>
+  </argumentPackage>
+  <artifactPackage xmi:id="AP_Evidence">
+    <name lang="en" content="Evidence and Context Artifacts" />
+    <taggedValue xmi:id="generated_4">
+      <key>
+        <value content="sacm.import.name" />
+      </key>
+      <content>
+        <value lang="ja" content="証拠および文脈成果物" />
+      </content>
+    </taggedValue>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_VehicleDescription">
+      <name lang="en" content="Vehicle Description" />
+      <description xmi:id="generated_6">
+        <content>
+          <value lang="en" content="Description of vehicle, operations, and stakeholder requirements" />
+          <value lang="ja" content="車両、運用、およびステークホルダー要求事項の説明" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_5">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="車両説明" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_SMSClaims">
+      <name lang="en" content="SMS Claims" />
+      <description xmi:id="generated_8">
+        <content>
+          <value lang="en" content="Relevant Safety Management System claims" />
+          <value lang="ja" content="関連する安全マネジメントシステム（SMS）の主張" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_7">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="SMS主張" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_SafetyAdvisoryBoard">
+      <name lang="en" content="Safety Advisory Board" />
+      <description xmi:id="generated_10">
+        <content>
+          <value lang="en" content="Our safety advisory board includes a full set of stakeholder responsibilities" />
+          <value lang="ja" content="当社の安全諮問委員会はステークホルダーの責任一式を含んでいる" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_9">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="安全諮問委員会" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_13">
+      <name lang="en" content="Independent Assessment 13" />
+      <description xmi:id="generated_12">
+        <content>
+          <value lang="en" content="Results of independent assessment - Transparency assessment results" />
+          <value lang="ja" content="独立評価結果 - 透明性評価の結果" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_11">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価13" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_14">
+      <name lang="en" content="Independent Assessment 14" />
+      <description xmi:id="generated_14">
+        <content>
+          <value lang="en" content="Results of independent assessment - Assessor independence verification" />
+          <value lang="ja" content="独立評価結果 - 評価者の独立性の検証" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_13">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価14" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_27">
+      <name lang="en" content="Independent Assessment 27" />
+      <description xmi:id="generated_16">
+        <content>
+          <value lang="en" content="Results of independent assessment - Safety advisory board approval" />
+          <value lang="ja" content="独立評価結果 - 安全諮問委員会の承認" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_15">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価27" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_28">
+      <name lang="en" content="Independent Assessment 28" />
+      <description xmi:id="generated_18">
+        <content>
+          <value lang="en" content="Results of independent assessment - Regulatory compliance" />
+          <value lang="ja" content="独立評価結果 - 規制適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_17">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価28" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_29">
+      <name lang="en" content="Independent Assessment 29" />
+      <description xmi:id="generated_20">
+        <content>
+          <value lang="en" content="Results of independent assessment - Ethics guidelines compliance" />
+          <value lang="ja" content="独立評価結果 - 倫理指針適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_19">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価29" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_30">
+      <name lang="en" content="Independent Assessment 30" />
+      <description xmi:id="generated_22">
+        <content>
+          <value lang="en" content="Results of independent assessment - 14 CFR Part 5 compliance" />
+          <value lang="ja" content="独立評価結果 - 14 CFR Part 5適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_21">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価30" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_31">
+      <name lang="en" content="Independent Assessment 31" />
+      <description xmi:id="generated_24">
+        <content>
+          <value lang="en" content="Results of independent assessment - UL 4600 continuous improvement" />
+          <value lang="ja" content="独立評価結果 - UL 4600に基づく継続的改善" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_23">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価31" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_32">
+      <name lang="en" content="Independent Assessment 32" />
+      <description xmi:id="generated_26">
+        <content>
+          <value lang="en" content="Results of independent assessment - IATF 16949 conformance" />
+          <value lang="ja" content="独立評価結果 - IATF 16949適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_25">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価32" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_61">
+      <name lang="en" content="Independent Assessment 61" />
+      <description xmi:id="generated_28">
+        <content>
+          <value lang="en" content="Results of independent assessment - STPA hazard analysis" />
+          <value lang="ja" content="独立評価結果 - STPAハザード分析" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_27">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価61" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_62">
+      <name lang="en" content="Independent Assessment 62" />
+      <description xmi:id="generated_30">
+        <content>
+          <value lang="en" content="Results of independent assessment - FMVSS conformance" />
+          <value lang="ja" content="独立評価結果 - FMVSS適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_29">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価62" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_63">
+      <name lang="en" content="Independent Assessment 63" />
+      <description xmi:id="generated_32">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 26262 conformance" />
+          <value lang="ja" content="独立評価結果 - ISO 26262適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_31">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価63" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_64">
+      <name lang="en" content="Independent Assessment 64" />
+      <description xmi:id="generated_34">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO/PAS 8800 conformance" />
+          <value lang="ja" content="独立評価結果 - ISO/PAS 8800適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_33">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価64" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_65">
+      <name lang="en" content="Independent Assessment 65" />
+      <description xmi:id="generated_36">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 21448 conformance" />
+          <value lang="ja" content="独立評価結果 - ISO 21448適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_35">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価65" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_66">
+      <name lang="en" content="Independent Assessment 66" />
+      <description xmi:id="generated_38">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 21434 conformance" />
+          <value lang="ja" content="独立評価結果 - ISO 21434適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_37">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価66" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_67">
+      <name lang="en" content="Independent Assessment 67" />
+      <description xmi:id="generated_40">
+        <content>
+          <value lang="en" content="Results of independent assessment - ISO 10007 conformance" />
+          <value lang="ja" content="独立評価結果 - ISO 10007適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_39">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価67" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_68">
+      <name lang="en" content="Independent Assessment 68" />
+      <description xmi:id="generated_42">
+        <content>
+          <value lang="en" content="Results of independent assessment - SAE AVSC 00004 conformance" />
+          <value lang="ja" content="独立評価結果 - SAE AVSC 00004適合" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_41">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価68" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_80">
+      <name lang="en" content="Independent Assessment 80" />
+      <description xmi:id="generated_44">
+        <content>
+          <value lang="en" content="Results of independent assessment - Trip interruption operations" />
+          <value lang="ja" content="独立評価結果 - 運行中断対応" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_43">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価80" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_81">
+      <name lang="en" content="Independent Assessment 81" />
+      <description xmi:id="generated_46">
+        <content>
+          <value lang="en" content="Results of independent assessment - Post-crash operations" />
+          <value lang="ja" content="独立評価結果 - 事故後運用" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_45">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価81" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_82">
+      <name lang="en" content="Independent Assessment 82" />
+      <description xmi:id="generated_48">
+        <content>
+          <value lang="en" content="Results of independent assessment - Remote operations" />
+          <value lang="ja" content="独立評価結果 - 遠隔運用" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_47">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価82" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_83">
+      <name lang="en" content="Independent Assessment 83" />
+      <description xmi:id="generated_50">
+        <content>
+          <value lang="en" content="Results of independent assessment - First responder interactions" />
+          <value lang="ja" content="独立評価結果 - ファーストレスポンダー対応" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_49">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価83" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_84">
+      <name lang="en" content="Independent Assessment 84" />
+      <description xmi:id="generated_52">
+        <content>
+          <value lang="en" content="Results of independent assessment - Safety inspections" />
+          <value lang="ja" content="独立評価結果 - 安全点検" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_51">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価84" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_85">
+      <name lang="en" content="Independent Assessment 85" />
+      <description xmi:id="generated_54">
+        <content>
+          <value lang="en" content="Results of independent assessment - Operational metrics monitoring" />
+          <value lang="ja" content="独立評価結果 - 運用指標の監視" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_53">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価85" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_86">
+      <name lang="en" content="Independent Assessment 86" />
+      <description xmi:id="generated_56">
+        <content>
+          <value lang="en" content="Results of independent assessment - Procedural hazard mitigations" />
+          <value lang="ja" content="独立評価結果 - 手順的ハザード緩和策" />
+        </content>
+      </description>
+      <taggedValue xmi:id="generated_55">
+        <key>
+          <value content="sacm.import.name" />
+        </key>
+        <content>
+          <value lang="ja" content="独立評価86" />
+        </content>
+      </taggedValue>
+    </artifactElement>
+  </artifactPackage>
+  <terminologyPackage xmi:id="TP_Standards">
+    <name lang="en" content="Referenced Standards" />
+    <taggedValue xmi:id="generated_3">
+      <key>
+        <value content="sacm.import.name" />
+      </key>
+      <content>
+        <value lang="ja" content="参照規格" />
+      </content>
+    </taggedValue>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_UL4600" value="UL 4600 - Standard for Evaluation of Autonomous Products">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO26262" value="ISO 26262 - Road vehicles Functional Safety">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO21448" value="ISO 21448 - Safety of the Intended Functionality (SOTIF)">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO21434" value="ISO 21434 - Road vehicles Cybersecurity engineering">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO10007" value="ISO 10007 - Quality management Configuration management">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISOPAS8800" value="ISO/PAS 8800 - Road vehicles Safety and AI">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_FMVSS" value="Federal Motor Vehicle Safety Standards">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_J3307" value="SAE J3307 - STPA Hazard Analysis">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSC00003" value="SAE AVSC 00003 - Trip Interruption">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSC00004" value="SAE AVSC 00004 - Data Recording">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSC00006" value="SAE AVSC 00006 - Safety Metrics">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCI01" value="SAE AVSC-I-01 - First Responder Interaction">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCI04" value="SAE AVSC-I-04 - Remote Operations">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCI05" value="SAE AVSC-I-05 - Post-Crash Operations">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCD03" value="SAE AVSC-D-03 - Safety Inspections">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_14CFR5" value="14 CFR Part 5 - Safety Management Systems">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_IATF16949" value="IATF 16949 - Automotive Quality Management">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_GermanEthics" value="German Ethics Commission Report on Automated Driving">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SMS" value="Safety Management System">
+      <name />
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>

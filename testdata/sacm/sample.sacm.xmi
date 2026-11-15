@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="SAMPLE">
+  <name content="Sample Assurance Case" />
+  <description xmi:id="generated_1">
+    <content>
+      <value lang="en" content="A minimal sample for demonstration" />
+    </content>
+  </description>
+  <argumentPackage xmi:id="AP1">
+    <name content="Safety Argument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1">
+      <name content="Top Goal" />
+      <description xmi:id="generated_3">
+        <content>
+          <value content="The system is safe" />
+        </content>
+      </description>
+      <description xmi:id="generated_2">
+        <content>
+          <value lang="en" content="Top-level safety claim" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G2">
+      <name content="Sub Goal 1" />
+      <description xmi:id="generated_4">
+        <content>
+          <value content="Hazards are identified" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3">
+      <name content="Sub Goal 2" />
+      <description xmi:id="generated_5">
+        <content>
+          <value content="Risks are mitigated" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G4">
+      <name content="New Goal" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1">
+      <name content="Strategy 1" />
+      <description xmi:id="generated_6">
+        <content>
+          <value content="Argue over identified hazards" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S2">
+      <name content="Strategy 2" />
+      <description xmi:id="generated_7">
+        <content>
+          <value content="Argue over mitigation measures" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV1" referencedArtifactElement="ART_HazardAnalysis">
+      <name content="Evidence 1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV2" referencedArtifactElement="ART_TestReport">
+      <name content="Evidence 2" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="R1" source="G4" target="G1">
+      <name />
+    </argumentElement>
+  </argumentPackage>
+  <artifactPackage xmi:id="ARP1">
+    <name content="Artifacts" />
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_HazardAnalysis">
+      <name content="Hazard Analysis Report" />
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_TestReport">
+      <name content="System Test Report" />
+    </artifactElement>
+  </artifactPackage>
+  <terminologyPackage xmi:id="TP1">
+    <name content="Terminology" />
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAFE" value="System operates without causing harm">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_TEST" value="Verification through testing">
+      <name />
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>

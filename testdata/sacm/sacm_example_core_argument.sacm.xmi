@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="acp_vehicle_braking">
+  <name content="VehicleBrakingAssuranceCase" />
+  <description xmi:id="generated_1">
+    <content>
+      <value lang="en" content="Simple assurance case demonstrating core SACM argumentation elements." />
+    </content>
+  </description>
+  <argumentPackage xmi:id="argpkg_braking">
+    <name content="BrakingArgumentPackage" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cl_top">
+      <name content="TopClaim" />
+      <description xmi:id="generated_2">
+        <content>
+          <value lang="en" content="The braking function is acceptably safe in the defined operational context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cl_sub_1">
+      <name content="SubClaim_Architecture" />
+      <description xmi:id="generated_3">
+        <content>
+          <value lang="en" content="The braking system architecture mitigates identified hazardous failures." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cl_sub_2" assertionDeclaration="needsSupport">
+      <name content="SubClaim_Verification" />
+      <description xmi:id="generated_4">
+        <content>
+          <value lang="en" content="Verification activities demonstrate braking requirements are satisfied." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cl_assumption_1" assertionDeclaration="assumed">
+      <name content="Assumption_Environment" />
+      <description xmi:id="generated_5">
+        <content>
+          <value lang="en" content="Road friction remains within the assumed operating envelope." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ar_1">
+      <name content="Reasoning_ArchitectureAndVerification" />
+      <description xmi:id="generated_6">
+        <content>
+          <value lang="en" content="If the architecture mitigates hazards and verification shows requirements satisfaction, then the top safety claim is supported." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="ctx_1">
+      <name content="OperationalDesignDomainContext" />
+      <description xmi:id="generated_7">
+        <content>
+          <value lang="en" content="Operational design domain definition for the braking function." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="ev_1">
+      <name content="BrakeFMEAReference" />
+      <description xmi:id="generated_8">
+        <content>
+          <value lang="en" content="Reference to brake system FMEA report." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="ev_2">
+      <name content="BrakeVerificationReportReference" />
+      <description xmi:id="generated_9">
+        <content>
+          <value lang="en" content="Reference to braking verification report." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="inf_1" reasoning="ar_1" source="cl_sub_1 cl_sub_2" target="cl_top">
+      <name content="Inference_ToTop" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="inf_2" source="cl_assumption_1" target="cl_sub_1">
+      <name content="Inference_AssumptionToArchitecture" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="acx_1" source="ctx_1" target="cl_top">
+      <name content="Context_ForTopClaim" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="ae_1" source="ev_1" target="cl_sub_1">
+      <name content="Evidence_ForArchitectureClaim" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="ae_2" source="ev_2" target="cl_sub_2">
+      <name content="Evidence_ForVerificationClaim" />
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>
