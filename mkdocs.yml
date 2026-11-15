@@ -43,6 +43,7 @@ nav:
   - Roadmap:
     - Rust rebuild, Phase 0: roadmap/rust-rebuild-phase-0.md
     - Canvas spike findings: spikes/canvas.md
+    - Desktop shell spike findings: spikes/desktop-shell.md
   - Standards:
     - SACM to GSN mapping: standards/sacm-gsn-mapping.md
     - GSN metamodel gaps: standards/sacm-gsn-metamodel-gaps.md

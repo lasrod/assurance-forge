@@ -242,8 +242,8 @@ allows for them from milestone 1.
 
 ## What remains in Phase 0
 
-- [ ] **Spike: desktop shell.** Tauri and DATUM, opening a SACM file through
-      libSACM and showing the tree.
+- [x] **Spike: desktop shell.** Done; see the [findings](../spikes/desktop-shell.md).
+      Tauri, React and DATUM on a Rust core open, edit and save a SACM file.
 - [x] **Spike: GSN canvas.** Done; see the [findings](../spikes/canvas.md). Text
       measured in Rust matches the browser, and the diagram is drawn on a canvas.
 - [ ] **Spike: one core, two targets.** The same crate running natively and as
