@@ -1,100 +1,21 @@
-# Build directories
-build/
-build-coverage/
-build-docs/
-build-sacm-standalone/
-out/
-cmake-build-*/
+# Rust
+/target/
 
-# IDE
-.vs/
+# Frontend
+node_modules/
+dist/
+
+# Documentation site
+/site/
+
+# Working state the tool keeps beside a case file
+*.af/
+
+# Editors and operating systems
 .vscode/
-.claude/*
-!.claude/agents/
-# Skills are shared project knowledge, not local tooling config.
-!.claude/skills/
-# The project hook that refuses writes to write-denied agents (#326) is policy,
-# not a personal setting. settings.local.json stays untracked.
-!.claude/settings.json
-*.user
-*.suo
-*.sln
-*.vcxproj*
-
-# Compiled binaries
-*.exe
-*.dll
-*.lib
-*.pdb
-*.obj
-*.o
-*.a
-
-# CMake generated
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-compile_commands.json
-cmake_test_discovery_*.json
-
-# CTest working directory (created by running ctest from the repository root)
-Testing/
-
-# Captured build and test output. These belong in a terminal or a CI log, not in
-# git: they are machine- and moment-specific, and a stale one is worse than none
-# (a committed test log claiming 383 tests outlived the suite reaching 1207).
-build_out.txt
-build_output.txt
-*_tests.txt
-*build*.log
-LastTest.log
-# Machine-written test and coverage reports.
-test-results.xml
-test_results.xml
-junit*.xml
-coverage*.xml
-cobertura*.xml
-
-# One-off scratch files for composing issues, PRs and commit messages.
-issue-body.md
-pr-body.md
-commit-msg.txt
-
-# FetchContent downloads
-_deps/
-
-# OMG SACM reference artifacts (fetch with: bash scripts/fetch-sacm23-references.sh)
-third_party/
-
-# OS
+.idea/
 .DS_Store
 Thumbs.db
 
-# Temporary files
-tmp/
-
-# Coverage HTML reports
-coverage_full/
-coverage_core/
-
-# Generated docs output
-site/
-
-# Vendored Mermaid JS (download with: curl -fsSL https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js -o docs/javascripts/mermaid.min.js)
-docs/javascripts/mermaid.min.js
-
-# Generated docs diagrams (keep folder placeholder)
-docs/diagrams/generated/*
-!docs/diagrams/generated/.gitkeep
-!docs/diagrams/generated/*.mmd
-
-# Python
-__pycache__/
-*.pyc
-
-# ImGui state
-imgui.ini
-
-# Screenshots produced by .claude/skills/run-assurance-forge
-shots/
+# Local agent settings
+.claude/settings.local.json

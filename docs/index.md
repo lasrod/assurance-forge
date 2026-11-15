@@ -1,76 +1,29 @@
 # Assurance Forge
 
-Assurance Forge is an open-source tool for creating, reviewing, and maintaining structured assurance cases and safety cases.
+Assurance Forge is an open-source tool for building, reviewing and navigating
+safety cases. Engineers work in Goal Structuring Notation (GSN); the case is
+stored as standard SACM 2.3 XMI.
 
-The application is built in C++ using Dear ImGui and is designed around structured argumentation concepts such as SACM and GSN.
+## Where things stand
 
-![The Assurance Forge window: case explorer, GSN canvas and element inspector](screenshot/dark.png)
+Assurance Forge is being rebuilt in Rust. This site describes that work.
 
-!!! warning "Alpha software"
-    Assurance Forge is under active development. SACM XML is the source of truth
-    and preserving it is a primary design constraint, but keep your assurance
-    data in version control and keep backups. What is claimed, per capability
-    and with the tests behind it, is the [capability matrix](features/feature-matrix.md);
-    if a capability is not there, treat it as not claimed.
+| You want | Go to |
+|---|---|
+| A tool to use today | The C++ application: [release 0.3.0-alpha.3](https://github.com/lasrod/assurance-forge/releases/tag/0.3.0-alpha.3). Its documentation is on the [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp/docs). |
+| The plan for the rebuild | [Rust rebuild, Phase 0](roadmap/rust-rebuild-phase-0.md) |
+| The shape of the new code | [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md) |
+| How GSN is expressed in SACM | [SACM to GSN mapping](standards/sacm-gsn-mapping.md) |
+| What the C++ version can do | [Capability matrix](reference/cpp-capability-matrix.md) |
 
-<div class="grid cards" markdown>
+## What is on this site
 
--   :material-file-document-check-outline:{ .lg .middle } **SACM-First Foundation**
+- **Roadmap.** What was decided for the rebuild and what comes next.
+- **Standards.** How GSN maps onto SACM, with the evidence for each mapping, and
+  where the two metamodels do not line up. These hold for any implementation.
+- **C++ version.** The capability and GSN conformance matrices of the C++
+  application as of release 0.3.0-alpha.3. They are the reference for what the
+  Rust tool has to match, and they are not maintained here.
 
-    ---
-
-    Consumes and produces SACM 2.3 XML through an independent, reusable SACM library. An edit the standard cannot express is refused, not approximated.
-
--   :material-graph-outline:{ .lg .middle } **GSN Visualization**
-
-    ---
-
-    Structured safety arguments rendered automatically — including pattern, dialectic and ACP notation. No manual node positioning.
-
--   :material-robot-outline:{ .lg .middle } **AI-Assisted Review**
-
-    ---
-
-    Provider-agnostic AI with configurable profiles evaluates arguments and identifies weaknesses. Nothing is sent without your explicit action.
-
--   :material-shield-check-outline:{ .lg .middle } **SCCG Integration**
-
-    ---
-
-    Safety Case Core Guidelines built into review, into mechanical checks, and into the guidance an external AI client is given.
-
--   :material-source-branch:{ .lg .middle } **Your Own AI Client, Over MCP**
-
-    ---
-
-    An AI client you run yourself can read the case and propose changes — landing in a working draft a human accepts, never applied behind your back.
-
--   :material-history:{ .lg .middle } **Audited by Construction**
-
-    ---
-
-    Every edit is a replayable transaction with undo boundaries, baselines, snapshots, and a timeline that reconstructs the argument as it stood.
-
--   :material-translate:{ .lg .middle } **Two Languages, Reviewed**
-
-    ---
-
-    Arguments carry a second language end to end; machine-translated text is held for an explicit reviewer acceptance.
-
--   :material-map-outline:{ .lg .middle } **[View the Roadmap &rarr;](roadmap/public.md)**
-
-    ---
-
-    See what is stable, what is planned next, and what is on the long-term horizon.
-
-</div>
-
-## Documentation
-
-- **[User Guide](user-guide/index.md)** — open a project, navigate and edit the argument, review it, work with evidence, export, and connect an AI client.
-- **[Features](features/index.md)** — the [capability matrix](features/feature-matrix.md) plus per-feature documentation: [terminology assist](features/terminology-assist.md), the [MCP server](features/mcp-server.md), the [confidence panel](features/confidence-panel-prototype.md).
-- **[Standards](sacm/index.md)** — [SACM 2.3 conformance](sacm/sacm-conformance-matrix.md), [GSN v3 conformance](gsn/gsn-v3-conformance-matrix.md), the [SACM–GSN mapping](sacm/sacm-gsn-mapping.md), and the verification records behind them.
-- **[Architecture](architecture/index.md)** — component layout, [layers and ownership](architecture/layers-and-ownership.md), and the [decision records](architecture/decisions/index.md).
-- **[Developer Guide](developer-guide/index.md)** — building, testing, generating diagrams, and the repository's own [quality evidence](quality/evidence-index.md).
-
-Not sure which page is authoritative? The [documentation map](documentation-map.md) says which document wins on conflict.
+The SACM library itself is a separate project:
+[libSACM](https://github.com/lasrod/libSACM).

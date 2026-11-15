@@ -18,12 +18,12 @@ normative for the notation. The GSN **Metamodel** Specification **v2.2** (July
 2021) is normative for interchange but models GSN **v2** — it has never been
 revised for v3. Where v2.2 forbids something v3 requires, *the metamodel is the
 stale artifact, not our behaviour*. Do not "fix" a v3 feature by removing it to
-satisfy v2.2 OCL. Record the conflict in `docs/sacm/sacm-gsn-metamodel-gaps.md`
+satisfy v2.2 OCL. Record the conflict in `docs/standards/sacm-gsn-metamodel-gaps.md`
 instead — that document is an active change proposal to the SCSC ACWG and the
 OMG SACM 2.4 RTF, and it is where the project's leverage lives.
 
 **2. Never guess a mapping.** Every GSN→SACM mapping in this project is
-evidence-backed and recorded in `docs/sacm/sacm-gsn-mapping.md` with its basis
+evidence-backed and recorded in `docs/standards/sacm-gsn-mapping.md` with its basis
 (`[M]` mapping, `[N]` evidenced absence, `[G]` genuine gap). If a construct you
 need is not in that table, it is an open decision — raise it, add a row, and say
 what the evidence is. Do not pick the plausible option in code.
@@ -63,22 +63,19 @@ Load the one that matches the task.
 Repository documents that are authoritative and must not be duplicated into this
 skill — read them directly:
 
-- `docs/sacm/sacm-gsn-mapping.md` — the GSN→SACM 2.3 mapping table and its evidence.
-- `docs/sacm/sacm-gsn-metamodel-gaps.md` — where the standards fall short, with clause-level citations.
-- `docs/sacm/sacm-conformance-matrix.md` — SACM requirement IDs; tests embed them.
-- `docs/features/feature-matrix.md` — which GSN capabilities actually ship today.
+- `docs/standards/sacm-gsn-mapping.md` — the GSN→SACM 2.3 mapping table and its evidence.
+- `docs/standards/sacm-gsn-metamodel-gaps.md` — where the standards fall short, with clause-level citations.
+- `docs/reference/cpp-gsn-v3-conformance-matrix.md` — GSN v3 requirements and how the C++ application met them.
+- `docs/reference/cpp-capability-matrix.md` — which GSN capabilities the C++ application shipped.
+- `ARCHITECTURE.md` — where GSN code lives in the Rust rebuild.
 
 ## Before you finish any GSN change
 
-- Does `docs/features/feature-matrix.md` still describe reality? A new decorator
-  or element kind almost always moves a row. The `feature_matrix_check` CTest
-  will fail if a `planned` row has acquired tests, but it cannot notice a
-  `supported` row that quietly grew a caveat — that judgement is yours.
 - Does the change touch a mapping decision? Then `sacm-gsn-mapping.md` needs a
-  row, and the SACM conformance matrix may need one too.
-- Canvas and SVG export are **separate renderers** with separate models. A
-  decorator added to the canvas is not in exported diagrams until it is added to
-  `src/export/` as well, and the omission is silent. This has already produced a
-  real defect (AF-ENG-015), and not a cosmetic one: the export projected
-  challenges as support, drawing counter-evidence as evidence *for* the claim.
-- Every user-visible string goes through `AF_TR` / `ui::i18n`.
+  row with its evidence.
+- Is there one geometry? Layout produces the shapes that both the canvas and the
+  SVG export draw. The C++ application had two renderers, and its export once
+  drew counter-evidence as evidence *for* a claim because a change reached only
+  one of them. Do not add a second renderer.
+- Does the core return a code with arguments, leaving the text to the frontend?
+- Is `ARCHITECTURE.md` still accurate?

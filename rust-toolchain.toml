@@ -1,0 +1,6 @@
+# Development toolchain. The minimum supported Rust version is `rust-version`
+# in Cargo.toml.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

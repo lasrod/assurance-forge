@@ -6,14 +6,10 @@ repo_name: lasrod/assurance-forge
 
 theme:
   name: material
-  # Open Graph and Twitter card tags for shared links: overrides/main.html.
-  custom_dir: overrides
   features:
-    - navigation.tabs
     - navigation.sections
     - navigation.indexes
     - content.code.copy
-    - content.tabs.link
     - search.suggest
     - search.highlight
   palette:
@@ -36,104 +32,19 @@ markdown_extensions:
   - md_in_html
   - tables
   - pymdownx.details
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - pymdownx.snippets:
-      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
-          class: mermaid-source
-          format: !!python/name:pymdownx.superfences.fence_div_format
-
-extra_css:
-  - stylesheets/extra.css
-
-extra_javascript:
-  - javascripts/mermaid-config.js
-  - javascripts/mermaid.min.js
-  - javascripts/mermaid-init.js
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
   - Home: index.md
-  - User Guide:
-    - Overview: user-guide/index.md
-    - Open a Project: user-guide/open-a-project.md
-    - Navigate the Argument: user-guide/navigate-the-argument.md
-    - Edit the Argument: user-guide/edit-the-argument.md
-    - Review an Element: user-guide/review-an-element.md
-    - Evidence and Registers: user-guide/evidence-and-registers.md
-    - Export a Diagram: user-guide/export-a-diagram.md
-    - Connect an AI Client: user-guide/connect-an-ai-client.md
-  - Features:
-    - Overview: features/index.md
-    - Capability Matrix: features/feature-matrix.md
-    - Terminology Assist: features/terminology-assist.md
-    - Confidence Panel Prototype: features/confidence-panel-prototype.md
-    - MCP Server: features/mcp-server.md
-    - MCP Authoring Quality: features/mcp-authoring-quality-plan.md
   - Roadmap:
-    - Product Roadmap: roadmap/public.md
-    - Workflow: roadmap/workflow.md
-    - Demo Plan (2026-08): roadmap/demo-2026-08.md
-    - Rust Rebuild (Phase 0): roadmap/rust-rebuild-phase-0.md
+    - Rust rebuild, Phase 0: roadmap/rust-rebuild-phase-0.md
   - Standards:
-    - Overview: sacm/index.md
-    - GSN v3 Conformance: gsn/gsn-v3-conformance-matrix.md
-    - SACM 2.3 Conformance statement: sacm/sacm-conformance-statement.md
-    - SACM 2.3 Compliance points: sacm/sacm-compliance-points.md
-    - SACM integration preservation: sacm/sacm-integration-preservation.md
-    - SACM 2.3 Conformance: sacm/sacm-conformance-matrix.md
-    - Verification Records: sacm/verification/README.md
-    - SACM–GSN Mapping: sacm/sacm-gsn-mapping.md
-    - GSN Metamodel Gaps: sacm/sacm-gsn-metamodel-gaps.md
-  - Architecture:
-      - Overview: architecture/index.md
-      - Layers and Ownership: architecture/layers-and-ownership.md
-      - Legacy Bridge Migration Plan: architecture/legacy-bridge-migration-plan.md
-      - Runtime and State: architecture/runtime-state.md
-      - Frame Ordering and Draft Views: architecture/frame-and-draft-views.md
-      - Promotable by Construction: architecture/promotable-by-construction.md
-      - Parser and SACM: architecture/parser-sacm.md
-      - App Shell and UI Areas: architecture/app-shell.md
-      - UI Panels: architecture/ui-panels.md
-      - Controllers: architecture/controllers.md
-      - Project Storage: architecture/project-storage.md
-      - Review and AI: architecture/review-ai.md
-      - Integrated Draft Workspace (planned): architecture/integrated-draft-workspace-plan.md
-      - AI Inference and Projectless MCP (planned): architecture/ai-inference-and-projectless-mcp-plan.md
-      - SCCG Tool-Integration Conformance (planned): architecture/sccg-conformance-plan.md
-      - Decisions (ADRs):
-          - Overview: architecture/decisions/index.md
-          - ADR Template: architecture/decisions/adr-template.md
-          - 0001 Record architecture decisions: architecture/decisions/0001-record-architecture-decisions.md
-          - 0002 Layered architecture with build-time gates: architecture/decisions/0002-layered-architecture-with-build-time-gates.md
-          - 0003 SACM XML as the source of truth: architecture/decisions/0003-sacm-xml-as-source-of-truth.md
-          - 0004 MkDocs Material documentation site: architecture/decisions/0004-mkdocs-material-documentation-site.md
-          - 0005 Provider-agnostic AI with explicit user consent: architecture/decisions/0005-provider-agnostic-ai-with-user-consent.md
-          - 0006 SACM 2.3 as an independent reusable library: architecture/decisions/0006-sacm-23-independent-library.md
-          - 0007 Explicit consent for sharing over MCP: architecture/decisions/0007-mcp-server-consent.md
-          - 0008 One owner for the open project: architecture/decisions/0008-one-owner-for-the-open-project.md
-          - 0009 One integrated working draft per argument file: architecture/decisions/0009-one-integrated-working-draft-per-argument.md
-          - 0010 Draft provenance, persistence and human promotion: architecture/decisions/0010-draft-provenance-persistence-and-human-promotion.md
-          - 0011 Panels own their view types: architecture/decisions/0011-panels-own-their-view-types.md
-          - 0012 A claim carries one Description: architecture/decisions/0012-a-claim-carries-one-description.md
-          - 0013 Review methods independent of inference providers: architecture/decisions/0013-review-methods-independent-of-inference-providers.md
-          - 0014 Projectless MCP discovery with runtime case binding: architecture/decisions/0014-projectless-mcp-discovery-with-runtime-case-binding.md
-          - 0015 Versioned provider profiles and fail-closed selection: architecture/decisions/0015-versioned-provider-profiles-and-fail-closed-selection.md
-          - 0016 The working draft is a SACM document: architecture/decisions/0016-the-draft-is-a-sacm-document.md
-      - Generated Class Diagrams: architecture/generated-class-diagrams.md
-  - Developer Guide:
-      - Overview: developer-guide/index.md
-      - Documentation Map: documentation-map.md
-      - Generating Class Diagrams: developer-guide/generating-class-diagrams.md
-      - Running Tests: developer-guide/running-tests.md
-      - Repository Quality Baseline: quality/repository-baseline.md
-      - Repository Assurance Case: quality/assurance-case.md
-      - Evidence Index: quality/evidence-index.md
-      - Code Quality Policy: quality/code-quality-policy.md
-      - Hotspot Register: quality/hotspot-register.md
-      - Static Analysis: quality/static-analysis.md
-      - Code Coverage: COVERAGE.md
-      - Releasing: RELEASING.md
+    - SACM to GSN mapping: standards/sacm-gsn-mapping.md
+    - GSN metamodel gaps: standards/sacm-gsn-metamodel-gaps.md
+  - C++ version:
+    - Capability matrix: reference/cpp-capability-matrix.md
+    - GSN v3 conformance matrix: reference/cpp-gsn-v3-conformance-matrix.md

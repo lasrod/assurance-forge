@@ -1,132 +1,43 @@
 name: Docs Pages
 
 on:
-  pull_request:
-    paths:
-      - docs/**
-      - mkdocs.yml
-      - overrides/**
-      - requirements-docs.txt
-      - .clang-uml
-      - src/**
-      - .github/workflows/docs-pages.yml
-      - .github/workflows/docs.yml
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - docs/**
       - mkdocs.yml
-      - overrides/**
       - requirements-docs.txt
-      - .clang-uml
-      - src/**
       - .github/workflows/docs-pages.yml
-      - .github/workflows/docs.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: pages
   cancel-in-progress: true
 
 jobs:
   build:
     name: Build docs site
-    runs-on: ubuntu-24.04
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: requirements-docs.txt
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          # clang-18 + libstdc++-13-dev are needed so libclang (used by
-          # clang-uml to parse our TUs) resolves the libstdc++ 13 headers
-          # that ship `std::expected`. Configuring CMake with clang (not
-          # gcc) keeps the emitted compile_commands.json clang-native, so
-          # clang-uml does not have to re-interpret gcc-only driver flags.
-          sudo apt-get install -y \
-            ninja-build clang-18 libstdc++-13-dev \
-            xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev \
-            libssl-dev libcurl4-openssl-dev
-
-      - name: Install clang-uml (pinned release)
-        env:
-          CLANG_UML_VERSION: "0.6.2"
-          CLANG_UML_SHA256: "992be77258b9c6f1bd7c8883bd1e2491c0d55ae8a884308848eb3b76a35089a3"
-        run: |
-          set -euo pipefail
-
-          package_url="https://github.com/bkryza/clang-uml/releases/download/${CLANG_UML_VERSION}/clang-uml_${CLANG_UML_VERSION}-0ubuntu1ppa1.noble_amd64.deb"
-          package_path="${RUNNER_TEMP}/clang-uml.deb"
-
-          curl -fL "$package_url" -o "$package_path"
-          actual_sha256="$(sha256sum "$package_path" | cut -d ' ' -f 1)"
-          if [ "$actual_sha256" != "$CLANG_UML_SHA256" ]; then
-            echo "clang-uml checksum mismatch" >&2
-            echo "Expected: $CLANG_UML_SHA256" >&2
-            echo "Actual:   $actual_sha256" >&2
-            exit 1
-          fi
-
-          sudo apt-get install -y "$package_path"
-          clang-uml --version
-
-      - name: Generate compile database
-        run: |
-          # Use clang as the compiler so compile_commands.json contains
-          # clang-native invocations. clang-uml's libclang then parses
-          # the TUs with the exact same flags (including `-std=gnu++23`)
-          # the database carries, which avoids the GCC/clang flag
-          # translation that was dropping the C++23 standard request
-          # and breaking lookups of `std::expected`.
-          cmake -S . -B build-docs -G Ninja \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DHELLOIMGUI_DOWNLOAD_GLFW_IF_NEEDED=ON
-
-      - name: Generate Mermaid class diagrams
-        # `add_compile_flags: [-std=c++23]` in .clang-uml supplies the
-        # C++ standard if any TU's database entry is missing it.
-        run: clang-uml -g mermaid
-
-      - name: Install docs dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-docs.txt
-
-      - name: Download Mermaid JS
-        run: |
-          curl -fsSL https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js \
-               -o docs/javascripts/mermaid.min.js
-
-      - name: Build MkDocs (strict)
-        run: python -m mkdocs build --strict
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+      - run: pip install -r requirements-docs.txt
+      - run: mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pages: write
@@ -134,8 +45,6 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Deploy
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v5
