@@ -42,8 +42,10 @@ Every step the script took in the built application passed:
 | Open a file libSACM refuses | An error with the line and column; no tree. |
 
 The saved file was valid in libSACM, survived a strict round trip, and differed
-from the original in the one renamed element only: the same 278 ids, and the
-same text values apart from the name.
+from the file that was opened in the one renamed element only: the same 278
+ids, and the same text values apart from the name. The file that was opened is
+the converted sample described in finding 5, not the original bilingual sample,
+so this says nothing about preserving the content that conversion dropped.
 
 ### 2. It is small and fast enough
 
