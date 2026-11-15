@@ -244,8 +244,8 @@ allows for them from milestone 1.
 
 - [ ] **Spike: desktop shell.** Tauri and DATUM, opening a SACM file through
       libSACM and showing the tree.
-- [ ] **Spike: GSN canvas.** The largest real case, with pan, zoom and editing.
-      Text measurement in Rust, including Japanese, is the first thing to test.
+- [x] **Spike: GSN canvas.** Done; see the [findings](../spikes/canvas.md). Text
+      measured in Rust matches the browser, and the diagram is drawn on a canvas.
 - [ ] **Spike: one core, two targets.** The same crate running natively and as
       WebAssembly.
 - [x] **Release plan.** The five milestones above.
