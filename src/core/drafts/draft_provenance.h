@@ -79,4 +79,14 @@ struct DraftContribution {
 // skipped rather than guessed at.
 std::vector<DraftContribution> ReadDraftProvenance(const sacm_adapter::LibraryDocument& document);
 
+// Adds `contributions` to an accept's attribution: each contributor's label, or
+// its source where it gave none, and `"<title>: <rationale>"` for each that gave
+// a reason. What is already listed is not listed twice, so this can run after
+// the change groups have reported the same contributor.
+//
+// This is what puts a hand edit in the audit record: it has no change group.
+void AddDraftContributions(const std::vector<DraftContribution>& contributions,
+                           std::vector<std::string>& source_labels,
+                           std::vector<std::string>& rationales);
+
 } // namespace core::drafts

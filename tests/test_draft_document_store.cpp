@@ -2,6 +2,7 @@
 
 #include "core/derived_views.h"
 #include "core/drafts/draft_document_diff.h"
+#include "core/drafts/draft_provenance.h"
 #include "core/project_file_io.h"
 #include "sacm_adapter/case_projection.h"
 #include "sacm_adapter/document_edit.h"
@@ -11,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <system_error>
 
@@ -448,4 +450,40 @@ TEST(DraftDocumentStoreTest, AnUnreadableDraftIsNeverReplacedByAFreshOne) {
     ASSERT_TRUE(store.Open(root.path, argument, *accepted, error)) << error;
     EXPECT_FALSE(store.unreadable());
     EXPECT_TRUE(store.EnsureDraft(*accepted, error)) << error;
+}
+
+// The write is the one step that can fail after the tags are dealt with. A draft
+// that came back from a failed accept without them would have lost who wrote it,
+// and the retry would record nobody.
+TEST(DraftDocumentStoreTest, AFailedAcceptKeepsTheDraftsProvenanceForTheRetry) {
+    TempDir dir(test_support::UniqueTempDirectory("draft_document_store"));
+    const std::filesystem::path argument = dir.path / "arguments" / "main.sacm";
+    const std::unique_ptr<sacm_adapter::LibraryDocument> accepted = NewAcceptedDocument(argument, "Case");
+    ASSERT_NE(accepted, nullptr);
+
+    core::drafts::DraftDocumentStore store;
+    std::string error;
+    ASSERT_TRUE(store.Open(dir.path, argument, *accepted, error)) << error;
+    ASSERT_TRUE(store.EnsureDraft(*accepted, error)) << error;
+
+    core::drafts::DraftProvenance provenance;
+    provenance.contribution_id = "group-1";
+    provenance.source = core::drafts::DraftSource::Mcp;
+    provenance.label = "Claude Code";
+    const std::string claim = FirstClaimId(sacm_adapter::project_case(*store.document()));
+    ASSERT_TRUE(core::drafts::WriteDraftProvenance(*store.document(), {claim}, provenance, error)) << error;
+    store.MarkChanged();
+
+    // A directory with something in it cannot be replaced by a file.
+    const std::filesystem::path unwritable = dir.path / "occupied";
+    std::filesystem::create_directories(unwritable);
+    std::ofstream(unwritable / "keeps-it-occupied") << "x";
+
+    ASSERT_FALSE(store.AcceptInto(unwritable, error));
+    ASSERT_TRUE(store.active()) << "a failed accept must leave the draft to retry";
+    EXPECT_EQ(core::drafts::ReadDraftProvenance(*store.document()).size(), 1u) << "the failed accept lost who wrote it";
+
+    ASSERT_TRUE(store.AcceptInto(argument, error)) << error;
+    EXPECT_EQ(ReadFile(argument).find(core::drafts::kDraftProvenanceTagPrefix), std::string::npos)
+        << "the accepted argument carries a record of the draft";
 }

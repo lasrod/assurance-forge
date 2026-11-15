@@ -131,4 +131,22 @@ std::vector<DraftContribution> ReadDraftProvenance(const sacm_adapter::LibraryDo
     return contributions;
 }
 
+void AddDraftContributions(const std::vector<DraftContribution>& contributions,
+                           std::vector<std::string>& source_labels,
+                           std::vector<std::string>& rationales) {
+    const auto add_unique = [](std::vector<std::string>& values, const std::string& value) {
+        if (std::find(values.begin(), values.end(), value) == values.end())
+            values.push_back(value);
+    };
+    for (const DraftContribution& contribution : contributions) {
+        const DraftProvenance& provenance = contribution.provenance;
+        add_unique(source_labels,
+                   provenance.label.empty() ? std::string(DraftSourceToString(provenance.source)) : provenance.label);
+        if (!provenance.rationale.empty()) {
+            const std::string& title = provenance.title.empty() ? provenance.contribution_id : provenance.title;
+            add_unique(rationales, title + ": " + provenance.rationale);
+        }
+    }
+}
+
 } // namespace core::drafts

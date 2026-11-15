@@ -478,6 +478,9 @@ void AppRuntime::RenderFrame(bool& done) {
     feedback_dock_callbacks.draft_changes.focus_group = [this](const std::string& group_id) {
         FocusDraftGroup(group_id);
     };
+    feedback_dock_callbacks.draft_changes.focus_element = [this](const std::string& element_id) {
+        FocusDraftElement(element_id);
+    };
     {
         core::perf::ScopedTimer s("app.area.feedback_dock");
         areas::RenderFeedbackDockArea(*impl_, regions.feedback_dock, kPanelFlags, feedback_dock_callbacks);
