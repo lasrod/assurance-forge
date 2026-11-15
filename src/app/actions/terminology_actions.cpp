@@ -46,7 +46,6 @@ using detail::OpenTerminologyProblemTerm;
 using detail::QuickDefineTargetPackageResult;
 using detail::RefreshVisibleTerminologyContextProjection;
 using detail::ResolveQuickDefineTargetPackage;
-using detail::SetStatus;
 using detail::SyncVisibleTerminologyContextToParser;
 using detail::TermDraftFromEditor;
 using detail::TerminologySuggestionKey;

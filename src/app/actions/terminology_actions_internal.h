@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/actions/action_status.h"
 #include "app/app_events.h"
 #include "app/app_runtime_state.h"
 #include "core/app_state.h"
@@ -15,10 +16,6 @@ namespace app {
 struct AppRuntimeState;
 
 namespace actions::detail {
-
-inline void SetStatus(AppRuntimeState& state, const std::string& message) {
-    state.events.Emit(StatusMessageEvent{message});
-}
 
 std::string TerminologySuggestionKey(const std::string& element_id, const std::string& term_value);
 
