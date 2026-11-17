@@ -58,7 +58,7 @@ it has a change stream to own.
 
 ## Decisions this plan takes
 
-Each is a proposal until the tracking issue records agreement.
+Each is a proposal until the tracking issue, [#493](https://github.com/lasrod/assurance-forge/issues/493), records agreement.
 
 | # | Decision | Why |
 |---|---|---|
@@ -151,7 +151,7 @@ an argument is read, and get the independent review described in
 
 | Goal | Outcome | Check | Needs |
 |---|---|---|---|
-| **G1** † | Reading rules recorded in the mapping record; the open rows decided or left drawing a neutral shape | Independent review passes; the user agrees the open rows in the tracking issue | |
+| **G1** † | Reading rules recorded in the mapping record; the open rows decided or left drawing a neutral shape | Independent review passes; the user agrees the open rows in #493 | |
 | **G2** † | `af-gsn` derives a view from a `sacm::Document`: nodes with kind, labels and decorators; edges in GSN direction with their SACM relationship id; coded items for what it could not place | `cargo test -p af-gsn`: the expected view, and D4 for every sample libSACM reads. `cargo build -p af-gsn --target wasm32-unknown-unknown` | G1 |
 | **G3** | `af-layout` measures and wraps text from font bytes, sizes nodes per kind, lays out the tree, and returns a render model: shapes, text runs, edge lines with arrowhead kind, decorators. Measurements are cached per text and width. | `cargo test -p af-layout`: output is deterministic; no two nodes overlap; edges end on their node's outline; children sit below their parent and context beside it; native layout within budget. Wasm build. | G2 |
 | **G4** | `af-api`: `open(bytes)` answers with a revision and diagnostic counts, or a refusal code with line and column; `diagram()` returns the render model at the revision; `element(id)` returns the details panel's content. TypeScript types generated with `ts-rs`. | `cargo test -p af-api`, including a test that fails when the generated types are stale. Wasm build. | G3 |
@@ -193,7 +193,7 @@ An agent, or a person, runs the plan like this:
 5. For a goal that changes the interface, a screenshot of the running
    application goes in the pull request.
 6. One goal, one pull request. Merge when CI is green and tick the goal in the
-   tracking issue.
+   tracking issue, #493.
 7. If a goal cannot pass without changing its check, stop and ask. Never weaken
    a check to pass it.
 
