@@ -7,14 +7,16 @@ starts. It describes the tool that is planned. What is built so far is stated in
 
 ## What is changing
 
-Assurance Forge will be rebuilt in Rust as a desktop application with a web
-technology user interface. It is a rebuild from the ideas, not a line-by-line
-conversion of the C++ code.
+Assurance Forge will be rebuilt in Rust as a standalone desktop application and
+a web application, with one web technology user interface. It is a rebuild
+from the ideas, not a line-by-line conversion of the C++ code.
 
 - **Core:** Rust, on top of [libSACM](https://github.com/lasrod/libSACM), the
   Rust SACM 2.3 library.
-- **User interface:** React with the DATUM design system, packaged as a desktop
-  application with Tauri.
+- **User interface:** React with the DATUM design system. Tauri packages it as
+  the desktop application; the same interface runs in the browser as the web
+  application, on the core compiled to WebAssembly (`af-wasm`). Decided
+  2026-11-17: every feature works in both.
 - **Repository:** this one, at the same URL. `main` holds the Rust workspace.
   The C++ application is on the
   [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp), and its
@@ -28,7 +30,8 @@ the way the standards intend.
 
 ## Scope of the tool
 
-Assurance Forge stays a fully local desktop tool. It is a document editor for
+Assurance Forge stays a fully local tool, on the desktop and in the browser:
+in both, the case stays on the user's machine. It is a document editor for
 assurance cases:
 
 - All GSN and SACM notation: core elements, pattern notation, modules,
@@ -251,6 +254,9 @@ allows for them from milestone 1.
 - [x] **Release plan.** The five milestones above.
 - [ ] **Remaining decisions:** draft storage and acceptance, MCP consent and
       session binding for a file-based tool, and the shared layout model.
+- [ ] **The web application's shell:** how it opens and saves files, keeps
+      the working-state folder and the recovery copy, holds a provider key,
+      and whether an MCP client can reach it.
 - [x] **Repository setup:** `main` cleared for the Rust workspace, with CI that
       checks only what a change touches.
 - [ ] **Milestone plan** for milestone 1.

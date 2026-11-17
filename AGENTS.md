@@ -1,8 +1,8 @@
 # AGENTS.md
 
-Assurance Forge is a desktop tool for safety case engineering: GSN for the user,
-SACM 2.3 XMI underneath. It is being rebuilt in Rust; almost nothing is built
-yet.
+Assurance Forge is a tool for safety case engineering that runs as a desktop
+application and as a web application: GSN for the user, SACM 2.3 XMI
+underneath. It is being rebuilt in Rust; almost nothing is built yet.
 
 Read first: [`ARCHITECTURE.md`](ARCHITECTURE.md) (shape and rules) and
 [`docs/roadmap/rust-rebuild-phase-0.md`](docs/roadmap/rust-rebuild-phase-0.md)
@@ -22,6 +22,10 @@ workspace before pushing.
 
 ## Rules that are easy to break
 
+- **Desktop and web.** Every feature works in the desktop application (Tauri,
+  `af-desktop`) and in the web application (the core as WebAssembly,
+  `af-wasm`). Only those two shells differ; the interface and the core are
+  the same code.
 - **One model.** The libSACM `Document` is the only model. Never add a second,
   editable representation of the argument. Views are derived and read-only;
   every change is a SACM operation.
@@ -40,6 +44,8 @@ workspace before pushing.
 
 ## Working here
 
+- Always work on a branch and merge through a pull request. Never commit to
+  `main` directly.
 - Keep crates small and isolated. Add a crate when it can be built and tested
   without the rest.
 - Changes to reading, writing, GSN to SACM mapping or edit commands need tests.

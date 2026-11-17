@@ -20,12 +20,16 @@ about what exists.
    derived from it; every change is a SACM operation.
 4. **Fast to change.** A small change is checked in seconds locally and in
    minutes in CI.
+5. **Desktop and web.** The tool runs as a standalone desktop application,
+   built with Tauri, and as a web application in the browser, with the core
+   compiled to WebAssembly. Both have the same interface and the same core;
+   only the shell differs.
 
 ## The system
 
 ```mermaid
 flowchart LR
-    User([Safety engineer]) --> App[Assurance Forge desktop app]
+    User([Safety engineer]) --> App[Assurance Forge<br/>desktop or web app]
     Agent([User's AI assistant]) --> Mcp[MCP server]
     Mcp --> App
     App --> File[(SACM XMI file<br/>and its .af folder)]
@@ -70,7 +74,7 @@ flowchart TD
 | `af-api` | The frontend contract: commands, queries, views | no |
 | `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | no |
 | `af-mcp` | MCP server executable | no |
-| `af-wasm` | Browser wrapper around `af-api` | no |
+| `af-wasm` | Web application shell: `af-api` in the browser, browser file access | no |
 | `ui/` | React and DATUM frontend | no |
 
 A crate is added when it can be built and tested without the rest.
@@ -82,6 +86,7 @@ A crate is added when it can be built and tested without the rest.
 | Every crate down to `af-api` is pure: no file system, network, threads or clock. Those arrive through traits the shells implement. | CI builds these crates for `wasm32-unknown-unknown` |
 | `af-review` and `af-ai` never depend on each other. `af-ai` depends on no other crate of ours. | Cargo dependencies; not yet checked |
 | Only `af-desktop`, `af-mcp` and `af-wasm` touch the outside world. | The first rule |
+| Every feature works in the desktop and the web application. The interface talks to the core through one interface with two implementations, Tauri commands and `af-wasm`. | not yet checked |
 | No `unsafe`. | `unsafe_code = "forbid"` in the workspace lints |
 | The core sends codes and arguments, never sentences. The frontend translates. | not yet checked |
 

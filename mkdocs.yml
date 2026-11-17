@@ -42,6 +42,7 @@ nav:
   - Home: index.md
   - Roadmap:
     - Rust rebuild, Phase 0: roadmap/rust-rebuild-phase-0.md
+    - "Milestone 1, step 1: the diagram": roadmap/milestone-1-diagram.md
     - Canvas spike findings: spikes/canvas.md
     - Desktop shell spike findings: spikes/desktop-shell.md
   - Standards:
