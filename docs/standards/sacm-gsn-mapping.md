@@ -241,3 +241,160 @@ Tests: `SACM23_COMPAT_002_OriginalGsnTypeIsRecordedOnImport`,
 `SACM23_COMPAT_002_GsnAssumptionAndJustificationAreNotPlainGoals`,
 `SACM23_COMPAT_002_RecordedGsnTypeSurvivesSaveAndReload`,
 `SACM23_COMPAT_002_ExplicitAssertionDeclarationBeatsTheGsnType`.
+
+## Reading a SACM 2.3 file as GSN
+
+The table above says how GSN is written into SACM. Opening a SACM 2.3 file needs
+the reverse: which GSN element each SACM element is drawn as, and which edge
+each relationship becomes. The reverse is not unique, because several GSN
+elements share one SACM class. These are the rules the Rust view (`af-gsn`)
+follows. Each has an id that its tests cite, a status and a basis.
+
+**Status.** *Decided*: settled by the mapping table, the standards, or a rule of
+the diagram plan, `docs/roadmap/milestone-1-diagram.md`: the view draws what the
+file says (D3), every argument element appears exactly once (D4), and a case
+without evidence is drawn with a neutral shape and a code, never guessed.
+*Proposed*: a choice between readings that both have a basis, waiting for a
+decision in [#493](https://github.com/lasrod/assurance-forge/issues/493).
+
+Four principles run through the rules:
+
+1. **A Claim's shape comes from what it declares, never from how it is
+   reached.** GSN's element types are kinds of statement. Whether a Goal may be
+   reached by `InContextOf` is a well-formedness question, which the problem
+   list answers. A view that retyped an element by its position would repair the
+   argument while drawing it.
+2. **An `ArtifactReference` declares nothing**, so how it is reached is all
+   there is to go on.
+3. **What these rules do not name is drawn neutral, with a code.** The core
+   sends the code and its arguments; the frontend words it.
+4. **The view reads; it never changes the document.**
+
+The view covers the elements of every `ArgumentPackage` in the document, at any
+depth, in one diagram. Elements of artifact and terminology packages are not
+argument elements and are not drawn; an `ArtifactReference` points at them.
+
+### Nodes
+
+| Rule | SACM | Drawn as | Status | Basis |
+|---|---|---|---|---|
+| R1 | A recorded GSN type: `sacm.import.extensionType` (Goal, Strategy, Solution, Context, Assumption or Justification, in any GSN namespace above), or `assuranceForge.gsn.role` = `Justification` | The recorded type, when it agrees with the element (below). Otherwise R2 to R14 decide, with code AF-VIEW-001 | Decided | "Recording the original GSN type" above; the C++ edit seam's role tag (`src/sacm_adapter/gsn_role_tag.h`). An explicit declaration beats the type there too |
+| R2 | `Claim`, declared `asserted` | Goal | Decided | Mapping table |
+| R3 | `Claim`, declared `needsSupport` | Goal with the undeveloped decorator | Decided | "`undeveloped` occupies the declaration" above |
+| R4 | `Claim`, declared `assumed` | Assumption | Decided | Mapping table |
+| R5 | `Claim`, declared `axiomatic`, however it is reached | Justification | **Proposed** | [R5](#r5-an-axiomatic-claim-is-a-justification) below |
+| R6 | `Claim`, declared `asserted`, reached only by `AssertedContext` | Goal, by R2, with its `InContextOf` edge | **Proposed** | [R6](#r6-a-goal-reached-as-context-stays-a-goal) below |
+| R7 | `Claim`, declared `defeated` or `asCited` | Neutral, code AF-VIEW-002 | Decided | The declaration has taken the one slot that tells Goal, Assumption and Justification apart, so the GSN type is unknown. Challenges and citations are later steps |
+| R8 | `ArgumentReasoning`, wherever it is: an inference's `reasoning`, the target of an `AssertedContext`, or reached by nothing | Strategy | Decided | Mapping table; "Strategy is a node in GSN" above |
+| R9 | `ArtifactReference` reached only as the source of `AssertedEvidence` | Solution | Decided | Mapping table. SACM 2.3 §11.15 allows only an `ArtifactReference` as that source |
+| R10 | `ArtifactReference` reached only as the source of `AssertedContext` | Context | Decided | v2.2 §2.1; "Context — undecidable by design" above |
+| R11 | `ArtifactReference` reached as both, as neither, or in any other way | Neutral, code AF-VIEW-003 | **Proposed** | [R11](#r11-an-artifactreference-that-is-not-plainly-evidence-or-context) below |
+| R12 | Any element with `isCitation` set | Neutral, code AF-VIEW-004 | Decided | Away elements (GSN3-MOD-003) come with modules |
+| R13 | Any element with `isAbstract` set | Its kind by the other rules, with code AF-VIEW-005: the uninstantiated decorator is not drawn yet | Decided | Mapping table, `uninstantiated` ↔ `isAbstract`. Patterns are a later step, and the code keeps the omission visible |
+| R14 | `ArgumentGroup`, `ArgumentPackageInterface`, `ArgumentPackageBinding` | Not drawn, code AF-VIEW-006 | Decided | Modules and contracts are a later step |
+
+A recorded type agrees with the element when: Goal is a `Claim` declared
+`asserted` or `needsSupport`; Assumption, `assumed`; Justification, `axiomatic`;
+Context, an `ArtifactReference` or a `Claim` declared `axiomatic` (v2.2 §2.1);
+Strategy, an `ArgumentReasoning`; Solution, an `ArtifactReference`. Any other
+recorded type (an Away element, a Module, a Choice) is drawn by the other rules,
+with code AF-VIEW-001.
+
+### Edges
+
+| Rule | SACM | Drawn as | Status | Basis |
+|---|---|---|---|---|
+| E1 | `AssertedInference` with `reasoning` | SupportedBy from the target to the Strategy, and from the Strategy to each source. Every edge carries the inference's id | Decided | Mapping table, endpoints swapped; "Strategy is a node in GSN" above |
+| E2 | `AssertedInference` without `reasoning` | SupportedBy from the target to each source | Decided | Mapping table |
+| E3 | `AssertedEvidence` | SupportedBy from the target to each source | Decided | Mapping table |
+| E4 | `AssertedContext` | InContextOf from the target to each source. The target may be a `Claim` or an `ArgumentReasoning`, which is context for a Strategy | Decided | Mapping table. 18 of the samples' 45 `AssertedContext` target an `ArgumentReasoning` |
+| E5 | A relationship with `isCounter` set | A neutral edge in the same direction, code AF-VIEW-007. Never SupportedBy or InContextOf | Decided | A counter relationship drawn as support says the opposite of the file. The C++ SVG export once drew counter-evidence as evidence for a claim |
+| E6 | A relationship declared other than `asserted` | Its edge by E1 to E5, code AF-VIEW-008: the declaration is not drawn | Decided | Core GSN has no edge decorator for it |
+| E7 | A relationship with an end that is another relationship, or that names no element | Not placed, code AF-VIEW-009. Its other ends are drawn by their own rules | Decided | A claim about an inference has no core GSN form; an unresolved end has nothing to draw |
+| E8 | `AssertedArtifactSupport`, `AssertedArtifactContext` | Not drawn, code AF-VIEW-010 | Decided | They relate artifacts to artifacts (§11.17, §11.18); GSN has no such edge |
+
+An element reached by several relationships is still one node, with an edge for
+each (D4). One `ArgumentReasoning` named by several inferences is one Strategy,
+with each inference's edges.
+
+### Node text
+
+| Rule | Part | Read from | Status |
+|---|---|---|---|
+| T1 | Identifier | The `assuranceForge.gsn.identifier` tagged value, else the SACM id | Decided: C++ capability AF-GSN-015 (`GsnIdentifierFor`) |
+| T2 | Name | The element's `name`, which holds one language (clause 8.6) | **Proposed** |
+| T3 | Statement | The first `description`: its value in the interface language, else its first value | **Proposed** |
+
+See [T2 and T3](#t2-and-t3-which-text-a-node-shows) below.
+
+### The proposed rules
+
+#### R5: an axiomatic Claim is a Justification
+
+SACM gives Justification the declaration `axiomatic` (mapping table). GSN
+metamodel v2.2 §2.1 also lets a Context be "of type Axiomatic Claim", so an
+`axiomatic` Claim reached by `AssertedContext` could be either. Two things
+decide it here:
+
+- **The only real case says Justification.** All 13 `axiomatic` Claims in
+  `safety-case-sanitized-strict.sacm.xmi` are named `J_nnn`, with the statement
+  "Justification J_nnn". Eleven are reached by `AssertedContext`, and two by
+  nothing.
+- **A Context written that way can still be told apart**, by a recorded type
+  (R1). Without one, nothing in the file says Context.
+
+The C++ application read it differently: an `axiomatic` Claim was a
+Justification only with its role tag, otherwise a Goal, and a Context when an
+`AssertedContext` reached it. It drew the 11 justifications of the sanitized
+case as Context. That is not carried over.
+
+#### R6: a Goal reached as context stays a Goal
+
+A Claim declared `asserted` and reached only by `AssertedContext` is drawn as a
+Goal with an `InContextOf` edge, which the well-formedness checks will report.
+The C++ application drew it as Context. v2.2 §2.1 admits an *axiomatic* Claim as
+a Context, not an asserted one, so retyping it would read more into the file
+than it says (principle 1). No sample has the case.
+
+#### R11: an ArtifactReference that is not plainly evidence or context
+
+No sample reaches an `ArtifactReference` both by `AssertedEvidence` and by
+`AssertedContext`. Twenty-two are reached by nothing: 20 in the sanitized case,
+which were unconnected in its original too, and two in `sample.sacm.xmi`.
+Drawing an unconnected reference as a Solution would show it as evidence, and as
+a Context would show it as context; the file says neither. The neutral shape
+keeps the element in view without claiming either.
+
+#### T2 and T3: which text a node shows
+
+The C++ application showed "identifier: name" with the statement below it. It
+took the statement from the first description, in its first language
+(`src/core/assurance_tree.cpp`, `MultiLangString::primary`), with a second
+language on request. The proposal keeps that and puts the interface language
+first, so the Japanese text of `oasc-ja.sacm.xmi` shows in a Japanese interface.
+
+- A **second description** is not drawn. The converted samples carry a note
+  there, which SACM 2.3 does not allow (SACM-MULT-001), and where the note
+  belongs is not decided.
+- **`sacm.import.name`**, where the C++ library kept a name's other languages,
+  is not read as a name. libSACM keeps it as an ordinary tagged value and has not
+  adopted the convention (its LIB-COMPAT-012). So in a Japanese interface the
+  names in `oasc-ja` stay in English while their statements change.
+- Choosing the diagram's language apart from the interface's is a later step.
+
+### Codes
+
+Each carries the id of the element or relationship as an argument.
+
+| Code | Meaning |
+|---|---|
+| AF-VIEW-001 | A recorded GSN type was not used: it disagrees with the element, or names a type this step does not draw |
+| AF-VIEW-002 | A Claim's declaration (`defeated`, `asCited`) leaves its GSN type unknown |
+| AF-VIEW-003 | An `ArtifactReference` is neither plainly evidence nor plainly context |
+| AF-VIEW-004 | A citation (an Away element), drawn neutral until modules |
+| AF-VIEW-005 | The uninstantiated decorator is not drawn yet |
+| AF-VIEW-006 | An element kind this step does not draw |
+| AF-VIEW-007 | A counter relationship, drawn neutral |
+| AF-VIEW-008 | A relationship's declaration is not drawn |
+| AF-VIEW-009 | A relationship end that cannot be placed |
+| AF-VIEW-010 | A relationship between artifacts, not drawn |
