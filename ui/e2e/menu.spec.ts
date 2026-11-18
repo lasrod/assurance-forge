@@ -37,7 +37,7 @@ test('View toggles each panel', async ({ page }) => {
   await opened(page);
   const properties = page.getByRole('region', { name: 'Element Properties' });
   const problems = page.getByRole('region', { name: 'Problems' });
-  const explorer = page.getByRole('tablist', { name: 'Case Explorer' });
+  const explorer = page.getByRole('tablist', { name: 'Case Explorer and Argument Navigator' });
 
   for (const [item, panel] of [
     ['Element Properties', properties],

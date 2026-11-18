@@ -24,7 +24,7 @@ import {
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
-import { loadLayout, loadStartView, saveLayout, saveStartView, type StartView } from './layout';
+import { loadWorkspace, saveWorkspace, type StartView } from './layout';
 import { isOpenShortcut } from './shortcuts';
 import { MenuBar, PANELS, type PanelId } from './MenuBar';
 
@@ -72,7 +72,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [core, setCore] = useState<Core | null>(null);
   const [state, setState] = useState<State>({ kind: 'starting' });
   const [diagram, setDiagram] = useState<DiagramAt | null>(null);
-  const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
+  const [workspace, setWorkspace] = useState(loadWorkspace);
+  const { layout, startView } = workspace;
   const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
@@ -254,13 +255,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // The start dock holds the Case Explorer and the Argument Navigator: tabs,
   // until DATUM's Workspace can stack them as the C++ application did (D9).
-  const [startView, setStartViewState] = useState<StartView>(loadStartView);
   const setStartView = (view: StartView) => {
-    setStartViewState(view);
-    saveStartView(view);
+    const next = { layout, startView: view };
+    setWorkspace(next);
+    saveWorkspace(next);
   };
   // Which dock shows a panel depends on the tier: at the medium tier the side
   // docks are one, under `end`; at the narrow tier every view is under `bottom`.
+  // A copy of DATUM's rule, until its Workspace says which dock holds a view
+  // and can show one (raised there); until then, opening the Argument
+  // Navigator selects its tab at the wide tier only.
   const [tier, setTier] = useState<WorkspaceTier>('wide');
   const host = (id: PanelId): 'start' | 'end' | 'bottom' => {
     if (tier === 'narrow') return 'bottom';
@@ -270,16 +274,19 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   };
   const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)]);
   const changeLayout = (next: WorkspaceLayout) => {
-    setLayout(next);
-    saveLayout(next);
+    const state = { layout: next, startView };
+    setWorkspace(state);
+    saveWorkspace(state);
   };
   const onPanelsChange = (next: PanelId[]) => {
     const added = next.find((id) => !panels.includes(id));
     const removed = panels.find((id) => !next.includes(id));
     const changed = added ?? removed;
     if (!changed) return;
-    if (added === 'caseExplorer' || added === 'argumentNavigator') setStartView(added);
-    changeLayout({ ...layout, open: { ...layout.open, [host(changed)]: added !== undefined } });
+    const view = added === 'caseExplorer' || added === 'argumentNavigator' ? added : startView;
+    const state = { layout: { ...layout, open: { ...layout.open, [host(changed)]: added !== undefined } }, startView: view };
+    setWorkspace(state);
+    saveWorkspace(state);
   };
   const chooseFile = useCallback(() => input.current?.click(), []);
 
@@ -336,9 +343,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           onMeasure={(measure) => setTier(measure.tier)}
           copy={copy}
           start={{
-            // Named after the view it shows, as the C++ panels were named.
-            name: t(startView),
-            nameInText: t(startView === 'caseExplorer' ? 'caseExplorerInText' : 'argumentNavigatorInText'),
+            // Both C++ names: the dock holds both panels, as tabs until DATUM can stack them.
+            name: t('startDock'),
+            nameInText: t('startDockInText'),
             min: 14,
             icons: { hide: <PanelLeftClose />, show: <PanelLeftOpen /> },
             activeView: startView,

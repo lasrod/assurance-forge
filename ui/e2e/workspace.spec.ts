@@ -25,10 +25,10 @@ const docks: Array<{
   grows: 'width' | 'height';
 }> = [
   {
-    // Named after the view it shows, as the C++ panels were.
-    name: 'Case Explorer',
-    shown: (page) => page.getByRole('tablist', { name: 'Case Explorer' }),
-    hide: 'Hide case explorer',
+    // The dock holds both C++ panels, as tabs until DATUM can stack them.
+    name: 'Case Explorer and Argument Navigator',
+    shown: (page) => page.getByRole('tablist', { name: 'Case Explorer and Argument Navigator' }),
+    hide: 'Hide case explorer and argument navigator',
     reopen: 'Case Explorer',
     grows: 'width',
   },

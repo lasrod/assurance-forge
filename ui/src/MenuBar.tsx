@@ -7,7 +7,8 @@
 //
 // Until DATUM's Workspace can stack views, the Case Explorer and the Argument
 // Navigator share the start dock as tabs: both are checked while it is open,
-// unchecking either closes it, and checking either opens it on that tab.
+// unchecking either closes it, and checking either opens it (on that tab at
+// the wide tier: see App.tsx).
 
 import type { ThemeChoice, Language, MessageKey } from './i18n/messages';
 import { Button, Menu, MenuItem, MenuSection, Toolbar } from './design';
@@ -42,7 +43,7 @@ export function MenuBar({
   onLanguageChange,
 }: MenuBarProps) {
   const title = (key: MessageKey) => (
-    <Button variant="ghost" data-menu={key}>
+    <Button variant="ghost">
       {t(key)}
     </Button>
   );

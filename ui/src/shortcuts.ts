@@ -12,8 +12,14 @@ const mac = isMac();
 /** `⌘O` on macOS, `Ctrl+O` elsewhere, as the File menu shows it. */
 export const OPEN_SHORTCUT = mac ? '⌘O' : 'Ctrl+O';
 
-/** Whether `event` is the open shortcut: ⌘O on macOS, Ctrl+O elsewhere, not while an IME composes. */
+/**
+ * Whether `event` is the open shortcut: ⌘O on macOS, Ctrl+O elsewhere. Not
+ * while an IME composes, and not a held key's repeats. The key is O by its
+ * letter, or by its place when the layout is not Latin (Ctrl+щ on Russian).
+ */
 export function isOpenShortcut(event: KeyboardEvent): boolean {
   const modifier = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-  return modifier && !event.shiftKey && !event.altKey && !event.isComposing && event.key.toLowerCase() === 'o';
+  const latin = /^[\x20-\x7e]$/.test(event.key);
+  const o = latin ? event.key.toLowerCase() === 'o' : event.code === 'KeyO';
+  return modifier && o && !event.shiftKey && !event.altKey && !event.isComposing && !event.repeat;
 }
