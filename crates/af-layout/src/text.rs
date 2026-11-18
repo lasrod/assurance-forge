@@ -231,8 +231,9 @@ impl<'a> Shaper<'a> {
     }
 
     /// Ends `line`, measured whole. Kerning across a break opportunity can
-    /// make it wider than the estimate; then its last segment is left in
-    /// `line`, to start the next line.
+    /// make it wider than the segments' sum; then the line ends at the last
+    /// break whose head fits (at the first break if none does), and what
+    /// follows, its spaces kept, is left in `line` to start the next line.
     fn finish(
         &self,
         lines: &mut Vec<Line>,
@@ -244,14 +245,24 @@ impl<'a> Shaper<'a> {
         let text = line.trim_end().to_owned();
         let width = self.width(&text, size, weight);
         if width > max_width {
-            if let Some(split) = last_break(&text) {
-                let (head, tail) = text.split_at(split);
-                let head = head.trim_end();
-                lines.push(Line {
-                    text: head.to_owned(),
-                    width: self.width(head, size, weight),
+            let breaks = break_points(&text);
+            let chosen = breaks
+                .iter()
+                .rev()
+                .map(|&split| (split, self.width(text[..split].trim_end(), size, weight)))
+                .find(|&(_, head)| head <= max_width)
+                .or_else(|| {
+                    breaks
+                        .first()
+                        .map(|&split| (split, self.width(text[..split].trim_end(), size, weight)))
                 });
-                *line = tail.to_owned();
+            if let Some((split, head_width)) = chosen {
+                lines.push(Line {
+                    text: text[..split].trim_end().to_owned(),
+                    width: head_width,
+                });
+                // `line` starts with `text`, so the split is a boundary in both.
+                *line = line[split..].to_owned();
                 return;
             }
         }
@@ -301,15 +312,64 @@ impl<'a> Shaper<'a> {
     }
 }
 
-/// The last allowed break in `text` before its end, if any.
-fn last_break(text: &str) -> Option<usize> {
+/// The allowed breaks inside `text`, in order: not at its start or end.
+fn break_points(text: &str) -> Vec<usize> {
     linebreaks(text)
         .map(|(index, _)| index)
         .filter(|index| *index > 0 && *index < text.len())
-        .last()
+        .collect()
 }
 
 /// Hiragana, katakana and their extensions, which are shaped without kerning.
 fn is_kana(c: char) -> bool {
     matches!(c, '\u{3040}'..='\u{309F}' | '\u{30A0}'..='\u{30FF}' | '\u{31F0}'..='\u{31FF}' | '\u{FF65}'..='\u{FF9F}')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Fonts, Shaper, Weight};
+
+    fn fonts() -> Fonts {
+        let read = |name: &str| {
+            let path = format!("{}/../../testdata/fonts/{name}", env!("CARGO_MANIFEST_DIR"));
+            std::fs::read(&path).unwrap_or_else(|error| panic!("setup: {path}: {error}"))
+        };
+        match Fonts::new(
+            read("IBMPlexSans-Regular.ttf"),
+            read("IBMPlexSans-SemiBold.ttf"),
+            read("AFTestSansJP-Regular.ttf"),
+            read("AFTestSansJP-SemiBold.ttf"),
+        ) {
+            Ok(fonts) => fonts,
+            Err(error) => panic!("setup: {error:?}"),
+        }
+    }
+
+    #[test]
+    fn a_line_too_wide_ends_at_the_last_break_that_fits_and_keeps_the_space() {
+        let fonts = fonts();
+        let shaper = Shaper::new(&fonts);
+        let width = |text: &str| shaper.width(text, 14.0, Weight::Regular);
+        // Wide enough for "aaa bbb", not for "aaa bbb ccc".
+        let max = width("aaa bbb") + 1.0;
+        let mut lines = Vec::new();
+        let mut line = String::from("aaa bbb ccc ");
+        shaper.finish(&mut lines, &mut line, 14.0, Weight::Regular, max);
+        let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
+        assert_eq!(texts, ["aaa bbb"]);
+        // What is carried keeps its space, so the next segment cannot join it.
+        assert_eq!(line, "ccc ");
+        // Narrower than "aaa bbb": the earlier break.
+        let mut lines = Vec::new();
+        let mut line = String::from("aaa bbb ccc ");
+        shaper.finish(
+            &mut lines,
+            &mut line,
+            14.0,
+            Weight::Regular,
+            width("aaa") + 1.0,
+        );
+        assert_eq!(lines[0].text, "aaa");
+        assert_eq!(line, "bbb ccc ");
+    }
 }

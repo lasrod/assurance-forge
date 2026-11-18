@@ -22,12 +22,13 @@ import {
   type WorkspaceLayout,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
+import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
 import { loadLayout, saveLayout } from './layout';
 
 type State =
   | { kind: 'starting' }
-  | { kind: 'failed'; reason: string }
+  | { kind: 'failed'; code: string; detail: string }
   | { kind: 'empty' }
   | { kind: 'unreadable' }
   | { kind: 'result'; result: OpenResult };
@@ -39,7 +40,9 @@ function message(state: State, t: T, language: Language): { text: string; tone?:
     case 'starting':
       return { text: t('starting') };
     case 'failed':
-      return { text: t('failed', { reason: state.reason }), tone: 'error' };
+      if (state.code === 'font-unreadable') return { text: t('fontUnreadable', { face: state.detail }), tone: 'error' };
+      if (state.code === 'font-missing') return { text: t('fontMissing'), tone: 'error' };
+      return { text: t('failed'), tone: 'error' };
     case 'empty':
       return { text: t('empty') };
     case 'unreadable':
@@ -94,6 +97,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [core],
   );
+  /** A read that failed, unless a later request has started: nothing is open. */
+  const unreadable = (request: number) => {
+    if (request !== latest.current) return;
+    setDiagram(null);
+    setState({ kind: 'unreadable' });
+  };
   /** Starts a request: the bytes it reads open only if no later one started. */
   const begin = () => {
     latest.current += 1;
@@ -124,7 +133,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         setState({ kind: 'empty' });
       },
       (error: unknown) => {
-        if (wanted) setState({ kind: 'failed', reason: String(error) });
+        if (!wanted) return;
+        const known = error instanceof StartError;
+        setState({ kind: 'failed', code: known ? error.code : 'core', detail: known ? error.detail : '' });
       },
     );
     return () => {
@@ -145,8 +156,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         (next) => {
           if (current && next) setDiagram(next);
         },
-        (error: unknown) => {
-          if (current) setState({ kind: 'failed', reason: String(error) });
+        () => {
+          if (current) setState({ kind: 'failed', code: 'core', detail: '' });
         },
       );
     return () => {
@@ -162,7 +173,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     fetch(`/samples/${encodeURIComponent(sample)}`)
       .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(String(response.status)))))
       .then((buffer) => open(new Uint8Array(buffer), request))
-      .catch(() => setState({ kind: 'unreadable' }));
+      .catch(() => unreadable(request));
   }, [core, open]);
 
   const openFile = (file: File | undefined) => {
@@ -170,7 +181,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     const request = begin();
     file.arrayBuffer().then(
       (buffer) => void open(new Uint8Array(buffer), request),
-      () => setState({ kind: 'unreadable' }),
+      () => unreadable(request),
     );
   };
 
@@ -180,9 +191,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   };
 
   // The diagram's text follows DATUM's type tokens, so the user's text size.
+  const sentStyle = useRef('');
   const onTextStyle = useCallback(
     (style: TextStyle) => {
-      if (!core) return;
+      // A theme or pixel-ratio change gives the same sizes: nothing to lay out.
+      const key = JSON.stringify(style);
+      if (!core || key === sentStyle.current) return;
+      sentStyle.current = key;
       core
         .setStyle(style)
         .then(() => core.diagram())

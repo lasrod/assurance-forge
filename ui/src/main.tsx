@@ -1,14 +1,14 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { createWasmCore } from './core/wasmCore';
+import { createWasmCore, StartError } from './core/wasmCore';
 import { measuredFontUrls } from './design';
 import { initialLanguage, type Language } from './i18n/messages';
 import './app.css';
 
 async function bytes(url: string): Promise<Uint8Array> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: ${response.status}`);
+  const response = await fetch(url).catch(() => null);
+  if (!response?.ok) throw new StartError('font-missing', url);
   return new Uint8Array(await response.arrayBuffer());
 }
 

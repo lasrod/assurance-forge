@@ -222,5 +222,13 @@ pnpm --dir ui e2e
 - Opening files in the older SACM namespace that the C++ application wrote
   ([libSACM#66](https://github.com/lasrod/libSACM/issues/66)).
 - Choosing the language of the diagram's text separately from the interface's.
+- Characters neither measured face has, such as emoji or Hangul. The core
+  measures them with the missing glyph while the browser draws a system font,
+  so such text can overflow its node. A third, measured fallback face, or a
+  code that names the text, would close the gap.
+- Wording each of libSACM's refusal templates in English and Japanese. Until
+  then a refusal is worded by its code, with its arguments.
+- Keeping the parsed faces between `Engine::measure` and `wrap` calls, which
+  parse them each time; a layout parses them once.
 - Saving from the web application. The File System Access API writes back to
   the opened file in Chromium browsers only; elsewhere saving is a download.

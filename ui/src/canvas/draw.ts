@@ -29,7 +29,8 @@ const FIT_MARGIN = 16;
 /** The viewport that fits `bounds` in a `width` × `height` canvas, centred, at most 100%. */
 export function fit(bounds: Rect, width: number, height: number): Viewport {
   const room = (size: number) => Math.max(size - 2 * FIT_MARGIN, 1);
-  const scale = Math.min(Math.max(Math.min(room(width) / bounds.width, room(height) / bounds.height, 1), MIN_SCALE), MAX_SCALE);
+  // At most 100%: fitting never enlarges a small diagram.
+  const scale = Math.max(Math.min(room(width) / bounds.width, room(height) / bounds.height, 1), MIN_SCALE);
   return {
     scale,
     offsetX: (width - bounds.width * scale) / 2 - bounds.x * scale,
@@ -60,8 +61,6 @@ export function visibleArea(viewport: Viewport, width: number, height: number): 
 function overlaps(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
-
-
 
 /**
  * Paints `diagram` on a backing store of `width` × `height` CSS px at `dpr`

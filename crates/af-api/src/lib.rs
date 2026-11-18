@@ -160,6 +160,9 @@ impl Core {
     /// The open document's view and diagram are derived again; its revision
     /// stays, since the document has not changed.
     pub fn set_language(&mut self, language: &str) {
+        if language == self.language {
+            return;
+        }
         self.language = language.to_owned();
         self.engine.clear_cache();
         self.layout += 1;

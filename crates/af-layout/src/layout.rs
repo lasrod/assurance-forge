@@ -181,12 +181,16 @@ fn content(
     let mut lines = Vec::new();
     let mut height = 0.0;
     let texts = texts(node);
-    for (group, (role, text)) in texts.iter().enumerate() {
+    for (role, text) in &texts {
         let (size, line_height, weight) = role_style(*role, style);
         let wrapped = cache
             .entry(((*text).to_owned(), *role, width.to_bits()))
             .or_insert_with(|| shaper.wrap(text, size, weight, width));
-        if group > 0 {
+        // A gap between groups that have lines, as `size` places them.
+        if wrapped.is_empty() {
+            continue;
+        }
+        if !lines.is_empty() {
             height += GROUP_GAP;
         }
         height += line_height * wrapped.len() as f32;
