@@ -76,7 +76,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
 
   // A file given before the core is ready waits for it.
-  const [pending, setPending] = useState<Uint8Array | null>(null);
+  const [pending, setPending] = useState<{ bytes: Uint8Array; request: number } | null>(null);
   // Each open is numbered, so a slower earlier read cannot replace the file
   // chosen last.
   const latest = useRef(0);
@@ -88,13 +88,23 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     if (!next || next.revision !== shown.current) return;
     setDiagram((current) => (current && current.layout === next.layout && current.revision === next.revision ? current : next));
   }, []);
+  const coreRef = useRef<Core | null>(null);
+  coreRef.current = core;
+  /** A read that failed, unless a later request has started: nothing is open, in the core too. */
+  const unreadable = useCallback((request: number) => {
+    if (request !== latest.current) return;
+    shown.current = null;
+    setDiagram(null);
+    setState({ kind: 'unreadable' });
+    void coreRef.current?.close();
+  }, []);
   const open = useCallback(
     async (bytes: Uint8Array, request: number) => {
       // A later request has started: this one must not reach the core, which
       // holds one document, nor wait for it.
       if (request !== latest.current) return;
       if (!core) {
-        setPending(bytes);
+        setPending({ bytes, request });
         return;
       }
       try {
@@ -105,21 +115,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         setState({ kind: 'result', result });
         setDiagram(next);
       } catch {
-        if (request !== latest.current) return;
-        shown.current = null;
-        setDiagram(null);
-        setState({ kind: 'unreadable' });
+        unreadable(request);
       }
     },
-    [core],
+    [core, unreadable],
   );
-  /** A read that failed, unless a later request has started: nothing is open. */
-  const unreadable = (request: number) => {
-    if (request !== latest.current) return;
-    shown.current = null;
-    setDiagram(null);
-    setState({ kind: 'unreadable' });
-  };
   /** Starts a request: the bytes it reads open only if no later one started. */
   const begin = () => {
     latest.current += 1;
@@ -128,7 +128,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   useEffect(() => {
     if (core && pending) {
       setPending(null);
-      void open(pending, latest.current);
+      void open(pending.bytes, pending.request);
     }
   }, [core, pending, open]);
 
@@ -191,7 +191,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(String(response.status)))))
       .then((buffer) => open(new Uint8Array(buffer), request))
       .catch(() => unreadable(request));
-  }, [core, open]);
+  }, [core, open, unreadable]);
 
   const openFile = (file: File | undefined) => {
     if (!file) return;

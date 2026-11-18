@@ -206,12 +206,14 @@ impl<'a> Shaper<'a> {
                 line.clear();
                 estimate = 0.0;
             }
-            let segment = if line.is_empty() {
+            let starts = line.is_empty() && segment.starts_with(char::is_whitespace);
+            let segment = if starts {
                 segment.trim_start()
             } else {
                 segment
             };
-            let (full, trimmed) = if line.is_empty() {
+            // Measured again only when the spaces at its start were removed.
+            let (full, trimmed) = if starts {
                 let full = self.width(segment, size, weight);
                 let trimmed = if segment.ends_with(char::is_whitespace) {
                     self.width(segment.trim_end(), size, weight)
@@ -249,6 +251,10 @@ impl<'a> Shaper<'a> {
                 line.clear();
                 estimate = 0.0;
             }
+        }
+        // Blank lines before nothing but spaces or newlines are at the end.
+        while lines.last().is_some_and(|line| line.text.is_empty()) {
+            lines.pop();
         }
         lines
     }

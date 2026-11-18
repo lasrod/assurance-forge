@@ -536,3 +536,32 @@ fn a_cycle_is_rooted_at_its_first_node_that_is_not_only_context() {
     let context = diagram.edges.iter().find(|edge| edge.relationship == "x1");
     assert_eq!(context.map(|edge| edge.placement), Some(Placement::Beside));
 }
+
+#[test]
+fn blank_lines_before_only_spaces_are_dropped() {
+    let engine = engine();
+    for text in ["Statement text\n\n    ", "Statement text\n\n\n"] {
+        let lines = engine.wrap(text, 14.0, Weight::Regular, 500.0);
+        let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
+        assert_eq!(texts, ["Statement text"], "{text:?}");
+    }
+}
+
+#[test]
+fn a_size_that_is_not_a_number_changes_nothing() {
+    let mut engine = engine();
+    let unresolved = Style {
+        text_size: f32::NAN,
+        ..Style::default()
+    };
+    assert!(!engine.set_style(unresolved));
+    assert!(
+        !engine.set_style(unresolved),
+        "NaN is never equal to itself"
+    );
+    assert_eq!(engine.style(), Style::default());
+    assert!(engine.set_style(Style {
+        text_size: 16.0,
+        ..Style::default()
+    }));
+}

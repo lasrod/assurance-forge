@@ -73,11 +73,21 @@ impl Engine {
     }
 
     /// Changes the text sizes, which drops every kept measurement.
-    pub fn set_style(&mut self, style: Style) {
-        if style != self.style {
-            self.style = style;
-            self.cache.clear();
+    /// Says whether anything changed. A size that is not a finite number
+    /// greater than 0, such as a token that did not resolve, changes nothing.
+    pub fn set_style(&mut self, style: Style) -> bool {
+        let sizes = [
+            style.text_size,
+            style.text_line_height,
+            style.identifier_size,
+            style.identifier_line_height,
+        ];
+        if style == self.style || sizes.iter().any(|size| !size.is_finite() || *size <= 0.0) {
+            return false;
         }
+        self.style = style;
+        self.cache.clear();
+        true
     }
 
     /// The diagram for `view`. The same view gives the same diagram.

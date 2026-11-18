@@ -18,6 +18,8 @@ export interface TextStyle {
 export interface Core {
   /** Reads a SACM 2.3 XMI file. A refused file leaves nothing open. */
   open(bytes: Uint8Array): Promise<OpenResult>;
+  /** Closes what is open: after it nothing is. */
+  close(): Promise<void>;
   /** The diagram of what is open, or null. */
   diagram(): Promise<DiagramAt | null>;
   /** What the details panel shows for the node with this SACM id. */

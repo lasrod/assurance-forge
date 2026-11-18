@@ -67,6 +67,11 @@ impl WasmCore {
             .transpose()
     }
 
+    /// Closes what is open.
+    pub fn close(&mut self) {
+        self.core.close();
+    }
+
     #[wasm_bindgen(js_name = setLanguage)]
     pub fn set_language(&mut self, language: &str) {
         self.core.set_language(language);

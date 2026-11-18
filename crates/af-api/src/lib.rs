@@ -62,6 +62,8 @@ impl Core {
     pub fn open(&mut self, bytes: &[u8]) -> OpenResult {
         self.revision += 1;
         self.layout += 1;
+        // The last document's measurements go, whether or not this one opens.
+        self.engine.clear_cache();
         let output = match xmi::read(bytes, &ReadOptions::default().with_mode(Mode::Strict)) {
             Ok(output) => output,
             Err(error) => {
@@ -88,7 +90,6 @@ impl Core {
             }
         }
         let document = output.into_document();
-        self.engine.clear_cache();
         let view = view::view(&document, &self.language);
         let result = OpenResult::Opened {
             revision: self.revision,
@@ -103,6 +104,12 @@ impl Core {
             diagram: None,
         });
         result
+    }
+
+    /// Closes what is open, as a refused file does: nothing is open after.
+    pub fn close(&mut self) {
+        self.open = None;
+        self.engine.clear_cache();
     }
 
     /// The revision of what is open, or of the last refusal.
@@ -164,7 +171,8 @@ impl Core {
             return;
         }
         self.language = language.to_owned();
-        self.engine.clear_cache();
+        // The measurements are kept: they are by text, and only the texts in
+        // the other language are new.
         self.layout += 1;
         if let Some(open) = self.open.as_mut() {
             open.view = view::view(&open.document, &self.language);
@@ -174,10 +182,9 @@ impl Core {
 
     /// Changes the text sizes, which lays the diagram out again.
     pub fn set_style(&mut self, style: Style) {
-        if style == self.engine.style() {
+        if !self.engine.set_style(style) {
             return;
         }
-        self.engine.set_style(style);
         self.layout += 1;
         if let Some(open) = self.open.as_mut() {
             open.diagram = None;

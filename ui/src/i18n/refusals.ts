@@ -52,11 +52,17 @@ const place: Record<Language, (line: number, column: number) => string> = {
   ja: (line, column) => `${line} 行 ${column} 列`,
 };
 
+/** Arguments whose values are libSACM's English prose, not names. */
+const PROSE = new Set(['error', 'message', 'reason', 'detail', 'label']);
+
 /** The refusal as a sentence: why, what it names, where, and the code. */
 export function wordRefusal(refusal: Refusal, language: Language): string {
   const reason = (language === 'ja' ? ja : en)[refusal.code] ?? fallback[language];
+  // What names the problem: ids, names, counts. Arguments that carry
+  // libSACM's own English sentences are left out, as is anything long.
   const named = refusal.arguments
-    .filter((argument) => argument.value.type === 'text' && argument.value.value.length <= 80)
+    .filter((argument) => !PROSE.has(argument.name))
+    .filter((argument) => argument.value.type === 'count' || argument.value.value.length <= 80)
     .map((argument) => `${argument.name}: ${String(argument.value.value)}`);
   const parts = [reason];
   if (named.length > 0) parts.push(`(${named.join(', ')})`);
