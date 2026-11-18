@@ -484,3 +484,55 @@ fn the_bounds_hold_every_edge_too() {
         }
     }
 }
+
+#[test]
+fn indented_text_starts_with_its_first_word() {
+    let engine = engine();
+    let lines = engine.wrap("\n  The system is safe", 14.0, Weight::Regular, 120.0);
+    // Without its indentation it fits on one line.
+    let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
+    assert_eq!(texts, ["The system is safe"]);
+    let lines = engine.wrap(
+        "   Averyveryverylongwordthatmustbreak",
+        14.0,
+        Weight::Regular,
+        120.0,
+    );
+    assert!(lines.iter().all(|line| !line.text.is_empty()), "{lines:?}");
+    assert!(lines[0].text.starts_with('A'), "{lines:?}");
+    let lines = engine.wrap(
+        "abc\n   Averyveryverylongwordthatmustbreak",
+        14.0,
+        Weight::Regular,
+        120.0,
+    );
+    assert_eq!(lines[0].text, "abc");
+    assert!(lines[1].text.starts_with('A'), "{lines:?}");
+}
+
+#[test]
+fn a_cycle_is_rooted_at_its_first_node_that_is_not_only_context() {
+    // G1 and G2 support each other; C1 is G2's context and comes first.
+    let text = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="C"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="c1"><name content="c1"/></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g1"><name content="g1"/></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g2"><name content="g2"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i1" source="g2" target="g1"><name content="i1"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i2" source="g1" target="g2"><name content="i2"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x1" source="c1" target="g2"><name content="x1"/></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>"#;
+    let document = match xmi::read(
+        text.as_bytes(),
+        &ReadOptions::default().with_mode(Mode::Strict),
+    ) {
+        Ok(output) => output.into_document(),
+        Err(error) => panic!("setup: {error:?}"),
+    };
+    let diagram = engine().layout(&view(&document, "en"));
+    let context = diagram.edges.iter().find(|edge| edge.relationship == "x1");
+    assert_eq!(context.map(|edge| edge.placement), Some(Placement::Beside));
+}

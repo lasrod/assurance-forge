@@ -34,6 +34,8 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
   const parse = <T>(json: string | undefined): T | null => (json === undefined ? null : (JSON.parse(json) as T));
   return {
     open: async (bytes) => JSON.parse(core.open(bytes)) as OpenResult,
+    // The methods below throw `core-serialize` if the core's answer cannot be
+    // written, which is the core's failure, not the file's.
     diagram: async () => parse<DiagramAt>(core.diagram()),
     element: async (id) => parse<ElementDetails>(core.element(id)),
     setLanguage: async (language) => core.setLanguage(language),

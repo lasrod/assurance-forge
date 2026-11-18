@@ -15,9 +15,10 @@ pub struct WasmCore {
     core: Core,
 }
 
-fn json<T: Serialize>(value: &T) -> String {
-    // The contract's types are plain data and always serialize.
-    serde_json::to_string(value).unwrap_or_default()
+/// The contract's JSON. A failure is the core's, not the file's: the page
+/// hears it as an error named `core-serialize`.
+fn json<T: Serialize>(value: &T) -> Result<String, JsError> {
+    serde_json::to_string(value).map_err(|_| JsError::new("core-serialize"))
 }
 
 #[wasm_bindgen]
@@ -49,18 +50,21 @@ impl WasmCore {
     }
 
     /// `OpenResult` as JSON.
-    pub fn open(&mut self, bytes: &[u8]) -> String {
+    pub fn open(&mut self, bytes: &[u8]) -> Result<String, JsError> {
         json(&self.core.open(bytes))
     }
 
     /// `DiagramAt` as JSON, or `None` when nothing is open.
-    pub fn diagram(&mut self) -> Option<String> {
-        self.core.diagram_ref().map(|at| json(&at))
+    pub fn diagram(&mut self) -> Result<Option<String>, JsError> {
+        self.core.diagram_ref().map(|at| json(&at)).transpose()
     }
 
     /// `ElementDetails` as JSON, or `None` when no node has the id.
-    pub fn element(&self, id: &str) -> Option<String> {
-        self.core.element(id).map(|details| json(&details))
+    pub fn element(&self, id: &str) -> Result<Option<String>, JsError> {
+        self.core
+            .element(id)
+            .map(|details| json(&details))
+            .transpose()
     }
 
     #[wasm_bindgen(js_name = setLanguage)]

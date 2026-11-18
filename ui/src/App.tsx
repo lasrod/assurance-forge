@@ -80,23 +80,33 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Each open is numbered, so a slower earlier read cannot replace the file
   // chosen last.
   const latest = useRef(0);
+  // The revision on screen, or null. A relayout (language, text size) shows a
+  // diagram only of that revision: after a failed read the core may still hold
+  // an earlier document, which must not come back.
+  const shown = useRef<number | null>(null);
+  const showRelayout = useCallback((next: DiagramAt | null) => {
+    if (!next || next.revision !== shown.current) return;
+    setDiagram((current) => (current && current.layout === next.layout && current.revision === next.revision ? current : next));
+  }, []);
   const open = useCallback(
     async (bytes: Uint8Array, request: number) => {
+      // A later request has started: this one must not reach the core, which
+      // holds one document, nor wait for it.
+      if (request !== latest.current) return;
       if (!core) {
         setPending(bytes);
         return;
       }
-      // A later request has started: this one must not reach the core, which
-      // holds one document.
-      if (request !== latest.current) return;
       try {
         const result = await core.open(bytes);
         const next = result.result === 'opened' ? await core.diagram() : null;
         if (request !== latest.current) return;
+        shown.current = result.result === 'opened' ? result.revision : null;
         setState({ kind: 'result', result });
         setDiagram(next);
       } catch {
         if (request !== latest.current) return;
+        shown.current = null;
         setDiagram(null);
         setState({ kind: 'unreadable' });
       }
@@ -106,6 +116,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   /** A read that failed, unless a later request has started: nothing is open. */
   const unreadable = (request: number) => {
     if (request !== latest.current) return;
+    shown.current = null;
     setDiagram(null);
     setState({ kind: 'unreadable' });
   };
@@ -160,7 +171,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       .then(() => core.diagram())
       .then(
         (next) => {
-          if (current && next) setDiagram(next);
+          if (current) showRelayout(next);
         },
         () => {
           if (current) setState({ kind: 'relayoutFailed' });
@@ -169,7 +180,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     return () => {
       current = false;
     };
-  }, [core, language]);
+  }, [core, language, showRelayout]);
 
   // In development and the browser tests, `?sample=<file>` opens a sample case.
   useEffect(() => {
@@ -210,12 +221,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           (next) => {
             // Kept only once the core has it, so a failure is tried again.
             sentStyle.current = key;
-            if (next) setDiagram((current) => (current && current.layout === next.layout && current.revision === next.revision ? current : next));
+            showRelayout(next);
           },
           () => setState({ kind: 'relayoutFailed' }),
         );
     },
-    [core],
+    [core, showRelayout],
   );
 
   // The canvas takes its size from the workspace's centre surface (D5).

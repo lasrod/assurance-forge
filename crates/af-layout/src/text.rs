@@ -173,7 +173,8 @@ impl<'a> Shaper<'a> {
     /// `text` wrapped to `max_width`, by the Unicode line breaking algorithm.
     /// A word wider than the line is broken between characters. Spaces at the
     /// end of a line are not part of it. A mandatory break (a newline) ends a
-    /// line; an empty line between two is kept, and one at the end is not.
+    /// line; an empty line between two is kept, and one at the start or end
+    /// is not. Spaces at the start of a line are not part of it either.
     pub(crate) fn wrap(&self, text: &str, size: f32, weight: Weight, max_width: f32) -> Vec<Line> {
         let mut lines = Vec::new();
         let mut line = String::new();
@@ -195,10 +196,32 @@ impl<'a> Shaper<'a> {
 
             // Ends lines until the segment fits after what is left: an overflow
             // in `finish` carries a segment, which may leave no room either.
-            while !line.is_empty() && estimate + trimmed > max_width {
+            while !line.trim_end().is_empty() && estimate + trimmed > max_width {
                 self.finish(&mut lines, &mut line, size, weight, max_width);
                 estimate = self.width(&line, size, weight);
             }
+            // A line does not start with spaces: an indented statement is
+            // laid out as its words.
+            if line.trim_end().is_empty() {
+                line.clear();
+                estimate = 0.0;
+            }
+            let segment = if line.is_empty() {
+                segment.trim_start()
+            } else {
+                segment
+            };
+            let (full, trimmed) = if line.is_empty() {
+                let full = self.width(segment, size, weight);
+                let trimmed = if segment.ends_with(char::is_whitespace) {
+                    self.width(segment.trim_end(), size, weight)
+                } else {
+                    full
+                };
+                (full, trimmed)
+            } else {
+                (full, trimmed)
+            };
             if line.is_empty() && trimmed > max_width {
                 // A word wider than the line.
                 let (broken, rest) = self.break_word(segment, size, weight, max_width);
@@ -211,8 +234,8 @@ impl<'a> Shaper<'a> {
             }
             if mandatory {
                 if line.trim_end().is_empty() {
-                    // An empty line: kept between lines, not at the end.
-                    if end < text.len() {
+                    // An empty line: kept between lines, not at the start or end.
+                    if end < text.len() && !lines.is_empty() {
                         lines.push(Line {
                             text: String::new(),
                             width: 0.0,

@@ -454,8 +454,11 @@ impl Tree {
         // Roots: nothing structural reaches them, in document order; then,
         // for a cycle nothing outside reaches, its first node.
         let first_roots: Vec<usize> = (0..count).filter(|n| !has_incoming[*n]).collect();
+        // For a cycle: its first node in document order that is not merely
+        // attached as context, which its parent's turn places beside it.
+        let cycles: Vec<usize> = (0..count).filter(|n| !attached(*n)).collect();
         let rest: Vec<usize> = (0..count).collect();
-        for root in first_roots.into_iter().chain(rest) {
+        for root in first_roots.into_iter().chain(cycles).chain(rest) {
             if placed[root] {
                 continue;
             }
