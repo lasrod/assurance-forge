@@ -20,14 +20,17 @@ async function start(language: Language) {
     bytes(measuredFontUrls.japaneseRegular),
     bytes(measuredFontUrls.japaneseSemiBold),
   ]);
-  // Each face by its own family: given the whole list, WebKit loads only the
-  // first family's face, and Japanese text was then drawn with a system font.
-  await Promise.all(
-    ['400', '600'].flatMap((weight) => [
-      document.fonts.load(`${weight} 14px 'DATUM Measured Sans'`, 'A'),
-      document.fonts.load(`${weight} 14px 'DATUM Measured Sans JP'`, '日'),
-    ]),
-  );
+  // The canvas draws with the very bytes the core measures with: each face is
+  // added from them, under the families DATUM's measured.css declares, so the
+  // files are downloaded once. Each is loaded by its own family; given the
+  // whole list, WebKit loaded only the first family's face.
+  const faces = [
+    new FontFace('DATUM Measured Sans', sansRegular, { weight: '400', display: 'block' }),
+    new FontFace('DATUM Measured Sans', sansSemiBold, { weight: '600', display: 'block' }),
+    new FontFace('DATUM Measured Sans JP', japaneseRegular, { weight: '400', display: 'block' }),
+    new FontFace('DATUM Measured Sans JP', japaneseSemiBold, { weight: '600', display: 'block' }),
+  ];
+  for (const face of await Promise.all(faces.map((face) => face.load()))) document.fonts.add(face);
   return createWasmCore({ sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold }, language);
 }
 

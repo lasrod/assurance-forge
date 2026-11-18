@@ -295,6 +295,8 @@ pub struct DiagramEdge {
     /// corners.
     pub head: [Point; 3],
     pub placement: Placement,
+    /// Everything drawn for the edge: its line and arrowhead.
+    pub bounds: Rect,
 }
 
 #[derive(Clone, Debug, PartialEq)]

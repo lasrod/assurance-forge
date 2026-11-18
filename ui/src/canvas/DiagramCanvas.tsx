@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DiagramAt } from '../core/Core';
+import type { DiagramAt, TextStyle } from '../core/Core';
 import { measuredFontFamily, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { draw, fit, type Palette } from './draw';
@@ -14,7 +14,28 @@ function palette(style: CanvasStyle): Palette {
 }
 
 /** The diagram, fitted to the canvas, which fills its parent. */
-export function DiagramCanvas({ diagram, label }: { diagram: DiagramAt | null; label: string }) {
+function textStyle(style: CanvasStyle): TextStyle {
+  return {
+    textSize: style.px('type.control.size'),
+    textLineHeight: style.px('type.control.line-height'),
+    identifierSize: style.px('type.metadata.size'),
+    identifierLineHeight: style.px('type.metadata.line-height'),
+  };
+}
+
+/**
+ * The diagram, fitted to the canvas, which fills its parent. `onTextStyle`
+ * hears the text sizes DATUM's tokens resolve to, for the layout.
+ */
+export function DiagramCanvas({
+  diagram,
+  label,
+  onTextStyle,
+}: {
+  diagram: DiagramAt | null;
+  label: string;
+  onTextStyle: (style: TextStyle) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -33,10 +54,14 @@ export function DiagramCanvas({ diagram, label }: { diagram: DiagramAt | null; l
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
-    const watch = watchCanvasStyle(element, (next) => setStyle(next));
+    const watch = watchCanvasStyle(element, (next) => {
+      setStyle(next);
+      onTextStyle(textStyle(next));
+    });
     setStyle(watch.style);
+    onTextStyle(textStyle(watch.style));
     return () => watch.dispose();
-  }, []);
+  }, [onTextStyle]);
 
   useEffect(() => {
     const element = canvas.current;

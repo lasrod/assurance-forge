@@ -195,3 +195,40 @@ fn the_contract_serializes_in_camel_case_with_tags() {
     assert_eq!(diagram["diagram"]["edges"][0]["kind"], "supportedBy");
     assert_eq!(diagram["diagram"]["edges"][0]["arrowhead"], "filled");
 }
+
+#[test]
+fn the_borrowed_diagram_serializes_exactly_as_the_contract_type() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let owned = serde_json::to_value(core.diagram()).unwrap_or_default();
+    let borrowed = serde_json::to_value(core.diagram_ref()).unwrap_or_default();
+    assert!(owned.is_object());
+    assert_eq!(owned, borrowed);
+}
+
+#[test]
+fn the_layout_number_changes_with_the_language_and_text_size_but_not_otherwise() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let layout = |core: &mut Core| core.diagram().map(|at| (at.revision, at.layout));
+    let first = layout(&mut core);
+    assert_eq!(layout(&mut core), first, "asking again is the same layout");
+    core.set_language("ja");
+    let second = layout(&mut core);
+    assert_eq!(
+        second.map(|(revision, _)| revision),
+        first.map(|(revision, _)| revision)
+    );
+    assert_ne!(second, first);
+    core.set_style(Style::default());
+    assert_eq!(
+        layout(&mut core),
+        second,
+        "an unchanged style lays nothing out again"
+    );
+    core.set_style(Style {
+        text_size: 16.0,
+        ..Style::default()
+    });
+    assert_ne!(layout(&mut core), second);
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas } from './canvas/DiagramCanvas';
-import type { Core, DiagramAt, OpenResult } from './core/Core';
+import type { Core, DiagramAt, OpenResult, TextStyle } from './core/Core';
 import {
   Button,
   ChevronDown,
@@ -22,6 +22,7 @@ import {
   type WorkspaceLayout,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
+import { wordRefusal } from './i18n/refusals';
 import { loadLayout, saveLayout } from './layout';
 
 type State =
@@ -33,7 +34,7 @@ type State =
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
-function message(state: State, t: T): { text: string; tone?: 'error' } {
+function message(state: State, t: T, language: Language): { text: string; tone?: 'error' } {
   switch (state.kind) {
     case 'starting':
       return { text: t('starting') };
@@ -53,13 +54,7 @@ function message(state: State, t: T): { text: string; tone?: 'error' } {
           })}`,
         };
       }
-      return {
-        text:
-          result.line === null
-            ? t('refusedNoPlace', { code: result.code })
-            : t('refused', { code: result.code, line: result.line, column: result.column ?? '' }),
-        tone: 'error',
-      };
+      return { text: t('notOpened', { reason: wordRefusal(result, language) }), tone: 'error' };
     }
   }
 }
@@ -76,27 +71,38 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // A file given before the core is ready waits for it.
   const [pending, setPending] = useState<Uint8Array | null>(null);
+  // Each open is numbered, so a slower earlier read cannot replace the file
+  // chosen last.
+  const latest = useRef(0);
   const open = useCallback(
-    async (bytes: Uint8Array) => {
+    async (bytes: Uint8Array, request: number) => {
       if (!core) {
         setPending(bytes);
         return;
       }
       try {
         const result = await core.open(bytes);
+        const next = result.result === 'opened' ? await core.diagram() : null;
+        if (request !== latest.current) return;
         setState({ kind: 'result', result });
-        setDiagram(result.result === 'opened' ? await core.diagram() : null);
+        setDiagram(next);
       } catch {
+        if (request !== latest.current) return;
         setDiagram(null);
         setState({ kind: 'unreadable' });
       }
     },
     [core],
   );
+  /** Starts a request: the bytes it reads open only if no later one started. */
+  const begin = () => {
+    latest.current += 1;
+    return latest.current;
+  };
   useEffect(() => {
     if (core && pending) {
       setPending(null);
-      void open(pending);
+      void open(pending, latest.current);
     }
   }, [core, pending, open]);
 
@@ -135,9 +141,14 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     core
       .setLanguage(language)
       .then(() => core.diagram())
-      .then((next) => {
-        if (current && next) setDiagram(next);
-      });
+      .then(
+        (next) => {
+          if (current && next) setDiagram(next);
+        },
+        (error: unknown) => {
+          if (current) setState({ kind: 'failed', reason: String(error) });
+        },
+      );
     return () => {
       current = false;
     };
@@ -147,16 +158,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   useEffect(() => {
     const sample = new URLSearchParams(location.search).get('sample');
     if (!core || !sample) return;
+    const request = begin();
     fetch(`/samples/${encodeURIComponent(sample)}`)
       .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(String(response.status)))))
-      .then((buffer) => open(new Uint8Array(buffer)))
+      .then((buffer) => open(new Uint8Array(buffer), request))
       .catch(() => setState({ kind: 'unreadable' }));
   }, [core, open]);
 
   const openFile = (file: File | undefined) => {
     if (!file) return;
+    const request = begin();
     file.arrayBuffer().then(
-      (buffer) => void open(new Uint8Array(buffer)),
+      (buffer) => void open(new Uint8Array(buffer), request),
       () => setState({ kind: 'unreadable' }),
     );
   };
@@ -165,6 +178,23 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     event.preventDefault();
     openFile(event.dataTransfer.files[0]);
   };
+
+  // The diagram's text follows DATUM's type tokens, so the user's text size.
+  const onTextStyle = useCallback(
+    (style: TextStyle) => {
+      if (!core) return;
+      core
+        .setStyle(style)
+        .then(() => core.diagram())
+        .then(
+          (next) => {
+            if (next) setDiagram((current) => (current && current.layout === next.layout && current.revision === next.revision ? current : next));
+          },
+          () => undefined,
+        );
+    },
+    [core],
+  );
 
   const copy: WorkspaceCopy = useMemo(
     () => ({
@@ -179,7 +209,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   );
 
   const empty = (key: MessageKey) => <p className="datum-meta af-dock-empty">{t(key)}</p>;
-  const status = message(state, t);
+  const status = message(state, t, language);
   return (
     <DatumRoot app className="af-app" lang={language} theme={theme === 'system' ? undefined : theme}>
       <Toolbar label={t('appName')}>
@@ -251,7 +281,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             views: [{ id: 'problems', label: t('problems'), content: empty('problemsEmpty') }],
           }}
         >
-          <DiagramCanvas diagram={diagram} label={t('canvas')} />
+          <DiagramCanvas diagram={diagram} label={t('canvas')} onTextStyle={onTextStyle} />
         </Workspace>
       </div>
       <StatusBar>

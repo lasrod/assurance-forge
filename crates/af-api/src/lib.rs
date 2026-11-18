@@ -20,8 +20,8 @@ use sacm::diagnostic::Severity;
 use sacm::xmi::{self, Mode, ReadOptions};
 
 use contract::{
-    ArgumentValue, DiagnosticCounts, DiagramAt, ElementDetails, MessageArgument, OpenResult,
-    Refusal, ViewCode,
+    ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, ElementDetails, MessageArgument,
+    OpenResult, Refusal, ViewCode,
 };
 
 mod convert;
@@ -31,6 +31,8 @@ pub struct Core {
     engine: Engine,
     language: String,
     revision: u32,
+    /// Counts layouts, which change with the language and the text sizes.
+    layout: u32,
     open: Option<Open>,
 }
 
@@ -50,6 +52,7 @@ impl Core {
             engine: Engine::new(fonts, style),
             language: language.to_owned(),
             revision: 0,
+            layout: 0,
             open: None,
         }
     }
@@ -58,6 +61,7 @@ impl Core {
     /// A refused file leaves nothing open.
     pub fn open(&mut self, bytes: &[u8]) -> OpenResult {
         self.revision += 1;
+        self.layout += 1;
         let output = match xmi::read(bytes, &ReadOptions::default().with_mode(Mode::Strict)) {
             Ok(output) => output,
             Err(error) => {
@@ -108,21 +112,25 @@ impl Core {
 
     /// The diagram of the open document, or `None` when nothing is open.
     pub fn diagram(&mut self) -> Option<DiagramAt> {
-        let revision = self.revision;
-        self.diagram_ref().map(|diagram| DiagramAt {
-            revision,
-            diagram: diagram.clone(),
+        self.diagram_ref().map(|at| DiagramAt {
+            revision: at.revision,
+            layout: at.layout,
+            diagram: at.diagram.clone(),
         })
     }
 
     /// The diagram of the open document, borrowed: what a shell serializes
-    /// without copying it first. It is at [`Core::revision`].
-    pub fn diagram_ref(&mut self) -> Option<&contract::Diagram> {
+    /// without copying it first.
+    pub fn diagram_ref(&mut self) -> Option<DiagramAtRef<'_>> {
         let open = self.open.as_mut()?;
-        Some(
-            open.diagram
-                .get_or_insert_with(|| convert::diagram(&self.engine.layout(&open.view))),
-        )
+        let diagram = open
+            .diagram
+            .get_or_insert_with(|| convert::diagram(&self.engine.layout(&open.view)));
+        Some(DiagramAtRef {
+            revision: self.revision,
+            layout: self.layout,
+            diagram,
+        })
     }
 
     /// What the details panel shows for the node with SACM id `id`.
@@ -154,6 +162,7 @@ impl Core {
     pub fn set_language(&mut self, language: &str) {
         self.language = language.to_owned();
         self.engine.clear_cache();
+        self.layout += 1;
         if let Some(open) = self.open.as_mut() {
             open.view = view::view(&open.document, &self.language);
             open.diagram = None;
@@ -162,7 +171,11 @@ impl Core {
 
     /// Changes the text sizes, which lays the diagram out again.
     pub fn set_style(&mut self, style: Style) {
+        if style == self.engine.style() {
+            return;
+        }
         self.engine.set_style(style);
+        self.layout += 1;
         if let Some(open) = self.open.as_mut() {
             open.diagram = None;
         }

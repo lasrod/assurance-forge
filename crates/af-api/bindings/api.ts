@@ -31,7 +31,16 @@ export type MessageArgument = { name: string, value: ArgumentValue, };
 
 export type ArgumentValue = { "type": "text", "value": string } | { "type": "count", "value": number };
 
-export type DiagramAt = { revision: number, diagram: Diagram, };
+export type DiagramAt = { 
+/**
+ * The document's revision.
+ */
+revision: number, 
+/**
+ * Which layout of it: it changes when the language or the text sizes
+ * do, which change the diagram but not the document.
+ */
+layout: number, diagram: Diagram, };
 
 export type ElementDetails = { 
 /**
@@ -101,6 +110,10 @@ points: Array<Point>, arrowhead: Arrowhead,
 /**
  * The tip, on the `to` node's outline, then the other two corners.
  */
-head: Array<Point>, };
+head: Array<Point>, 
+/**
+ * Everything drawn for the edge, for culling.
+ */
+bounds: Rect, };
 
 export type Diagram = { nodes: Array<DiagramNode>, edges: Array<DiagramEdge>, bounds: Rect, };

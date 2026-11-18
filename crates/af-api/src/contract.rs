@@ -75,8 +75,22 @@ pub enum ArgumentValue {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct DiagramAt {
+    /// The document's revision.
     pub revision: u32,
+    /// Which layout of it: it changes when the language or the text sizes
+    /// do, which change the diagram but not the document.
+    pub layout: u32,
     pub diagram: Diagram,
+}
+
+/// [`DiagramAt`] with the diagram borrowed, for a shell to serialize without
+/// copying it. It serializes exactly as `DiagramAt`, which a test checks.
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagramAtRef<'a> {
+    pub revision: u32,
+    pub layout: u32,
+    pub diagram: &'a Diagram,
 }
 
 /// What the details panel shows for a node.
@@ -254,6 +268,8 @@ pub struct DiagramEdge {
     pub arrowhead: Arrowhead,
     /// The tip, on the `to` node's outline, then the other two corners.
     pub head: Vec<Point>,
+    /// Everything drawn for the edge, for culling.
+    pub bounds: Rect,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

@@ -29,6 +29,6 @@ test('a refused file shows its code and place, and no diagram', async ({ page })
     mimeType: 'application/xml',
     buffer: Buffer.from('<?xml version="1.0"?>\n<sacm:AssuranceCasePackage\n  oops'),
   });
-  await expect(page.getByTestId('status')).toContainText(/Not opened: SACM-[A-Z]+-\d+ at line \d+, column \d+/);
+  await expect(page.getByTestId('status')).toContainText(/Not opened: The file is not well-formed XML\. \[SACM-XML-001 line \d+, column \d+\]/);
   await expect.poll(async () => (await drawn(page))?.drawn).toEqual({ nodes: 0, edges: 0 });
 });

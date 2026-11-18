@@ -33,8 +33,7 @@ const en = {
   empty: 'Open a SACM 2.3 file, or drop one here.',
   opened: '{nodes} nodes, {edges} edges',
   findings: '{errors} errors, {warnings} warnings',
-  refused: 'Not opened: {code} at line {line}, column {column}',
-  refusedNoPlace: 'Not opened: {code}',
+  notOpened: 'Not opened: {reason}',
   unreadable: 'Could not read the file.',
 };
 
@@ -70,8 +69,7 @@ const ja: Record<MessageKey, string> = {
   empty: 'SACM 2.3 ファイルを開くか、ここにドロップしてください。',
   opened: 'ノード {nodes} 個、エッジ {edges} 本',
   findings: 'エラー {errors} 件、警告 {warnings} 件',
-  refused: '開けませんでした: {code}（{line} 行 {column} 列）',
-  refusedNoPlace: '開けませんでした: {code}',
+  notOpened: '開けませんでした: {reason}',
   unreadable: 'ファイルを読み込めませんでした。',
 };
 

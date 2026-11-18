@@ -7,6 +7,14 @@ import type { DiagramAt, ElementDetails, OpenResult } from '../../../crates/af-a
 
 export type * from '../../../crates/af-api/bindings/api';
 
+/** `type.control` and `type.metadata`, resolved: they follow the user's text size. */
+export interface TextStyle {
+  textSize: number;
+  textLineHeight: number;
+  identifierSize: number;
+  identifierLineHeight: number;
+}
+
 export interface Core {
   /** Reads a SACM 2.3 XMI file. A refused file leaves nothing open. */
   open(bytes: Uint8Array): Promise<OpenResult>;
@@ -16,6 +24,8 @@ export interface Core {
   element(id: string): Promise<ElementDetails | null>;
   /** A BCP 47 tag such as `en` or `ja`: the node text follows it. */
   setLanguage(language: string): Promise<void>;
+  /** The diagram's text sizes in CSS px, from DATUM's type tokens. */
+  setStyle(style: TextStyle): Promise<void>;
   /** Frees what the core holds. It is not used after. */
   dispose(): void;
 }

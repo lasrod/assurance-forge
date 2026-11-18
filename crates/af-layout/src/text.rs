@@ -186,12 +186,17 @@ impl<'a> Shaper<'a> {
             start = end;
             let mandatory = opportunity == BreakOpportunity::Mandatory;
             let segment = segment.trim_end_matches(['\n', '\r', '\u{2028}', '\u{2029}', '\u{85}']);
-            let trimmed = self.width(segment.trim_end(), size, weight);
             let full = self.width(segment, size, weight);
+            let trimmed = if segment.ends_with(char::is_whitespace) {
+                self.width(segment.trim_end(), size, weight)
+            } else {
+                full
+            };
 
-            if !line.is_empty() && estimate + trimmed > max_width {
+            // Ends lines until the segment fits after what is left: an overflow
+            // in `finish` carries a segment, which may leave no room either.
+            while !line.is_empty() && estimate + trimmed > max_width {
                 self.finish(&mut lines, &mut line, size, weight, max_width);
-                // What an overflow carried starts the next line.
                 estimate = self.width(&line, size, weight);
             }
             if line.is_empty() && trimmed > max_width {
@@ -266,19 +271,23 @@ impl<'a> Shaper<'a> {
         let mut lines = Vec::new();
         let mut rest = word;
         while self.width(rest.trim_end(), size, weight) > max_width {
-            // The longest prefix that fits, at least one character.
-            let mut fit = rest
+            // The longest prefix that fits, at least one character, by binary
+            // search over the character boundaries: a prefix's width grows
+            // with its length.
+            let ends: Vec<usize> = rest
                 .char_indices()
-                .nth(1)
-                .map_or(rest.len(), |(index, _)| index);
-            for (index, c) in rest.char_indices().skip(1) {
-                let end = index + c.len_utf8();
-                if self.width(&rest[..end], size, weight) > max_width {
-                    break;
+                .map(|(index, c)| index + c.len_utf8())
+                .collect();
+            let (mut low, mut high) = (0, ends.len() - 1);
+            while low < high {
+                let middle = (low + high).div_ceil(2);
+                if self.width(&rest[..ends[middle]], size, weight) <= max_width {
+                    low = middle;
+                } else {
+                    high = middle - 1;
                 }
-                fit = end;
             }
-            let (head, tail) = rest.split_at(fit);
+            let (head, tail) = rest.split_at(ends[low]);
             lines.push(Line {
                 text: head.to_owned(),
                 width: self.width(head, size, weight),

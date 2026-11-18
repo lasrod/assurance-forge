@@ -55,16 +55,7 @@ impl WasmCore {
 
     /// `DiagramAt` as JSON, or `None` when nothing is open.
     pub fn diagram(&mut self) -> Option<String> {
-        // Serialized as `DiagramAt` from the borrowed diagram, without copying it.
-        #[derive(Serialize)]
-        struct DiagramAt<'a> {
-            revision: u32,
-            diagram: &'a af_api::contract::Diagram,
-        }
-        let revision = self.core.revision();
-        self.core
-            .diagram_ref()
-            .map(|diagram| json(&DiagramAt { revision, diagram }))
+        self.core.diagram_ref().map(|at| json(&at))
     }
 
     /// `ElementDetails` as JSON, or `None` when no node has the id.

@@ -67,3 +67,17 @@ test('switching the theme draws the canvas again in its colours', async ({ page 
   await expect.poll(() => page.evaluate(() => window.__assuranceForge?.paints ?? 0)).toBeGreaterThan(paints);
   await expect.poll(ground).toBeLessThan(light - 200);
 });
+
+test('the diagram text follows the user\'s text size', async ({ page }) => {
+  // A larger browser text size: DATUM's type tokens are in rem.
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.documentElement.style.fontSize = '20px';
+    });
+  });
+  await opened(page, 'sacm_example_core_argument.sacm.xmi', '&lang=en');
+  const size = () =>
+    page.evaluate(() => window.__assuranceForge?.diagram?.diagram.nodes[0].text.find((line) => line.role === 'statement')?.size);
+  // type.control is 0.875rem: 17.5 px at a 20 px root.
+  await expect.poll(size).toBe(17.5);
+});

@@ -108,6 +108,7 @@ fn edge(edge: &layout::DiagramEdge) -> DiagramEdge {
             layout::Arrowhead::Open => Arrowhead::Open,
         },
         head: edge.head.iter().copied().map(point).collect(),
+        bounds: rect(edge.bounds),
     }
 }
 

@@ -61,14 +61,7 @@ function overlaps(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
-function edgeBounds(edge: DiagramEdge): Rect {
-  const points = [...edge.points, ...edge.head];
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
-}
+
 
 /**
  * Paints `diagram` on a backing store of `width` × `height` CSS px at `dpr`
@@ -94,7 +87,7 @@ export function draw(
   const visible = visibleArea(viewport, size.width, size.height);
   const drawn = { nodes: 0, edges: 0 };
   for (const edge of diagram.edges) {
-    if (!overlaps(edgeBounds(edge), visible)) continue;
+    if (!overlaps(edge.bounds, visible)) continue;
     drawEdge(context, edge, palette, scale);
     drawn.edges += 1;
   }

@@ -115,7 +115,7 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
     let bounds = nodes
         .iter()
         .map(|node| node.bounds)
-        .chain(diagram_edges.iter().map(edge_bounds))
+        .chain(diagram_edges.iter().map(|edge| edge.bounds))
         .reduce(|a, b| a.union(&b))
         .map_or(
             Rect {
@@ -566,8 +566,8 @@ fn place(tree: &Tree, sized: &[Sized]) -> Vec<Point> {
 
 // ===== Edges =====
 
-fn edge_bounds(edge: &DiagramEdge) -> Rect {
-    let points = edge.points.iter().chain(&edge.head);
+fn bounds_of(points: &[Point], head: &[Point; 3]) -> Rect {
+    let points = points.iter().chain(head);
     let (mut x0, mut y0, mut x1, mut y1) = (
         f32::INFINITY,
         f32::INFINITY,
@@ -640,6 +640,7 @@ fn edge_geometry(
     } else {
         base
     });
+    let bounds = bounds_of(&points, &head);
     DiagramEdge {
         relationship: edge.relationship.clone(),
         from: edge.from.clone(),
@@ -650,5 +651,6 @@ fn edge_geometry(
         arrowhead,
         head,
         placement,
+        bounds,
     }
 }
