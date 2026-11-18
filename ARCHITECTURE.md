@@ -61,7 +61,7 @@ flowchart TD
 | Crate | Owns | Built |
 |---|---|---|
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM) | external |
-| `af-gsn` | GSN view of a document, GSN commands, identifiers, well-formedness checks | skeleton |
+| `af-gsn` | GSN view of a document, GSN commands, identifiers, well-formedness checks | view (reading rules in `docs/standards/sacm-gsn-mapping.md`); commands and checks no |
 | `af-layout` | Diagram layout, positioned render model, SVG export | no |
 | `af-session` | Open document, revisions, change stream, undo, drafts, storage trait | no |
 | `af-problems` | The problem list and its attention model | no |
