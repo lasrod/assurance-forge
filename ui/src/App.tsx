@@ -6,25 +6,27 @@ import {
   ChevronDown,
   ChevronUp,
   DatumRoot,
+  FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  SegmentedControl,
   Status,
   StatusBar,
   StatusBarSpacer,
   Toolbar,
   ToolbarGroup,
-  ToolbarSpacer,
   Workspace,
   type WorkspaceCopy,
   type WorkspaceLayout,
+  type WorkspaceDockId,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
-import { loadLayout, saveLayout } from './layout';
+import { loadWorkspace, saveWorkspace, toStartView, type StartView, type WorkspaceState } from './layout';
+import { isOpenShortcut } from './shortcuts';
+import { MenuBar, PANELS, type PanelId } from './MenuBar';
 
 type State =
   | { kind: 'starting' }
@@ -70,7 +72,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [core, setCore] = useState<Core | null>(null);
   const [state, setState] = useState<State>({ kind: 'starting' });
   const [diagram, setDiagram] = useState<DiagramAt | null>(null);
-  const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
+  const [workspace, setWorkspace] = useState(loadWorkspace);
+  const { layout, startView } = workspace;
   const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
@@ -249,35 +252,80 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   );
 
   const empty = (key: MessageKey) => <p className="datum-meta af-dock-empty">{t(key)}</p>;
+
+  // The start dock holds the Case Explorer and the Argument Navigator: tabs,
+  // until DATUM's Workspace can stack them as the C++ application did (D9).
+  // Every change goes through `update`, from the latest state: DATUM's rail
+  // reports a tab and then the dock's opening in one click, and the second
+  // must not undo the first. The state is saved whenever it changes.
+  useEffect(() => saveWorkspace(workspace), [workspace]);
+  const setStartView = (view: StartView) => setWorkspace((current) => ({ ...current, startView: view }));
+  const changeLayout = (next: WorkspaceLayout) => setWorkspace((current) => ({ ...current, layout: next }));
+
+  // Which dock holds a panel depends on the tier, as DATUM's measure reports
+  // it: at the medium tier the side panels are in one side dock, at the narrow
+  // tier every panel is in the bottom dock. A copy of DATUM's rule, read from
+  // the docks it measures, until its Workspace says which dock holds a view and
+  // can show one (raised there); until then, opening the Argument Navigator
+  // selects its tab at the wide tier only.
+  const [shownDocks, setShownDocks] = useState<WorkspaceDockId[]>(['start', 'end', 'bottom']);
+  const host = (id: PanelId): WorkspaceDockId => {
+    const side = shownDocks.filter((dock) => dock !== 'bottom');
+    if (side.length === 0) return 'bottom';
+    if (id === 'problems') return 'bottom';
+    if (side.length === 1) return side[0];
+    return id === 'elementProperties' ? 'end' : 'start';
+  };
+  const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)]);
+  const onPanelsChange = (next: PanelId[]) => {
+    const added = next.find((id) => !panels.includes(id));
+    const removed = panels.find((id) => !next.includes(id));
+    const changed = added ?? removed;
+    if (!changed) return;
+    const dock = host(changed);
+    setWorkspace((current: WorkspaceState) => ({
+      layout: { ...current.layout, open: { ...current.layout.open, [dock]: added !== undefined } },
+      startView: added === 'caseExplorer' || added === 'argumentNavigator' ? added : current.startView,
+    }));
+  };
+  const chooseFile = useCallback(() => input.current?.click(), []);
+
+  // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      // Not when something else has the key: a component that handled it, an
+      // open menu or dialog, or a field being typed in.
+      const target = event.target instanceof Element ? event.target : null;
+      const busy = target?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"]');
+      if (event.defaultPrevented || busy || !isOpenShortcut(event)) return;
+      event.preventDefault();
+      // As the File menu: nothing to open into until the core has started.
+      if (core) chooseFile();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [chooseFile, core]);
+
   const status = message(state, t, language);
   return (
     <DatumRoot app className="af-app" lang={language} theme={theme === 'system' ? undefined : theme}>
-      <Toolbar label={t('appName')}>
+      <MenuBar
+        t={t}
+        canOpen={core !== null}
+        onOpen={chooseFile}
+        panels={panels}
+        onPanelsChange={onPanelsChange}
+        theme={theme}
+        onThemeChange={setTheme}
+        language={language}
+        onLanguageChange={setLanguage}
+      />
+      <Toolbar label={t('toolbar')}>
         <ToolbarGroup>
-          <Button onClick={() => input.current?.click()} unavailable={!core}>
+          <Button icon={<FolderOpen aria-hidden="true" />} onClick={chooseFile} unavailable={!core}>
             {t('open')}
           </Button>
         </ToolbarGroup>
-        <ToolbarSpacer />
-        <SegmentedControl<ThemeChoice>
-          legend={t('theme')}
-          options={[
-            { value: 'system', label: t('themeSystem') },
-            { value: 'light', label: t('themeLight') },
-            { value: 'dark', label: t('themeDark') },
-          ]}
-          value={theme}
-          onChange={setTheme}
-        />
-        <SegmentedControl<Language>
-          legend={t('language')}
-          options={[
-            { value: 'en', label: 'EN' },
-            { value: 'ja', label: '日本語' },
-          ]}
-          value={language}
-          onChange={setLanguage}
-        />
       </Toolbar>
       <input
         ref={input}
@@ -295,24 +343,31 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           centreLabel={t('diagram')}
           onCentreSize={onCentreSize}
           layout={layout}
-          onLayoutChange={(next) => {
-            setLayout(next);
-            saveLayout(next);
+          onLayoutChange={changeLayout}
+          onMeasure={(measure) => {
+            const docks = measure.docks.map((dock) => dock.id);
+            setShownDocks((current) => (current.join() === docks.join() ? current : docks));
           }}
           copy={copy}
           start={{
-            name: t('outline'),
-            nameInText: t('outlineInText'),
+            // Both C++ names: the dock holds both panels, as tabs until DATUM can stack them.
+            name: t('startDock'),
+            nameInText: t('startDockInText'),
             min: 14,
             icons: { hide: <PanelLeftClose />, show: <PanelLeftOpen /> },
-            views: [{ id: 'outline', label: t('outline'), content: empty('outlineEmpty') }],
+            activeView: startView,
+            onActiveViewChange: (id) => setStartView(toStartView(id)),
+            views: [
+              { id: 'caseExplorer', label: t('caseExplorer'), content: empty('caseExplorerEmpty') },
+              { id: 'argumentNavigator', label: t('argumentNavigator'), content: empty('argumentNavigatorEmpty') },
+            ],
           }}
           end={{
-            name: t('details'),
-            nameInText: t('detailsInText'),
+            name: t('elementProperties'),
+            nameInText: t('elementPropertiesInText'),
             min: 14,
             icons: { hide: <PanelRightClose />, show: <PanelRightOpen /> },
-            views: [{ id: 'details', label: t('details'), content: empty('detailsEmpty') }],
+            views: [{ id: 'elementProperties', label: t('elementProperties'), content: empty('elementPropertiesEmpty') }],
           }}
           bottom={{
             name: t('problems'),

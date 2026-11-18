@@ -8,13 +8,18 @@
 
   .af-app {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     height: 100%;
   }
 
   .af-workspace {
     display: grid;
     min-height: 0;
+    /* The side docks' default, about the C++ application's 20% of a window,
+       so the start dock's two tab labels fit. With DATUM's 36rem centre they
+       make the 70rem at which both side docks show. A splitter's reset returns here. */
+    --datum-workspace-start-default: 17rem;
+    --datum-workspace-end-default: 17rem;
   }
 
   .af-dock-empty {

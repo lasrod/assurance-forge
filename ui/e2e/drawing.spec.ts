@@ -63,7 +63,8 @@ test('switching the theme draws the canvas again in its colours', async ({ page 
     });
   const light = await ground();
   const paints = await page.evaluate(() => window.__assuranceForge?.paints ?? 0);
-  await page.getByRole('radio', { name: 'Dark' }).check();
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Dark' }).click();
   await expect.poll(() => page.evaluate(() => window.__assuranceForge?.paints ?? 0)).toBeGreaterThan(paints);
   await expect.poll(ground).toBeLessThan(light - 200);
 });
