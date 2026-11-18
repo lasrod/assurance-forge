@@ -1,0 +1,23 @@
+[package]
+name = "af-layout"
+description = "Text measurement, GSN diagram layout and the render model the canvas and the SVG export draw."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+af-gsn = { path = "../af-gsn" }
+# Shapes text as HarfBuzz does, so widths match the browser's (canvas spike).
+rustybuzz = "0.20.1"
+# The Unicode line breaking algorithm, UAX #14.
+unicode-linebreak = "0.1.5"
+
+[dev-dependencies]
+# Reads the samples in tests.
+sacm = { git = "https://github.com/lasrod/libSACM", rev = "2aa2f3793345c9747dc44576f2cb8f97fce0db81" }
+
+[lints]
+workspace = true

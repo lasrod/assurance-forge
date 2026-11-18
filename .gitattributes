@@ -7,3 +7,10 @@ testdata/** text eol=lf
 
 *.png binary
 *.ico binary
+
+# Fonts are binary, including those under testdata/ (the rule above would
+# convert their line endings and corrupt them).
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

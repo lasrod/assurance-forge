@@ -1,0 +1,81 @@
+import { useEffect, useRef, useState } from 'react';
+import type { DiagramAt, TextStyle } from '../core/Core';
+import { measuredFontFamily, watchCanvasStyle, type CanvasStyle } from '../design';
+import { report } from '../testHook';
+import { draw, fit, type Palette } from './draw';
+
+function palette(style: CanvasStyle): Palette {
+  return {
+    ground: style.color('surface.canvas'),
+    line: style.color('line.control'),
+    text: style.color('text.primary'),
+    secondary: style.color('text.secondary'),
+  };
+}
+
+/** The diagram's text sizes, as DATUM's type tokens resolve here. */
+function textStyle(style: CanvasStyle): TextStyle {
+  return {
+    textSize: style.px('type.control.size'),
+    textLineHeight: style.px('type.control.line-height'),
+    identifierSize: style.px('type.metadata.size'),
+    identifierLineHeight: style.px('type.metadata.line-height'),
+  };
+}
+
+/**
+ * The diagram, fitted to the canvas, which fills the workspace's centre
+ * surface and is `size` CSS px. `onTextStyle` hears the text sizes DATUM's
+ * tokens resolve to, for the layout.
+ */
+export function DiagramCanvas({
+  diagram,
+  label,
+  size,
+  onTextStyle,
+}: {
+  diagram: DiagramAt | null;
+  label: string;
+  size: { width: number; height: number };
+  onTextStyle: (style: TextStyle) => void;
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [style, setStyle] = useState<CanvasStyle | null>(null);
+
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const watch = watchCanvasStyle(element, (next) => {
+      setStyle(next);
+      onTextStyle(textStyle(next));
+    });
+    setStyle(watch.style);
+    onTextStyle(textStyle(watch.style));
+    return () => watch.dispose();
+  }, [onTextStyle]);
+
+  useEffect(() => {
+    const element = canvas.current;
+    const context = element?.getContext('2d');
+    if (!element || !context || !style || size.width === 0 || size.height === 0) return;
+    const dpr = style.dpr;
+    element.width = Math.round(size.width * dpr);
+    element.height = Math.round(size.height * dpr);
+    if (!diagram) {
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.fillStyle = style.color('surface.canvas');
+      context.fillRect(0, 0, element.width, element.height);
+      report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null });
+      return;
+    }
+    const viewport = fit(diagram.diagram.bounds, size.width, size.height);
+    const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFontFamily, { ...size, dpr });
+    report({ revision: diagram.revision, drawn, diagram });
+  }, [diagram, size, style]);
+
+  return (
+    <div className="af-canvas-host">
+      <canvas ref={canvas} className="af-canvas" role="img" aria-label={label} />
+    </div>
+  );
+}

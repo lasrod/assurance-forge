@@ -14,7 +14,20 @@ Read first: [`ARCHITECTURE.md`](ARCHITECTURE.md) (shape and rules) and
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo build -p af-gsn --target wasm32-unknown-unknown
+cargo build -p af-gsn -p af-layout -p af-api -p af-wasm --target wasm32-unknown-unknown
+```
+
+The interface (`ui/`) needs DATUM, which is private and never enters this
+repository: pack it from a local DATUM checkout first. CI cannot, so these run
+locally:
+
+```bash
+pnpm --dir ui datum      # pack DATUM from ../datum-ui (or DATUM_DIR) into ui/vendor/
+pnpm --dir ui install
+pnpm --dir ui wasm       # build crates/af-wasm into ui/src/wasm/
+pnpm --dir ui check      # types, lint, unit tests
+pnpm --dir ui e2e        # browser tests against the production build
+pnpm --dir ui dev        # then open /?sample=sacm_example_core_argument.sacm.xmi
 ```
 
 Test only what you changed while working (`cargo test -p <crate>`); run the
@@ -41,6 +54,9 @@ workspace before pushing.
 - **Never silently change an argument.** Reading and writing a file must
   preserve its meaning; a change that cannot be made correctly is refused.
 - **No data leaves the machine without the user's explicit consent.**
+- **DATUM stays out of the repository.** Never commit, publish or fetch its
+  tarballs in CI, and never link to its repository. `ui/` imports it only
+  through `ui/src/design/`.
 
 ## Working here
 

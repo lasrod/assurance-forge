@@ -1,0 +1,36 @@
+@layer app {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  .af-app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100%;
+  }
+
+  .af-workspace {
+    display: grid;
+    min-height: 0;
+  }
+
+  .af-dock-empty {
+    margin: 0;
+    padding: var(--datum-space-3, 0.75rem);
+  }
+
+  .af-canvas-host {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .af-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}

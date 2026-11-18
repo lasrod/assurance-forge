@@ -62,7 +62,7 @@ flowchart TD
 |---|---|---|
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM) | external |
 | `af-gsn` | GSN view of a document, GSN commands, identifiers, well-formedness checks | view (reading rules in `docs/standards/sacm-gsn-mapping.md`); commands and checks no |
-| `af-layout` | Diagram layout, positioned render model, SVG export | no |
+| `af-layout` | Text measurement, diagram layout, positioned render model, SVG export | layout and render model; SVG export no |
 | `af-session` | Open document, revisions, change stream, undo, drafts, storage trait | no |
 | `af-problems` | The problem list and its attention model | no |
 | `af-sccg` | Guideline catalogue and mechanical checks | no |
@@ -71,11 +71,11 @@ flowchart TD
 | `af-review` | Review methods: scope, prompt and result contracts, result validation | no |
 | `af-ai` | Provider profiles and inference; knows nothing about SACM or GSN | no |
 | `af-agent` | Operations an external agent may request | no |
-| `af-api` | The frontend contract: commands, queries, views | no |
+| `af-api` | The frontend contract: commands, queries, views | open, diagram and element queries; TypeScript types in `crates/af-api/bindings/api.ts` |
 | `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | no |
 | `af-mcp` | MCP server executable | no |
-| `af-wasm` | Web application shell: `af-api` in the browser, browser file access | no |
-| `ui/` | React and DATUM frontend | no |
+| `af-wasm` | Web application shell: `af-api` in the browser, browser file access | the core for the browser |
+| `ui/` | React and DATUM frontend | the browser build: open a file, draw the diagram, in a workspace with Outline, Details and Problems docks, in English and Japanese. DATUM is installed from tarballs packed locally |
 
 A crate is added when it can be built and tested without the rest.
 
