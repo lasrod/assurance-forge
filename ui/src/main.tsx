@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { createWasmCore } from './core/wasmCore';
-import { measuredFontFamily, measuredFontUrls } from './design';
+import { measuredFontUrls } from './design';
 import { initialLanguage, type Language } from './i18n/messages';
 import './app.css';
 
@@ -20,10 +20,12 @@ async function start(language: Language) {
     bytes(measuredFontUrls.japaneseRegular),
     bytes(measuredFontUrls.japaneseSemiBold),
   ]);
+  // Each face by its own family: given the whole list, WebKit loads only the
+  // first family's face, and Japanese text was then drawn with a system font.
   await Promise.all(
     ['400', '600'].flatMap((weight) => [
-      document.fonts.load(`${weight} 14px ${measuredFontFamily}`, 'A'),
-      document.fonts.load(`${weight} 14px ${measuredFontFamily}`, '日'),
+      document.fonts.load(`${weight} 14px 'DATUM Measured Sans'`, 'A'),
+      document.fonts.load(`${weight} 14px 'DATUM Measured Sans JP'`, '日'),
     ]),
   );
   return createWasmCore({ sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold }, language);

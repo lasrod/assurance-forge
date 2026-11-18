@@ -49,12 +49,12 @@ export function DiagramCanvas({ diagram, label }: { diagram: DiagramAt | null; l
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.fillStyle = style.color('surface.canvas');
       context.fillRect(0, 0, element.width, element.height);
-      report({ revision: null, drawn: { nodes: 0, edges: 0 } });
+      report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null });
       return;
     }
     const viewport = fit(diagram.diagram.bounds, size.width, size.height);
     const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFontFamily, { ...size, dpr });
-    report({ revision: diagram.revision, drawn });
+    report({ revision: diagram.revision, drawn, diagram });
   }, [diagram, size, style]);
 
   return (

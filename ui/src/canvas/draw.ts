@@ -42,6 +42,34 @@ export interface Drawn {
   edges: number;
 }
 
+/** Text smaller than this on screen is not drawn: only identifiers are (DATUM's canvas rule 5). */
+export const SMALLEST_TEXT_PX = 7;
+/** The identifier's size on screen when zoomed far out: `type.metadata`. */
+const FAR_IDENTIFIER_PX = 12;
+
+/** The part of the diagram in view, in diagram coordinates. */
+export function visibleArea(viewport: Viewport, width: number, height: number): Rect {
+  return {
+    x: -viewport.offsetX / viewport.scale,
+    y: -viewport.offsetY / viewport.scale,
+    width: width / viewport.scale,
+    height: height / viewport.scale,
+  };
+}
+
+function overlaps(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+function edgeBounds(edge: DiagramEdge): Rect {
+  const points = [...edge.points, ...edge.head];
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+}
+
 /**
  * Paints `diagram` on a backing store of `width` × `height` CSS px at `dpr`
  * device pixels each. Returns what was drawn.
@@ -62,9 +90,20 @@ export function draw(
   context.lineWidth = 1 / scale;
   context.lineJoin = 'round';
 
-  for (const edge of diagram.edges) drawEdge(context, edge, palette, scale);
-  for (const node of diagram.nodes) drawNode(context, node, palette, fontFamily, scale);
-  return { nodes: diagram.nodes.length, edges: diagram.edges.length };
+  // Only what is in view is drawn.
+  const visible = visibleArea(viewport, size.width, size.height);
+  const drawn = { nodes: 0, edges: 0 };
+  for (const edge of diagram.edges) {
+    if (!overlaps(edgeBounds(edge), visible)) continue;
+    drawEdge(context, edge, palette, scale);
+    drawn.edges += 1;
+  }
+  for (const node of diagram.nodes) {
+    if (!overlaps(node.bounds, visible)) continue;
+    drawNode(context, node, palette, fontFamily, scale);
+    drawn.nodes += 1;
+  }
+  return drawn;
 }
 
 function polyline(context: CanvasRenderingContext2D, points: Point[]) {
@@ -146,9 +185,29 @@ function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette:
     }
   }
 
+  const statement = node.text.find((line) => line.role !== 'identifier');
+  if (statement && statement.size * scale < SMALLEST_TEXT_PX) {
+    drawFarIdentifier(context, node, palette, fontFamily, scale);
+    return;
+  }
   for (const line of node.text) {
     context.fillStyle = line.role === 'identifier' ? palette.secondary : palette.text;
     context.font = `${line.weight} ${line.size}px ${fontFamily}`;
     context.fillText(line.text, line.x, line.baseline);
   }
+}
+
+/** Zoomed far out: the identifier alone, at metadata size on screen, centred, if it fits. */
+function drawFarIdentifier(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, fontFamily: string, scale: number) {
+  const identifier = node.text.find((line) => line.role === 'identifier');
+  if (!identifier) return;
+  const size = FAR_IDENTIFIER_PX / scale;
+  context.font = `400 ${size}px ${fontFamily}`;
+  const width = context.measureText(identifier.text).width;
+  const rect = node.shape.rect;
+  if (width > rect.width * 0.9 || size > rect.height * 0.9) return;
+  context.fillStyle = palette.text;
+  context.textBaseline = 'middle';
+  context.fillText(identifier.text, rect.x + (rect.width - width) / 2, rect.y + rect.height / 2);
+  context.textBaseline = 'alphabetic';
 }

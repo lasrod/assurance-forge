@@ -15,8 +15,10 @@ test('a file chosen in the picker opens', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('status')).toContainText('Open a SACM 2.3 file');
   await page.getByTestId('open-file').setInputFiles('../testdata/sacm/safety-case-sanitized-strict.sacm.xmi');
-  // 133 Claims, 29 ArgumentReasonings and 109 ArtifactReferences.
-  await expect.poll(async () => (await drawn(page))?.drawn.nodes).toBe(271);
+  // 133 Claims, 29 ArgumentReasonings and 109 ArtifactReferences. Fitted at the
+  // smallest zoom it is still wider than the canvas, so fewer are drawn.
+  await expect(page.getByTestId('status')).toContainText('271 nodes');
+  await expect.poll(async () => (await drawn(page))?.drawn.nodes).toBeGreaterThan(0);
 });
 
 test('a refused file shows its code and place, and no diagram', async ({ page }) => {

@@ -21,7 +21,7 @@ import {
   type WorkspaceCopy,
   type WorkspaceLayout,
 } from './design';
-import { translate, type Language, type MessageKey } from './i18n/messages';
+import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { loadLayout, saveLayout } from './layout';
 
 type State =
@@ -70,6 +70,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [state, setState] = useState<State>({ kind: 'starting' });
   const [diagram, setDiagram] = useState<DiagramAt | null>(null);
   const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
+  const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
 
@@ -149,7 +150,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const empty = (key: MessageKey) => <p className="datum-meta af-dock-empty">{t(key)}</p>;
   const status = message(state, t);
   return (
-    <DatumRoot app className="af-app" lang={language}>
+    <DatumRoot app className="af-app" lang={language} theme={theme === 'system' ? undefined : theme}>
       <Toolbar label={t('appName')}>
         <ToolbarGroup>
           <Button onClick={() => input.current?.click()} unavailable={!core}>
@@ -157,6 +158,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           </Button>
         </ToolbarGroup>
         <ToolbarSpacer />
+        <SegmentedControl<ThemeChoice>
+          legend={t('theme')}
+          options={[
+            { value: 'system', label: t('themeSystem') },
+            { value: 'light', label: t('themeLight') },
+            { value: 'dark', label: t('themeDark') },
+          ]}
+          value={theme}
+          onChange={setTheme}
+        />
         <SegmentedControl<Language>
           legend={t('language')}
           options={[

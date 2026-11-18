@@ -7,6 +7,10 @@ const en = {
   appName: 'Assurance Forge',
   open: 'Open…',
   language: 'Language',
+  theme: 'Theme',
+  themeSystem: 'System',
+  themeLight: 'Light',
+  themeDark: 'Dark',
   canvas: 'GSN diagram',
   diagram: 'Diagram',
   outline: 'Outline',
@@ -40,6 +44,10 @@ const ja: Record<MessageKey, string> = {
   appName: 'Assurance Forge',
   open: '開く…',
   language: '言語',
+  theme: 'テーマ',
+  themeSystem: 'システム',
+  themeLight: 'ライト',
+  themeDark: 'ダーク',
   canvas: 'GSN 図',
   diagram: '図',
   outline: 'アウトライン',
@@ -71,6 +79,14 @@ const MESSAGES: Record<Language, Record<MessageKey, string>> = { en, ja };
 
 export function translate(language: Language, key: MessageKey, values: Record<string, string | number> = {}): string {
   return MESSAGES[language][key].replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`));
+}
+
+export type ThemeChoice = 'system' | 'light' | 'dark';
+
+/** `?theme=light` or `?theme=dark` chooses; otherwise the system's. */
+export function initialTheme(search: string): ThemeChoice {
+  const asked = new URLSearchParams(search).get('theme');
+  return asked === 'light' || asked === 'dark' ? asked : 'system';
 }
 
 /** `?lang=ja` or `?lang=en` chooses; otherwise the browser's first language, if Japanese. */
