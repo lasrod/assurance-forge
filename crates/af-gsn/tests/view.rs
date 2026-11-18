@@ -3,8 +3,8 @@
 
 use std::collections::HashSet;
 
-use af_gsn::view::{Code, EdgeKind, NodeKind, View, is_argument_element, view};
-use sacm::model::Document;
+use af_gsn::view::{Code, EdgeKind, NodeKind, View, view};
+use sacm::model::{Document, ElementKind as SacmKind, MetamodelPackage};
 use sacm::xmi::{self, Mode, ReadOptions};
 
 const SAMPLES: [&str; 5] = [
@@ -110,7 +110,12 @@ fn edge(
 fn assert_each_element_once(document: &Document, view: &View, what: &str) {
     let expected: Vec<&str> = document
         .elements()
-        .filter(|element| is_argument_element(element.kind()))
+        .filter(|element| {
+            // Independent of the view's own definition: every kind of the
+            // Argumentation package but a plain ArgumentPackage.
+            element.kind().package() == MetamodelPackage::Argumentation
+                && element.kind() != SacmKind::ArgumentPackage
+        })
         .map(|element| element.id().as_str())
         .collect();
     let nodes: Vec<&str> = view.nodes.iter().map(|node| node.id.as_str()).collect();
@@ -861,4 +866,322 @@ fn e8_a_reasoning_on_evidence_is_not_linked() {
     );
     assert_eq!(codes_of(&view, "e1"), [Code::EndNotPlaced]);
     assert_eq!(kind_of(&view, "ev"), NodeKind::Solution);
+}
+
+// ===== Found by the independent review of the code =====
+
+fn inference(id: &str, attributes: &str) -> String {
+    element("AssertedInference", id, attributes, "")
+}
+
+#[test]
+fn e5_a_cited_challenge_is_still_drawn_as_a_challenge() {
+    let document = case(
+        &[
+            claim("goal", ""),
+            claim("against", ""),
+            inference(
+                "i1",
+                r#" source="against" target="goal" isCounter="true" isCitation="true""#,
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(
+        edges(&view),
+        [edge("against", "goal", EdgeKind::Neutral, "i1")]
+    );
+    assert_eq!(codes_of(&view, "i1"), [Code::Citation, Code::Counter]);
+}
+
+#[test]
+fn every_code_whose_condition_holds_is_sent() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            inference(
+                "counter_assumed",
+                r#" source="sub" target="top" isCounter="true" assertionDeclaration="assumed""#,
+            ),
+            inference(
+                "cited_defeated",
+                r#" source="sub" target="top" isCitation="true" assertionDeclaration="defeated""#,
+            ),
+            inference(
+                "abstract_meta",
+                r#" source="sub" target="top" isAbstract="true" metaClaim="sub""#,
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(
+        codes_of(&view, "counter_assumed"),
+        [Code::Counter, Code::RelationshipDeclarationNotDrawn]
+    );
+    assert_eq!(
+        codes_of(&view, "cited_defeated"),
+        [Code::Citation, Code::Defeated]
+    );
+    assert_eq!(
+        codes_of(&view, "abstract_meta"),
+        [Code::UninstantiatedNotDrawn, Code::MetaClaimNotDrawn]
+    );
+    assert!(
+        edges(&view).contains(&edge("top", "sub", EdgeKind::SupportedBy, "abstract_meta")),
+        "an abstract relationship with a metaClaim is still live support"
+    );
+}
+
+#[test]
+fn e6_every_other_declaration_on_a_relationship_is_coded() {
+    let literals = ["needsSupport", "assumed", "axiomatic", "asCited"];
+    let body: String = [claim("top", ""), claim("sub", "")]
+        .into_iter()
+        .chain(literals.iter().map(|literal| {
+            inference(
+                literal,
+                &format!(r#" source="sub" target="top" assertionDeclaration="{literal}""#),
+            )
+        }))
+        .collect();
+    let view = view(&case(&body), "en");
+    for literal in literals {
+        assert_eq!(
+            codes_of(&view, literal),
+            [Code::RelationshipDeclarationNotDrawn],
+            "{literal}"
+        );
+        assert!(edges(&view).contains(&edge("top", "sub", EdgeKind::SupportedBy, literal)));
+    }
+}
+
+#[test]
+fn e8_a_reasoning_that_names_no_argument_reasoning_is_not_a_strategy() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            claim("not_reasoning", ""),
+            inference(
+                "i1",
+                r#" source="sub" target="top" reasoning="not_reasoning""#,
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(
+        edges(&view),
+        [edge("top", "sub", EdgeKind::SupportedBy, "i1")]
+    );
+    assert_eq!(codes_of(&view, "i1"), [Code::EndNotPlaced]);
+}
+
+#[test]
+fn e10_comes_before_e9_and_r12_before_r1() {
+    let document = case(
+        &[
+            reference("a"),
+            reference("b"),
+            element(
+                "AssertedArtifactSupport",
+                "cited_support",
+                r#" source="a" target="b" isCitation="true""#,
+                "",
+            ),
+            element(
+                "Claim",
+                "cited_goal",
+                r#" isCitation="true" citedElement="a""#,
+                &tagged(
+                    "sacm.import.extensionType",
+                    "{http://scsc.acwg.gsn/2.0}Goal",
+                ),
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(view.unplaced.len(), 1);
+    assert_eq!(view.unplaced[0].code, Code::ArtifactRelationshipNotDrawn);
+    assert!(codes_of(&view, "cited_support").is_empty());
+    assert_eq!(kind_of(&view, "cited_goal"), NodeKind::Neutral);
+    assert_eq!(codes_of(&view, "cited_goal"), [Code::Citation]);
+}
+
+#[test]
+fn r1_every_gsn_namespace_counts_conflicts_do_not_and_other_tags_are_ignored() {
+    let document = case(
+        &[
+            // Reached by nothing, so only the recorded type makes it a Context.
+            element(
+                "ArtifactReference",
+                "acwg",
+                "",
+                &tagged(
+                    "sacm.import.extensionType",
+                    "{http://acwg.org/3.0/gsn}Context",
+                ),
+            ),
+            element(
+                "ArtifactReference",
+                "acme",
+                "",
+                &tagged(
+                    "sacm.import.extensionType",
+                    "{http://org.eclipse.acme/1.0/gsn}Solution",
+                ),
+            ),
+            element(
+                "Claim",
+                "conflict",
+                r#" assertionDeclaration="axiomatic""#,
+                &[
+                    tagged("assuranceForge.gsn.role", "Justification"),
+                    tagged(
+                        "sacm.import.extensionType",
+                        "{http://scsc.acwg.gsn/2.0}Goal",
+                    ),
+                ]
+                .concat(),
+            ),
+            element(
+                "Claim",
+                "not_gsn",
+                "",
+                &[
+                    tagged("sacm.import.extensionType", "{http://example.org/cae}Claim"),
+                    tagged("assuranceForge.gsn.role", "Goal"),
+                ]
+                .concat(),
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(kind_of(&view, "acwg"), NodeKind::Context);
+    assert_eq!(kind_of(&view, "acme"), NodeKind::Solution);
+    assert!(
+        codes_of(&view, "acme").is_empty(),
+        "the recorded type beats R11"
+    );
+    assert_eq!(kind_of(&view, "conflict"), NodeKind::Justification);
+    assert_eq!(codes_of(&view, "conflict"), [Code::RecordedTypeNotUsed]);
+    assert_eq!(kind_of(&view, "not_gsn"), NodeKind::Goal);
+    assert!(codes_of(&view, "not_gsn").is_empty());
+}
+
+#[test]
+fn r15_the_contents_of_a_binding_are_not_drawn() {
+    let document = case(
+        &[
+            claim("c1", ""),
+            element(
+                "ArgumentPackageBinding",
+                "b1",
+                r#" participantPackage="p p""#,
+                &claim("bound", ""),
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    let nodes: Vec<&str> = view.nodes.iter().map(|node| node.id.as_str()).collect();
+    assert_eq!(nodes, ["c1"]);
+    let unplaced: Vec<&str> = view.unplaced.iter().map(|item| item.id.as_str()).collect();
+    assert_eq!(unplaced, ["b1", "bound"]);
+    assert_each_element_once(&document, &view, "binding");
+}
+
+#[test]
+fn r11_evidence_that_is_also_reached_otherwise_is_neutral() {
+    let document = case(
+        &[
+            claim("goal", ""),
+            reference("ev"),
+            element(
+                "AssertedEvidence",
+                "e1",
+                r#" source="ev" target="goal""#,
+                "",
+            ),
+            inference("i1", r#" source="goal" target="ev""#),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(kind_of(&view, "ev"), NodeKind::Neutral);
+}
+
+#[test]
+fn t3_an_exact_tag_beats_a_primary_subtag_and_empty_values_are_skipped() {
+    let document = case(&element(
+        "Claim",
+        "c1",
+        "",
+        r#"<description xmi:id="d1"><content><value lang="en" content=""/><value lang="en-GB" content="colour"/><value lang="en-US" content="color"/></content></description>"#,
+    ));
+    assert_eq!(
+        view(&document, "en-US").nodes[0].statement.as_deref(),
+        Some("color")
+    );
+    assert_eq!(
+        view(&document, "en").nodes[0].statement.as_deref(),
+        Some("colour")
+    );
+}
+
+#[test]
+fn findings_come_in_document_order() {
+    let document = case(
+        &[
+            claim("first", r#" isAbstract="true""#),
+            claim("top", ""),
+            inference(
+                "later",
+                r#" source="first" target="top" assertionDeclaration="assumed""#,
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    let order: Vec<&str> = view.findings.iter().map(|f| f.element.as_str()).collect();
+    assert_eq!(order, ["first", "later"]);
+}
+
+#[test]
+fn e7_a_relationship_with_no_source_and_one_with_a_repeated_source() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            inference("no_source", r#" target="top""#),
+            inference("twice", r#" source="sub sub" target="top""#),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    let no_source: Vec<(Code, Option<String>)> = view
+        .findings
+        .iter()
+        .filter(|f| f.element == "no_source")
+        .map(|f| (f.code, f.end.clone()))
+        .collect();
+    assert_eq!(no_source, [(Code::EndNotPlaced, None)]);
+    assert_eq!(view.unplaced[0].id, "no_source");
+    assert_eq!(
+        edges(&view),
+        [edge("top", "sub", EdgeKind::SupportedBy, "twice")]
+    );
+}
+
+#[test]
+fn e12_a_strategy_structure_is_coded() {
+    let document = case(&element("ArgumentReasoning", "r", r#" structure="p""#, ""));
+    let view = view(&document, "en");
+    assert_eq!(kind_of(&view, "r"), NodeKind::Strategy);
+    assert_eq!(codes_of(&view, "r"), [Code::StructureNotDrawn]);
 }

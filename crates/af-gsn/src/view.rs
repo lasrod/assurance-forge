@@ -3,7 +3,7 @@
 //! [`view`] reads a [`Document`] and answers what the diagram draws: nodes,
 //! edges, the elements it does not place, and a code for everything it draws
 //! differently from the file or not at all. It follows the reading rules in
-//! `docs/standards/sacm-gsn-mapping.md`, whose ids (R1 to R15, E1 to E11, T1 to
+//! `docs/standards/sacm-gsn-mapping.md`, whose ids (R1 to R15, E1 to E12, T1 to
 //! T3) the comments here cite. It never changes the document.
 //!
 //! Every argument element appears in the view exactly once (plan decision D4):
@@ -12,7 +12,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use sacm::model::{AssertionDeclaration, Document, ElementKind as SacmKind, SacmElement};
+use sacm::model::{
+    AssertionDeclaration, Document, ElementKind as SacmKind, MetamodelPackage, SacmElement,
+};
 
 use crate::ElementKind;
 
@@ -44,11 +46,13 @@ pub enum Code {
     Defeated,
     /// AF-VIEW-012: an assertion's `metaClaim` link is not drawn (E11).
     MetaClaimNotDrawn,
+    /// AF-VIEW-013: a Strategy's `structure` link is not drawn (E12).
+    StructureNotDrawn,
 }
 
 impl Code {
     /// Every code, in the order of the mapping record's table.
-    pub const ALL: [Code; 12] = [
+    pub const ALL: [Code; 13] = [
         Code::RecordedTypeNotUsed,
         Code::DeclarationHasNoShape,
         Code::ArtifactReferenceNotPlaced,
@@ -61,6 +65,7 @@ impl Code {
         Code::ArtifactRelationshipNotDrawn,
         Code::Defeated,
         Code::MetaClaimNotDrawn,
+        Code::StructureNotDrawn,
     ];
 
     /// The code as the mapping record writes it, such as `AF-VIEW-001`.
@@ -78,6 +83,7 @@ impl Code {
             Code::ArtifactRelationshipNotDrawn => "AF-VIEW-010",
             Code::Defeated => "AF-VIEW-011",
             Code::MetaClaimNotDrawn => "AF-VIEW-012",
+            Code::StructureNotDrawn => "AF-VIEW-013",
         }
     }
 }
@@ -342,28 +348,31 @@ fn relationship<'a>(
         return;
     }
 
-    // E9, then E5, then E5a, then E1 to E4 with E6.
+    // The style: E5 for a counter, then E5a or E9 for a defeated or cited
+    // relationship, then E1 to E4. Every code whose condition holds is sent,
+    // whichever style won.
     let declaration = element
         .assertion_declaration()
         .unwrap_or(AssertionDeclaration::Asserted);
-    let style = if element.is_citation() {
-        builder.finding(Code::Citation, id, None);
-        Style::NeutralInGsnDirection
-    } else if element.is_counter() {
-        builder.finding(Code::Counter, id, None);
-        if declaration == AssertionDeclaration::Defeated {
-            builder.finding(Code::Defeated, id, None);
-        }
+    let defeated = declaration == AssertionDeclaration::Defeated;
+    let style = if element.is_counter() {
         Style::Counter
-    } else if declaration == AssertionDeclaration::Defeated {
-        builder.finding(Code::Defeated, id, None);
+    } else if defeated || element.is_citation() {
         Style::NeutralInGsnDirection
     } else {
-        if declaration != AssertionDeclaration::Asserted {
-            builder.finding(Code::RelationshipDeclarationNotDrawn, id, None);
-        }
         Style::Live
     };
+    if element.is_citation() {
+        builder.finding(Code::Citation, id, None);
+    }
+    if element.is_counter() {
+        builder.finding(Code::Counter, id, None);
+    }
+    if defeated {
+        builder.finding(Code::Defeated, id, None);
+    } else if declaration != AssertionDeclaration::Asserted {
+        builder.finding(Code::RelationshipDeclarationNotDrawn, id, None);
+    }
     // R13, E11.
     if element.is_abstract() {
         builder.finding(Code::UninstantiatedNotDrawn, id, None);
@@ -384,12 +393,21 @@ fn relationship<'a>(
             None
         }
     };
+    // A source named twice is one premise, and one edge.
     let mut sources: Vec<&'a str> = Vec::new();
+    if element.sources().is_empty() {
+        builder.finding(Code::EndNotPlaced, id, None);
+    }
+    let mut seen: HashSet<&'a str> = HashSet::new();
     for source in element.sources() {
-        if placeable.contains_key(source.as_str()) {
-            sources.push(source.as_str());
+        let source = source.as_str();
+        if !seen.insert(source) {
+            continue;
+        }
+        if placeable.contains_key(source) {
+            sources.push(source);
         } else {
-            builder.finding(Code::EndNotPlaced, id, Some(source.as_str()));
+            builder.finding(Code::EndNotPlaced, id, Some(source));
         }
     }
 
@@ -485,6 +503,10 @@ fn node(element: SacmElement<'_>, reached: Reach, language: &str, builder: &mut 
     if !element.meta_claims().is_empty() {
         builder.finding(Code::MetaClaimNotDrawn, id, None);
     }
+    // E12.
+    if element.structure().is_some() {
+        builder.finding(Code::StructureNotDrawn, id, None);
+    }
 
     builder.nodes.push(Node {
         id: id.to_owned(),
@@ -565,9 +587,14 @@ fn recorded_type(element: SacmElement<'_>) -> Recorded {
         };
         let value = first_content(tag.content()).unwrap_or_default();
         match key {
-            EXTENSION_TYPE_KEY => found.push(extension_type(value)),
-            GSN_ROLE_KEY => {
-                found.push((value == "Justification").then_some(ElementKind::Justification))
+            EXTENSION_TYPE_KEY => {
+                if let Some(recorded) = extension_type(value) {
+                    found.push(recorded);
+                }
+            }
+            // Only `Justification` is a role the C++ application wrote.
+            GSN_ROLE_KEY if value == "Justification" => {
+                found.push(Some(ElementKind::Justification));
             }
             IMPORT_DECLARATION_KEY if value == "justification" => {
                 found.push(Some(ElementKind::Justification));
@@ -584,14 +611,16 @@ fn recorded_type(element: SacmElement<'_>) -> Recorded {
     }
 }
 
-/// A Clark-notation type, `{namespace}Local`, as a core GSN kind.
-fn extension_type(value: &str) -> Option<ElementKind> {
+/// A Clark-notation type, `{namespace}Local`. `None` when it is no GSN type
+/// at all, which R1 ignores; `Some(None)` for a GSN type this step does not
+/// draw, such as an Away Goal.
+fn extension_type(value: &str) -> Option<Option<ElementKind>> {
     let rest = value.strip_prefix('{')?;
     let (namespace, local) = rest.split_once('}')?;
     if !GSN_NAMESPACES.contains(&namespace) {
         return None;
     }
-    match local {
+    Some(match local {
         "Goal" => Some(ElementKind::Goal),
         "Strategy" => Some(ElementKind::Strategy),
         "Solution" => Some(ElementKind::Solution),
@@ -599,7 +628,7 @@ fn extension_type(value: &str) -> Option<ElementKind> {
         "Assumption" => Some(ElementKind::Assumption),
         "Justification" => Some(ElementKind::Justification),
         _ => None,
-    }
+    })
 }
 
 /// Whether a recorded type agrees with the element (R1).
@@ -639,6 +668,10 @@ fn in_language<'a>(values: &'a [sacm::model::LangString], language: &str) -> Opt
             .to_ascii_lowercase()
     };
     let wanted = primary(language);
+    let values: Vec<&sacm::model::LangString> = values
+        .iter()
+        .filter(|value| value.content().is_some_and(|content| !content.is_empty()))
+        .collect();
     values
         .iter()
         .find(|value| {
@@ -655,17 +688,11 @@ fn in_language<'a>(values: &'a [sacm::model::LangString], language: &str) -> Opt
         .and_then(|value| value.content())
 }
 
-/// The element kinds D4 accounts for: every `ArgumentationElement` but a plain
-/// `ArgumentPackage`, which is a container.
+/// The element kinds D4 accounts for: every kind of SACM's Argumentation
+/// package but a plain `ArgumentPackage`, which is a container. A kind a later
+/// libSACM adds is included, and is unplaced by R14 until a rule names it.
 pub fn is_argument_element(kind: SacmKind) -> bool {
-    is_node_kind(kind)
-        || is_relationship(kind)
-        || matches!(
-            kind,
-            SacmKind::ArgumentGroup
-                | SacmKind::ArgumentPackageInterface
-                | SacmKind::ArgumentPackageBinding
-        )
+    kind.package() == MetamodelPackage::Argumentation && kind != SacmKind::ArgumentPackage
 }
 
 fn is_node_kind(kind: SacmKind) -> bool {
@@ -686,22 +713,23 @@ fn is_relationship(kind: SacmKind) -> bool {
     )
 }
 
-/// R14 and R15: a group, an interface, a binding, or an element inside an
-/// interface or binding at any depth.
+/// R14 and R15: an argument element that is neither a node nor a
+/// relationship (a group, an interface, a binding, or a kind no rule names), or
+/// one inside an interface or binding at any depth, of an argument package or
+/// of an assurance case package.
 fn is_hidden(element: SacmElement<'_>) -> bool {
-    if matches!(
-        element.kind(),
-        SacmKind::ArgumentGroup
-            | SacmKind::ArgumentPackageInterface
-            | SacmKind::ArgumentPackageBinding
-    ) {
+    let kind = element.kind();
+    if is_argument_element(kind) && !is_node_kind(kind) && !is_relationship(kind) {
         return true;
     }
     let mut parent = element.parent();
     while let Some(ancestor) = parent {
         if matches!(
             ancestor.kind(),
-            SacmKind::ArgumentPackageInterface | SacmKind::ArgumentPackageBinding
+            SacmKind::ArgumentPackageInterface
+                | SacmKind::ArgumentPackageBinding
+                | SacmKind::AssuranceCasePackageInterface
+                | SacmKind::AssuranceCasePackageBinding
         ) {
             return true;
         }
