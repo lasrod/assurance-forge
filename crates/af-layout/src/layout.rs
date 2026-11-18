@@ -519,8 +519,7 @@ fn place(tree: &Tree, sized: &[Sized]) -> Vec<Point> {
     let rows = tree.depth.iter().copied().max().map_or(0, |d| d + 1);
     let mut row_up = vec![0.0f32; rows];
     let mut row_down = vec![0.0f32; rows];
-    for node in 0..count {
-        let d = tree.depth[node];
+    for (node, &d) in tree.depth.iter().enumerate() {
         row_up[d] = row_up[d].max(up(node));
         row_down[d] = row_down[d].max(down(node));
     }
