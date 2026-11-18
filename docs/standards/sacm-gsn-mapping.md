@@ -277,16 +277,16 @@ Elements of artifact and terminology packages are not argument elements and are
 not drawn; an `ArtifactReference` points at them.
 
 **Reached.** Where a rule says an element is *reached* by a relationship, only
-relationships that the view draws as SupportedBy or InContextOf count (E1 to E4,
-and E6 when not `defeated`). A relationship drawn neutral, or not drawn, reaches
-nothing, so an `AssertedArtifactSupport` from a piece of evidence does not make
-it less of a Solution.
+relationships that the view draws as SupportedBy or InContextOf count (E1 to
+E4, with E6's code or without). A relationship drawn neutral, or not drawn,
+reaches nothing, so an `AssertedArtifactSupport` from a piece of evidence does
+not make it less of a Solution.
 
-**Order.** For a node: R12 first, since a citation is neutral whatever else it
-says; then R1, a recorded type; then R2 to R11, by the element's class and
-declaration. R13 adds its code to whatever kind those give. For a relationship:
-E9 first, then E5, then E1 to E4, with the codes of E6, E7, E8, E11 and R13
-added.
+**Order.** For a node: R14 and R15 first, since what is not drawn is not
+drawn whatever else it says; then R12, since a citation is neutral; then R1, a
+recorded type; then R2 to R11, by the element's class and declaration. R13 adds
+its code to whatever kind those give. For a relationship: R15 and E10 first;
+then E9, E5 and E5a; then E1 to E4; with the codes of E6, E7, E8, E11 and R13 added.
 
 ### Nodes
 
@@ -306,7 +306,7 @@ added.
 | R12 | Any node element with `isCitation` set | Neutral, code AF-VIEW-004 | Decided | Away elements (GSN3-MOD-003) come with modules |
 | R13 | Any element with `isAbstract` set, node or relationship | Its kind by the other rules, with code AF-VIEW-005: the uninstantiated decorator is not drawn yet | Decided | Attribute table above, `uninstantiated` ↔ `isAbstract`. Patterns are a later step, and the code keeps the omission visible |
 | R14 | `ArgumentGroup` | Not drawn, code AF-VIEW-006. Its members are references, not contents, and are drawn by their own rules | Decided | Groups are not core GSN |
-| R15 | `ArgumentPackageInterface`, `ArgumentPackageBinding`, and the elements they contain | Not drawn, code AF-VIEW-006 for each | Decided | Modules and contracts are a later step. An interface's elements stand for elements of another package, so drawing them now would draw those twice |
+| R15 | `ArgumentPackageInterface`, `ArgumentPackageBinding`, and the elements they contain at any depth | Not drawn, code AF-VIEW-006 for each | Decided | Modules and contracts are a later step. An interface's elements stand for elements of another package, so drawing them now would draw those twice |
 
 A recorded type agrees with the element when: Goal is a `Claim` declared
 `asserted` or `needsSupport`; Assumption, `assumed`; Justification, `axiomatic`;
@@ -325,11 +325,12 @@ Context [N]), and the C++ importer maps `gsn:Context` to no SACM type
 | E2 | `AssertedInference` without `reasoning` | SupportedBy from the target to each source | Decided | Mapping table |
 | E3 | `AssertedEvidence` | SupportedBy from the target to each source | Decided | Mapping table |
 | E4 | `AssertedContext` | InContextOf from the target to each source. The target may be a `Claim` or an `ArgumentReasoning`, which is context for a Strategy | Decided | Mapping table. 18 of the samples' 45 `AssertedContext` target an `ArgumentReasoning` |
-| E5 | A relationship with `isCounter` set, or declared `defeated` | A neutral edge from each source to the target, pointing at what is challenged or defeated: the opposite of SupportedBy. Code AF-VIEW-007 (counter) or AF-VIEW-011 (defeated). Never SupportedBy or InContextOf | Decided | A challenge points at what it challenges (GSN v3 Dialectic extension; `notation.md`). A counter or defeated relationship drawn as support says the opposite of the file: the C++ SVG export once drew counter-evidence as evidence for a claim. GSN v3 has Defeated on SupportedBy and InContextOf (gap row 2), which the dialectic step will draw |
+| E5 | A relationship with `isCounter` set | A neutral edge from each source to the target, pointing at what is challenged: the opposite of SupportedBy. Code AF-VIEW-007. Never SupportedBy or InContextOf. Its `reasoning`, if any, is not linked: code AF-VIEW-009 for it | Decided | A challenge points at what it challenges (GSN v3 Dialectic extension; `notation.md`). A counter relationship drawn as support says the opposite of the file: the C++ SVG export once drew counter-evidence as evidence for a claim |
+| E5a | A relationship declared `defeated` | The edges E1 to E4 would give, in the same GSN direction and through its Strategy, drawn neutral. Code AF-VIEW-011 | Decided | What is defeated is the relationship, not its target, so the edge keeps its direction and only stops looking like live support. GSN v3 has Defeated on SupportedBy and InContextOf (gap row 2), which the dialectic step will draw |
 | E6 | A relationship declared `needsSupport`, `assumed`, `axiomatic` or `asCited` | Its edge by E1 to E4, code AF-VIEW-008: the declaration is not drawn | Decided | Core GSN has no edge decorator for these |
-| E7 | A relationship whose target, or one of whose sources, names no element or names a relationship | The edges to its ends that can be placed are drawn; code AF-VIEW-009 for each end that cannot. With no target that can be placed, no edge is drawn, and its sources are drawn by their own rules | Decided | A claim about an inference has no core GSN form; an unresolved end has nothing to draw. libSACM keeps a dangling reference as read (SACM-REF-001), so the case is reachable |
+| E7 | A relationship whose target, or one of whose sources, names no element, names a relationship, or names an element the view does not draw (R14, R15) | The edges to its ends that can be placed are drawn; code AF-VIEW-009 for each end that cannot. With no target that can be placed, no edge is drawn, and its sources are drawn by their own rules | Decided | A claim about an inference has no core GSN form; an unresolved end has nothing to draw. libSACM keeps a dangling reference as read (SACM-REF-001), so the case is reachable |
 | E8 | `AssertedInference` whose `reasoning` names no element, or not an `ArgumentReasoning` | Drawn by E2, code AF-VIEW-009 for the reasoning | Decided | The support is still in the file; only the Strategy cannot be placed |
-| E9 | A relationship with `isCitation` set | A neutral edge from each source to the target, code AF-VIEW-004 | Decided | As R12 |
+| E9 | A relationship with `isCitation` set | As E5a: the edges E1 to E4 would give, in the GSN direction, drawn neutral. Code AF-VIEW-004 | Decided | As R12. A cited relationship is still support or context, so it keeps its direction |
 | E10 | `AssertedArtifactSupport`, `AssertedArtifactContext` | Not drawn, code AF-VIEW-010 | Decided | They relate artifacts to artifacts (§11.17, §11.18); GSN has no such edge |
 | E11 | `metaClaim` of an assertion | Not drawn, code AF-VIEW-012 on the assertion. The Claims it names are drawn by their own rules | Decided | It is how SACM holds an assurance claim point (gap rows 5 and 6), a later step |
 
@@ -379,9 +380,10 @@ A Claim declared `asserted` and reached only by `AssertedContext` is drawn as a
 Goal with an `InContextOf` edge, which the well-formedness checks will report.
 The C++ application drew it as Context. The proposal rests on principle 1 and
 D3: the declaration says Goal, and retyping it by its position would read more
-into the file than it says. (Under v2.2 a Context that is a Claim is declared
-`asserted` too, so v2.2 cannot tell the two apart either; a recorded type can,
-by R1.) No sample has the case.
+into the file than it says. Nothing in a SACM 2.3 file can tell such a Goal
+from a Context written as a Claim: under v2.2 both are declared `asserted`, and
+R1 does not accept a Context recorded on a Claim. If a file that needs it turns
+up, that is a new decision. No sample has the case.
 
 #### R11: an ArtifactReference that is not plainly evidence or context
 
