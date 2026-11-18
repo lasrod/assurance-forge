@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-e2e/
+# DATUM is private: its tarballs are packed locally (scripts/pack-datum.mjs) and never committed.
+vendor/
+# Built by `pnpm wasm` from crates/af-wasm.
+src/wasm/
+test-results/
+playwright-report/

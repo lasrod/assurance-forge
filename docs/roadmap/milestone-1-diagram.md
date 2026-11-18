@@ -30,7 +30,9 @@ open Phase 0 spike "one core, two targets".
    [budgets](#budgets).
 4. A file libSACM refuses shows the refusal, worded in the interface language
    from its code and arguments, with its line and column, and no diagram.
-5. CI is green, and `ARCHITECTURE.md` says what is built.
+5. CI is green, and `ARCHITECTURE.md` says what is built. CI cannot install
+   DATUM, so the interface checks (`pnpm --dir ui check` and `e2e`) run on
+   the development machine and their results go in each pull request.
 
 ### Out of scope
 
@@ -66,7 +68,7 @@ revised that day, when DATUM and libSACM had delivered what they waited for.
 | D2 | **Reading rules are written down before they are coded.** How each SACM element and relationship is drawn in GSN is a new section of `docs/standards/sacm-gsn-mapping.md`, with a basis for each row. A case without evidence is drawn with a neutral shape and a code, never guessed. | The mapping table says how GSN is stored in SACM. A SACM 2.3 file needs the reverse, and the reverse has ambiguous cases (see below). |
 | D3 | **The view draws what the file says.** If the file has an inference from an assumption, the diagram shows a SupportedBy arrow to an Assumption. Well-formedness checks report it later; the view never rearranges an argument to make it well formed. | Never silently reinterpret an argument. |
 | D4 | **Every argument element appears in the view exactly once**: as a node, as part of an edge, or as a coded item the view could not place. A test checks this for every sample file. | Nothing is dropped without a trace. |
-| D5 | **The workspace is DATUM's `Workspace`**: docks at the start, end and bottom of a centre surface, with layout state held by the application. The canvas sits in the centre surface and takes its size from `onCentreSize`. DATUM comes as versioned tarballs, as in the shell spike: packed locally from DATUM's main until a release has `Workspace`, the measured faces and `watchCanvasStyle`, then from that release. | DATUM now has a shared workspace, written for Assurance Forge and Simulation Studio alike, so the application writes no docking of its own. |
+| D5 | **The workspace is DATUM's `Workspace`**: docks at the start, end and bottom of a centre surface, with layout state held by the application. The canvas sits in the centre surface and takes its size from `onCentreSize`. DATUM comes as tarballs packed locally from a DATUM checkout (`pnpm --dir ui datum`) and is never committed, published or fetched in CI: DATUM is private, the look of the owner's software. Others can build the core but not the DATUM interface; a plain interface for them is an open question. `ui/` imports DATUM only through `ui/src/design/`, so a replacement has one module to stand in for. | DATUM now has a shared workspace, written for Assurance Forge and Simulation Studio alike, so the application writes no docking of its own. |
 | D6 | **The diagram's text uses DATUM's measured faces**, `DATUM Measured Sans` (IBM Plex Sans) then `DATUM Measured Sans JP` (IBM Plex Sans JP), at 400 and 600: whole TrueType files, given to `af-layout` as bytes by the shell and loaded once by the page. Each character comes from the first face that has it, as in the browser; kerning applies within a run from one face. Shape with `rustybuzz`, break with `unicode-linebreak`. The interface's woff2 faces cannot be used: the shaper does not read woff2, and a face split by Unicode range loses kerning between pieces. | The canvas spike's findings, and DATUM's rule for text laid out outside the browser. Not embedding the fonts in the WebAssembly package keeps it small; each Japanese weight is 5.7 MB. |
 | D7 | **A simple layout first.** A layered tree: SupportedBy children below their parent, InContextOf attachments beside it, siblings in document order, straight edges. The C++ `src/ui/gsn/gsn_layout.cpp` is the reference for spacing and placement, not code to port. | A diagram that can be read beats a clever one that is late. Crossing reduction comes when real cases need it. |
 | D8 | **Files open by a strict read.** A file the strict read refuses shows its refusal and no diagram. A tolerant read waits for a case that needs it. Warnings from the read are counted and kept for the problem list. | `sacm` 0.2 reads the terminology package, and all five samples now read strictly. Their only findings are warnings that a Claim has two descriptions (SACM-MULT-001). |
@@ -168,7 +170,7 @@ and arguments on every refusal and diagnostic, are done. What is left:
 
 | What | Needed by | Until it is done |
 |---|---|---|
-| A DATUM release with `Workspace`, the measured faces and `watchCanvasStyle` | G5, G6, G7 | Pack the tarballs from DATUM's main locally, and record its commit beside them |
+| A DATUM release with `Workspace`, the measured faces and `watchCanvasStyle` | G5, G6, G7 | Packed from DATUM's main by `ui/scripts/pack-datum.mjs`, which records the commit in `ui/vendor/datum/manifest.json` |
 | `sacm` 0.2.0 on crates.io | G2 | A git dependency on libSACM's main, at a pinned commit |
 | A measured face for identifiers. DATUM's canvas rule sets them in Plex Mono, which has no whole face yet | G7 | Identifiers in `DATUM Measured Sans` at metadata size |
 | [libSACM#66](https://github.com/lasrod/libSACM/issues/66) Older namespaces | after this step | A file in the C++ application's namespace is refused |
