@@ -37,6 +37,7 @@ const en = {
   findings: '{errors} errors, {warnings} warnings',
   notOpened: 'Not opened: {reason}',
   unreadable: 'Could not read the file.',
+  relayoutFailed: 'The diagram could not be laid out again.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -75,6 +76,7 @@ const ja: Record<MessageKey, string> = {
   findings: 'エラー {errors} 件、警告 {warnings} 件',
   notOpened: '開けませんでした: {reason}',
   unreadable: 'ファイルを読み込めませんでした。',
+  relayoutFailed: '図を再レイアウトできませんでした。',
 };
 
 const MESSAGES: Record<Language, Record<MessageKey, string>> = { en, ja };

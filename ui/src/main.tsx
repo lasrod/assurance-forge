@@ -24,13 +24,21 @@ async function start(language: Language) {
   // added from them, under the families DATUM's measured.css declares, so the
   // files are downloaded once. Each is loaded by its own family; given the
   // whole list, WebKit loaded only the first family's face.
-  const faces = [
-    new FontFace('DATUM Measured Sans', sansRegular, { weight: '400', display: 'block' }),
-    new FontFace('DATUM Measured Sans', sansSemiBold, { weight: '600', display: 'block' }),
-    new FontFace('DATUM Measured Sans JP', japaneseRegular, { weight: '400', display: 'block' }),
-    new FontFace('DATUM Measured Sans JP', japaneseSemiBold, { weight: '600', display: 'block' }),
+  const faces: Array<[string, FontFace]> = [
+    ['SansRegular', new FontFace('DATUM Measured Sans', sansRegular, { weight: '400', display: 'block' })],
+    ['SansSemiBold', new FontFace('DATUM Measured Sans', sansSemiBold, { weight: '600', display: 'block' })],
+    ['JapaneseRegular', new FontFace('DATUM Measured Sans JP', japaneseRegular, { weight: '400', display: 'block' })],
+    ['JapaneseSemiBold', new FontFace('DATUM Measured Sans JP', japaneseSemiBold, { weight: '600', display: 'block' })],
   ];
-  for (const face of await Promise.all(faces.map((face) => face.load()))) document.fonts.add(face);
+  // A file the browser cannot read as a font is named, as af-wasm names one.
+  const loaded = await Promise.all(
+    faces.map(([name, face]) =>
+      face.load().catch(() => {
+        throw new StartError('font-unreadable', name);
+      }),
+    ),
+  );
+  for (const face of loaded) document.fonts.add(face);
   return createWasmCore({ sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold }, language);
 }
 

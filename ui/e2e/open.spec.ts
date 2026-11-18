@@ -22,8 +22,9 @@ test('a file chosen in the picker opens', async ({ page }) => {
 });
 
 test('a refused file shows its code and place, and no diagram', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('status')).toContainText('Open a SACM 2.3 file');
+  // Something is open and drawn first, so the refusal must clear it.
+  await page.goto('/?sample=sacm_example_core_argument.sacm.xmi');
+  await expect.poll(async () => (await drawn(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
   await page.getByTestId('open-file').setInputFiles({
     name: 'broken.sacm.xmi',
     mimeType: 'application/xml',

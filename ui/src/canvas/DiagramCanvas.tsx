@@ -13,7 +13,7 @@ function palette(style: CanvasStyle): Palette {
   };
 }
 
-/** The diagram, fitted to the canvas, which fills its parent. */
+/** The diagram's text sizes, as DATUM's type tokens resolve here. */
 function textStyle(style: CanvasStyle): TextStyle {
   return {
     textSize: style.px('type.control.size'),
@@ -24,32 +24,23 @@ function textStyle(style: CanvasStyle): TextStyle {
 }
 
 /**
- * The diagram, fitted to the canvas, which fills its parent. `onTextStyle`
- * hears the text sizes DATUM's tokens resolve to, for the layout.
+ * The diagram, fitted to the canvas, which fills the workspace's centre
+ * surface and is `size` CSS px. `onTextStyle` hears the text sizes DATUM's
+ * tokens resolve to, for the layout.
  */
 export function DiagramCanvas({
   diagram,
   label,
+  size,
   onTextStyle,
 }: {
   diagram: DiagramAt | null;
   label: string;
+  size: { width: number; height: number };
   onTextStyle: (style: TextStyle) => void;
 }) {
-  const host = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
   const [style, setStyle] = useState<CanvasStyle | null>(null);
-
-  useEffect(() => {
-    const element = host.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     const element = canvas.current;
@@ -83,7 +74,7 @@ export function DiagramCanvas({
   }, [diagram, size, style]);
 
   return (
-    <div ref={host} className="af-canvas-host">
+    <div className="af-canvas-host">
       <canvas ref={canvas} className="af-canvas" role="img" aria-label={label} />
     </div>
   );

@@ -31,6 +31,7 @@ type State =
   | { kind: 'failed'; code: string; detail: string }
   | { kind: 'empty' }
   | { kind: 'unreadable' }
+  | { kind: 'relayoutFailed' }
   | { kind: 'result'; result: OpenResult };
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
@@ -47,6 +48,8 @@ function message(state: State, t: T, language: Language): { text: string; tone?:
       return { text: t('empty') };
     case 'unreadable':
       return { text: t('unreadable'), tone: 'error' };
+    case 'relayoutFailed':
+      return { text: t('relayoutFailed'), tone: 'error' };
     case 'result': {
       const result = state.result;
       if (result.result === 'opened') {
@@ -83,6 +86,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         setPending(bytes);
         return;
       }
+      // A later request has started: this one must not reach the core, which
+      // holds one document.
+      if (request !== latest.current) return;
       try {
         const result = await core.open(bytes);
         const next = result.result === 'opened' ? await core.diagram() : null;
@@ -157,7 +163,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           if (current && next) setDiagram(next);
         },
         () => {
-          if (current) setState({ kind: 'failed', code: 'core', detail: '' });
+          if (current) setState({ kind: 'relayoutFailed' });
         },
       );
     return () => {
@@ -197,18 +203,26 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       // A theme or pixel-ratio change gives the same sizes: nothing to lay out.
       const key = JSON.stringify(style);
       if (!core || key === sentStyle.current) return;
-      sentStyle.current = key;
       core
         .setStyle(style)
         .then(() => core.diagram())
         .then(
           (next) => {
+            // Kept only once the core has it, so a failure is tried again.
+            sentStyle.current = key;
             if (next) setDiagram((current) => (current && current.layout === next.layout && current.revision === next.revision ? current : next));
           },
-          () => undefined,
+          () => setState({ kind: 'relayoutFailed' }),
         );
     },
     [core],
+  );
+
+  // The canvas takes its size from the workspace's centre surface (D5).
+  const [centreSize, setCentreSize] = useState({ width: 0, height: 0 });
+  const onCentreSize = useCallback(
+    (size: { inline: number; block: number }) => setCentreSize({ width: size.inline, height: size.block }),
+    [],
   );
 
   const copy: WorkspaceCopy = useMemo(
@@ -268,6 +282,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       <div className="af-workspace" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
         <Workspace
           centreLabel={t('diagram')}
+          onCentreSize={onCentreSize}
           layout={layout}
           onLayoutChange={(next) => {
             setLayout(next);
@@ -296,7 +311,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             views: [{ id: 'problems', label: t('problems'), content: empty('problemsEmpty') }],
           }}
         >
-          <DiagramCanvas diagram={diagram} label={t('canvas')} onTextStyle={onTextStyle} />
+          <DiagramCanvas diagram={diagram} label={t('canvas')} size={centreSize} onTextStyle={onTextStyle} />
         </Workspace>
       </div>
       <StatusBar>
