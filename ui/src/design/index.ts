@@ -10,6 +10,10 @@ import './styles.css';
 export {
   Button,
   DatumRoot,
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuSeparator,
   SegmentedControl,
   Status,
   StatusBar,
@@ -21,7 +25,7 @@ export {
 } from '@datum-ui/react';
 export type { Theme, WorkspaceCopy, WorkspaceLayout } from '@datum-ui/react';
 export { watchCanvasStyle, type CanvasStyle } from '@datum-ui/charts';
-export { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+export { ChevronDown, ChevronUp, FolderOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
 import sansRegular from '@datum-ui/fonts/measured/IBMPlexSans-Regular.ttf?url';
 import sansSemiBold from '@datum-ui/fonts/measured/IBMPlexSans-SemiBold.ttf?url';

@@ -6,17 +6,16 @@ import {
   ChevronDown,
   ChevronUp,
   DatumRoot,
+  FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  SegmentedControl,
   Status,
   StatusBar,
   StatusBarSpacer,
   Toolbar,
   ToolbarGroup,
-  ToolbarSpacer,
   Workspace,
   type WorkspaceCopy,
   type WorkspaceLayout,
@@ -25,6 +24,7 @@ import { initialTheme, translate, type Language, type MessageKey, type ThemeChoi
 import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
 import { loadLayout, saveLayout } from './layout';
+import { MenuBar, type PanelId } from './MenuBar';
 
 type State =
   | { kind: 'starting' }
@@ -249,35 +249,63 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   );
 
   const empty = (key: MessageKey) => <p className="datum-meta af-dock-empty">{t(key)}</p>;
+
+  // The start dock holds the Case Explorer and the Argument Navigator: tabs,
+  // until DATUM's Workspace can stack them as the C++ application did (D9).
+  const [startView, setStartView] = useState<'caseExplorer' | 'argumentNavigator'>('caseExplorer');
+  const panels: PanelId[] = [
+    ...(layout.open.start ? [startView] : []),
+    ...(layout.open.end ? (['elementProperties'] as const) : []),
+    ...(layout.open.bottom ? (['problems'] as const) : []),
+  ];
+  const changeLayout = (next: WorkspaceLayout) => {
+    setLayout(next);
+    saveLayout(next);
+  };
+  const onPanelsChange = (next: PanelId[]) => {
+    const added = next.find((id) => !panels.includes(id));
+    if (added === 'caseExplorer' || added === 'argumentNavigator') setStartView(added);
+    const start =
+      added === 'caseExplorer' || added === 'argumentNavigator' ? true : layout.open.start && next.includes(startView);
+    changeLayout({
+      ...layout,
+      open: { start, end: next.includes('elementProperties'), bottom: next.includes('problems') },
+    });
+  };
+  const chooseFile = useCallback(() => input.current?.click(), []);
+
+  // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'o') {
+        event.preventDefault();
+        chooseFile();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [chooseFile]);
+
   const status = message(state, t, language);
   return (
     <DatumRoot app className="af-app" lang={language} theme={theme === 'system' ? undefined : theme}>
-      <Toolbar label={t('appName')}>
+      <MenuBar
+        t={t}
+        canOpen={core !== null}
+        onOpen={chooseFile}
+        panels={panels}
+        onPanelsChange={onPanelsChange}
+        theme={theme}
+        onThemeChange={setTheme}
+        language={language}
+        onLanguageChange={setLanguage}
+      />
+      <Toolbar label={t('toolbar')} className="af-toolbar">
         <ToolbarGroup>
-          <Button onClick={() => input.current?.click()} unavailable={!core}>
+          <Button icon={<FolderOpen aria-hidden="true" />} onClick={chooseFile} unavailable={!core}>
             {t('open')}
           </Button>
         </ToolbarGroup>
-        <ToolbarSpacer />
-        <SegmentedControl<ThemeChoice>
-          legend={t('theme')}
-          options={[
-            { value: 'system', label: t('themeSystem') },
-            { value: 'light', label: t('themeLight') },
-            { value: 'dark', label: t('themeDark') },
-          ]}
-          value={theme}
-          onChange={setTheme}
-        />
-        <SegmentedControl<Language>
-          legend={t('language')}
-          options={[
-            { value: 'en', label: 'EN' },
-            { value: 'ja', label: '日本語' },
-          ]}
-          value={language}
-          onChange={setLanguage}
-        />
       </Toolbar>
       <input
         ref={input}
@@ -295,24 +323,26 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           centreLabel={t('diagram')}
           onCentreSize={onCentreSize}
           layout={layout}
-          onLayoutChange={(next) => {
-            setLayout(next);
-            saveLayout(next);
-          }}
+          onLayoutChange={changeLayout}
           copy={copy}
           start={{
-            name: t('outline'),
-            nameInText: t('outlineInText'),
+            name: t('explorer'),
+            nameInText: t('explorerInText'),
             min: 14,
             icons: { hide: <PanelLeftClose />, show: <PanelLeftOpen /> },
-            views: [{ id: 'outline', label: t('outline'), content: empty('outlineEmpty') }],
+            activeView: startView,
+            onActiveViewChange: (id) => setStartView(id === 'argumentNavigator' ? 'argumentNavigator' : 'caseExplorer'),
+            views: [
+              { id: 'caseExplorer', label: t('caseExplorer'), content: empty('caseExplorerEmpty') },
+              { id: 'argumentNavigator', label: t('argumentNavigator'), content: empty('argumentNavigatorEmpty') },
+            ],
           }}
           end={{
-            name: t('details'),
-            nameInText: t('detailsInText'),
+            name: t('elementProperties'),
+            nameInText: t('elementPropertiesInText'),
             min: 14,
             icons: { hide: <PanelRightClose />, show: <PanelRightOpen /> },
-            views: [{ id: 'details', label: t('details'), content: empty('detailsEmpty') }],
+            views: [{ id: 'elementProperties', label: t('elementProperties'), content: empty('detailsEmpty') }],
           }}
           bottom={{
             name: t('problems'),

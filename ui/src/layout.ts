@@ -5,13 +5,15 @@ import type { WorkspaceLayout } from './design';
 
 const KEY = 'assurance-forge.workspace.v1';
 
-export const DEFAULT_LAYOUT: WorkspaceLayout = { open: { start: true, end: true, bottom: true }, size: {} };
+// The side docks start at 18rem, about the C++ application's 20% of a window,
+// so the start dock's two tab labels fit.
+export const DEFAULT_LAYOUT: WorkspaceLayout = { open: { start: true, end: true, bottom: true }, size: { start: 18, end: 18 } };
 
 export function loadLayout(): WorkspaceLayout {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) ?? 'null') as WorkspaceLayout | null;
     if (stored && typeof stored.open === 'object' && typeof stored.size === 'object') {
-      return { open: { ...DEFAULT_LAYOUT.open, ...stored.open }, size: { ...stored.size } };
+      return { open: { ...DEFAULT_LAYOUT.open, ...stored.open }, size: { ...DEFAULT_LAYOUT.size, ...stored.size } };
     }
   } catch {
     // No storage, or something unreadable in it: the default.
