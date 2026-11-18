@@ -42,7 +42,8 @@ export function MenuBar({
           shortcut={openShortcut()}
           textValue={t('open')}
           unavailable={!canOpen}
-          onAction={canOpen ? onOpen : undefined}
+          note={canOpen ? undefined : t('starting')}
+          onAction={onOpen}
         >
           {t('open')}
         </MenuItem>

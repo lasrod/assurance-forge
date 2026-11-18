@@ -57,26 +57,25 @@ export function saveWorkspace(state: WorkspaceState) {
 /**
  * The layout with one panel shown or hidden, in the dock that holds it.
  *
- * A stacked view is hidden on its own. Hiding the last one closes the dock,
- * as DATUM's own Hide does, and the views are shown again the next time it
- * opens. Showing a view of a closed dock opens the dock on that view alone.
+ * In the stacked start dock (the wide tier) it does what DATUM's own Hide and
+ * rail do: hiding a view adds it to `hidden`, and hiding the last one shown
+ * closes the dock instead, keeping `hidden` as it was; showing a view takes it
+ * out of `hidden` and opens the dock. Anywhere else the panel goes with its
+ * dock: below the wide tier DATUM shows the start views as tabs and does not
+ * apply `hidden`.
  */
 export function togglePanel(layout: WorkspaceLayout, id: string, show: boolean, dock: WorkspaceDockId): WorkspaceLayout {
-  const stacked = (START_VIEWS as readonly string[]).includes(id);
+  const stacked = dock === 'start' && (START_VIEWS as readonly string[]).includes(id);
   if (!stacked) return { ...layout, open: { ...layout.open, [dock]: show } };
   const hidden = new Set(layout.hidden ?? []);
   if (show) {
-    if (!layout.open[dock]) {
-      // The dock opens on the chosen view alone.
-      START_VIEWS.forEach((view) => hidden.add(view));
-    }
     hidden.delete(id);
-    return { ...layout, open: { ...layout.open, [dock]: true }, hidden: [...hidden] };
+    return { ...layout, open: { ...layout.open, start: true }, hidden: [...hidden] };
   }
-  hidden.add(id);
-  if (START_VIEWS.every((view) => hidden.has(view))) {
-    START_VIEWS.forEach((view) => hidden.delete(view));
-    return { ...layout, open: { ...layout.open, [dock]: false }, hidden: [...hidden] };
+  const othersShown = START_VIEWS.some((view) => view !== id && !hidden.has(view));
+  if (layout.open.start && othersShown) {
+    hidden.add(id);
+    return { ...layout, hidden: [...hidden] };
   }
-  return { ...layout, hidden: [...hidden] };
+  return { ...layout, open: { ...layout.open, start: false } };
 }

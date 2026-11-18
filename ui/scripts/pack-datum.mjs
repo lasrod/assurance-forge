@@ -56,5 +56,8 @@ const packages = NAMES.map((name) => {
 });
 const version = JSON.parse(readFileSync(resolve(datum, 'package.json'), 'utf8')).version;
 writeFileSync(resolve(out, 'manifest.json'), `${JSON.stringify({ version, commit, dirty, packages }, null, 2)}\n`);
+// The DATUM the lockfile was made with, in the repository: pack this commit to
+// install with --frozen-lockfile. Its contents are not secret; DATUM's are.
+writeFileSync(resolve(ui, 'datum.json'), `${JSON.stringify({ version, commit, dirty }, null, 2)}\n`);
 console.log(`Packed DATUM ${version} at ${commit.slice(0, 7)}${dirty ? ' (dirty)' : ''} into ${out}`);
 if (dirty) console.warn('DATUM\'s tree is dirty, so these tarballs are not exactly that commit.');

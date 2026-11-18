@@ -255,7 +255,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // The start dock stacks the Case Explorer above the Argument Navigator, as
   // the C++ application did (D9); below the wide tier DATUM shows them as tabs.
-  // Every change is made from the latest state, and saved when it changes.
+  // DATUM's own changes hand over a whole layout; the View menu's change from
+  // the latest state. The layout is saved when it changes.
   useEffect(() => saveWorkspace(workspace), [workspace]);
   const changeLayout = (next: WorkspaceLayout) => setWorkspace({ layout: next });
 
@@ -272,8 +273,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     if (side.length === 1) return side[0];
     return id === 'elementProperties' ? 'end' : 'start';
   };
+  // `hidden` applies only where the start dock stacks its views.
   const hidden = layout.hidden ?? [];
-  const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)] && !hidden.includes(id));
+  const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)] && !(host(id) === 'start' && hidden.includes(id)));
   const onPanelsChange = (next: PanelId[]) => {
     const added = next.find((id) => !panels.includes(id));
     const removed = panels.find((id) => !next.includes(id));
