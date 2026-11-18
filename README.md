@@ -27,7 +27,9 @@ There is nothing to run here yet.
 - **AI on your terms.** Review with your own provider key, and an MCP server so
   your own assistant can read a case and propose changes. Nothing leaves your
   machine without your consent, and an AI never changes the argument by itself.
-- **Local.** A desktop application that opens a file, edits it and saves it.
+- **Local, on the desktop or in the browser.** A standalone desktop
+  application, and the same tool as a web application. Either opens a file,
+  edits it and saves it, and the case stays on your machine.
 
 The [plan](docs/roadmap/rust-rebuild-phase-0.md) says which of these arrive in
 which release.
@@ -36,7 +38,8 @@ which release.
 
 - A Rust core on [libSACM](https://github.com/lasrod/libSACM), the SACM 2.3
   library.
-- A React interface, packaged as a desktop application with Tauri.
+- A React interface, packaged as a desktop application with Tauri, and run in
+  the browser on the core compiled to WebAssembly.
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) describes the shape of the code and the
 rules it follows.
