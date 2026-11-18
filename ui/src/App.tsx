@@ -19,12 +19,12 @@ import {
   Workspace,
   type WorkspaceCopy,
   type WorkspaceLayout,
-  type WorkspaceTier,
+  type WorkspaceDockId,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
-import { loadWorkspace, saveWorkspace, type StartView } from './layout';
+import { loadWorkspace, saveWorkspace, toStartView, type StartView, type WorkspaceState } from './layout';
 import { isOpenShortcut } from './shortcuts';
 import { MenuBar, PANELS, type PanelId } from './MenuBar';
 
@@ -255,38 +255,39 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // The start dock holds the Case Explorer and the Argument Navigator: tabs,
   // until DATUM's Workspace can stack them as the C++ application did (D9).
-  const setStartView = (view: StartView) => {
-    const next = { layout, startView: view };
-    setWorkspace(next);
-    saveWorkspace(next);
-  };
-  // Which dock shows a panel depends on the tier: at the medium tier the side
-  // docks are one, under `end`; at the narrow tier every view is under `bottom`.
-  // A copy of DATUM's rule, until its Workspace says which dock holds a view
-  // and can show one (raised there); until then, opening the Argument
-  // Navigator selects its tab at the wide tier only.
-  const [tier, setTier] = useState<WorkspaceTier>('wide');
-  const host = (id: PanelId): 'start' | 'end' | 'bottom' => {
-    if (tier === 'narrow') return 'bottom';
+  // Every change goes through `update`, from the latest state: DATUM's rail
+  // reports a tab and then the dock's opening in one click, and the second
+  // must not undo the first. The state is saved whenever it changes.
+  const update = (change: (current: WorkspaceState) => WorkspaceState) => setWorkspace(change);
+  useEffect(() => saveWorkspace(workspace), [workspace]);
+  const setStartView = (view: StartView) => update((current) => ({ ...current, startView: view }));
+  const changeLayout = (next: WorkspaceLayout) => update((current) => ({ ...current, layout: next }));
+
+  // Which dock holds a panel depends on the tier, as DATUM's measure reports
+  // it: at the medium tier the side panels are in one side dock, at the narrow
+  // tier every panel is in the bottom dock. A copy of DATUM's rule, read from
+  // the docks it measures, until its Workspace says which dock holds a view and
+  // can show one (raised there); until then, opening the Argument Navigator
+  // selects its tab at the wide tier only.
+  const [shownDocks, setShownDocks] = useState<WorkspaceDockId[]>(['start', 'end', 'bottom']);
+  const host = (id: PanelId): WorkspaceDockId => {
+    const side = shownDocks.filter((dock) => dock !== 'bottom');
+    if (side.length === 0) return 'bottom';
     if (id === 'problems') return 'bottom';
-    if (tier === 'medium') return 'end';
+    if (side.length === 1) return side[0];
     return id === 'elementProperties' ? 'end' : 'start';
   };
   const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)]);
-  const changeLayout = (next: WorkspaceLayout) => {
-    const state = { layout: next, startView };
-    setWorkspace(state);
-    saveWorkspace(state);
-  };
   const onPanelsChange = (next: PanelId[]) => {
     const added = next.find((id) => !panels.includes(id));
     const removed = panels.find((id) => !next.includes(id));
     const changed = added ?? removed;
     if (!changed) return;
-    const view = added === 'caseExplorer' || added === 'argumentNavigator' ? added : startView;
-    const state = { layout: { ...layout, open: { ...layout.open, [host(changed)]: added !== undefined } }, startView: view };
-    setWorkspace(state);
-    saveWorkspace(state);
+    const dock = host(changed);
+    update((current) => ({
+      layout: { ...current.layout, open: { ...current.layout.open, [dock]: added !== undefined } },
+      startView: added === 'caseExplorer' || added === 'argumentNavigator' ? added : current.startView,
+    }));
   };
   const chooseFile = useCallback(() => input.current?.click(), []);
 
@@ -340,7 +341,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           onCentreSize={onCentreSize}
           layout={layout}
           onLayoutChange={changeLayout}
-          onMeasure={(measure) => setTier(measure.tier)}
+          onMeasure={(measure) => {
+            const docks = measure.docks.map((dock) => dock.id);
+            setShownDocks((current) => (current.join() === docks.join() ? current : docks));
+          }}
           copy={copy}
           start={{
             // Both C++ names: the dock holds both panels, as tabs until DATUM can stack them.
@@ -349,7 +353,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             min: 14,
             icons: { hide: <PanelLeftClose />, show: <PanelLeftOpen /> },
             activeView: startView,
-            onActiveViewChange: (id) => setStartView(id === 'argumentNavigator' ? 'argumentNavigator' : 'caseExplorer'),
+            onActiveViewChange: (id) => setStartView(toStartView(id)),
             views: [
               { id: 'caseExplorer', label: t('caseExplorer'), content: empty('caseExplorerEmpty') },
               { id: 'argumentNavigator', label: t('argumentNavigator'), content: empty('argumentNavigatorEmpty') },

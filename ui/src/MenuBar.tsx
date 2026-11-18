@@ -12,7 +12,7 @@
 
 import type { ThemeChoice, Language, MessageKey } from './i18n/messages';
 import { Button, Menu, MenuItem, MenuSection, Toolbar } from './design';
-import { OPEN_SHORTCUT } from './shortcuts';
+import { openShortcut } from './shortcuts';
 
 export type PanelId = 'caseExplorer' | 'argumentNavigator' | 'elementProperties' | 'problems';
 
@@ -50,7 +50,7 @@ export function MenuBar({
   return (
     <Toolbar label={t('menu')}>
       <Menu label={t('file')} trigger={title('file')}>
-        <MenuItem id="open" shortcut={OPEN_SHORTCUT} textValue={t('open')} disabled={!canOpen} onAction={onOpen}>
+        <MenuItem id="open" shortcut={openShortcut()} textValue={t('open')} disabled={!canOpen} onAction={onOpen}>
           {t('open')}
         </MenuItem>
       </Menu>

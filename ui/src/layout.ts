@@ -5,8 +5,15 @@
 import type { WorkspaceLayout } from './design';
 
 const KEY = 'assurance-forge.workspace.v2';
+/** Before the start dock's tab was kept, the layout alone was stored here. */
+const LAYOUT_V1 = 'assurance-forge.workspace.v1';
 
 export type StartView = 'caseExplorer' | 'argumentNavigator';
+
+/** Any id as a start view: the Argument Navigator, or else the Case Explorer. */
+export function toStartView(id: unknown): StartView {
+  return id === 'argumentNavigator' ? 'argumentNavigator' : 'caseExplorer';
+}
 
 export interface WorkspaceState {
   layout: WorkspaceLayout;
@@ -20,12 +27,18 @@ export const DEFAULT_WORKSPACE: WorkspaceState = {
 
 export function loadWorkspace(): WorkspaceState {
   try {
-    const stored = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<WorkspaceState> | null;
+    let stored = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<WorkspaceState> | null;
+    if (!stored) {
+      // A layout saved by the earlier version is kept.
+      const v1 = JSON.parse(localStorage.getItem(LAYOUT_V1) ?? 'null') as WorkspaceLayout | null;
+      if (v1) stored = { layout: v1 };
+      localStorage.removeItem(LAYOUT_V1);
+    }
     const layout = stored?.layout;
     if (layout && typeof layout.open === 'object' && typeof layout.size === 'object') {
       return {
         layout: { open: { ...DEFAULT_WORKSPACE.layout.open, ...layout.open }, size: { ...layout.size } },
-        startView: stored?.startView === 'argumentNavigator' ? 'argumentNavigator' : 'caseExplorer',
+        startView: toStartView(stored?.startView),
       };
     }
   } catch {

@@ -20,7 +20,7 @@ export {
   ToolbarGroup,
   Workspace,
 } from '@datum-ui/react';
-export type { Theme, WorkspaceCopy, WorkspaceLayout, WorkspaceMeasure, WorkspaceTier } from '@datum-ui/react';
+export type { Theme, WorkspaceCopy, WorkspaceDockId, WorkspaceLayout } from '@datum-ui/react';
 export { watchCanvasStyle, type CanvasStyle } from '@datum-ui/charts';
 export { ChevronDown, ChevronUp, FolderOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 

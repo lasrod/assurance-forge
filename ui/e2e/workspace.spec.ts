@@ -68,6 +68,16 @@ for (const dock of docks) {
   });
 }
 
+test('reopening the start dock from a tab\'s rail button opens it on that tab', async ({ page }) => {
+  await opened(page);
+  await page.getByRole('button', { name: 'Hide case explorer and argument navigator', exact: true }).click();
+  await page.getByRole('button', { name: 'Argument Navigator', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Argument Navigator' })).toHaveAttribute('aria-selected', 'true');
+  // And it is kept.
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'Argument Navigator' })).toHaveAttribute('aria-selected', 'true');
+});
+
 test('the panels carry the C++ application\'s names, in Japanese too', async ({ page }) => {
   await opened(page, '&lang=ja');
   await expect(page.getByRole('tab', { name: 'ケースエクスプローラー' })).toBeVisible();
