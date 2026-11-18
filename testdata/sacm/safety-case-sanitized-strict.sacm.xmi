@@ -1,0 +1,4507 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="ACP_SANITIZED">
+  <name content="Sanitized Safety Case Structure" />
+  <description xmi:id="generated_1">
+    <content>
+      <value content="Sanitized SACM package preserving structure and relationships while removing proprietary prose." />
+    </content>
+  </description>
+  <argumentPackage xmi:id="PKG_001">
+    <name content="PKG_001" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_001">
+      <name content="G_001" />
+      <description xmi:id="generated_59">
+        <content>
+          <value content="Claim G_001" />
+        </content>
+      </description>
+      <description xmi:id="generated_58">
+        <content>
+          <value content="Claim G_001" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_002" assertionDeclaration="needsSupport">
+      <name content="G_002" />
+      <description xmi:id="generated_61">
+        <content>
+          <value content="Claim G_002" />
+        </content>
+      </description>
+      <description xmi:id="generated_60">
+        <content>
+          <value content="Claim G_002" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_003" assertionDeclaration="needsSupport">
+      <name content="G_003" />
+      <description xmi:id="generated_63">
+        <content>
+          <value content="Claim G_003" />
+        </content>
+      </description>
+      <description xmi:id="generated_62">
+        <content>
+          <value content="Claim G_003" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_004" assertionDeclaration="needsSupport">
+      <name content="G_004" />
+      <description xmi:id="generated_65">
+        <content>
+          <value content="Claim G_004" />
+        </content>
+      </description>
+      <description xmi:id="generated_64">
+        <content>
+          <value content="Claim G_004" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_005">
+      <name content="G_005" />
+      <description xmi:id="generated_67">
+        <content>
+          <value content="Claim G_005" />
+        </content>
+      </description>
+      <description xmi:id="generated_66">
+        <content>
+          <value content="Claim G_005" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_006" assertionDeclaration="needsSupport">
+      <name content="G_006" />
+      <description xmi:id="generated_69">
+        <content>
+          <value content="Claim G_006" />
+        </content>
+      </description>
+      <description xmi:id="generated_68">
+        <content>
+          <value content="Claim G_006" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_007" assertionDeclaration="needsSupport">
+      <name content="G_007" />
+      <description xmi:id="generated_71">
+        <content>
+          <value content="Claim G_007" />
+        </content>
+      </description>
+      <description xmi:id="generated_70">
+        <content>
+          <value content="Claim G_007" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_008" assertionDeclaration="needsSupport">
+      <name content="G_008" />
+      <description xmi:id="generated_73">
+        <content>
+          <value content="Claim G_008" />
+        </content>
+      </description>
+      <description xmi:id="generated_72">
+        <content>
+          <value content="Claim G_008" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_009">
+      <name content="G_009" />
+      <description xmi:id="generated_75">
+        <content>
+          <value content="Claim G_009" />
+        </content>
+      </description>
+      <description xmi:id="generated_74">
+        <content>
+          <value content="Claim G_009" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_010" assertionDeclaration="axiomatic">
+      <name content="J_010" />
+      <description xmi:id="generated_77">
+        <content>
+          <value content="Justification J_010" />
+        </content>
+      </description>
+      <description xmi:id="generated_76">
+        <content>
+          <value content="Justification J_010" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_011" assertionDeclaration="axiomatic">
+      <name content="J_011" />
+      <description xmi:id="generated_79">
+        <content>
+          <value content="Justification J_011" />
+        </content>
+      </description>
+      <description xmi:id="generated_78">
+        <content>
+          <value content="Justification J_011" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_001">
+      <name content="S_001" />
+      <description xmi:id="generated_81">
+        <content>
+          <value content="Strategy S_001" />
+        </content>
+      </description>
+      <description xmi:id="generated_80">
+        <content>
+          <value content="Strategy S_001" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_002">
+      <name content="S_002" />
+      <description xmi:id="generated_83">
+        <content>
+          <value content="Strategy S_002" />
+        </content>
+      </description>
+      <description xmi:id="generated_82">
+        <content>
+          <value content="Strategy S_002" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_001" referencedArtifactElement="ART_001">
+      <name content="REF_001" />
+      <description xmi:id="generated_84">
+        <content>
+          <value content="Reference REF_001" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_002" referencedArtifactElement="ART_002">
+      <name content="REF_002" />
+      <description xmi:id="generated_85">
+        <content>
+          <value content="Reference REF_002" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_003" referencedArtifactElement="ART_003">
+      <name content="REF_003" />
+      <description xmi:id="generated_86">
+        <content>
+          <value content="Reference REF_003" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_004" referencedArtifactElement="ART_004">
+      <name content="REF_004" />
+      <description xmi:id="generated_87">
+        <content>
+          <value content="Reference REF_004" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_005" referencedArtifactElement="ART_005">
+      <name content="REF_005" />
+      <description xmi:id="generated_88">
+        <content>
+          <value content="Reference REF_005" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_006" referencedArtifactElement="ART_006">
+      <name content="REF_006" />
+      <description xmi:id="generated_89">
+        <content>
+          <value content="Reference REF_006" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_007" referencedArtifactElement="ART_007">
+      <name content="REF_007" />
+      <description xmi:id="generated_90">
+        <content>
+          <value content="Reference REF_007" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_001" reasoning="ARGR_002" source="CLM_009" target="CLM_001">
+      <name content="AI_001" />
+      <description xmi:id="generated_91">
+        <content>
+          <value content="AssertedInference AI_001" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_002" reasoning="ARGR_001" source="CLM_004 CLM_003 CLM_002 CLM_005 CLM_006 CLM_007 CLM_008" target="CLM_001">
+      <name content="AI_002" />
+      <description xmi:id="generated_92">
+        <content>
+          <value content="AssertedInference AI_002" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_001" source="REF_001" target="CLM_009">
+      <name content="AE_001" />
+      <description xmi:id="generated_93">
+        <content>
+          <value content="AssertedEvidence AE_001" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_001" source="REF_004" target="CLM_001">
+      <name content="AC_001" />
+      <description xmi:id="generated_94">
+        <content>
+          <value content="AssertedContext AC_001" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_002" source="REF_005" target="CLM_001">
+      <name content="AC_002" />
+      <description xmi:id="generated_95">
+        <content>
+          <value content="AssertedContext AC_002" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_003" source="CLM_010" target="CLM_001">
+      <name content="AC_003" />
+      <description xmi:id="generated_96">
+        <content>
+          <value content="AssertedContext AC_003" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_004" source="REF_002" target="ARGR_002">
+      <name content="AC_004" />
+      <description xmi:id="generated_97">
+        <content>
+          <value content="AssertedContext AC_004" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_005" source="REF_006" target="ARGR_001">
+      <name content="AC_005" />
+      <description xmi:id="generated_98">
+        <content>
+          <value content="AssertedContext AC_005" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_006" source="CLM_011" target="ARGR_001">
+      <name content="AC_006" />
+      <description xmi:id="generated_99">
+        <content>
+          <value content="AssertedContext AC_006" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_007" source="REF_007" target="ARGR_001">
+      <name content="AC_007" />
+      <description xmi:id="generated_100">
+        <content>
+          <value content="AssertedContext AC_007" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_002">
+    <name content="PKG_002" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_012" assertionDeclaration="axiomatic">
+      <name content="J_012" />
+      <description xmi:id="generated_102">
+        <content>
+          <value content="Justification J_012" />
+        </content>
+      </description>
+      <description xmi:id="generated_101">
+        <content>
+          <value content="Justification J_012" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_013" assertionDeclaration="axiomatic">
+      <name content="J_013" />
+      <description xmi:id="generated_104">
+        <content>
+          <value content="Justification J_013" />
+        </content>
+      </description>
+      <description xmi:id="generated_103">
+        <content>
+          <value content="Justification J_013" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_014" assertionDeclaration="axiomatic">
+      <name content="J_014" />
+      <description xmi:id="generated_106">
+        <content>
+          <value content="Justification J_014" />
+        </content>
+      </description>
+      <description xmi:id="generated_105">
+        <content>
+          <value content="Justification J_014" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_015">
+      <name content="G_015" />
+      <description xmi:id="generated_108">
+        <content>
+          <value content="Claim G_015" />
+        </content>
+      </description>
+      <description xmi:id="generated_107">
+        <content>
+          <value content="Claim G_015" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_016">
+      <name content="G_016" />
+      <description xmi:id="generated_110">
+        <content>
+          <value content="Claim G_016" />
+        </content>
+      </description>
+      <description xmi:id="generated_109">
+        <content>
+          <value content="Claim G_016" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_017">
+      <name content="G_017" />
+      <description xmi:id="generated_112">
+        <content>
+          <value content="Claim G_017" />
+        </content>
+      </description>
+      <description xmi:id="generated_111">
+        <content>
+          <value content="Claim G_017" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_018">
+      <name content="G_018" />
+      <description xmi:id="generated_114">
+        <content>
+          <value content="Claim G_018" />
+        </content>
+      </description>
+      <description xmi:id="generated_113">
+        <content>
+          <value content="Claim G_018" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_003">
+      <name content="S_003" />
+      <description xmi:id="generated_116">
+        <content>
+          <value content="Strategy S_003" />
+        </content>
+      </description>
+      <description xmi:id="generated_115">
+        <content>
+          <value content="Strategy S_003" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_008" referencedArtifactElement="ART_008">
+      <name content="REF_008" />
+      <description xmi:id="generated_117">
+        <content>
+          <value content="Reference REF_008" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_009" referencedArtifactElement="ART_009">
+      <name content="REF_009" />
+      <description xmi:id="generated_118">
+        <content>
+          <value content="Reference REF_009" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_010" referencedArtifactElement="ART_010">
+      <name content="REF_010" />
+      <description xmi:id="generated_119">
+        <content>
+          <value content="Reference REF_010" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_003" reasoning="ARGR_003" source="CLM_017 CLM_016 CLM_018 CLM_015" target="CLM_005">
+      <name content="AI_003" />
+      <description xmi:id="generated_120">
+        <content>
+          <value content="AssertedInference AI_003" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_008" source="REF_008" target="CLM_005">
+      <name content="AC_008" />
+      <description xmi:id="generated_121">
+        <content>
+          <value content="AssertedContext AC_008" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_009" source="REF_009" target="CLM_005">
+      <name content="AC_009" />
+      <description xmi:id="generated_122">
+        <content>
+          <value content="AssertedContext AC_009" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_010" source="REF_010" target="CLM_005">
+      <name content="AC_010" />
+      <description xmi:id="generated_123">
+        <content>
+          <value content="AssertedContext AC_010" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_011" source="CLM_012" target="CLM_005">
+      <name content="AC_011" />
+      <description xmi:id="generated_124">
+        <content>
+          <value content="AssertedContext AC_011" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_012" source="CLM_013" target="ARGR_003">
+      <name content="AC_012" />
+      <description xmi:id="generated_125">
+        <content>
+          <value content="AssertedContext AC_012" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_003">
+    <name content="PKG_003" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_019">
+      <name content="G_019" />
+      <description xmi:id="generated_127">
+        <content>
+          <value content="Claim G_019" />
+        </content>
+      </description>
+      <description xmi:id="generated_126">
+        <content>
+          <value content="Claim G_019" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_020">
+      <name content="G_020" />
+      <description xmi:id="generated_129">
+        <content>
+          <value content="Claim G_020" />
+        </content>
+      </description>
+      <description xmi:id="generated_128">
+        <content>
+          <value content="Claim G_020" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_021">
+      <name content="G_021" />
+      <description xmi:id="generated_131">
+        <content>
+          <value content="Claim G_021" />
+        </content>
+      </description>
+      <description xmi:id="generated_130">
+        <content>
+          <value content="Claim G_021" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_022">
+      <name content="G_022" />
+      <description xmi:id="generated_133">
+        <content>
+          <value content="Claim G_022" />
+        </content>
+      </description>
+      <description xmi:id="generated_132">
+        <content>
+          <value content="Claim G_022" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_004">
+      <name content="S_004" />
+      <description xmi:id="generated_135">
+        <content>
+          <value content="Strategy S_004" />
+        </content>
+      </description>
+      <description xmi:id="generated_134">
+        <content>
+          <value content="Strategy S_004" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_011" referencedArtifactElement="ART_011">
+      <name content="REF_011" />
+      <description xmi:id="generated_136">
+        <content>
+          <value content="Reference REF_011" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_012" referencedArtifactElement="ART_012">
+      <name content="REF_012" />
+      <description xmi:id="generated_137">
+        <content>
+          <value content="Reference REF_012" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_013" referencedArtifactElement="ART_013">
+      <name content="REF_013" />
+      <description xmi:id="generated_138">
+        <content>
+          <value content="Reference REF_013" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_014" referencedArtifactElement="ART_014">
+      <name content="REF_014" />
+      <description xmi:id="generated_139">
+        <content>
+          <value content="Reference REF_014" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_015" referencedArtifactElement="ART_015">
+      <name content="REF_015" />
+      <description xmi:id="generated_140">
+        <content>
+          <value content="Reference REF_015" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_016" referencedArtifactElement="ART_016">
+      <name content="REF_016" />
+      <description xmi:id="generated_141">
+        <content>
+          <value content="Reference REF_016" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_004" reasoning="ARGR_004" source="CLM_019 CLM_020 CLM_021 CLM_022" target="CLM_016">
+      <name content="AI_004" />
+      <description xmi:id="generated_142">
+        <content>
+          <value content="AssertedInference AI_004" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_002" source="REF_011" target="CLM_019">
+      <name content="AE_002" />
+      <description xmi:id="generated_143">
+        <content>
+          <value content="AssertedEvidence AE_002" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_003" source="REF_015" target="CLM_022">
+      <name content="AE_003" />
+      <description xmi:id="generated_144">
+        <content>
+          <value content="AssertedEvidence AE_003" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_013" source="REF_016" target="CLM_016">
+      <name content="AC_013" />
+      <description xmi:id="generated_145">
+        <content>
+          <value content="AssertedContext AC_013" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_014" source="REF_013" target="CLM_019">
+      <name content="AC_014" />
+      <description xmi:id="generated_146">
+        <content>
+          <value content="AssertedContext AC_014" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_004">
+    <name content="PKG_004" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_023">
+      <name content="G_023" />
+      <description xmi:id="generated_148">
+        <content>
+          <value content="Claim G_023" />
+        </content>
+      </description>
+      <description xmi:id="generated_147">
+        <content>
+          <value content="Claim G_023" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_024">
+      <name content="G_024" />
+      <description xmi:id="generated_150">
+        <content>
+          <value content="Claim G_024" />
+        </content>
+      </description>
+      <description xmi:id="generated_149">
+        <content>
+          <value content="Claim G_024" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_025">
+      <name content="G_025" />
+      <description xmi:id="generated_152">
+        <content>
+          <value content="Claim G_025" />
+        </content>
+      </description>
+      <description xmi:id="generated_151">
+        <content>
+          <value content="Claim G_025" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_026">
+      <name content="G_026" />
+      <description xmi:id="generated_154">
+        <content>
+          <value content="Claim G_026" />
+        </content>
+      </description>
+      <description xmi:id="generated_153">
+        <content>
+          <value content="Claim G_026" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_027">
+      <name content="G_027" />
+      <description xmi:id="generated_156">
+        <content>
+          <value content="Claim G_027" />
+        </content>
+      </description>
+      <description xmi:id="generated_155">
+        <content>
+          <value content="Claim G_027" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_028">
+      <name content="G_028" />
+      <description xmi:id="generated_158">
+        <content>
+          <value content="Claim G_028" />
+        </content>
+      </description>
+      <description xmi:id="generated_157">
+        <content>
+          <value content="Claim G_028" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_029">
+      <name content="G_029" />
+      <description xmi:id="generated_160">
+        <content>
+          <value content="Claim G_029" />
+        </content>
+      </description>
+      <description xmi:id="generated_159">
+        <content>
+          <value content="Claim G_029" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_030">
+      <name content="G_030" />
+      <description xmi:id="generated_162">
+        <content>
+          <value content="Claim G_030" />
+        </content>
+      </description>
+      <description xmi:id="generated_161">
+        <content>
+          <value content="Claim G_030" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_031">
+      <name content="G_031" />
+      <description xmi:id="generated_164">
+        <content>
+          <value content="Claim G_031" />
+        </content>
+      </description>
+      <description xmi:id="generated_163">
+        <content>
+          <value content="Claim G_031" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_032">
+      <name content="G_032" />
+      <description xmi:id="generated_166">
+        <content>
+          <value content="Claim G_032" />
+        </content>
+      </description>
+      <description xmi:id="generated_165">
+        <content>
+          <value content="Claim G_032" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_033">
+      <name content="G_033" />
+      <description xmi:id="generated_168">
+        <content>
+          <value content="Claim G_033" />
+        </content>
+      </description>
+      <description xmi:id="generated_167">
+        <content>
+          <value content="Claim G_033" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_034">
+      <name content="G_034" />
+      <description xmi:id="generated_170">
+        <content>
+          <value content="Claim G_034" />
+        </content>
+      </description>
+      <description xmi:id="generated_169">
+        <content>
+          <value content="Claim G_034" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_035">
+      <name content="G_035" />
+      <description xmi:id="generated_172">
+        <content>
+          <value content="Claim G_035" />
+        </content>
+      </description>
+      <description xmi:id="generated_171">
+        <content>
+          <value content="Claim G_035" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_036">
+      <name content="G_036" />
+      <description xmi:id="generated_174">
+        <content>
+          <value content="Claim G_036" />
+        </content>
+      </description>
+      <description xmi:id="generated_173">
+        <content>
+          <value content="Claim G_036" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_037">
+      <name content="G_037" />
+      <description xmi:id="generated_176">
+        <content>
+          <value content="Claim G_037" />
+        </content>
+      </description>
+      <description xmi:id="generated_175">
+        <content>
+          <value content="Claim G_037" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_038">
+      <name content="G_038" />
+      <description xmi:id="generated_178">
+        <content>
+          <value content="Claim G_038" />
+        </content>
+      </description>
+      <description xmi:id="generated_177">
+        <content>
+          <value content="Claim G_038" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_039">
+      <name content="G_039" />
+      <description xmi:id="generated_180">
+        <content>
+          <value content="Claim G_039" />
+        </content>
+      </description>
+      <description xmi:id="generated_179">
+        <content>
+          <value content="Claim G_039" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_040">
+      <name content="G_040" />
+      <description xmi:id="generated_182">
+        <content>
+          <value content="Claim G_040" />
+        </content>
+      </description>
+      <description xmi:id="generated_181">
+        <content>
+          <value content="Claim G_040" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_041" assertionDeclaration="axiomatic">
+      <name content="J_041" />
+      <description xmi:id="generated_184">
+        <content>
+          <value content="Justification J_041" />
+        </content>
+      </description>
+      <description xmi:id="generated_183">
+        <content>
+          <value content="Justification J_041" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_042" assertionDeclaration="needsSupport">
+      <name content="G_042" />
+      <description xmi:id="generated_186">
+        <content>
+          <value content="Claim G_042" />
+        </content>
+      </description>
+      <description xmi:id="generated_185">
+        <content>
+          <value content="Claim G_042" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_043" assertionDeclaration="needsSupport">
+      <name content="G_043" />
+      <description xmi:id="generated_188">
+        <content>
+          <value content="Claim G_043" />
+        </content>
+      </description>
+      <description xmi:id="generated_187">
+        <content>
+          <value content="Claim G_043" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_044" assertionDeclaration="needsSupport">
+      <name content="G_044" />
+      <description xmi:id="generated_190">
+        <content>
+          <value content="Claim G_044" />
+        </content>
+      </description>
+      <description xmi:id="generated_189">
+        <content>
+          <value content="Claim G_044" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_045" assertionDeclaration="needsSupport">
+      <name content="G_045" />
+      <description xmi:id="generated_192">
+        <content>
+          <value content="Claim G_045" />
+        </content>
+      </description>
+      <description xmi:id="generated_191">
+        <content>
+          <value content="Claim G_045" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_046" assertionDeclaration="needsSupport">
+      <name content="G_046" />
+      <description xmi:id="generated_194">
+        <content>
+          <value content="Claim G_046" />
+        </content>
+      </description>
+      <description xmi:id="generated_193">
+        <content>
+          <value content="Claim G_046" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_047" assertionDeclaration="needsSupport">
+      <name content="G_047" />
+      <description xmi:id="generated_196">
+        <content>
+          <value content="Claim G_047" />
+        </content>
+      </description>
+      <description xmi:id="generated_195">
+        <content>
+          <value content="Claim G_047" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_048" assertionDeclaration="needsSupport">
+      <name content="G_048" />
+      <description xmi:id="generated_198">
+        <content>
+          <value content="Claim G_048" />
+        </content>
+      </description>
+      <description xmi:id="generated_197">
+        <content>
+          <value content="Claim G_048" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_049" assertionDeclaration="needsSupport">
+      <name content="G_049" />
+      <description xmi:id="generated_200">
+        <content>
+          <value content="Claim G_049" />
+        </content>
+      </description>
+      <description xmi:id="generated_199">
+        <content>
+          <value content="Claim G_049" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_050" assertionDeclaration="needsSupport">
+      <name content="G_050" />
+      <description xmi:id="generated_202">
+        <content>
+          <value content="Claim G_050" />
+        </content>
+      </description>
+      <description xmi:id="generated_201">
+        <content>
+          <value content="Claim G_050" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_051" assertionDeclaration="needsSupport">
+      <name content="G_051" />
+      <description xmi:id="generated_204">
+        <content>
+          <value content="Claim G_051" />
+        </content>
+      </description>
+      <description xmi:id="generated_203">
+        <content>
+          <value content="Claim G_051" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_052" assertionDeclaration="needsSupport">
+      <name content="G_052" />
+      <description xmi:id="generated_206">
+        <content>
+          <value content="Claim G_052" />
+        </content>
+      </description>
+      <description xmi:id="generated_205">
+        <content>
+          <value content="Claim G_052" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_053" assertionDeclaration="axiomatic">
+      <name content="J_053" />
+      <description xmi:id="generated_208">
+        <content>
+          <value content="Justification J_053" />
+        </content>
+      </description>
+      <description xmi:id="generated_207">
+        <content>
+          <value content="Justification J_053" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_054" assertionDeclaration="axiomatic">
+      <name content="J_054" />
+      <description xmi:id="generated_210">
+        <content>
+          <value content="Justification J_054" />
+        </content>
+      </description>
+      <description xmi:id="generated_209">
+        <content>
+          <value content="Justification J_054" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_005">
+      <name content="S_005" />
+      <description xmi:id="generated_212">
+        <content>
+          <value content="Strategy S_005" />
+        </content>
+      </description>
+      <description xmi:id="generated_211">
+        <content>
+          <value content="Strategy S_005" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_006">
+      <name content="S_006" />
+      <description xmi:id="generated_214">
+        <content>
+          <value content="Strategy S_006" />
+        </content>
+      </description>
+      <description xmi:id="generated_213">
+        <content>
+          <value content="Strategy S_006" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_007">
+      <name content="S_007" />
+      <description xmi:id="generated_216">
+        <content>
+          <value content="Strategy S_007" />
+        </content>
+      </description>
+      <description xmi:id="generated_215">
+        <content>
+          <value content="Strategy S_007" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_008">
+      <name content="S_008" />
+      <description xmi:id="generated_218">
+        <content>
+          <value content="Strategy S_008" />
+        </content>
+      </description>
+      <description xmi:id="generated_217">
+        <content>
+          <value content="Strategy S_008" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_009">
+      <name content="S_009" />
+      <description xmi:id="generated_220">
+        <content>
+          <value content="Strategy S_009" />
+        </content>
+      </description>
+      <description xmi:id="generated_219">
+        <content>
+          <value content="Strategy S_009" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_017" referencedArtifactElement="ART_017">
+      <name content="REF_017" />
+      <description xmi:id="generated_221">
+        <content>
+          <value content="Reference REF_017" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_018" referencedArtifactElement="ART_018">
+      <name content="REF_018" />
+      <description xmi:id="generated_222">
+        <content>
+          <value content="Reference REF_018" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_019" referencedArtifactElement="ART_018">
+      <name content="REF_019" />
+      <description xmi:id="generated_223">
+        <content>
+          <value content="Reference REF_019" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_020" referencedArtifactElement="ART_018">
+      <name content="REF_020" />
+      <description xmi:id="generated_224">
+        <content>
+          <value content="Reference REF_020" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_021" referencedArtifactElement="ART_018">
+      <name content="REF_021" />
+      <description xmi:id="generated_225">
+        <content>
+          <value content="Reference REF_021" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_022" referencedArtifactElement="ART_018">
+      <name content="REF_022" />
+      <description xmi:id="generated_226">
+        <content>
+          <value content="Reference REF_022" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_023" referencedArtifactElement="ART_018">
+      <name content="REF_023" />
+      <description xmi:id="generated_227">
+        <content>
+          <value content="Reference REF_023" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_024" referencedArtifactElement="ART_018">
+      <name content="REF_024" />
+      <description xmi:id="generated_228">
+        <content>
+          <value content="Reference REF_024" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_025" referencedArtifactElement="ART_018">
+      <name content="REF_025" />
+      <description xmi:id="generated_229">
+        <content>
+          <value content="Reference REF_025" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_026" referencedArtifactElement="ART_019">
+      <name content="REF_026" />
+      <description xmi:id="generated_230">
+        <content>
+          <value content="Reference REF_026" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_027" referencedArtifactElement="ART_020">
+      <name content="REF_027" />
+      <description xmi:id="generated_231">
+        <content>
+          <value content="Reference REF_027" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_028" referencedArtifactElement="ART_021">
+      <name content="REF_028" />
+      <description xmi:id="generated_232">
+        <content>
+          <value content="Reference REF_028" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_029" referencedArtifactElement="ART_022">
+      <name content="REF_029" />
+      <description xmi:id="generated_233">
+        <content>
+          <value content="Reference REF_029" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_030" referencedArtifactElement="ART_023">
+      <name content="REF_030" />
+      <description xmi:id="generated_234">
+        <content>
+          <value content="Reference REF_030" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_031" referencedArtifactElement="ART_024">
+      <name content="REF_031" />
+      <description xmi:id="generated_235">
+        <content>
+          <value content="Reference REF_031" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_032" referencedArtifactElement="ART_025">
+      <name content="REF_032" />
+      <description xmi:id="generated_236">
+        <content>
+          <value content="Reference REF_032" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_033" referencedArtifactElement="ART_026">
+      <name content="REF_033" />
+      <description xmi:id="generated_237">
+        <content>
+          <value content="Reference REF_033" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_034" referencedArtifactElement="ART_027">
+      <name content="REF_034" />
+      <description xmi:id="generated_238">
+        <content>
+          <value content="Reference REF_034" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_035" referencedArtifactElement="ART_028">
+      <name content="REF_035" />
+      <description xmi:id="generated_239">
+        <content>
+          <value content="Reference REF_035" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_036" referencedArtifactElement="ART_029">
+      <name content="REF_036" />
+      <description xmi:id="generated_240">
+        <content>
+          <value content="Reference REF_036" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_037" referencedArtifactElement="ART_030">
+      <name content="REF_037" />
+      <description xmi:id="generated_241">
+        <content>
+          <value content="Reference REF_037" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_038" referencedArtifactElement="ART_031">
+      <name content="REF_038" />
+      <description xmi:id="generated_242">
+        <content>
+          <value content="Reference REF_038" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_039" referencedArtifactElement="ART_032">
+      <name content="REF_039" />
+      <description xmi:id="generated_243">
+        <content>
+          <value content="Reference REF_039" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_040" referencedArtifactElement="ART_018">
+      <name content="REF_040" />
+      <description xmi:id="generated_244">
+        <content>
+          <value content="Reference REF_040" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_005" reasoning="ARGR_005" source="CLM_025 CLM_023 CLM_026 CLM_027 CLM_028 CLM_029 CLM_030 CLM_031 CLM_039 CLM_024" target="CLM_015">
+      <name content="AI_005" />
+      <description xmi:id="generated_245">
+        <content>
+          <value content="AssertedInference AI_005" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_006" reasoning="ARGR_006" source="CLM_032 CLM_033 CLM_034 CLM_035 CLM_036 CLM_037 CLM_038" target="CLM_015">
+      <name content="AI_006" />
+      <description xmi:id="generated_246">
+        <content>
+          <value content="AssertedInference AI_006" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_007" reasoning="ARGR_007" source="CLM_040" target="CLM_015">
+      <name content="AI_007" />
+      <description xmi:id="generated_247">
+        <content>
+          <value content="AssertedInference AI_007" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_008" reasoning="ARGR_008" source="CLM_042 CLM_043 CLM_044 CLM_045 CLM_046" target="CLM_015">
+      <name content="AI_008" />
+      <description xmi:id="generated_248">
+        <content>
+          <value content="AssertedInference AI_008" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_009" reasoning="ARGR_009" source="CLM_047 CLM_048 CLM_049 CLM_050 CLM_051 CLM_052" target="CLM_015">
+      <name content="AI_009" />
+      <description xmi:id="generated_249">
+        <content>
+          <value content="AssertedInference AI_009" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_004" source="REF_018" target="CLM_025">
+      <name content="AE_004" />
+      <description xmi:id="generated_250">
+        <content>
+          <value content="AssertedEvidence AE_004" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_005" source="REF_019" target="CLM_026">
+      <name content="AE_005" />
+      <description xmi:id="generated_251">
+        <content>
+          <value content="AssertedEvidence AE_005" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_006" source="REF_020" target="CLM_027">
+      <name content="AE_006" />
+      <description xmi:id="generated_252">
+        <content>
+          <value content="AssertedEvidence AE_006" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_007" source="REF_023" target="CLM_030">
+      <name content="AE_007" />
+      <description xmi:id="generated_253">
+        <content>
+          <value content="AssertedEvidence AE_007" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_008" source="REF_026" target="CLM_040">
+      <name content="AE_008" />
+      <description xmi:id="generated_254">
+        <content>
+          <value content="AssertedEvidence AE_008" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_015" source="CLM_013" target="ARGR_005">
+      <name content="AC_015" />
+      <description xmi:id="generated_255">
+        <content>
+          <value content="AssertedContext AC_015" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_016" source="REF_017" target="ARGR_005">
+      <name content="AC_016" />
+      <description xmi:id="generated_256">
+        <content>
+          <value content="AssertedContext AC_016" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_017" source="CLM_053" target="ARGR_008">
+      <name content="AC_017" />
+      <description xmi:id="generated_257">
+        <content>
+          <value content="AssertedContext AC_017" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_018" source="CLM_054" target="ARGR_009">
+      <name content="AC_018" />
+      <description xmi:id="generated_258">
+        <content>
+          <value content="AssertedContext AC_018" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_019" source="REF_027" target="CLM_025">
+      <name content="AC_019" />
+      <description xmi:id="generated_259">
+        <content>
+          <value content="AssertedContext AC_019" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_020" source="REF_028" target="CLM_026">
+      <name content="AC_020" />
+      <description xmi:id="generated_260">
+        <content>
+          <value content="AssertedContext AC_020" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_021" source="REF_029" target="CLM_027">
+      <name content="AC_021" />
+      <description xmi:id="generated_261">
+        <content>
+          <value content="AssertedContext AC_021" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_022" source="REF_030" target="CLM_030">
+      <name content="AC_022" />
+      <description xmi:id="generated_262">
+        <content>
+          <value content="AssertedContext AC_022" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_005">
+    <name content="PKG_005" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_055">
+      <name content="G_055" />
+      <description xmi:id="generated_264">
+        <content>
+          <value content="Claim G_055" />
+        </content>
+      </description>
+      <description xmi:id="generated_263">
+        <content>
+          <value content="Claim G_055" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_056">
+      <name content="G_056" />
+      <description xmi:id="generated_266">
+        <content>
+          <value content="Claim G_056" />
+        </content>
+      </description>
+      <description xmi:id="generated_265">
+        <content>
+          <value content="Claim G_056" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_057">
+      <name content="G_057" />
+      <description xmi:id="generated_268">
+        <content>
+          <value content="Claim G_057" />
+        </content>
+      </description>
+      <description xmi:id="generated_267">
+        <content>
+          <value content="Claim G_057" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_058">
+      <name content="G_058" />
+      <description xmi:id="generated_270">
+        <content>
+          <value content="Claim G_058" />
+        </content>
+      </description>
+      <description xmi:id="generated_269">
+        <content>
+          <value content="Claim G_058" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_059">
+      <name content="G_059" />
+      <description xmi:id="generated_272">
+        <content>
+          <value content="Claim G_059" />
+        </content>
+      </description>
+      <description xmi:id="generated_271">
+        <content>
+          <value content="Claim G_059" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_060" assertionDeclaration="needsSupport">
+      <name content="G_060" />
+      <description xmi:id="generated_274">
+        <content>
+          <value content="Claim G_060" />
+        </content>
+      </description>
+      <description xmi:id="generated_273">
+        <content>
+          <value content="Claim G_060" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_061" assertionDeclaration="needsSupport">
+      <name content="G_061" />
+      <description xmi:id="generated_276">
+        <content>
+          <value content="Claim G_061" />
+        </content>
+      </description>
+      <description xmi:id="generated_275">
+        <content>
+          <value content="Claim G_061" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_062" assertionDeclaration="axiomatic">
+      <name content="J_062" />
+      <description xmi:id="generated_278">
+        <content>
+          <value content="Justification J_062" />
+        </content>
+      </description>
+      <description xmi:id="generated_277">
+        <content>
+          <value content="Justification J_062" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_063" assertionDeclaration="axiomatic">
+      <name content="J_063" />
+      <description xmi:id="generated_280">
+        <content>
+          <value content="Justification J_063" />
+        </content>
+      </description>
+      <description xmi:id="generated_279">
+        <content>
+          <value content="Justification J_063" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_041" referencedArtifactElement="ART_033">
+      <name content="REF_041" />
+      <description xmi:id="generated_281">
+        <content>
+          <value content="Reference REF_041" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_042" referencedArtifactElement="ART_034">
+      <name content="REF_042" />
+      <description xmi:id="generated_282">
+        <content>
+          <value content="Reference REF_042" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_043" referencedArtifactElement="ART_035">
+      <name content="REF_043" />
+      <description xmi:id="generated_283">
+        <content>
+          <value content="Reference REF_043" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_010" source="CLM_057 CLM_060 CLM_061 CLM_058 CLM_059" target="CLM_017">
+      <name content="AI_010" />
+      <description xmi:id="generated_284">
+        <content>
+          <value content="AssertedInference AI_010" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_023" source="REF_041" target="CLM_017">
+      <name content="AC_023" />
+      <description xmi:id="generated_285">
+        <content>
+          <value content="AssertedContext AC_023" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_024" source="REF_042" target="CLM_017">
+      <name content="AC_024" />
+      <description xmi:id="generated_286">
+        <content>
+          <value content="AssertedContext AC_024" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_025" source="REF_043" target="CLM_017">
+      <name content="AC_025" />
+      <description xmi:id="generated_287">
+        <content>
+          <value content="AssertedContext AC_025" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_026" source="CLM_062" target="CLM_060">
+      <name content="AC_026" />
+      <description xmi:id="generated_288">
+        <content>
+          <value content="AssertedContext AC_026" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_027" source="CLM_063" target="CLM_061">
+      <name content="AC_027" />
+      <description xmi:id="generated_289">
+        <content>
+          <value content="AssertedContext AC_027" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_006">
+    <name content="PKG_006" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_064">
+      <name content="G_064" />
+      <description xmi:id="generated_291">
+        <content>
+          <value content="Claim G_064" />
+        </content>
+      </description>
+      <description xmi:id="generated_290">
+        <content>
+          <value content="Claim G_064" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_065" assertionDeclaration="needsSupport">
+      <name content="G_065" />
+      <description xmi:id="generated_293">
+        <content>
+          <value content="Claim G_065" />
+        </content>
+      </description>
+      <description xmi:id="generated_292">
+        <content>
+          <value content="Claim G_065" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_066">
+      <name content="G_066" />
+      <description xmi:id="generated_295">
+        <content>
+          <value content="Claim G_066" />
+        </content>
+      </description>
+      <description xmi:id="generated_294">
+        <content>
+          <value content="Claim G_066" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_067">
+      <name content="G_067" />
+      <description xmi:id="generated_297">
+        <content>
+          <value content="Claim G_067" />
+        </content>
+      </description>
+      <description xmi:id="generated_296">
+        <content>
+          <value content="Claim G_067" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_068">
+      <name content="G_068" />
+      <description xmi:id="generated_299">
+        <content>
+          <value content="Claim G_068" />
+        </content>
+      </description>
+      <description xmi:id="generated_298">
+        <content>
+          <value content="Claim G_068" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_069">
+      <name content="G_069" />
+      <description xmi:id="generated_301">
+        <content>
+          <value content="Claim G_069" />
+        </content>
+      </description>
+      <description xmi:id="generated_300">
+        <content>
+          <value content="Claim G_069" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_070">
+      <name content="G_070" />
+      <description xmi:id="generated_303">
+        <content>
+          <value content="Claim G_070" />
+        </content>
+      </description>
+      <description xmi:id="generated_302">
+        <content>
+          <value content="Claim G_070" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_071">
+      <name content="G_071" />
+      <description xmi:id="generated_305">
+        <content>
+          <value content="Claim G_071" />
+        </content>
+      </description>
+      <description xmi:id="generated_304">
+        <content>
+          <value content="Claim G_071" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_072" assertionDeclaration="needsSupport">
+      <name content="G_072" />
+      <description xmi:id="generated_307">
+        <content>
+          <value content="Claim G_072" />
+        </content>
+      </description>
+      <description xmi:id="generated_306">
+        <content>
+          <value content="Claim G_072" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_073">
+      <name content="G_073" />
+      <description xmi:id="generated_309">
+        <content>
+          <value content="Claim G_073" />
+        </content>
+      </description>
+      <description xmi:id="generated_308">
+        <content>
+          <value content="Claim G_073" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_074">
+      <name content="G_074" />
+      <description xmi:id="generated_311">
+        <content>
+          <value content="Claim G_074" />
+        </content>
+      </description>
+      <description xmi:id="generated_310">
+        <content>
+          <value content="Claim G_074" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_010">
+      <name content="S_010" />
+      <description xmi:id="generated_313">
+        <content>
+          <value content="Strategy S_010" />
+        </content>
+      </description>
+      <description xmi:id="generated_312">
+        <content>
+          <value content="Strategy S_010" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_011">
+      <name content="S_011" />
+      <description xmi:id="generated_315">
+        <content>
+          <value content="Strategy S_011" />
+        </content>
+      </description>
+      <description xmi:id="generated_314">
+        <content>
+          <value content="Strategy S_011" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_012">
+      <name content="S_012" />
+      <description xmi:id="generated_317">
+        <content>
+          <value content="Strategy S_012" />
+        </content>
+      </description>
+      <description xmi:id="generated_316">
+        <content>
+          <value content="Strategy S_012" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_013">
+      <name content="S_013" />
+      <description xmi:id="generated_319">
+        <content>
+          <value content="Strategy S_013" />
+        </content>
+      </description>
+      <description xmi:id="generated_318">
+        <content>
+          <value content="Strategy S_013" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_044" referencedArtifactElement="ART_036">
+      <name content="REF_044" />
+      <description xmi:id="generated_320">
+        <content>
+          <value content="Reference REF_044" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_045" referencedArtifactElement="ART_037">
+      <name content="REF_045" />
+      <description xmi:id="generated_321">
+        <content>
+          <value content="Reference REF_045" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_046" referencedArtifactElement="ART_038">
+      <name content="REF_046" />
+      <description xmi:id="generated_322">
+        <content>
+          <value content="Reference REF_046" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_047" referencedArtifactElement="ART_039">
+      <name content="REF_047" />
+      <description xmi:id="generated_323">
+        <content>
+          <value content="Reference REF_047" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_048" referencedArtifactElement="ART_037">
+      <name content="REF_048" />
+      <description xmi:id="generated_324">
+        <content>
+          <value content="Reference REF_048" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_049" referencedArtifactElement="ART_036">
+      <name content="REF_049" />
+      <description xmi:id="generated_325">
+        <content>
+          <value content="Reference REF_049" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_050" referencedArtifactElement="ART_040">
+      <name content="REF_050" />
+      <description xmi:id="generated_326">
+        <content>
+          <value content="Reference REF_050" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_051" referencedArtifactElement="ART_036">
+      <name content="REF_051" />
+      <description xmi:id="generated_327">
+        <content>
+          <value content="Reference REF_051" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_052" referencedArtifactElement="ART_041">
+      <name content="REF_052" />
+      <description xmi:id="generated_328">
+        <content>
+          <value content="Reference REF_052" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_053" referencedArtifactElement="ART_037">
+      <name content="REF_053" />
+      <description xmi:id="generated_329">
+        <content>
+          <value content="Reference REF_053" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_054" referencedArtifactElement="ART_036">
+      <name content="REF_054" />
+      <description xmi:id="generated_330">
+        <content>
+          <value content="Reference REF_054" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_055" referencedArtifactElement="ART_042">
+      <name content="REF_055" />
+      <description xmi:id="generated_331">
+        <content>
+          <value content="Reference REF_055" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_011" reasoning="ARGR_010" source="CLM_064 CLM_065 CLM_066 CLM_067 CLM_068 CLM_069 CLM_070 CLM_071 CLM_072 CLM_073" target="CLM_057">
+      <name content="AI_011" />
+      <description xmi:id="generated_332">
+        <content>
+          <value content="AssertedInference AI_011" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_009" source="REF_044" target="CLM_064">
+      <name content="AE_009" />
+      <description xmi:id="generated_333">
+        <content>
+          <value content="AssertedEvidence AE_009" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_010" source="REF_045" target="CLM_064">
+      <name content="AE_010" />
+      <description xmi:id="generated_334">
+        <content>
+          <value content="AssertedEvidence AE_010" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_011" source="REF_048" target="CLM_066">
+      <name content="AE_011" />
+      <description xmi:id="generated_335">
+        <content>
+          <value content="AssertedEvidence AE_011" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_012" source="REF_049" target="CLM_066">
+      <name content="AE_012" />
+      <description xmi:id="generated_336">
+        <content>
+          <value content="AssertedEvidence AE_012" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_013" source="REF_051" target="CLM_067">
+      <name content="AE_013" />
+      <description xmi:id="generated_337">
+        <content>
+          <value content="AssertedEvidence AE_013" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_014" source="REF_052" target="CLM_070">
+      <name content="AE_014" />
+      <description xmi:id="generated_338">
+        <content>
+          <value content="AssertedEvidence AE_014" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_015" source="REF_053" target="CLM_070">
+      <name content="AE_015" />
+      <description xmi:id="generated_339">
+        <content>
+          <value content="AssertedEvidence AE_015" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_016" source="REF_050" target="CLM_071">
+      <name content="AE_016" />
+      <description xmi:id="generated_340">
+        <content>
+          <value content="AssertedEvidence AE_016" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_017" source="REF_054" target="CLM_073">
+      <name content="AE_017" />
+      <description xmi:id="generated_341">
+        <content>
+          <value content="AssertedEvidence AE_017" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_028" source="REF_046" target="CLM_065">
+      <name content="AC_028" />
+      <description xmi:id="generated_342">
+        <content>
+          <value content="AssertedContext AC_028" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_029" source="REF_047" target="CLM_065">
+      <name content="AC_029" />
+      <description xmi:id="generated_343">
+        <content>
+          <value content="AssertedContext AC_029" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_007">
+    <name content="PKG_007" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_075" assertionDeclaration="axiomatic">
+      <name content="J_075" />
+      <description xmi:id="generated_345">
+        <content>
+          <value content="Justification J_075" />
+        </content>
+      </description>
+      <description xmi:id="generated_344">
+        <content>
+          <value content="Justification J_075" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_076">
+      <name content="G_076" />
+      <description xmi:id="generated_347">
+        <content>
+          <value content="Claim G_076" />
+        </content>
+      </description>
+      <description xmi:id="generated_346">
+        <content>
+          <value content="Claim G_076" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_077">
+      <name content="G_077" />
+      <description xmi:id="generated_349">
+        <content>
+          <value content="Claim G_077" />
+        </content>
+      </description>
+      <description xmi:id="generated_348">
+        <content>
+          <value content="Claim G_077" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_078">
+      <name content="G_078" />
+      <description xmi:id="generated_351">
+        <content>
+          <value content="Claim G_078" />
+        </content>
+      </description>
+      <description xmi:id="generated_350">
+        <content>
+          <value content="Claim G_078" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_079" assertionDeclaration="axiomatic">
+      <name content="J_079" />
+      <description xmi:id="generated_353">
+        <content>
+          <value content="Justification J_079" />
+        </content>
+      </description>
+      <description xmi:id="generated_352">
+        <content>
+          <value content="Justification J_079" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_014">
+      <name content="S_014" />
+      <description xmi:id="generated_355">
+        <content>
+          <value content="Strategy S_014" />
+        </content>
+      </description>
+      <description xmi:id="generated_354">
+        <content>
+          <value content="Strategy S_014" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_056" referencedArtifactElement="ART_043">
+      <name content="REF_056" />
+      <description xmi:id="generated_356">
+        <content>
+          <value content="Reference REF_056" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_057" referencedArtifactElement="ART_044">
+      <name content="REF_057" />
+      <description xmi:id="generated_357">
+        <content>
+          <value content="Reference REF_057" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_058" referencedArtifactElement="ART_045">
+      <name content="REF_058" />
+      <description xmi:id="generated_358">
+        <content>
+          <value content="Reference REF_058" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_059" referencedArtifactElement="ART_045">
+      <name content="REF_059" />
+      <description xmi:id="generated_359">
+        <content>
+          <value content="Reference REF_059" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_060" referencedArtifactElement="ART_045">
+      <name content="REF_060" />
+      <description xmi:id="generated_360">
+        <content>
+          <value content="Reference REF_060" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_061" referencedArtifactElement="ART_036">
+      <name content="REF_061" />
+      <description xmi:id="generated_361">
+        <content>
+          <value content="Reference REF_061" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_012" reasoning="ARGR_014" source="CLM_077 CLM_076 CLM_078 CLM_055 CLM_056" target="CLM_058">
+      <name content="AI_012" />
+      <description xmi:id="generated_362">
+        <content>
+          <value content="AssertedInference AI_012" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_018" source="REF_061" target="CLM_076">
+      <name content="AE_018" />
+      <description xmi:id="generated_363">
+        <content>
+          <value content="AssertedEvidence AE_018" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_019" source="REF_058" target="CLM_077">
+      <name content="AE_019" />
+      <description xmi:id="generated_364">
+        <content>
+          <value content="AssertedEvidence AE_019" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_030" source="REF_056" target="ARGR_014">
+      <name content="AC_030" />
+      <description xmi:id="generated_365">
+        <content>
+          <value content="AssertedContext AC_030" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_031" source="REF_057" target="ARGR_014">
+      <name content="AC_031" />
+      <description xmi:id="generated_366">
+        <content>
+          <value content="AssertedContext AC_031" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_032" source="CLM_075" target="ARGR_014">
+      <name content="AC_032" />
+      <description xmi:id="generated_367">
+        <content>
+          <value content="AssertedContext AC_032" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_033" source="CLM_079" target="CLM_077">
+      <name content="AC_033" />
+      <description xmi:id="generated_368">
+        <content>
+          <value content="AssertedContext AC_033" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_008">
+    <name content="PKG_008" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_080">
+      <name content="G_080" />
+      <description xmi:id="generated_370">
+        <content>
+          <value content="Claim G_080" />
+        </content>
+      </description>
+      <description xmi:id="generated_369">
+        <content>
+          <value content="Claim G_080" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_081">
+      <name content="G_081" />
+      <description xmi:id="generated_372">
+        <content>
+          <value content="Claim G_081" />
+        </content>
+      </description>
+      <description xmi:id="generated_371">
+        <content>
+          <value content="Claim G_081" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_082">
+      <name content="G_082" />
+      <description xmi:id="generated_374">
+        <content>
+          <value content="Claim G_082" />
+        </content>
+      </description>
+      <description xmi:id="generated_373">
+        <content>
+          <value content="Claim G_082" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_083">
+      <name content="G_083" />
+      <description xmi:id="generated_376">
+        <content>
+          <value content="Claim G_083" />
+        </content>
+      </description>
+      <description xmi:id="generated_375">
+        <content>
+          <value content="Claim G_083" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_084">
+      <name content="G_084" />
+      <description xmi:id="generated_378">
+        <content>
+          <value content="Claim G_084" />
+        </content>
+      </description>
+      <description xmi:id="generated_377">
+        <content>
+          <value content="Claim G_084" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_015">
+      <name content="S_015" />
+      <description xmi:id="generated_380">
+        <content>
+          <value content="Strategy S_015" />
+        </content>
+      </description>
+      <description xmi:id="generated_379">
+        <content>
+          <value content="Strategy S_015" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_062" referencedArtifactElement="ART_046">
+      <name content="REF_062" />
+      <description xmi:id="generated_381">
+        <content>
+          <value content="Reference REF_062" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_063" referencedArtifactElement="ART_047">
+      <name content="REF_063" />
+      <description xmi:id="generated_382">
+        <content>
+          <value content="Reference REF_063" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_064" referencedArtifactElement="ART_048">
+      <name content="REF_064" />
+      <description xmi:id="generated_383">
+        <content>
+          <value content="Reference REF_064" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_065" referencedArtifactElement="ART_048">
+      <name content="REF_065" />
+      <description xmi:id="generated_384">
+        <content>
+          <value content="Reference REF_065" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_066" referencedArtifactElement="ART_048">
+      <name content="REF_066" />
+      <description xmi:id="generated_385">
+        <content>
+          <value content="Reference REF_066" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_067" referencedArtifactElement="ART_048">
+      <name content="REF_067" />
+      <description xmi:id="generated_386">
+        <content>
+          <value content="Reference REF_067" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_068" referencedArtifactElement="ART_046">
+      <name content="REF_068" />
+      <description xmi:id="generated_387">
+        <content>
+          <value content="Reference REF_068" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_013" reasoning="ARGR_015" source="CLM_080 CLM_081 CLM_082 CLM_083 CLM_084" target="CLM_059">
+      <name content="AI_013" />
+      <description xmi:id="generated_388">
+        <content>
+          <value content="AssertedInference AI_013" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_020" source="REF_062" target="CLM_080">
+      <name content="AE_020" />
+      <description xmi:id="generated_389">
+        <content>
+          <value content="AssertedEvidence AE_020" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_021" source="REF_063" target="CLM_080">
+      <name content="AE_021" />
+      <description xmi:id="generated_390">
+        <content>
+          <value content="AssertedEvidence AE_021" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_022" source="REF_064" target="CLM_081">
+      <name content="AE_022" />
+      <description xmi:id="generated_391">
+        <content>
+          <value content="AssertedEvidence AE_022" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_023" source="REF_065" target="CLM_082">
+      <name content="AE_023" />
+      <description xmi:id="generated_392">
+        <content>
+          <value content="AssertedEvidence AE_023" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_024" source="REF_066" target="CLM_083">
+      <name content="AE_024" />
+      <description xmi:id="generated_393">
+        <content>
+          <value content="AssertedEvidence AE_024" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_025" source="REF_068" target="CLM_084">
+      <name content="AE_025" />
+      <description xmi:id="generated_394">
+        <content>
+          <value content="AssertedEvidence AE_025" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_026" source="REF_067" target="CLM_084">
+      <name content="AE_026" />
+      <description xmi:id="generated_395">
+        <content>
+          <value content="AssertedEvidence AE_026" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_009">
+    <name content="PKG_009" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_085" assertionDeclaration="axiomatic">
+      <name content="J_085" />
+      <description xmi:id="generated_397">
+        <content>
+          <value content="Justification J_085" />
+        </content>
+      </description>
+      <description xmi:id="generated_396">
+        <content>
+          <value content="Justification J_085" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_086">
+      <name content="G_086" />
+      <description xmi:id="generated_399">
+        <content>
+          <value content="Claim G_086" />
+        </content>
+      </description>
+      <description xmi:id="generated_398">
+        <content>
+          <value content="Claim G_086" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_087">
+      <name content="G_087" />
+      <description xmi:id="generated_401">
+        <content>
+          <value content="Claim G_087" />
+        </content>
+      </description>
+      <description xmi:id="generated_400">
+        <content>
+          <value content="Claim G_087" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_016">
+      <name content="S_016" />
+      <description xmi:id="generated_403">
+        <content>
+          <value content="Strategy S_016" />
+        </content>
+      </description>
+      <description xmi:id="generated_402">
+        <content>
+          <value content="Strategy S_016" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_017">
+      <name content="S_017" />
+      <description xmi:id="generated_405">
+        <content>
+          <value content="Strategy S_017" />
+        </content>
+      </description>
+      <description xmi:id="generated_404">
+        <content>
+          <value content="Strategy S_017" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_069" referencedArtifactElement="ART_049">
+      <name content="REF_069" />
+      <description xmi:id="generated_406">
+        <content>
+          <value content="Reference REF_069" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_070" referencedArtifactElement="ART_011">
+      <name content="REF_070" />
+      <description xmi:id="generated_407">
+        <content>
+          <value content="Reference REF_070" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_071" referencedArtifactElement="ART_049">
+      <name content="REF_071" />
+      <description xmi:id="generated_408">
+        <content>
+          <value content="Reference REF_071" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_014" reasoning="ARGR_016" source="CLM_086" target="CLM_018">
+      <name content="AI_014" />
+      <description xmi:id="generated_409">
+        <content>
+          <value content="AssertedInference AI_014" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_015" reasoning="ARGR_017" source="CLM_087" target="CLM_018">
+      <name content="AI_015" />
+      <description xmi:id="generated_410">
+        <content>
+          <value content="AssertedInference AI_015" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_027" source="REF_070" target="CLM_086">
+      <name content="AE_027" />
+      <description xmi:id="generated_411">
+        <content>
+          <value content="AssertedEvidence AE_027" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_028" source="REF_069" target="CLM_086">
+      <name content="AE_028" />
+      <description xmi:id="generated_412">
+        <content>
+          <value content="AssertedEvidence AE_028" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_029" source="REF_071" target="CLM_087">
+      <name content="AE_029" />
+      <description xmi:id="generated_413">
+        <content>
+          <value content="AssertedEvidence AE_029" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_034" source="CLM_085" target="CLM_018">
+      <name content="AC_034" />
+      <description xmi:id="generated_414">
+        <content>
+          <value content="AssertedContext AC_034" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_010">
+    <name content="PKG_010" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_088">
+      <name content="G_088" />
+      <description xmi:id="generated_416">
+        <content>
+          <value content="Claim G_088" />
+        </content>
+      </description>
+      <description xmi:id="generated_415">
+        <content>
+          <value content="Claim G_088" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_089">
+      <name content="G_089" />
+      <description xmi:id="generated_418">
+        <content>
+          <value content="Claim G_089" />
+        </content>
+      </description>
+      <description xmi:id="generated_417">
+        <content>
+          <value content="Claim G_089" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_090">
+      <name content="G_090" />
+      <description xmi:id="generated_420">
+        <content>
+          <value content="Claim G_090" />
+        </content>
+      </description>
+      <description xmi:id="generated_419">
+        <content>
+          <value content="Claim G_090" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_091">
+      <name content="G_091" />
+      <description xmi:id="generated_422">
+        <content>
+          <value content="Claim G_091" />
+        </content>
+      </description>
+      <description xmi:id="generated_421">
+        <content>
+          <value content="Claim G_091" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_092">
+      <name content="G_092" />
+      <description xmi:id="generated_424">
+        <content>
+          <value content="Claim G_092" />
+        </content>
+      </description>
+      <description xmi:id="generated_423">
+        <content>
+          <value content="Claim G_092" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_093">
+      <name content="G_093" />
+      <description xmi:id="generated_426">
+        <content>
+          <value content="Claim G_093" />
+        </content>
+      </description>
+      <description xmi:id="generated_425">
+        <content>
+          <value content="Claim G_093" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_094">
+      <name content="G_094" />
+      <description xmi:id="generated_428">
+        <content>
+          <value content="Claim G_094" />
+        </content>
+      </description>
+      <description xmi:id="generated_427">
+        <content>
+          <value content="Claim G_094" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_095">
+      <name content="G_095" />
+      <description xmi:id="generated_430">
+        <content>
+          <value content="Claim G_095" />
+        </content>
+      </description>
+      <description xmi:id="generated_429">
+        <content>
+          <value content="Claim G_095" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_096">
+      <name content="G_096" />
+      <description xmi:id="generated_432">
+        <content>
+          <value content="Claim G_096" />
+        </content>
+      </description>
+      <description xmi:id="generated_431">
+        <content>
+          <value content="Claim G_096" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_097">
+      <name content="G_097" />
+      <description xmi:id="generated_434">
+        <content>
+          <value content="Claim G_097" />
+        </content>
+      </description>
+      <description xmi:id="generated_433">
+        <content>
+          <value content="Claim G_097" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_098">
+      <name content="G_098" />
+      <description xmi:id="generated_436">
+        <content>
+          <value content="Claim G_098" />
+        </content>
+      </description>
+      <description xmi:id="generated_435">
+        <content>
+          <value content="Claim G_098" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_099">
+      <name content="G_099" />
+      <description xmi:id="generated_438">
+        <content>
+          <value content="Claim G_099" />
+        </content>
+      </description>
+      <description xmi:id="generated_437">
+        <content>
+          <value content="Claim G_099" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_100">
+      <name content="G_100" />
+      <description xmi:id="generated_440">
+        <content>
+          <value content="Claim G_100" />
+        </content>
+      </description>
+      <description xmi:id="generated_439">
+        <content>
+          <value content="Claim G_100" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_101">
+      <name content="G_101" />
+      <description xmi:id="generated_442">
+        <content>
+          <value content="Claim G_101" />
+        </content>
+      </description>
+      <description xmi:id="generated_441">
+        <content>
+          <value content="Claim G_101" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_018">
+      <name content="S_018" />
+      <description xmi:id="generated_444">
+        <content>
+          <value content="Strategy S_018" />
+        </content>
+      </description>
+      <description xmi:id="generated_443">
+        <content>
+          <value content="Strategy S_018" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_019">
+      <name content="S_019" />
+      <description xmi:id="generated_446">
+        <content>
+          <value content="Strategy S_019" />
+        </content>
+      </description>
+      <description xmi:id="generated_445">
+        <content>
+          <value content="Strategy S_019" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_020">
+      <name content="S_020" />
+      <description xmi:id="generated_448">
+        <content>
+          <value content="Strategy S_020" />
+        </content>
+      </description>
+      <description xmi:id="generated_447">
+        <content>
+          <value content="Strategy S_020" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_021">
+      <name content="S_021" />
+      <description xmi:id="generated_450">
+        <content>
+          <value content="Strategy S_021" />
+        </content>
+      </description>
+      <description xmi:id="generated_449">
+        <content>
+          <value content="Strategy S_021" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_072" referencedArtifactElement="ART_014">
+      <name content="REF_072" />
+      <description xmi:id="generated_451">
+        <content>
+          <value content="Reference REF_072" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_073" referencedArtifactElement="ART_014">
+      <name content="REF_073" />
+      <description xmi:id="generated_452">
+        <content>
+          <value content="Reference REF_073" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_074" referencedArtifactElement="ART_014">
+      <name content="REF_074" />
+      <description xmi:id="generated_453">
+        <content>
+          <value content="Reference REF_074" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_075" referencedArtifactElement="ART_050">
+      <name content="REF_075" />
+      <description xmi:id="generated_454">
+        <content>
+          <value content="Reference REF_075" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_076" referencedArtifactElement="ART_050">
+      <name content="REF_076" />
+      <description xmi:id="generated_455">
+        <content>
+          <value content="Reference REF_076" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_077" referencedArtifactElement="ART_050">
+      <name content="REF_077" />
+      <description xmi:id="generated_456">
+        <content>
+          <value content="Reference REF_077" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_078" referencedArtifactElement="ART_050">
+      <name content="REF_078" />
+      <description xmi:id="generated_457">
+        <content>
+          <value content="Reference REF_078" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_079" referencedArtifactElement="ART_050">
+      <name content="REF_079" />
+      <description xmi:id="generated_458">
+        <content>
+          <value content="Reference REF_079" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_080" referencedArtifactElement="ART_014">
+      <name content="REF_080" />
+      <description xmi:id="generated_459">
+        <content>
+          <value content="Reference REF_080" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_081" referencedArtifactElement="ART_050">
+      <name content="REF_081" />
+      <description xmi:id="generated_460">
+        <content>
+          <value content="Reference REF_081" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_082" referencedArtifactElement="ART_014">
+      <name content="REF_082" />
+      <description xmi:id="generated_461">
+        <content>
+          <value content="Reference REF_082" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_083" referencedArtifactElement="ART_050">
+      <name content="REF_083" />
+      <description xmi:id="generated_462">
+        <content>
+          <value content="Reference REF_083" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_084" referencedArtifactElement="ART_014">
+      <name content="REF_084" />
+      <description xmi:id="generated_463">
+        <content>
+          <value content="Reference REF_084" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_085" referencedArtifactElement="ART_050">
+      <name content="REF_085" />
+      <description xmi:id="generated_464">
+        <content>
+          <value content="Reference REF_085" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_086" referencedArtifactElement="ART_014">
+      <name content="REF_086" />
+      <description xmi:id="generated_465">
+        <content>
+          <value content="Reference REF_086" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_087" referencedArtifactElement="ART_050">
+      <name content="REF_087" />
+      <description xmi:id="generated_466">
+        <content>
+          <value content="Reference REF_087" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_088" referencedArtifactElement="ART_014">
+      <name content="REF_088" />
+      <description xmi:id="generated_467">
+        <content>
+          <value content="Reference REF_088" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_089" referencedArtifactElement="ART_050">
+      <name content="REF_089" />
+      <description xmi:id="generated_468">
+        <content>
+          <value content="Reference REF_089" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_090" referencedArtifactElement="ART_014">
+      <name content="REF_090" />
+      <description xmi:id="generated_469">
+        <content>
+          <value content="Reference REF_090" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_091" referencedArtifactElement="ART_051">
+      <name content="REF_091" />
+      <description xmi:id="generated_470">
+        <content>
+          <value content="Reference REF_091" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_092" referencedArtifactElement="ART_052">
+      <name content="REF_092" />
+      <description xmi:id="generated_471">
+        <content>
+          <value content="Reference REF_092" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_016" reasoning="ARGR_018" source="CLM_090 CLM_089 CLM_091" target="CLM_088">
+      <name content="AI_016" />
+      <description xmi:id="generated_472">
+        <content>
+          <value content="AssertedInference AI_016" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_017" reasoning="ARGR_019" source="CLM_092 CLM_093 CLM_094 CLM_095" target="CLM_088">
+      <name content="AI_017" />
+      <description xmi:id="generated_473">
+        <content>
+          <value content="AssertedInference AI_017" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_018" reasoning="ARGR_020" source="CLM_098 CLM_097 CLM_096" target="CLM_088">
+      <name content="AI_018" />
+      <description xmi:id="generated_474">
+        <content>
+          <value content="AssertedInference AI_018" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_019" reasoning="ARGR_021" source="CLM_100 CLM_101 CLM_099" target="CLM_088">
+      <name content="AI_019" />
+      <description xmi:id="generated_475">
+        <content>
+          <value content="AssertedInference AI_019" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_030" source="REF_072" target="CLM_089">
+      <name content="AE_030" />
+      <description xmi:id="generated_476">
+        <content>
+          <value content="AssertedEvidence AE_030" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_031" source="REF_073" target="CLM_090">
+      <name content="AE_031" />
+      <description xmi:id="generated_477">
+        <content>
+          <value content="AssertedEvidence AE_031" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_032" source="REF_092" target="CLM_090">
+      <name content="AE_032" />
+      <description xmi:id="generated_478">
+        <content>
+          <value content="AssertedEvidence AE_032" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_033" source="REF_074" target="CLM_091">
+      <name content="AE_033" />
+      <description xmi:id="generated_479">
+        <content>
+          <value content="AssertedEvidence AE_033" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_034" source="REF_075" target="CLM_092">
+      <name content="AE_034" />
+      <description xmi:id="generated_480">
+        <content>
+          <value content="AssertedEvidence AE_034" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_035" source="REF_076" target="CLM_093">
+      <name content="AE_035" />
+      <description xmi:id="generated_481">
+        <content>
+          <value content="AssertedEvidence AE_035" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_036" source="REF_078" target="CLM_094">
+      <name content="AE_036" />
+      <description xmi:id="generated_482">
+        <content>
+          <value content="AssertedEvidence AE_036" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_037" source="REF_077" target="CLM_095">
+      <name content="AE_037" />
+      <description xmi:id="generated_483">
+        <content>
+          <value content="AssertedEvidence AE_037" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_038" source="REF_080" target="CLM_096">
+      <name content="AE_038" />
+      <description xmi:id="generated_484">
+        <content>
+          <value content="AssertedEvidence AE_038" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_039" source="REF_079" target="CLM_096">
+      <name content="AE_039" />
+      <description xmi:id="generated_485">
+        <content>
+          <value content="AssertedEvidence AE_039" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_040" source="REF_081" target="CLM_097">
+      <name content="AE_040" />
+      <description xmi:id="generated_486">
+        <content>
+          <value content="AssertedEvidence AE_040" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_041" source="REF_082" target="CLM_097">
+      <name content="AE_041" />
+      <description xmi:id="generated_487">
+        <content>
+          <value content="AssertedEvidence AE_041" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_042" source="REF_083" target="CLM_098">
+      <name content="AE_042" />
+      <description xmi:id="generated_488">
+        <content>
+          <value content="AssertedEvidence AE_042" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_043" source="REF_084" target="CLM_098">
+      <name content="AE_043" />
+      <description xmi:id="generated_489">
+        <content>
+          <value content="AssertedEvidence AE_043" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_044" source="REF_085" target="CLM_099">
+      <name content="AE_044" />
+      <description xmi:id="generated_490">
+        <content>
+          <value content="AssertedEvidence AE_044" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_045" source="REF_086" target="CLM_099">
+      <name content="AE_045" />
+      <description xmi:id="generated_491">
+        <content>
+          <value content="AssertedEvidence AE_045" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_046" source="REF_087" target="CLM_100">
+      <name content="AE_046" />
+      <description xmi:id="generated_492">
+        <content>
+          <value content="AssertedEvidence AE_046" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_047" source="REF_088" target="CLM_100">
+      <name content="AE_047" />
+      <description xmi:id="generated_493">
+        <content>
+          <value content="AssertedEvidence AE_047" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_048" source="REF_090" target="CLM_101">
+      <name content="AE_048" />
+      <description xmi:id="generated_494">
+        <content>
+          <value content="AssertedEvidence AE_048" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_049" source="REF_089" target="CLM_101">
+      <name content="AE_049" />
+      <description xmi:id="generated_495">
+        <content>
+          <value content="AssertedEvidence AE_049" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_035" source="REF_091" target="CLM_090">
+      <name content="AC_035" />
+      <description xmi:id="generated_496">
+        <content>
+          <value content="AssertedContext AC_035" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_011">
+    <name content="PKG_011" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_102">
+      <name content="G_102" />
+      <description xmi:id="generated_498">
+        <content>
+          <value content="Claim G_102" />
+        </content>
+      </description>
+      <description xmi:id="generated_497">
+        <content>
+          <value content="Claim G_102" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_103" assertionDeclaration="needsSupport">
+      <name content="G_103" />
+      <description xmi:id="generated_500">
+        <content>
+          <value content="Claim G_103" />
+        </content>
+      </description>
+      <description xmi:id="generated_499">
+        <content>
+          <value content="Claim G_103" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_104" assertionDeclaration="needsSupport">
+      <name content="G_104" />
+      <description xmi:id="generated_502">
+        <content>
+          <value content="Claim G_104" />
+        </content>
+      </description>
+      <description xmi:id="generated_501">
+        <content>
+          <value content="Claim G_104" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_105" assertionDeclaration="needsSupport">
+      <name content="G_105" />
+      <description xmi:id="generated_504">
+        <content>
+          <value content="Claim G_105" />
+        </content>
+      </description>
+      <description xmi:id="generated_503">
+        <content>
+          <value content="Claim G_105" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_106" assertionDeclaration="needsSupport">
+      <name content="G_106" />
+      <description xmi:id="generated_506">
+        <content>
+          <value content="Claim G_106" />
+        </content>
+      </description>
+      <description xmi:id="generated_505">
+        <content>
+          <value content="Claim G_106" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_107" assertionDeclaration="needsSupport">
+      <name content="G_107" />
+      <description xmi:id="generated_508">
+        <content>
+          <value content="Claim G_107" />
+        </content>
+      </description>
+      <description xmi:id="generated_507">
+        <content>
+          <value content="Claim G_107" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_108" assertionDeclaration="needsSupport">
+      <name content="G_108" />
+      <description xmi:id="generated_510">
+        <content>
+          <value content="Claim G_108" />
+        </content>
+      </description>
+      <description xmi:id="generated_509">
+        <content>
+          <value content="Claim G_108" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_109" assertionDeclaration="needsSupport">
+      <name content="G_109" />
+      <description xmi:id="generated_512">
+        <content>
+          <value content="Claim G_109" />
+        </content>
+      </description>
+      <description xmi:id="generated_511">
+        <content>
+          <value content="Claim G_109" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_110" assertionDeclaration="needsSupport">
+      <name content="G_110" />
+      <description xmi:id="generated_514">
+        <content>
+          <value content="Claim G_110" />
+        </content>
+      </description>
+      <description xmi:id="generated_513">
+        <content>
+          <value content="Claim G_110" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_012">
+    <name content="PKG_012" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_111">
+      <name content="G_111" />
+      <description xmi:id="generated_516">
+        <content>
+          <value content="Claim G_111" />
+        </content>
+      </description>
+      <description xmi:id="generated_515">
+        <content>
+          <value content="Claim G_111" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_112">
+      <name content="G_112" />
+      <description xmi:id="generated_518">
+        <content>
+          <value content="Claim G_112" />
+        </content>
+      </description>
+      <description xmi:id="generated_517">
+        <content>
+          <value content="Claim G_112" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_113">
+      <name content="G_113" />
+      <description xmi:id="generated_520">
+        <content>
+          <value content="Claim G_113" />
+        </content>
+      </description>
+      <description xmi:id="generated_519">
+        <content>
+          <value content="Claim G_113" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_114">
+      <name content="G_114" />
+      <description xmi:id="generated_522">
+        <content>
+          <value content="Claim G_114" />
+        </content>
+      </description>
+      <description xmi:id="generated_521">
+        <content>
+          <value content="Claim G_114" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_115">
+      <name content="G_115" />
+      <description xmi:id="generated_524">
+        <content>
+          <value content="Claim G_115" />
+        </content>
+      </description>
+      <description xmi:id="generated_523">
+        <content>
+          <value content="Claim G_115" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_116">
+      <name content="G_116" />
+      <description xmi:id="generated_526">
+        <content>
+          <value content="Claim G_116" />
+        </content>
+      </description>
+      <description xmi:id="generated_525">
+        <content>
+          <value content="Claim G_116" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_022">
+      <name content="S_022" />
+      <description xmi:id="generated_528">
+        <content>
+          <value content="Strategy S_022" />
+        </content>
+      </description>
+      <description xmi:id="generated_527">
+        <content>
+          <value content="Strategy S_022" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_093" referencedArtifactElement="ART_012">
+      <name content="REF_093" />
+      <description xmi:id="generated_529">
+        <content>
+          <value content="Reference REF_093" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_094" referencedArtifactElement="ART_012">
+      <name content="REF_094" />
+      <description xmi:id="generated_530">
+        <content>
+          <value content="Reference REF_094" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_095" referencedArtifactElement="ART_012">
+      <name content="REF_095" />
+      <description xmi:id="generated_531">
+        <content>
+          <value content="Reference REF_095" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_096" referencedArtifactElement="ART_012">
+      <name content="REF_096" />
+      <description xmi:id="generated_532">
+        <content>
+          <value content="Reference REF_096" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_097" referencedArtifactElement="ART_012">
+      <name content="REF_097" />
+      <description xmi:id="generated_533">
+        <content>
+          <value content="Reference REF_097" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_098" referencedArtifactElement="ART_018">
+      <name content="REF_098" />
+      <description xmi:id="generated_534">
+        <content>
+          <value content="Reference REF_098" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_020" reasoning="ARGR_022" source="CLM_111 CLM_112 CLM_113 CLM_116 CLM_115" target="CLM_114">
+      <name content="AI_020" />
+      <description xmi:id="generated_535">
+        <content>
+          <value content="AssertedInference AI_020" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_050" source="REF_093" target="CLM_111">
+      <name content="AE_050" />
+      <description xmi:id="generated_536">
+        <content>
+          <value content="AssertedEvidence AE_050" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_051" source="REF_094" target="CLM_112">
+      <name content="AE_051" />
+      <description xmi:id="generated_537">
+        <content>
+          <value content="AssertedEvidence AE_051" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_052" source="REF_095" target="CLM_113">
+      <name content="AE_052" />
+      <description xmi:id="generated_538">
+        <content>
+          <value content="AssertedEvidence AE_052" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_053" source="REF_096" target="CLM_115">
+      <name content="AE_053" />
+      <description xmi:id="generated_539">
+        <content>
+          <value content="AssertedEvidence AE_053" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_054" source="REF_097" target="CLM_116">
+      <name content="AE_054" />
+      <description xmi:id="generated_540">
+        <content>
+          <value content="AssertedEvidence AE_054" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_055" source="REF_098" target="CLM_116">
+      <name content="AE_055" />
+      <description xmi:id="generated_541">
+        <content>
+          <value content="AssertedEvidence AE_055" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_013">
+    <name content="PKG_013" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_117">
+      <name content="G_117" />
+      <description xmi:id="generated_543">
+        <content>
+          <value content="Claim G_117" />
+        </content>
+      </description>
+      <description xmi:id="generated_542">
+        <content>
+          <value content="Claim G_117" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_118">
+      <name content="G_118" />
+      <description xmi:id="generated_545">
+        <content>
+          <value content="Claim G_118" />
+        </content>
+      </description>
+      <description xmi:id="generated_544">
+        <content>
+          <value content="Claim G_118" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_119">
+      <name content="G_119" />
+      <description xmi:id="generated_547">
+        <content>
+          <value content="Claim G_119" />
+        </content>
+      </description>
+      <description xmi:id="generated_546">
+        <content>
+          <value content="Claim G_119" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_120">
+      <name content="G_120" />
+      <description xmi:id="generated_549">
+        <content>
+          <value content="Claim G_120" />
+        </content>
+      </description>
+      <description xmi:id="generated_548">
+        <content>
+          <value content="Claim G_120" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_121">
+      <name content="G_121" />
+      <description xmi:id="generated_551">
+        <content>
+          <value content="Claim G_121" />
+        </content>
+      </description>
+      <description xmi:id="generated_550">
+        <content>
+          <value content="Claim G_121" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_122">
+      <name content="G_122" />
+      <description xmi:id="generated_553">
+        <content>
+          <value content="Claim G_122" />
+        </content>
+      </description>
+      <description xmi:id="generated_552">
+        <content>
+          <value content="Claim G_122" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_123">
+      <name content="G_123" />
+      <description xmi:id="generated_555">
+        <content>
+          <value content="Claim G_123" />
+        </content>
+      </description>
+      <description xmi:id="generated_554">
+        <content>
+          <value content="Claim G_123" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_023">
+      <name content="S_023" />
+      <description xmi:id="generated_557">
+        <content>
+          <value content="Strategy S_023" />
+        </content>
+      </description>
+      <description xmi:id="generated_556">
+        <content>
+          <value content="Strategy S_023" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_024">
+      <name content="S_024" />
+      <description xmi:id="generated_559">
+        <content>
+          <value content="Strategy S_024" />
+        </content>
+      </description>
+      <description xmi:id="generated_558">
+        <content>
+          <value content="Strategy S_024" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_025">
+      <name content="S_025" />
+      <description xmi:id="generated_561">
+        <content>
+          <value content="Strategy S_025" />
+        </content>
+      </description>
+      <description xmi:id="generated_560">
+        <content>
+          <value content="Strategy S_025" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_099" referencedArtifactElement="ART_011">
+      <name content="REF_099" />
+      <description xmi:id="generated_562">
+        <content>
+          <value content="Reference REF_099" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_100" referencedArtifactElement="ART_011">
+      <name content="REF_100" />
+      <description xmi:id="generated_563">
+        <content>
+          <value content="Reference REF_100" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_101" referencedArtifactElement="ART_011">
+      <name content="REF_101" />
+      <description xmi:id="generated_564">
+        <content>
+          <value content="Reference REF_101" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_102" referencedArtifactElement="ART_011">
+      <name content="REF_102" />
+      <description xmi:id="generated_565">
+        <content>
+          <value content="Reference REF_102" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_103" referencedArtifactElement="ART_011">
+      <name content="REF_103" />
+      <description xmi:id="generated_566">
+        <content>
+          <value content="Reference REF_103" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_104" referencedArtifactElement="ART_011">
+      <name content="REF_104" />
+      <description xmi:id="generated_567">
+        <content>
+          <value content="Reference REF_104" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_105" referencedArtifactElement="ART_053">
+      <name content="REF_105" />
+      <description xmi:id="generated_568">
+        <content>
+          <value content="Reference REF_105" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_021" reasoning="ARGR_023" source="CLM_119 CLM_118" target="CLM_117">
+      <name content="AI_021" />
+      <description xmi:id="generated_569">
+        <content>
+          <value content="AssertedInference AI_021" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_022" reasoning="ARGR_024" source="CLM_120 CLM_121" target="CLM_117">
+      <name content="AI_022" />
+      <description xmi:id="generated_570">
+        <content>
+          <value content="AssertedInference AI_022" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_023" reasoning="ARGR_025" source="CLM_122 CLM_123" target="CLM_117">
+      <name content="AI_023" />
+      <description xmi:id="generated_571">
+        <content>
+          <value content="AssertedInference AI_023" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_056" source="REF_104" target="CLM_118">
+      <name content="AE_056" />
+      <description xmi:id="generated_572">
+        <content>
+          <value content="AssertedEvidence AE_056" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_057" source="REF_103" target="CLM_119">
+      <name content="AE_057" />
+      <description xmi:id="generated_573">
+        <content>
+          <value content="AssertedEvidence AE_057" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_058" source="REF_102" target="CLM_120">
+      <name content="AE_058" />
+      <description xmi:id="generated_574">
+        <content>
+          <value content="AssertedEvidence AE_058" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_059" source="REF_101" target="CLM_121">
+      <name content="AE_059" />
+      <description xmi:id="generated_575">
+        <content>
+          <value content="AssertedEvidence AE_059" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_060" source="REF_100" target="CLM_122">
+      <name content="AE_060" />
+      <description xmi:id="generated_576">
+        <content>
+          <value content="AssertedEvidence AE_060" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_061" source="REF_099" target="CLM_123">
+      <name content="AE_061" />
+      <description xmi:id="generated_577">
+        <content>
+          <value content="AssertedEvidence AE_061" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_036" source="REF_105" target="CLM_117">
+      <name content="AC_036" />
+      <description xmi:id="generated_578">
+        <content>
+          <value content="AssertedContext AC_036" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_014">
+    <name content="PKG_014" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_124">
+      <name content="G_124" />
+      <description xmi:id="generated_580">
+        <content>
+          <value content="Claim G_124" />
+        </content>
+      </description>
+      <description xmi:id="generated_579">
+        <content>
+          <value content="Claim G_124" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_125" assertionDeclaration="needsSupport">
+      <name content="G_125" />
+      <description xmi:id="generated_582">
+        <content>
+          <value content="Claim G_125" />
+        </content>
+      </description>
+      <description xmi:id="generated_581">
+        <content>
+          <value content="Claim G_125" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_126" assertionDeclaration="needsSupport">
+      <name content="G_126" />
+      <description xmi:id="generated_584">
+        <content>
+          <value content="Claim G_126" />
+        </content>
+      </description>
+      <description xmi:id="generated_583">
+        <content>
+          <value content="Claim G_126" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_127" assertionDeclaration="needsSupport">
+      <name content="G_127" />
+      <description xmi:id="generated_586">
+        <content>
+          <value content="Claim G_127" />
+        </content>
+      </description>
+      <description xmi:id="generated_585">
+        <content>
+          <value content="Claim G_127" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_128" assertionDeclaration="needsSupport">
+      <name content="G_128" />
+      <description xmi:id="generated_588">
+        <content>
+          <value content="Claim G_128" />
+        </content>
+      </description>
+      <description xmi:id="generated_587">
+        <content>
+          <value content="Claim G_128" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_129" assertionDeclaration="needsSupport">
+      <name content="G_129" />
+      <description xmi:id="generated_590">
+        <content>
+          <value content="Claim G_129" />
+        </content>
+      </description>
+      <description xmi:id="generated_589">
+        <content>
+          <value content="Claim G_129" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_026">
+      <name content="S_026" />
+      <description xmi:id="generated_592">
+        <content>
+          <value content="Strategy S_026" />
+        </content>
+      </description>
+      <description xmi:id="generated_591">
+        <content>
+          <value content="Strategy S_026" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_027">
+      <name content="S_027" />
+      <description xmi:id="generated_594">
+        <content>
+          <value content="Strategy S_027" />
+        </content>
+      </description>
+      <description xmi:id="generated_593">
+        <content>
+          <value content="Strategy S_027" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_028">
+      <name content="S_028" />
+      <description xmi:id="generated_596">
+        <content>
+          <value content="Strategy S_028" />
+        </content>
+      </description>
+      <description xmi:id="generated_595">
+        <content>
+          <value content="Strategy S_028" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_024" reasoning="ARGR_026" source="CLM_125" target="CLM_124">
+      <name content="AI_024" />
+      <description xmi:id="generated_597">
+        <content>
+          <value content="AssertedInference AI_024" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_025" reasoning="ARGR_027" source="CLM_126 CLM_127" target="CLM_124">
+      <name content="AI_025" />
+      <description xmi:id="generated_598">
+        <content>
+          <value content="AssertedInference AI_025" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_026" reasoning="ARGR_028" source="CLM_128 CLM_129" target="CLM_124">
+      <name content="AI_026" />
+      <description xmi:id="generated_599">
+        <content>
+          <value content="AssertedInference AI_026" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="PKG_015">
+    <name content="PKG_015" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_130">
+      <name content="G_130" />
+      <description xmi:id="generated_601">
+        <content>
+          <value content="Claim G_130" />
+        </content>
+      </description>
+      <description xmi:id="generated_600">
+        <content>
+          <value content="Claim G_130" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_131">
+      <name content="G_131" />
+      <description xmi:id="generated_603">
+        <content>
+          <value content="Claim G_131" />
+        </content>
+      </description>
+      <description xmi:id="generated_602">
+        <content>
+          <value content="Claim G_131" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_132">
+      <name content="G_132" />
+      <description xmi:id="generated_605">
+        <content>
+          <value content="Claim G_132" />
+        </content>
+      </description>
+      <description xmi:id="generated_604">
+        <content>
+          <value content="Claim G_132" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CLM_133">
+      <name content="G_133" />
+      <description xmi:id="generated_607">
+        <content>
+          <value content="Claim G_133" />
+        </content>
+      </description>
+      <description xmi:id="generated_606">
+        <content>
+          <value content="Claim G_133" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="ARGR_029">
+      <name content="S_029" />
+      <description xmi:id="generated_609">
+        <content>
+          <value content="Strategy S_029" />
+        </content>
+      </description>
+      <description xmi:id="generated_608">
+        <content>
+          <value content="Strategy S_029" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_106" referencedArtifactElement="ART_054">
+      <name content="REF_106" />
+      <description xmi:id="generated_610">
+        <content>
+          <value content="Reference REF_106" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_107" referencedArtifactElement="ART_049">
+      <name content="REF_107" />
+      <description xmi:id="generated_611">
+        <content>
+          <value content="Reference REF_107" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_108" referencedArtifactElement="ART_055">
+      <name content="REF_108" />
+      <description xmi:id="generated_612">
+        <content>
+          <value content="Reference REF_108" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="REF_109" referencedArtifactElement="ART_056">
+      <name content="REF_109" />
+      <description xmi:id="generated_613">
+        <content>
+          <value content="Reference REF_109" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_027" reasoning="ARGR_029" source="CLM_131 CLM_132 CLM_133" target="CLM_130">
+      <name content="AI_027" />
+      <description xmi:id="generated_614">
+        <content>
+          <value content="AssertedInference AI_027" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_062" source="REF_106" target="CLM_131">
+      <name content="AE_062" />
+      <description xmi:id="generated_615">
+        <content>
+          <value content="AssertedEvidence AE_062" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_063" source="REF_107" target="CLM_132">
+      <name content="AE_063" />
+      <description xmi:id="generated_616">
+        <content>
+          <value content="AssertedEvidence AE_063" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_064" source="REF_108" target="CLM_133">
+      <name content="AE_064" />
+      <description xmi:id="generated_617">
+        <content>
+          <value content="AssertedEvidence AE_064" />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_037" source="REF_109" target="CLM_132">
+      <name content="AC_037" />
+      <description xmi:id="generated_618">
+        <content>
+          <value content="AssertedContext AC_037" />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <artifactPackage xmi:id="AP_001">
+    <name content="AP_001" />
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_001">
+      <name content="ART_001" />
+      <description xmi:id="generated_2">
+        <content>
+          <value content="Artifact ART_001" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_002">
+      <name content="ART_002" />
+      <description xmi:id="generated_3">
+        <content>
+          <value content="Artifact ART_002" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_003">
+      <name content="ART_003" />
+      <description xmi:id="generated_4">
+        <content>
+          <value content="Artifact ART_003" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_004">
+      <name content="ART_004" />
+      <description xmi:id="generated_5">
+        <content>
+          <value content="Artifact ART_004" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_005">
+      <name content="ART_005" />
+      <description xmi:id="generated_6">
+        <content>
+          <value content="Artifact ART_005" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_006">
+      <name content="ART_006" />
+      <description xmi:id="generated_7">
+        <content>
+          <value content="Artifact ART_006" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_007">
+      <name content="ART_007" />
+      <description xmi:id="generated_8">
+        <content>
+          <value content="Artifact ART_007" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_008">
+      <name content="ART_008" />
+      <description xmi:id="generated_9">
+        <content>
+          <value content="Artifact ART_008" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_009">
+      <name content="ART_009" />
+      <description xmi:id="generated_10">
+        <content>
+          <value content="Artifact ART_009" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_010">
+      <name content="ART_010" />
+      <description xmi:id="generated_11">
+        <content>
+          <value content="Artifact ART_010" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_011">
+      <name content="ART_011" />
+      <description xmi:id="generated_12">
+        <content>
+          <value content="Artifact ART_011" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_012">
+      <name content="ART_012" />
+      <description xmi:id="generated_13">
+        <content>
+          <value content="Artifact ART_012" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_013">
+      <name content="ART_013" />
+      <description xmi:id="generated_14">
+        <content>
+          <value content="Artifact ART_013" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_014">
+      <name content="ART_014" />
+      <description xmi:id="generated_15">
+        <content>
+          <value content="Artifact ART_014" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_015">
+      <name content="ART_015" />
+      <description xmi:id="generated_16">
+        <content>
+          <value content="Artifact ART_015" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_016">
+      <name content="ART_016" />
+      <description xmi:id="generated_17">
+        <content>
+          <value content="Artifact ART_016" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_017">
+      <name content="ART_017" />
+      <description xmi:id="generated_18">
+        <content>
+          <value content="Artifact ART_017" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_018">
+      <name content="ART_018" />
+      <description xmi:id="generated_19">
+        <content>
+          <value content="Artifact ART_018" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_019">
+      <name content="ART_019" />
+      <description xmi:id="generated_20">
+        <content>
+          <value content="Artifact ART_019" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_020">
+      <name content="ART_020" />
+      <description xmi:id="generated_21">
+        <content>
+          <value content="Artifact ART_020" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_021">
+      <name content="ART_021" />
+      <description xmi:id="generated_22">
+        <content>
+          <value content="Artifact ART_021" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_022">
+      <name content="ART_022" />
+      <description xmi:id="generated_23">
+        <content>
+          <value content="Artifact ART_022" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_023">
+      <name content="ART_023" />
+      <description xmi:id="generated_24">
+        <content>
+          <value content="Artifact ART_023" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_024">
+      <name content="ART_024" />
+      <description xmi:id="generated_25">
+        <content>
+          <value content="Artifact ART_024" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_025">
+      <name content="ART_025" />
+      <description xmi:id="generated_26">
+        <content>
+          <value content="Artifact ART_025" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_026">
+      <name content="ART_026" />
+      <description xmi:id="generated_27">
+        <content>
+          <value content="Artifact ART_026" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_027">
+      <name content="ART_027" />
+      <description xmi:id="generated_28">
+        <content>
+          <value content="Artifact ART_027" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_028">
+      <name content="ART_028" />
+      <description xmi:id="generated_29">
+        <content>
+          <value content="Artifact ART_028" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_029">
+      <name content="ART_029" />
+      <description xmi:id="generated_30">
+        <content>
+          <value content="Artifact ART_029" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_030">
+      <name content="ART_030" />
+      <description xmi:id="generated_31">
+        <content>
+          <value content="Artifact ART_030" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_031">
+      <name content="ART_031" />
+      <description xmi:id="generated_32">
+        <content>
+          <value content="Artifact ART_031" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_032">
+      <name content="ART_032" />
+      <description xmi:id="generated_33">
+        <content>
+          <value content="Artifact ART_032" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_033">
+      <name content="ART_033" />
+      <description xmi:id="generated_34">
+        <content>
+          <value content="Artifact ART_033" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_034">
+      <name content="ART_034" />
+      <description xmi:id="generated_35">
+        <content>
+          <value content="Artifact ART_034" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_035">
+      <name content="ART_035" />
+      <description xmi:id="generated_36">
+        <content>
+          <value content="Artifact ART_035" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_036">
+      <name content="ART_036" />
+      <description xmi:id="generated_37">
+        <content>
+          <value content="Artifact ART_036" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_037">
+      <name content="ART_037" />
+      <description xmi:id="generated_38">
+        <content>
+          <value content="Artifact ART_037" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_038">
+      <name content="ART_038" />
+      <description xmi:id="generated_39">
+        <content>
+          <value content="Artifact ART_038" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_039">
+      <name content="ART_039" />
+      <description xmi:id="generated_40">
+        <content>
+          <value content="Artifact ART_039" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_040">
+      <name content="ART_040" />
+      <description xmi:id="generated_41">
+        <content>
+          <value content="Artifact ART_040" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_041">
+      <name content="ART_041" />
+      <description xmi:id="generated_42">
+        <content>
+          <value content="Artifact ART_041" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_042">
+      <name content="ART_042" />
+      <description xmi:id="generated_43">
+        <content>
+          <value content="Artifact ART_042" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_043">
+      <name content="ART_043" />
+      <description xmi:id="generated_44">
+        <content>
+          <value content="Artifact ART_043" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_044">
+      <name content="ART_044" />
+      <description xmi:id="generated_45">
+        <content>
+          <value content="Artifact ART_044" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_045">
+      <name content="ART_045" />
+      <description xmi:id="generated_46">
+        <content>
+          <value content="Artifact ART_045" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_046">
+      <name content="ART_046" />
+      <description xmi:id="generated_47">
+        <content>
+          <value content="Artifact ART_046" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_047">
+      <name content="ART_047" />
+      <description xmi:id="generated_48">
+        <content>
+          <value content="Artifact ART_047" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_048">
+      <name content="ART_048" />
+      <description xmi:id="generated_49">
+        <content>
+          <value content="Artifact ART_048" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_049">
+      <name content="ART_049" />
+      <description xmi:id="generated_50">
+        <content>
+          <value content="Artifact ART_049" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_050">
+      <name content="ART_050" />
+      <description xmi:id="generated_51">
+        <content>
+          <value content="Artifact ART_050" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_051">
+      <name content="ART_051" />
+      <description xmi:id="generated_52">
+        <content>
+          <value content="Artifact ART_051" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_052">
+      <name content="ART_052" />
+      <description xmi:id="generated_53">
+        <content>
+          <value content="Artifact ART_052" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_053">
+      <name content="ART_053" />
+      <description xmi:id="generated_54">
+        <content>
+          <value content="Artifact ART_053" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_054">
+      <name content="ART_054" />
+      <description xmi:id="generated_55">
+        <content>
+          <value content="Artifact ART_054" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_055">
+      <name content="ART_055" />
+      <description xmi:id="generated_56">
+        <content>
+          <value content="Artifact ART_055" />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_056">
+      <name content="ART_056" />
+      <description xmi:id="generated_57">
+        <content>
+          <value content="Artifact ART_056" />
+        </content>
+      </description>
+    </artifactElement>
+  </artifactPackage>
+</sacm:AssuranceCasePackage>

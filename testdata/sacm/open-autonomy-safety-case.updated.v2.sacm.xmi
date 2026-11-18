@@ -1,0 +1,1850 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="OASC">
+  <name content="Open Autonomy Safety Case" />
+  <description xmi:id="generated_1">
+    <content>
+      <value content="Reusable base safety case for autonomy-enabled system deployment based on Positive Trust Balance." />
+    </content>
+  </description>
+  <argumentPackage xmi:id="ARG_Main">
+    <name content="Open Autonomy Safety Case - Main Argument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1">
+      <name content="Goal 1" />
+      <description xmi:id="generated_30">
+        <content>
+          <value content="The Autonomous System is acceptably safe for its Intended Deployment." />
+        </content>
+      </description>
+      <description xmi:id="generated_29">
+        <content>
+          <value content="Top-level safety claim for deployment of the Autonomous System." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3">
+      <name content="Goal 3" />
+      <description xmi:id="generated_32">
+        <content>
+          <value content="The Organization demonstrates Organizational Trustworthiness." />
+        </content>
+      </description>
+      <description xmi:id="generated_31">
+        <content>
+          <value content="Organizational trustworthiness claim for the Autonomous System lifecycle." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G4">
+      <name content="Goal 4" />
+      <description xmi:id="generated_34">
+        <content>
+          <value content="The Autonomous System is acceptably safe within the Operational Design Domain (ODD)." />
+        </content>
+      </description>
+      <description xmi:id="generated_33">
+        <content>
+          <value content="Autonomous System safety claim for the defined Operational Design Domain (ODD)." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G5">
+      <name content="Goal 5" />
+      <description xmi:id="generated_36">
+        <content>
+          <value content="Operations of the Autonomous System are acceptably safe within the Operational Design Domain (ODD)." />
+        </content>
+      </description>
+      <description xmi:id="generated_35">
+        <content>
+          <value content="Operational Safety claim for the defined Operations and Operational Design Domain (ODD)." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S2">
+      <name content="Strategy 2" />
+      <description xmi:id="generated_38">
+        <content>
+          <value content="Appeal to Positive Trust Balance across Organizational Trustworthiness, Autonomous System safety, and Operational Safety." />
+        </content>
+      </description>
+      <description xmi:id="generated_37">
+        <content>
+          <value content="Top-level strategy based on Positive Trust Balance across organization, system, and operations." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_VehicleOps" referencedArtifactElement="ART_VehicleDescription">
+      <name content="System and Deployment Context" />
+      <description xmi:id="generated_39">
+        <content>
+          <value content="Description of the Autonomous System, Deployment Context, Operational Design Domain (ODD), Operations, and Stakeholder Requirements." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_ScopeProfile" referencedArtifactElement="ART_AssuranceScopeProfile">
+      <name content="Assurance Scope Context" />
+      <description xmi:id="generated_40">
+        <content>
+          <value content="Selected standards, frameworks, regulatory regimes, and ethical principles for instantiating this base Safety Case." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_TopLevel" reasoning="S2" source="G3 G4 G5" target="G1">
+      <name content="Top-Level Inference" />
+      <description xmi:id="generated_41">
+        <content>
+          <value content="The top-level claim is supported by Organizational Trustworthiness, Autonomous System safety, and Operational Safety through Positive Trust Balance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_TopLevel" source="CTX_VehicleOps" target="S2">
+      <name content="Top-Level Context" />
+      <description xmi:id="generated_42">
+        <content>
+          <value content="System and Deployment Context informs the Positive Trust Balance strategy." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_ScopeProfile" source="CTX_ScopeProfile" target="S2">
+      <name content="Assurance Scope Context Link" />
+      <description xmi:id="generated_43">
+        <content>
+          <value content="Assurance Scope and Framework Profile informs the Positive Trust Balance strategy and selected instantiation choices." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ARG_OrgTrust">
+    <name content="Organization Trustworthiness" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G8">
+      <name content="Goal 8" />
+      <description xmi:id="generated_45">
+        <content>
+          <value content="Results of Independent Safety Assessment are regularly shared with Stakeholders." />
+        </content>
+      </description>
+      <description xmi:id="generated_44">
+        <content>
+          <value content="Transparency through sharing results of Independent Safety Assessment." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G9">
+      <name content="Goal 9" />
+      <description xmi:id="generated_47">
+        <content>
+          <value content="Assessor Independence is sufficient for the Assurance Objectives." />
+        </content>
+      </description>
+      <description xmi:id="generated_46">
+        <content>
+          <value content="Independent assessor qualification and independence are justified for the Assurance Objectives." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G10">
+      <name content="Goal 10" />
+      <description xmi:id="generated_49">
+        <content>
+          <value content="Safety Management System (SMS) policies are aligned with Stakeholder Requirements and the Deployment Context." />
+        </content>
+      </description>
+      <description xmi:id="generated_48">
+        <content>
+          <value content="Safety Management System (SMS) policies align with Stakeholder Requirements and the Deployment Context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G11">
+      <name content="Goal 11" />
+      <description xmi:id="generated_51">
+        <content>
+          <value content="Safety Management System (SMS) processes are defined, deployed, and used." />
+        </content>
+      </description>
+      <description xmi:id="generated_50">
+        <content>
+          <value content="Safety Management System (SMS) processes are actively implemented." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G12">
+      <name content="Goal 12" />
+      <description xmi:id="generated_53">
+        <content>
+          <value content="The Safety Case is monitored and improved as part of Continuous Improvement." />
+        </content>
+      </description>
+      <description xmi:id="generated_52">
+        <content>
+          <value content="Continuous monitoring and improvement of the Safety Case." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G21">
+      <name content="Goal 21" />
+      <description xmi:id="generated_55">
+        <content>
+          <value content="Safety-Related Claims (SRCs) are reviewed and approved through Safety Governance." />
+        </content>
+      </description>
+      <description xmi:id="generated_54">
+        <content>
+          <value content="Safety-Related Claims (SRCs) are approved through a defined governance body or equivalent process." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G22">
+      <name content="Goal 22" />
+      <description xmi:id="generated_57">
+        <content>
+          <value content="Safety-Related Claims (SRCs) satisfy Applicable Laws and Regulations for the Deployment Context." />
+        </content>
+      </description>
+      <description xmi:id="generated_56">
+        <content>
+          <value content="Safety-Related Claims (SRCs) satisfy deployment-specific laws, regulations, and approval conditions." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G23">
+      <name content="Goal 23" />
+      <description xmi:id="generated_59">
+        <content>
+          <value content="Safety-Related Claims (SRCs) are aligned with Applicable Ethical Principles for the Deployment Context." />
+        </content>
+      </description>
+      <description xmi:id="generated_58">
+        <content>
+          <value content="Safety-Related Claims (SRCs) are aligned with applicable ethical principles and organization-adopted ethical commitments." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G24">
+      <name content="Goal 24" />
+      <description xmi:id="generated_61">
+        <content>
+          <value content="The Safety Management System (SMS) conforms with the Selected Safety Management Framework." />
+        </content>
+      </description>
+      <description xmi:id="generated_60">
+        <content>
+          <value content="Safety Management System (SMS) conformance to a selected management framework appropriate to the Deployment Context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G25">
+      <name content="Goal 25" />
+      <description xmi:id="generated_63">
+        <content>
+          <value content="The Safety Case is continually improved in conformance with UL 4600." />
+        </content>
+      </description>
+      <description xmi:id="generated_62">
+        <content>
+          <value content="Continuous improvement aligned with UL 4600." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G26">
+      <name content="Goal 26" />
+      <description xmi:id="generated_65">
+        <content>
+          <value content="The Organization conforms with the Selected Quality Management Framework." />
+        </content>
+      </description>
+      <description xmi:id="generated_64">
+        <content>
+          <value content="Organizational quality management framework conformance. Example instantiation: IATF 16949." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S6">
+      <name content="Strategy 6" />
+      <description xmi:id="generated_67">
+        <content>
+          <value content="Appeal to Transparency and Independent Safety Assessment." />
+        </content>
+      </description>
+      <description xmi:id="generated_66">
+        <content>
+          <value content="Argument that Transparency through Independent Safety Assessment builds trust." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S7">
+      <name content="Strategy 7" />
+      <description xmi:id="generated_69">
+        <content>
+          <value content="Appeal to systematic Safety Management System (SMS) implementation." />
+        </content>
+      </description>
+      <description xmi:id="generated_68">
+        <content>
+          <value content="Argument that disciplined Safety Management System (SMS) implementation supports trustworthiness." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_15" referencedArtifactElement="ART_SafetyAdvisoryBoard">
+      <name content="Governance Context" />
+      <description xmi:id="generated_70">
+        <content>
+          <value content="Defined Safety Governance body or equivalent process responsible for review and approval of Safety-Related Claims (SRCs)." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S15">
+      <name content="Strategy 15" />
+      <description xmi:id="generated_72">
+        <content>
+          <value content="Appeal to Safety Governance." />
+        </content>
+      </description>
+      <description xmi:id="generated_71">
+        <content>
+          <value content="Argument based on defined Safety Governance for review and approval of Safety-Related Claims (SRCs)." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S16">
+      <name content="Strategy 16" />
+      <description xmi:id="generated_74">
+        <content>
+          <value content="Appeal to Applicable Laws and Regulations." />
+        </content>
+      </description>
+      <description xmi:id="generated_73">
+        <content>
+          <value content="Argument based on compliance with Applicable Laws and Regulations." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S17">
+      <name content="Strategy 17" />
+      <description xmi:id="generated_76">
+        <content>
+          <value content="Appeal to Applicable Ethical Principles." />
+        </content>
+      </description>
+      <description xmi:id="generated_75">
+        <content>
+          <value content="Argument based on applicable ethical principles for the Deployment Context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S18">
+      <name content="Strategy 18" />
+      <description xmi:id="generated_78">
+        <content>
+          <value content="Appeal to the Selected Safety Management Framework." />
+        </content>
+      </description>
+      <description xmi:id="generated_77">
+        <content>
+          <value content="Argument based on a selected safety management framework appropriate to the Deployment Context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S19">
+      <name content="Strategy 19" />
+      <description xmi:id="generated_80">
+        <content>
+          <value content="Appeal to UL 4600." />
+        </content>
+      </description>
+      <description xmi:id="generated_79">
+        <content>
+          <value content="Argument based on UL 4600." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S20">
+      <name content="Strategy 20" />
+      <description xmi:id="generated_82">
+        <content>
+          <value content="Appeal to the Selected Quality Management Framework." />
+        </content>
+      </description>
+      <description xmi:id="generated_81">
+        <content>
+          <value content="Argument based on a selected quality management framework. Example instantiation: IATF 16949." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_13" referencedArtifactElement="ART_Assessment_13">
+      <name content="Evidence 13" />
+      <description xmi:id="generated_83">
+        <content>
+          <value content="Results of Independent Safety Assessment for Transparency." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_14" referencedArtifactElement="ART_Assessment_14">
+      <name content="Evidence 14" />
+      <description xmi:id="generated_84">
+        <content>
+          <value content="Results of Independent Safety Assessment for Assessor Independence." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_27" referencedArtifactElement="ART_Assessment_27">
+      <name content="Evidence 27" />
+      <description xmi:id="generated_85">
+        <content>
+          <value content="Results of Independent Safety Assessment for Safety Governance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_28" referencedArtifactElement="ART_Assessment_28">
+      <name content="Evidence 28" />
+      <description xmi:id="generated_86">
+        <content>
+          <value content="Results of Independent Safety Assessment for Applicable Laws and Regulations." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_29" referencedArtifactElement="ART_Assessment_29">
+      <name content="Evidence 29" />
+      <description xmi:id="generated_87">
+        <content>
+          <value content="Results of Independent Safety Assessment for Applicable Ethical Principles." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_30" referencedArtifactElement="ART_Assessment_30">
+      <name content="Evidence 30" />
+      <description xmi:id="generated_88">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Safety Management Framework." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_31" referencedArtifactElement="ART_Assessment_31">
+      <name content="Evidence 31" />
+      <description xmi:id="generated_89">
+        <content>
+          <value content="Results of Independent Safety Assessment for UL 4600 Continuous Improvement." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_32" referencedArtifactElement="ART_Assessment_32">
+      <name content="Evidence 32" />
+      <description xmi:id="generated_90">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Quality Management Framework." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_OrgTrust_Transparency" reasoning="S6" source="G8 G9" target="G3">
+      <name content="Transparency Inference" />
+      <description xmi:id="generated_91">
+        <content>
+          <value content="Transparency and Assessor Independence support Organizational Trustworthiness." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_OrgTrust_SMS" reasoning="S7" source="G10 G11 G12" target="G3">
+      <name content="SMS Inference" />
+      <description xmi:id="generated_92">
+        <content>
+          <value content="Safety Management System (SMS) policies, processes, and Continuous Improvement support Organizational Trustworthiness." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G21_G10" reasoning="S15" source="G21" target="G10">
+      <name content="Advisory Board Approval Inference" />
+      <description xmi:id="generated_93">
+        <content>
+          <value content="Safety Governance supports alignment of Safety Management System (SMS) policies." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_G21_CTX15" source="CTX_15" target="S15">
+      <name content="Advisory Board Context" />
+      <description xmi:id="generated_94">
+        <content>
+          <value content="Governance Context informs the Safety Governance strategy." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G22_G10" reasoning="S16" source="G22" target="G10">
+      <name content="Regulatory Compliance Inference" />
+      <description xmi:id="generated_95">
+        <content>
+          <value content="Applicable Laws and Regulations support alignment of Safety Management System (SMS) policies." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G23_G10" reasoning="S17" source="G23" target="G10">
+      <name content="Ethical Principles Inference" />
+      <description xmi:id="generated_96">
+        <content>
+          <value content="Applicable Ethical Principles support alignment of Safety Management System (SMS) policies." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G24_G11" reasoning="S18" source="G24" target="G11">
+      <name content="Safety Management Framework Inference" />
+      <description xmi:id="generated_97">
+        <content>
+          <value content="The Selected Safety Management Framework supports Safety Management System (SMS) processes." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G25_G12" reasoning="S19" source="G25" target="G12">
+      <name content="UL 4600 Improvement Inference" />
+      <description xmi:id="generated_98">
+        <content>
+          <value content="UL 4600 supports Continuous Improvement of the Safety Case." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G26_G12" reasoning="S20" source="G26" target="G12">
+      <name content="IATF 16949 Inference" />
+      <description xmi:id="generated_99">
+        <content>
+          <value content="The Selected Quality Management Framework supports Continuous Improvement of the Safety Case." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G8_EV13" source="EV_13" target="G8">
+      <name content="Transparency Evidence" />
+      <description xmi:id="generated_100">
+        <content>
+          <value content="Independent Safety Assessment results support the Transparency claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G9_EV14" source="EV_14" target="G9">
+      <name content="Assessor Independence Evidence" />
+      <description xmi:id="generated_101">
+        <content>
+          <value content="Independent Safety Assessment results support the Assessor Independence claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G21_EV27" source="EV_27" target="G21">
+      <name content="Advisory Board Approval Evidence" />
+      <description xmi:id="generated_102">
+        <content>
+          <value content="Independent Safety Assessment results support the Safety Governance claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G22_EV28" source="EV_28" target="G22">
+      <name content="Regulatory Compliance Evidence" />
+      <description xmi:id="generated_103">
+        <content>
+          <value content="Independent Safety Assessment results support the Applicable Laws and Regulations claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G23_EV29" source="EV_29" target="G23">
+      <name content="Ethical Principles Evidence" />
+      <description xmi:id="generated_104">
+        <content>
+          <value content="Independent Safety Assessment results support the Applicable Ethical Principles claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G24_EV30" source="EV_30" target="G24">
+      <name content="Safety Management Framework Evidence" />
+      <description xmi:id="generated_105">
+        <content>
+          <value content="Independent Safety Assessment results support the Selected Safety Management Framework claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G25_EV31" source="EV_31" target="G25">
+      <name content="UL 4600 Improvement Evidence" />
+      <description xmi:id="generated_106">
+        <content>
+          <value content="Independent Safety Assessment results support the UL 4600 Continuous Improvement claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G26_EV32" source="EV_32" target="G26">
+      <name content="IATF 16949 Evidence" />
+      <description xmi:id="generated_107">
+        <content>
+          <value content="Independent Safety Assessment results support the Selected Quality Management Framework claim." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ARG_VehicleSafety">
+    <name content="Autonomous System Safety" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G37">
+      <name content="Goal 37" />
+      <description xmi:id="generated_109">
+        <content>
+          <value content="Hazard Analysis covers all reasonably foreseeable hazards posed by the Autonomous System." />
+        </content>
+      </description>
+      <description xmi:id="generated_108">
+        <content>
+          <value content="Coverage of reasonably foreseeable hazards by Hazard Analysis." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G38">
+      <name content="Goal 38" />
+      <description xmi:id="generated_111">
+        <content>
+          <value content="The Autonomous System conforms with Applicable Regulatory and Approval Requirements." />
+        </content>
+      </description>
+      <description xmi:id="generated_110">
+        <content>
+          <value content="Conformance with applicable regulatory and approval requirements for the Deployment Context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G39">
+      <name content="Goal 39" />
+      <description xmi:id="generated_113">
+        <content>
+          <value content="The Autonomous System satisfies Functional Safety requirements." />
+        </content>
+      </description>
+      <description xmi:id="generated_112">
+        <content>
+          <value content="Functional Safety requirements are satisfied. Example instantiation: ISO 26262." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G40">
+      <name content="Goal 40" />
+      <description xmi:id="generated_115">
+        <content>
+          <value content="The Autonomous System is developed with appropriate AI / Autonomy Engineering Rigor." />
+        </content>
+      </description>
+      <description xmi:id="generated_114">
+        <content>
+          <value content="AI / Autonomy Engineering Rigor is justified. Example instantiation: ISO/PAS 8800." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G41">
+      <name content="Goal 41" />
+      <description xmi:id="generated_117">
+        <content>
+          <value content="The Safety of the Intended Functionality (SOTIF) of the Autonomous System is acceptable." />
+        </content>
+      </description>
+      <description xmi:id="generated_116">
+        <content>
+          <value content="Safety of the Intended Functionality (SOTIF) is justified. Example instantiation: ISO 21448." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G42">
+      <name content="Goal 42" />
+      <description xmi:id="generated_119">
+        <content>
+          <value content="The Autonomous System conforms with applicable Cybersecurity requirements." />
+        </content>
+      </description>
+      <description xmi:id="generated_118">
+        <content>
+          <value content="Conformance with applicable Cybersecurity requirements. Example instantiation: ISO 21434." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G43">
+      <name content="Goal 43" />
+      <description xmi:id="generated_121">
+        <content>
+          <value content="Configuration Management is applied to safety-relevant items and changes." />
+        </content>
+      </description>
+      <description xmi:id="generated_120">
+        <content>
+          <value content="Configuration Management practices are applied to safety-relevant items and changes." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G44">
+      <name content="Goal 44" />
+      <description xmi:id="generated_123">
+        <content>
+          <value content="Data Recording supports safety monitoring, incident investigation, and learning." />
+        </content>
+      </description>
+      <description xmi:id="generated_122">
+        <content>
+          <value content="Data Recording supports safety monitoring, incident investigation, and learning." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G53">
+      <name content="Goal 53" />
+      <description xmi:id="generated_125">
+        <content>
+          <value content="A Hazard Analysis has been completed using the Selected Hazard Analysis Method." />
+        </content>
+      </description>
+      <description xmi:id="generated_124">
+        <content>
+          <value content="Hazard Analysis performed using a selected method. Example instantiation: SAE J3307 / STPA." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G54">
+      <name content="Goal 54" />
+      <description xmi:id="generated_127">
+        <content>
+          <value content="Applicable Regulatory and Approval Requirements are satisfied." />
+        </content>
+      </description>
+      <description xmi:id="generated_126">
+        <content>
+          <value content="Applicable regulatory and approval requirements are satisfied." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G55">
+      <name content="Goal 55" />
+      <description xmi:id="generated_129">
+        <content>
+          <value content="The Autonomous System is developed according to ISO 26262 or an equivalent justified Functional Safety process." />
+        </content>
+      </description>
+      <description xmi:id="generated_128">
+        <content>
+          <value content="Development aligned with ISO 26262 or an equivalent justified Functional Safety process." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G56">
+      <name content="Goal 56" />
+      <description xmi:id="generated_131">
+        <content>
+          <value content="The Autonomous System is developed according to ISO/PAS 8800 or an equivalent justified AI / Autonomy Safety process." />
+        </content>
+      </description>
+      <description xmi:id="generated_130">
+        <content>
+          <value content="Development aligned with ISO/PAS 8800 or an equivalent justified AI / Autonomy Safety process." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G57">
+      <name content="Goal 57" />
+      <description xmi:id="generated_133">
+        <content>
+          <value content="The Autonomous System is developed according to ISO 21448 or an equivalent justified intended functionality safety process." />
+        </content>
+      </description>
+      <description xmi:id="generated_132">
+        <content>
+          <value content="Development aligned with ISO 21448 or an equivalent justified intended functionality safety process." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G58">
+      <name content="Goal 58" />
+      <description xmi:id="generated_135">
+        <content>
+          <value content="The Autonomous System is developed according to the Selected Cybersecurity Standard or an equivalent justified process." />
+        </content>
+      </description>
+      <description xmi:id="generated_134">
+        <content>
+          <value content="Development aligned with a selected Cybersecurity standard. Example instantiation: ISO 21434." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G59">
+      <name content="Goal 59" />
+      <description xmi:id="generated_137">
+        <content>
+          <value content="Configuration Management is performed according to the Selected Configuration Management Standard or an equivalent justified process." />
+        </content>
+      </description>
+      <description xmi:id="generated_136">
+        <content>
+          <value content="Configuration Management aligned with a selected standard. Example instantiation: ISO 10007." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G60">
+      <name content="Goal 60" />
+      <description xmi:id="generated_139">
+        <content>
+          <value content="Data Recording for the Autonomous System and Operations conforms with the Selected Data Recording Guidance." />
+        </content>
+      </description>
+      <description xmi:id="generated_138">
+        <content>
+          <value content="Data Recording aligned with selected guidance. Example instantiation: SAE AVSC 00004." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S33">
+      <name content="Strategy 33" />
+      <description xmi:id="generated_141">
+        <content>
+          <value content="Appeal to Hazard Analysis." />
+        </content>
+      </description>
+      <description xmi:id="generated_140">
+        <content>
+          <value content="Argument based on Hazard Analysis methods." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S34">
+      <name content="Strategy 34" />
+      <description xmi:id="generated_143">
+        <content>
+          <value content="Appeal to risk reduction through Applicable Regulatory and Approval Requirements, Functional Safety, AI / Autonomy Engineering Rigor, Safety of the Intended Functionality (SOTIF), and Cybersecurity." />
+        </content>
+      </description>
+      <description xmi:id="generated_142">
+        <content>
+          <value content="Argument based on risk reduction through standards, requirements, and justified engineering rigor." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S35">
+      <name content="Strategy 35" />
+      <description xmi:id="generated_145">
+        <content>
+          <value content="Appeal to Configuration Management." />
+        </content>
+      </description>
+      <description xmi:id="generated_144">
+        <content>
+          <value content="Argument based on Configuration Management." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S36">
+      <name content="Strategy 36" />
+      <description xmi:id="generated_147">
+        <content>
+          <value content="Appeal to Data Recording and forensic readiness." />
+        </content>
+      </description>
+      <description xmi:id="generated_146">
+        <content>
+          <value content="Argument based on Data Recording for incident investigation and learning." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S45">
+      <name content="Strategy 45" />
+      <description xmi:id="generated_149">
+        <content>
+          <value content="Appeal to the Selected Hazard Analysis Method." />
+        </content>
+      </description>
+      <description xmi:id="generated_148">
+        <content>
+          <value content="Argument based on the selected Hazard Analysis method. Example instantiation: SAE J3307 / STPA." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S46">
+      <name content="Strategy 46" />
+      <description xmi:id="generated_151">
+        <content>
+          <value content="Appeal to Applicable Regulatory and Approval Requirements." />
+        </content>
+      </description>
+      <description xmi:id="generated_150">
+        <content>
+          <value content="Argument based on applicable regulatory and approval requirements for the Deployment Context." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S47">
+      <name content="Strategy 47" />
+      <description xmi:id="generated_153">
+        <content>
+          <value content="Appeal to ISO 26262." />
+        </content>
+      </description>
+      <description xmi:id="generated_152">
+        <content>
+          <value content="Argument based on ISO 26262." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S48">
+      <name content="Strategy 48" />
+      <description xmi:id="generated_155">
+        <content>
+          <value content="Appeal to ISO/PAS 8800." />
+        </content>
+      </description>
+      <description xmi:id="generated_154">
+        <content>
+          <value content="Argument based on ISO/PAS 8800." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S49">
+      <name content="Strategy 49" />
+      <description xmi:id="generated_157">
+        <content>
+          <value content="Appeal to ISO 21448." />
+        </content>
+      </description>
+      <description xmi:id="generated_156">
+        <content>
+          <value content="Argument based on ISO 21448." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S50">
+      <name content="Strategy 50" />
+      <description xmi:id="generated_159">
+        <content>
+          <value content="Appeal to the Selected Cybersecurity Standard." />
+        </content>
+      </description>
+      <description xmi:id="generated_158">
+        <content>
+          <value content="Argument based on the selected Cybersecurity standard. Example instantiation: ISO 21434." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S51">
+      <name content="Strategy 51" />
+      <description xmi:id="generated_161">
+        <content>
+          <value content="Appeal to the Selected Configuration Management Standard." />
+        </content>
+      </description>
+      <description xmi:id="generated_160">
+        <content>
+          <value content="Argument based on the selected Configuration Management standard. Example instantiation: ISO 10007." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S52">
+      <name content="Strategy 52" />
+      <description xmi:id="generated_163">
+        <content>
+          <value content="Appeal to the Selected Data Recording Guidance." />
+        </content>
+      </description>
+      <description xmi:id="generated_162">
+        <content>
+          <value content="Argument based on the selected Data Recording guidance. Example instantiation: SAE AVSC 00004." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_61" referencedArtifactElement="ART_Assessment_61">
+      <name content="Evidence 61" />
+      <description xmi:id="generated_164">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Hazard Analysis Method." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_62" referencedArtifactElement="ART_Assessment_62">
+      <name content="Evidence 62" />
+      <description xmi:id="generated_165">
+        <content>
+          <value content="Results of Independent Safety Assessment for Applicable Regulatory and Approval Requirements." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_63" referencedArtifactElement="ART_Assessment_63">
+      <name content="Evidence 63" />
+      <description xmi:id="generated_166">
+        <content>
+          <value content="Results of Independent Safety Assessment for ISO 26262 conformance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_64" referencedArtifactElement="ART_Assessment_64">
+      <name content="Evidence 64" />
+      <description xmi:id="generated_167">
+        <content>
+          <value content="Results of Independent Safety Assessment for ISO/PAS 8800 conformance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_65" referencedArtifactElement="ART_Assessment_65">
+      <name content="Evidence 65" />
+      <description xmi:id="generated_168">
+        <content>
+          <value content="Results of Independent Safety Assessment for ISO 21448 conformance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_66" referencedArtifactElement="ART_Assessment_66">
+      <name content="Evidence 66" />
+      <description xmi:id="generated_169">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Cybersecurity Standard." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_67" referencedArtifactElement="ART_Assessment_67">
+      <name content="Evidence 67" />
+      <description xmi:id="generated_170">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Configuration Management Standard." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_68" referencedArtifactElement="ART_Assessment_68">
+      <name content="Evidence 68" />
+      <description xmi:id="generated_171">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Data Recording Guidance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G37_G4" reasoning="S33" source="G37" target="G4">
+      <name content="Hazard Analysis Inference" />
+      <description xmi:id="generated_172">
+        <content>
+          <value content="Hazard Analysis supports Autonomous System safety." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_RiskMitigation_G4" reasoning="S34" source="G38 G39 G40 G41 G42" target="G4">
+      <name content="Risk Mitigation Inference" />
+      <description xmi:id="generated_173">
+        <content>
+          <value content="Requirements conformance and justified engineering rigor support Autonomous System safety through risk reduction." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G43_G4" reasoning="S35" source="G43" target="G4">
+      <name content="Configuration Management Inference" />
+      <description xmi:id="generated_174">
+        <content>
+          <value content="Configuration Management supports Autonomous System safety." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G44_G4" reasoning="S36" source="G44" target="G4">
+      <name content="Data Recording Inference" />
+      <description xmi:id="generated_175">
+        <content>
+          <value content="Data Recording supports Autonomous System safety through monitoring and learning." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G53_G37" reasoning="S45" source="G53" target="G37">
+      <name content="STPA Inference" />
+      <description xmi:id="generated_176">
+        <content>
+          <value content="The Selected Hazard Analysis Method supports the Hazard Analysis claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G54_G38" reasoning="S46" source="G54" target="G38">
+      <name content="Regulatory Requirements Inference" />
+      <description xmi:id="generated_177">
+        <content>
+          <value content="Applicable Regulatory and Approval Requirements support the corresponding claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G55_G39" reasoning="S47" source="G55" target="G39">
+      <name content="ISO 26262 Inference" />
+      <description xmi:id="generated_178">
+        <content>
+          <value content="ISO 26262 supports the Functional Safety claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G56_G40" reasoning="S48" source="G56" target="G40">
+      <name content="ISO/PAS 8800 Inference" />
+      <description xmi:id="generated_179">
+        <content>
+          <value content="ISO/PAS 8800 supports the AI / Autonomy Engineering Rigor claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G57_G41" reasoning="S49" source="G57" target="G41">
+      <name content="ISO 21448 Inference" />
+      <description xmi:id="generated_180">
+        <content>
+          <value content="ISO 21448 supports the SOTIF claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G58_G42" reasoning="S50" source="G58" target="G42">
+      <name content="ISO 21434 Inference" />
+      <description xmi:id="generated_181">
+        <content>
+          <value content="The Selected Cybersecurity Standard supports the Cybersecurity claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G59_G43" reasoning="S51" source="G59" target="G43">
+      <name content="ISO 10007 Inference" />
+      <description xmi:id="generated_182">
+        <content>
+          <value content="The Selected Configuration Management Standard supports the Configuration Management claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G60_G44" reasoning="S52" source="G60" target="G44">
+      <name content="SAE AVSC 00004 Inference" />
+      <description xmi:id="generated_183">
+        <content>
+          <value content="The Selected Data Recording Guidance supports the Data Recording claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G53_EV61" source="EV_61" target="G53">
+      <name content="STPA Evidence" />
+      <description xmi:id="generated_184">
+        <content>
+          <value content="Independent Safety Assessment results support the Selected Hazard Analysis Method claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G54_EV62" source="EV_62" target="G54">
+      <name content="Regulatory Requirements Evidence" />
+      <description xmi:id="generated_185">
+        <content>
+          <value content="Independent Safety Assessment results support the Applicable Regulatory and Approval Requirements claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G55_EV63" source="EV_63" target="G55">
+      <name content="ISO 26262 Evidence" />
+      <description xmi:id="generated_186">
+        <content>
+          <value content="Independent Safety Assessment results support the ISO 26262 claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G56_EV64" source="EV_64" target="G56">
+      <name content="ISO/PAS 8800 Evidence" />
+      <description xmi:id="generated_187">
+        <content>
+          <value content="Independent Safety Assessment results support the ISO/PAS 8800 claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G57_EV65" source="EV_65" target="G57">
+      <name content="ISO 21448 Evidence" />
+      <description xmi:id="generated_188">
+        <content>
+          <value content="Independent Safety Assessment results support the ISO 21448 claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G58_EV66" source="EV_66" target="G58">
+      <name content="ISO 21434 Evidence" />
+      <description xmi:id="generated_189">
+        <content>
+          <value content="Independent Safety Assessment results support the Selected Cybersecurity Standard claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G59_EV67" source="EV_67" target="G59">
+      <name content="ISO 10007 Evidence" />
+      <description xmi:id="generated_190">
+        <content>
+          <value content="Independent Safety Assessment results support the Selected Configuration Management Standard claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G60_EV68" source="EV_68" target="G60">
+      <name content="SAE AVSC 00004 Evidence" />
+      <description xmi:id="generated_191">
+        <content>
+          <value content="Independent Safety Assessment results support the Selected Data Recording Guidance claim." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="ARG_OpSafety">
+    <name content="Operational Safety" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G72">
+      <name content="Goal 72" />
+      <description xmi:id="generated_193">
+        <content>
+          <value content="Operations support safe management of Trip Interruptions." />
+        </content>
+      </description>
+      <description xmi:id="generated_192">
+        <content>
+          <value content="Trip interruption management. Example instantiation: SAE AVSC 00003." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G73">
+      <name content="Goal 73" />
+      <description xmi:id="generated_195">
+        <content>
+          <value content="Operations support safe Post-Incident Response." />
+        </content>
+      </description>
+      <description xmi:id="generated_194">
+        <content>
+          <value content="Post-incident response. Example instantiation: SAE AVSC-I-05 post-crash operations." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G74">
+      <name content="Goal 74" />
+      <description xmi:id="generated_197">
+        <content>
+          <value content="Remote Operations are defined and controlled." />
+        </content>
+      </description>
+      <description xmi:id="generated_196">
+        <content>
+          <value content="Remote Operations guidance. Example instantiation: SAE AVSC-I-04." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G75">
+      <name content="Goal 75" />
+      <description xmi:id="generated_199">
+        <content>
+          <value content="First Responder Interaction procedures are defined and communicated." />
+        </content>
+      </description>
+      <description xmi:id="generated_198">
+        <content>
+          <value content="First Responder Interaction procedures. Example instantiation: SAE AVSC-I-01." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G76">
+      <name content="Goal 76" />
+      <description xmi:id="generated_201">
+        <content>
+          <value content="Safety Inspections are defined and performed." />
+        </content>
+      </description>
+      <description xmi:id="generated_200">
+        <content>
+          <value content="Safety Inspection procedures. Example instantiation: SAE AVSC-D-03." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G77">
+      <name content="Goal 77" />
+      <description xmi:id="generated_203">
+        <content>
+          <value content="Safety Metrics are monitored during Operations." />
+        </content>
+      </description>
+      <description xmi:id="generated_202">
+        <content>
+          <value content="Operational Safety metrics monitoring. Example instantiation: SAE AVSC 00006." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G78">
+      <name content="Goal 78" />
+      <description xmi:id="generated_205">
+        <content>
+          <value content="Operating Procedures mitigate Residual Hazards not fully controlled by technical means." />
+        </content>
+      </description>
+      <description xmi:id="generated_204">
+        <content>
+          <value content="Procedural mitigation of Residual Hazards." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S69">
+      <name content="Strategy 69" />
+      <description xmi:id="generated_207">
+        <content>
+          <value content="Appeal to applicable Operational Safety practices." />
+        </content>
+      </description>
+      <description xmi:id="generated_206">
+        <content>
+          <value content="Argument based on operational safety practices and guidance." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S70">
+      <name content="Strategy 70" />
+      <description xmi:id="generated_209">
+        <content>
+          <value content="Appeal to Operating Procedures for Residual Hazards." />
+        </content>
+      </description>
+      <description xmi:id="generated_208">
+        <content>
+          <value content="Argument that Operating Procedures address Residual Hazards." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CTX_79" referencedArtifactElement="ART_SMSClaims">
+      <name content="Safety Management Context" />
+      <description xmi:id="generated_210">
+        <content>
+          <value content="Relevant Safety Management System (SMS) Claims providing context for Operational Safety." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_80" referencedArtifactElement="ART_Assessment_80">
+      <name content="Evidence 80" />
+      <description xmi:id="generated_211">
+        <content>
+          <value content="Results of Independent Safety Assessment for Trip Interruptions." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_81" referencedArtifactElement="ART_Assessment_81">
+      <name content="Evidence 81" />
+      <description xmi:id="generated_212">
+        <content>
+          <value content="Results of Independent Safety Assessment for Post-Incident Response." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_82" referencedArtifactElement="ART_Assessment_82">
+      <name content="Evidence 82" />
+      <description xmi:id="generated_213">
+        <content>
+          <value content="Results of Independent Safety Assessment for Remote Operations." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_83" referencedArtifactElement="ART_Assessment_83">
+      <name content="Evidence 83" />
+      <description xmi:id="generated_214">
+        <content>
+          <value content="Results of Independent Safety Assessment for First Responder Interaction." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_84" referencedArtifactElement="ART_Assessment_84">
+      <name content="Evidence 84" />
+      <description xmi:id="generated_215">
+        <content>
+          <value content="Results of Independent Safety Assessment for Safety Inspections." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_85" referencedArtifactElement="ART_Assessment_85">
+      <name content="Evidence 85" />
+      <description xmi:id="generated_216">
+        <content>
+          <value content="Results of Independent Safety Assessment for Safety Metrics monitoring." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="EV_86" referencedArtifactElement="ART_Assessment_86">
+      <name content="Evidence 86" />
+      <description xmi:id="generated_217">
+        <content>
+          <value content="Results of Independent Safety Assessment for Operating Procedures that mitigate Residual Hazards." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_OpBestPractices_G5" reasoning="S69" source="G72 G73 G74 G75 G76 G77" target="G5">
+      <name content="Operational Best Practices Inference" />
+      <description xmi:id="generated_218">
+        <content>
+          <value content="Operational safety practices support safe Operations of the Autonomous System." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="AI_G78_G5" reasoning="S70" source="G78" target="G5">
+      <name content="Procedural Mitigations Inference" />
+      <description xmi:id="generated_219">
+        <content>
+          <value content="Operating Procedures support safe Operations of the Autonomous System." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="AC_SMS_S71" source="CTX_79" target="S69">
+      <name content="SMS Context for Operational Safety Strategy" />
+      <description xmi:id="generated_220">
+        <content>
+          <value content="Safety Management System (SMS) Claims provide context for the Operational Safety strategy." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G72_EV80" source="EV_80" target="G72">
+      <name content="Trip Interruption Evidence" />
+      <description xmi:id="generated_221">
+        <content>
+          <value content="Independent Safety Assessment results support the Trip Interruptions claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G73_EV81" source="EV_81" target="G73">
+      <name content="Post-Crash Evidence" />
+      <description xmi:id="generated_222">
+        <content>
+          <value content="Independent Safety Assessment results support the Post-Incident Response claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G74_EV82" source="EV_82" target="G74">
+      <name content="Remote Operations Evidence" />
+      <description xmi:id="generated_223">
+        <content>
+          <value content="Independent Safety Assessment results support the Remote Operations claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G75_EV83" source="EV_83" target="G75">
+      <name content="First Responder Evidence" />
+      <description xmi:id="generated_224">
+        <content>
+          <value content="Independent Safety Assessment results support the First Responder Interaction claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G76_EV84" source="EV_84" target="G76">
+      <name content="Safety Inspections Evidence" />
+      <description xmi:id="generated_225">
+        <content>
+          <value content="Independent Safety Assessment results support the Safety Inspections claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G77_EV85" source="EV_85" target="G77">
+      <name content="Metrics Monitoring Evidence" />
+      <description xmi:id="generated_226">
+        <content>
+          <value content="Independent Safety Assessment results support the Safety Metrics claim." />
+        </content>
+      </description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="AE_G78_EV86" source="EV_86" target="G78">
+      <name content="Procedural Mitigations Evidence" />
+      <description xmi:id="generated_227">
+        <content>
+          <value content="Independent Safety Assessment results support the Operating Procedures claim." />
+        </content>
+      </description>
+    </argumentElement>
+  </argumentPackage>
+  <artifactPackage xmi:id="AP_Evidence">
+    <name content="Evidence and Context Artifacts" />
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_VehicleDescription">
+      <name content="System and Deployment Description" />
+      <description xmi:id="generated_2">
+        <content>
+          <value content="Description of the Autonomous System, Deployment Context, Operational Design Domain (ODD), Operations, and Stakeholder Requirements." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_AssuranceScopeProfile">
+      <name content="Assurance Scope and Framework Profile" />
+      <description xmi:id="generated_3">
+        <content>
+          <value content="Selected standards, frameworks, regulatory regimes, ethical principles, and other instantiation choices for this base Safety Case." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_SMSClaims">
+      <name content="Safety Management System (SMS) Claims" />
+      <description xmi:id="generated_4">
+        <content>
+          <value content="Relevant Safety Management System (SMS) Claims and associated safety management information." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_SafetyAdvisoryBoard">
+      <name content="Safety Governance Structure" />
+      <description xmi:id="generated_5">
+        <content>
+          <value content="Defined Safety Governance body or equivalent approval process for review and approval of Safety-Related Claims (SRCs)." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_13">
+      <name content="Independent Assessment 13" />
+      <description xmi:id="generated_6">
+        <content>
+          <value content="Results of Independent Safety Assessment for Transparency." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_14">
+      <name content="Independent Assessment 14" />
+      <description xmi:id="generated_7">
+        <content>
+          <value content="Results of Independent Safety Assessment for Assessor Independence." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_27">
+      <name content="Independent Assessment 27" />
+      <description xmi:id="generated_8">
+        <content>
+          <value content="Results of Independent Safety Assessment for Safety Governance." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_28">
+      <name content="Independent Assessment 28" />
+      <description xmi:id="generated_9">
+        <content>
+          <value content="Results of Independent Safety Assessment for Applicable Laws and Regulations." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_29">
+      <name content="Independent Assessment 29" />
+      <description xmi:id="generated_10">
+        <content>
+          <value content="Results of Independent Safety Assessment for Applicable Ethical Principles." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_30">
+      <name content="Independent Assessment 30" />
+      <description xmi:id="generated_11">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Safety Management Framework." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_31">
+      <name content="Independent Assessment 31" />
+      <description xmi:id="generated_12">
+        <content>
+          <value content="Results of Independent Safety Assessment for UL 4600 Continuous Improvement." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_32">
+      <name content="Independent Assessment 32" />
+      <description xmi:id="generated_13">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Quality Management Framework." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_61">
+      <name content="Independent Assessment 61" />
+      <description xmi:id="generated_14">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Hazard Analysis Method." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_62">
+      <name content="Independent Assessment 62" />
+      <description xmi:id="generated_15">
+        <content>
+          <value content="Results of Independent Safety Assessment for Applicable Regulatory and Approval Requirements." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_63">
+      <name content="Independent Assessment 63" />
+      <description xmi:id="generated_16">
+        <content>
+          <value content="Results of Independent Safety Assessment for ISO 26262 conformance." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_64">
+      <name content="Independent Assessment 64" />
+      <description xmi:id="generated_17">
+        <content>
+          <value content="Results of Independent Safety Assessment for ISO/PAS 8800 conformance." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_65">
+      <name content="Independent Assessment 65" />
+      <description xmi:id="generated_18">
+        <content>
+          <value content="Results of Independent Safety Assessment for ISO 21448 conformance." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_66">
+      <name content="Independent Assessment 66" />
+      <description xmi:id="generated_19">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Cybersecurity Standard." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_67">
+      <name content="Independent Assessment 67" />
+      <description xmi:id="generated_20">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Configuration Management Standard." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_68">
+      <name content="Independent Assessment 68" />
+      <description xmi:id="generated_21">
+        <content>
+          <value content="Results of Independent Safety Assessment for the Selected Data Recording Guidance." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_80">
+      <name content="Independent Assessment 80" />
+      <description xmi:id="generated_22">
+        <content>
+          <value content="Results of Independent Safety Assessment for Trip Interruptions." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_81">
+      <name content="Independent Assessment 81" />
+      <description xmi:id="generated_23">
+        <content>
+          <value content="Results of Independent Safety Assessment for Post-Incident Response." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_82">
+      <name content="Independent Assessment 82" />
+      <description xmi:id="generated_24">
+        <content>
+          <value content="Results of Independent Safety Assessment for Remote Operations." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_83">
+      <name content="Independent Assessment 83" />
+      <description xmi:id="generated_25">
+        <content>
+          <value content="Results of Independent Safety Assessment for First Responder Interaction." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_84">
+      <name content="Independent Assessment 84" />
+      <description xmi:id="generated_26">
+        <content>
+          <value content="Results of Independent Safety Assessment for Safety Inspections." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_85">
+      <name content="Independent Assessment 85" />
+      <description xmi:id="generated_27">
+        <content>
+          <value content="Results of Independent Safety Assessment for Safety Metrics monitoring." />
+        </content>
+      </description>
+    </artifactElement>
+    <artifactElement xmi:type="sacm:Artifact" xmi:id="ART_Assessment_86">
+      <name content="Independent Assessment 86" />
+      <description xmi:id="generated_28">
+        <content>
+          <value content="Results of Independent Safety Assessment for Operating Procedures that mitigate Residual Hazards." />
+        </content>
+      </description>
+    </artifactElement>
+  </artifactPackage>
+  <terminologyPackage xmi:id="TP_CoreTerms">
+    <name content="Core Safety Case Terminology" />
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_AUTONOMOUS_SYSTEM" value="Autonomous System">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ORGANIZATION" value="Organization">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_INTENDED_DEPLOYMENT" value="Intended Deployment">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_DEPLOYMENT_CONTEXT" value="Deployment Context">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ODD" value="Operational Design Domain (ODD)">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_STAKEHOLDER" value="Stakeholder">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_STAKEHOLDERS" value="Stakeholders">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_STAKEHOLDER_REQUIREMENTS" value="Stakeholder Requirements">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_POSITIVE_TRUST_BALANCE" value="Positive Trust Balance">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAFETY_CASE" value="Safety Case">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SRCS" value="Safety-Related Claims (SRCs)">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SMS_FULL" value="Safety Management System (SMS)">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_INDEPENDENT_SAFETY_ASSESSMENT" value="Independent Safety Assessment">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ASSESSOR_INDEPENDENCE" value="Assessor Independence">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ASSURANCE_OBJECTIVES" value="Assurance Objectives">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAFETY_GOVERNANCE" value="Safety Governance">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_APPLICABLE_LAWS" value="Applicable Laws and Regulations">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_APPLICABLE_ETHICAL_PRINCIPLES" value="Applicable Ethical Principles">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_SMS_FRAMEWORK" value="Selected Safety Management Framework">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_ASSURANCE_GUIDANCE" value="Selected Assurance Guidance">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_QMS_FRAMEWORK" value="Selected Quality Management Framework">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ORG_TRUSTWORTHINESS" value="Organizational Trustworthiness">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_OPERATIONAL_SAFETY" value="Operational Safety">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_TRANSPARENCY" value="Transparency">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_CONTINUOUS_IMPROVEMENT" value="Continuous Improvement">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_HAZARD_ANALYSIS" value="Hazard Analysis">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_APPLICABLE_REGULATORY_REQUIREMENTS" value="Applicable Regulatory and Approval Requirements">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_FUNCTIONAL_SAFETY" value="Functional Safety">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_AI_RIGOR" value="AI / Autonomy Engineering Rigor">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SOTIF" value="Safety of the Intended Functionality (SOTIF)">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_CYBERSECURITY" value="Cybersecurity">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_CONFIGURATION_MANAGEMENT" value="Configuration Management">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_DATA_RECORDING" value="Data Recording">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_HAZARD_METHOD" value="Selected Hazard Analysis Method">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_FS_STD" value="Selected Functional Safety Standard">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_AI_STD" value="Selected AI / Autonomy Safety Standard">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_SOTIF_STD" value="Selected Intended Functionality Safety Standard">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_CYBER_STD" value="Selected Cybersecurity Standard">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_CM_STD" value="Selected Configuration Management Standard">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SELECTED_DR_GUIDANCE" value="Selected Data Recording Guidance">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_OPERATIONS" value="Operations">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_TRIP_INTERRUPTION" value="Trip Interruptions">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_POST_INCIDENT" value="Post-Incident Response">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_REMOTE_OPERATIONS" value="Remote Operations">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_FIRST_RESPONDER" value="First Responder Interaction">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAFETY_INSPECTIONS" value="Safety Inspections">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAFETY_METRICS" value="Safety Metrics">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_OPERATING_PROCEDURES" value="Operating Procedures">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_RESIDUAL_HAZARDS" value="Residual Hazards">
+      <name />
+    </terminologyElement>
+  </terminologyPackage>
+  <terminologyPackage xmi:id="TP_Standards">
+    <name content="Referenced Standards" />
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_UL4600" value="UL 4600">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO26262" value="ISO 26262">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO21448" value="ISO 21448">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO21434" value="ISO 21434">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISO10007" value="ISO 10007">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_ISOPAS8800" value="ISO/PAS 8800">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_J3307" value="SAE J3307">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSC00003" value="SAE AVSC 00003">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSC00004" value="SAE AVSC 00004">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSC00006" value="SAE AVSC 00006">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCI01" value="SAE AVSC-I-01">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCI04" value="SAE AVSC-I-04">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCI05" value="SAE AVSC-I-05">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SAE_AVSCD03" value="SAE AVSC-D-03">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_IATF16949" value="IATF 16949">
+      <name />
+    </terminologyElement>
+    <terminologyElement xmi:type="sacm:Expression" xmi:id="TERM_SMS" value="SMS">
+      <name />
+    </terminologyElement>
+  </terminologyPackage>
+</sacm:AssuranceCasePackage>
