@@ -356,7 +356,7 @@ drawn as the file says; well-formedness reports it.
 |---|---|---|---|
 | T1 | Identifier | The `assuranceForge.gsn.identifier` tagged value, else the SACM id | Decided: C++ capability AF-GSN-015 (`GsnIdentifierFor`) |
 | T2 | Name | The element's `name`, which holds one language (clause 8.6) | Decided in #493 |
-| T3 | Statement | The first `description`, for every kind of element: of its values that have content, the one whose `lang` equals the interface language (ignoring case), else the first whose primary subtag equals the interface language's (`ja-JP` and `ja`, `en-GB` for `en-US`), else the first, with or without a `lang` | Decided in #493 |
+| T3 | Statement | The first `description`, for every kind of element: of its values whose content is not empty, the one whose `lang` equals the interface language (ignoring case), else the first whose primary subtag equals the interface language's (`ja-JP` and `ja`, `en-GB` for `en-US`), else the first, with or without a `lang` | Decided in #493 |
 
 See [T2 and T3](#t2-and-t3-which-text-a-node-shows) below.
 
