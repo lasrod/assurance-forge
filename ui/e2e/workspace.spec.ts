@@ -25,9 +25,10 @@ const docks: Array<{
   grows: 'width' | 'height';
 }> = [
   {
-    name: 'Explorer',
-    shown: (page) => page.getByRole('tablist', { name: 'Explorer' }),
-    hide: 'Hide explorer',
+    // Named after the view it shows, as the C++ panels were.
+    name: 'Case Explorer',
+    shown: (page) => page.getByRole('tablist', { name: 'Case Explorer' }),
+    hide: 'Hide case explorer',
     reopen: 'Case Explorer',
     grows: 'width',
   },

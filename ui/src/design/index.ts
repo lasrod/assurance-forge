@@ -13,17 +13,14 @@ export {
   Menu,
   MenuItem,
   MenuSection,
-  MenuSeparator,
-  SegmentedControl,
   Status,
   StatusBar,
   StatusBarSpacer,
   Toolbar,
   ToolbarGroup,
-  ToolbarSpacer,
   Workspace,
 } from '@datum-ui/react';
-export type { Theme, WorkspaceCopy, WorkspaceLayout } from '@datum-ui/react';
+export type { Theme, WorkspaceCopy, WorkspaceLayout, WorkspaceMeasure, WorkspaceTier } from '@datum-ui/react';
 export { watchCanvasStyle, type CanvasStyle } from '@datum-ui/charts';
 export { ChevronDown, ChevronUp, FolderOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 

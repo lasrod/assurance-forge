@@ -15,6 +15,10 @@
   .af-workspace {
     display: grid;
     min-height: 0;
+    /* The side docks' default, about the C++ application's 20% of a window,
+       so the start dock's two tab labels fit. A splitter's reset returns here. */
+    --datum-workspace-start-default: 18rem;
+    --datum-workspace-end-default: 18rem;
   }
 
   .af-dock-empty {
