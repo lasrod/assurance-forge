@@ -19,8 +19,13 @@ const datum = resolve(process.argv[2] ?? process.env.DATUM_DIR ?? resolve(ui, '.
 const out = resolve(ui, 'vendor/datum');
 const NAMES = ['tokens', 'quantity', 'css', 'charts', 'fonts', 'react'];
 
+// On Windows pnpm is a .cmd script, which runs only through the shell; the
+// shell joins arguments without quoting them, so a path with a space is quoted here.
+const windows = process.platform === 'win32';
+const quote = (arg) => (windows && /[\s"]/.test(arg) ? `"${arg.replaceAll('"', '\\"')}"` : arg);
+
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  const result = spawnSync(command, args.map(quote), { cwd, encoding: 'utf8', shell: windows });
   if (result.status !== 0) {
     console.error(`${command} ${args.join(' ')} failed in ${cwd}\n${result.stderr || result.stdout}`);
     process.exit(1);

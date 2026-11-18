@@ -172,8 +172,8 @@ impl<'a> Shaper<'a> {
 
     /// `text` wrapped to `max_width`, by the Unicode line breaking algorithm.
     /// A word wider than the line is broken between characters. Spaces at the
-    /// end of a line are not part of it; a mandatory break (a newline) ends a
-    /// line.
+    /// end of a line are not part of it. A mandatory break (a newline) ends a
+    /// line; an empty line between two is kept, and one at the end is not.
     pub(crate) fn wrap(&self, text: &str, size: f32, weight: Weight, max_width: f32) -> Vec<Line> {
         let mut lines = Vec::new();
         let mut line = String::new();
@@ -191,7 +191,8 @@ impl<'a> Shaper<'a> {
 
             if !line.is_empty() && estimate + trimmed > max_width {
                 self.finish(&mut lines, &mut line, size, weight, max_width);
-                estimate = 0.0;
+                // What an overflow carried starts the next line.
+                estimate = self.width(&line, size, weight);
             }
             if line.is_empty() && trimmed > max_width {
                 // A word wider than the line.
@@ -204,19 +205,29 @@ impl<'a> Shaper<'a> {
                 estimate += full;
             }
             if mandatory {
-                self.finish(&mut lines, &mut line, size, weight, max_width);
+                if line.trim_end().is_empty() {
+                    // An empty line: kept between lines, not at the end.
+                    if end < text.len() {
+                        lines.push(Line {
+                            text: String::new(),
+                            width: 0.0,
+                        });
+                    }
+                } else {
+                    while !line.trim_end().is_empty() {
+                        self.finish(&mut lines, &mut line, size, weight, max_width);
+                    }
+                }
+                line.clear();
                 estimate = 0.0;
             }
-        }
-        if !line.trim_end().is_empty() {
-            self.finish(&mut lines, &mut line, size, weight, max_width);
         }
         lines
     }
 
     /// Ends `line`, measured whole. Kerning across a break opportunity can
-    /// make it wider than the estimate; then its last segment goes to the next
-    /// line, which is returned in `line`.
+    /// make it wider than the estimate; then its last segment is left in
+    /// `line`, to start the next line.
     fn finish(
         &self,
         lines: &mut Vec<Line>,
@@ -230,20 +241,12 @@ impl<'a> Shaper<'a> {
         if width > max_width {
             if let Some(split) = last_break(&text) {
                 let (head, tail) = text.split_at(split);
-                let head = head.trim_end().to_owned();
-                let head_width = self.width(&head, size, weight);
+                let head = head.trim_end();
                 lines.push(Line {
-                    text: head,
-                    width: head_width,
+                    text: head.to_owned(),
+                    width: self.width(head, size, weight),
                 });
                 *line = tail.to_owned();
-                let tail = line.trim_end().to_owned();
-                let tail_width = self.width(&tail, size, weight);
-                lines.push(Line {
-                    text: tail,
-                    width: tail_width,
-                });
-                line.clear();
                 return;
             }
         }

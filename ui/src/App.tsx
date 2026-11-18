@@ -74,26 +74,57 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const input = useRef<HTMLInputElement>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
 
+  // A file given before the core is ready waits for it.
+  const [pending, setPending] = useState<Uint8Array | null>(null);
   const open = useCallback(
     async (bytes: Uint8Array) => {
-      if (!core) return;
-      const result = await core.open(bytes);
-      setState({ kind: 'result', result });
-      setDiagram(result.result === 'opened' ? await core.diagram() : null);
+      if (!core) {
+        setPending(bytes);
+        return;
+      }
+      try {
+        const result = await core.open(bytes);
+        setState({ kind: 'result', result });
+        setDiagram(result.result === 'opened' ? await core.diagram() : null);
+      } catch {
+        setDiagram(null);
+        setState({ kind: 'unreadable' });
+      }
     },
     [core],
   );
+  useEffect(() => {
+    if (core && pending) {
+      setPending(null);
+      void open(pending);
+    }
+  }, [core, pending, open]);
 
-  // The core starts once, in the language the page opened in.
+  // The core starts once, in the language the page opened in. A start that
+  // is no longer wanted (StrictMode runs effects twice in development) frees
+  // its core.
   const [startLanguage] = useState(initialLanguage);
   useEffect(() => {
+    let wanted = true;
+    let started: Core | null = null;
     start(startLanguage).then(
-      (started) => {
-        setCore(started);
+      (core) => {
+        if (!wanted) {
+          core.dispose();
+          return;
+        }
+        started = core;
+        setCore(core);
         setState({ kind: 'empty' });
       },
-      (error: unknown) => setState({ kind: 'failed', reason: String(error) }),
+      (error: unknown) => {
+        if (wanted) setState({ kind: 'failed', reason: String(error) });
+      },
     );
+    return () => {
+      wanted = false;
+      started?.dispose();
+    };
   }, [start, startLanguage]);
 
   // The node text follows the interface language.
@@ -125,7 +156,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const openFile = (file: File | undefined) => {
     if (!file) return;
     file.arrayBuffer().then(
-      (buffer) => open(new Uint8Array(buffer)),
+      (buffer) => void open(new Uint8Array(buffer)),
       () => setState({ kind: 'unreadable' }),
     );
   };

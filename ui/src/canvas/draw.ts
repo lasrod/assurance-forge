@@ -165,6 +165,11 @@ function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette:
   context.stroke();
   context.setLineDash([]);
 
+  // Zoomed far out the text is not drawn, the A and J included: only the
+  // identifier, at metadata size (DATUM's canvas rule 5).
+  const sized = node.text.find((line) => line.role !== 'identifier') ?? node.text[0];
+  const far = sized !== undefined && sized.size * scale < SMALLEST_TEXT_PX;
+
   for (const decorator of node.decorators) {
     if (decorator.type === 'undeveloped') {
       const { centre, half } = decorator;
@@ -178,15 +183,14 @@ function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette:
       context.fillStyle = palette.ground;
       context.fill();
       context.stroke();
-    } else {
+    } else if (!far) {
       context.fillStyle = palette.text;
       context.font = `600 ${decorator.size}px ${fontFamily}`;
       context.fillText(decorator.text, decorator.x, decorator.baseline);
     }
   }
 
-  const statement = node.text.find((line) => line.role !== 'identifier');
-  if (statement && statement.size * scale < SMALLEST_TEXT_PX) {
+  if (far) {
     drawFarIdentifier(context, node, palette, fontFamily, scale);
     return;
   }

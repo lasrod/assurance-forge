@@ -86,6 +86,12 @@ impl Engine {
         layout::layout(view, &shaper, self.style, &mut self.cache)
     }
 
+    /// Drops every kept measurement. The core calls it when a document is
+    /// opened or the language changes, so the cache holds one document's text.
+    pub fn clear_cache(&mut self) {
+        self.cache.clear();
+    }
+
     /// How many wrapped texts are kept.
     pub fn cached_texts(&self) -> usize {
         self.cache.len()

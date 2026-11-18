@@ -84,6 +84,7 @@ impl Core {
             }
         }
         let document = output.into_document();
+        self.engine.clear_cache();
         let view = view::view(&document, &self.language);
         let result = OpenResult::Opened {
             revision: self.revision,
@@ -107,15 +108,21 @@ impl Core {
 
     /// The diagram of the open document, or `None` when nothing is open.
     pub fn diagram(&mut self) -> Option<DiagramAt> {
-        let open = self.open.as_mut()?;
-        let diagram = open
-            .diagram
-            .get_or_insert_with(|| convert::diagram(&self.engine.layout(&open.view)))
-            .clone();
-        Some(DiagramAt {
-            revision: self.revision,
-            diagram,
+        let revision = self.revision;
+        self.diagram_ref().map(|diagram| DiagramAt {
+            revision,
+            diagram: diagram.clone(),
         })
+    }
+
+    /// The diagram of the open document, borrowed: what a shell serializes
+    /// without copying it first. It is at [`Core::revision`].
+    pub fn diagram_ref(&mut self) -> Option<&contract::Diagram> {
+        let open = self.open.as_mut()?;
+        Some(
+            open.diagram
+                .get_or_insert_with(|| convert::diagram(&self.engine.layout(&open.view))),
+        )
     }
 
     /// What the details panel shows for the node with SACM id `id`.
@@ -146,6 +153,7 @@ impl Core {
     /// stays, since the document has not changed.
     pub fn set_language(&mut self, language: &str) {
         self.language = language.to_owned();
+        self.engine.clear_cache();
         if let Some(open) = self.open.as_mut() {
             open.view = view::view(&open.document, &self.language);
             open.diagram = None;

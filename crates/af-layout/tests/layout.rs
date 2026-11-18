@@ -424,3 +424,63 @@ fn native_layout_is_within_budget() {
         );
     }
 }
+
+// ===== Found by the code review =====
+
+#[test]
+fn trailing_newline_and_spaces_add_no_line_and_blank_lines_between_are_kept() {
+    let engine = engine();
+    let lines = engine.wrap("Statement text\n    ", 14.0, Weight::Regular, 500.0);
+    let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
+    assert_eq!(texts, ["Statement text"]);
+    let lines = engine.wrap("a\n\nb", 14.0, Weight::Regular, 500.0);
+    let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
+    assert_eq!(texts, ["a", "", "b"]);
+}
+
+#[test]
+fn a_wrapped_line_is_as_full_as_it_can_be() {
+    // Greedy wrapping: no line could take the next line's first word.
+    let engine = engine();
+    let text = "Verification activities demonstrate that the braking requirements are satisfied in every mode we know of today.";
+    let lines = engine.wrap(text, 14.0, Weight::Regular, 150.0);
+    for pair in lines.windows(2) {
+        let next_word = pair[1].text.split(' ').next().unwrap_or_default();
+        let joined = format!("{} {next_word}", pair[0].text);
+        assert!(
+            engine.measure(&joined, 14.0, Weight::Regular) > 150.0,
+            "{:?} could have taken {next_word:?}",
+            pair[0].text
+        );
+    }
+}
+
+#[test]
+fn the_bounds_hold_every_edge_too() {
+    // An edge from a node to itself loops out past the node.
+    let text = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="C"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g"><name content="g"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="g" target="g"><name content="i"/></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>"#;
+    let document = match xmi::read(
+        text.as_bytes(),
+        &ReadOptions::default().with_mode(Mode::Strict),
+    ) {
+        Ok(output) => output.into_document(),
+        Err(error) => panic!("setup: {error:?}"),
+    };
+    let diagram = engine().layout(&view(&document, "en"));
+    let b = diagram.bounds;
+    for edge in &diagram.edges {
+        for point in edge.points.iter().chain(&edge.head) {
+            assert!(
+                point.x >= b.x && point.x <= b.right() && point.y >= b.y && point.y <= b.bottom(),
+                "{point:?} is outside {b:?}"
+            );
+        }
+    }
+}

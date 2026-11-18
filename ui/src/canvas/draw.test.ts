@@ -85,4 +85,20 @@ describe('draw', () => {
     draw(far.context, diagram, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, 'x', { width: 800, height: 600, dpr: 1 });
     expect(far.texts).toEqual(['G1']);
   });
+
+  it('draws no letter decorator far out, and treats a node with only an identifier the same', () => {
+    const assumption: DiagramNode = {
+      ...node('A1', 0),
+      kind: 'assumption',
+      decorators: [{ type: 'letter', text: 'A', x: 190, baseline: 90, size: 12 }],
+    };
+    const bare: DiagramNode = { ...node('G9', 300), text: [node('G9', 300).text[0]] };
+    const far = recorder();
+    draw(far.context, { nodes: [assumption, bare], edges: [], bounds: diagram.bounds }, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, 'x', {
+      width: 800,
+      height: 600,
+      dpr: 1,
+    });
+    expect(far.texts).toEqual(['A1', 'G9']);
+  });
 });

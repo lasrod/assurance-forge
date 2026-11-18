@@ -16,4 +16,6 @@ export interface Core {
   element(id: string): Promise<ElementDetails | null>;
   /** A BCP 47 tag such as `en` or `ja`: the node text follows it. */
   setLanguage(language: string): Promise<void>;
+  /** Frees what the core holds. It is not used after. */
+  dispose(): void;
 }

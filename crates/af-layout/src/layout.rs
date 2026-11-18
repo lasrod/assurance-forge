@@ -98,7 +98,7 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
         .map(|((node, sized), origin)| translate(node, sized, *origin))
         .collect();
 
-    let diagram_edges = edges
+    let diagram_edges: Vec<DiagramEdge> = edges
         .iter()
         .map(|&(e, from, to)| {
             let edge = &view.edges[e];
@@ -110,9 +110,12 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
         })
         .collect();
 
+    // Everything drawn: the nodes, and the edges, which a loop takes outside
+    // its node.
     let bounds = nodes
         .iter()
         .map(|node| node.bounds)
+        .chain(diagram_edges.iter().map(edge_bounds))
         .reduce(|a, b| a.union(&b))
         .map_or(
             Rect {
@@ -562,6 +565,28 @@ fn place(tree: &Tree, sized: &[Sized]) -> Vec<Point> {
 }
 
 // ===== Edges =====
+
+fn edge_bounds(edge: &DiagramEdge) -> Rect {
+    let points = edge.points.iter().chain(&edge.head);
+    let (mut x0, mut y0, mut x1, mut y1) = (
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    );
+    for point in points {
+        x0 = x0.min(point.x);
+        y0 = y0.min(point.y);
+        x1 = x1.max(point.x);
+        y1 = y1.max(point.y);
+    }
+    Rect {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+    }
+}
 
 fn edge_geometry(
     edge: &af_gsn::view::Edge,

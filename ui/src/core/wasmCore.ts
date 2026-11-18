@@ -20,5 +20,6 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     diagram: async () => parse<DiagramAt>(core.diagram()),
     element: async (id) => parse<ElementDetails>(core.element(id)),
     setLanguage: async (language) => core.setLanguage(language),
+    dispose: () => core.free(),
   };
 }
