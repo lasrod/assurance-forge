@@ -8,8 +8,11 @@ export function isMac(): boolean {
   return /mac|iphone|ipad/i.test(hinted || navigator.platform || navigator.userAgent);
 }
 
+/** The platform the page runs on, read once. */
+const MAC = isMac();
+
 /** `⌘O` on macOS, `Ctrl+O` elsewhere, as the File menu shows it. */
-export function openShortcut(mac = isMac()): string {
+export function openShortcut(mac = MAC): string {
   return mac ? '⌘O' : 'Ctrl+O';
 }
 
@@ -18,7 +21,7 @@ export function openShortcut(mac = isMac()): string {
  * while an IME composes, and not a held key's repeats. The key is O by its
  * letter, or by its place when the layout is not Latin (Ctrl+щ on Russian).
  */
-export function isOpenShortcut(event: KeyboardEvent, mac = isMac()): boolean {
+export function isOpenShortcut(event: KeyboardEvent, mac = MAC): boolean {
   const modifier = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   const latin = /^[\x20-\x7e]$/.test(event.key);
   const o = latin ? event.key.toLowerCase() === 'o' : event.code === 'KeyO';

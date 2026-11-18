@@ -32,7 +32,6 @@ export function loadWorkspace(): WorkspaceState {
       // A layout saved by the earlier version is kept.
       const v1 = JSON.parse(localStorage.getItem(LAYOUT_V1) ?? 'null') as WorkspaceLayout | null;
       if (v1) stored = { layout: v1 };
-      localStorage.removeItem(LAYOUT_V1);
     }
     const layout = stored?.layout;
     if (layout && typeof layout.open === 'object' && typeof layout.size === 'object') {
@@ -50,6 +49,8 @@ export function loadWorkspace(): WorkspaceState {
 export function saveWorkspace(state: WorkspaceState) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
+    // The earlier version's layout goes only once this one is saved.
+    localStorage.removeItem(LAYOUT_V1);
   } catch {
     // Storage is a convenience.
   }

@@ -16,9 +16,10 @@
     display: grid;
     min-height: 0;
     /* The side docks' default, about the C++ application's 20% of a window,
-       so the start dock's two tab labels fit. A splitter's reset returns here. */
-    --datum-workspace-start-default: 18rem;
-    --datum-workspace-end-default: 18rem;
+       so the start dock's two tab labels fit. With DATUM's 36rem centre they
+       make the 70rem at which both side docks show. A splitter's reset returns here. */
+    --datum-workspace-start-default: 17rem;
+    --datum-workspace-end-default: 17rem;
   }
 
   .af-dock-empty {

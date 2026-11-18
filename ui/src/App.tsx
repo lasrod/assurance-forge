@@ -258,10 +258,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Every change goes through `update`, from the latest state: DATUM's rail
   // reports a tab and then the dock's opening in one click, and the second
   // must not undo the first. The state is saved whenever it changes.
-  const update = (change: (current: WorkspaceState) => WorkspaceState) => setWorkspace(change);
   useEffect(() => saveWorkspace(workspace), [workspace]);
-  const setStartView = (view: StartView) => update((current) => ({ ...current, startView: view }));
-  const changeLayout = (next: WorkspaceLayout) => update((current) => ({ ...current, layout: next }));
+  const setStartView = (view: StartView) => setWorkspace((current) => ({ ...current, startView: view }));
+  const changeLayout = (next: WorkspaceLayout) => setWorkspace((current) => ({ ...current, layout: next }));
 
   // Which dock holds a panel depends on the tier, as DATUM's measure reports
   // it: at the medium tier the side panels are in one side dock, at the narrow
@@ -284,7 +283,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     const changed = added ?? removed;
     if (!changed) return;
     const dock = host(changed);
-    update((current) => ({
+    setWorkspace((current: WorkspaceState) => ({
       layout: { ...current.layout, open: { ...current.layout.open, [dock]: added !== undefined } },
       startView: added === 'caseExplorer' || added === 'argumentNavigator' ? added : current.startView,
     }));
@@ -294,7 +293,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!isOpenShortcut(event)) return;
+      // Not when something else has the key: a component that handled it, an
+      // open menu or dialog, or a field being typed in.
+      const target = event.target instanceof Element ? event.target : null;
+      const busy = target?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"]');
+      if (event.defaultPrevented || busy || !isOpenShortcut(event)) return;
       event.preventDefault();
       // As the File menu: nothing to open into until the core has started.
       if (core) chooseFile();
