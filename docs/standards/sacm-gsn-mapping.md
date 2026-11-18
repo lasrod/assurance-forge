@@ -286,7 +286,7 @@ not make it less of a Solution.
 drawn whatever else it says; then R12, since a citation is neutral; then R1, a
 recorded type; then R2 to R11, by the element's class and declaration. R13 adds
 its code to whatever kind those give. For a relationship: R15 and E10 first;
-then E9, E5 and E5a; then E1 to E4; with the codes of E6, E7, E8, E11 and R13 added.
+then E9, then E5 (before E5a: a defeated challenge is drawn as a challenge, with both codes), then E5a; then E1 to E4; with the codes of E6, E7, E8, E11 and R13 added.
 
 ### Nodes
 
