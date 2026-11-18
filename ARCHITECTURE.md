@@ -71,7 +71,7 @@ flowchart TD
 | `af-review` | Review methods: scope, prompt and result contracts, result validation | no |
 | `af-ai` | Provider profiles and inference; knows nothing about SACM or GSN | no |
 | `af-agent` | Operations an external agent may request | no |
-| `af-api` | The frontend contract: commands, queries, views | no |
+| `af-api` | The frontend contract: commands, queries, views | open, diagram and element queries; TypeScript types in `crates/af-api/bindings/api.ts` |
 | `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | no |
 | `af-mcp` | MCP server executable | no |
 | `af-wasm` | Web application shell: `af-api` in the browser, browser file access | no |

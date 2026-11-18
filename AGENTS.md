@@ -14,7 +14,7 @@ Read first: [`ARCHITECTURE.md`](ARCHITECTURE.md) (shape and rules) and
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo build -p af-gsn -p af-layout --target wasm32-unknown-unknown
+cargo build -p af-gsn -p af-layout -p af-api --target wasm32-unknown-unknown
 ```
 
 Test only what you changed while working (`cargo test -p <crate>`); run the
