@@ -71,29 +71,17 @@ revised that day, when DATUM and libSACM had delivered what they waited for.
 | D7 | **A simple layout first.** A layered tree: SupportedBy children below their parent, InContextOf attachments beside it, siblings in document order, straight edges. The C++ `src/ui/gsn/gsn_layout.cpp` is the reference for spacing and placement, not code to port. | A diagram that can be read beats a clever one that is late. Crossing reduction comes when real cases need it. |
 | D8 | **Files open by a strict read.** A file the strict read refuses shows its refusal and no diagram. A tolerant read waits for a case that needs it. Warnings from the read are counted and kept for the problem list. | `sacm` 0.2 reads the terminology package, and all five samples now read strictly. Their only findings are warnings that a Claim has two descriptions (SACM-MULT-001). |
 
-### Reading rules to record (D2)
+### Reading rules (D2)
 
-From the mapping table, the GSN skill and the C++ reader (`classify_role` in
-`src/core/assurance_tree.cpp` on the `cpp` branch). Rows marked *open* need a
-decision before they are coded.
-
-| SACM | Drawn as | Basis |
-|---|---|---|
-| `sacm.import.extensionType` tagged value present | The recorded GSN type | Mapping record, "Recording the original GSN type" |
-| `Claim`, declaration `asserted` or `needsSupport` | Goal | Mapping table |
-| `Claim`, declaration `assumed` | Assumption | Mapping table |
-| `Claim`, declaration `axiomatic` | Justification | Mapping table. The C++ reader tested for `justification`, which is not a SACM literal; do not carry that over. |
-| `Claim`, declaration `needsSupport` | The undeveloped decorator, on a Goal | Mapping record, "`undeveloped` occupies the declaration" |
-| `ArgumentReasoning` | Strategy, between the inference's target and its sources | Mapping table, "Strategy is a node in GSN" |
-| `ArtifactReference` reached by `AssertedEvidence` | Solution | Mapping table; C++ reader |
-| `ArtifactReference` reached by `AssertedContext` | Context | C++ reader; v2.2 §2.1 |
-| `AssertedInference`, `AssertedEvidence` | SupportedBy, endpoints swapped | Mapping table |
-| `AssertedContext` | InContextOf, endpoints swapped | Mapping table |
-| `assuranceForge.gsn.identifier` tagged value | The node's identifier label | C++ capability AF-GSN-015 |
-| *open:* `Claim` declared `asserted` and reached only by `AssertedContext` | Context (the C++ reader) or Goal | v2.2 allows a Claim as Context, "determined by the nature of its content" |
-| *open:* `Claim` declared `axiomatic` and reached by `AssertedContext` | Justification or Context | Both readings have a basis |
-| *open:* `ArtifactReference` reached by both, or by neither | Neutral shape and a code, until decided | none yet |
-| *open:* which text a node shows | Statement (first description) in the interface language, else the first language, else the name | To confirm against the C++ application |
+Recorded in the mapping record, `docs/standards/sacm-gsn-mapping.md`, under
+"Reading a SACM 2.3 file as GSN" (G1, #494): rules for nodes, edges and node
+text, each with its basis, and the codes the view sends for what it does not
+draw. The four rows this plan left open were decided in #493 on 18 November
+2026: an `axiomatic` Claim is a Justification however it is reached; an
+`asserted` Claim reached only as context stays a Goal; an `ArtifactReference`
+that is not plainly evidence or context is drawn neutral with a code; and a node
+shows its identifier, its name and its first description in the interface
+language.
 
 ### The expected view
 

@@ -254,8 +254,10 @@ follows. Each has an id that its tests cite, a status and a basis.
 the diagram plan, `docs/roadmap/milestone-1-diagram.md`: the view draws what the
 file says (D3), every argument element appears exactly once (D4), and a case
 without evidence is drawn with a neutral shape and a code, never guessed.
-*Proposed*: a choice between readings that both have a basis, waiting for a
-decision in [#493](https://github.com/lasrod/assurance-forge/issues/493).
+*Decided in #493*: a choice between readings that both have a basis, made by the
+owner on 18 November 2026
+([#493](https://github.com/lasrod/assurance-forge/issues/493)). The reasons and
+the readings not chosen are kept below.
 
 Four principles run through the rules:
 
@@ -296,13 +298,13 @@ then E9, then E5 (before E5a: a defeated challenge is drawn as a challenge, with
 | R2 | `Claim`, declared `asserted` | Goal | Decided | Mapping table |
 | R3 | `Claim`, declared `needsSupport` | Goal with the undeveloped decorator | Decided | "`undeveloped` occupies the declaration" above |
 | R4 | `Claim`, declared `assumed` | Assumption | Decided | Mapping table |
-| R5 | `Claim`, declared `axiomatic`, however it is reached | Justification | **Proposed** | [R5](#r5-an-axiomatic-claim-is-a-justification) below |
-| R6 | `Claim`, declared `asserted`, reached only by `AssertedContext` | Goal, by R2, with its `InContextOf` edge | **Proposed** | [R6](#r6-a-goal-reached-as-context-stays-a-goal) below |
+| R5 | `Claim`, declared `axiomatic`, however it is reached | Justification | Decided in #493 | [R5](#r5-an-axiomatic-claim-is-a-justification) below |
+| R6 | `Claim`, declared `asserted`, reached only by `AssertedContext` | Goal, by R2, with its `InContextOf` edge | Decided in #493 | [R6](#r6-a-goal-reached-as-context-stays-a-goal) below |
 | R7 | `Claim`, declared `defeated` or `asCited` | Neutral, code AF-VIEW-002 | Decided | The declaration has taken the one slot that tells Goal, Assumption and Justification apart, so the GSN type is unknown. Challenges and citations are later steps |
 | R8 | `ArgumentReasoning`, wherever it is: an inference's `reasoning`, the target of an `AssertedContext`, the source or target of an inference, or reached by nothing | Strategy | Decided | Mapping table; "Strategy is a node in GSN" above. A Strategy at an inference's end is drawn there, as the file says (D3), and well-formedness reports it |
 | R9 | `ArtifactReference` reached only as the source of `AssertedEvidence` | Solution | Decided | Mapping table. SACM 2.3 §11.15 allows only an `ArtifactReference` as that source |
 | R10 | `ArtifactReference` reached only as the source of `AssertedContext` | Context | Decided | v2.2 §2.1; "Context — undecidable by design" above |
-| R11 | `ArtifactReference` reached as both, as neither, or in any other way | Neutral, code AF-VIEW-003 | **Proposed** | [R11](#r11-an-artifactreference-that-is-not-plainly-evidence-or-context) below |
+| R11 | `ArtifactReference` reached as both, as neither, or in any other way | Neutral, code AF-VIEW-003 | Decided in #493 | [R11](#r11-an-artifactreference-that-is-not-plainly-evidence-or-context) below |
 | R12 | Any node element with `isCitation` set | Neutral, code AF-VIEW-004 | Decided | Away elements (GSN3-MOD-003) come with modules |
 | R13 | Any element with `isAbstract` set, node or relationship | Its kind by the other rules, with code AF-VIEW-005: the uninstantiated decorator is not drawn yet | Decided | Attribute table above, `uninstantiated` ↔ `isAbstract`. Patterns are a later step, and the code keeps the omission visible |
 | R14 | `ArgumentGroup` | Not drawn, code AF-VIEW-006. Its members are references, not contents, and are drawn by their own rules | Decided | Groups are not core GSN |
@@ -344,12 +346,12 @@ each carrying its own relationship's id.
 | Rule | Part | Read from | Status |
 |---|---|---|---|
 | T1 | Identifier | The `assuranceForge.gsn.identifier` tagged value, else the SACM id | Decided: C++ capability AF-GSN-015 (`GsnIdentifierFor`) |
-| T2 | Name | The element's `name`, which holds one language (clause 8.6) | **Proposed** |
-| T3 | Statement | The first `description`, for every kind of element: its value whose `lang` equals the interface language (ignoring case), else one whose primary subtag does (`ja-JP` for `ja`), else its first value, with or without a `lang` | **Proposed** |
+| T2 | Name | The element's `name`, which holds one language (clause 8.6) | Decided in #493 |
+| T3 | Statement | The first `description`, for every kind of element: its value whose `lang` equals the interface language (ignoring case), else one whose primary subtag does (`ja-JP` for `ja`), else its first value, with or without a `lang` | Decided in #493 |
 
 See [T2 and T3](#t2-and-t3-which-text-a-node-shows) below.
 
-### The proposed rules
+### The rules decided in #493
 
 #### R5: an axiomatic Claim is a Justification
 
@@ -378,7 +380,7 @@ The other readings:
 
 A Claim declared `asserted` and reached only by `AssertedContext` is drawn as a
 Goal with an `InContextOf` edge, which the well-formedness checks will report.
-The C++ application drew it as Context. The proposal rests on principle 1 and
+The C++ application drew it as Context. The rule rests on principle 1 and
 D3: the declaration says Goal, and retyping it by its position would read more
 into the file than it says. Nothing in a SACM 2.3 file can tell such a Goal
 from a Context written as a Claim: under v2.2 both are declared `asserted`, and
@@ -401,7 +403,7 @@ The C++ application showed "identifier: name" with the statement below it
 its first language (`src/sacm_adapter/case_projection.cpp`,
 `MultiLangString::primary`): as the statement for a Claim or an
 `ArgumentReasoning`, and as the description for other elements, which it showed
-in the same place. A second language was shown on request. The proposal keeps
+in the same place. A second language was shown on request. The rule keeps
 that and puts the interface language first, so the Japanese text of
 `oasc-ja.sacm.xmi` shows in a Japanese interface.
 
