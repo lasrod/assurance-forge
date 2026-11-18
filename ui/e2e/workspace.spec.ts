@@ -55,6 +55,11 @@ test('the Case Explorer is stacked above the Argument Navigator, and each hides 
   await page.getByRole('button', { name: 'Hide case explorer', exact: true }).click();
   await expect(explorer).toBeHidden();
   await expect(navigator).toBeVisible();
+  // Polled a while, so a dock that wrongly closed or resized after the click would show.
+  await expect
+    .poll(async () => (await canvas(page).boundingBox())?.width, { intervals: [100, 100, 200], timeout: 1000 })
+    .toBeCloseTo(before.width, 0);
+  await page.waitForTimeout(300);
   expect((await canvas(page).boundingBox())?.width).toBeCloseTo(before.width, 0);
 
   // Hiding the last one closes the dock, and the canvas grows.
@@ -69,6 +74,19 @@ test('the Case Explorer is stacked above the Argument Navigator, and each hides 
   await expectCanvasFillsCentre(page);
   await page.reload();
   await expect(page.getByRole('region', { name: 'Argument Navigator' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Case Explorer' })).toBeHidden();
+});
+
+test('at the medium width the side panels are tabs in one dock, and the canvas fills the centre', async ({ page }) => {
+  // 56rem: DATUM's medium tier merges the side docks, and a stacked dock's views become tabs.
+  await page.setViewportSize({ width: 900, height: 800 });
+  await opened(page);
+  for (const tab of ['Element Properties', 'Case Explorer', 'Argument Navigator']) {
+    await expect(page.getByRole('tab', { name: tab })).toBeVisible();
+  }
+  await page.getByRole('tab', { name: 'Argument Navigator' }).click();
+  await expect(page.getByRole('tab', { name: 'Argument Navigator' })).toHaveAttribute('aria-selected', 'true');
+  await expectCanvasFillsCentre(page);
 });
 
 test('the panels carry the C++ application\'s names, in Japanese too', async ({ page }) => {

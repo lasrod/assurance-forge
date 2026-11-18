@@ -14,7 +14,6 @@ export {
   MenuBarMenu,
   MenuItem,
   MenuSection,
-  MenuSeparator,
   Submenu,
   Status,
   StatusBar,

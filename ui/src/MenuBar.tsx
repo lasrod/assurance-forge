@@ -10,6 +10,8 @@ import { openShortcut } from './shortcuts';
 interface MenuBarProps {
   t: (key: MessageKey) => string;
   canOpen: boolean;
+  /** The core is still starting: why Open… is unavailable, if it is. */
+  starting: boolean;
   onOpen: () => void;
   theme: ThemeChoice;
   onThemeChange: (theme: ThemeChoice) => void;
@@ -20,6 +22,7 @@ interface MenuBarProps {
 export function MenuBar({
   t,
   canOpen,
+  starting,
   onOpen,
   theme,
   onThemeChange,
@@ -34,7 +37,7 @@ export function MenuBar({
           shortcut={openShortcut()}
           textValue={t('open')}
           unavailable={!canOpen}
-          note={canOpen ? undefined : t('starting')}
+          note={!canOpen && starting ? t('starting') : undefined}
           onAction={onOpen}
         >
           {t('open')}

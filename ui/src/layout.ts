@@ -22,10 +22,7 @@ function sizes(value: unknown): Record<string, number | null> {
 
 /** A stored layout, checked: what is not a layout is the default. */
 export function readLayout(value: unknown): WorkspaceLayout {
-  // v2 stored `{ layout }`, v1 and v3 the layout itself.
-  const stored = (value && typeof value === 'object' && 'layout' in value ? (value as { layout: unknown }).layout : value) as
-    | Partial<WorkspaceLayout>
-    | null;
+  const stored = value as Partial<WorkspaceLayout> | null;
   if (!stored || typeof stored.open !== 'object' || stored.open === null) return DEFAULT_LAYOUT;
   const open = Object.fromEntries(
     DOCKS.map((dock) => [dock, typeof stored.open?.[dock] === 'boolean' ? stored.open[dock] : DEFAULT_LAYOUT.open[dock]]),
@@ -43,7 +40,10 @@ export function loadLayout(): WorkspaceLayout {
   try {
     for (const key of [KEY, ...EARLIER]) {
       const stored = localStorage.getItem(key);
-      if (stored !== null) return readLayout(JSON.parse(stored));
+      if (stored === null) continue;
+      const value: unknown = JSON.parse(stored);
+      // v2 kept the layout under `layout`; v1 and v3 keep the layout itself.
+      return readLayout(key === EARLIER[0] && value && typeof value === 'object' ? (value as { layout?: unknown }).layout : value);
     }
   } catch {
     // No storage, or something unreadable in it: the default.

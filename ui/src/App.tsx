@@ -279,6 +279,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       <MenuBar
         t={t}
         canOpen={core !== null}
+        starting={state.kind === 'starting'}
         onOpen={chooseFile}
         theme={theme}
         onThemeChange={setTheme}

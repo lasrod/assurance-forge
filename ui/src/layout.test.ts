@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT, readLayout } from './layout';
 
+// The earlier version's `{ layout }` wrapper is unwrapped by loadLayout, by its key.
+
 describe('readLayout', () => {
   it('reads a stored layout, hidden views and their sizes included', () => {
     const layout = {
@@ -10,10 +12,6 @@ describe('readLayout', () => {
       viewSize: { argumentNavigator: 12 },
     };
     expect(readLayout(layout)).toEqual(layout);
-  });
-
-  it('reads the earlier version, which kept the layout under `layout`', () => {
-    expect(readLayout({ layout: { open: { start: false, end: true, bottom: true }, size: {} }, startView: 'x' }).open.start).toBe(false);
   });
 
   it('drops what is not a size, and is the default for what is not a layout', () => {
