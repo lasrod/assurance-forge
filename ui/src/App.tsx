@@ -19,14 +19,13 @@ import {
   Workspace,
   type WorkspaceCopy,
   type WorkspaceLayout,
-  type WorkspaceDockId,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
-import { loadWorkspace, saveWorkspace, togglePanel } from './layout';
+import { loadLayout, saveLayout } from './layout';
 import { isOpenShortcut } from './shortcuts';
-import { MenuBar, PANELS, type PanelId } from './MenuBar';
+import { MenuBar } from './MenuBar';
 
 type State =
   | { kind: 'starting' }
@@ -72,8 +71,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [core, setCore] = useState<Core | null>(null);
   const [state, setState] = useState<State>({ kind: 'starting' });
   const [diagram, setDiagram] = useState<DiagramAt | null>(null);
-  const [workspace, setWorkspace] = useState(loadWorkspace);
-  const { layout } = workspace;
+  const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
   const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
@@ -253,36 +251,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   const empty = (key: MessageKey) => <p className="datum-meta af-dock-empty">{t(key)}</p>;
 
-  // The start dock stacks the Case Explorer above the Argument Navigator, as
-  // the C++ application did (D9); below the wide tier DATUM shows them as tabs.
-  // DATUM's own changes hand over a whole layout; the View menu's change from
-  // the latest state. The layout is saved when it changes.
-  useEffect(() => saveWorkspace(workspace), [workspace]);
-  const changeLayout = (next: WorkspaceLayout) => setWorkspace({ layout: next });
+  // DATUM's Workspace owns the layout: which docks are open, their sizes, and
+  // which stacked views are hidden. The page keeps it between visits.
+  useEffect(() => saveLayout(layout), [layout]);
 
-  // Which dock holds a panel depends on the tier, as DATUM's measure reports
-  // it: at the medium tier the side panels are in one side dock, at the narrow
-  // tier every panel is in the bottom dock. A copy of DATUM's rule, read from
-  // the docks it measures, until its Workspace says which dock holds a view and
-  // can show one (raised there).
-  const [shownDocks, setShownDocks] = useState<WorkspaceDockId[]>(['start', 'end', 'bottom']);
-  const host = (id: PanelId): WorkspaceDockId => {
-    const side = shownDocks.filter((dock) => dock !== 'bottom');
-    if (side.length === 0) return 'bottom';
-    if (id === 'problems') return 'bottom';
-    if (side.length === 1) return side[0];
-    return id === 'elementProperties' ? 'end' : 'start';
-  };
-  // `hidden` applies only where the start dock stacks its views.
-  const hidden = layout.hidden ?? [];
-  const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)] && !(host(id) === 'start' && hidden.includes(id)));
-  const onPanelsChange = (next: PanelId[]) => {
-    const added = next.find((id) => !panels.includes(id));
-    const removed = panels.find((id) => !next.includes(id));
-    const changed = added ?? removed;
-    if (!changed) return;
-    setWorkspace((current) => ({ layout: togglePanel(current.layout, changed, added !== undefined, host(changed)) }));
-  };
   const chooseFile = useCallback(() => input.current?.click(), []);
 
   // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
@@ -308,8 +280,6 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         t={t}
         canOpen={core !== null}
         onOpen={chooseFile}
-        panels={panels}
-        onPanelsChange={onPanelsChange}
         theme={theme}
         onThemeChange={setTheme}
         language={language}
@@ -338,11 +308,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           centreLabel={t('diagram')}
           onCentreSize={onCentreSize}
           layout={layout}
-          onLayoutChange={changeLayout}
-          onMeasure={(measure) => {
-            const docks = measure.docks.map((dock) => dock.id);
-            setShownDocks((current) => (current.join() === docks.join() ? current : docks));
-          }}
+          onLayoutChange={setLayout}
           copy={copy}
           start={{
             // Both C++ panels, stacked; the dock's own name is for its rail.

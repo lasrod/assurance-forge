@@ -1,22 +1,16 @@
 // The menu bar, arranged as the C++ application's (plan decision D9): File and
 // View now; Edit and Add come with editing. View ▸ Appearance holds Theme and
-// Language, as in the C++ application.
+// Language, as in the C++ application. Panels are shown and hidden by their
+// own Hide buttons and rails, as DATUM's Workspace draws them.
 
 import type { ThemeChoice, Language, MessageKey } from './i18n/messages';
-import { MenuBar as DatumMenuBar, MenuBarMenu, MenuItem, MenuSection, MenuSeparator, Submenu } from './design';
+import { MenuBar as DatumMenuBar, MenuBarMenu, MenuItem, MenuSection, Submenu } from './design';
 import { openShortcut } from './shortcuts';
-
-export type PanelId = 'caseExplorer' | 'argumentNavigator' | 'elementProperties' | 'problems';
-
-export const PANELS: readonly PanelId[] = ['caseExplorer', 'argumentNavigator', 'elementProperties', 'problems'];
 
 interface MenuBarProps {
   t: (key: MessageKey) => string;
   canOpen: boolean;
   onOpen: () => void;
-  /** The panels in view. */
-  panels: readonly PanelId[];
-  onPanelsChange: (panels: PanelId[]) => void;
   theme: ThemeChoice;
   onThemeChange: (theme: ThemeChoice) => void;
   language: Language;
@@ -27,8 +21,6 @@ export function MenuBar({
   t,
   canOpen,
   onOpen,
-  panels,
-  onPanelsChange,
   theme,
   onThemeChange,
   language,
@@ -49,19 +41,6 @@ export function MenuBar({
         </MenuItem>
       </MenuBarMenu>
       <MenuBarMenu id="view" label={t('view')}>
-        <MenuSection
-          label={t('panels')}
-          selection="multiple"
-          selected={panels}
-          onSelectionChange={(next) => onPanelsChange(next.filter((id): id is PanelId => PANELS.includes(id as PanelId)))}
-        >
-          {PANELS.map((id) => (
-            <MenuItem key={id} id={id}>
-              {t(id)}
-            </MenuItem>
-          ))}
-        </MenuSection>
-        <MenuSeparator />
         <Submenu id="appearance" label={t('appearance')}>
           <Submenu id="theme" label={t('theme')}>
             <MenuSection

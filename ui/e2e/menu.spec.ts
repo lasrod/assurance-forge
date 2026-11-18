@@ -10,12 +10,6 @@ async function viewMenu(page: Page) {
   await expect(page.getByRole('menu', { name: 'View' })).toBeVisible();
 }
 
-/** A checkbox item keeps its menu open, as a menu of options should; Escape closes it. */
-async function closeMenu(page: Page) {
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('menu')).toHaveCount(0);
-}
-
 test('the menu bar is a menu bar: File and View, moved between by the arrow keys', async ({ page }) => {
   await opened(page);
   const bar = page.getByRole('menubar', { name: 'Menu' });
@@ -42,42 +36,10 @@ test('Ctrl+O opens the file chooser', async ({ page }) => {
   expect(await chooser).toBeTruthy();
 });
 
-test('View toggles each panel on its own', async ({ page }) => {
-  await opened(page);
-  for (const name of ['Case Explorer', 'Argument Navigator', 'Element Properties', 'Problems']) {
-    const panel = page.getByRole('region', { name });
-    await viewMenu(page);
-    await expect(page.getByRole('menuitemcheckbox', { name })).toBeChecked();
-    await page.getByRole('menuitemcheckbox', { name }).click();
-    await closeMenu(page);
-    await expect(panel).toBeHidden();
-    await viewMenu(page);
-    await expect(page.getByRole('menuitemcheckbox', { name })).not.toBeChecked();
-    await page.getByRole('menuitemcheckbox', { name }).click();
-    await closeMenu(page);
-    await expect(panel).toBeVisible();
-  }
-  // The two stacked panels are independent: one hidden leaves the other.
-  await viewMenu(page);
-  await page.getByRole('menuitemcheckbox', { name: 'Case Explorer' }).click();
-  await closeMenu(page);
-  await expect(page.getByRole('region', { name: 'Case Explorer' })).toBeHidden();
-  await expect(page.getByRole('region', { name: 'Argument Navigator' })).toBeVisible();
-});
-
-test('at the medium width the side panels share one dock, and View follows it', async ({ page }) => {
-  // 56rem: DATUM's medium tier puts the side docks' views under the end dock.
-  await page.setViewportSize({ width: 900, height: 800 });
+test("View holds Appearance, as the C++ application’s did, and no panel toggles", async ({ page }) => {
   await opened(page);
   await viewMenu(page);
-  await page.getByRole('menuitemcheckbox', { name: 'Element Properties' }).click();
-  await closeMenu(page);
-  await expect(page.getByRole('tab', { name: 'Case Explorer' })).toBeHidden();
-  await viewMenu(page);
-  for (const item of ['Case Explorer', 'Argument Navigator', 'Element Properties']) {
-    await expect(page.getByRole('menuitemcheckbox', { name: item })).not.toBeChecked();
-  }
-  await expect(page.getByRole('menuitemcheckbox', { name: 'Problems' })).toBeChecked();
+  await expect(page.getByRole('menu', { name: 'View' }).getByRole('menuitem')).toHaveText(['Appearance']);
 });
 
 test('View ▸ Appearance ▸ Theme and Language switch them', async ({ page }) => {
