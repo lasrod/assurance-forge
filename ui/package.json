@@ -20,6 +20,7 @@
     "@datum-ui/quantity": "file:vendor/datum/datum-ui-quantity.tgz",
     "@datum-ui/react": "file:vendor/datum/datum-ui-react.tgz",
     "@datum-ui/tokens": "file:vendor/datum/datum-ui-tokens.tgz",
+    "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

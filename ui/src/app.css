@@ -12,9 +12,14 @@
     height: 100%;
   }
 
-  .af-centre {
-    position: relative;
+  .af-workspace {
+    display: grid;
     min-height: 0;
+  }
+
+  .af-dock-empty {
+    margin: 0;
+    padding: var(--datum-space-3, 0.75rem);
   }
 
   .af-canvas-host {

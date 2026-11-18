@@ -3,12 +3,25 @@
 // DATUM is private and installed from tarballs packed locally
 // (scripts/pack-datum.mjs). Keeping every DATUM import here means a plain
 // replacement, for builds without DATUM, has one module to stand in for.
+// The icons DATUM leaves to each product come from lucide-react, here too.
 
 import './styles.css';
 
-export { Button, DatumRoot, Status, StatusBar, StatusBarSpacer, Toolbar, ToolbarGroup, ToolbarSpacer } from '@datum-ui/react';
-export type { Theme } from '@datum-ui/react';
+export {
+  Button,
+  DatumRoot,
+  SegmentedControl,
+  Status,
+  StatusBar,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarGroup,
+  ToolbarSpacer,
+  Workspace,
+} from '@datum-ui/react';
+export type { Theme, WorkspaceCopy, WorkspaceLayout } from '@datum-ui/react';
 export { watchCanvasStyle, type CanvasStyle } from '@datum-ui/charts';
+export { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
 import sansRegular from '@datum-ui/fonts/measured/IBMPlexSans-Regular.ttf?url';
 import sansSemiBold from '@datum-ui/fonts/measured/IBMPlexSans-SemiBold.ttf?url';

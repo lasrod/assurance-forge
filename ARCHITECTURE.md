@@ -75,7 +75,7 @@ flowchart TD
 | `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | no |
 | `af-mcp` | MCP server executable | no |
 | `af-wasm` | Web application shell: `af-api` in the browser, browser file access | the core for the browser |
-| `ui/` | React and DATUM frontend | the browser build: open a file, draw the diagram. DATUM is installed from tarballs packed locally |
+| `ui/` | React and DATUM frontend | the browser build: open a file, draw the diagram, in a workspace with Outline, Details and Problems docks, in English and Japanese. DATUM is installed from tarballs packed locally |
 
 A crate is added when it can be built and tested without the rest.
 
