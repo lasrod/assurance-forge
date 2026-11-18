@@ -1,98 +1,89 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 async function opened(page: Page, query = '') {
   await page.goto(`/?sample=sacm_example_core_argument.sacm.xmi${query}`);
   await expect.poll(() => page.evaluate(() => window.__assuranceForge?.drawn)).toEqual({ nodes: 8, edges: 7 });
 }
 
+const canvas = (page: Page) => page.getByRole('img', { name: 'GSN diagram' });
+
 /** The canvas fills the centre surface exactly. */
 async function expectCanvasFillsCentre(page: Page) {
   const centre = await page.getByRole('region', { name: 'Diagram' }).boundingBox();
-  const canvas = await page.getByRole('img', { name: 'GSN diagram' }).boundingBox();
-  expect(canvas).not.toBeNull();
-  expect(canvas).toEqual(centre);
-  return canvas!;
+  const box = await canvas(page).boundingBox();
+  expect(box).not.toBeNull();
+  expect(box).toEqual(centre);
+  return box!;
 }
 
-// The C++ application's arrangement (plan decision D9): the Case Explorer and
-// the Argument Navigator in the start dock, Element Properties at the end,
+// The C++ application's arrangement (plan decision D9): the Case Explorer
+// stacked above the Argument Navigator, Element Properties at the end,
 // Problems at the bottom.
-const docks: Array<{
-  name: string;
-  shown: (page: Page) => Locator;
-  hide: string;
-  reopen: string;
-  grows: 'width' | 'height';
-}> = [
-  {
-    // The dock holds both C++ panels, as tabs until DATUM can stack them.
-    name: 'Case Explorer and Argument Navigator',
-    shown: (page) => page.getByRole('tablist', { name: 'Case Explorer and Argument Navigator' }),
-    hide: 'Hide case explorer and argument navigator',
-    reopen: 'Case Explorer',
-    grows: 'width',
-  },
-  {
-    name: 'Element Properties',
-    shown: (page) => page.getByRole('region', { name: 'Element Properties' }),
-    hide: 'Hide element properties',
-    reopen: 'Element Properties',
-    grows: 'width',
-  },
-  {
-    name: 'Problems',
-    shown: (page) => page.getByRole('region', { name: 'Problems' }),
-    hide: 'Hide problems',
-    reopen: 'Show problems',
-    grows: 'height',
-  },
-];
-
-for (const dock of docks) {
+for (const dock of [
+  { name: 'Element Properties', hide: 'Hide element properties', reopen: 'Element Properties', grows: 'width' as const },
+  { name: 'Problems', hide: 'Hide problems', reopen: 'Show problems', grows: 'height' as const },
+]) {
   test(`the ${dock.name} dock closes and reopens, and the canvas fills the centre`, async ({ page }) => {
     await opened(page);
-    await expect(dock.shown(page)).toBeVisible();
+    const region = page.getByRole('region', { name: dock.name });
+    await expect(region).toBeVisible();
     const before = await expectCanvasFillsCentre(page);
 
     await page.getByRole('button', { name: dock.hide, exact: true }).click();
-    await expect(dock.shown(page)).toBeHidden();
-    await expect.poll(async () => (await page.getByRole('img', { name: 'GSN diagram' }).boundingBox())?.[dock.grows]).toBeGreaterThan(before[dock.grows]);
+    await expect(region).toBeHidden();
+    await expect.poll(async () => (await canvas(page).boundingBox())?.[dock.grows]).toBeGreaterThan(before[dock.grows]);
     await expectCanvasFillsCentre(page);
     // The diagram was drawn again at the new size.
     expect(await page.evaluate(() => window.__assuranceForge?.drawn)).toEqual({ nodes: 8, edges: 7 });
 
     await page.getByRole('button', { name: dock.reopen, exact: true }).click();
-    await expect(dock.shown(page)).toBeVisible();
-    await expect.poll(async () => (await page.getByRole('img', { name: 'GSN diagram' }).boundingBox())?.[dock.grows]).toBeCloseTo(before[dock.grows], 0);
+    await expect(region).toBeVisible();
+    await expect.poll(async () => (await canvas(page).boundingBox())?.[dock.grows]).toBeCloseTo(before[dock.grows], 0);
     await expectCanvasFillsCentre(page);
   });
 }
 
-test('reopening the start dock from a tab\'s rail button opens it on that tab', async ({ page }) => {
+test('the Case Explorer is stacked above the Argument Navigator, and each hides on its own', async ({ page }) => {
   await opened(page);
-  await page.getByRole('button', { name: 'Hide case explorer and argument navigator', exact: true }).click();
+  const explorer = page.getByRole('region', { name: 'Case Explorer' });
+  const navigator = page.getByRole('region', { name: 'Argument Navigator' });
+  const [above, below] = [await explorer.boundingBox(), await navigator.boundingBox()];
+  expect(above && below && above.y + above.height <= below.y && Math.abs(above.x - below.x) < 1).toBe(true);
+  const before = await expectCanvasFillsCentre(page);
+
+  // Hiding one: the other takes the dock, and the canvas keeps its size.
+  await page.getByRole('button', { name: 'Hide case explorer', exact: true }).click();
+  await expect(explorer).toBeHidden();
+  await expect(navigator).toBeVisible();
+  expect((await canvas(page).boundingBox())?.width).toBeCloseTo(before.width, 0);
+
+  // Hiding the last one closes the dock, and the canvas grows.
+  await page.getByRole('button', { name: 'Hide argument navigator', exact: true }).click();
+  await expect(navigator).toBeHidden();
+  await expect.poll(async () => (await canvas(page).boundingBox())?.width).toBeGreaterThan(before.width);
+  await expectCanvasFillsCentre(page);
+
+  // The rail opens the dock on the view chosen, and it is kept.
   await page.getByRole('button', { name: 'Argument Navigator', exact: true }).click();
-  await expect(page.getByRole('tab', { name: 'Argument Navigator' })).toHaveAttribute('aria-selected', 'true');
-  // And it is kept.
+  await expect(navigator).toBeVisible();
+  await expectCanvasFillsCentre(page);
   await page.reload();
-  await expect(page.getByRole('tab', { name: 'Argument Navigator' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('region', { name: 'Argument Navigator' })).toBeVisible();
 });
 
 test('the panels carry the C++ application\'s names, in Japanese too', async ({ page }) => {
   await opened(page, '&lang=ja');
-  await expect(page.getByRole('tab', { name: 'ケースエクスプローラー' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '論証ナビゲーター' })).toBeVisible();
-  for (const title of ['要素プロパティ', '問題']) {
+  for (const title of ['ケースエクスプローラー', '論証ナビゲーター', '要素プロパティ', '問題']) {
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   }
-  await expect(page.getByRole('button', { name: 'ファイル', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'ファイル', exact: true })).toBeVisible();
   await expect(page.getByTestId('status')).toContainText('ノード 8 個、エッジ 7 本');
 
-  await page.getByRole('button', { name: '表示', exact: true }).click();
+  await page.getByRole('menuitem', { name: '表示', exact: true }).click();
+  await page.getByRole('menuitem', { name: '外観' }).click();
+  await page.getByRole('menuitem', { name: '言語' }).click();
   await page.getByRole('menuitemradio', { name: 'English' }).click();
-  await expect(page.getByRole('tab', { name: 'Case Explorer' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Argument Navigator' })).toBeVisible();
-  for (const title of ['Element Properties', 'Problems']) {
+  for (const title of ['Case Explorer', 'Argument Navigator', 'Element Properties', 'Problems']) {
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   }
   await expect(page.getByTestId('status')).toContainText('8 nodes, 7 edges');

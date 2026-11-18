@@ -10,9 +10,12 @@ import './styles.css';
 export {
   Button,
   DatumRoot,
-  Menu,
+  MenuBar,
+  MenuBarMenu,
   MenuItem,
   MenuSection,
+  MenuSeparator,
+  Submenu,
   Status,
   StatusBar,
   StatusBarSpacer,
