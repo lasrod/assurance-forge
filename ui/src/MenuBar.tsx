@@ -1,30 +1,18 @@
 // The menu bar, arranged as the C++ application's (plan decision D9): File and
-// View now; Edit and Add come with editing.
-//
-// A stopgap until DATUM has a menu bar with submenus: it is a toolbar of menu
-// buttons, and what the C++ application put in submenus (View ▸ Appearance ▸
-// Theme, Language) are sections of the View menu.
-//
-// Until DATUM's Workspace can stack views, the Case Explorer and the Argument
-// Navigator share the start dock as tabs: both are checked while it is open,
-// unchecking either closes it, and checking either opens it (on that tab at
-// the wide tier: see App.tsx).
+// View now; Edit and Add come with editing. View ▸ Appearance holds Theme and
+// Language, as in the C++ application. Panels are shown and hidden by their
+// own Hide buttons and rails, as DATUM's Workspace draws them.
 
 import type { ThemeChoice, Language, MessageKey } from './i18n/messages';
-import { Button, Menu, MenuItem, MenuSection, Toolbar } from './design';
+import { MenuBar as DatumMenuBar, MenuBarMenu, MenuItem, MenuSection, Submenu } from './design';
 import { openShortcut } from './shortcuts';
-
-export type PanelId = 'caseExplorer' | 'argumentNavigator' | 'elementProperties' | 'problems';
-
-export const PANELS: readonly PanelId[] = ['caseExplorer', 'argumentNavigator', 'elementProperties', 'problems'];
 
 interface MenuBarProps {
   t: (key: MessageKey) => string;
   canOpen: boolean;
+  /** The core is still starting: why Open… is unavailable, if it is. */
+  starting: boolean;
   onOpen: () => void;
-  /** The panels in view. */
-  panels: readonly PanelId[];
-  onPanelsChange: (panels: PanelId[]) => void;
   theme: ThemeChoice;
   onThemeChange: (theme: ThemeChoice) => void;
   language: Language;
@@ -34,63 +22,58 @@ interface MenuBarProps {
 export function MenuBar({
   t,
   canOpen,
+  starting,
   onOpen,
-  panels,
-  onPanelsChange,
   theme,
   onThemeChange,
   language,
   onLanguageChange,
 }: MenuBarProps) {
-  const title = (key: MessageKey) => (
-    <Button variant="ghost">
-      {t(key)}
-    </Button>
-  );
   return (
-    <Toolbar label={t('menu')}>
-      <Menu label={t('file')} trigger={title('file')}>
-        <MenuItem id="open" shortcut={openShortcut()} textValue={t('open')} disabled={!canOpen} onAction={onOpen}>
+    <DatumMenuBar label={t('menu')}>
+      <MenuBarMenu id="file" label={t('file')}>
+        <MenuItem
+          id="open"
+          shortcut={openShortcut()}
+          textValue={t('open')}
+          unavailable={!canOpen}
+          note={!canOpen && starting ? t('starting') : undefined}
+          onAction={onOpen}
+        >
           {t('open')}
         </MenuItem>
-      </Menu>
-      <Menu label={t('view')} trigger={title('view')}>
-        <MenuSection
-          title={t('panels')}
-          selection="multiple"
-          selected={panels}
-          onSelectionChange={(next) => onPanelsChange(next.filter((id): id is PanelId => PANELS.includes(id as PanelId)))}
-        >
-          {PANELS.map((id) => (
-            <MenuItem key={id} id={id}>
-              {t(id)}
-            </MenuItem>
-          ))}
-        </MenuSection>
-        <MenuSection
-          title={t('appearanceTheme')}
-          selection="single"
-          selected={[theme]}
-          onSelectionChange={([next]) => {
-            if (next === 'system' || next === 'light' || next === 'dark') onThemeChange(next);
-          }}
-        >
-          <MenuItem id="system">{t('themeSystem')}</MenuItem>
-          <MenuItem id="light">{t('themeLight')}</MenuItem>
-          <MenuItem id="dark">{t('themeDark')}</MenuItem>
-        </MenuSection>
-        <MenuSection
-          title={t('appearanceLanguage')}
-          selection="single"
-          selected={[language]}
-          onSelectionChange={([next]) => {
-            if (next === 'en' || next === 'ja') onLanguageChange(next);
-          }}
-        >
-          <MenuItem id="en">{t('english')}</MenuItem>
-          <MenuItem id="ja">{t('japanese')}</MenuItem>
-        </MenuSection>
-      </Menu>
-    </Toolbar>
+      </MenuBarMenu>
+      <MenuBarMenu id="view" label={t('view')}>
+        <Submenu id="appearance" label={t('appearance')}>
+          <Submenu id="theme" label={t('theme')}>
+            <MenuSection
+              label={t('theme')}
+              selection="single"
+              selected={[theme]}
+              onSelectionChange={([next]) => {
+                if (next === 'system' || next === 'light' || next === 'dark') onThemeChange(next);
+              }}
+            >
+              <MenuItem id="system">{t('themeSystem')}</MenuItem>
+              <MenuItem id="light">{t('themeLight')}</MenuItem>
+              <MenuItem id="dark">{t('themeDark')}</MenuItem>
+            </MenuSection>
+          </Submenu>
+          <Submenu id="language" label={t('language')}>
+            <MenuSection
+              label={t('language')}
+              selection="single"
+              selected={[language]}
+              onSelectionChange={([next]) => {
+                if (next === 'en' || next === 'ja') onLanguageChange(next);
+              }}
+            >
+              <MenuItem id="en">{t('english')}</MenuItem>
+              <MenuItem id="ja">{t('japanese')}</MenuItem>
+            </MenuSection>
+          </Submenu>
+        </Submenu>
+      </MenuBarMenu>
+    </DatumMenuBar>
   );
 }

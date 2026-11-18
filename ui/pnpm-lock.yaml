@@ -174,7 +174,7 @@ packages:
     version: 0.4.0-rc.1
 
   '@datum-ui/css@file:vendor/datum/datum-ui-css.tgz':
-    resolution: {integrity: sha512-Qcs7be+QxYsoyRrA5DN2/vPWgsyLXaXuxyaLIJb0n6vdmDIjrKNfSex4rUpHYGg0i5BboAB7z6Dee8HFOaOlMw==, tarball: file:vendor/datum/datum-ui-css.tgz}
+    resolution: {integrity: sha512-n67Uvk52f84hCK4DzWPjpZgzoVhY+qL9GWAH4rS0Orao+DVli9ujK1gnex6wsfvbJOa2GvlfCMPH+WlP63SSfA==, tarball: file:vendor/datum/datum-ui-css.tgz}
     version: 0.4.0-rc.1
 
   '@datum-ui/fonts@file:vendor/datum/datum-ui-fonts.tgz':
@@ -186,7 +186,7 @@ packages:
     version: 0.4.0-rc.1
 
   '@datum-ui/react@file:vendor/datum/datum-ui-react.tgz':
-    resolution: {integrity: sha512-Wu8tCWBKSK+AjRh1k28d9AqePUJYKRJJsvWU4SLHFhOu2Xf/gaKqyuBWhLHVjAoGGwT4Y5bdRBuCK1Ww0kwGcQ==, tarball: file:vendor/datum/datum-ui-react.tgz}
+    resolution: {integrity: sha512-QOanp00AB+jzkoMeWVPCdJnzzRNxy6U4EncDe/EnKROTp6tybAPcXV0zSJx3MKAE78h0yM8sffbbCnn5vtJSmg==, tarball: file:vendor/datum/datum-ui-react.tgz}
     version: 0.4.0-rc.1
     peerDependencies:
       react: ^19.0.0

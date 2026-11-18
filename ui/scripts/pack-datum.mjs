@@ -1,12 +1,15 @@
 // Packs DATUM from a local checkout into ui/vendor/datum/, which git ignores.
 //
-//   node scripts/pack-datum.mjs [path-to-datum-checkout]
+//   node scripts/pack-datum.mjs [path-to-datum-checkout] [--allow-dirty]
 //
 // DATUM is private and stays out of this repository: its tarballs are never
 // committed, published or fetched in CI. The checkout defaults to ../datum-ui
 // beside this repository, or DATUM_DIR. The tarballs get names without a
-// version, so package.json does not change when DATUM does; manifest.json
-// records the DATUM commit they came from, and whether its tree was dirty.
+// version, so package.json does not change when DATUM does. manifest.json,
+// beside them, records the DATUM commit they came from; ui/datum.json, which is
+// committed, records the same commit, so that pnpm-lock.yaml's hashes can be
+// reproduced. A DATUM tree with uncommitted changes cannot be reproduced, so
+// it is refused unless --allow-dirty is given, for a trial.
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -15,7 +18,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ui = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const datum = resolve(process.argv[2] ?? process.env.DATUM_DIR ?? resolve(ui, '../../datum-ui'));
+const args = process.argv.slice(2);
+const allowDirty = args.includes('--allow-dirty');
+const datum = resolve(args.find((arg) => !arg.startsWith('--')) ?? process.env.DATUM_DIR ?? resolve(ui, '../../datum-ui'));
 const out = resolve(ui, 'vendor/datum');
 const NAMES = ['tokens', 'quantity', 'css', 'charts', 'fonts', 'react'];
 
@@ -39,9 +44,15 @@ if (!existsSync(resolve(datum, 'packages/react/package.json'))) {
 }
 
 const commit = run('git', ['rev-parse', 'HEAD'], datum);
+// The committed sources must be clean before the build; untracked scratch
+// files and what the build writes do not count.
+const dirty = run('git', ['status', '--porcelain', '--untracked-files=no'], datum) !== '';
+if (dirty && !allowDirty) {
+  console.error(`DATUM at ${datum} has uncommitted changes, so these tarballs could not be made again. Commit there, or pass --allow-dirty for a trial.`);
+  process.exit(1);
+}
 // Builds pkg/ (not committed in DATUM) for each package.
 run('node', ['scripts/build-packages.mjs'], datum);
-const dirty = run('git', ['status', '--porcelain'], datum) !== '';
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -56,5 +67,11 @@ const packages = NAMES.map((name) => {
 });
 const version = JSON.parse(readFileSync(resolve(datum, 'package.json'), 'utf8')).version;
 writeFileSync(resolve(out, 'manifest.json'), `${JSON.stringify({ version, commit, dirty, packages }, null, 2)}\n`);
+// The DATUM the lockfile was made with, in the repository: pack this commit to
+// install with --frozen-lockfile. Its contents are not secret; DATUM's are.
+// A dirty pack says so here too, so a lockfile made from it is not taken for
+// one that this commit reproduces.
+writeFileSync(resolve(ui, 'datum.json'), `${JSON.stringify(dirty ? { version, commit, dirty } : { version, commit }, null, 2)}\n`);
+if (dirty) console.warn('ui/datum.json now says dirty: do not commit pnpm-lock.yaml from this pack.');
 console.log(`Packed DATUM ${version} at ${commit.slice(0, 7)}${dirty ? ' (dirty)' : ''} into ${out}`);
 if (dirty) console.warn('DATUM\'s tree is dirty, so these tarballs are not exactly that commit.');

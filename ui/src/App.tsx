@@ -19,14 +19,13 @@ import {
   Workspace,
   type WorkspaceCopy,
   type WorkspaceLayout,
-  type WorkspaceDockId,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { StartError } from './core/wasmCore';
 import { wordRefusal } from './i18n/refusals';
-import { loadWorkspace, saveWorkspace, toStartView, type StartView, type WorkspaceState } from './layout';
+import { loadLayout, saveLayout } from './layout';
 import { isOpenShortcut } from './shortcuts';
-import { MenuBar, PANELS, type PanelId } from './MenuBar';
+import { MenuBar } from './MenuBar';
 
 type State =
   | { kind: 'starting' }
@@ -72,8 +71,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [core, setCore] = useState<Core | null>(null);
   const [state, setState] = useState<State>({ kind: 'starting' });
   const [diagram, setDiagram] = useState<DiagramAt | null>(null);
-  const [workspace, setWorkspace] = useState(loadWorkspace);
-  const { layout, startView } = workspace;
+  const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
   const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
@@ -253,41 +251,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   const empty = (key: MessageKey) => <p className="datum-meta af-dock-empty">{t(key)}</p>;
 
-  // The start dock holds the Case Explorer and the Argument Navigator: tabs,
-  // until DATUM's Workspace can stack them as the C++ application did (D9).
-  // Every change goes through `update`, from the latest state: DATUM's rail
-  // reports a tab and then the dock's opening in one click, and the second
-  // must not undo the first. The state is saved whenever it changes.
-  useEffect(() => saveWorkspace(workspace), [workspace]);
-  const setStartView = (view: StartView) => setWorkspace((current) => ({ ...current, startView: view }));
-  const changeLayout = (next: WorkspaceLayout) => setWorkspace((current) => ({ ...current, layout: next }));
+  // DATUM's Workspace owns the layout: which docks are open, their sizes, and
+  // which stacked views are hidden. The page keeps it between visits.
+  useEffect(() => saveLayout(layout), [layout]);
 
-  // Which dock holds a panel depends on the tier, as DATUM's measure reports
-  // it: at the medium tier the side panels are in one side dock, at the narrow
-  // tier every panel is in the bottom dock. A copy of DATUM's rule, read from
-  // the docks it measures, until its Workspace says which dock holds a view and
-  // can show one (raised there); until then, opening the Argument Navigator
-  // selects its tab at the wide tier only.
-  const [shownDocks, setShownDocks] = useState<WorkspaceDockId[]>(['start', 'end', 'bottom']);
-  const host = (id: PanelId): WorkspaceDockId => {
-    const side = shownDocks.filter((dock) => dock !== 'bottom');
-    if (side.length === 0) return 'bottom';
-    if (id === 'problems') return 'bottom';
-    if (side.length === 1) return side[0];
-    return id === 'elementProperties' ? 'end' : 'start';
-  };
-  const panels: PanelId[] = PANELS.filter((id) => layout.open[host(id)]);
-  const onPanelsChange = (next: PanelId[]) => {
-    const added = next.find((id) => !panels.includes(id));
-    const removed = panels.find((id) => !next.includes(id));
-    const changed = added ?? removed;
-    if (!changed) return;
-    const dock = host(changed);
-    setWorkspace((current: WorkspaceState) => ({
-      layout: { ...current.layout, open: { ...current.layout.open, [dock]: added !== undefined } },
-      startView: added === 'caseExplorer' || added === 'argumentNavigator' ? added : current.startView,
-    }));
-  };
   const chooseFile = useCallback(() => input.current?.click(), []);
 
   // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
@@ -312,9 +279,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       <MenuBar
         t={t}
         canOpen={core !== null}
+        starting={state.kind === 'starting'}
         onOpen={chooseFile}
-        panels={panels}
-        onPanelsChange={onPanelsChange}
         theme={theme}
         onThemeChange={setTheme}
         language={language}
@@ -343,23 +309,28 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           centreLabel={t('diagram')}
           onCentreSize={onCentreSize}
           layout={layout}
-          onLayoutChange={changeLayout}
-          onMeasure={(measure) => {
-            const docks = measure.docks.map((dock) => dock.id);
-            setShownDocks((current) => (current.join() === docks.join() ? current : docks));
-          }}
+          onLayoutChange={setLayout}
           copy={copy}
           start={{
-            // Both C++ names: the dock holds both panels, as tabs until DATUM can stack them.
+            // Both C++ panels, stacked; the dock's own name is for its rail.
             name: t('startDock'),
             nameInText: t('startDockInText'),
             min: 14,
+            arrangement: 'stacked',
             icons: { hide: <PanelLeftClose />, show: <PanelLeftOpen /> },
-            activeView: startView,
-            onActiveViewChange: (id) => setStartView(toStartView(id)),
             views: [
-              { id: 'caseExplorer', label: t('caseExplorer'), content: empty('caseExplorerEmpty') },
-              { id: 'argumentNavigator', label: t('argumentNavigator'), content: empty('argumentNavigatorEmpty') },
+              {
+                id: 'caseExplorer',
+                label: t('caseExplorer'),
+                nameInText: t('caseExplorerInText'),
+                content: empty('caseExplorerEmpty'),
+              },
+              {
+                id: 'argumentNavigator',
+                label: t('argumentNavigator'),
+                nameInText: t('argumentNavigatorInText'),
+                content: empty('argumentNavigatorEmpty'),
+              },
             ],
           }}
           end={{
