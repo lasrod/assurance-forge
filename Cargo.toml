@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/af-gsn"]
+members = ["crates/af-gsn", "crates/af-layout"]
 
 [workspace.package]
 version = "0.4.0-dev"
@@ -15,3 +15,10 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# Shaping is most of a layout's time; unoptimised, the tests take 30 s.
+[profile.dev.package.rustybuzz]
+opt-level = 3
+
+[profile.dev.package.ttf-parser]
+opt-level = 3

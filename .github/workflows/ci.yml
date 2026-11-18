@@ -64,7 +64,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       # The pure crates must build for the browser. Add each new pure crate here.
-      - run: cargo build -p af-gsn --target wasm32-unknown-unknown
+      - run: cargo build -p af-gsn -p af-layout --target wasm32-unknown-unknown
 
   # The other operating systems run on main only, so a pull request is not
   # held up by them. A failure here is a failure of main and must be fixed.
