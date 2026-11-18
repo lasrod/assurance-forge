@@ -5,3 +5,29 @@ version = 4
 [[package]]
 name = "af-gsn"
 version = "0.4.0-dev"
+dependencies = [
+ "sacm",
+]
+
+[[package]]
+name = "memchr"
+version = "2.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "roxmltree"
+version = "0.21.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9da7f59328b09405b181fee1018925fad50f157afb43c0c0f5c522c256dd5907"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "sacm"
+version = "0.1.0"
+source = "git+https://github.com/lasrod/libSACM?rev=2aa2f3793345c9747dc44576f2cb8f97fce0db81#2aa2f3793345c9747dc44576f2cb8f97fce0db81"
+dependencies = [
+ "roxmltree",
+]

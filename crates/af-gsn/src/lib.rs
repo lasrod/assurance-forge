@@ -9,7 +9,11 @@
 //!
 //! It does no I/O and must build for `wasm32-unknown-unknown`.
 //!
-//! Nothing is implemented yet. See `ARCHITECTURE.md` at the repository root.
+//! Built so far: the view, [`view::view`], which follows the reading rules in
+//! `docs/standards/sacm-gsn-mapping.md` ("Reading a SACM 2.3 file as GSN").
+//! Rule ids in comments (R1, E5a, T3 and so on) are that section's.
+
+pub mod view;
 
 /// The GSN element kinds of the GSN Community Standard Version 3 core notation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
