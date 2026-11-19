@@ -9,9 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-# libSACM's main at the commit that reads all five samples strictly. Replace with
-# `sacm = "0.2"` from crates.io when 0.2.0 is published.
-sacm = { git = "https://github.com/lasrod/libSACM", rev = "2aa2f3793345c9747dc44576f2cb8f97fce0db81" }
+sacm = "0.3.0"
 
 [lints]
 workspace = true

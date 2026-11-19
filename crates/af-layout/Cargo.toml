@@ -17,7 +17,7 @@ unicode-linebreak = "0.1.5"
 
 [dev-dependencies]
 # Reads the samples in tests.
-sacm = { git = "https://github.com/lasrod/libSACM", rev = "2aa2f3793345c9747dc44576f2cb8f97fce0db81" }
+sacm = "0.3.0"
 
 [lints]
 workspace = true

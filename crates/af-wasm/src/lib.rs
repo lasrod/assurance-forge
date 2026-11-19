@@ -23,7 +23,7 @@ fn json<T: Serialize>(value: &T) -> Result<String, JsError> {
 
 #[wasm_bindgen]
 impl WasmCore {
-    /// A core with nothing open, laying text out with the four measured faces
+    /// A core with nothing open, laying text out with the five measured faces
     /// (whole TrueType files) and naming the interface language.
     ///
     /// # Errors
@@ -35,6 +35,7 @@ impl WasmCore {
         sans_semibold: Vec<u8>,
         japanese_regular: Vec<u8>,
         japanese_semibold: Vec<u8>,
+        mono_regular: Vec<u8>,
         language: &str,
     ) -> Result<WasmCore, JsError> {
         let fonts = Fonts::new(
@@ -42,6 +43,7 @@ impl WasmCore {
             sans_semibold,
             japanese_regular,
             japanese_semibold,
+            mono_regular,
         )
         .map_err(|error| JsError::new(&format!("font-unreadable:{:?}", error.face)))?;
         Ok(Self {

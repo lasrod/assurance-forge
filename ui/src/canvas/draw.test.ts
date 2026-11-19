@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Diagram, DiagramNode } from '../core/Core';
-import { draw, fit, MAX_SCALE, MIN_SCALE, type Palette } from './draw';
+import { draw, fit, MAX_SCALE, MIN_SCALE, type Families, type Palette } from './draw';
 
 describe('fit', () => {
   it('centres a small diagram at 100%', () => {
@@ -24,15 +24,20 @@ describe('fit', () => {
 });
 
 
-/** A context that records the text drawn and measures 0.5 em per character. */
+/** A context that records the text drawn, and its font, and measures 0.5 em per character. */
 function recorder() {
   const texts: string[] = [];
+  const fonts: string[] = [];
   let font = '10px x';
   const context = new Proxy(
     {},
     {
       get: (_, name) => {
-        if (name === 'fillText') return (text: string) => texts.push(text);
+        if (name === 'fillText')
+          return (text: string) => {
+            texts.push(text);
+            fonts.push(font);
+          };
         if (name === 'measureText') return (text: string) => ({ width: text.length * 0.5 * parseFloat(font.split(' ')[1]) });
         if (name === 'font') return font;
         return () => undefined;
@@ -43,10 +48,11 @@ function recorder() {
       },
     },
   ) as unknown as CanvasRenderingContext2D;
-  return { context, texts };
+  return { context, texts, fonts };
 }
 
 const palette: Palette = { ground: '#fff', line: '#000', text: '#000', secondary: '#666' };
+const families: Families = { text: 'sans', identifier: 'mono' };
 
 function node(id: string, x: number): DiagramNode {
   const rect = { x, y: 0, width: 200, height: 80 };
@@ -72,17 +78,17 @@ const diagram: Diagram = {
 describe('draw', () => {
   it('draws only what is in view', () => {
     const { context } = recorder();
-    const drawn = draw(context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, 'x', { width: 800, height: 600, dpr: 1 });
+    const drawn = draw(context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
     expect(drawn).toEqual({ nodes: 1, edges: 0 });
   });
 
   it('draws only identifiers when the text would be under 7 px', () => {
     const near = recorder();
-    draw(near.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, 'x', { width: 800, height: 600, dpr: 1 });
+    draw(near.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
     expect(near.texts).toEqual(['G1', 'Statement of G1']);
 
     const far = recorder();
-    draw(far.context, diagram, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, 'x', { width: 800, height: 600, dpr: 1 });
+    draw(far.context, diagram, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
     expect(far.texts).toEqual(['G1']);
   });
 
@@ -94,11 +100,21 @@ describe('draw', () => {
     };
     const bare: DiagramNode = { ...node('G9', 300), text: [node('G9', 300).text[0]] };
     const far = recorder();
-    draw(far.context, { nodes: [assumption, bare], edges: [], bounds: diagram.bounds }, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, 'x', {
+    draw(far.context, { nodes: [assumption, bare], edges: [], bounds: diagram.bounds }, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, families, {
       width: 800,
       height: 600,
       dpr: 1,
     });
     expect(far.texts).toEqual(['A1', 'G9']);
+  });
+
+  it('draws identifiers in the identifier family, near and far, and the rest in the text family', () => {
+    const near = recorder();
+    draw(near.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
+    expect(near.fonts).toEqual(['400 12px mono', '400 14px sans']);
+
+    const far = recorder();
+    draw(far.context, diagram, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
+    expect(far.fonts).toEqual(['400 30px mono']);
   });
 });

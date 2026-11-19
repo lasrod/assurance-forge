@@ -34,6 +34,7 @@ fn run() -> Result<(), String> {
         read(&format!("{fonts_dir}/IBMPlexSans-SemiBold.ttf"))?,
         read(&format!("{fonts_dir}/AFTestSansJP-Regular.ttf"))?,
         read(&format!("{fonts_dir}/AFTestSansJP-SemiBold.ttf"))?,
+        read(&format!("{fonts_dir}/IBMPlexMono-Regular.ttf"))?,
     )
     .map_err(|error| format!("{error:?}"))?;
     let bytes = read(&input)?;
@@ -176,15 +177,18 @@ fn run() -> Result<(), String> {
             } else {
                 400
             };
-            let fill = if line.role == TextRole::Identifier {
-                "#666"
+            let (fill, family) = if line.role == TextRole::Identifier {
+                (
+                    "#666",
+                    r#" font-family="IBM Plex Mono, IBM Plex Sans, IBM Plex Sans JP, monospace""#,
+                )
             } else {
-                "#111"
+                ("#111", "")
             };
             let text = line.text.replace('&', "&amp;").replace('<', "&lt;");
             let _ = writeln!(
                 svg,
-                r#"<text x="{}" y="{}" font-size="{}" font-weight="{weight}" fill="{fill}" textLength="{}">{text}</text>"#,
+                r#"<text x="{}" y="{}" font-size="{}" font-weight="{weight}" fill="{fill}"{family} textLength="{}">{text}</text>"#,
                 line.x, line.baseline, line.size, line.width
             );
         }

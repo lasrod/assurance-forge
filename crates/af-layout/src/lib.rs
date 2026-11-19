@@ -22,7 +22,7 @@ pub use model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
     Shape, ShapeKind, TextLine, TextRole,
 };
-pub use text::{FaceName, FontError, Fonts, Line, Weight};
+pub use text::{FaceName, Font, FontError, Fonts, Line, Weight};
 
 /// Text sizes, in CSS pixels. They come from DATUM's type tokens and follow
 /// the user's text size, so the shell passes them in.
@@ -109,12 +109,12 @@ impl Engine {
 
     /// The width of one line of `text`, in CSS pixels, as the diagram measures
     /// it.
-    pub fn measure(&self, text: &str, size: f32, weight: Weight) -> f32 {
-        text::Shaper::new(&self.fonts).width(text, size, weight)
+    pub fn measure(&self, text: &str, size: f32, font: Font) -> f32 {
+        text::Shaper::new(&self.fonts).width(text, size, font)
     }
 
     /// `text` wrapped to `max_width`, as the diagram wraps it.
-    pub fn wrap(&self, text: &str, size: f32, weight: Weight, max_width: f32) -> Vec<Line> {
-        text::Shaper::new(&self.fonts).wrap(text, size, weight, max_width)
+    pub fn wrap(&self, text: &str, size: f32, font: Font, max_width: f32) -> Vec<Line> {
+        text::Shaper::new(&self.fonts).wrap(text, size, font, max_width)
     }
 }

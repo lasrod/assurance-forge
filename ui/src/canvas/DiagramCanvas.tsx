@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DiagramAt, TextStyle } from '../core/Core';
-import { measuredFontFamily, watchCanvasStyle, type CanvasStyle } from '../design';
+import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { draw, fit, type Palette } from './draw';
 
@@ -69,7 +69,7 @@ export function DiagramCanvas({
       return;
     }
     const viewport = fit(diagram.diagram.bounds, size.width, size.height);
-    const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFontFamily, { ...size, dpr });
+    const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFamilies, { ...size, dpr });
     report({ revision: diagram.revision, drawn, diagram });
   }, [diagram, size, style]);
 

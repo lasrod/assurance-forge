@@ -12,7 +12,7 @@ use crate::model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
     Shape, ShapeKind, TextLine, TextRole,
 };
-use crate::text::{Line, Shaper, Weight};
+use crate::text::{Font, Line, Shaper};
 use crate::{Cache, Style};
 
 /// The width of a Goal, Strategy, Context or neutral node.
@@ -157,15 +157,15 @@ fn texts(node: &Node) -> Vec<(TextRole, &str)> {
     texts
 }
 
-fn role_style(role: TextRole, style: Style) -> (f32, f32, Weight) {
+fn role_style(role: TextRole, style: Style) -> (f32, f32, Font) {
     match role {
         TextRole::Identifier => (
             style.identifier_size,
             style.identifier_line_height,
-            Weight::Regular,
+            Font::Mono,
         ),
-        TextRole::Name => (style.text_size, style.text_line_height, Weight::SemiBold),
-        TextRole::Statement => (style.text_size, style.text_line_height, Weight::Regular),
+        TextRole::Name => (style.text_size, style.text_line_height, Font::SemiBold),
+        TextRole::Statement => (style.text_size, style.text_line_height, Font::Regular),
     }
 }
 
@@ -182,10 +182,10 @@ fn content(
     let mut height = 0.0;
     let texts = texts(node);
     for (role, text) in &texts {
-        let (size, line_height, weight) = role_style(*role, style);
+        let (size, line_height, font) = role_style(*role, style);
         let wrapped = cache
             .entry(((*text).to_owned(), *role, width.to_bits()))
-            .or_insert_with(|| shaper.wrap(text, size, weight, width));
+            .or_insert_with(|| shaper.wrap(text, size, font, width));
         // A gap between groups that have lines, as `size` places them.
         if wrapped.is_empty() {
             continue;
@@ -269,7 +269,7 @@ fn size(node: &Node, shaper: &Shaper<'_>, style: Style, cache: &mut Cache) -> Si
             top += GROUP_GAP;
         }
         previous = Some(role);
-        let (size, line_height, weight) = role_style(role, style);
+        let (size, line_height, font) = role_style(role, style);
         let baseline = top + (line_height - (ascent + descent) * size) / 2.0 + ascent * size;
         text.push(TextLine {
             x: centre.x - line.width / 2.0,
@@ -278,7 +278,7 @@ fn size(node: &Node, shaper: &Shaper<'_>, style: Style, cache: &mut Cache) -> Si
             text: line.text,
             role,
             size,
-            weight,
+            weight: font.weight(),
         });
         top += line_height;
     }
@@ -308,7 +308,7 @@ fn size(node: &Node, shaper: &Shaper<'_>, style: Style, cache: &mut Cache) -> Si
     };
     if let Some(letter) = letter {
         let size = style.identifier_size;
-        let letter_width = shaper.width(&letter.to_string(), size, Weight::SemiBold);
+        let letter_width = shaper.width(&letter.to_string(), size, Font::SemiBold);
         let x = centre.x + width / 2.0 * 0.72;
         let baseline = centre.y + height / 2.0 * 0.72 + size;
         decorators.push(Decorator::Letter {

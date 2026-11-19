@@ -11,13 +11,15 @@ async function textErrors(page: Page) {
     const state = window.__assuranceForge;
     const context = document.createElement('canvas').getContext('2d');
     if (!state?.diagram || !context) return null;
-    const family = "'DATUM Measured Sans', 'DATUM Measured Sans JP'";
+    // The canvas's stacks (DATUM decisions 0021 and 0027).
+    const text = "'DATUM Measured Sans', 'DATUM Measured Sans JP'";
+    const identifier = `'DATUM Measured Mono', ${text}`;
     let largest = 0;
     let worst = '';
     let lines = 0;
     for (const node of state.diagram.diagram.nodes) {
       for (const line of node.text) {
-        context.font = `${line.weight} ${line.size}px ${family}`;
+        context.font = `${line.weight} ${line.size}px ${line.role === 'identifier' ? identifier : text}`;
         const error = Math.abs(context.measureText(line.text).width - line.width);
         lines += 1;
         if (error > largest) {

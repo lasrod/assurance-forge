@@ -30,9 +30,17 @@ import sansRegular from '@datum-ui/fonts/measured/IBMPlexSans-Regular.ttf?url';
 import sansSemiBold from '@datum-ui/fonts/measured/IBMPlexSans-SemiBold.ttf?url';
 import japaneseRegular from '@datum-ui/fonts/measured/IBMPlexSansJP-Regular.ttf?url';
 import japaneseSemiBold from '@datum-ui/fonts/measured/IBMPlexSansJP-SemiBold.ttf?url';
+import monoRegular from '@datum-ui/fonts/measured/IBMPlexMono-Regular.ttf?url';
 
 /** The measured faces' files, which the layout reads and the canvas draws with. */
-export const measuredFontUrls = { sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold };
+export const measuredFontUrls = { sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold, monoRegular };
 
-/** The families declared by `@datum-ui/fonts/measured.css`, in fallback order. */
-export const measuredFontFamily = "'DATUM Measured Sans', 'DATUM Measured Sans JP'";
+/**
+ * The families declared by `@datum-ui/fonts/measured.css`, in fallback order:
+ * names and statements in the sans stack, identifiers in Plex Mono with the
+ * sans faces after it for what it lacks (DATUM decision 0027).
+ */
+export const measuredFamilies = {
+  text: "'DATUM Measured Sans', 'DATUM Measured Sans JP'",
+  identifier: "'DATUM Measured Mono', 'DATUM Measured Sans', 'DATUM Measured Sans JP'",
+};
