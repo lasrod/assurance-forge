@@ -34,6 +34,9 @@ importers:
       '@datum-ui/tokens':
         specifier: file:vendor/datum/datum-ui-tokens.tgz
         version: file:vendor/datum/datum-ui-tokens.tgz
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
       lucide-react:
         specifier: ^0.511.0
         version: 0.511.0(react@19.3.1)
@@ -583,6 +586,9 @@ packages:
 
   '@swc/helpers@0.5.24':
     resolution: {integrity: sha512-6tcXo4kA8HgGO7AVmawB57RYi/piBPYVHVcO6dXjX+SZw8GoHmi262sp4v2Ha2kNP9Cx84qei27yT+fjS1lxgg==}
+
+  '@tauri-apps/api@2.12.4':
+    resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -1784,6 +1790,8 @@ snapshots:
     optional: true
 
   '@swc/helpers@0.5.24': {}
+
+  '@tauri-apps/api@2.12.4': {}
 
   '@types/babel__core@7.20.5':
     dependencies:

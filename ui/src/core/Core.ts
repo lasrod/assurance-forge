@@ -1,9 +1,9 @@
 // The one interface the interface talks to. The browser build serves it with
-// the core compiled to WebAssembly (wasmCore.ts); the desktop application will
-// serve it through Tauri (goal G9). Its types are generated from the Rust
-// contract in crates/af-api.
+// the core compiled to WebAssembly (wasmCore.ts); the desktop application
+// serves it through Tauri (tauriCore.ts). Its types are generated from the
+// Rust contract in crates/af-api.
 
-import type { DiagramAt, ElementDetails, OpenResult } from '../../../crates/af-api/bindings/api';
+import type { DiagramAt, ElementDetails, OpenedFile, OpenResult } from '../../../crates/af-api/bindings/api';
 
 export type * from '../../../crates/af-api/bindings/api';
 
@@ -30,4 +30,12 @@ export interface Core {
   setStyle(style: TextStyle): Promise<void>;
   /** Frees what the core holds. It is not used after. */
   dispose(): void;
+  /** The file named when the application started, the first time it is asked; else null. */
+  initialFile(): Promise<OpenedFile | null>;
+  /**
+   * The system's open dialog, where the shell has one: it opens the file
+   * chosen, or answers null when the dialog is cancelled. Null in the
+   * browser, which chooses a file with a file input.
+   */
+  readonly openDialog: (() => Promise<OpenedFile | null>) | null;
 }

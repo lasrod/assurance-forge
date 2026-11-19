@@ -1,0 +1,36 @@
+[package]
+name = "af-desktop"
+description = "The desktop application: the interface in a Tauri window, on af-api, with the file system and native dialogs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "af_desktop"
+
+[[bin]]
+name = "af-desktop"
+path = "src/main.rs"
+
+[features]
+# Embeds the built interface (ui/dist) in the executable. Without it the
+# window loads the Vite development server, which is what `cargo run` wants.
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+# Pinned: the versions the desktop-shell spike ran, at least two weeks old.
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+af-api = { path = "../af-api" }
+af-layout = { path = "../af-layout" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = { version = "=2.12.5", features = [] }
+tauri-plugin-dialog = "=2.8.4"
+
+[lints]
+workspace = true

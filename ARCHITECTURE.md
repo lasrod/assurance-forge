@@ -71,8 +71,8 @@ flowchart TD
 | `af-review` | Review methods: scope, prompt and result contracts, result validation | no |
 | `af-ai` | Provider profiles and inference; knows nothing about SACM or GSN | no |
 | `af-agent` | Operations an external agent may request | no |
-| `af-api` | The frontend contract: commands, queries, views | open, diagram and element queries; TypeScript types in `crates/af-api/bindings/api.ts` |
-| `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | no |
+| `af-api` | The frontend contract: commands, queries, views | open, diagram and element queries; a file opens before the fonts arrive; TypeScript types in `crates/af-api/bindings/api.ts` |
+| `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | the window on `af-api`: a file named on the command line, the open dialog; `--smoke` for CI. Windows checked in CI |
 | `af-mcp` | MCP server executable | no |
 | `af-wasm` | Web application shell: `af-api` in the browser, browser file access | the core for the browser |
 | `ui/` | React and DATUM frontend | the browser build: open a file and draw the diagram; pan, zoom, fit, select and hover on it, with the selected element in Element Properties; arranged as the C++ application (menu bar, toolbar, Case Explorer and Argument Navigator, Element Properties, Problems), in English and Japanese. DATUM is installed from tarballs packed locally |
@@ -86,7 +86,7 @@ A crate is added when it can be built and tested without the rest.
 | Every crate down to `af-api` is pure: no file system, network, threads or clock. Those arrive through traits the shells implement. | CI builds these crates for `wasm32-unknown-unknown` |
 | `af-review` and `af-ai` never depend on each other. `af-ai` depends on no other crate of ours. | Cargo dependencies; not yet checked |
 | Only `af-desktop`, `af-mcp` and `af-wasm` touch the outside world. | The first rule |
-| Every feature works in the desktop and the web application. The interface talks to the core through one interface with two implementations, Tauri commands and `af-wasm`. | not yet checked |
+| Every feature works in the desktop and the web application. The interface talks to the core through one interface with two implementations, Tauri commands (`ui/src/core/tauriCore.ts`) and `af-wasm` (`ui/src/core/wasmCore.ts`). | Both implement `ui/src/core/Core.ts`, which the type check enforces; the interface tests drive the web build only |
 | No `unsafe`. | `unsafe_code = "forbid"` in the workspace lints |
 | The core sends codes and arguments, never sentences. The frontend translates. | not yet checked |
 

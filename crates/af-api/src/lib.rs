@@ -7,7 +7,8 @@
 //! [`contract`] are what crosses to the frontend, as JSON.
 //!
 //! It does no I/O and builds for `wasm32-unknown-unknown`: a shell reads the
-//! file and the fonts and hands in bytes.
+//! file and the fonts and hands in bytes. A file opens before the fonts
+//! arrive; the diagram is laid out once they have.
 //!
 //! With nothing edited there is one revision per opened file. An edit session
 //! (`af-session`) takes over the document with the first edit.
@@ -28,7 +29,10 @@ mod convert;
 
 /// The open document and what is derived from it.
 pub struct Core {
-    engine: Engine,
+    /// The layout engine, once the shell has handed in the fonts.
+    engine: Option<Engine>,
+    /// The text sizes, kept for an engine that does not exist yet.
+    style: Style,
     language: String,
     revision: u32,
     /// Counts layouts, which change with the language and the text sizes.
@@ -45,16 +49,41 @@ struct Open {
 }
 
 impl Core {
-    /// A core with nothing open. `language` is the interface language, a BCP
-    /// 47 tag such as `en` or `ja`.
+    /// A core with nothing open, laying text out with `fonts`. `language` is
+    /// the interface language, a BCP 47 tag such as `en` or `ja`.
     pub fn new(fonts: Fonts, style: Style, language: &str) -> Self {
+        let mut core = Self::without_fonts(style, language);
+        core.set_fonts(fonts);
+        core
+    }
+
+    /// A core with nothing open and no fonts yet. It opens files, counts what
+    /// they hold and answers [`Core::element`]; [`Core::diagram`] waits for
+    /// [`Core::set_fonts`]. The desktop shell opens a file named on the
+    /// command line this way, before its page has loaded the fonts.
+    pub fn without_fonts(style: Style, language: &str) -> Self {
         Self {
-            engine: Engine::new(fonts, style),
+            engine: None,
+            style,
             language: language.to_owned(),
             revision: 0,
             layout: 0,
             open: None,
         }
+    }
+
+    /// Lays text out with `fonts` from now on. What is open is laid out again.
+    pub fn set_fonts(&mut self, fonts: Fonts) {
+        self.engine = Some(Engine::new(fonts, self.style));
+        self.layout += 1;
+        if let Some(open) = self.open.as_mut() {
+            open.diagram = None;
+        }
+    }
+
+    /// Whether the fonts have been handed in, so a diagram can be laid out.
+    pub fn has_fonts(&self) -> bool {
+        self.engine.is_some()
     }
 
     /// Reads `bytes` as SACM 2.3 XMI by a strict read (plan decision D8).
@@ -63,7 +92,9 @@ impl Core {
         self.revision += 1;
         self.layout += 1;
         // The last document's measurements go, whether or not this one opens.
-        self.engine.clear_cache();
+        if let Some(engine) = self.engine.as_mut() {
+            engine.clear_cache();
+        }
         let output = match xmi::read(bytes, &ReadOptions::default().with_mode(Mode::Strict)) {
             Ok(output) => output,
             Err(error) => {
@@ -109,7 +140,9 @@ impl Core {
     /// Closes what is open, as a refused file does: nothing is open after.
     pub fn close(&mut self) {
         self.open = None;
-        self.engine.clear_cache();
+        if let Some(engine) = self.engine.as_mut() {
+            engine.clear_cache();
+        }
     }
 
     /// The revision of what is open, or of the last refusal.
@@ -117,7 +150,8 @@ impl Core {
         self.revision
     }
 
-    /// The diagram of the open document, or `None` when nothing is open.
+    /// The diagram of the open document, or `None` when nothing is open or
+    /// the fonts have not been handed in.
     pub fn diagram(&mut self) -> Option<DiagramAt> {
         self.diagram_ref().map(|at| DiagramAt {
             revision: at.revision,
@@ -130,9 +164,10 @@ impl Core {
     /// without copying it first.
     pub fn diagram_ref(&mut self) -> Option<DiagramAtRef<'_>> {
         let open = self.open.as_mut()?;
+        let engine = self.engine.as_mut()?;
         let diagram = open
             .diagram
-            .get_or_insert_with(|| convert::diagram(&self.engine.layout(&open.view)));
+            .get_or_insert_with(|| convert::diagram(&engine.layout(&open.view)));
         Some(DiagramAtRef {
             revision: self.revision,
             layout: self.layout,
@@ -182,9 +217,15 @@ impl Core {
 
     /// Changes the text sizes, which lays the diagram out again.
     pub fn set_style(&mut self, style: Style) {
-        if !self.engine.set_style(style) {
+        // Without an engine yet, checked as the engine checks it and kept.
+        let changed = match self.engine.as_mut() {
+            Some(engine) => engine.set_style(style),
+            None => style != self.style && Engine::style_is_usable(style),
+        };
+        if !changed {
             return;
         }
+        self.style = style;
         self.layout += 1;
         if let Some(open) = self.open.as_mut() {
             open.diagram = None;

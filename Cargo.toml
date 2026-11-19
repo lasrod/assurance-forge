@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/af-api", "crates/af-gsn", "crates/af-layout", "crates/af-wasm"]
+members = ["crates/af-api", "crates/af-desktop", "crates/af-gsn", "crates/af-layout", "crates/af-wasm"]
 
 [workspace.package]
 version = "0.4.0-dev"

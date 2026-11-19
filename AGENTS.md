@@ -30,6 +30,17 @@ pnpm --dir ui e2e        # browser tests against the production build
 pnpm --dir ui dev        # then open /?sample=sacm_example_core_argument.sacm.xmi
 ```
 
+The desktop application (`af-desktop`) loads the development server in a
+debug build and embeds `ui/dist` in a release build:
+
+```bash
+cargo run -p af-desktop -- testdata/sacm/sacm_example_core_argument.sacm.xmi   # with `pnpm --dir ui dev` running
+pnpm --dir ui build && cargo build -p af-desktop --release --features custom-protocol
+```
+
+On Linux, `af-desktop` needs WebKitGTK to build (Tauri's prerequisites); CI
+checks it on Windows and leaves it out of the Linux job.
+
 Test only what you changed while working (`cargo test -p <crate>`); run the
 workspace before pushing.
 

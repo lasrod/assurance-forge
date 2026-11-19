@@ -26,7 +26,7 @@ import {
   type WorkspaceLayout,
 } from './design';
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
-import { StartError } from './core/wasmCore';
+import { StartError } from './core/start';
 import { wordRefusal } from './i18n/refusals';
 import { loadLayout, saveLayout } from './layout';
 import { isOpenShortcut } from './shortcuts';
@@ -111,18 +111,17 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     setState({ kind: 'unreadable' });
     void coreRef.current?.close();
   }, []);
-  const open = useCallback(
-    async (bytes: Uint8Array, request: number) => {
-      // A later request has started: this one must not reach the core, which
-      // holds one document, nor wait for it.
-      if (request !== latest.current) return;
-      if (!core) {
-        setPending({ bytes, request });
-        return;
-      }
+  /**
+   * Shows what an open gave, unless a later request has started: the diagram
+   * of a file that opened, fitted with nothing selected, or its refusal. The
+   * core may have read the bytes itself (a file named at start, or chosen in
+   * the desktop's open dialog).
+   */
+  const show = useCallback(
+    async (on: Core, opening: () => Promise<OpenResult>, request: number) => {
       try {
-        const result = await core.open(bytes);
-        const next = result.result === 'opened' ? await core.diagram() : null;
+        const result = await opening();
+        const next = result.result === 'opened' ? await on.diagram() : null;
         if (request !== latest.current) return;
         shown.current = result.result === 'opened' ? result.revision : null;
         setState({ kind: 'result', result });
@@ -133,7 +132,20 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         unreadable(request);
       }
     },
-    [core, unreadable],
+    [unreadable],
+  );
+  const open = useCallback(
+    async (bytes: Uint8Array, request: number) => {
+      // A later request has started: this one must not reach the core, which
+      // holds one document, nor wait for it.
+      if (request !== latest.current) return;
+      if (!core) {
+        setPending({ bytes, request });
+        return;
+      }
+      await show(core, () => core.open(bytes), request);
+    },
+    [core, show],
   );
   /** Starts a request: the bytes it reads open only if no later one started. */
   const begin = () => {
@@ -196,6 +208,23 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       current = false;
     };
   }, [core, language, showRelayout]);
+
+  // The desktop application opens a file named on its command line.
+  useEffect(() => {
+    if (!core) return;
+    let wanted = true;
+    core.initialFile().then(
+      (file) => {
+        if (!wanted || !file) return;
+        const request = begin();
+        void show(core, async () => file.result, request);
+      },
+      () => undefined,
+    );
+    return () => {
+      wanted = false;
+    };
+  }, [core, show]);
 
   // In development and the browser tests, `?sample=<file>` opens a sample case.
   useEffect(() => {
@@ -312,7 +341,23 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // which stacked views are hidden. The page keeps it between visits.
   useEffect(() => saveLayout(layout), [layout]);
 
-  const chooseFile = useCallback(() => input.current?.click(), []);
+  // The desktop's own open dialog, which knows the file's path; in the browser,
+  // the file input.
+  const chooseFile = useCallback(() => {
+    const dialog = core?.openDialog;
+    if (!core || !dialog) {
+      input.current?.click();
+      return;
+    }
+    // Numbered once a file is chosen: a cancelled dialog leaves an open in
+    // progress alone. The core has read the file by then.
+    dialog().then(
+      (file) => {
+        if (file) void show(core, async () => file.result, begin());
+      },
+      () => unreadable(begin()),
+    );
+  }, [core, show, unreadable]);
 
   // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
   useEffect(() => {
