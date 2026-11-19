@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { DiagramCanvas } from './canvas/DiagramCanvas';
-import type { Core, DiagramAt, OpenResult, TextStyle } from './core/Core';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
+import { fit, zoomAbout, type Viewport } from './canvas/draw';
+import type { Core, DiagramAt, ElementDetails, OpenResult, TextStyle } from './core/Core';
+import { ElementProperties } from './ElementProperties';
 import {
   Button,
   ChevronDown,
   ChevronUp,
   DatumRoot,
   FolderOpen,
+  Maximize,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -17,6 +20,8 @@ import {
   Toolbar,
   ToolbarGroup,
   Workspace,
+  ZoomIn,
+  ZoomOut,
   type WorkspaceCopy,
   type WorkspaceLayout,
 } from './design';
@@ -71,6 +76,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [core, setCore] = useState<Core | null>(null);
   const [state, setState] = useState<State>({ kind: 'starting' });
   const [diagram, setDiagram] = useState<DiagramAt | null>(null);
+  // Pan and zoom, and the selection, stay in the frontend. A new file starts
+  // fitted (null until the canvas has a size) with nothing selected.
+  const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [details, setDetails] = useState<ElementDetails | null>(null);
   const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
   const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
@@ -96,6 +106,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     if (request !== latest.current) return;
     shown.current = null;
     setDiagram(null);
+    setViewport(null);
+    setSelected(null);
     setState({ kind: 'unreadable' });
     void coreRef.current?.close();
   }, []);
@@ -115,6 +127,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         shown.current = result.result === 'opened' ? result.revision : null;
         setState({ kind: 'result', result });
         setDiagram(next);
+        setViewport(null);
+        setSelected(null);
       } catch {
         unreadable(request);
       }
@@ -230,12 +244,55 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     [core, showRelayout],
   );
 
-  // The canvas takes its size from the workspace's centre surface (D5).
+  // The canvas takes its size from the workspace's centre surface (D5). When
+  // it changes, the point at the centre of the view stays at its centre.
   const [centreSize, setCentreSize] = useState({ width: 0, height: 0 });
-  const onCentreSize = useCallback(
-    (size: { inline: number; block: number }) => setCentreSize({ width: size.inline, height: size.block }),
-    [],
-  );
+  const onCentreSize = useCallback((size: { inline: number; block: number }) => {
+    setCentreSize((before) => {
+      const after = { width: size.inline, height: size.block };
+      if (before.width > 0 && before.height > 0 && after.width > 0 && after.height > 0) {
+        const dx = (after.width - before.width) / 2;
+        const dy = (after.height - before.height) / 2;
+        setViewport((view) => view && { ...view, offsetX: view.offsetX + dx, offsetY: view.offsetY + dy });
+      }
+      return after;
+    });
+  }, []);
+
+  // A new file is fitted once the canvas has a size, before it is painted.
+  useLayoutEffect(() => {
+    if (!viewport && diagram && centreSize.width > 0 && centreSize.height > 0) {
+      setViewport(fit(diagram.diagram.bounds, centreSize.width, centreSize.height));
+    }
+  }, [viewport, diagram, centreSize]);
+
+  const fitAll = () => {
+    if (diagram) setViewport(fit(diagram.diagram.bounds, centreSize.width, centreSize.height));
+  };
+  const zoomBy = (factor: number) =>
+    setViewport((view) => view && zoomAbout(view, factor, centreSize.width / 2, centreSize.height / 2));
+
+  // What Element Properties shows: the core's details of the selected node, read
+  // again when the diagram is (its text follows the language). An answer for a
+  // selection that has since changed is dropped.
+  useEffect(() => {
+    if (!core || !selected || !diagram) {
+      setDetails(null);
+      return;
+    }
+    let current = true;
+    core.element(selected).then(
+      (next) => {
+        if (current) setDetails(next);
+      },
+      () => {
+        if (current) setDetails(null);
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [core, selected, diagram]);
 
   const copy: WorkspaceCopy = useMemo(
     () => ({
@@ -292,6 +349,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             {t('open')}
           </Button>
         </ToolbarGroup>
+        {/* Panning and zooming never need a drag (WCAG 2.5.7): buttons and keys too. */}
+        <ToolbarGroup>
+          <Button icon={<ZoomOut aria-hidden="true" />} onClick={() => zoomBy(1 / ZOOM_STEP)} unavailable={!viewport}>
+            {t('zoomOut')}
+          </Button>
+          <Button icon={<ZoomIn aria-hidden="true" />} onClick={() => zoomBy(ZOOM_STEP)} unavailable={!viewport}>
+            {t('zoomIn')}
+          </Button>
+          <Button icon={<Maximize aria-hidden="true" />} onClick={fitAll} unavailable={!viewport}>
+            {t('fit')}
+          </Button>
+        </ToolbarGroup>
       </Toolbar>
       <input
         ref={input}
@@ -338,7 +407,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             nameInText: t('elementPropertiesInText'),
             min: 14,
             icons: { hide: <PanelRightClose />, show: <PanelRightOpen /> },
-            views: [{ id: 'elementProperties', label: t('elementProperties'), content: empty('elementPropertiesEmpty') }],
+            views: [
+              { id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} /> },
+            ],
           }}
           bottom={{
             name: t('problems'),
@@ -348,7 +419,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             views: [{ id: 'problems', label: t('problems'), content: empty('problemsEmpty') }],
           }}
         >
-          <DiagramCanvas diagram={diagram} label={t('canvas')} size={centreSize} onTextStyle={onTextStyle} />
+          <DiagramCanvas
+            diagram={diagram}
+            label={t('canvas')}
+            size={centreSize}
+            viewport={viewport}
+            onViewport={setViewport}
+            selected={selected}
+            onSelect={setSelected}
+            onTextStyle={onTextStyle}
+          />
         </Workspace>
       </div>
       <StatusBar>
@@ -356,6 +436,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           {status.text}
         </Status>
         <StatusBarSpacer />
+        {viewport && diagram && <Status data-testid="zoom">{t('zoom', { percent: Math.round(viewport.scale * 100) })}</Status>}
       </StatusBar>
     </DatumRoot>
   );
