@@ -310,3 +310,15 @@ test('Resize: when a panel closes and reopens, the canvas keeps its view centre'
   expect(still.x).toBeCloseTo(middle.x, 3);
   expect(still.y).toBeCloseTo(middle.y, 3);
 });
+
+test('Keys: a click gives the canvas focus without a ring, so its keys work; Tab shows the ring', async ({ page }) => {
+  await opened(page);
+  const node = await nodeCentre(page, 'cl_top');
+  await page.mouse.click(node.x, node.y);
+  const focus = () => canvas(page).evaluate((element) => ({ focused: document.activeElement === element, ring: element.matches(':focus-visible') }));
+  expect(await focus()).toEqual({ focused: true, ring: false });
+
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  expect(await focus()).toEqual({ focused: true, ring: true });
+});

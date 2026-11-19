@@ -167,7 +167,6 @@ export function DiagramCanvas({
     if (!viewport || (event.button !== 0 && event.button !== 1)) return;
     // The middle button would start the browser's autoscroll.
     if (event.button === 1) event.preventDefault();
-    event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = local(event);
     pointers.current.set(event.pointerId, point);

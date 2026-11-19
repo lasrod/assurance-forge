@@ -28,7 +28,8 @@ export function ElementProperties({ details, t }: { details: ElementDetails | nu
   const none = t('propertyNone');
   return (
     <div className="af-properties" data-testid="element-properties">
-      <PropertyGrid>
+      {/* The values are words, not quantities: they start-align and wrap. */}
+      <PropertyGrid data-values="text">
         <PropertyRow label={t('propertyType')} value={kindLabel(details, t)} />
         <PropertyRow label={t('propertyId')} value={details.identifier} mono />
         <PropertyRow label={t('propertyName')} value={details.name} missingLabel={none} />
