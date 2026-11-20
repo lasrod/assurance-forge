@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { createWasmCore, StartError } from './core/wasmCore';
+import { StartError } from './core/start';
+import { createTauriCore, inDesktop } from './core/tauriCore';
 import { measuredFontUrls } from './design';
 import { initialLanguage, type Language } from './i18n/messages';
 import './app.css';
@@ -41,7 +42,12 @@ async function start(language: Language) {
     ),
   );
   for (const face of loaded) document.fonts.add(face);
-  return createWasmCore({ sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold, monoRegular }, language);
+  const fonts = { sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold, monoRegular };
+  // The desktop application's core is Rust in its shell; the browser's is
+  // WebAssembly, loaded only there.
+  if (inDesktop()) return createTauriCore(fonts, language);
+  const { createWasmCore } = await import('./core/wasmCore');
+  return createWasmCore(fonts, language);
 }
 
 const root = document.getElementById('root');

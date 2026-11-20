@@ -13,6 +13,20 @@ export interface Palette {
   text: string;
   /** `text.secondary`: the identifier. */
   secondary: string;
+  /** `surface.hover`: the fill of the node under the pointer. */
+  hover: string;
+  /** `selection.surface`: the selected node's fill. */
+  selectedFill: string;
+  /** `selection.indicator`: the selected node's outline. */
+  selectedLine: string;
+  /** Forced colours are on: the selected outline is heavier, since there is no fill to see. */
+  forced: boolean;
+}
+
+/** Which node is selected and which is under the pointer: separate states (DATUM). */
+export interface Marks {
+  selected: string | null;
+  hovered: string | null;
 }
 
 /** Diagram coordinates to CSS pixels: `x * scale + offsetX`. */
@@ -26,6 +40,8 @@ export const MIN_SCALE = 0.1;
 export const MAX_SCALE = 4;
 const FIT_MARGIN = 16;
 
+const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
+
 /** The viewport that fits `bounds` in a `width` × `height` canvas, centred, at most 100%. */
 export function fit(bounds: Rect, width: number, height: number): Viewport {
   const room = (size: number) => Math.max(size - 2 * FIT_MARGIN, 1);
@@ -36,6 +52,58 @@ export function fit(bounds: Rect, width: number, height: number): Viewport {
     offsetX: (width - bounds.width * scale) / 2 - bounds.x * scale,
     offsetY: (height - bounds.height * scale) / 2 - bounds.y * scale,
   };
+}
+
+/**
+ * Zooms by `factor` about the canvas point (`x`, `y`) in CSS px, which stays
+ * where it is, within 10% to 400%.
+ */
+export function zoomAbout(viewport: Viewport, factor: number, x: number, y: number): Viewport {
+  const scale = clamp(viewport.scale * factor, MIN_SCALE, MAX_SCALE);
+  const k = scale / viewport.scale;
+  return { scale, offsetX: x - (x - viewport.offsetX) * k, offsetY: y - (y - viewport.offsetY) * k };
+}
+
+/** The viewport moved by (`dx`, `dy`) CSS px. */
+export function pan(viewport: Viewport, dx: number, dy: number): Viewport {
+  return { ...viewport, offsetX: viewport.offsetX + dx, offsetY: viewport.offsetY + dy };
+}
+
+/** A canvas point in CSS px as a diagram point. */
+export function toDiagram(viewport: Viewport, x: number, y: number): Point {
+  return { x: (x - viewport.offsetX) / viewport.scale, y: (y - viewport.offsetY) / viewport.scale };
+}
+
+/** Whether the diagram point lies inside the node's shape, its outline included. */
+export function insideShape(node: DiagramNode, point: Point): boolean {
+  const shape = node.shape;
+  const { x, y, width, height } = shape.rect;
+  if (point.x < x || point.x > x + width || point.y < y || point.y > y + height) return false;
+  switch (shape.type) {
+    case 'ellipse':
+    case 'circle': {
+      const dx = (point.x - (x + width / 2)) / (width / 2);
+      const dy = (point.y - (y + height / 2)) / (height / 2);
+      return dx * dx + dy * dy <= 1;
+    }
+    case 'parallelogram': {
+      // The left edge runs from (x + skew, y) down to (x, y + height); the right edge likewise.
+      const shift = shape.skew * (1 - (point.y - y) / height);
+      return point.x >= x + shift && point.x <= x + width - shape.skew + shift;
+    }
+    default:
+      return true;
+  }
+}
+
+/** The node under the canvas point (`x`, `y`) in CSS px: the one drawn last, on top. */
+export function hitTest(diagram: Diagram, viewport: Viewport, x: number, y: number): DiagramNode | null {
+  const point = toDiagram(viewport, x, y);
+  for (let index = diagram.nodes.length - 1; index >= 0; index -= 1) {
+    const node = diagram.nodes[index];
+    if (insideShape(node, point)) return node;
+  }
+  return null;
 }
 
 /** The font families: names and statements, and identifiers. */
@@ -79,6 +147,7 @@ export function draw(
   palette: Palette,
   families: Families,
   size: { width: number; height: number; dpr: number },
+  marks: Marks = { selected: null, hovered: null },
 ): Drawn {
   const { scale, offsetX, offsetY } = viewport;
   context.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
@@ -98,7 +167,7 @@ export function draw(
   }
   for (const node of diagram.nodes) {
     if (!overlaps(node.bounds, visible)) continue;
-    drawNode(context, node, palette, families, scale);
+    drawNode(context, node, palette, families, scale, marks);
     drawn.nodes += 1;
   }
   return drawn;
@@ -154,14 +223,27 @@ function shapePath(context: CanvasRenderingContext2D, node: DiagramNode) {
   }
 }
 
-function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, families: Families, scale: number) {
+function drawNode(
+  context: CanvasRenderingContext2D,
+  node: DiagramNode,
+  palette: Palette,
+  families: Families,
+  scale: number,
+  marks: Marks,
+) {
+  // Selected and hovered are told apart by fill and outline, never by the
+  // outline's colour alone (DATUM's list treatment).
+  const selected = marks.selected === node.id;
+  const hovered = marks.hovered === node.id;
   shapePath(context, node);
-  context.fillStyle = palette.ground;
+  context.fillStyle = selected ? palette.selectedFill : hovered ? palette.hover : palette.ground;
   context.fill();
-  context.strokeStyle = palette.line;
+  context.strokeStyle = selected ? palette.selectedLine : palette.line;
+  context.lineWidth = (selected && palette.forced ? 2 : 1) / scale;
   context.setLineDash(node.shape.type === 'neutral' ? [4 / scale, 3 / scale] : []);
   context.stroke();
   context.setLineDash([]);
+  context.lineWidth = 1 / scale;
 
   // Zoomed far out the text is not drawn, the A and J included: only the
   // identifier, at metadata size (DATUM's canvas rule 5).

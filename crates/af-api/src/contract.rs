@@ -29,6 +29,17 @@ pub enum OpenResult {
     Refused(Refusal),
 }
 
+/// A file a shell read itself (named on the desktop application's command
+/// line, or chosen in its open dialog): the file's name and what opening it
+/// gave.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct OpenedFile {
+    pub name: String,
+    pub result: OpenResult,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[serde(rename_all = "camelCase")]
@@ -288,6 +299,7 @@ pub fn typescript() -> String {
     let cfg = ts_rs::Config::new();
     let declarations = [
         OpenResult::decl(&cfg),
+        OpenedFile::decl(&cfg),
         DiagnosticCounts::decl(&cfg),
         Refusal::decl(&cfg),
         MessageArgument::decl(&cfg),

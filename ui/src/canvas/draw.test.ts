@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Diagram, DiagramNode } from '../core/Core';
-import { draw, fit, MAX_SCALE, MIN_SCALE, type Families, type Palette } from './draw';
+import { draw, fit, hitTest, insideShape, MAX_SCALE, MIN_SCALE, pan, toDiagram, zoomAbout, type Families, type Palette } from './draw';
 
 describe('fit', () => {
   it('centres a small diagram at 100%', () => {
@@ -28,7 +28,12 @@ describe('fit', () => {
 function recorder() {
   const texts: string[] = [];
   const fonts: string[] = [];
+  /** The fill style at each fill, and the stroke style at each stroke. */
+  const fills: string[] = [];
+  const strokes: string[] = [];
   let font = '10px x';
+  let fillStyle = '';
+  let strokeStyle = '';
   const context = new Proxy(
     {},
     {
@@ -40,18 +45,31 @@ function recorder() {
           };
         if (name === 'measureText') return (text: string) => ({ width: text.length * 0.5 * parseFloat(font.split(' ')[1]) });
         if (name === 'font') return font;
+        if (name === 'fill') return () => fills.push(fillStyle);
+        if (name === 'stroke') return () => strokes.push(strokeStyle);
         return () => undefined;
       },
       set: (_, name, value) => {
         if (name === 'font') font = value as string;
+        if (name === 'fillStyle') fillStyle = value as string;
+        if (name === 'strokeStyle') strokeStyle = value as string;
         return true;
       },
     },
   ) as unknown as CanvasRenderingContext2D;
-  return { context, texts, fonts };
+  return { context, texts, fonts, fills, strokes };
 }
 
-const palette: Palette = { ground: '#fff', line: '#000', text: '#000', secondary: '#666' };
+const palette: Palette = {
+  ground: '#fff',
+  line: '#000',
+  text: '#000',
+  secondary: '#666',
+  hover: '#eee',
+  selectedFill: '#def',
+  selectedLine: '#00f',
+  forced: false,
+};
 const families: Families = { text: 'sans', identifier: 'mono' };
 
 function node(id: string, x: number): DiagramNode {
@@ -116,5 +134,71 @@ describe('draw', () => {
     const far = recorder();
     draw(far.context, diagram, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
     expect(far.fonts).toEqual(['400 30px mono']);
+  });
+});
+
+describe('the view', () => {
+  it('zooms about a point, which stays where it is', () => {
+    const before = { scale: 1, offsetX: 10, offsetY: 20 };
+    const after = zoomAbout(before, 2, 300, 200);
+    expect(after.scale).toBe(2);
+    expect(toDiagram(after, 300, 200)).toEqual(toDiagram(before, 300, 200));
+  });
+
+  it('keeps the zoom between 10% and 400%', () => {
+    expect(zoomAbout({ scale: 3, offsetX: 0, offsetY: 0 }, 10, 0, 0).scale).toBe(MAX_SCALE);
+    expect(zoomAbout({ scale: 0.2, offsetX: 0, offsetY: 0 }, 0.01, 0, 0).scale).toBe(MIN_SCALE);
+  });
+
+  it('pans by screen pixels', () => {
+    expect(pan({ scale: 2, offsetX: 10, offsetY: 20 }, 5, -5)).toEqual({ scale: 2, offsetX: 15, offsetY: 15 });
+  });
+});
+
+describe('hit testing', () => {
+  const rect = { x: 0, y: 0, width: 100, height: 50 };
+  const shaped = (shape: DiagramNode['shape']): DiagramNode => ({ ...node('N', 0), shape, bounds: rect });
+
+  it('follows the shape, not its box', () => {
+    const ellipse = shaped({ type: 'ellipse', rect });
+    expect(insideShape(ellipse, { x: 50, y: 25 })).toBe(true);
+    expect(insideShape(ellipse, { x: 3, y: 3 })).toBe(false);
+    const parallelogram = shaped({ type: 'parallelogram', rect, skew: 20 });
+    // The top left corner is outside the slanted edge, the bottom left inside.
+    expect(insideShape(parallelogram, { x: 5, y: 2 })).toBe(false);
+    expect(insideShape(parallelogram, { x: 5, y: 48 })).toBe(true);
+    expect(insideShape(parallelogram, { x: 95, y: 48 })).toBe(false);
+    expect(insideShape(shaped({ type: 'rectangle', rect }), { x: 101, y: 25 })).toBe(false);
+  });
+
+  it('finds the node under a canvas point through the viewport', () => {
+    const viewport = { scale: 0.5, offsetX: 100, offsetY: 0 };
+    // G1 spans 0 to 200 by 0 to 80 in the diagram: 100 to 200 by 0 to 40 on the canvas.
+    expect(hitTest(diagram, viewport, 150, 20)?.id).toBe('G1');
+    expect(hitTest(diagram, viewport, 50, 20)).toBeNull();
+  });
+});
+
+describe('selected and hovered', () => {
+  it('fill and outline the node, each its own way', () => {
+    const plain = recorder();
+    draw(plain.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
+    expect(plain.fills).toEqual(['#fff']);
+
+    const selected = recorder();
+    draw(selected.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 }, {
+      selected: 'G1',
+      hovered: null,
+    });
+    expect(selected.fills).toEqual(['#def']);
+    expect(selected.strokes).toEqual(['#00f']);
+
+    const hovered = recorder();
+    draw(hovered.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 }, {
+      selected: null,
+      hovered: 'G1',
+    });
+    expect(hovered.fills).toEqual(['#eee']);
+    expect(hovered.strokes).toEqual(['#000']);
   });
 });

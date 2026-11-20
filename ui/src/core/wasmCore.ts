@@ -2,25 +2,7 @@
 
 import init, { WasmCore } from '../wasm/af_wasm';
 import type { Core, DiagramAt, ElementDetails, OpenResult } from './Core';
-
-/** The measured faces, as whole font files, in their fallback order. */
-export interface FontBytes {
-  sansRegular: Uint8Array;
-  sansSemiBold: Uint8Array;
-  japaneseRegular: Uint8Array;
-  japaneseSemiBold: Uint8Array;
-  monoRegular: Uint8Array;
-}
-
-/** Why the core did not start: a code the interface words. */
-export class StartError extends Error {
-  constructor(
-    readonly code: 'font-unreadable' | 'font-missing' | 'core',
-    readonly detail = '',
-  ) {
-    super(`${code}${detail ? `:${detail}` : ''}`);
-  }
-}
+import { StartError, type FontBytes } from './start';
 
 export async function createWasmCore(fonts: FontBytes, language: string): Promise<Core> {
   await init();
@@ -44,5 +26,8 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     setStyle: async (style) =>
       core.setStyle(style.textSize, style.textLineHeight, style.identifierSize, style.identifierLineHeight),
     dispose: () => core.free(),
+    // A page has no command line, and chooses a file with a file input.
+    initialFile: async () => null,
+    openDialog: null,
   };
 }

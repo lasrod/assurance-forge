@@ -61,10 +61,46 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      # af-desktop needs WebKitGTK on Linux; the desktop job checks it on Windows.
+      - run: cargo clippy --workspace --exclude af-desktop --all-targets -- -D warnings
+      - run: cargo test --workspace --exclude af-desktop
       # The pure crates must build for the browser. Add each new pure crate here.
       - run: cargo build -p af-gsn -p af-layout -p af-api -p af-wasm --target wasm32-unknown-unknown
+
+  # Goal G9's check: the desktop application builds on Windows, and starts
+  # with the sample. CI cannot build the interface (DATUM is private), so the
+  # release build embeds a placeholder page: what is checked is the shell and
+  # the core, which open the file and log what was read before any page loads.
+  desktop:
+    name: Desktop (Windows build and smoke test)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo clippy -p af-desktop --all-targets -- -D warnings
+      # Includes tests/smoke.rs, which starts the debug build with the sample.
+      - run: cargo test -p af-desktop
+      - name: Release build over a placeholder page
+        shell: bash
+        run: |
+          mkdir -p ui/dist
+          printf '<!doctype html><meta charset="utf-8"><title>Assurance Forge</title>' > ui/dist/index.html
+          cargo build -p af-desktop --release --features custom-protocol
+      - name: Smoke test of the release build
+        shell: bash
+        run: |
+          code=0
+          ./target/release/af-desktop.exe --smoke testdata/sacm/sacm_example_core_argument.sacm.xmi 2> smoke.log || code=$?
+          cat smoke.log
+          test "$code" -eq 0
+          grep -E '^af-desktop opened .* revision=1 nodes=8 edges=7 ' smoke.log
+          grep -F 'af-desktop smoke window=true' smoke.log
 
   # The other operating systems run on main only, so a pull request is not
   # held up by them. A failure here is a failure of main and must be fixed.

@@ -12,16 +12,64 @@ fn testdata(path: &str) -> Vec<u8> {
     std::fs::read(&path).unwrap_or_else(|error| panic!("setup: {path}: {error}"))
 }
 
-fn core(language: &str) -> Core {
-    let fonts = Fonts::new(
+fn fonts() -> Fonts {
+    Fonts::new(
         testdata("fonts/IBMPlexSans-Regular.ttf"),
         testdata("fonts/IBMPlexSans-SemiBold.ttf"),
         testdata("fonts/AFTestSansJP-Regular.ttf"),
         testdata("fonts/AFTestSansJP-SemiBold.ttf"),
         testdata("fonts/IBMPlexMono-Regular.ttf"),
     )
-    .unwrap_or_else(|error| panic!("setup: {error:?}"));
-    Core::new(fonts, Style::default(), language)
+    .unwrap_or_else(|error| panic!("setup: {error:?}"))
+}
+
+fn core(language: &str) -> Core {
+    Core::new(fonts(), Style::default(), language)
+}
+
+#[test]
+fn a_file_opens_before_the_fonts_arrive_and_is_drawn_once_they_have() {
+    // The desktop shell opens a file named on the command line before its
+    // page has loaded the fonts.
+    let mut core = Core::without_fonts(Style::default(), "en");
+    assert!(!core.has_fonts());
+    let opened = core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    assert!(
+        matches!(
+            opened,
+            OpenResult::Opened {
+                revision: 1,
+                nodes: 8,
+                edges: 7,
+                ..
+            }
+        ),
+        "{opened:?}"
+    );
+    assert!(core.element("cl_top").is_some());
+    assert!(core.diagram().is_none(), "no layout without fonts");
+
+    // A text size set meanwhile is the one the layout uses.
+    let larger = Style {
+        text_size: 17.5,
+        text_line_height: 25.0,
+        identifier_size: 15.0,
+        identifier_line_height: 20.0,
+    };
+    core.set_style(larger);
+    core.set_fonts(fonts());
+    assert!(core.has_fonts());
+    let Some(at) = core.diagram() else {
+        panic!("no diagram once the fonts are in");
+    };
+    assert_eq!(at.revision, 1);
+    assert_eq!(at.diagram.nodes.len(), 8);
+    let statement = at.diagram.nodes[0]
+        .text
+        .iter()
+        .find(|line| line.role == af_api::contract::TextRole::Statement)
+        .map(|line| line.size);
+    assert_eq!(statement, Some(17.5));
 }
 
 #[test]

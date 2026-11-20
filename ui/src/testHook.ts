@@ -3,12 +3,19 @@
 // and the code is removed.
 
 import type { DiagramAt } from './core/Core';
+import type { Viewport } from './canvas/draw';
 
 export interface TestState {
   revision: number | null;
   drawn: { nodes: number; edges: number };
   /** What was drawn from, to compare the browser's text widths with the core's. */
   diagram: DiagramAt | null;
+  /** Diagram coordinates to canvas CSS px, as drawn. */
+  viewport: Viewport | null;
+  /** The selected node's SACM id. */
+  selected: string | null;
+  /** The node under the pointer. */
+  hovered: string | null;
   /** How many times the canvas was painted. */
   paints: number;
 }

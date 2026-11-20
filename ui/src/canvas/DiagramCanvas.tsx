@@ -1,15 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { DiagramAt, TextStyle } from '../core/Core';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
-import { draw, fit, type Palette } from './draw';
+import { draw, fit, hitTest, pan, zoomAbout, type Palette, type Viewport } from './draw';
 
 function palette(style: CanvasStyle): Palette {
+  // Forced colours: the system's, as DATUM's canvas rule says.
+  const color = (token: string, system: string) => (style.forced ? system : style.color(token));
   return {
-    ground: style.color('surface.canvas'),
-    line: style.color('line.control'),
-    text: style.color('text.primary'),
-    secondary: style.color('text.secondary'),
+    ground: color('surface.canvas', 'Canvas'),
+    line: color('line.control', 'CanvasText'),
+    text: color('text.primary', 'CanvasText'),
+    secondary: color('text.secondary', 'CanvasText'),
+    hover: color('surface.hover', 'Canvas'),
+    selectedFill: color('selection.surface', 'Canvas'),
+    selectedLine: color('selection.indicator', 'Highlight'),
+    forced: style.forced,
   };
 }
 
@@ -23,24 +29,61 @@ function textStyle(style: CanvasStyle): TextStyle {
   };
 }
 
+/** A press that moves less than this, in CSS px, is a click. */
+const DRAG_SLOP = 4;
+/** One press of + or −. */
+export const ZOOM_STEP = 1.25;
+
+/** The view's keys while the canvas has focus (DATUM decision 0023), or null for any other key. */
+export function viewKey(event: Pick<globalThis.KeyboardEvent, 'key' | 'code' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'altKey'>) {
+  // Ctrl or ⌘ with + − 0 stays the browser's zoom.
+  if (event.ctrlKey || event.metaKey || event.altKey) return null;
+  // Shift with 1, 2 or 0, by key position, so it is the same on every layout.
+  if (event.shiftKey && event.code === 'Digit1') return 'fit';
+  if (event.shiftKey && event.code === 'Digit2') return 'fitSelection';
+  if (event.shiftKey && event.code === 'Digit0') return 'actualSize';
+  if (event.key === '+' || event.key === '=') return 'zoomIn';
+  if (event.key === '-') return 'zoomOut';
+  if (event.key === 'Escape') return 'clear';
+  return null;
+}
+
+type Gesture = {
+  start: { x: number; y: number };
+  view: Viewport;
+  panning: boolean;
+  pinch?: { distance: number; middle: { x: number; y: number } };
+};
+
 /**
- * The diagram, fitted to the canvas, which fills the workspace's centre
- * surface and is `size` CSS px. `onTextStyle` hears the text sizes DATUM's
- * tokens resolve to, for the layout.
+ * The diagram on a canvas that fills the workspace's centre surface, `size`
+ * CSS px. The viewport and the selection are the application's: the canvas
+ * asks to change them. `onTextStyle` hears the text sizes DATUM's tokens
+ * resolve to, for the layout.
  */
 export function DiagramCanvas({
   diagram,
   label,
   size,
+  viewport,
+  onViewport,
+  selected,
+  onSelect,
   onTextStyle,
 }: {
   diagram: DiagramAt | null;
   label: string;
   size: { width: number; height: number };
+  viewport: Viewport | null;
+  onViewport: (next: Viewport) => void;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
   onTextStyle: (style: TextStyle) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [panning, setPanning] = useState(false);
 
   useEffect(() => {
     const element = canvas.current;
@@ -54,6 +97,9 @@ export function DiagramCanvas({
     return () => watch.dispose();
   }, [onTextStyle]);
 
+  // A node that is gone, after a new file, is no longer under the pointer.
+  const shownHover = diagram && hovered && diagram.diagram.nodes.some((node) => node.id === hovered) ? hovered : null;
+
   useEffect(() => {
     const element = canvas.current;
     const context = element?.getContext('2d');
@@ -61,21 +107,177 @@ export function DiagramCanvas({
     const dpr = style.dpr;
     element.width = Math.round(size.width * dpr);
     element.height = Math.round(size.height * dpr);
-    if (!diagram) {
+    if (!diagram || !viewport) {
       context.setTransform(1, 0, 0, 1, 0, 0);
-      context.fillStyle = style.color('surface.canvas');
+      context.fillStyle = style.forced ? 'Canvas' : style.color('surface.canvas');
       context.fillRect(0, 0, element.width, element.height);
-      report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null });
+      report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null, viewport: null, selected, hovered: null });
       return;
     }
-    const viewport = fit(diagram.diagram.bounds, size.width, size.height);
-    const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFamilies, { ...size, dpr });
-    report({ revision: diagram.revision, drawn, diagram });
-  }, [diagram, size, style]);
+    const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFamilies, { ...size, dpr }, {
+      selected,
+      hovered: shownHover,
+    });
+    report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover });
+  }, [diagram, size, style, viewport, selected, shownHover]);
+
+  // The latest values, for the handlers below, which outlive a render.
+  const latest = useRef({ diagram, viewport, size, onViewport });
+  latest.current = { diagram, viewport, size, onViewport };
+
+  // Scroll pans on both axes; Ctrl or ⌘ with the wheel, and a touchpad pinch
+  // (which the browser sends as Ctrl and the wheel), zoom about the pointer.
+  // Not passive, so the page neither scrolls nor zooms.
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const onWheel = (event: WheelEvent) => {
+      const { viewport: view, onViewport: change } = latest.current;
+      if (!view) return;
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1;
+      const rect = element.getBoundingClientRect();
+      if (event.ctrlKey || event.metaKey) {
+        const dy = Math.max(-50, Math.min(50, event.deltaY * unit));
+        change(zoomAbout(view, Math.exp(-dy * 0.01), event.clientX - rect.left, event.clientY - rect.top));
+        return;
+      }
+      let dx = event.deltaX * unit;
+      let dy = event.deltaY * unit;
+      // Shift and a wheel with one axis scrolls sideways, as a page does.
+      if (event.shiftKey && dx === 0) [dx, dy] = [dy, 0];
+      change(pan(view, -dx, -dy));
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<Gesture | null>(null);
+  const local = (event: PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const twoPointers = () => {
+    const [a, b] = [...pointers.current.values()];
+    return { distance: Math.hypot(a.x - b.x, a.y - b.y), middle: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  };
+
+  const onPointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (!viewport || (event.button !== 0 && event.button !== 1)) return;
+    // The middle button would start the browser's autoscroll.
+    if (event.button === 1) event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = local(event);
+    pointers.current.set(event.pointerId, point);
+    if (pointers.current.size === 2) {
+      gesture.current = { start: point, view: viewport, panning: true, pinch: twoPointers() };
+    } else {
+      gesture.current = { start: point, view: viewport, panning: event.button === 1 };
+    }
+    setPanning(gesture.current.panning);
+  };
+
+  const onPointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
+    const point = local(event);
+    const current = gesture.current;
+    if (!current) {
+      if (diagram && viewport) setHovered(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+      return;
+    }
+    pointers.current.set(event.pointerId, point);
+    if (current.pinch && pointers.current.size >= 2) {
+      const now = twoPointers();
+      const zoomed = zoomAbout(current.view, now.distance / current.pinch.distance, current.pinch.middle.x, current.pinch.middle.y);
+      onViewport(pan(zoomed, now.middle.x - current.pinch.middle.x, now.middle.y - current.pinch.middle.y));
+      return;
+    }
+    if (!current.panning && Math.hypot(point.x - current.start.x, point.y - current.start.y) > DRAG_SLOP) {
+      current.panning = true;
+      setPanning(true);
+      setHovered(null);
+    }
+    if (current.panning) onViewport(pan(current.view, point.x - current.start.x, point.y - current.start.y));
+  };
+
+  const onPointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
+    const current = gesture.current;
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size > 0) return;
+    gesture.current = null;
+    setPanning(false);
+    if (!current || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
+    // A press that did not move is a click: it selects the node under it, or
+    // clears the selection on empty canvas.
+    const point = local(event);
+    onSelect(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+  };
+
+  const onPointerCancel = (event: PointerEvent<HTMLCanvasElement>) => {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size === 0) {
+      gesture.current = null;
+      setPanning(false);
+    }
+  };
+
+  const fitTo = useCallback(
+    (id: string | null) => {
+      const { diagram: shown, size: area, onViewport: change } = latest.current;
+      if (!shown) return;
+      const node = id === null ? null : shown.diagram.nodes.find((candidate) => candidate.id === id);
+      if (id !== null && !node) return;
+      change(fit(node ? node.bounds : shown.diagram.bounds, area.width, area.height));
+    },
+    [],
+  );
+
+  const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
+    const action = viewKey(event);
+    if (!action || !viewport || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    const centre = { x: size.width / 2, y: size.height / 2 };
+    switch (action) {
+      case 'fit':
+        fitTo(null);
+        break;
+      case 'fitSelection':
+        // With nothing selected, nothing happens.
+        if (selected) fitTo(selected);
+        break;
+      case 'actualSize':
+        onViewport(zoomAbout(viewport, 1 / viewport.scale, centre.x, centre.y));
+        break;
+      case 'zoomIn':
+        onViewport(zoomAbout(viewport, ZOOM_STEP, centre.x, centre.y));
+        break;
+      case 'zoomOut':
+        onViewport(zoomAbout(viewport, 1 / ZOOM_STEP, centre.x, centre.y));
+        break;
+      case 'clear':
+        onSelect(null);
+        break;
+    }
+  };
 
   return (
     <div className="af-canvas-host">
-      <canvas ref={canvas} className="af-canvas" role="img" aria-label={label} />
+      <canvas
+        ref={canvas}
+        className="af-canvas"
+        role="img"
+        aria-label={label}
+        aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape"
+        tabIndex={0}
+        style={{ cursor: panning ? 'grabbing' : shownHover ? 'pointer' : 'default' }}
+        onKeyDown={onKeyDown}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={() => setHovered(null)}
+        onAuxClick={(event) => event.preventDefault()}
+      />
     </div>
   );
 }

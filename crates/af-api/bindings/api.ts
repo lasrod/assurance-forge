@@ -11,6 +11,8 @@ diagnostics: DiagnosticCounts, nodes: number, edges: number,
  */
 viewCodes: number, } | { "result": "refused" } & Refusal;
 
+export type OpenedFile = { name: string, result: OpenResult, };
+
 export type DiagnosticCounts = { errors: number, warnings: number, infos: number, };
 
 export type Refusal = { 

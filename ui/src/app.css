@@ -24,7 +24,16 @@
 
   .af-dock-empty {
     margin: 0;
-    padding: var(--datum-space-3, 0.75rem);
+    padding: var(--datum-space-12);
+  }
+
+  .af-properties {
+    padding: var(--datum-space-12);
+  }
+
+  /* An identifier or a statement with no spaces still wraps in the narrow dock. */
+  .af-properties dd {
+    overflow-wrap: anywhere;
   }
 
   .af-canvas-host {
@@ -37,5 +46,16 @@
     display: block;
     width: 100%;
     height: 100%;
+  }
+
+  /* The canvas is one Tab stop: DATUM's focus ring when the keyboard reached
+     it, none after a click. */
+  .af-canvas:focus {
+    outline: none;
+  }
+
+  .af-canvas:focus-visible {
+    outline: var(--datum-focus-width) solid var(--datum-focus-ring);
+    outline-offset: calc(-1 * var(--datum-focus-width));
   }
 }
