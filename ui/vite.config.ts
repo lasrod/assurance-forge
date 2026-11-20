@@ -35,7 +35,10 @@ function samples(): Plugin {
 
 export default defineConfig({
   plugins: [react(), samples()],
-  server: { fs: { allow: ['..'] } },
+  // Its own port, and only that one: the desktop application's debug build
+  // loads this address (crates/af-desktop/tauri.conf.json), and must never be
+  // shown another project's page that happens to hold Vite's default port.
+  server: { port: 5183, strictPort: true, fs: { allow: ['..'] } },
   build: { target: 'es2022' },
   test: { include: ['src/**/*.test.ts'] },
 });

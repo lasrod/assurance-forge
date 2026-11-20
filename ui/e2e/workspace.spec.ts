@@ -7,9 +7,9 @@ async function opened(page: Page, query = '') {
 
 const canvas = (page: Page) => page.getByRole('img', { name: 'GSN diagram' });
 
-/** The canvas fills the centre surface exactly. */
+/** The canvas fills the centre's surface exactly: the centre, under its zoom bar. */
 async function expectCanvasFillsCentre(page: Page) {
-  const centre = await page.getByRole('region', { name: 'Diagram' }).boundingBox();
+  const centre = await page.getByRole('region', { name: 'Diagram' }).locator('.datum-workspace-surface').boundingBox();
   const box = await canvas(page).boundingBox();
   expect(box).not.toBeNull();
   expect(box).toEqual(centre);

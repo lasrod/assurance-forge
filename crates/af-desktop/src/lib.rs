@@ -3,7 +3,7 @@
 //!
 //! This shell, `af-mcp` and `af-wasm` are the only crates that touch the
 //! outside world. Here that is the file system (a file named on the command
-//! line, the open dialog) and the window. The page loads DATUM's measured
+//! line, the open dialog, the list of recent files) and the window. The page loads DATUM's measured
 //! faces once and hands the same bytes to the core, as it does in the browser.
 //!
 //! The commands are the browser core's (`ui/src/core/Core.ts`), so the
@@ -12,6 +12,8 @@
 //! `af-desktop [--smoke] [FILE]` opens `FILE` at start and writes one line
 //! saying what was read to standard error. `--smoke` exits after that line:
 //! it is how CI checks that the application starts.
+
+pub mod recent;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -23,6 +25,8 @@ use serde::Deserialize;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
+
+use recent::{RecentFile, RecentFiles};
 
 /// What the command line asks for.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -137,11 +141,15 @@ fn file_name(path: &Path) -> String {
     )
 }
 
-/// What the window's commands share: the core, and the file named on the
-/// command line until the page has taken it.
+/// What the window's commands share: the core, the file named on the
+/// command line until the page has taken it, and the recent files.
 pub struct Desktop {
     core: Core,
     initial: Option<Opened>,
+    /// The file named on the command line, when it opened: recorded as a
+    /// recent file once the list is loaded.
+    initial_path: Option<(PathBuf, OpenResult)>,
+    recent: RecentFiles,
 }
 
 impl Desktop {
@@ -150,12 +158,14 @@ impl Desktop {
     pub fn start(args: &Args) -> (Self, Option<String>) {
         let mut core = Core::without_fonts(Style::default(), "en");
         let mut initial = None;
+        let mut initial_path = None;
         let mut line = None;
         if let Some(path) = &args.file {
             match std::fs::read(path) {
                 Ok(bytes) => {
                     let result = core.open(&bytes);
                     line = Some(log_line(path, &result));
+                    initial_path = Some((path.clone(), result.clone()));
                     initial = Some(Opened {
                         name: file_name(path),
                         result,
@@ -170,7 +180,59 @@ impl Desktop {
                 }
             }
         }
-        (Self { core, initial }, line)
+        (
+            Self {
+                core,
+                initial,
+                initial_path,
+                recent: RecentFiles::default(),
+            },
+            line,
+        )
+    }
+
+    /// Reads the recent files kept in `store`, and puts the file named on the
+    /// command line first if it opened.
+    pub fn load_recent(&mut self, store: PathBuf) {
+        self.recent = RecentFiles::load(store);
+        if let Some((path, result)) = self.initial_path.take() {
+            self.recent.record(&path, &result, recent::now());
+        }
+    }
+
+    /// Reads the file at `path` and opens it. A file that opens becomes the
+    /// most recent one.
+    ///
+    /// # Errors
+    ///
+    /// `file-unreadable` when the file cannot be read.
+    pub fn open_path(&mut self, path: &Path) -> Result<Opened, String> {
+        let bytes = std::fs::read(path).map_err(|_| "file-unreadable".to_owned())?;
+        let result = self.core.open(&bytes);
+        self.recent.record(path, &result, recent::now());
+        Ok(Opened {
+            name: file_name(path),
+            result,
+        })
+    }
+
+    /// Opens the recent file with this id. A file that is no longer there is
+    /// taken off the list, and the answer is `None`.
+    pub fn open_recent(&mut self, id: &str) -> Option<Opened> {
+        if !self.recent.files().iter().any(|file| file.id == id) {
+            return None;
+        }
+        match self.open_path(Path::new(id)) {
+            Ok(opened) => Some(opened),
+            Err(_) => {
+                self.recent.forget(id);
+                None
+            }
+        }
+    }
+
+    pub fn recent_files(&self) -> &[RecentFile] {
+        self.recent.files()
     }
 
     /// Whether the file named on the command line opened.
@@ -245,12 +307,36 @@ async fn open_dialog(app: tauri::AppHandle, state: Shared<'_>) -> Result<Option<
     let path = chosen
         .into_path()
         .map_err(|_| "file-unreadable".to_owned())?;
-    let bytes = std::fs::read(&path).map_err(|_| "file-unreadable".to_owned())?;
-    let result = lock(&state)?.core.open(&bytes);
-    Ok(Some(Opened {
-        name: file_name(&path),
-        result,
-    }))
+    lock(&state)?.open_path(&path).map(Some)
+}
+
+/// The files opened lately, most recent first.
+#[tauri::command]
+fn recent_files(state: Shared<'_>) -> Result<Vec<RecentFile>, String> {
+    Ok(lock(&state)?.recent_files().to_vec())
+}
+
+/// Opens a recent file, or answers `None` when it is no longer there: it is
+/// then off the list.
+#[tauri::command]
+fn open_recent(id: String, state: Shared<'_>) -> Result<Option<Opened>, String> {
+    Ok(lock(&state)?.open_recent(&id))
+}
+
+#[tauri::command]
+fn forget_recent(id: String, state: Shared<'_>) -> Result<(), String> {
+    lock(&state)?.recent.forget(&id);
+    Ok(())
+}
+
+#[tauri::command]
+fn outline(state: Shared<'_>) -> Result<Option<af_api::contract::Outline>, String> {
+    Ok(lock(&state)?.core.outline())
+}
+
+#[tauri::command]
+fn packages(state: Shared<'_>) -> Result<Vec<af_api::contract::Package>, String> {
+    Ok(lock(&state)?.core.packages())
 }
 
 #[tauri::command]
@@ -327,6 +413,11 @@ pub fn run(args: Args) -> i32 {
             initial_file,
             open,
             open_dialog,
+            recent_files,
+            open_recent,
+            forget_recent,
+            outline,
+            packages,
             close,
             diagram,
             element,
@@ -334,6 +425,15 @@ pub fn run(args: Args) -> i32 {
             set_style
         ])
         .setup(move |app| {
+            // A smoke run leaves the user's recent files alone.
+            if !smoke {
+                if let Ok(directory) = app.path().app_config_dir() {
+                    let state = app.state::<Mutex<Desktop>>();
+                    if let Ok(mut desktop) = state.lock() {
+                        desktop.load_recent(directory.join("recent.json"));
+                    }
+                }
+            }
             if smoke {
                 // The window exists by now: the shell has started.
                 let window = app.get_webview_window("main").is_some();
@@ -403,6 +503,65 @@ mod tests {
             initial.map(|opened| opened.name),
             Some("sacm_example_core_argument.sacm.xmi".to_owned())
         );
+        // Once the list is loaded, the file is its most recent one.
+        assert!(desktop.recent_files().is_empty());
+        let store = std::env::temp_dir().join(format!(
+            "af-desktop-initial-{}/recent.json",
+            std::process::id()
+        ));
+        desktop.load_recent(store.clone());
+        let names: Vec<&str> = desktop
+            .recent_files()
+            .iter()
+            .map(|file| file.name.as_str())
+            .collect();
+        assert_eq!(names, ["sacm_example_core_argument.sacm.xmi"]);
+        assert_eq!(desktop.recent_files()[0].nodes, 8);
+        if let Some(directory) = store.parent() {
+            let _ = std::fs::remove_dir_all(directory);
+        }
+    }
+
+    #[test]
+    fn a_recent_file_opens_again_and_one_that_is_gone_leaves_the_list() {
+        let directory =
+            std::env::temp_dir().join(format!("af-desktop-reopen-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&directory);
+        let copy = directory.join("copy.sacm.xmi");
+        let sample = testdata("sacm/sacm_example_core_argument.sacm.xmi");
+        assert!(std::fs::copy(&sample, &copy).is_ok());
+
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert_eq!(
+            desktop
+                .open_path(&directory.join("missing.xmi"))
+                .err()
+                .as_deref(),
+            Some("file-unreadable")
+        );
+        assert!(desktop.recent_files().is_empty());
+        assert!(desktop.open_path(&copy).is_ok());
+        let id = desktop.recent_files()[0].id.clone();
+
+        desktop.core.close();
+        let again = desktop.open_recent(&id);
+        assert!(
+            matches!(
+                again,
+                Some(Opened {
+                    result: OpenResult::Opened { nodes: 8, .. },
+                    ..
+                })
+            ),
+            "{again:?}"
+        );
+        // An id that is not on the list opens nothing, whatever file it names.
+        assert!(desktop.open_recent(&sample.display().to_string()).is_none());
+
+        assert!(std::fs::remove_file(&copy).is_ok());
+        assert!(desktop.open_recent(&id).is_none());
+        assert!(desktop.recent_files().is_empty());
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]

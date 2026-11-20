@@ -27,7 +27,7 @@ pnpm --dir ui install
 pnpm --dir ui wasm       # build crates/af-wasm into ui/src/wasm/
 pnpm --dir ui check      # types, lint, unit tests
 pnpm --dir ui e2e        # browser tests against the production build
-pnpm --dir ui dev        # then open /?sample=sacm_example_core_argument.sacm.xmi
+pnpm --dir ui dev        # http://localhost:5183; add /?sample=sacm_example_core_argument.sacm.xmi to open a sample
 ```
 
 The desktop application (`af-desktop`) loads the development server in a

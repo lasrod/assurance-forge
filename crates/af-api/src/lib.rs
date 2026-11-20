@@ -18,11 +18,12 @@ pub mod contract;
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
 use sacm::diagnostic::Severity;
+use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions};
 
 use contract::{
     ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, ElementDetails, MessageArgument,
-    OpenResult, Refusal, ViewCode,
+    OpenResult, Outline, OutlineRow, Package, Refusal, ViewCode,
 };
 
 mod convert;
@@ -196,6 +197,70 @@ impl Core {
                 })
                 .collect(),
         })
+    }
+
+    /// The argument as a tree, for the Argument Navigator: the tree the
+    /// diagram is laid out from, so the two agree. `None` when nothing is
+    /// open. It needs no fonts.
+    pub fn outline(&self) -> Option<Outline> {
+        let view = &self.open.as_ref()?.view;
+        let rows = af_layout::outline(view)
+            .into_iter()
+            .map(|row| {
+                let node = &view.nodes[row.node];
+                OutlineRow {
+                    id: node.id.clone(),
+                    level: count(row.level),
+                    kind: convert::node_kind(node.kind),
+                    undeveloped: node.undeveloped,
+                    identifier: node.identifier.clone(),
+                    name: node.name.clone(),
+                    statement: node.statement.clone(),
+                }
+            })
+            .collect();
+        Some(Outline {
+            revision: self.revision,
+            rows,
+        })
+    }
+
+    /// The packages of the open file, depth first in document order, for the
+    /// Case Explorer. Empty when nothing is open.
+    pub fn packages(&self) -> Vec<Package> {
+        let Some(open) = self.open.as_ref() else {
+            return Vec::new();
+        };
+        let mut packages = Vec::new();
+        let mut stack: Vec<(sacm::model::SacmElement<'_>, u32)> = open
+            .document
+            .roots()
+            .filter(|root| root.kind().is_package())
+            .map(|root| (root, 1))
+            .collect();
+        stack.reverse();
+        while let Some((element, level)) = stack.pop() {
+            let held = element
+                .children()
+                .filter(|child| !child.kind().is_a(AbstractClass::UtilityElement))
+                .count();
+            packages.push(Package {
+                id: element.id().as_str().to_owned(),
+                level,
+                kind: element.kind().name().to_owned(),
+                name: element
+                    .name()
+                    .and_then(|name| name.content())
+                    .map(str::to_owned),
+                elements: count(held),
+            });
+            let inner: Vec<_> = element
+                .children()
+                .filter(|child| child.kind().is_package())
+                .collect();
+            stack.extend(inner.into_iter().rev().map(|child| (child, level + 1)));
+        }
+        packages
     }
 
     /// Changes the interface language, which changes the node text (T3).

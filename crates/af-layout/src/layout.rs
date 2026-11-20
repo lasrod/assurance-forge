@@ -67,25 +67,7 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
         .iter()
         .map(|node| size(node, shaper, style, cache))
         .collect();
-    let index: HashMap<&str, usize> = view
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, node)| (node.id.as_str(), i))
-        .collect();
-    // Edges whose ends are both nodes. The view gives no other.
-    let edges: Vec<(usize, usize, usize)> = view
-        .edges
-        .iter()
-        .enumerate()
-        .filter_map(|(e, edge)| {
-            Some((
-                e,
-                *index.get(edge.from.as_str())?,
-                *index.get(edge.to.as_str())?,
-            ))
-        })
-        .collect();
+    let edges = node_edges(view);
 
     let tree = Tree::new(view, &edges, sized.len());
     let origins = place(&tree, &sized);
@@ -381,6 +363,55 @@ fn translate(node: &Node, sized: &Sized, origin: Point) -> DiagramNode {
             .collect(),
         bounds: move_rect(sized.footprint),
     }
+}
+
+/// The view's edges whose ends are both nodes, as the edge's index and its
+/// ends' node indices. The view gives no other.
+fn node_edges(view: &View) -> Vec<(usize, usize, usize)> {
+    let index: HashMap<&str, usize> = view
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, node)| (node.id.as_str(), i))
+        .collect();
+    view.edges
+        .iter()
+        .enumerate()
+        .filter_map(|(e, edge)| {
+            Some((
+                e,
+                *index.get(edge.from.as_str())?,
+                *index.get(edge.to.as_str())?,
+            ))
+        })
+        .collect()
+}
+
+/// One row of the argument's outline: a node and how deep it sits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OutlineRow {
+    /// The node's index in [`View::nodes`].
+    pub node: usize,
+    /// 1 for a root.
+    pub level: usize,
+}
+
+/// The argument as a tree, depth first: the tree the diagram is laid out
+/// from, so the outline and the picture agree. Under each node come the
+/// nodes attached beside it (its context), then the nodes below it, each in
+/// edge order. Every node appears exactly once.
+pub fn outline(view: &View) -> Vec<OutlineRow> {
+    let edges = node_edges(view);
+    let tree = Tree::new(view, &edges, view.nodes.len());
+    let mut rows = Vec::with_capacity(view.nodes.len());
+    let mut stack: Vec<(usize, usize)> = tree.roots.iter().rev().map(|&root| (root, 1)).collect();
+    while let Some((node, level)) = stack.pop() {
+        rows.push(OutlineRow { node, level });
+        let children = tree.beside[node].iter().chain(&tree.below[node]);
+        let children: Vec<usize> = children.copied().collect();
+        stack.extend(children.into_iter().rev().map(|child| (child, level + 1)));
+    }
+    rows
 }
 
 // ===== The tree =====

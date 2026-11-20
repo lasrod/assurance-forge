@@ -66,6 +66,41 @@ end: string | null, };
 
 export type NodeKind = "goal" | "strategy" | "solution" | "context" | "assumption" | "justification" | "neutral";
 
+export type Outline = { 
+/**
+ * The document's revision.
+ */
+revision: number, rows: Array<OutlineRow>, };
+
+export type OutlineRow = { 
+/**
+ * The SACM id, as in the diagram.
+ */
+id: string, 
+/**
+ * 1 for a root.
+ */
+level: number, kind: NodeKind, undeveloped: boolean, identifier: string, name: string | null, statement: string | null, };
+
+export type Package = { 
+/**
+ * The SACM id.
+ */
+id: string, 
+/**
+ * 1 for a package at the top of the file.
+ */
+level: number, 
+/**
+ * The SACM class, such as `ArgumentPackage`: the frontend words it.
+ */
+kind: string, name: string | null, 
+/**
+ * How many elements it holds directly, utility elements (descriptions,
+ * notes, tagged values) aside.
+ */
+elements: number, };
+
 export type Point = { x: number, y: number, };
 
 export type Rect = { x: number, y: number, width: number, height: number, };

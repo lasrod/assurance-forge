@@ -5,7 +5,7 @@
   "identifier": "com.assuranceforge.desktop",
   "build": {
     "frontendDist": "../../ui/dist",
-    "devUrl": "http://localhost:5173"
+    "devUrl": "http://localhost:5183"
   },
   "app": {
     "windows": [

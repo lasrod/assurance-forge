@@ -3,7 +3,7 @@
 // both (plan decision D1).
 
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import type { Core, DiagramAt, ElementDetails, OpenedFile, OpenResult } from './Core';
+import type { Core, DiagramAt, ElementDetails, OpenedFile, OpenResult, Outline, Package, RecentFile } from './Core';
 import { StartError, type FontBytes } from './start';
 
 /** Whether the page runs in the desktop application's window. */
@@ -41,11 +41,23 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     close: () => invoke('close'),
     diagram: () => invoke<DiagramAt | null>('diagram'),
     element: (id) => invoke<ElementDetails | null>('element', { id }),
+    outline: () => invoke<Outline | null>('outline'),
+    packages: () => invoke<Package[]>('packages'),
     setLanguage: (language) => invoke('set_language', { language }),
     setStyle: (style) => invoke('set_style', { style }),
     // The core lives as long as the window.
     dispose: () => undefined,
     initialFile: () => invoke<OpenedFile | null>('initial_file'),
     openDialog: () => invoke<OpenedFile | null>('open_dialog'),
+    // The shell keeps the paths of the files it read itself, and reads them again.
+    recent: {
+      list: () => invoke<RecentFile[]>('recent_files'),
+      open: (id) => invoke<OpenedFile | null>('open_recent', { id }),
+      clear: async () => {
+        for (const file of await invoke<RecentFile[]>('recent_files')) await invoke('forget_recent', { id: file.id });
+      },
+      remember: async () => undefined,
+      keepsCopies: false,
+    },
   };
 }

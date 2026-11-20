@@ -143,6 +143,53 @@ pub enum NodeKind {
     Neutral,
 }
 
+/// The argument as a tree, for the Argument Navigator: the tree the diagram
+/// is laid out from, depth first.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Outline {
+    /// The document's revision.
+    pub revision: u32,
+    pub rows: Vec<OutlineRow>,
+}
+
+/// One node of the outline. A row's parent is the nearest row before it with
+/// a smaller level.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct OutlineRow {
+    /// The SACM id, as in the diagram.
+    pub id: String,
+    /// 1 for a root.
+    pub level: u32,
+    pub kind: NodeKind,
+    pub undeveloped: bool,
+    pub identifier: String,
+    pub name: Option<String>,
+    pub statement: Option<String>,
+}
+
+/// A package of the open file, for the Case Explorer. The packages come
+/// depth first; a package's parent is the nearest one before it with a
+/// smaller level.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Package {
+    /// The SACM id.
+    pub id: String,
+    /// 1 for a package at the top of the file.
+    pub level: u32,
+    /// The SACM class, such as `ArgumentPackage`: the frontend words it.
+    pub kind: String,
+    pub name: Option<String>,
+    /// How many elements it holds directly, utility elements (descriptions,
+    /// notes, tagged values) aside.
+    pub elements: u32,
+}
+
 // ===== The render model =====
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -308,6 +355,9 @@ pub fn typescript() -> String {
         ElementDetails::decl(&cfg),
         ViewCode::decl(&cfg),
         NodeKind::decl(&cfg),
+        Outline::decl(&cfg),
+        OutlineRow::decl(&cfg),
+        Package::decl(&cfg),
         Point::decl(&cfg),
         Rect::decl(&cfg),
         Shape::decl(&cfg),

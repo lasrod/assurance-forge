@@ -18,6 +18,7 @@ mod text;
 
 use std::collections::HashMap;
 
+pub use layout::{OutlineRow, outline};
 pub use model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
     Shape, ShapeKind, TextLine, TextRole,
