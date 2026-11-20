@@ -38,6 +38,12 @@ export function fit(bounds: Rect, width: number, height: number): Viewport {
   };
 }
 
+/** The font families: names and statements, and identifiers. */
+export interface Families {
+  text: string;
+  identifier: string;
+}
+
 export interface Drawn {
   nodes: number;
   edges: number;
@@ -71,7 +77,7 @@ export function draw(
   diagram: Diagram,
   viewport: Viewport,
   palette: Palette,
-  fontFamily: string,
+  families: Families,
   size: { width: number; height: number; dpr: number },
 ): Drawn {
   const { scale, offsetX, offsetY } = viewport;
@@ -92,7 +98,7 @@ export function draw(
   }
   for (const node of diagram.nodes) {
     if (!overlaps(node.bounds, visible)) continue;
-    drawNode(context, node, palette, fontFamily, scale);
+    drawNode(context, node, palette, families, scale);
     drawn.nodes += 1;
   }
   return drawn;
@@ -148,7 +154,7 @@ function shapePath(context: CanvasRenderingContext2D, node: DiagramNode) {
   }
 }
 
-function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, fontFamily: string, scale: number) {
+function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, families: Families, scale: number) {
   shapePath(context, node);
   context.fillStyle = palette.ground;
   context.fill();
@@ -177,28 +183,28 @@ function drawNode(context: CanvasRenderingContext2D, node: DiagramNode, palette:
       context.stroke();
     } else if (!far) {
       context.fillStyle = palette.text;
-      context.font = `600 ${decorator.size}px ${fontFamily}`;
+      context.font = `600 ${decorator.size}px ${families.text}`;
       context.fillText(decorator.text, decorator.x, decorator.baseline);
     }
   }
 
   if (far) {
-    drawFarIdentifier(context, node, palette, fontFamily, scale);
+    drawFarIdentifier(context, node, palette, families, scale);
     return;
   }
   for (const line of node.text) {
     context.fillStyle = line.role === 'identifier' ? palette.secondary : palette.text;
-    context.font = `${line.weight} ${line.size}px ${fontFamily}`;
+    context.font = `${line.weight} ${line.size}px ${line.role === 'identifier' ? families.identifier : families.text}`;
     context.fillText(line.text, line.x, line.baseline);
   }
 }
 
 /** Zoomed far out: the identifier alone, at metadata size on screen, centred, if it fits. */
-function drawFarIdentifier(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, fontFamily: string, scale: number) {
+function drawFarIdentifier(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, families: Families, scale: number) {
   const identifier = node.text.find((line) => line.role === 'identifier');
   if (!identifier) return;
   const size = FAR_IDENTIFIER_PX / scale;
-  context.font = `400 ${size}px ${fontFamily}`;
+  context.font = `400 ${size}px ${families.identifier}`;
   const width = context.measureText(identifier.text).width;
   const rect = node.shape.rect;
   if (width > rect.width * 0.9 || size > rect.height * 0.9) return;

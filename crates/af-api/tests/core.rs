@@ -18,6 +18,7 @@ fn core(language: &str) -> Core {
         testdata("fonts/IBMPlexSans-SemiBold.ttf"),
         testdata("fonts/AFTestSansJP-Regular.ttf"),
         testdata("fonts/AFTestSansJP-SemiBold.ttf"),
+        testdata("fonts/IBMPlexMono-Regular.ttf"),
     )
     .unwrap_or_else(|error| panic!("setup: {error:?}"));
     Core::new(fonts, Style::default(), language)

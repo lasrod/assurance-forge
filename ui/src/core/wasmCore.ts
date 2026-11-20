@@ -9,6 +9,7 @@ export interface FontBytes {
   sansSemiBold: Uint8Array;
   japaneseRegular: Uint8Array;
   japaneseSemiBold: Uint8Array;
+  monoRegular: Uint8Array;
 }
 
 /** Why the core did not start: a code the interface words. */
@@ -25,7 +26,7 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
   await init();
   let core: WasmCore;
   try {
-    core = new WasmCore(fonts.sansRegular, fonts.sansSemiBold, fonts.japaneseRegular, fonts.japaneseSemiBold, language);
+    core = new WasmCore(fonts.sansRegular, fonts.sansSemiBold, fonts.japaneseRegular, fonts.japaneseSemiBold, fonts.monoRegular, language);
   } catch (error) {
     // af-wasm refuses a face as `font-unreadable:<FaceName>`.
     const match = /font-unreadable:(\w+)/.exec(String(error));

@@ -174,11 +174,11 @@ packages:
     version: 0.4.0-rc.1
 
   '@datum-ui/css@file:vendor/datum/datum-ui-css.tgz':
-    resolution: {integrity: sha512-n67Uvk52f84hCK4DzWPjpZgzoVhY+qL9GWAH4rS0Orao+DVli9ujK1gnex6wsfvbJOa2GvlfCMPH+WlP63SSfA==, tarball: file:vendor/datum/datum-ui-css.tgz}
+    resolution: {integrity: sha512-vDhdqCizG5MzONGpKOCJ+OHpgGgfonpIaYL5GsiFlwM2AMrZn1EOizAmYal8OSr8GB1JVQmgnHUj2Utz8qfIGg==, tarball: file:vendor/datum/datum-ui-css.tgz}
     version: 0.4.0-rc.1
 
   '@datum-ui/fonts@file:vendor/datum/datum-ui-fonts.tgz':
-    resolution: {integrity: sha512-pJ2JZRu1TRxRzQQ+Y4imtQfaPHBP4aTqn2l0DQCp7OUKK3iLirENAB32N6hsMMKAZZsKBW/BLDsVsC1Q9/J8VQ==, tarball: file:vendor/datum/datum-ui-fonts.tgz}
+    resolution: {integrity: sha512-KVzkaN1quq8P9+WjZeO/6OJKnb/mhsId4jeBZEotHpqJ0dTNcoOLxmSsA9qD5G9iAgsX8UDgbak9Me/AmjAQBg==, tarball: file:vendor/datum/datum-ui-fonts.tgz}
     version: 0.4.0-rc.1
 
   '@datum-ui/quantity@file:vendor/datum/datum-ui-quantity.tgz':
@@ -186,7 +186,7 @@ packages:
     version: 0.4.0-rc.1
 
   '@datum-ui/react@file:vendor/datum/datum-ui-react.tgz':
-    resolution: {integrity: sha512-QOanp00AB+jzkoMeWVPCdJnzzRNxy6U4EncDe/EnKROTp6tybAPcXV0zSJx3MKAE78h0yM8sffbbCnn5vtJSmg==, tarball: file:vendor/datum/datum-ui-react.tgz}
+    resolution: {integrity: sha512-RxOJZzSXRStFupL9gHpIHZyMaZSdZBfWlgTLNNiIKDafrJBOPhrZAVf5TvXFzIhMtCEhN4R0IFi3ONPmnZ2gIg==, tarball: file:vendor/datum/datum-ui-react.tgz}
     version: 0.4.0-rc.1
     peerDependencies:
       react: ^19.0.0

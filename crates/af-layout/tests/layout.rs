@@ -5,8 +5,8 @@
 
 use af_gsn::view::{EdgeKind, NodeKind, View, view};
 use af_layout::{
-    Arrowhead, Decorator, Diagram, DiagramNode, Engine, Fonts, LineStyle, Placement, Point, Style,
-    Weight,
+    Arrowhead, Decorator, Diagram, DiagramNode, Engine, Font, Fonts, LineStyle, Placement, Point,
+    Style, TextRole, Weight,
 };
 use sacm::xmi::{self, Mode, ReadOptions};
 
@@ -29,6 +29,7 @@ fn fonts() -> Fonts {
         testdata("fonts/IBMPlexSans-SemiBold.ttf"),
         testdata("fonts/AFTestSansJP-Regular.ttf"),
         testdata("fonts/AFTestSansJP-SemiBold.ttf"),
+        testdata("fonts/IBMPlexMono-Regular.ttf"),
     ) {
         Ok(fonts) => fonts,
         Err(error) => panic!("setup: {error:?}"),
@@ -67,9 +68,8 @@ fn inside(node: &DiagramNode, point: Point) -> bool {
 #[test]
 fn latin_text_is_kerned() {
     let engine = engine();
-    let pair = engine.measure("AV", 14.0, Weight::Regular);
-    let apart =
-        engine.measure("A", 14.0, Weight::Regular) + engine.measure("V", 14.0, Weight::Regular);
+    let pair = engine.measure("AV", 14.0, Font::Regular);
+    let apart = engine.measure("A", 14.0, Font::Regular) + engine.measure("V", 14.0, Font::Regular);
     assert!(pair < apart - 0.1, "AV {pair} against A + V {apart}");
 }
 
@@ -77,9 +77,9 @@ fn latin_text_is_kerned() {
 fn kana_is_not_kerned() {
     // The Japanese face kerns ー then ノ by -60 units: 0.84 px at 14 px.
     let engine = engine();
-    let pair = engine.measure("ーノ", 14.0, Weight::Regular);
+    let pair = engine.measure("ーノ", 14.0, Font::Regular);
     let apart =
-        engine.measure("ー", 14.0, Weight::Regular) + engine.measure("ノ", 14.0, Weight::Regular);
+        engine.measure("ー", 14.0, Font::Regular) + engine.measure("ノ", 14.0, Font::Regular);
     assert!(
         (pair - apart).abs() < 0.001,
         "ーノ {pair} against ー + ノ {apart}"
@@ -90,7 +90,7 @@ fn kana_is_not_kerned() {
 fn a_character_the_latin_face_lacks_comes_from_the_japanese_face() {
     // A kanji is one em wide in the Japanese face.
     let engine = engine();
-    let width = engine.measure("自動", 14.0, Weight::Regular);
+    let width = engine.measure("自動", 14.0, Font::Regular);
     assert!((width - 28.0).abs() < 0.01, "自動 is {width}");
 }
 
@@ -98,12 +98,12 @@ fn a_character_the_latin_face_lacks_comes_from_the_japanese_face() {
 fn wrapped_lines_fit_and_keep_every_word() {
     let engine = engine();
     let text = "The braking system architecture mitigates identified hazardous failures in every operating mode.";
-    let lines = engine.wrap(text, 14.0, Weight::Regular, 160.0);
+    let lines = engine.wrap(text, 14.0, Font::Regular, 160.0);
     assert!(lines.len() > 2, "{lines:?}");
     for line in &lines {
         assert!(line.width <= 160.0, "{line:?}");
         assert_eq!(line.text, line.text.trim(), "{line:?}");
-        let measured = engine.measure(&line.text, 14.0, Weight::Regular);
+        let measured = engine.measure(&line.text, 14.0, Font::Regular);
         assert!((measured - line.width).abs() < 0.001, "{line:?}");
     }
     let joined: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
@@ -114,7 +114,7 @@ fn wrapped_lines_fit_and_keep_every_word() {
 fn a_word_wider_than_the_line_is_broken_between_characters() {
     let engine = engine();
     let word = "Reasoning_ArchitectureAndVerification";
-    let lines = engine.wrap(word, 14.0, Weight::SemiBold, 120.0);
+    let lines = engine.wrap(word, 14.0, Font::SemiBold, 120.0);
     assert!(lines.len() > 1, "{lines:?}");
     assert!(lines.iter().all(|line| line.width <= 120.0), "{lines:?}");
     let joined: String = lines.iter().map(|line| line.text.as_str()).collect();
@@ -127,15 +127,15 @@ fn japanese_wraps_between_characters_and_a_newline_ends_a_line() {
     let lines = engine.wrap(
         "自動運転車は導入するのに十分安全である。",
         14.0,
-        Weight::Regular,
+        Font::Regular,
         100.0,
     );
     assert!(lines.len() > 1, "{lines:?}");
     assert!(lines.iter().all(|line| line.width <= 100.0), "{lines:?}");
-    let lines = engine.wrap("first\nsecond", 14.0, Weight::Regular, 500.0);
+    let lines = engine.wrap("first\nsecond", 14.0, Font::Regular, 500.0);
     let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
     assert_eq!(texts, ["first", "second"]);
-    assert!(engine.wrap("", 14.0, Weight::Regular, 100.0).is_empty());
+    assert!(engine.wrap("", 14.0, Font::Regular, 100.0).is_empty());
 }
 
 #[test]
@@ -145,8 +145,55 @@ fn a_file_that_is_not_a_font_is_refused() {
         testdata("fonts/IBMPlexSans-SemiBold.ttf"),
         testdata("fonts/AFTestSansJP-Regular.ttf"),
         testdata("fonts/AFTestSansJP-SemiBold.ttf"),
+        testdata("fonts/IBMPlexMono-Regular.ttf"),
     );
     assert!(matches!(refused, Err(error) if error.face == af_layout::FaceName::SansRegular));
+    let refused = Fonts::new(
+        testdata("fonts/IBMPlexSans-Regular.ttf"),
+        testdata("fonts/IBMPlexSans-SemiBold.ttf"),
+        testdata("fonts/AFTestSansJP-Regular.ttf"),
+        testdata("fonts/AFTestSansJP-SemiBold.ttf"),
+        b"not a font".to_vec(),
+    );
+    assert!(matches!(refused, Err(error) if error.face == af_layout::FaceName::MonoRegular));
+}
+
+#[test]
+fn an_identifier_is_set_in_plex_mono() {
+    // Every Plex Mono advance is 600 units in 1,000 (DATUM decision 0027).
+    let engine = engine();
+    let width = engine.measure("cl_top", 100.0, Font::Mono);
+    assert!((width - 360.0).abs() < 0.01, "cl_top is {width}");
+    // Not the sans face, whose letters differ in width.
+    let sans = engine.measure("cl_top", 100.0, Font::Regular);
+    assert!((width - sans).abs() > 1.0, "mono {width}, sans {sans}");
+}
+
+#[test]
+fn a_character_plex_mono_lacks_comes_from_the_faces_after_it() {
+    // Plex Mono has no kanji: it is the Japanese face's, one em wide.
+    let engine = engine();
+    let width = engine.measure("G自", 100.0, Font::Mono);
+    assert!((width - 160.0).abs() < 0.01, "G自 is {width}");
+}
+
+#[test]
+fn every_identifier_in_the_diagram_is_measured_in_plex_mono() {
+    let mut engine = engine();
+    let diagram = engine.layout(&sample_view("sacm_example_core_argument.sacm.xmi", "en"));
+    let size = Style::default().identifier_size;
+    let identifiers: Vec<_> = diagram
+        .nodes
+        .iter()
+        .flat_map(|node| &node.text)
+        .filter(|line| line.role == TextRole::Identifier)
+        .collect();
+    assert_eq!(identifiers.len(), diagram.nodes.len());
+    for line in identifiers {
+        let mono = engine.measure(&line.text, size, Font::Mono);
+        assert!((line.width - mono).abs() < 0.001, "{line:?} against {mono}");
+        assert_eq!(line.weight, Weight::Regular, "{line:?}");
+    }
 }
 
 // ===== The core sample =====
@@ -430,10 +477,10 @@ fn native_layout_is_within_budget() {
 #[test]
 fn trailing_newline_and_spaces_add_no_line_and_blank_lines_between_are_kept() {
     let engine = engine();
-    let lines = engine.wrap("Statement text\n    ", 14.0, Weight::Regular, 500.0);
+    let lines = engine.wrap("Statement text\n    ", 14.0, Font::Regular, 500.0);
     let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
     assert_eq!(texts, ["Statement text"]);
-    let lines = engine.wrap("a\n\nb", 14.0, Weight::Regular, 500.0);
+    let lines = engine.wrap("a\n\nb", 14.0, Font::Regular, 500.0);
     let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
     assert_eq!(texts, ["a", "", "b"]);
 }
@@ -443,12 +490,12 @@ fn a_wrapped_line_is_as_full_as_it_can_be() {
     // Greedy wrapping: no line could take the next line's first word.
     let engine = engine();
     let text = "Verification activities demonstrate that the braking requirements are satisfied in every mode we know of today.";
-    let lines = engine.wrap(text, 14.0, Weight::Regular, 150.0);
+    let lines = engine.wrap(text, 14.0, Font::Regular, 150.0);
     for pair in lines.windows(2) {
         let next_word = pair[1].text.split(' ').next().unwrap_or_default();
         let joined = format!("{} {next_word}", pair[0].text);
         assert!(
-            engine.measure(&joined, 14.0, Weight::Regular) > 150.0,
+            engine.measure(&joined, 14.0, Font::Regular) > 150.0,
             "{:?} could have taken {next_word:?}",
             pair[0].text
         );
@@ -488,14 +535,14 @@ fn the_bounds_hold_every_edge_too() {
 #[test]
 fn indented_text_starts_with_its_first_word() {
     let engine = engine();
-    let lines = engine.wrap("\n  The system is safe", 14.0, Weight::Regular, 120.0);
+    let lines = engine.wrap("\n  The system is safe", 14.0, Font::Regular, 120.0);
     // Without its indentation it fits on one line.
     let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
     assert_eq!(texts, ["The system is safe"]);
     let lines = engine.wrap(
         "   Averyveryverylongwordthatmustbreak",
         14.0,
-        Weight::Regular,
+        Font::Regular,
         120.0,
     );
     assert!(lines.iter().all(|line| !line.text.is_empty()), "{lines:?}");
@@ -503,7 +550,7 @@ fn indented_text_starts_with_its_first_word() {
     let lines = engine.wrap(
         "abc\n   Averyveryverylongwordthatmustbreak",
         14.0,
-        Weight::Regular,
+        Font::Regular,
         120.0,
     );
     assert_eq!(lines[0].text, "abc");
@@ -541,7 +588,7 @@ fn a_cycle_is_rooted_at_its_first_node_that_is_not_only_context() {
 fn blank_lines_before_only_spaces_are_dropped() {
     let engine = engine();
     for text in ["Statement text\n\n    ", "Statement text\n\n\n"] {
-        let lines = engine.wrap(text, 14.0, Weight::Regular, 500.0);
+        let lines = engine.wrap(text, 14.0, Font::Regular, 500.0);
         let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
         assert_eq!(texts, ["Statement text"], "{text:?}");
     }

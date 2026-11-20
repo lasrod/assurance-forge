@@ -45,7 +45,7 @@ milestone 1 and in milestone 2.
 
 | Piece | Crate or folder | New in this step |
 |---|---|---|
-| The SACM model | `sacm` 0.2 from crates.io | dependency |
+| The SACM model | `sacm` 0.3 from crates.io | dependency |
 | GSN view of a document | `af-gsn` | the view and its reading rules |
 | Text measurement, layout, render model | `af-layout` | crate |
 | The frontend contract | `af-api` | crate, holding the open document |
@@ -69,7 +69,7 @@ revised that day, when DATUM and libSACM had delivered what they waited for.
 | D3 | **The view draws what the file says.** If the file has an inference from an assumption, the diagram shows a SupportedBy arrow to an Assumption. Well-formedness checks report it later; the view never rearranges an argument to make it well formed. | Never silently reinterpret an argument. |
 | D4 | **Every argument element appears in the view exactly once**: as a node, as part of an edge, or as a coded item the view could not place. A test checks this for every sample file. | Nothing is dropped without a trace. |
 | D5 | **The workspace is DATUM's `Workspace`**: docks at the start, end and bottom of a centre surface, with layout state held by the application. The canvas sits in the centre surface and takes its size from `onCentreSize`. DATUM comes as tarballs packed locally from a DATUM checkout (`pnpm --dir ui datum`) and is never committed, published or fetched in CI: DATUM is private, the look of the owner's software. Others can build the core but not the DATUM interface; a plain interface for them is an open question. `ui/` imports DATUM only through `ui/src/design/`, so a replacement has one module to stand in for. | DATUM now has a shared workspace, written for Assurance Forge and Simulation Studio alike, so the application writes no docking of its own. |
-| D6 | **The diagram's text uses DATUM's measured faces**, `DATUM Measured Sans` (IBM Plex Sans) then `DATUM Measured Sans JP` (IBM Plex Sans JP), at 400 and 600: whole TrueType files, given to `af-layout` as bytes by the shell and loaded once by the page. Each character comes from the first face that has it, as in the browser; kerning applies within a run from one face. Shape with `rustybuzz`, break with `unicode-linebreak`. The interface's woff2 faces cannot be used: the shaper does not read woff2, and a face split by Unicode range loses kerning between pieces. | The canvas spike's findings, and DATUM's rule for text laid out outside the browser. Not embedding the fonts in the WebAssembly package keeps it small; each Japanese weight is 5.7 MB. |
+| D6 | **The diagram's text uses DATUM's measured faces**, `DATUM Measured Sans` (IBM Plex Sans) then `DATUM Measured Sans JP` (IBM Plex Sans JP), at 400 and 600, and identifiers `DATUM Measured Mono` (IBM Plex Mono) at 400 with the sans faces after it (DATUM decision 0027): whole TrueType files, given to `af-layout` as bytes by the shell and loaded once by the page. Each character comes from the first face that has it, as in the browser; kerning applies within a run from one face. Shape with `rustybuzz`, break with `unicode-linebreak`. The interface's woff2 faces cannot be used: the shaper does not read woff2, and a face split by Unicode range loses kerning between pieces. | The canvas spike's findings, and DATUM's rule for text laid out outside the browser. Not embedding the fonts in the WebAssembly package keeps it small; each Japanese weight is 5.7 MB. |
 | D7 | **A simple layout first.** A layered tree: SupportedBy children below their parent, InContextOf attachments beside it, siblings in document order, straight edges. The C++ `src/ui/gsn/gsn_layout.cpp` is the reference for spacing and placement, not code to port. | A diagram that can be read beats a clever one that is late. Crossing reduction comes when real cases need it. |
 | D8 | **Files open by a strict read.** A file the strict read refuses shows its refusal and no diagram. A tolerant read waits for a case that needs it. Warnings from the read are counted and kept for the problem list. | `sacm` 0.2 reads the terminology package, and all five samples now read strictly. Their only findings are warnings that a Claim has two descriptions (SACM-MULT-001). |
 | D9 | **The window is arranged as the C++ application's.** A menu bar, a toolbar under it, the Case Explorer and the Argument Navigator in the start dock, the diagram in the centre, Element Properties in the end dock, Problems in the bottom dock under the centre, and a status bar. Names and their Japanese are the C++ application's. Simplified: one file, not a project (Phase 0), so File ▸ Open… opens a SACM file and the Case Explorer will show that file's packages; menus offer only what works, so Edit and Add come with editing in milestone 2, and View holds Appearance ▸ Theme and Language (the C++ View menu's workbench tabs come with the workbench); panels are shown and hidden by their own Hide buttons and rails. The menu bar is DATUM's `MenuBar` with submenus, and the start dock stacks its two views (DATUM decisions 0024 and 0025). | People who used the C++ application find their way at once. The rebuild takes its learnings, not its code. Agreed on 18 November 2026. |
@@ -167,14 +167,13 @@ G6 can start at once, beside G1 to G4: the dock needs no core.
 
 ### What waits on other repositories
 
-DATUM's workspace, measured faces and diagram canvas rule, and libSACM's codes
-and arguments on every refusal and diagnostic, are done. What is left:
+DATUM's workspace, measured faces (Plex Mono included) and diagram canvas rule,
+and libSACM's codes and arguments on every refusal and diagnostic, are done, and
+`sacm` 0.3.0 is on crates.io. What is left:
 
 | What | Needed by | Until it is done |
 |---|---|---|
 | A DATUM release with `Workspace`, the measured faces and `watchCanvasStyle` | G5, G6, G7 | Packed from DATUM's main by `ui/scripts/pack-datum.mjs`, which records the commit in `ui/vendor/datum/manifest.json` |
-| `sacm` 0.2.0 on crates.io | G2 | A git dependency on libSACM's main, at a pinned commit |
-| A measured face for identifiers. DATUM's canvas rule sets them in Plex Mono, which has no whole face yet | G7 | Identifiers in `DATUM Measured Sans` at metadata size |
 | [libSACM#66](https://github.com/lasrod/libSACM/issues/66) Older namespaces | after this step | A file in the C++ application's namespace is refused |
 
 None stops a goal from starting. Each stopgap says in the code what replaces it,

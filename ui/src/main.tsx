@@ -14,11 +14,12 @@ async function bytes(url: string): Promise<Uint8Array> {
 
 /** Loads the measured faces once: the core measures with the bytes, the canvas draws with the same files. */
 async function start(language: Language) {
-  const [sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold] = await Promise.all([
+  const [sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold, monoRegular] = await Promise.all([
     bytes(measuredFontUrls.sansRegular),
     bytes(measuredFontUrls.sansSemiBold),
     bytes(measuredFontUrls.japaneseRegular),
     bytes(measuredFontUrls.japaneseSemiBold),
+    bytes(measuredFontUrls.monoRegular),
   ]);
   // The canvas draws with the very bytes the core measures with: each face is
   // added from them, under the families DATUM's measured.css declares, so the
@@ -29,6 +30,7 @@ async function start(language: Language) {
     ['SansSemiBold', new FontFace('DATUM Measured Sans', sansSemiBold, { weight: '600', display: 'block' })],
     ['JapaneseRegular', new FontFace('DATUM Measured Sans JP', japaneseRegular, { weight: '400', display: 'block' })],
     ['JapaneseSemiBold', new FontFace('DATUM Measured Sans JP', japaneseSemiBold, { weight: '600', display: 'block' })],
+    ['MonoRegular', new FontFace('DATUM Measured Mono', monoRegular, { weight: '400', display: 'block' })],
   ];
   // A file the browser cannot read as a font is named, as af-wasm names one.
   const loaded = await Promise.all(
@@ -39,7 +41,7 @@ async function start(language: Language) {
     ),
   );
   for (const face of loaded) document.fonts.add(face);
-  return createWasmCore({ sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold }, language);
+  return createWasmCore({ sansRegular, sansSemiBold, japaneseRegular, japaneseSemiBold, monoRegular }, language);
 }
 
 const root = document.getElementById('root');

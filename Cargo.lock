@@ -153,8 +153,9 @@ dependencies = [
 
 [[package]]
 name = "sacm"
-version = "0.1.0"
-source = "git+https://github.com/lasrod/libSACM?rev=2aa2f3793345c9747dc44576f2cb8f97fce0db81#2aa2f3793345c9747dc44576f2cb8f97fce0db81"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5bc60cbc0bb008070fb323ade26e1ac8f4032cbc659f8890405c179bace3d50"
 dependencies = [
  "roxmltree",
 ]

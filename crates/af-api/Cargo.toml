@@ -17,7 +17,7 @@ typescript = ["dep:ts-rs"]
 [dependencies]
 af-gsn = { path = "../af-gsn" }
 af-layout = { path = "../af-layout" }
-sacm = { git = "https://github.com/lasrod/libSACM", rev = "2aa2f3793345c9747dc44576f2cb8f97fce0db81" }
+sacm = "0.3.0"
 serde = { version = "1.0.229", features = ["derive"] }
 ts-rs = { version = "12.0.1", optional = true }
 
