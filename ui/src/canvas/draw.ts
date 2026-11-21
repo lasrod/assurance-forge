@@ -17,13 +17,16 @@ export interface Palette {
   hover: string;
   /** `selection.surface`: the selected node's fill. */
   selectedFill: string;
-  /** `selection.indicator`: the selected node's outline. */
+  /** `selection.indicator`: the selected node's outline, and a selected line. */
   selectedLine: string;
   /** Forced colours are on: the selected outline is heavier, since there is no fill to see. */
   forced: boolean;
 }
 
-/** Which node is selected and which is under the pointer: separate states (DATUM). */
+/**
+ * What is selected and what is under the pointer: separate states (DATUM).
+ * Each is a node's SACM id, or the key of one edge (`edgeKey`).
+ */
 export interface Marks {
   selected: string | null;
   hovered: string | null;
@@ -106,6 +109,84 @@ export function hitTest(diagram: Diagram, viewport: Viewport, x: number, y: numb
   return null;
 }
 
+/**
+ * What names one edge of the diagram: its relationship and its two ends. One
+ * SACM relationship may be drawn as several edges (an inference through a
+ * Strategy, or with several premises), and each is selected by itself. An XML
+ * id holds no space, so the key cannot be a node's id.
+ */
+export function edgeKey(edge: Pick<DiagramEdge, 'relationship' | 'from' | 'to'>): string {
+  return `${edge.relationship} ${edge.from} ${edge.to}`;
+}
+
+/** The edge with this key, or null. */
+export function findEdge(diagram: Diagram, key: string): DiagramEdge | null {
+  return diagram.edges.find((edge) => edgeKey(edge) === key) ?? null;
+}
+
+/** How near a line the pointer selects it, in CSS px on either side. */
+export const EDGE_REACH = 5;
+
+/** How far the diagram point is from the segment `a` to `b`. */
+function segmentDistance(point: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = dx * dx + dy * dy;
+  const t = length === 0 ? 0 : clamp(((point.x - a.x) * dx + (point.y - a.y) * dy) / length, 0, 1);
+  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
+}
+
+/** How far the diagram point is from the edge's line and arrowhead. */
+export function edgeDistance(edge: DiagramEdge, point: Point): number {
+  const [tip, left, right] = edge.head;
+  const line = [...edge.points, tip];
+  let nearest = Infinity;
+  for (let index = 1; index < line.length; index += 1) {
+    nearest = Math.min(nearest, segmentDistance(point, line[index - 1], line[index]));
+  }
+  return Math.min(nearest, segmentDistance(point, tip, left), segmentDistance(point, tip, right), segmentDistance(point, left, right));
+}
+
+/**
+ * The edge whose line is within `EDGE_REACH` CSS px of the canvas point
+ * (`x`, `y`): the nearest, and of two as near, the one drawn last. The reach
+ * is on screen, so a line is as easy to take at any zoom.
+ */
+export function hitEdge(diagram: Diagram, viewport: Viewport, x: number, y: number): DiagramEdge | null {
+  const point = toDiagram(viewport, x, y);
+  const reach = EDGE_REACH / viewport.scale;
+  let found: DiagramEdge | null = null;
+  let nearest = reach;
+  for (const edge of diagram.edges) {
+    const { bounds } = edge;
+    if (point.x < bounds.x - reach || point.x > bounds.x + bounds.width + reach) continue;
+    if (point.y < bounds.y - reach || point.y > bounds.y + bounds.height + reach) continue;
+    const distance = edgeDistance(edge, point);
+    if (distance <= nearest) {
+      nearest = distance;
+      found = edge;
+    }
+  }
+  return found;
+}
+
+/**
+ * What is under the canvas point: the id of a node, which is drawn over the
+ * lines, or else the key of the edge whose line is there.
+ */
+export function hitId(diagram: Diagram, viewport: Viewport, x: number, y: number): string | null {
+  const node = hitTest(diagram, viewport, x, y);
+  if (node) return node.id;
+  const edge = hitEdge(diagram, viewport, x, y);
+  return edge ? edgeKey(edge) : null;
+}
+
+/** Everything drawn for the node with this id or the edge with this key, or null when it is neither. */
+export function boundsOf(diagram: Diagram, id: string): Rect | null {
+  const node = diagram.nodes.find((candidate) => candidate.id === id);
+  return node ? node.bounds : (findEdge(diagram, id)?.bounds ?? null);
+}
+
 /** The font families: names and statements, and identifiers. */
 export interface Families {
   text: string;
@@ -160,9 +241,12 @@ export function draw(
   // Only what is in view is drawn.
   const visible = visibleArea(viewport, size.width, size.height);
   const drawn = { nodes: 0, edges: 0 };
-  for (const edge of diagram.edges) {
+  // A marked line goes over the others, the selected one last.
+  const rank = (edge: DiagramEdge) => (edgeKey(edge) === marks.selected ? 2 : edgeKey(edge) === marks.hovered ? 1 : 0);
+  const edges = marks.selected || marks.hovered ? [...diagram.edges].sort((a, b) => rank(a) - rank(b)) : diagram.edges;
+  for (const edge of edges) {
     if (!overlaps(edge.bounds, visible)) continue;
-    drawEdge(context, edge, palette, scale);
+    drawEdge(context, edge, palette, scale, marks);
     drawn.edges += 1;
   }
   for (const node of diagram.nodes) {
@@ -178,23 +262,36 @@ function polyline(context: CanvasRenderingContext2D, points: Point[]) {
   points.forEach((point, index) => (index === 0 ? context.moveTo(point.x, point.y) : context.lineTo(point.x, point.y)));
 }
 
-function drawEdge(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, scale: number) {
-  context.strokeStyle = palette.line;
-  context.setLineDash(edge.dashed ? [4 / scale, 3 / scale] : []);
+/** The dashes of each line style, in CSS px: a challenge is dashed, a neutral edge dotted. */
+const DASHES = { solid: [], dashed: [6, 4], dotted: [1.5, 3.5] } as const;
+/** A line's width in CSS px: plain, under the pointer, and selected. */
+const EDGE_WIDTH = { plain: 1, hovered: 2, selected: 2.5 } as const;
+
+function drawEdge(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, scale: number, marks: Marks) {
+  // Selected and hovered are told apart by weight as well as colour.
+  const selected = marks.selected === edgeKey(edge);
+  const hovered = marks.hovered === edgeKey(edge);
+  const stroke = selected ? palette.selectedLine : palette.line;
+  context.strokeStyle = stroke;
+  context.lineWidth = (selected ? EDGE_WIDTH.selected : hovered ? EDGE_WIDTH.hovered : EDGE_WIDTH.plain) / scale;
+  context.lineCap = edge.line === 'dotted' ? 'round' : 'butt';
+  context.setLineDash(DASHES[edge.line].map((length) => length / scale));
   polyline(context, edge.points);
   context.stroke();
   context.setLineDash([]);
+  context.lineCap = 'butt';
   const [tip, left, right] = edge.head;
   if (edge.arrowhead === 'open') {
     polyline(context, [left, tip, right]);
     context.stroke();
-    return;
+  } else {
+    polyline(context, [tip, left, right]);
+    context.closePath();
+    context.fillStyle = edge.arrowhead === 'filled' ? stroke : palette.ground;
+    context.fill();
+    context.stroke();
   }
-  polyline(context, [tip, left, right]);
-  context.closePath();
-  context.fillStyle = edge.arrowhead === 'filled' ? palette.line : palette.ground;
-  context.fill();
-  context.stroke();
+  context.lineWidth = 1 / scale;
 }
 
 function shapePath(context: CanvasRenderingContext2D, node: DiagramNode) {

@@ -61,8 +61,8 @@ flowchart TD
 | Crate | Owns | Built |
 |---|---|---|
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM) | external |
-| `af-gsn` | GSN view of a document, GSN commands, identifiers, well-formedness checks | view (reading rules in `docs/standards/sacm-gsn-mapping.md`); commands and checks no |
-| `af-layout` | Text measurement, diagram layout, positioned render model, SVG export | layout and render model; SVG export no |
+| `af-gsn` | GSN view of a document, GSN commands, identifiers, well-formedness checks | view (reading rules in `docs/standards/sacm-gsn-mapping.md`), with challenges of elements and of relationships; commands and checks no |
+| `af-layout` | Text measurement, diagram layout, positioned render model, SVG export | layout and render model: support in rows below, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges, and lines that bend only where no node is; SVG export no |
 | `af-session` | Open document, revisions, change stream, undo, drafts, storage trait | no |
 | `af-problems` | The problem list and its attention model | no |
 | `af-sccg` | Guideline catalogue and mechanical checks | no |
@@ -71,11 +71,11 @@ flowchart TD
 | `af-review` | Review methods: scope, prompt and result contracts, result validation | no |
 | `af-ai` | Provider profiles and inference; knows nothing about SACM or GSN | no |
 | `af-agent` | Operations an external agent may request | no |
-| `af-api` | The frontend contract: commands, queries, views | open, diagram, element, outline (the argument as the tree the diagram is laid out from) and package queries; a file opens before the fonts arrive; TypeScript types in `crates/af-api/bindings/api.ts` |
+| `af-api` | The frontend contract: commands, queries, views | open, diagram, element, relationship, outline (the argument as the tree the diagram is laid out from) and package queries; a file opens before the fonts arrive; TypeScript types in `crates/af-api/bindings/api.ts` |
 | `af-desktop` | Tauri shell: files, dialogs, secret storage, HTTP, local bridge | the window on `af-api`: a file named on the command line, the open dialog, and the recent files, kept as paths in the application's configuration directory; `--smoke` for CI. Windows checked in CI |
 | `af-mcp` | MCP server executable | no |
 | `af-wasm` | Web application shell: `af-api` in the browser, browser file access | the core for the browser. Its recent files are copies kept in the browser's IndexedDB (`ui/src/core/webRecent.ts`) |
-| `ui/` | React and DATUM frontend | open a file and draw the diagram; pan, zoom, fit, select and hover on it, with the selected element in Element Properties; arranged as DATUM's diagram workspace and the C++ application (menu bar, zoom bar above the canvas, Case Explorer with the file's packages, Argument Navigator with the argument's tree sharing the canvas's selection, Element Properties, Problems); a welcome page while nothing is open, with the example and the recent files; in English and Japanese. DATUM is installed from tarballs packed locally |
+| `ui/` | React and DATUM frontend | open a file and draw the diagram; pan, zoom, fit, select and hover on it, nodes and the lines of relationships alike, with the selected element or relationship in Element Properties; arranged as DATUM's diagram workspace and the C++ application (menu bar, zoom bar above the canvas, Case Explorer with the file's packages, Argument Navigator with the argument's tree sharing the canvas's selection, Element Properties, Problems); a welcome page while nothing is open, with the example and the recent files; in English and Japanese. DATUM is installed from tarballs packed locally |
 
 A crate is added when it can be built and tested without the rest.
 

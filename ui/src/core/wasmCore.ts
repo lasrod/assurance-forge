@@ -1,7 +1,7 @@
 // The browser's core: crates/af-wasm, built by `pnpm wasm` into src/wasm/.
 
 import init, { WasmCore } from '../wasm/af_wasm';
-import type { Core, DiagramAt, ElementDetails, OpenResult, Outline, Package } from './Core';
+import type { Core, DiagramAt, ElementDetails, OpenResult, Outline, Package, RelationshipDetails } from './Core';
 import { createWebRecent } from './webRecent';
 import { StartError, type FontBytes } from './start';
 
@@ -24,6 +24,7 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     close: async () => core.close(),
     diagram: async () => parse<DiagramAt>(core.diagram()),
     element: async (id) => parse<ElementDetails>(core.element(id)),
+    relationship: async (id) => parse<RelationshipDetails>(core.relationship(id)),
     outline: async () => parse<Outline>(core.outline()),
     packages: async () => JSON.parse(core.packages()) as Package[],
     setLanguage: async (language) => core.setLanguage(language),

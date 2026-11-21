@@ -3,7 +3,15 @@
 // serves it through Tauri (tauriCore.ts). Its types are generated from the
 // Rust contract in crates/af-api.
 
-import type { DiagramAt, ElementDetails, OpenedFile, OpenResult, Outline, Package } from '../../../crates/af-api/bindings/api';
+import type {
+  DiagramAt,
+  ElementDetails,
+  OpenedFile,
+  OpenResult,
+  Outline,
+  Package,
+  RelationshipDetails,
+} from '../../../crates/af-api/bindings/api';
 
 export type * from '../../../crates/af-api/bindings/api';
 
@@ -65,6 +73,8 @@ export interface Core {
   diagram(): Promise<DiagramAt | null>;
   /** What the details panel shows for the node with this SACM id. */
   element(id: string): Promise<ElementDetails | null>;
+  /** What the details panel shows for the relationship with this SACM id, when the diagram draws it. */
+  relationship(id: string): Promise<RelationshipDetails | null>;
   /** The argument as a tree, the one the diagram is laid out from; null when nothing is open. */
   outline(): Promise<Outline | null>;
   /** The open file's packages, depth first; empty when nothing is open. */

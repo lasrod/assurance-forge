@@ -4,7 +4,7 @@
 //! `element` gives the details panel's content.
 
 use af_api::Core;
-use af_api::contract::{ArgumentValue, NodeKind, OpenResult, Shape};
+use af_api::contract::{ArgumentValue, EdgeKind, NodeKind, OpenResult, Shape};
 use af_layout::{Fonts, Style};
 
 fn testdata(path: &str) -> Vec<u8> {
@@ -364,4 +364,66 @@ fn the_packages_of_the_core_sample_are_listed_with_what_they_hold() {
     core.close();
     assert!(core.packages().is_empty());
     assert!(core.outline().is_none());
+}
+
+#[test]
+fn relationship_gives_the_details_panel_content() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/challenges.sacm.xmi"));
+
+    // An inference with a Strategy: its ends as SACM names them.
+    let Some(inference) = core.relationship("i_hazards") else {
+        panic!("no i_hazards");
+    };
+    assert_eq!(inference.class, "AssertedInference");
+    assert_eq!(inference.kind, EdgeKind::SupportedBy);
+    assert_eq!(
+        inference.target.as_ref().map(|end| end.id.as_str()),
+        Some("g_top")
+    );
+    assert_eq!(
+        inference.target.as_ref().and_then(|end| end.node),
+        Some(NodeKind::Goal)
+    );
+    let sources: Vec<&str> = inference
+        .sources
+        .iter()
+        .map(|end| end.id.as_str())
+        .collect();
+    assert_eq!(sources, ["g_trap", "g_moving"]);
+    let reasoning = inference.reasoning.as_ref();
+    assert_eq!(reasoning.and_then(|end| end.node), Some(NodeKind::Strategy));
+    assert!(inference.codes.is_empty());
+
+    // A challenge of a relationship: its target is that relationship.
+    let Some(challenge) = core.relationship("k_sample") else {
+        panic!("no k_sample");
+    };
+    assert_eq!(challenge.kind, EdgeKind::Challenge);
+    let Some(target) = challenge.target else {
+        panic!("k_sample has no target");
+    };
+    assert_eq!(target.id, "e_trials");
+    assert!(target.relationship);
+    assert_eq!(target.node, None);
+    assert_eq!(target.identifier, None);
+
+    assert!(
+        core.relationship("g_top").is_none(),
+        "a node is no relationship"
+    );
+    assert!(core.relationship("nothing").is_none());
+
+    let diagram = serde_json::to_value(core.diagram()).unwrap_or_default();
+    let edges = diagram["diagram"]["edges"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let Some(edge) = edges.iter().find(|edge| edge["relationship"] == "k_sample") else {
+        panic!("no edge of k_sample");
+    };
+    assert_eq!(edge["kind"], "challenge");
+    assert_eq!(edge["line"], "dashed");
+    assert_eq!(edge["arrowhead"], "open");
+    assert_eq!(edge["toRelationship"], true);
 }

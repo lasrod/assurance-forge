@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_challenges">
+  <name content="ChallengesCase" />
+  <argumentPackage xmi:id="argpkg_challenges">
+    <name content="ChallengesArgumentPackage" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g_top">
+      <name content="TopClaim" />
+      <description xmi:id="d_g_top"><content><value lang="en" content="The door control function is acceptably safe to operate in passenger service." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="c_scope">
+      <name content="OperationalScope" />
+      <description xmi:id="d_c_scope"><content><value lang="en" content="Passenger service as defined in the operational concept, revision 4." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="c_definition">
+      <name content="SafeDefinition" />
+      <description xmi:id="d_c_definition"><content><value lang="en" content="Acceptably safe: every identified hazard is reduced as low as reasonably practicable." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="a_maintained" assertionDeclaration="assumed">
+      <name content="MaintainedFleet" />
+      <description xmi:id="d_a_maintained"><content><value lang="en" content="Door actuators are maintained to the published schedule." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="j_hazards" assertionDeclaration="axiomatic">
+      <name content="HazardArgument" />
+      <description xmi:id="d_j_hazards"><content><value lang="en" content="Arguing over hazards is the method the operator's safety policy requires." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="s_hazards">
+      <name content="OverHazards" />
+      <description xmi:id="d_s_hazards"><content><value lang="en" content="Argument over each identified hazard of the door control function." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g_trap">
+      <name content="NoTrapping" />
+      <description xmi:id="d_g_trap"><content><value lang="en" content="A closing door does not trap a passenger." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g_moving" assertionDeclaration="needsSupport">
+      <name content="NoOpeningWhileMoving" />
+      <description xmi:id="d_g_moving"><content><value lang="en" content="A door does not open while the vehicle is moving." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="sn_trials">
+      <name content="ObstacleTrials" />
+      <description xmi:id="d_sn_trials"><content><value lang="en" content="Obstacle detection trials, report TR-112." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cg_thin">
+      <name content="ThinObstacles" />
+      <description xmi:id="d_cg_thin"><content><value lang="en" content="Obstacles thinner than 10 mm are not detected, so a strap or a lead can be trapped." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="sn_incident">
+      <name content="IncidentRecord" />
+      <description xmi:id="d_sn_incident"><content><value lang="en" content="Incident record IR-2031: a dog lead trapped in a closing door." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cg_sample">
+      <name content="TrialSample" />
+      <description xmi:id="d_cg_sample"><content><value lang="en" content="The trials covered one door type of the three in service." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cg_scope">
+      <name content="ScopeOutdated" />
+      <description xmi:id="d_cg_scope"><content><value lang="en" content="Revision 4 of the operational concept predates platform screen doors." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cg_rebuttal">
+      <name content="LeadsAreRare" />
+      <description xmi:id="d_cg_rebuttal"><content><value lang="en" content="A single incident in ten years does not show the claim is false." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="cg_complete">
+      <name content="HazardsIncomplete" />
+      <description xmi:id="d_cg_complete"><content><value lang="en" content="The hazard list omits loss of door position sensing." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="ce_audit">
+      <name content="PolicyAudit" />
+      <description xmi:id="d_ce_audit"><content><value lang="en" content="Audit finding AF-7: the definition is not the one the regulator uses." /></content></description>
+    </argumentElement>
+
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x_scope" source="c_scope" target="g_top"><name content="x_scope" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x_definition" source="c_definition" target="g_top"><name content="x_definition" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x_maintained" source="a_maintained" target="g_top"><name content="x_maintained" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x_hazards" source="j_hazards" target="s_hazards"><name content="x_hazards" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i_hazards" source="g_trap g_moving" target="g_top" reasoning="s_hazards"><name content="i_hazards" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e_trials" source="sn_trials" target="g_trap"><name content="e_trials" /></argumentElement>
+
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="k_thin" source="cg_thin" target="g_trap" isCounter="true"><name content="k_thin" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e_incident" source="sn_incident" target="cg_thin"><name content="e_incident" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="k_sample" source="cg_sample" target="e_trials" isCounter="true"><name content="k_sample" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="k_scope" source="cg_scope" target="x_scope" isCounter="true"><name content="k_scope" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="k_rebuttal" source="cg_rebuttal" target="k_thin" isCounter="true"><name content="k_rebuttal" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="k_complete" source="cg_complete" target="i_hazards" isCounter="true"><name content="k_complete" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="k_audit" source="ce_audit" target="c_definition" isCounter="true"><name content="k_audit" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

@@ -54,6 +54,56 @@ id: string, kind: NodeKind, undeveloped: boolean, identifier: string, name: stri
  */
 codes: Array<ViewCode>, };
 
+export type RelationshipDetails = { 
+/**
+ * The SACM id.
+ */
+id: string, 
+/**
+ * The SACM class, such as `AssertedInference`: the frontend words it.
+ */
+class: string, 
+/**
+ * How its edges are drawn.
+ */
+kind: EdgeKind, name: string | null, 
+/**
+ * SACM's target: the conclusion of support, what context is for, what a
+ * challenge challenges.
+ */
+target: RelationshipEnd | null, 
+/**
+ * SACM's sources: the premises, the context, what challenges.
+ */
+sources: Array<RelationshipEnd>, 
+/**
+ * The `reasoning`: the Strategy of an inference.
+ */
+reasoning: RelationshipEnd | null, 
+/**
+ * The view's codes about this relationship.
+ */
+codes: Array<ViewCode>, };
+
+export type RelationshipEnd = { 
+/**
+ * The SACM id the relationship names.
+ */
+id: string, 
+/**
+ * The GSN identifier, when the end is a node of the diagram.
+ */
+identifier: string | null, 
+/**
+ * What the node is drawn as, when the end is a node of the diagram.
+ */
+node: NodeKind | null, 
+/**
+ * The end is a relationship the diagram draws: a challenge may point at
+ * one.
+ */
+relationship: boolean, };
+
 export type ViewCode = { 
 /**
  * Such as `AF-VIEW-003`.
@@ -131,7 +181,9 @@ id: string, kind: NodeKind, shape: Shape, text: Array<TextLine>, decorators: Arr
  */
 bounds: Rect, };
 
-export type EdgeKind = "supportedBy" | "inContextOf" | "neutral";
+export type EdgeKind = "supportedBy" | "inContextOf" | "challenge" | "neutral";
+
+export type LineStyle = "solid" | "dashed" | "dotted";
 
 export type Arrowhead = "filled" | "hollow" | "open";
 
@@ -139,13 +191,23 @@ export type DiagramEdge = {
 /**
  * The SACM id of the relationship.
  */
-relationship: string, from: string, to: string, kind: EdgeKind, dashed: boolean, 
+relationship: string, from: string, 
 /**
- * From the `from` node's outline to the arrowhead.
+ * The SACM id of what the arrow points at: a node, or a relationship
+ * when `to_relationship` is set.
+ */
+to: string, 
+/**
+ * A challenge of a relationship: the tip is on that relationship's line.
+ */
+toRelationship: boolean, kind: EdgeKind, line: LineStyle, 
+/**
+ * From the `from` node's outline to the arrowhead. A curve is given as
+ * the points along it.
  */
 points: Array<Point>, arrowhead: Arrowhead, 
 /**
- * The tip, on the `to` node's outline, then the other two corners.
+ * The tip, on what the arrow points at, then the other two corners.
  */
 head: Array<Point>, 
 /**

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Poin
 import type { DiagramAt, TextStyle } from '../core/Core';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
-import { draw, fit, hitTest, pan, zoomAbout, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, fit, hitId, pan, zoomAbout, type Palette, type Viewport } from './draw';
 
 function palette(style: CanvasStyle): Palette {
   // Forced colours: the system's, as DATUM's canvas rule says.
@@ -76,6 +76,7 @@ export function DiagramCanvas({
   size: { width: number; height: number };
   viewport: Viewport | null;
   onViewport: (next: Viewport) => void;
+  /** The selected node's SACM id, or the selected edge's key (`edgeKey`). */
   selected: string | null;
   onSelect: (id: string | null) => void;
   onTextStyle: (style: TextStyle) => void;
@@ -97,8 +98,8 @@ export function DiagramCanvas({
     return () => watch.dispose();
   }, [onTextStyle]);
 
-  // A node that is gone, after a new file, is no longer under the pointer.
-  const shownHover = diagram && hovered && diagram.diagram.nodes.some((node) => node.id === hovered) ? hovered : null;
+  // What is gone, after a new file, is no longer under the pointer.
+  const shownHover = diagram && hovered && boundsOf(diagram.diagram, hovered) ? hovered : null;
 
   useEffect(() => {
     const element = canvas.current;
@@ -182,7 +183,7 @@ export function DiagramCanvas({
     const point = local(event);
     const current = gesture.current;
     if (!current) {
-      if (diagram && viewport) setHovered(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+      if (diagram && viewport) setHovered(hitId(diagram.diagram, viewport, point.x, point.y));
       return;
     }
     pointers.current.set(event.pointerId, point);
@@ -208,9 +209,9 @@ export function DiagramCanvas({
     setPanning(false);
     if (!current || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
     // A press that did not move is a click: it selects the node under it, or
-    // clears the selection on empty canvas.
+    // the line under it, or clears the selection on empty canvas.
     const point = local(event);
-    onSelect(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+    onSelect(hitId(diagram.diagram, viewport, point.x, point.y));
   };
 
   const onPointerCancel = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -225,9 +226,9 @@ export function DiagramCanvas({
     (id: string | null) => {
       const { diagram: shown, size: area, onViewport: change } = latest.current;
       if (!shown) return;
-      const node = id === null ? null : shown.diagram.nodes.find((candidate) => candidate.id === id);
-      if (id !== null && !node) return;
-      change(fit(node ? node.bounds : shown.diagram.bounds, area.width, area.height));
+      const bounds = id === null ? shown.diagram.bounds : boundsOf(shown.diagram, id);
+      if (!bounds) return;
+      change(fit(bounds, area.width, area.height));
     },
     [],
   );

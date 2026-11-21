@@ -282,7 +282,10 @@ not drawn; an `ArtifactReference` points at them.
 relationships that the view draws as SupportedBy or InContextOf count (E1 to
 E4, with E6's code or without). A relationship drawn neutral, or not drawn,
 reaches nothing, so an `AssertedArtifactSupport` from a piece of evidence does
-not make it less of a Solution.
+not make it less of a Solution. A challenge (E5) reaches nothing either: an
+`ArtifactReference` that is only the source of a counter `AssertedEvidence` is
+neutral by R11. Whether such counter-evidence is drawn as a Solution, as GSN v3
+draws it and the C++ application did, is not decided.
 
 **Order.** For a node: R14 and R15 first, since what is not drawn is not
 drawn whatever else it says; then R12, since a citation is neutral; then R1, a
@@ -291,7 +294,7 @@ its code to whatever kind those give. For a relationship: R15 and E10 first;
 then E5, since a challenge is drawn as a challenge even when it is also cited or
 defeated; then E5a or E9; then E1 to E4. Every code whose condition holds is
 sent, whichever rule decided how the edge is drawn: a cited, defeated challenge
-carries AF-VIEW-004, 007 and 011. An element that is not drawn (R14, R15, E10)
+carries AF-VIEW-004 and 011. An element that is not drawn (R14, R15, E10)
 carries only its own code.
 
 ### Nodes
@@ -333,10 +336,10 @@ Context [N]), and the C++ importer maps `gsn:Context` to no SACM type
 | E2 | `AssertedInference` without `reasoning` | SupportedBy from the target to each source | Decided | Mapping table |
 | E3 | `AssertedEvidence` | SupportedBy from the target to each source | Decided | Mapping table |
 | E4 | `AssertedContext` | InContextOf from the target to each source. The target may be a `Claim` or an `ArgumentReasoning`, which is context for a Strategy | Decided | Mapping table. 18 of the samples' 45 `AssertedContext` target an `ArgumentReasoning` |
-| E5 | A relationship with `isCounter` set, whatever else it says | A neutral edge from each source to the target, pointing at what is challenged: the opposite of SupportedBy. Code AF-VIEW-007. Never SupportedBy or InContextOf. Its `reasoning`, if any, is not linked: code AF-VIEW-009 for it | Decided | A challenge points at what it challenges (GSN v3 Dialectic extension; `notation.md`). A counter relationship drawn as support says the opposite of the file: the C++ SVG export once drew counter-evidence as evidence for a claim |
+| E5 | A relationship with `isCounter` set, whatever else it says | A Challenge edge from each source to the target, pointing at what is challenged: the opposite of SupportedBy. The target may be a node, or a relationship the view draws an edge for, in which case the arrow points at that relationship's first edge. Never SupportedBy or InContextOf. Its `reasoning`, if any, is not linked: code AF-VIEW-009 for it | Decided on 21 November 2026 | [E5](#e5-a-counter-relationship-is-a-challenge) below. A challenge points at what it challenges (GSN v3 Dialectic extension; `notation.md`). A counter relationship drawn as support says the opposite of the file: the C++ SVG export once drew counter-evidence as evidence for a claim |
 | E5a | A relationship declared `defeated` that is not a counter | The edges E1 to E4 would give, in the same GSN direction and through its Strategy, drawn neutral. Code AF-VIEW-011 | Decided | What is defeated is the relationship, not its target, so the edge keeps its direction and only stops looking like live support. GSN v3 has Defeated on SupportedBy and InContextOf (gap row 2), which the dialectic step will draw |
 | E6 | A relationship declared `needsSupport`, `assumed`, `axiomatic` or `asCited` | Its edge by E1 to E4, code AF-VIEW-008: the declaration is not drawn | Decided | Core GSN has no edge decorator for these |
-| E7 | A relationship whose target, or one of whose sources, names no element, names a relationship, or names an element the view does not draw (R14, R15), or that has no target or no source | The edges to its ends that can be placed are drawn; code AF-VIEW-009 for each end that cannot, naming the id, or no id for a missing end. With no edge to draw, the relationship is not placed, also with AF-VIEW-009, and its ends are drawn by their own rules | Decided | A claim about an inference has no core GSN form; an unresolved end has nothing to draw. libSACM keeps a dangling reference as read (SACM-REF-001), so the case is reachable |
+| E7 | A relationship whose target, or one of whose sources, names no element, names a relationship (but for the target of a challenge, E5), or names an element the view does not draw (R14, R15), or that has no target or no source; and a challenge whose target is itself, or a relationship the view draws no edge for | The edges to its ends that can be placed are drawn; code AF-VIEW-009 for each end that cannot, naming the id, or no id for a missing end. With no edge to draw, the relationship is not placed, also with AF-VIEW-009, and its ends are drawn by their own rules | Decided | A claim about an inference has no core GSN form; an unresolved end has nothing to draw. libSACM keeps a dangling reference as read (SACM-REF-001), so the case is reachable |
 | E8 | `AssertedInference` whose `reasoning` names no element, or not an `ArgumentReasoning`; and a `reasoning` on any other relationship | Drawn without it (an inference by E2), code AF-VIEW-009 for the reasoning | Decided | The support is still in the file; only the Strategy cannot be placed. SACM 2.3 gives every asserted relationship a `reasoning` (§11.13), and GSN puts a Strategy only between a goal and its premises |
 | E9 | A relationship with `isCitation` set that is not a counter | As E5a: the edges E1 to E4 would give, in the GSN direction, drawn neutral. Code AF-VIEW-004 | Decided | As R12. A cited relationship is still support or context, so it keeps its direction |
 | E10 | `AssertedArtifactSupport`, `AssertedArtifactContext` | Not drawn, code AF-VIEW-010 | Decided | They relate artifacts to artifacts (§11.17, §11.18); GSN has no such edge |
@@ -349,6 +352,34 @@ with each inference's edges. Two inferences with the same ends give two edges,
 each carrying its own relationship's id. A source named twice in one
 relationship is one premise and one edge. An edge from an element to itself is
 drawn as the file says; well-formedness reports it.
+
+#### E5: a counter relationship is a challenge
+
+Until 21 November 2026 a counter relationship was drawn as a neutral edge with
+code AF-VIEW-007, and one that targeted a relationship was not placed (E7). It
+is now drawn as GSN's challenge: a dashed line with an open arrowhead, at the
+element or the relationship it challenges.
+
+- **The mapping is not new.** `isCounter` is what carries a challenge in SACM
+  (mapping table, "ACP, Challenge, Defeated"; gap row 4), and the C++
+  application wrote and drew it so (GSN3-DIA-001 to 005 in
+  `docs/reference/cpp-gsn-v3-conformance-matrix.md`). Only the reading rule
+  changed, from "not drawn as GSN yet" to "drawn".
+- **A relationship as the target.** GSN v3 lets a challenge point at a
+  relationship, and SACM allows it: an asserted relationship's target is an
+  `ArgumentAsset`, which a relationship is. A relationship drawn as several
+  edges (E1) is challenged at its first, the edge from the conclusion into the
+  Strategy, because GSN v3 §1:6.3.12 puts a challenge of an inference with
+  several premises at its Strategy. A relationship that is not a challenge and
+  targets a relationship still has no GSN form (E7).
+- **AF-VIEW-007 is retired.** It said a challenge was drawn differently from
+  what it is, which is no longer so. Its number is kept, so the later codes
+  keep theirs.
+- **Not decided.** The source of a counter `AssertedEvidence` is still neutral
+  by R11 (see "Reached"). The defeated decorator (E5a) and the in-doubt state
+  are not drawn.
+
+How the layout places a challenge is not a mapping: it is in `af-layout`.
 
 ### Node text
 
@@ -438,7 +469,7 @@ Each carries the id of the element or relationship as an argument.
 | AF-VIEW-004 | A citation (an Away element or a cited relationship), drawn neutral until modules |
 | AF-VIEW-005 | The uninstantiated decorator is not drawn yet |
 | AF-VIEW-006 | An element kind this step does not draw |
-| AF-VIEW-007 | A counter relationship, drawn neutral |
+| AF-VIEW-007 | Retired on 21 November 2026, and no longer sent. It said a counter relationship was drawn neutral; a counter relationship is drawn as a challenge (E5) |
 | AF-VIEW-008 | A relationship's declaration is not drawn |
 | AF-VIEW-009 | A relationship end, or an inference's reasoning, that cannot be placed |
 | AF-VIEW-010 | A relationship between artifacts, not drawn |

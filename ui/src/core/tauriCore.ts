@@ -3,7 +3,17 @@
 // both (plan decision D1).
 
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import type { Core, DiagramAt, ElementDetails, OpenedFile, OpenResult, Outline, Package, RecentFile } from './Core';
+import type {
+  Core,
+  DiagramAt,
+  ElementDetails,
+  OpenedFile,
+  OpenResult,
+  Outline,
+  Package,
+  RecentFile,
+  RelationshipDetails,
+} from './Core';
 import { StartError, type FontBytes } from './start';
 
 /** Whether the page runs in the desktop application's window. */
@@ -41,6 +51,7 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     close: () => invoke('close'),
     diagram: () => invoke<DiagramAt | null>('diagram'),
     element: (id) => invoke<ElementDetails | null>('element', { id }),
+    relationship: (id) => invoke<RelationshipDetails | null>('relationship', { id }),
     outline: () => invoke<Outline | null>('outline'),
     packages: () => invoke<Package[]>('packages'),
     setLanguage: (language) => invoke('set_language', { language }),

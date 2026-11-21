@@ -120,6 +120,47 @@ pub struct ElementDetails {
     pub codes: Vec<ViewCode>,
 }
 
+/// What the details panel shows for a relationship: one the diagram draws an
+/// edge for. Its ends are named as SACM names them; the frontend puts them in
+/// the direction the arrow points.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct RelationshipDetails {
+    /// The SACM id.
+    pub id: String,
+    /// The SACM class, such as `AssertedInference`: the frontend words it.
+    pub class: String,
+    /// How its edges are drawn.
+    pub kind: EdgeKind,
+    pub name: Option<String>,
+    /// SACM's target: the conclusion of support, what context is for, what a
+    /// challenge challenges.
+    pub target: Option<RelationshipEnd>,
+    /// SACM's sources: the premises, the context, what challenges.
+    pub sources: Vec<RelationshipEnd>,
+    /// The `reasoning`: the Strategy of an inference.
+    pub reasoning: Option<RelationshipEnd>,
+    /// The view's codes about this relationship.
+    pub codes: Vec<ViewCode>,
+}
+
+/// One end of a relationship.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct RelationshipEnd {
+    /// The SACM id the relationship names.
+    pub id: String,
+    /// The GSN identifier, when the end is a node of the diagram.
+    pub identifier: Option<String>,
+    /// What the node is drawn as, when the end is a node of the diagram.
+    pub node: Option<NodeKind>,
+    /// The end is a relationship the diagram draws: a challenge may point at
+    /// one.
+    pub relationship: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[serde(rename_all = "camelCase")]
@@ -298,7 +339,22 @@ pub struct DiagramNode {
 pub enum EdgeKind {
     SupportedBy,
     InContextOf,
+    /// A counter relationship: it points at what it challenges.
+    Challenge,
+    /// A defeated or cited relationship, drawn as none of GSN's.
     Neutral,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum LineStyle {
+    /// SupportedBy and InContextOf.
+    Solid,
+    /// A challenge.
+    Dashed,
+    /// A neutral edge.
+    Dotted,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -318,13 +374,18 @@ pub struct DiagramEdge {
     /// The SACM id of the relationship.
     pub relationship: String,
     pub from: String,
+    /// The SACM id of what the arrow points at: a node, or a relationship
+    /// when `to_relationship` is set.
     pub to: String,
+    /// A challenge of a relationship: the tip is on that relationship's line.
+    pub to_relationship: bool,
     pub kind: EdgeKind,
-    pub dashed: bool,
-    /// From the `from` node's outline to the arrowhead.
+    pub line: LineStyle,
+    /// From the `from` node's outline to the arrowhead. A curve is given as
+    /// the points along it.
     pub points: Vec<Point>,
     pub arrowhead: Arrowhead,
-    /// The tip, on the `to` node's outline, then the other two corners.
+    /// The tip, on what the arrow points at, then the other two corners.
     pub head: Vec<Point>,
     /// Everything drawn for the edge, for culling.
     pub bounds: Rect,
@@ -353,6 +414,8 @@ pub fn typescript() -> String {
         ArgumentValue::decl(&cfg),
         DiagramAt::decl(&cfg),
         ElementDetails::decl(&cfg),
+        RelationshipDetails::decl(&cfg),
+        RelationshipEnd::decl(&cfg),
         ViewCode::decl(&cfg),
         NodeKind::decl(&cfg),
         Outline::decl(&cfg),
@@ -366,6 +429,7 @@ pub fn typescript() -> String {
         Decorator::decl(&cfg),
         DiagramNode::decl(&cfg),
         EdgeKind::decl(&cfg),
+        LineStyle::decl(&cfg),
         Arrowhead::decl(&cfg),
         DiagramEdge::decl(&cfg),
         Diagram::decl(&cfg),

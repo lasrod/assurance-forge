@@ -379,6 +379,14 @@ fn element(
 }
 
 #[tauri::command]
+fn relationship(
+    id: String,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::RelationshipDetails>, String> {
+    Ok(lock(&state)?.core.relationship(&id))
+}
+
+#[tauri::command]
 fn set_language(language: String, state: Shared<'_>) -> Result<(), String> {
     lock(&state)?.core.set_language(&language);
     Ok(())
@@ -434,6 +442,7 @@ pub fn run(args: Args) -> i32 {
             close,
             diagram,
             element,
+            relationship,
             set_language,
             set_style
         ])

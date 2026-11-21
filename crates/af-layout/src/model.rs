@@ -254,8 +254,12 @@ pub struct DiagramNode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LineStyle {
+    /// SupportedBy and InContextOf.
     Solid,
+    /// A challenge.
     Dashed,
+    /// A neutral edge, so it reads as none of GSN's relationships.
+    Dotted,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -264,7 +268,7 @@ pub enum Arrowhead {
     Filled,
     /// InContextOf.
     Hollow,
-    /// A neutral edge: two strokes.
+    /// A challenge, and a neutral edge: two strokes.
     Open,
 }
 
@@ -273,9 +277,14 @@ pub enum Arrowhead {
 pub enum Placement {
     /// The `to` node sits in the row below the `from` node.
     Below,
-    /// The `to` node sits beside the `from` node, in its row.
+    /// The `to` node sits in a lane beside the `from` node: level with it
+    /// when it is the lane's first, lower otherwise.
     Beside,
-    /// The edge did not place its end.
+    /// The `from` node, which challenges, sits by what it challenges: in a
+    /// lane beside that node (below it, when that node is itself in a lane),
+    /// or beside that relationship's line.
+    Challenger,
+    /// The edge did not place a node.
     None,
 }
 
@@ -284,15 +293,21 @@ pub struct DiagramEdge {
     /// The SACM id of the relationship.
     pub relationship: String,
     pub from: String,
+    /// The SACM id of what the arrow points at: a node, or a relationship
+    /// when `to_relationship` is set.
     pub to: String,
+    /// A challenge of a relationship: the tip is on that relationship's
+    /// first edge.
+    pub to_relationship: bool,
     pub kind: EdgeKind,
     pub style: LineStyle,
     /// The line, from the `from` node's outline to the arrowhead's base (or
-    /// to its tip for an open arrowhead). Two points for a straight edge.
+    /// to its tip for an open arrowhead). Two points for a straight edge; a
+    /// curve is given as the points along it.
     pub points: Vec<Point>,
     pub arrowhead: Arrowhead,
-    /// The arrowhead's tip, on the `to` node's outline, then its two other
-    /// corners.
+    /// The arrowhead's tip, on the `to` node's outline or the relationship's
+    /// line, then its two other corners.
     pub head: [Point; 3],
     pub placement: Placement,
     /// Everything drawn for the edge: its line and arrowhead.

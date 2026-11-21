@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
-import { fit, zoomAbout, type Viewport } from './canvas/draw';
-import type { Core, DiagramAt, ElementDetails, OpenedFile, OpenResult, OutlineRow, Package, RecentFile, TextStyle } from './core/Core';
-import { ElementProperties } from './ElementProperties';
+import { findEdge, fit, zoomAbout, type Viewport } from './canvas/draw';
+import type { Core, DiagramAt, OpenedFile, OpenResult, OutlineRow, Package, RecentFile, TextStyle } from './core/Core';
+import { ElementProperties, type Details } from './ElementProperties';
 import {
   ChevronDown,
   ChevronUp,
@@ -90,7 +90,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // fitted (null until the canvas has a size) with nothing selected.
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [details, setDetails] = useState<ElementDetails | null>(null);
+  const [details, setDetails] = useState<Details | null>(null);
   // What the left panels show: the argument's tree and the file's packages.
   const [outline, setOutline] = useState<OutlineRow[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -418,16 +418,21 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const zoomBy = (factor: number) =>
     moveView((view) => view && zoomAbout(view, factor, centreSize.width / 2, centreSize.height / 2));
 
-  // What Element Properties shows: the core's details of the selected node, read
-  // again when the diagram is (its text follows the language). An answer for a
-  // selection that has since changed is dropped.
+  // What Element Properties shows: the core's details of the selected node or
+  // relationship, read again when the diagram is (its text follows the
+  // language). An answer for a selection that has since changed is dropped.
   useEffect(() => {
     if (!core || !selected || !diagram) {
       setDetails(null);
       return;
     }
     let current = true;
-    core.element(selected).then(
+    // A node by its id; else one edge, whose relationship the core describes.
+    const edge = diagram.diagram.nodes.some((node) => node.id === selected) ? null : findEdge(diagram.diagram, selected);
+    const read: Promise<Details | null> = edge
+      ? core.relationship(edge.relationship).then((relationship) => relationship && { type: 'relationship', relationship, edge })
+      : core.element(selected).then((element) => element && { type: 'element', element });
+    read.then(
       (next) => {
         if (current) setDetails(next);
       },

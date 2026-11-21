@@ -9,10 +9,15 @@ Assurance cases in SACM 2.3 XMI, for tests and for trying the application.
 | `open-autonomy-safety-case.updated.v2.sacm.xmi` | 465 | The Open Autonomy Safety Case, in English. |
 | `oasc-ja.sacm.xmi` | 581 | A variant of the same case, with English and Japanese text. |
 | `safety-case-sanitized-strict.sacm.xmi` | 1,090 | The largest case: 15 argument packages. |
+| `challenges.sacm.xmi` | 47 | Written by hand for the layout: context on both sides of a goal, and a challenge of a claim, of a context, of a line of support, of a line of context, of an inference with a Strategy and of another challenge. |
 
 "Elements" counts every element with an id, descriptions included.
 
 ## Where they come from
+
+`challenges.sacm.xmi` was written by hand in SACM 2.3 XMI on 2026-11-21, since
+no converted case has a counter relationship. The rest of this section is
+about the other five.
 
 They were written by the C++ application in its own dialect of SACM, and were
 converted once, on 2026-11-15, with that application's library
