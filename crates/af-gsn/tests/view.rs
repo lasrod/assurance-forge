@@ -1284,6 +1284,67 @@ fn e5_and_e7_a_challenge_of_a_relationship_with_no_edge_is_not_placed() {
 }
 
 #[test]
+fn e5_and_e7_a_challenge_whose_sources_cannot_be_placed_names_a_target_with_no_edge() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            element(
+                "AssertedInference",
+                "drawn",
+                r#" source="sub" target="top""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "nothing",
+                r#" source="gone" target="nowhere""#,
+                "",
+            ),
+            // Neither challenge has a source that can be placed. The first
+            // challenges a relationship with no edge, which its finding
+            // names as it would were its source placed; the second one that
+            // is drawn, which is not named.
+            element(
+                "AssertedInference",
+                "of_nothing",
+                r#" source="missing" target="nothing" isCounter="true""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "of_drawn",
+                r#" source="missing" target="drawn" isCounter="true""#,
+                "",
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    let named = |id: &str| -> Vec<Option<String>> {
+        view.findings
+            .iter()
+            .filter(|finding| finding.element == id)
+            .map(|finding| finding.end.clone())
+            .collect()
+    };
+    assert_eq!(
+        named("of_nothing"),
+        [Some("missing".to_owned()), Some("nothing".to_owned())]
+    );
+    assert_eq!(named("of_drawn"), [Some("missing".to_owned())]);
+    assert_eq!(codes_of(&view, "of_nothing"), [Code::EndNotPlaced; 2]);
+    for id in ["of_nothing", "of_drawn"] {
+        assert!(view.unplaced.iter().any(|item| item.id == id), "{id}");
+    }
+    assert_eq!(
+        edges(&view),
+        [edge("top", "sub", EdgeKind::SupportedBy, "drawn")]
+    );
+    assert_each_element_once(&document, &view, "challenges with no source");
+}
+
+#[test]
 fn e7_only_a_challenge_may_point_at_a_relationship() {
     // Support for a relationship has no GSN form: it stays unplaced.
     let document = case(

@@ -311,6 +311,10 @@ struct Builder {
     edges: Vec<Edge>,
     unplaced: Vec<Unplaced>,
     findings: Vec<Finding>,
+    /// Challenges of a relationship that made no edge (none of their sources
+    /// can be placed), and the relationship each challenges: whether that is
+    /// drawn is known only once every edge is.
+    edgeless_challenges: Vec<(String, String)>,
 }
 
 impl Builder {
@@ -340,9 +344,23 @@ impl Builder {
     }
 
     /// E5 and E7: a challenge of a relationship that has no edge has nothing
-    /// to point at. Dropping one may leave another with nothing, so this runs
-    /// until none is left.
+    /// to point at, and its finding names that relationship, whether or not
+    /// the challenge's sources can be placed. Dropping one may leave another
+    /// with nothing, so this runs until none is left.
     fn drop_challenges_of_nothing(&mut self) {
+        self.drop_challenge_edges_of_nothing();
+        for (id, target) in std::mem::take(&mut self.edgeless_challenges) {
+            if !self.edges.iter().any(|edge| edge.relationship == target) {
+                self.findings.push(Finding {
+                    code: Code::EndNotPlaced,
+                    element: id,
+                    end: Some(target),
+                });
+            }
+        }
+    }
+
+    fn drop_challenge_edges_of_nothing(&mut self) {
         loop {
             let drawn: HashSet<&str> = self
                 .edges
@@ -527,6 +545,11 @@ fn relationship<'a>(
         }
     }
     if builder.edges.len() == edges_before {
+        if let Some(target) = target.filter(|_| target_is_relationship) {
+            builder
+                .edgeless_challenges
+                .push((id.to_owned(), target.to_owned()));
+        }
         builder.unplaced(id, Code::EndNotPlaced);
         return;
     }
