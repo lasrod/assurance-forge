@@ -60,6 +60,7 @@ fn main() -> ExitCode {
         let arrow = match edge.kind {
             EdgeKind::SupportedBy => "SupportedBy",
             EdgeKind::InContextOf => "InContextOf",
+            EdgeKind::Challenge => "Challenge  ",
             EdgeKind::Neutral => "Neutral    ",
         };
         println!(

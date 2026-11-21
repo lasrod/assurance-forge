@@ -4,7 +4,7 @@
 //! `element` gives the details panel's content.
 
 use af_api::Core;
-use af_api::contract::{ArgumentValue, NodeKind, OpenResult, Shape};
+use af_api::contract::{ArgumentValue, EdgeKind, NodeKind, OpenResult, Shape};
 use af_layout::{Fonts, Style};
 
 fn testdata(path: &str) -> Vec<u8> {
@@ -280,4 +280,150 @@ fn the_layout_number_changes_with_the_language_and_text_size_but_not_otherwise()
         ..Style::default()
     });
     assert_ne!(layout(&mut core), second);
+}
+
+#[test]
+fn the_outline_is_the_diagrams_tree_with_context_before_what_supports() {
+    let mut core = Core::without_fonts(Style::default(), "en");
+    assert!(core.outline().is_none(), "nothing is open");
+    assert!(core.packages().is_empty());
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let Some(outline) = core.outline() else {
+        panic!("no outline");
+    };
+    assert_eq!(outline.revision, 1);
+    let rows: Vec<(&str, u32)> = outline
+        .rows
+        .iter()
+        .map(|row| (row.id.as_str(), row.level))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("cl_top", 1),
+            ("ctx_1", 2),
+            ("ar_1", 2),
+            ("cl_sub_1", 3),
+            ("cl_assumption_1", 4),
+            ("ev_1", 4),
+            ("cl_sub_2", 3),
+            ("ev_2", 4),
+        ]
+    );
+    assert_eq!(outline.rows[2].kind, NodeKind::Strategy);
+    assert_eq!(outline.rows[0].name.as_deref(), Some("TopClaim"));
+}
+
+#[test]
+fn every_node_of_every_sample_is_in_the_outline_once() {
+    for name in [
+        "sample.sacm.xmi",
+        "open-autonomy-safety-case.updated.v2.sacm.xmi",
+        "oasc-ja.sacm.xmi",
+        "safety-case-sanitized-strict.sacm.xmi",
+    ] {
+        let mut core = Core::without_fonts(Style::default(), "en");
+        let OpenResult::Opened { nodes, .. } = core.open(&testdata(&format!("sacm/{name}"))) else {
+            panic!("{name}: refused");
+        };
+        let rows = core
+            .outline()
+            .map(|outline| outline.rows)
+            .unwrap_or_default();
+        assert_eq!(rows.len(), nodes as usize, "{name}");
+        let mut ids: Vec<&str> = rows.iter().map(|row| row.id.as_str()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), nodes as usize, "{name}: a node twice");
+        // A row is a root, or at most one level under the row before it.
+        assert_eq!(rows.first().map(|row| row.level), Some(1), "{name}");
+        for pair in rows.windows(2) {
+            assert!(
+                pair[1].level >= 1 && pair[1].level <= pair[0].level + 1,
+                "{name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_packages_of_the_core_sample_are_listed_with_what_they_hold() {
+    let mut core = Core::without_fonts(Style::default(), "en");
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let packages = core.packages();
+    assert!(!packages.is_empty());
+    assert_eq!(packages[0].level, 1);
+    assert!(
+        packages
+            .iter()
+            .any(|package| package.kind == "ArgumentPackage" && package.elements > 0)
+    );
+    for pair in packages.windows(2) {
+        assert!(pair[1].level <= pair[0].level + 1);
+    }
+    core.close();
+    assert!(core.packages().is_empty());
+    assert!(core.outline().is_none());
+}
+
+#[test]
+fn relationship_gives_the_details_panel_content() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/challenges.sacm.xmi"));
+
+    // An inference with a Strategy: its ends as SACM names them.
+    let Some(inference) = core.relationship("i_hazards") else {
+        panic!("no i_hazards");
+    };
+    assert_eq!(inference.class, "AssertedInference");
+    assert_eq!(inference.kind, EdgeKind::SupportedBy);
+    assert_eq!(
+        inference.target.as_ref().map(|end| end.id.as_str()),
+        Some("g_top")
+    );
+    assert_eq!(
+        inference.target.as_ref().and_then(|end| end.node),
+        Some(NodeKind::Goal)
+    );
+    let sources: Vec<&str> = inference
+        .sources
+        .iter()
+        .map(|end| end.id.as_str())
+        .collect();
+    assert_eq!(sources, ["g_trap", "g_moving"]);
+    let reasoning = inference.reasoning.as_ref();
+    assert_eq!(reasoning.and_then(|end| end.node), Some(NodeKind::Strategy));
+    assert!(inference.codes.is_empty());
+
+    // A challenge of a relationship: its target is that relationship.
+    let Some(challenge) = core.relationship("k_sample") else {
+        panic!("no k_sample");
+    };
+    assert_eq!(challenge.kind, EdgeKind::Challenge);
+    let Some(target) = challenge.target else {
+        panic!("k_sample has no target");
+    };
+    assert_eq!(target.id, "e_trials");
+    assert!(target.relationship);
+    assert_eq!(target.node, None);
+    assert_eq!(target.identifier, None);
+
+    assert!(
+        core.relationship("g_top").is_none(),
+        "a node is no relationship"
+    );
+    assert!(core.relationship("nothing").is_none());
+
+    let diagram = serde_json::to_value(core.diagram()).unwrap_or_default();
+    let edges = diagram["diagram"]["edges"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let Some(edge) = edges.iter().find(|edge| edge["relationship"] == "k_sample") else {
+        panic!("no edge of k_sample");
+    };
+    assert_eq!(edge["kind"], "challenge");
+    assert_eq!(edge["line"], "dashed");
+    assert_eq!(edge["arrowhead"], "open");
+    assert_eq!(edge["toRelationship"], true);
 }

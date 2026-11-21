@@ -3,8 +3,8 @@
 use af_layout as layout;
 
 use crate::contract::{
-    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, EdgeKind, NodeKind, Point, Rect,
-    Shape, TextLine, TextRole,
+    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, EdgeKind, LineStyle, NodeKind, Point,
+    Rect, Shape, TextLine, TextRole,
 };
 
 pub(crate) fn node_kind(kind: af_gsn::view::NodeKind) -> NodeKind {
@@ -17,6 +17,16 @@ pub(crate) fn node_kind(kind: af_gsn::view::NodeKind) -> NodeKind {
         K::Assumption => NodeKind::Assumption,
         K::Justification => NodeKind::Justification,
         K::Neutral => NodeKind::Neutral,
+    }
+}
+
+pub(crate) fn edge_kind(kind: af_gsn::view::EdgeKind) -> EdgeKind {
+    use af_gsn::view::EdgeKind as K;
+    match kind {
+        K::SupportedBy => EdgeKind::SupportedBy,
+        K::InContextOf => EdgeKind::InContextOf,
+        K::Challenge => EdgeKind::Challenge,
+        K::Neutral => EdgeKind::Neutral,
     }
 }
 
@@ -90,17 +100,17 @@ fn decorator(decorator: &layout::Decorator) -> Decorator {
 }
 
 fn edge(edge: &layout::DiagramEdge) -> DiagramEdge {
-    use af_gsn::view::EdgeKind as K;
     DiagramEdge {
         relationship: edge.relationship.clone(),
         from: edge.from.clone(),
         to: edge.to.clone(),
-        kind: match edge.kind {
-            K::SupportedBy => EdgeKind::SupportedBy,
-            K::InContextOf => EdgeKind::InContextOf,
-            K::Neutral => EdgeKind::Neutral,
+        to_relationship: edge.to_relationship,
+        kind: edge_kind(edge.kind),
+        line: match edge.style {
+            layout::LineStyle::Solid => LineStyle::Solid,
+            layout::LineStyle::Dashed => LineStyle::Dashed,
+            layout::LineStyle::Dotted => LineStyle::Dotted,
         },
-        dashed: edge.style == layout::LineStyle::Dashed,
         points: edge.points.iter().copied().map(point).collect(),
         arrowhead: match edge.arrowhead {
             layout::Arrowhead::Filled => Arrowhead::Filled,

@@ -6,9 +6,10 @@
     margin: 0;
   }
 
+  /* The frame: the menu bar and the status bar sit on it, at its edges. */
   .af-app {
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100%;
   }
 
@@ -22,18 +23,134 @@
     --datum-workspace-end-default: 17rem;
   }
 
+  /* The workspace keeps the 8px edge a product's frame gives it. */
+  .af-workspace > .datum-workspace {
+    padding-inline: var(--datum-space-8);
+  }
+
+  /* The zoom controls above the canvas, as DATUM's diagram composition has them. */
+  .af-zoom-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--datum-space-4);
+  }
+
+  .af-zoom-bar .datum-quantity-cell {
+    inline-size: 6rem;
+  }
+
   .af-dock-empty {
     margin: 0;
     padding: var(--datum-space-12);
   }
 
-  .af-properties {
-    padding: var(--datum-space-12);
-  }
-
-  /* An identifier or a statement with no spaces still wraps in the narrow dock. */
+  /* An identifier with no spaces still wraps in the narrow dock. */
   .af-properties dd {
     overflow-wrap: anywhere;
+  }
+
+  /* A narrow panel stacks label over value. DATUM puts a text value in the
+     unit column there, which indents it by the label's width; until DATUM
+     stacks it too, it takes the row. */
+  @container (max-width: 19.5rem) {
+    .af-properties > .datum-property-row > dd {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* A row's trailing text (an identifier, a kind, a count) stays on one line; the name wraps. */
+  .af-tree-meta {
+    white-space: nowrap;
+  }
+
+  /* The statement is prose: a paragraph above the properties. */
+  .af-statement {
+    margin: 0 0 var(--datum-space-8);
+    overflow-wrap: anywhere;
+  }
+
+  /* The welcome page: one block of panel on the frame, sized to its content. */
+  .af-welcome {
+    display: grid;
+    place-items: start center;
+    overflow: auto;
+    padding: var(--datum-space-48) var(--datum-space-16) var(--datum-space-16);
+  }
+
+  .af-welcome-block {
+    display: grid;
+    gap: var(--datum-space-24);
+    inline-size: min(100%, 60rem);
+    padding: var(--datum-space-24);
+    background: var(--datum-surface-panel);
+    border-radius: var(--datum-radius-structural);
+  }
+
+  .af-welcome-title {
+    margin: 0;
+    font-size: var(--datum-type-reading-size);
+    line-height: var(--datum-type-reading-line-height);
+    font-weight: 600;
+  }
+
+  .af-welcome-tagline,
+  .af-welcome-actions p,
+  .af-welcome-note {
+    margin: 0;
+  }
+
+  .af-welcome-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: var(--datum-space-24) var(--datum-space-32);
+    align-items: start;
+  }
+
+  .af-welcome-columns > section {
+    display: grid;
+    gap: var(--datum-space-12);
+    min-inline-size: 0;
+  }
+
+  .af-welcome-heading {
+    margin: 0;
+    font-size: var(--datum-type-control-size);
+    line-height: var(--datum-type-control-line-height);
+    font-weight: 500;
+    color: var(--datum-text-secondary);
+  }
+
+  .af-welcome-actions {
+    display: grid;
+    gap: var(--datum-space-16);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .af-welcome-actions > li {
+    display: grid;
+    gap: var(--datum-space-4);
+    justify-items: start;
+  }
+
+  /* A recent file: its name, and under it where it is or when it was opened. */
+  .af-recent {
+    display: grid;
+    min-inline-size: 0;
+    padding-block: var(--datum-space-4);
+  }
+
+  .af-recent-name,
+  .af-recent-where {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .af-welcome-clear {
+    display: flex;
+    justify-content: end;
   }
 
   .af-canvas-host {

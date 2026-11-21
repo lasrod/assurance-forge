@@ -61,10 +61,10 @@ fn run() -> Result<(), String> {
             .iter()
             .map(|p| format!("{},{}", p.x, p.y))
             .collect();
-        let dash = if edge.style == LineStyle::Dashed {
-            r#" stroke-dasharray="4 3""#
-        } else {
-            ""
+        let dash = match edge.style {
+            LineStyle::Solid => "",
+            LineStyle::Dashed => r#" stroke-dasharray="6 4""#,
+            LineStyle::Dotted => r#" stroke-dasharray="1 3""#,
         };
         let _ = writeln!(
             svg,

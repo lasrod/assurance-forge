@@ -634,9 +634,9 @@ fn e5_a_counter_relationship_points_at_what_it_challenges() {
     let view = view(&document, "en");
     assert_eq!(
         edges(&view),
-        [edge("counter_claim", "goal", EdgeKind::Neutral, "i1")]
+        [edge("counter_claim", "goal", EdgeKind::Challenge, "i1")]
     );
-    assert_eq!(codes_of(&view, "i1"), [Code::Counter, Code::EndNotPlaced]);
+    assert_eq!(codes_of(&view, "i1"), [Code::EndNotPlaced]);
     assert_eq!(
         view.findings
             .iter()
@@ -657,9 +657,9 @@ fn e5_a_defeated_challenge_is_drawn_as_a_challenge_with_both_codes() {
     let view = view(&document, "en");
     assert_eq!(
         edges(&view),
-        [edge("counter_claim", "goal", EdgeKind::Neutral, "i1")]
+        [edge("counter_claim", "goal", EdgeKind::Challenge, "i1")]
     );
-    assert_eq!(codes_of(&view, "i1"), [Code::Counter, Code::Defeated]);
+    assert_eq!(codes_of(&view, "i1"), [Code::Defeated]);
 }
 
 #[test]
@@ -890,9 +890,9 @@ fn e5_a_cited_challenge_is_still_drawn_as_a_challenge() {
     let view = view(&document, "en");
     assert_eq!(
         edges(&view),
-        [edge("against", "goal", EdgeKind::Neutral, "i1")]
+        [edge("against", "goal", EdgeKind::Challenge, "i1")]
     );
-    assert_eq!(codes_of(&view, "i1"), [Code::Citation, Code::Counter]);
+    assert_eq!(codes_of(&view, "i1"), [Code::Citation]);
 }
 
 #[test]
@@ -919,7 +919,7 @@ fn every_code_whose_condition_holds_is_sent() {
     let view = view(&document, "en");
     assert_eq!(
         codes_of(&view, "counter_assumed"),
-        [Code::Counter, Code::RelationshipDeclarationNotDrawn]
+        [Code::RelationshipDeclarationNotDrawn]
     );
     assert_eq!(
         codes_of(&view, "cited_defeated"),
@@ -1184,4 +1184,209 @@ fn e12_a_strategy_structure_is_coded() {
     let view = view(&document, "en");
     assert_eq!(kind_of(&view, "r"), NodeKind::Strategy);
     assert_eq!(codes_of(&view, "r"), [Code::StructureNotDrawn]);
+}
+
+#[test]
+fn e5_a_challenge_may_point_at_a_relationship_that_is_drawn() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            claim("against", ""),
+            claim("against_that", ""),
+            element(
+                "AssertedInference",
+                "i1",
+                r#" source="sub" target="top""#,
+                "",
+            ),
+            // At a relationship, and at the challenge of it.
+            element(
+                "AssertedInference",
+                "k1",
+                r#" source="against" target="i1" isCounter="true""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "k2",
+                r#" source="against_that" target="k1" isCounter="true""#,
+                "",
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(
+        edges(&view),
+        [
+            edge("top", "sub", EdgeKind::SupportedBy, "i1"),
+            edge("against", "i1", EdgeKind::Challenge, "k1"),
+            edge("against_that", "k1", EdgeKind::Challenge, "k2"),
+        ]
+    );
+    let at_relationship: Vec<bool> = view.edges.iter().map(|edge| edge.to_relationship).collect();
+    assert_eq!(at_relationship, [false, true, true]);
+    assert!(view.findings.is_empty(), "{:?}", view.findings);
+    assert!(view.unplaced.is_empty());
+    assert_each_element_once(&document, &view, "challenges of relationships");
+}
+
+#[test]
+fn e5_and_e7_a_challenge_of_a_relationship_with_no_edge_is_not_placed() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("against", ""),
+            claim("against_that", ""),
+            // No end of `nothing` can be placed, so it has no edge; `k1`
+            // challenges it, `k2` challenges `k1`, and `own` itself.
+            element(
+                "AssertedInference",
+                "nothing",
+                r#" source="gone" target="nowhere""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "k1",
+                r#" source="against" target="nothing" isCounter="true""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "k2",
+                r#" source="against_that" target="k1" isCounter="true""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "own",
+                r#" source="against" target="own" isCounter="true""#,
+                "",
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert!(view.edges.is_empty(), "{:?}", view.edges);
+    for (id, end) in [("k1", "nothing"), ("k2", "k1"), ("own", "own")] {
+        assert_eq!(codes_of(&view, id), [Code::EndNotPlaced], "{id}");
+        let named = view
+            .findings
+            .iter()
+            .find(|finding| finding.element == id)
+            .and_then(|finding| finding.end.as_deref());
+        assert_eq!(named, Some(end), "{id}");
+        assert!(view.unplaced.iter().any(|item| item.id == id), "{id}");
+    }
+    assert_each_element_once(&document, &view, "challenges of nothing");
+}
+
+#[test]
+fn e5_and_e7_a_challenge_whose_sources_cannot_be_placed_names_a_target_with_no_edge() {
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            element(
+                "AssertedInference",
+                "drawn",
+                r#" source="sub" target="top""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "nothing",
+                r#" source="gone" target="nowhere""#,
+                "",
+            ),
+            // Neither challenge has a source that can be placed. The first
+            // challenges a relationship with no edge, which its finding
+            // names as it would were its source placed; the second one that
+            // is drawn, which is not named.
+            element(
+                "AssertedInference",
+                "of_nothing",
+                r#" source="missing" target="nothing" isCounter="true""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "of_drawn",
+                r#" source="missing" target="drawn" isCounter="true""#,
+                "",
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    let named = |id: &str| -> Vec<Option<String>> {
+        view.findings
+            .iter()
+            .filter(|finding| finding.element == id)
+            .map(|finding| finding.end.clone())
+            .collect()
+    };
+    assert_eq!(
+        named("of_nothing"),
+        [Some("missing".to_owned()), Some("nothing".to_owned())]
+    );
+    assert_eq!(named("of_drawn"), [Some("missing".to_owned())]);
+    assert_eq!(codes_of(&view, "of_nothing"), [Code::EndNotPlaced; 2]);
+    for id in ["of_nothing", "of_drawn"] {
+        assert!(view.unplaced.iter().any(|item| item.id == id), "{id}");
+    }
+    assert_eq!(
+        edges(&view),
+        [edge("top", "sub", EdgeKind::SupportedBy, "drawn")]
+    );
+    assert_each_element_once(&document, &view, "challenges with no source");
+}
+
+#[test]
+fn e7_only_a_challenge_may_point_at_a_relationship() {
+    // Support for a relationship has no GSN form: it stays unplaced.
+    let document = case(
+        &[
+            claim("top", ""),
+            claim("sub", ""),
+            claim("other", ""),
+            element(
+                "AssertedInference",
+                "i1",
+                r#" source="sub" target="top""#,
+                "",
+            ),
+            element(
+                "AssertedInference",
+                "i2",
+                r#" source="other" target="i1""#,
+                "",
+            ),
+        ]
+        .concat(),
+    );
+    let view = view(&document, "en");
+    assert_eq!(
+        edges(&view),
+        [edge("top", "sub", EdgeKind::SupportedBy, "i1")]
+    );
+    assert_eq!(codes_of(&view, "i2"), [Code::EndNotPlaced]);
+}
+
+#[test]
+fn the_retired_counter_code_is_never_sent() {
+    let document = sample("../sacm/challenges.sacm.xmi");
+    let view = view(&document, "en");
+    assert!(
+        view.edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Challenge)
+    );
+    assert!(
+        view.findings
+            .iter()
+            .all(|finding| finding.code != Code::Counter)
+    );
 }

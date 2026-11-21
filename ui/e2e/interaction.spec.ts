@@ -140,7 +140,7 @@ test('Zoom: Ctrl and the wheel zoom about the pointer, + and − about the centr
   expect((await viewport(page)).scale).toBeCloseTo(0.1, 5);
   await expect(page.getByTestId('zoom')).toHaveText('Zoom 10%');
 
-  // The toolbar's buttons do the same as the keys.
+  // The zoom bar's buttons do the same as the keys.
   await page.getByRole('button', { name: 'Zoom in' }).click();
   expect((await viewport(page)).scale).toBeCloseTo(0.125, 5);
   await page.getByRole('button', { name: 'Zoom out' }).click();

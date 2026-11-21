@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import type { Diagram, DiagramNode } from '../core/Core';
-import { draw, fit, hitTest, insideShape, MAX_SCALE, MIN_SCALE, pan, toDiagram, zoomAbout, type Families, type Palette } from './draw';
+import type { Diagram, DiagramEdge, DiagramNode } from '../core/Core';
+import {
+  boundsOf,
+  draw,
+  EDGE_REACH,
+  edgeDistance,
+  edgeKey,
+  findEdge,
+  fit,
+  hitEdge,
+  hitId,
+  hitTest,
+  insideShape,
+  MAX_SCALE,
+  MIN_SCALE,
+  pan,
+  toDiagram,
+  zoomAbout,
+  type Families,
+  type Palette,
+} from './draw';
 
 describe('fit', () => {
   it('centres a small diagram at 100%', () => {
@@ -31,6 +50,10 @@ function recorder() {
   /** The fill style at each fill, and the stroke style at each stroke. */
   const fills: string[] = [];
   const strokes: string[] = [];
+  /** The line width at each stroke, and every dash pattern set. */
+  const widths: number[] = [];
+  const dashes: number[][] = [];
+  let lineWidth = 1;
   let font = '10px x';
   let fillStyle = '';
   let strokeStyle = '';
@@ -46,18 +69,24 @@ function recorder() {
         if (name === 'measureText') return (text: string) => ({ width: text.length * 0.5 * parseFloat(font.split(' ')[1]) });
         if (name === 'font') return font;
         if (name === 'fill') return () => fills.push(fillStyle);
-        if (name === 'stroke') return () => strokes.push(strokeStyle);
+        if (name === 'stroke')
+          return () => {
+            strokes.push(strokeStyle);
+            widths.push(lineWidth);
+          };
+        if (name === 'setLineDash') return (pattern: number[]) => dashes.push(pattern);
         return () => undefined;
       },
       set: (_, name, value) => {
         if (name === 'font') font = value as string;
         if (name === 'fillStyle') fillStyle = value as string;
         if (name === 'strokeStyle') strokeStyle = value as string;
+        if (name === 'lineWidth') lineWidth = value as number;
         return true;
       },
     },
   ) as unknown as CanvasRenderingContext2D;
-  return { context, texts, fonts, fills, strokes };
+  return { context, texts, fonts, fills, strokes, widths, dashes };
 }
 
 const palette: Palette = {
@@ -200,5 +229,108 @@ describe('selected and hovered', () => {
     });
     expect(hovered.fills).toEqual(['#eee']);
     expect(hovered.strokes).toEqual(['#000']);
+  });
+});
+
+/** An edge along `points` to `tip`, its arrowhead pointing down. */
+function edge(relationship: string, points: { x: number; y: number }[], tip: { x: number; y: number }, line: DiagramEdge['line'] = 'solid'): DiagramEdge {
+  const all = [...points, tip];
+  const xs = all.map((point) => point.x);
+  const ys = all.map((point) => point.y);
+  return {
+    relationship,
+    from: 'G1',
+    to: 'G2',
+    toRelationship: false,
+    kind: line === 'dashed' ? 'challenge' : 'supportedBy',
+    line,
+    points,
+    arrowhead: line === 'solid' ? 'filled' : 'open',
+    head: [tip, { x: tip.x - 5, y: tip.y - 10 }, { x: tip.x + 5, y: tip.y - 10 }],
+    bounds: { x: Math.min(...xs) - 5, y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs) + 10, height: Math.max(...ys) - Math.min(...ys) },
+  };
+}
+
+describe('relationships', () => {
+  // A bent line from (100, 80) down, across and down to (300, 200); and a second relationship beside it.
+  const bent = edge('i1', [{ x: 100, y: 80 }, { x: 100, y: 140 }, { x: 300, y: 140 }, { x: 300, y: 190 }], { x: 300, y: 200 });
+  const other = edge('k1', [{ x: 400, y: 80 }, { x: 400, y: 190 }], { x: 400, y: 200 }, 'dashed');
+  const withEdges: Diagram = { nodes: [node('G1', 0)], edges: [bent, other], bounds: { x: 0, y: 0, width: 500, height: 200 } };
+  const unit = { scale: 1, offsetX: 0, offsetY: 0 };
+
+  it('measures the distance to any part of a line, and to its arrowhead', () => {
+    expect(edgeDistance(bent, { x: 200, y: 143 })).toBeCloseTo(3);
+    expect(edgeDistance(bent, { x: 100, y: 100 })).toBe(0);
+    expect(edgeDistance(bent, { x: 300, y: 200 })).toBe(0);
+    expect(edgeDistance(bent, { x: 200, y: 100 })).toBeCloseTo(40);
+  });
+
+  it('takes the line within reach of the pointer, on screen', () => {
+    expect(hitEdge(withEdges, unit, 200, 140 + EDGE_REACH)?.relationship).toBe('i1');
+    expect(hitEdge(withEdges, unit, 200, 141 + EDGE_REACH)).toBeNull();
+    // Zoomed out to 25% the reach is still 5 px on screen: 20 in the diagram.
+    const far = { scale: 0.25, offsetX: 0, offsetY: 0 };
+    expect(hitEdge(withEdges, far, 50, 35 + 4)?.relationship).toBe('i1');
+    expect(hitEdge(withEdges, far, 50, 35 + 7)).toBeNull();
+  });
+
+  it('takes the nearer of two lines', () => {
+    const close = edge('i2', [{ x: 104, y: 80 }, { x: 104, y: 190 }], { x: 104, y: 200 });
+    const both: Diagram = { ...withEdges, edges: [bent, close] };
+    expect(hitEdge(both, unit, 101, 100)?.relationship).toBe('i1');
+    expect(hitEdge(both, unit, 103, 100)?.relationship).toBe('i2');
+  });
+
+  it('puts a node before the line under it', () => {
+    // (100, 79) is on G1 and within reach of the line that leaves its bottom edge.
+    expect(hitId(withEdges, unit, 100, 79)).toBe('G1');
+    expect(hitId(withEdges, unit, 100, 100)).toBe('i1 G1 G2');
+    expect(hitId(withEdges, unit, 250, 300)).toBeNull();
+  });
+
+  // A second line of the same relationship, to another node.
+  const second = { ...edge('i1', [{ x: 100, y: 80 }, { x: 100, y: 290 }], { x: 100, y: 300 }), to: 'G3' };
+  const two: Diagram = { ...withEdges, edges: [bent, second] };
+
+  it('names each line of a relationship apart, and bounds a node or one line', () => {
+    expect(edgeKey(bent)).toBe('i1 G1 G2');
+    expect(edgeKey(second)).toBe('i1 G1 G3');
+    expect(findEdge(two, 'i1 G1 G3')).toBe(second);
+    expect(findEdge(two, 'i1')).toBeNull();
+    expect(boundsOf(two, 'G1')).toEqual({ x: 0, y: 0, width: 200, height: 80 });
+    expect(boundsOf(two, 'i1 G1 G2')).toEqual(bent.bounds);
+    expect(boundsOf(two, 'i1 G1 G3')).toEqual(second.bounds);
+    expect(boundsOf(two, 'nothing')).toBeNull();
+  });
+
+  it('marks only the selected line of a relationship with several', () => {
+    const drawn = recorder();
+    draw(drawn.context, { ...two, nodes: [] }, unit, palette, families, { width: 800, height: 600, dpr: 1 }, { selected: 'i1 G1 G3', hovered: null });
+    // The other line of i1 and its arrowhead stay plain; the selected one is drawn last.
+    expect(drawn.strokes).toEqual(['#000', '#000', '#00f', '#00f']);
+    expect(drawn.widths).toEqual([1, 1, 2.5, 2.5]);
+  });
+
+  it('draws a challenge dashed and a neutral edge dotted', () => {
+    const dotted = edge('n1', [{ x: 450, y: 80 }, { x: 450, y: 190 }], { x: 450, y: 200 }, 'dotted');
+    const drawn = recorder();
+    draw(drawn.context, { ...withEdges, nodes: [], edges: [bent, other, dotted] }, unit, palette, families, { width: 800, height: 600, dpr: 1 });
+    // Each edge sets its pattern, then clears it for the arrowhead.
+    expect(drawn.dashes).toEqual([[], [], [6, 4], [], [1.5, 3.5], []]);
+  });
+
+  it('marks the selected line by colour and weight, and the hovered one by weight', () => {
+    const drawn = recorder();
+    draw(drawn.context, { ...withEdges, nodes: [] }, unit, palette, families, { width: 800, height: 600, dpr: 1 }, {
+      selected: 'k1 G1 G2',
+      hovered: 'i1 G1 G2',
+    });
+    // The hovered line and its arrowhead, then the selected ones, which are drawn last.
+    expect(drawn.strokes).toEqual(['#000', '#000', '#00f', '#00f']);
+    expect(drawn.widths).toEqual([2, 2, 2.5, 2.5]);
+
+    const plain = recorder();
+    draw(plain.context, { ...withEdges, nodes: [] }, unit, palette, families, { width: 800, height: 600, dpr: 1 });
+    expect(plain.widths).toEqual([1, 1, 1, 1]);
   });
 });

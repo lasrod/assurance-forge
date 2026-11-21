@@ -9,8 +9,10 @@
 //! the fonts as bytes ([`Fonts`]).
 //!
 //! The layout is a layered tree (plan decision D7): SupportedBy children in
-//! the row below their parent, InContextOf attachments beside it, siblings in
-//! document order, straight edges.
+//! the row below their parent, InContextOf attachments in a lane on either
+//! side of it, a challenge beside what it challenges, siblings in document
+//! order. A line bends only in the clear band between two rows or between a
+//! node and its lane.
 
 mod layout;
 mod model;
@@ -18,6 +20,7 @@ mod text;
 
 use std::collections::HashMap;
 
+pub use layout::{OutlineRow, outline};
 pub use model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
     Shape, ShapeKind, TextLine, TextRole,

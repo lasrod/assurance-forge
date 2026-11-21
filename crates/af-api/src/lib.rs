@@ -18,11 +18,13 @@ pub mod contract;
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
 use sacm::diagnostic::Severity;
+use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions};
 
 use contract::{
     ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, ElementDetails, MessageArgument,
-    OpenResult, Refusal, ViewCode,
+    OpenResult, Outline, OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd,
+    ViewCode,
 };
 
 mod convert;
@@ -186,16 +188,113 @@ impl Core {
             identifier: node.identifier.clone(),
             name: node.name.clone(),
             statement: node.statement.clone(),
-            codes: view
-                .findings
-                .iter()
-                .filter(|finding| finding.element == id)
-                .map(|finding| ViewCode {
-                    code: finding.code.as_str().to_owned(),
-                    end: finding.end.clone(),
-                })
-                .collect(),
+            codes: codes(view, id),
         })
+    }
+
+    /// What the details panel shows for the relationship with SACM id `id`,
+    /// or `None` when the diagram draws no edge for it.
+    pub fn relationship(&self, id: &str) -> Option<RelationshipDetails> {
+        let open = self.open.as_ref()?;
+        let view = &open.view;
+        let edge = view.edges.iter().find(|edge| edge.relationship == id)?;
+        let element = open
+            .document
+            .elements()
+            .find(|element| element.id().as_str() == id)?;
+        let end = |id: &str| {
+            let node = view.nodes.iter().find(|node| node.id == id);
+            RelationshipEnd {
+                id: id.to_owned(),
+                identifier: node.map(|node| node.identifier.clone()),
+                node: node.map(|node| convert::node_kind(node.kind)),
+                relationship: view.edges.iter().any(|edge| edge.relationship == id),
+            }
+        };
+        // A source named twice is one end, as it is one edge.
+        let mut sources: Vec<RelationshipEnd> = Vec::new();
+        for source in element.sources() {
+            if !sources.iter().any(|known| known.id == source.as_str()) {
+                sources.push(end(source.as_str()));
+            }
+        }
+        Some(RelationshipDetails {
+            id: id.to_owned(),
+            class: element.kind().name().to_owned(),
+            kind: convert::edge_kind(edge.kind),
+            name: element
+                .name()
+                .and_then(|name| name.content())
+                .map(str::to_owned),
+            target: element.target().map(|target| end(target.as_str())),
+            sources,
+            reasoning: element.reasoning().map(|reasoning| end(reasoning.as_str())),
+            codes: codes(view, id),
+        })
+    }
+
+    /// The argument as a tree, for the Argument Navigator: the tree the
+    /// diagram is laid out from, so the two agree. `None` when nothing is
+    /// open. It needs no fonts.
+    pub fn outline(&self) -> Option<Outline> {
+        let view = &self.open.as_ref()?.view;
+        let rows = af_layout::outline(view)
+            .into_iter()
+            .map(|row| {
+                let node = &view.nodes[row.node];
+                OutlineRow {
+                    id: node.id.clone(),
+                    level: count(row.level),
+                    kind: convert::node_kind(node.kind),
+                    undeveloped: node.undeveloped,
+                    identifier: node.identifier.clone(),
+                    name: node.name.clone(),
+                    statement: node.statement.clone(),
+                }
+            })
+            .collect();
+        Some(Outline {
+            revision: self.revision,
+            rows,
+        })
+    }
+
+    /// The packages of the open file, depth first in document order, for the
+    /// Case Explorer. Empty when nothing is open.
+    pub fn packages(&self) -> Vec<Package> {
+        let Some(open) = self.open.as_ref() else {
+            return Vec::new();
+        };
+        let mut packages = Vec::new();
+        let mut stack: Vec<(sacm::model::SacmElement<'_>, u32)> = open
+            .document
+            .roots()
+            .filter(|root| root.kind().is_package())
+            .map(|root| (root, 1))
+            .collect();
+        stack.reverse();
+        while let Some((element, level)) = stack.pop() {
+            let held = element
+                .children()
+                .filter(|child| !child.kind().is_a(AbstractClass::UtilityElement))
+                .count();
+            packages.push(Package {
+                id: element.id().as_str().to_owned(),
+                level,
+                kind: element.kind().name().to_owned(),
+                name: element
+                    .name()
+                    .and_then(|name| name.content())
+                    .map(str::to_owned),
+                elements: count(held),
+            });
+            let inner: Vec<_> = element
+                .children()
+                .filter(|child| child.kind().is_package())
+                .collect();
+            stack.extend(inner.into_iter().rev().map(|child| (child, level + 1)));
+        }
+        packages
     }
 
     /// Changes the interface language, which changes the node text (T3).
@@ -231,6 +330,18 @@ impl Core {
             open.diagram = None;
         }
     }
+}
+
+/// The view's codes about one element or relationship.
+fn codes(view: &View, id: &str) -> Vec<ViewCode> {
+    view.findings
+        .iter()
+        .filter(|finding| finding.element == id)
+        .map(|finding| ViewCode {
+            code: finding.code.as_str().to_owned(),
+            end: finding.end.clone(),
+        })
+        .collect()
 }
 
 fn count(n: usize) -> u32 {

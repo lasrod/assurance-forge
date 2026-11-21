@@ -10,33 +10,47 @@ import './styles.css';
 export {
   Button,
   DatumRoot,
+  ListBox,
   MenuBar,
   MenuBarMenu,
   MenuItem,
   MenuSection,
+  MenuSeparator,
   PropertyGrid,
   PropertyRow,
+  QuantityField,
+  Section,
   Submenu,
   Status,
   StatusBar,
   StatusBarSpacer,
-  Toolbar,
-  ToolbarGroup,
+  Tooltip,
+  Tree,
   Workspace,
 } from '@datum-ui/react';
-export type { Theme, WorkspaceCopy, WorkspaceDockId, WorkspaceLayout } from '@datum-ui/react';
+export type {
+  QuantityDef,
+  Theme,
+  TreeNode,
+  WorkspaceCopy,
+  WorkspaceDockId,
+  WorkspaceHandle,
+  WorkspaceLayout,
+  WorkspaceMeasure,
+} from '@datum-ui/react';
 export { watchCanvasStyle, type CanvasStyle } from '@datum-ui/charts';
 export {
   ChevronDown,
   ChevronUp,
+  FileText,
   FolderOpen,
   Maximize,
+  Minus,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  ZoomIn,
-  ZoomOut,
+  Plus,
 } from 'lucide-react';
 
 import sansRegular from '@datum-ui/fonts/measured/IBMPlexSans-Regular.ttf?url';

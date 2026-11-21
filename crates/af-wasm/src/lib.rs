@@ -69,6 +69,27 @@ impl WasmCore {
             .transpose()
     }
 
+    /// `RelationshipDetails` as JSON, or `None` when no edge is drawn for the id.
+    pub fn relationship(&self, id: &str) -> Result<Option<String>, JsError> {
+        self.core
+            .relationship(id)
+            .map(|details| json(&details))
+            .transpose()
+    }
+
+    /// `Outline` as JSON, or `None` when nothing is open.
+    pub fn outline(&self) -> Result<Option<String>, JsError> {
+        self.core
+            .outline()
+            .map(|outline| json(&outline))
+            .transpose()
+    }
+
+    /// The open file's packages, `Package[]` as JSON.
+    pub fn packages(&self) -> Result<String, JsError> {
+        json(&self.core.packages())
+    }
+
     /// Closes what is open.
     pub fn close(&mut self) {
         self.core.close();

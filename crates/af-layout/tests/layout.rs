@@ -5,12 +5,13 @@
 
 use af_gsn::view::{EdgeKind, NodeKind, View, view};
 use af_layout::{
-    Arrowhead, Decorator, Diagram, DiagramNode, Engine, Font, Fonts, LineStyle, Placement, Point,
-    Style, TextRole, Weight,
+    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, Engine, Font, Fonts, LineStyle,
+    Placement, Point, Style, TextRole, Weight,
 };
 use sacm::xmi::{self, Mode, ReadOptions};
 
-const SAMPLES: [&str; 5] = [
+const SAMPLES: [&str; 6] = [
+    "challenges.sacm.xmi",
     "sacm_example_core_argument.sacm.xmi",
     "sample.sacm.xmi",
     "open-autonomy-safety-case.updated.v2.sacm.xmi",
@@ -61,6 +62,70 @@ fn inside(node: &DiagramNode, point: Point) -> bool {
     let (dx, dy) = (point.x - c.x, point.y - c.y);
     let on = node.shape.outline_point(dx, dy);
     dx.hypot(dy) <= (on.x - c.x).hypot(on.y - c.y) + 0.01
+}
+
+fn first_edge<'a>(diagram: &'a Diagram, relationship: &str) -> &'a DiagramEdge {
+    match diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == relationship)
+    {
+        Some(edge) => edge,
+        None => panic!("no edge of {relationship}"),
+    }
+}
+
+/// An edge's whole line: its points, and on to the arrowhead's tip.
+fn line(edge: &DiagramEdge) -> Vec<Point> {
+    let mut line = edge.points.clone();
+    line.push(edge.head[0]);
+    line
+}
+
+/// How far `point` is from an edge's line.
+fn distance_to_line(edge: &DiagramEdge, point: Point) -> f32 {
+    line(edge)
+        .windows(2)
+        .map(|pair| {
+            let (a, b) = (pair[0], pair[1]);
+            let (dx, dy) = (b.x - a.x, b.y - a.y);
+            let length = dx * dx + dy * dy;
+            let t = if length == 0.0 {
+                0.0
+            } else {
+                (((point.x - a.x) * dx + (point.y - a.y) * dy) / length).clamp(0.0, 1.0)
+            };
+            (point.x - (a.x + dx * t)).hypot(point.y - (a.y + dy * t))
+        })
+        .fold(f32::INFINITY, f32::min)
+}
+
+/// The points of an edge's line, a pixel or so apart.
+fn along(edge: &DiagramEdge) -> Vec<Point> {
+    let mut points = Vec::new();
+    for pair in line(edge).windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        let steps = (b.x - a.x).hypot(b.y - a.y).ceil().max(1.0) as usize;
+        for step in 0..=steps {
+            let t = step as f32 / steps as f32;
+            points.push(Point {
+                x: a.x + (b.x - a.x) * t,
+                y: a.y + (b.y - a.y) * t,
+            });
+        }
+    }
+    points
+}
+
+/// Whether `point` is inside the node's shape by more than a pixel.
+fn well_inside(node: &DiagramNode, point: Point) -> bool {
+    let r = node.shape.rect;
+    point.x > r.x && point.x < r.right() && point.y > r.y && point.y < r.bottom() && {
+        let c = r.centre();
+        let (dx, dy) = (point.x - c.x, point.y - c.y);
+        let on = node.shape.outline_point(dx, dy);
+        dx.hypot(dy) < (on.x - c.x).hypot(on.y - c.y) - 1.0
+    }
 }
 
 // ===== Text =====
@@ -230,7 +295,7 @@ fn the_core_sample_is_drawn_as_the_plan_expects() {
         let expected = match edge.kind {
             EdgeKind::SupportedBy => Arrowhead::Filled,
             EdgeKind::InContextOf => Arrowhead::Hollow,
-            EdgeKind::Neutral => Arrowhead::Open,
+            EdgeKind::Challenge | EdgeKind::Neutral => Arrowhead::Open,
         };
         assert_eq!(edge.arrowhead, expected, "{}", edge.relationship);
         assert_eq!(edge.style, LineStyle::Solid);
@@ -289,7 +354,6 @@ fn edges_start_and_end_on_their_nodes_outlines() {
         let diagram = engine().layout(&sample_view(name, "en"));
         for edge in &diagram.edges {
             let from = node(&diagram, &edge.from);
-            let to = node(&diagram, &edge.to);
             let start = edge.points[0];
             let tip = edge.head[0];
             assert!(
@@ -298,6 +362,18 @@ fn edges_start_and_end_on_their_nodes_outlines() {
                 edge.relationship,
                 from.id
             );
+            if edge.to_relationship {
+                // A challenge of a relationship ends on that relationship's line.
+                let off = distance_to_line(first_edge(&diagram, &edge.to), tip);
+                assert!(
+                    off < 0.05,
+                    "{name}: {} ends {off} off the line of {}",
+                    edge.relationship,
+                    edge.to
+                );
+                continue;
+            }
+            let to = node(&diagram, &edge.to);
             assert!(
                 to.shape.outline_distance(tip) < 0.05,
                 "{name}: {} ends off {}",
@@ -313,7 +389,7 @@ fn children_sit_below_their_parent_and_context_beside_it() {
     for name in SAMPLES {
         let diagram = engine().layout(&sample_view(name, "en"));
         let mut placed = 0;
-        for edge in &diagram.edges {
+        for edge in diagram.edges.iter().filter(|edge| !edge.to_relationship) {
             let parent = node(&diagram, &edge.from);
             let child = node(&diagram, &edge.to);
             match edge.placement {
@@ -327,15 +403,12 @@ fn children_sit_below_their_parent_and_context_beside_it() {
                     placed += 1;
                 }
                 Placement::Beside => {
+                    // In a lane on either side, from the parent's row down.
                     let (a, b) = (parent.shape.rect.centre().y, child.shape.rect.centre().y);
+                    assert!(b >= a - 0.01, "{name}: {} above {}", child.id, parent.id);
                     assert!(
-                        (a - b).abs() < 0.01,
-                        "{name}: {} not level with {}",
-                        child.id,
-                        parent.id
-                    );
-                    assert!(
-                        child.bounds.x >= parent.bounds.right(),
+                        child.bounds.x >= parent.bounds.right()
+                            || child.bounds.right() <= parent.bounds.x,
                         "{name}: {} not beside {}",
                         child.id,
                         parent.id
@@ -344,7 +417,7 @@ fn children_sit_below_their_parent_and_context_beside_it() {
                         placed += 1;
                     }
                 }
-                Placement::None => {}
+                Placement::Challenger | Placement::None => {}
             }
         }
         assert!(placed > 0, "{name}: no edge placed anything");
@@ -611,4 +684,278 @@ fn a_size_that_is_not_a_number_changes_nothing() {
         text_size: 16.0,
         ..Style::default()
     }));
+}
+
+// ===== Lanes, challenges and the lines between =====
+
+fn case_view(body: &str) -> View {
+    let text = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="C"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    {body}
+  </argumentPackage>
+</sacm:AssuranceCasePackage>"#
+    );
+    match xmi::read(
+        text.as_bytes(),
+        &ReadOptions::default().with_mode(Mode::Strict),
+    ) {
+        Ok(output) => view(output.document(), "en"),
+        Err(error) => panic!("setup: {error:?}"),
+    }
+}
+
+fn element(kind: &str, id: &str, attributes: &str) -> String {
+    format!(
+        r#"<argumentElement xmi:type="sacm:{kind}" xmi:id="{id}"{attributes}><name content="{id}"/></argumentElement>"#
+    )
+}
+
+#[test]
+fn a_line_the_layout_placed_crosses_no_node() {
+    for name in SAMPLES {
+        let diagram = engine().layout(&sample_view(name, "en"));
+        for edge in &diagram.edges {
+            if edge.placement == Placement::None {
+                continue;
+            }
+            let points = along(edge);
+            for other in &diagram.nodes {
+                if other.id == edge.from || (!edge.to_relationship && other.id == edge.to) {
+                    continue;
+                }
+                assert!(
+                    !points.iter().any(|point| well_inside(other, *point)),
+                    "{name}: {} crosses {}",
+                    edge.relationship,
+                    other.id
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_crossing_check_sees_a_line_through_a_node() {
+    // The check above passes only if it can fail: an edge that placed
+    // nothing runs straight, here through the node between its ends.
+    let diagram = engine().layout(&case_view(
+        &[
+            element("Claim", "a", ""),
+            element("Claim", "b", ""),
+            element("Claim", "c", ""),
+            element("AssertedInference", "i1", r#" source="b" target="a""#),
+            element("AssertedInference", "i2", r#" source="c" target="b""#),
+            element("AssertedInference", "i3", r#" source="a" target="c""#),
+        ]
+        .concat(),
+    ));
+    let straight = first_edge(&diagram, "i3");
+    assert_eq!(straight.placement, Placement::None);
+    let between = node(&diagram, "b");
+    assert!(
+        along(straight)
+            .iter()
+            .any(|point| well_inside(between, *point))
+    );
+}
+
+#[test]
+fn context_takes_both_sides_and_stacks_from_its_node_down() {
+    let diagram = engine().layout(&sample_view("challenges.sacm.xmi", "en"));
+    let top = node(&diagram, "g_top");
+    let first = node(&diagram, "c_scope");
+    let second = node(&diagram, "c_definition");
+    let third = node(&diagram, "a_maintained");
+    let level = |a: &DiagramNode, b: &DiagramNode| {
+        (a.shape.rect.centre().y - b.shape.rect.centre().y).abs() < 0.01
+    };
+    // The first on the right, the second on the left, both level with it.
+    assert!(first.bounds.x >= top.bounds.right());
+    assert!(second.bounds.right() <= top.bounds.x);
+    assert!(level(first, top) && level(second, top));
+    // The third is under the first, their near sides in line.
+    assert!(third.bounds.y >= first.bounds.bottom());
+    assert!((third.shape.rect.x - first.shape.rect.x).abs() < 0.01);
+    // What is beside a node pushes its children down, not sideways.
+    let strategy = node(&diagram, "s_hazards");
+    assert!(strategy.bounds.y >= third.bounds.bottom());
+    assert!((strategy.shape.rect.centre().x - top.shape.rect.centre().x).abs() < 0.01);
+}
+
+#[test]
+fn a_challenge_sits_by_what_it_challenges_and_points_at_it() {
+    let diagram = engine().layout(&sample_view("challenges.sacm.xmi", "en"));
+    for edge in &diagram.edges {
+        if edge.kind == EdgeKind::Challenge {
+            assert_eq!(edge.style, LineStyle::Dashed, "{}", edge.relationship);
+            assert_eq!(edge.arrowhead, Arrowhead::Open, "{}", edge.relationship);
+            assert_eq!(
+                edge.placement,
+                Placement::Challenger,
+                "{}",
+                edge.relationship
+            );
+        } else {
+            assert_eq!(edge.style, LineStyle::Solid, "{}", edge.relationship);
+        }
+    }
+    let beside = |a: &DiagramNode, b: &DiagramNode| {
+        a.bounds.x >= b.bounds.right() || a.bounds.right() <= b.bounds.x
+    };
+
+    // Of a claim: in a lane beside it.
+    let (claim, counter) = (node(&diagram, "g_trap"), node(&diagram, "cg_thin"));
+    assert!(beside(counter, claim));
+    assert!(counter.bounds.y < claim.bounds.bottom() && claim.bounds.y < counter.bounds.bottom());
+    assert!(
+        claim
+            .shape
+            .outline_distance(first_edge(&diagram, "k_thin").head[0])
+            < 0.05
+    );
+
+    // Of a context, which is itself in a lane: under it.
+    let (context, counter) = (node(&diagram, "c_definition"), node(&diagram, "ce_audit"));
+    assert!(counter.bounds.y >= context.bounds.bottom());
+    assert!(
+        context
+            .shape
+            .outline_distance(first_edge(&diagram, "k_audit").head[0])
+            < 0.05
+    );
+
+    // Of the line down into a node: beside that line, between its ends.
+    let (goal, evidence) = (node(&diagram, "g_trap"), node(&diagram, "sn_trials"));
+    let counter = node(&diagram, "cg_sample");
+    assert!(counter.bounds.y >= goal.bounds.bottom());
+    assert!(counter.bounds.bottom() <= evidence.bounds.y);
+    let tip = first_edge(&diagram, "k_sample").head[0];
+    assert!((tip.x - evidence.shape.rect.centre().x).abs() < 0.01);
+    assert!((tip.y - counter.shape.rect.centre().y).abs() < 0.01);
+
+    // Of an inference with a Strategy: at its first edge, the one into the
+    // Strategy.
+    let tip = first_edge(&diagram, "k_complete").head[0];
+    let into_strategy = first_edge(&diagram, "i_hazards");
+    assert_eq!(into_strategy.to, "s_hazards");
+    assert!(distance_to_line(into_strategy, tip) < 0.05);
+
+    // Of the line out to a context: under the context, its arrow coming up
+    // between the context and its node.
+    let (top, context) = (node(&diagram, "g_top"), node(&diagram, "c_scope"));
+    let counter = node(&diagram, "cg_scope");
+    assert!(counter.bounds.y >= context.bounds.bottom());
+    let tip = first_edge(&diagram, "k_scope").head[0];
+    assert!(tip.x > top.bounds.right() && tip.x < context.bounds.x);
+    assert!(distance_to_line(first_edge(&diagram, "x_scope"), tip) < 0.05);
+
+    // Of a challenge: at the dashed line it challenges.
+    let tip = first_edge(&diagram, "k_rebuttal").head[0];
+    assert!(distance_to_line(first_edge(&diagram, "k_thin"), tip) < 0.05);
+}
+
+#[test]
+fn a_bent_line_ends_straight_for_its_arrowhead() {
+    for name in SAMPLES {
+        let diagram = engine().layout(&sample_view(name, "en"));
+        for edge in diagram.edges.iter().filter(|edge| edge.points.len() > 2) {
+            let line = line(edge);
+            let (tip, before) = (line[line.len() - 1], line[line.len() - 2]);
+            let earlier = line[line.len() - 3];
+            let run = (tip.x - earlier.x).hypot(tip.y - earlier.y);
+            let turn = (tip.x - before.x) * (before.y - earlier.y)
+                - (tip.y - before.y) * (before.x - earlier.x);
+            assert!(
+                turn.abs() < 0.01 && run >= 10.0,
+                "{name}: {} bends under its arrowhead",
+                edge.relationship
+            );
+        }
+    }
+}
+
+#[test]
+fn challenges_that_point_at_each_other_are_still_drawn() {
+    let diagram = engine().layout(&case_view(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "a", ""),
+            element("Claim", "b", ""),
+            element(
+                "AssertedInference",
+                "k0",
+                r#" source="a" target="g" isCounter="true""#,
+            ),
+            element(
+                "AssertedInference",
+                "k1",
+                r#" source="a" target="k2" isCounter="true""#,
+            ),
+            element(
+                "AssertedInference",
+                "k2",
+                r#" source="b" target="k1" isCounter="true""#,
+            ),
+        ]
+        .concat(),
+    ));
+    assert_eq!(diagram.edges.len(), 3);
+    for edge in &diagram.edges {
+        assert!(edge.points.len() >= 2, "{}", edge.relationship);
+        for point in edge.points.iter().chain(&edge.head) {
+            assert!(
+                point.x.is_finite() && point.y.is_finite(),
+                "{}",
+                edge.relationship
+            );
+        }
+    }
+}
+
+#[test]
+fn a_neutral_edge_is_dotted_and_keeps_its_end_in_the_tree() {
+    // A defeated inference is still drawn below its conclusion (E5a).
+    let diagram = engine().layout(&case_view(
+        &[
+            element("Claim", "top", ""),
+            element("Claim", "sub", ""),
+            element(
+                "AssertedInference",
+                "i",
+                r#" source="sub" target="top" assertionDeclaration="defeated""#,
+            ),
+        ]
+        .concat(),
+    ));
+    let edge = first_edge(&diagram, "i");
+    assert_eq!(edge.kind, EdgeKind::Neutral);
+    assert_eq!(edge.style, LineStyle::Dotted);
+    assert_eq!(edge.arrowhead, Arrowhead::Open);
+    assert_eq!(edge.placement, Placement::Below);
+    assert!(node(&diagram, "sub").bounds.y >= node(&diagram, "top").bounds.bottom());
+}
+
+#[test]
+fn an_assumption_reached_by_support_still_sits_beside_its_goal() {
+    // The core sample reaches its Assumption by an AssertedInference. GSN
+    // puts an Assumption beside its goal; the line stays as the file says.
+    let diagram = engine().layout(&sample_view("sacm_example_core_argument.sacm.xmi", "en"));
+    let (goal, assumption) = (
+        node(&diagram, "cl_sub_1"),
+        node(&diagram, "cl_assumption_1"),
+    );
+    let level = (goal.shape.rect.centre().y - assumption.shape.rect.centre().y).abs() < 0.01;
+    assert!(level, "not level with its goal");
+    assert!(
+        assumption.bounds.x >= goal.bounds.right() || assumption.bounds.right() <= goal.bounds.x
+    );
+    let edge = first_edge(&diagram, "inf_2");
+    assert_eq!(edge.placement, Placement::Beside);
+    assert_eq!(edge.kind, EdgeKind::SupportedBy);
+    assert_eq!(edge.arrowhead, Arrowhead::Filled);
+    // The evidence is still below.
+    assert!(node(&diagram, "ev_1").bounds.y >= goal.bounds.bottom());
 }

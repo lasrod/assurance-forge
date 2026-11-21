@@ -34,7 +34,9 @@ pub enum Code {
     UninstantiatedNotDrawn,
     /// AF-VIEW-006: an element kind this step does not draw (R14, R15).
     KindNotDrawn,
-    /// AF-VIEW-007: a counter relationship, drawn neutral (E5).
+    /// AF-VIEW-007: retired. It said a counter relationship was drawn
+    /// neutral; a counter is drawn as a challenge now (E5), so it is no
+    /// longer sent. The number is kept so the later codes keep theirs.
     Counter,
     /// AF-VIEW-008: a relationship's declaration is not drawn (E6).
     RelationshipDeclarationNotDrawn,
@@ -160,19 +162,27 @@ pub struct Node {
 pub enum EdgeKind {
     SupportedBy,
     InContextOf,
-    /// Neither: a counter, defeated or cited relationship (E5, E5a, E9).
+    /// A counter relationship: GSN's challenge (E5).
+    Challenge,
+    /// None of those: a defeated or cited relationship (E5a, E9).
     Neutral,
 }
 
 /// An edge of the diagram, from `from` to `to` as the arrow points.
 ///
 /// SupportedBy and InContextOf run from the conclusion to the premise, the
-/// opposite of SACM's source and target. A counter relationship's neutral edge
-/// runs from source to target, at what it challenges (E5).
+/// opposite of SACM's source and target. A challenge runs from source to
+/// target, at what it challenges (E5).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Edge {
+    /// The SACM id of the node the edge leaves.
     pub from: String,
+    /// The SACM id of what the arrow points at: a node, or, when
+    /// `to_relationship` is set, a relationship.
     pub to: String,
+    /// `to` names a relationship, whose first edge the arrow points at. Only
+    /// a challenge has it (E5).
+    pub to_relationship: bool,
     pub kind: EdgeKind,
     /// The SACM id of the relationship the edge draws.
     pub relationship: String,
@@ -232,6 +242,13 @@ pub fn view(document: &Document, language: &str) -> View {
         .filter(|element| is_hidden(**element))
         .map(|element| element.id().as_str())
         .collect();
+    // The relationships an edge may be drawn for, which a challenge may point
+    // at (E5).
+    let relationships: HashSet<&str> = elements
+        .iter()
+        .filter(|element| is_edge_kind(element.kind()) && !hidden.contains(element.id().as_str()))
+        .map(|element| element.id().as_str())
+        .collect();
     // The elements a node is drawn for, and their SACM kind.
     let placeable: HashMap<&str, SacmKind> = elements
         .iter()
@@ -247,9 +264,16 @@ pub fn view(document: &Document, language: &str) -> View {
         if hidden.contains(id) {
             builder.unplaced(id, Code::KindNotDrawn);
         } else if is_relationship(element.kind()) {
-            relationship(*element, &placeable, &mut reach, &mut builder);
+            relationship(
+                *element,
+                &placeable,
+                &relationships,
+                &mut reach,
+                &mut builder,
+            );
         }
     }
+    builder.drop_challenges_of_nothing();
     for element in &elements {
         let id = element.id().as_str();
         if placeable.contains_key(id) {
@@ -287,6 +311,10 @@ struct Builder {
     edges: Vec<Edge>,
     unplaced: Vec<Unplaced>,
     findings: Vec<Finding>,
+    /// Challenges of a relationship that made no edge (none of their sources
+    /// can be placed), and the relationship each challenges: whether that is
+    /// drawn is known only once every edge is.
+    edgeless_challenges: Vec<(String, String)>,
 }
 
 impl Builder {
@@ -309,9 +337,66 @@ impl Builder {
         self.edges.push(Edge {
             from: from.to_owned(),
             to: to.to_owned(),
+            to_relationship: false,
             kind,
             relationship: relationship.to_owned(),
         });
+    }
+
+    /// E5 and E7: a challenge of a relationship that has no edge has nothing
+    /// to point at, and its finding names that relationship, whether or not
+    /// the challenge's sources can be placed. Dropping one may leave another
+    /// with nothing, so this runs until none is left.
+    fn drop_challenges_of_nothing(&mut self) {
+        self.drop_challenge_edges_of_nothing();
+        for (id, target) in std::mem::take(&mut self.edgeless_challenges) {
+            if !self.edges.iter().any(|edge| edge.relationship == target) {
+                self.findings.push(Finding {
+                    code: Code::EndNotPlaced,
+                    element: id,
+                    end: Some(target),
+                });
+            }
+        }
+    }
+
+    fn drop_challenge_edges_of_nothing(&mut self) {
+        loop {
+            let drawn: HashSet<&str> = self
+                .edges
+                .iter()
+                .map(|edge| edge.relationship.as_str())
+                .collect();
+            let dropped: Vec<Edge> = self
+                .edges
+                .iter()
+                .filter(|edge| edge.to_relationship && !drawn.contains(edge.to.as_str()))
+                .cloned()
+                .collect();
+            if dropped.is_empty() {
+                return;
+            }
+            self.edges
+                .retain(|edge| !(edge.to_relationship && dropped.contains(edge)));
+            let mut reported: HashSet<&str> = HashSet::new();
+            for edge in &dropped {
+                let id = edge.relationship.as_str();
+                if !reported.insert(id) {
+                    continue;
+                }
+                self.findings.push(Finding {
+                    code: Code::EndNotPlaced,
+                    element: id.to_owned(),
+                    end: Some(edge.to.clone()),
+                });
+                if !self.edges.iter().any(|kept| kept.relationship == id) {
+                    self.unplaced.push(Unplaced {
+                        id: id.to_owned(),
+                        code: Code::EndNotPlaced,
+                    });
+                }
+            }
+        }
     }
 
     fn finish(mut self, order: &HashMap<&str, usize>) -> View {
@@ -333,6 +418,7 @@ impl Builder {
 fn relationship<'a>(
     element: SacmElement<'a>,
     placeable: &HashMap<&'a str, SacmKind>,
+    relationships: &HashSet<&'a str>,
     reach: &mut HashMap<&'a str, Reach>,
     builder: &mut Builder,
 ) {
@@ -365,9 +451,6 @@ fn relationship<'a>(
     if element.is_citation() {
         builder.finding(Code::Citation, id, None);
     }
-    if element.is_counter() {
-        builder.finding(Code::Counter, id, None);
-    }
     if defeated {
         builder.finding(Code::Defeated, id, None);
     } else if declaration != AssertionDeclaration::Asserted {
@@ -381,9 +464,19 @@ fn relationship<'a>(
         builder.finding(Code::MetaClaimNotDrawn, id, None);
     }
 
-    // E7: the ends that can be placed.
+    // E7: the ends that can be placed. E5: a challenge may point at another
+    // relationship, though not at itself.
+    let mut target_is_relationship = false;
     let target = match element.target() {
         Some(target) if placeable.contains_key(target.as_str()) => Some(target.as_str()),
+        Some(target)
+            if style == Style::Counter
+                && target.as_str() != id
+                && relationships.contains(target.as_str()) =>
+        {
+            target_is_relationship = true;
+            Some(target.as_str())
+        }
         Some(target) => {
             builder.finding(Code::EndNotPlaced, id, Some(target.as_str()));
             None
@@ -428,13 +521,17 @@ fn relationship<'a>(
     let edge_kind = match (style, kind) {
         (Style::Live, SacmKind::AssertedContext) => EdgeKind::InContextOf,
         (Style::Live, _) => EdgeKind::SupportedBy,
-        _ => EdgeKind::Neutral,
+        (Style::Counter, _) => EdgeKind::Challenge,
+        (Style::NeutralInGsnDirection, _) => EdgeKind::Neutral,
     };
     let edges_before = builder.edges.len();
     if let Some(target) = target {
         if style == Style::Counter {
             for source in &sources {
                 builder.edge(source, target, edge_kind, id);
+                if let Some(edge) = builder.edges.last_mut() {
+                    edge.to_relationship = target_is_relationship;
+                }
             }
         } else if let Some(strategy) = strategy {
             builder.edge(target, strategy, edge_kind, id);
@@ -448,6 +545,11 @@ fn relationship<'a>(
         }
     }
     if builder.edges.len() == edges_before {
+        if let Some(target) = target.filter(|_| target_is_relationship) {
+            builder
+                .edgeless_challenges
+                .push((id.to_owned(), target.to_owned()));
+        }
         builder.unplaced(id, Code::EndNotPlaced);
         return;
     }
@@ -699,6 +801,14 @@ fn is_node_kind(kind: SacmKind) -> bool {
     matches!(
         kind,
         SacmKind::Claim | SacmKind::ArgumentReasoning | SacmKind::ArtifactReference
+    )
+}
+
+/// The relationships an edge is drawn for (E1 to E9; not E10).
+fn is_edge_kind(kind: SacmKind) -> bool {
+    matches!(
+        kind,
+        SacmKind::AssertedInference | SacmKind::AssertedEvidence | SacmKind::AssertedContext
     )
 }
 
