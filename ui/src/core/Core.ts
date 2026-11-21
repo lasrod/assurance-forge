@@ -37,14 +37,19 @@ export interface RecentFile {
 export interface Recent {
   /** Most recent first. Empty when there are none, or the shell cannot keep any. */
   list(): Promise<RecentFile[]>;
-  /** Opens one, or answers null when it is no longer there: it is then off the list. */
-  open(id: string): Promise<OpenedFile | null>;
+  /**
+   * Opens one, or answers null when it is no longer there: it is then off the
+   * list, and what was open stays open. `wanted` is asked once the file is
+   * read and before it reaches the core: when it answers false the core is
+   * left as it was, and the answer is null.
+   */
+  open(id: string, wanted: () => boolean): Promise<OpenedFile | null>;
   /** Takes every file off the list. */
   clear(): Promise<void>;
   /**
    * A file the page read itself (a file input, a drop) has opened. The
    * browser keeps it; the desktop application, which was given no path,
-   * does not.
+   * does not. The page need not wait for it: `list` answers with it.
    */
   remember(name: string, bytes: Uint8Array, result: OpenResult): Promise<void>;
   /** Whether the list holds copies of the files (the browser), which the welcome page says. */

@@ -108,6 +108,67 @@ test('the trees follow the language', async ({ page }) => {
   await expect(explorer(page).getByRole('treeitem').nth(1)).toContainText('Assurance case');
 });
 
+test('a branch closed in the tree stays closed when the language changes', async ({ page }) => {
+  await opened(page);
+  const branch = navigator(page).getByRole('treeitem', { name: /Reasoning_ArchitectureAndVerification/ });
+  await branch.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(navigator(page).getByRole('treeitem')).toHaveCount(3);
+  await page.getByRole('menuitem', { name: 'View', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Appearance' }).click();
+  await page.getByRole('menuitem', { name: 'Language' }).click();
+  await page.getByRole('menuitemradio', { name: '日本語' }).click();
+  const tree = page.getByRole('tree', { name: '論証ナビゲーター' });
+  await expect(page.getByTestId('status')).toContainText('ノード 8 個');
+  await expect(tree.getByRole('treeitem')).toHaveCount(3);
+});
+
+async function theme(page: Page, name: string) {
+  await page.getByRole('menuitem', { name: 'View', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Appearance' }).click();
+  await page.getByRole('menuitem', { name: 'Theme' }).click();
+  await page.getByRole('menuitemradio', { name }).click();
+}
+
+test('a new file is fitted to the text sizes it is drawn with, until the view is moved', async ({ page }) => {
+  await opened(page);
+  /** Whether the diagram as it is now drawn is fitted: the whole of it in view, centred. */
+  const isFitted = async () => {
+    // The canvas is measured each time: the text size changes the bars around it.
+    const size = (await page.getByRole('img', { name: 'GSN diagram' }).boundingBox())!;
+    const { diagram, viewport: view } = await hook(page);
+    const bounds = diagram!.diagram.bounds;
+    const left = bounds.x * view!.scale + view!.offsetX;
+    const right = size.width - (left + bounds.width * view!.scale);
+    const top = bounds.y * view!.scale + view!.offsetY;
+    const bottom = size.height - (top + bounds.height * view!.scale);
+    return left >= -1 && right >= -1 && top >= -1 && bottom >= -1 && (Math.abs(left - right) < 2 || Math.abs(top - bottom) < 2);
+  };
+  await expect.poll(isFitted).toBe(true);
+
+  // The text sizes change before the user has moved the view, as the first
+  // ones do when the canvas says them after the file is drawn: the diagram
+  // is laid out again and fitted again. The canvas reads the sizes again
+  // when the theme changes.
+  const before = (await hook(page)).diagram!.layout;
+  await page.evaluate(() => (document.documentElement.style.fontSize = '24px'));
+  await theme(page, 'Dark');
+  await expect.poll(async () => (await hook(page)).diagram!.layout).toBeGreaterThan(before);
+  await expect.poll(isFitted).toBe(true);
+
+  // A view the user moved keeps their zoom; the resize only keeps its centre.
+  const fittedScale = (await hook(page)).viewport!.scale;
+  await page.getByRole('img', { name: 'GSN diagram' }).focus();
+  await page.keyboard.press('+');
+  await expect.poll(async () => (await hook(page)).viewport!.scale).toBeGreaterThan(fittedScale);
+  const moved = (await hook(page)).viewport!.scale;
+  const after = (await hook(page)).diagram!.layout;
+  await page.evaluate(() => (document.documentElement.style.fontSize = '16px'));
+  await theme(page, 'Light');
+  await expect.poll(async () => (await hook(page)).diagram!.layout).toBeGreaterThan(after);
+  expect((await hook(page)).viewport!.scale).toBe(moved);
+});
+
 test('the zoom field above the canvas shows the zoom and sets it', async ({ page }) => {
   await opened(page);
   const field = page.getByRole('region', { name: 'Diagram' }).getByLabel('Zoom', { exact: true });

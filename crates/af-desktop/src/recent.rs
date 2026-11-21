@@ -60,9 +60,12 @@ impl RecentFiles {
         let OpenResult::Opened { nodes, edges, .. } = result else {
             return;
         };
-        let path = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+        let path = known_path(path);
         let id = path.display().to_string();
-        self.files.retain(|file| file.id != id);
+        // A file is listed once, whichever spelling of its path it was opened
+        // by now or was kept under before.
+        self.files
+            .retain(|file| file.id != id && known_path(Path::new(&file.id)) != path);
         self.files.insert(
             0,
             RecentFile {
@@ -99,6 +102,31 @@ impl RecentFiles {
         if let Ok(json) = serde_json::to_vec_pretty(&self.files) {
             let _ = std::fs::write(store, json);
         }
+    }
+}
+
+/// The path a file is known by: its canonical path, so that one file has one
+/// id whatever case, separators or `..` it was named with, or its absolute
+/// path when it cannot be resolved (it is gone).
+fn known_path(path: &Path) -> PathBuf {
+    match std::fs::canonicalize(path) {
+        Ok(canonical) => without_verbatim_prefix(canonical),
+        Err(_) => std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf()),
+    }
+}
+
+/// Windows resolves a path to its verbatim form (`\\?\C:\…`), which no one
+/// types and the list shows: a drive or network path is given back without it.
+fn without_verbatim_prefix(path: PathBuf) -> PathBuf {
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{unc}"));
+    }
+    match text.strip_prefix(r"\\?\") {
+        Some(drive) if drive.as_bytes().get(1) == Some(&b':') => PathBuf::from(drive),
+        _ => path,
     }
 }
 
@@ -150,6 +178,52 @@ mod tests {
         let first = &recent.files()[0];
         assert!(Path::new(&first.id).is_absolute(), "{}", first.id);
         assert_eq!(first.location.as_deref(), Some(first.id.as_str()));
+    }
+
+    #[test]
+    fn one_file_is_listed_once_whatever_its_path_is_spelt() {
+        let store = store("spelling");
+        let Some(directory) = store.parent() else {
+            return;
+        };
+        assert!(std::fs::create_dir_all(directory.join("sub")).is_ok());
+        let file = directory.join("Case.xmi");
+        assert!(std::fs::write(&file, b"").is_ok());
+
+        let mut recent = RecentFiles::default();
+        recent.record(&file, &opened(8), 1);
+        recent.record(
+            &directory.join("sub").join("..").join("Case.xmi"),
+            &opened(8),
+            2,
+        );
+        // Windows does not tell case apart in a path.
+        if cfg!(windows) {
+            recent.record(&directory.join("case.XMI"), &opened(8), 3);
+        }
+        assert_eq!(recent.files().len(), 1, "{:?}", recent.files());
+        let id = &recent.files()[0].id;
+        assert!(!id.starts_with(r"\\?\"), "{id}");
+        assert!(id.ends_with("Case.xmi"), "{id}");
+        if let Some(parent) = directory.parent() {
+            let _ = std::fs::remove_dir_all(parent);
+        }
+    }
+
+    #[test]
+    fn a_verbatim_path_is_given_back_as_it_is_typed() {
+        assert_eq!(
+            without_verbatim_prefix(PathBuf::from(r"\\?\C:\cases\a.xmi")),
+            PathBuf::from(r"C:\cases\a.xmi")
+        );
+        assert_eq!(
+            without_verbatim_prefix(PathBuf::from(r"\\?\UNC\server\share\a.xmi")),
+            PathBuf::from(r"\\server\share\a.xmi")
+        );
+        assert_eq!(
+            without_verbatim_prefix(PathBuf::from("/home/a.xmi")),
+            PathBuf::from("/home/a.xmi")
+        );
     }
 
     #[test]

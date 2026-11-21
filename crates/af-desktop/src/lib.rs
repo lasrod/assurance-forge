@@ -208,26 +208,39 @@ impl Desktop {
     /// `file-unreadable` when the file cannot be read.
     pub fn open_path(&mut self, path: &Path) -> Result<Opened, String> {
         let bytes = std::fs::read(path).map_err(|_| "file-unreadable".to_owned())?;
-        let result = self.core.open(&bytes);
+        Ok(self.open_bytes(path, &bytes))
+    }
+
+    /// Opens the bytes read from `path`. A file that opens becomes the most
+    /// recent one.
+    fn open_bytes(&mut self, path: &Path, bytes: &[u8]) -> Opened {
+        let result = self.core.open(bytes);
         self.recent.record(path, &result, recent::now());
-        Ok(Opened {
+        Opened {
             name: file_name(path),
             result,
-        })
+        }
     }
 
     /// Opens the recent file with this id. A file that is no longer there is
-    /// taken off the list, and the answer is `None`.
-    pub fn open_recent(&mut self, id: &str) -> Option<Opened> {
+    /// taken off the list, and the answer is `None`; what is open stays open.
+    ///
+    /// # Errors
+    ///
+    /// `file-unreadable` when the file is there but cannot be read (it is
+    /// locked, or on a drive that is not connected): it stays on the list.
+    pub fn open_recent(&mut self, id: &str) -> Result<Option<Opened>, String> {
         if !self.recent.files().iter().any(|file| file.id == id) {
-            return None;
+            return Ok(None);
         }
-        match self.open_path(Path::new(id)) {
-            Ok(opened) => Some(opened),
-            Err(_) => {
+        let path = Path::new(id);
+        match std::fs::read(path) {
+            Ok(bytes) => Ok(Some(self.open_bytes(path, &bytes))),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 self.recent.forget(id);
-                None
+                Ok(None)
             }
+            Err(_) => Err("file-unreadable".to_owned()),
         }
     }
 
@@ -320,7 +333,7 @@ fn recent_files(state: Shared<'_>) -> Result<Vec<RecentFile>, String> {
 /// then off the list.
 #[tauri::command]
 fn open_recent(id: String, state: Shared<'_>) -> Result<Option<Opened>, String> {
-    Ok(lock(&state)?.open_recent(&id))
+    lock(&state)?.open_recent(&id)
 }
 
 #[tauri::command]
@@ -544,7 +557,7 @@ mod tests {
         let id = desktop.recent_files()[0].id.clone();
 
         desktop.core.close();
-        let again = desktop.open_recent(&id);
+        let again = desktop.open_recent(&id).ok().flatten();
         assert!(
             matches!(
                 again,
@@ -556,11 +569,34 @@ mod tests {
             "{again:?}"
         );
         // An id that is not on the list opens nothing, whatever file it names.
-        assert!(desktop.open_recent(&sample.display().to_string()).is_none());
+        assert_eq!(desktop.open_recent(&sample.display().to_string()), Ok(None));
 
         assert!(std::fs::remove_file(&copy).is_ok());
-        assert!(desktop.open_recent(&id).is_none());
+        assert_eq!(desktop.open_recent(&id), Ok(None));
         assert!(desktop.recent_files().is_empty());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_recent_file_that_is_there_but_cannot_be_read_stays_on_the_list() {
+        // A directory is there, and reading it as a file fails, as a locked
+        // file or one on a drive that is not connected does.
+        let directory =
+            std::env::temp_dir().join(format!("af-desktop-unreadable-{}", std::process::id()));
+        assert!(std::fs::create_dir_all(&directory).is_ok());
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        let opened = OpenResult::Opened {
+            revision: 1,
+            diagnostics: af_api::contract::DiagnosticCounts::default(),
+            nodes: 1,
+            edges: 0,
+            view_codes: 0,
+        };
+        desktop.recent.record(&directory, &opened, 1);
+        let id = desktop.recent_files()[0].id.clone();
+
+        assert_eq!(desktop.open_recent(&id), Err("file-unreadable".to_owned()));
+        assert_eq!(desktop.recent_files().len(), 1);
         let _ = std::fs::remove_dir_all(&directory);
     }
 

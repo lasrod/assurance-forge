@@ -133,10 +133,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   }, []);
   /** A read that failed, unless a later request has started: nothing is open, in the core too. */
   const unreadable = useCallback(
-    (request: number, kind: 'unreadable' | 'recentGone' = 'unreadable') => {
+    (request: number) => {
       if (request !== latest.current) return;
       clear();
-      setState({ kind });
+      setState({ kind: 'unreadable' });
       void coreRef.current?.close();
     },
     [clear],
@@ -184,8 +184,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         core,
         async () => {
           const result = await core.open(bytes);
-          // A file the page read itself: the shell keeps it as a recent file if it can.
-          await core.recent.remember(name, bytes, result);
+          // A file the page read itself: the shell keeps it as a recent file
+          // if it can. The diagram does not wait for the copy to be written.
+          void core.recent.remember(name, bytes, result);
           return { name, result };
         },
         request,
@@ -313,15 +314,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const openRecent = (id: string) => {
     if (!core) return;
     const request = begin();
-    core.recent.open(id).then(
+    core.recent.open(id, () => request === latest.current).then(
       (file) => {
         if (file) {
           void show(core, async () => file, request);
           return;
         }
-        // No longer there: off the list, and said so.
+        if (request !== latest.current) return;
+        // No longer there: off the list, and said so. The core was not
+        // touched, so what was open stays open.
         refreshRecent(core);
-        unreadable(request, 'recentGone');
+        setReading(false);
+        setState({ kind: 'recentGone' });
       },
       () => unreadable(request),
     );
@@ -350,6 +354,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // The diagram's text follows DATUM's type tokens, so the user's text size.
   const sentStyle = useRef('');
+  // The view is a fit the application made (a new file's, or Fit), which the
+  // user has not moved since: it is made again when the diagram is laid out
+  // again for other text sizes. A resize keeps its centre, and keeps this.
+  const fitted = useRef(false);
+  /** A view the user chose: zoom, pan, a node brought into view. */
+  const moveView = useCallback((next: Viewport | ((view: Viewport | null) => Viewport | null)) => {
+    fitted.current = false;
+    setViewport(next);
+  }, []);
   const onTextStyle = useCallback(
     (style: TextStyle) => {
       // A theme or pixel-ratio change gives the same sizes: nothing to lay out.
@@ -363,6 +376,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             // Kept only once the core has it, so a failure is tried again.
             sentStyle.current = key;
             showRelayout(next);
+            // A view that is still the fit made for the earlier sizes is made
+            // again for these: the canvas, which says them, mounts only once
+            // the first file is drawn.
+            if (fitted.current) setViewport(null);
           },
           () => setState({ kind: 'relayoutFailed' }),
         );
@@ -388,15 +405,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // A new file is fitted once the canvas has a size, before it is painted.
   useLayoutEffect(() => {
     if (!viewport && diagram && centreSize.width > 0 && centreSize.height > 0) {
+      fitted.current = true;
       setViewport(fit(diagram.diagram.bounds, centreSize.width, centreSize.height));
     }
   }, [viewport, diagram, centreSize]);
 
   const fitAll = () => {
-    if (diagram) setViewport(fit(diagram.diagram.bounds, centreSize.width, centreSize.height));
+    if (!diagram) return;
+    fitted.current = true;
+    setViewport(fit(diagram.diagram.bounds, centreSize.width, centreSize.height));
   };
   const zoomBy = (factor: number) =>
-    setViewport((view) => view && zoomAbout(view, factor, centreSize.width / 2, centreSize.height / 2));
+    moveView((view) => view && zoomAbout(view, factor, centreSize.width / 2, centreSize.height / 2));
 
   // What Element Properties shows: the core's details of the selected node, read
   // again when the diagram is (its text follows the language). An answer for a
@@ -438,8 +458,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // canvas share one selection, so the tree is the canvas's parallel structure.
   const argument = useMemo(() => outlineTree(outline), [outline]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // A new file's tree starts open, as the C++ application's does.
-  useEffect(() => setExpanded(new Set(argument.branches)), [argument]);
+  // A new file's tree starts open, as the C++ application's does. The same
+  // file in another language keeps the branches the user closed.
+  const expandedFor = useRef<number | null>(null);
+  const revision = diagram?.revision ?? null;
+  useEffect(() => {
+    if (revision === expandedFor.current) return;
+    expandedFor.current = revision;
+    setExpanded(new Set(argument.branches));
+  }, [revision, argument]);
   // A node selected on the canvas shows in the tree: its ancestors open.
   useEffect(() => {
     if (!selected) return;
@@ -455,7 +482,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     const top = node.bounds.y * viewport.scale + viewport.offsetY;
     const [width, height] = [node.bounds.width * viewport.scale, node.bounds.height * viewport.scale];
     if (left >= 0 && top >= 0 && left + width <= centreSize.width && top + height <= centreSize.height) return;
-    setViewport({
+    moveView({
       ...viewport,
       offsetX: viewport.offsetX + (centreSize.width - width) / 2 - left,
       offsetY: viewport.offsetY + (centreSize.height - height) / 2 - top,
@@ -670,7 +697,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               label={t('canvas')}
               size={centreSize}
               viewport={viewport}
-              onViewport={setViewport}
+              onViewport={moveView}
               selected={selected}
               onSelect={setSelected}
               onTextStyle={onTextStyle}

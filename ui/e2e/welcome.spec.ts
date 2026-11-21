@@ -11,6 +11,23 @@ async function fileMenu(page: Page, item: string | RegExp) {
   await page.getByRole('menuitem', { name: item }).click();
 }
 
+/**
+ * Opens the two samples, so both are recent files, the core sample last. A
+ * copy is written after its file is drawn: this waits until both are listed.
+ */
+async function twoRecent(page: Page) {
+  await page.goto('/');
+  await page.getByTestId('open-file').setInputFiles('../testdata/sacm/sample.sacm.xmi');
+  await expect.poll(async () => (await hook(page))?.revision).toBe(1);
+  await page.getByTestId('open-file').setInputFiles(`../testdata/sacm/${SAMPLE}`);
+  await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
+  await fileMenu(page, 'Open Recent');
+  await expect(page.getByRole('menu', { name: 'Open Recent' }).getByRole('menuitem')).toHaveText([SAMPLE, 'sample.sacm.xmi']);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu', { name: 'Open Recent' })).toBeHidden();
+}
+
 test('with nothing open the window shows the welcome page, and no empty panels', async ({ page }) => {
   await page.goto('/');
   await expect(welcome(page)).toBeVisible();
@@ -48,11 +65,7 @@ test('the example opens, File ▸ Close returns to the welcome page, and the fil
 });
 
 test('a recent file opens again after the page is loaded again, most recent first', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('open-file').setInputFiles('../testdata/sacm/sample.sacm.xmi');
-  await expect.poll(async () => (await hook(page))?.revision).toBe(1);
-  await page.getByTestId('open-file').setInputFiles(`../testdata/sacm/${SAMPLE}`);
-  await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
+  await twoRecent(page);
 
   await page.goto('/');
   await expect(recent(page).getByRole('option')).toHaveCount(2);
@@ -67,6 +80,75 @@ test('a recent file opens again after the page is loaded again, most recent firs
   await expect(page.getByRole('menu', { name: 'Open Recent' }).getByRole('menuitem')).toHaveText(['sample.sacm.xmi', SAMPLE]);
   await page.getByRole('menuitem', { name: SAMPLE }).click();
   await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
+});
+
+async function openRecent(page: Page, name: string) {
+  await page.getByRole('menuitem', { name: 'File', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Open Recent' }).click();
+  await page.getByRole('menuitem', { name }).click();
+}
+
+test('a recent file that is gone is said so, and the file that is open stays open', async ({ page }) => {
+  await twoRecent(page);
+  // Take its copy away, as clearing site data elsewhere would, but leave it listed.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const opening = indexedDB.open('assurance-forge');
+        opening.onsuccess = () => {
+          const transaction = opening.result.transaction('recent-bytes', 'readwrite');
+          transaction.objectStore('recent-bytes').delete('sample.sacm.xmi');
+          transaction.oncomplete = () => {
+            opening.result.close();
+            resolve();
+          };
+          transaction.onerror = () => reject(transaction.error);
+        };
+        opening.onerror = () => reject(opening.error);
+      }),
+  );
+  await openRecent(page, 'sample.sacm.xmi');
+  await expect(page.getByTestId('status')).toContainText('That file is no longer there');
+  await expect(page).toHaveTitle(`${SAMPLE} – Assurance Forge`);
+  expect((await hook(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
+  await expect(page.getByRole('region', { name: 'Diagram' })).toBeVisible();
+});
+
+test('a recent file still being read does not replace a file chosen after it', async ({ page }) => {
+  // This browser's IndexedDB answers late, so the copy is still being read
+  // when the next file is chosen.
+  await page.addInitScript(() => {
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (this: IDBFactory, ...args: Parameters<IDBFactory['open']>) {
+      const opening = open.apply(this, args);
+      if (!(window as { slowRecent?: boolean }).slowRecent) return opening;
+      let handler: ((event: Event) => void) | null = null;
+      Object.defineProperty(opening, 'onsuccess', {
+        configurable: true,
+        get: () => handler,
+        set: (next: (event: Event) => void) => (handler = next),
+      });
+      opening.addEventListener('success', (event) => setTimeout(() => handler?.call(opening, event), 1500));
+      return opening;
+    };
+  });
+  await twoRecent(page);
+  await page.evaluate(() => ((window as { slowRecent?: boolean }).slowRecent = true));
+  await openRecent(page, 'sample.sacm.xmi');
+  await page.getByTestId('open-file').setInputFiles({
+    name: 'chosen-last.sacm.xmi',
+    mimeType: 'application/xml',
+    buffer: await import('node:fs').then((fs) => fs.readFileSync(`../testdata/sacm/${SAMPLE}`)),
+  });
+  await expect(page).toHaveTitle('chosen-last.sacm.xmi – Assurance Forge');
+  const revision = (await hook(page))!.revision;
+  // Long after the copy was read: nothing else reached the core. A node of
+  // the file on screen is still the core's.
+  await page.waitForTimeout(2500);
+  await expect(page).toHaveTitle('chosen-last.sacm.xmi – Assurance Forge');
+  expect((await hook(page))!.revision).toBe(revision);
+  await page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem', { name: /TopClaim/ }).click();
+  await expect(page.getByTestId('element-properties')).toContainText('cl_top');
 });
 
 test('Clear recent files empties the list, and it stays empty', async ({ page }) => {

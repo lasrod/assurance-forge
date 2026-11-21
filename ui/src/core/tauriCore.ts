@@ -52,7 +52,9 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     // The shell keeps the paths of the files it read itself, and reads them again.
     recent: {
       list: () => invoke<RecentFile[]>('recent_files'),
-      open: (id) => invoke<OpenedFile | null>('open_recent', { id }),
+      // The shell reads the file and opens it in one command, and runs
+      // commands in the order they are sent: `wanted` is asked before.
+      open: async (id, wanted) => (wanted() ? invoke<OpenedFile | null>('open_recent', { id }) : null),
       clear: async () => {
         for (const file of await invoke<RecentFile[]>('recent_files')) await invoke('forget_recent', { id: file.id });
       },
