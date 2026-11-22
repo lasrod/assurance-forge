@@ -233,6 +233,12 @@ Found while building the layout gallery and `pnpm --dir ui verify`
   broad tree, not one wide fan. Fit stops at 10%, so the overview cannot
   show it whole. Wrapping long rows of leaves, or a deeper overview, is
   open.
+- **Routing cost.** Each routed line's search looks at every node's
+  keep-off zones and every earlier routed run at each step. The large case
+  has one routed line and lays out in about 28 ms, but a case with many
+  second parents across a wide diagram would cost much more. Indexing the
+  zones and runs by position, and a gallery fixture with many routed lines
+  to time it, are open (found in review, 23 November 2026).
 - **Tree labels in narrow panels** break inside a word (DATUM's `Tree`).
   This belongs to DATUM, not the application.
 - **DATUM's packed tarballs are not byte for byte reproducible**: packing
