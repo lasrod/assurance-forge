@@ -4,7 +4,7 @@
 //! The core sends codes and their arguments, never sentences: the frontend
 //! words them in the interface language.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "typescript")]
 use ts_rs::TS;
@@ -400,6 +400,77 @@ pub struct Diagram {
     pub bounds: Rect,
 }
 
+/// A GSN element kind that can be added: the six of the core notation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum ElementKind {
+    Goal,
+    Strategy,
+    Solution,
+    Context,
+    Assumption,
+    Justification,
+}
+
+/// One kind the add menu lists, and whether it can be chosen.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AddChoice {
+    pub kind: ElementKind,
+    /// Why it cannot be added there (`AF-EDIT-001` to `AF-EDIT-006`), or
+    /// null when it can. The frontend words it.
+    pub refusal: Option<String>,
+    /// Adding it also clears the parent Goal's undeveloped decorator, which
+    /// the menu says.
+    pub develops: bool,
+}
+
+/// The add menu for a node, or for the empty canvas, at `revision`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AddChoices {
+    pub revision: u32,
+    /// The six kinds, in the order the standard introduces them.
+    pub choices: Vec<AddChoice>,
+}
+
+/// What a command gave.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(tag = "result", rename_all = "camelCase")]
+pub enum EditResult {
+    /// The document changed: it is now at `revision`.
+    #[serde(rename_all = "camelCase")]
+    Applied {
+        revision: u32,
+        /// The element the command added, which the interface selects: for
+        /// a Strategy, the Strategy. Null for undo and redo.
+        element: Option<String>,
+        /// The SACM ids the command created, changed and deleted.
+        created: Vec<String>,
+        changed: Vec<String>,
+        deleted: Vec<String>,
+    },
+    /// Nothing changed. `code` is an `AF-EDIT-*` code: why the add cannot be
+    /// made, nothing is open (`AF-EDIT-007`), there is nothing to undo or
+    /// redo (`AF-EDIT-008`), the add menu was for another revision
+    /// (`AF-EDIT-009`), or libSACM refused the operations (`AF-EDIT-010`).
+    Refused { code: String },
+}
+
+/// What Edit ▸ Undo and Redo would do, at `revision`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct History {
+    pub revision: u32,
+    pub can_undo: bool,
+    pub can_redo: bool,
+}
+
 /// The TypeScript declarations of every type above, in one module, as
 /// `bindings/api.ts` holds them.
 #[cfg(feature = "typescript")]
@@ -433,6 +504,11 @@ pub fn typescript() -> String {
         Arrowhead::decl(&cfg),
         DiagramEdge::decl(&cfg),
         Diagram::decl(&cfg),
+        ElementKind::decl(&cfg),
+        AddChoice::decl(&cfg),
+        AddChoices::decl(&cfg),
+        EditResult::decl(&cfg),
+        History::decl(&cfg),
     ];
     let mut out = String::from(
         "// Generated from crates/af-api/src/contract.rs by its tests; do not edit.\n\

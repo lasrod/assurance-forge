@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
 import type { DiagramAt, TextStyle } from '../core/Core';
+import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
-import { boundsOf, draw, fit, hitId, pan, zoomAbout, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Palette, type Viewport } from './draw';
 
 function palette(style: CanvasStyle): Palette {
   // Forced colours: the system's, as DATUM's canvas rule says.
@@ -34,6 +35,12 @@ const DRAG_SLOP = 4;
 /** One press of + or −. */
 export const ZOOM_STEP = 1.25;
 
+/** Whether `event` opens the context menu from the keyboard: the context-menu key, or Shift+F10. */
+export function isMenuKey(event: Pick<globalThis.KeyboardEvent, 'key' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'altKey'>): boolean {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  return event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10');
+}
+
 /** The view's keys while the canvas has focus (DATUM decision 0023), or null for any other key. */
 export function viewKey(event: Pick<globalThis.KeyboardEvent, 'key' | 'code' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'altKey'>) {
   // Ctrl or ⌘ with + − 0 stays the browser's zoom.
@@ -59,7 +66,10 @@ type Gesture = {
  * The diagram on a canvas that fills the workspace's centre surface, `size`
  * CSS px. The viewport and the selection are the application's: the canvas
  * asks to change them. `onTextStyle` hears the text sizes DATUM's tokens
- * resolve to, for the layout.
+ * resolve to, for the layout. `onContextMenu` asks for the add menu of a
+ * node, or of the empty canvas (`null`), at a point in client coordinates:
+ * from a right-click, or from the context-menu key or Shift+F10 on the
+ * selected node.
  */
 export function DiagramCanvas({
   diagram,
@@ -70,6 +80,7 @@ export function DiagramCanvas({
   selected,
   onSelect,
   onTextStyle,
+  onContextMenu,
 }: {
   diagram: DiagramAt | null;
   label: string;
@@ -80,6 +91,7 @@ export function DiagramCanvas({
   selected: string | null;
   onSelect: (id: string | null) => void;
   onTextStyle: (style: TextStyle) => void;
+  onContextMenu: (id: string | null, at: { x: number; y: number }, source: ContextMenuSource) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
@@ -155,7 +167,7 @@ export function DiagramCanvas({
 
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture | null>(null);
-  const local = (event: PointerEvent<HTMLCanvasElement>) => {
+  const local = (event: PointerEvent<HTMLCanvasElement> | MouseEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
@@ -233,7 +245,37 @@ export function DiagramCanvas({
     [],
   );
 
+  // A right-click on a node, or on the empty canvas. A line takes no menu:
+  // nothing is added to a line.
+  const onContext = (event: MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    if (!diagram || !viewport) return;
+    // The canvas takes focus, so closing the menu returns it here.
+    event.currentTarget.focus();
+    const point = local(event);
+    const node = hitTest(diagram.diagram, viewport, point.x, point.y);
+    if (!node && hitEdge(diagram.diagram, viewport, point.x, point.y)) return;
+    onContextMenu(node?.id ?? null, { x: event.clientX, y: event.clientY }, 'pointer');
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
+    if (isMenuKey(event) && diagram && viewport && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      // The selected node's menu at its centre; with no node selected, the
+      // canvas's at the canvas's centre.
+      const rect = event.currentTarget.getBoundingClientRect();
+      const node = selected ? diagram.diagram.nodes.find((candidate) => candidate.id === selected) : undefined;
+      // A selected line takes no menu, as a right-click on it takes none.
+      if (selected && !node) return;
+      const centre = node
+        ? {
+            x: (node.bounds.x + node.bounds.width / 2) * viewport.scale + viewport.offsetX,
+            y: (node.bounds.y + node.bounds.height / 2) * viewport.scale + viewport.offsetY,
+          }
+        : { x: size.width / 2, y: size.height / 2 };
+      onContextMenu(node?.id ?? null, { x: rect.left + centre.x, y: rect.top + centre.y }, 'keyboard');
+      return;
+    }
     const action = viewKey(event);
     if (!action || !viewport || event.nativeEvent.isComposing) return;
     event.preventDefault();
@@ -268,7 +310,7 @@ export function DiagramCanvas({
         className="af-canvas"
         role="img"
         aria-label={label}
-        aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape"
+        aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape Shift+F10 ContextMenu"
         tabIndex={0}
         style={{ cursor: panning ? 'grabbing' : shownHover ? 'pointer' : 'default' }}
         onKeyDown={onKeyDown}
@@ -278,6 +320,7 @@ export function DiagramCanvas({
         onPointerCancel={onPointerCancel}
         onPointerLeave={() => setHovered(null)}
         onAuxClick={(event) => event.preventDefault()}
+        onContextMenu={onContext}
       />
     </div>
   );

@@ -1,12 +1,12 @@
-// The menu bar, arranged as the C++ application's (plan decision D9): File and
-// View now; Edit and Add come with editing. File opens a file, a recent one,
-// and closes what is open. View holds the panels, which are DATUM Workspace's
+// The menu bar, arranged as the C++ application's (plan decision D9): File,
+// Edit and View. File opens a file, a recent one, and closes what is open.
+// Edit undoes and redoes; adding is on the canvas's context menu. View holds the panels, which are DATUM Workspace's
 // views, and Appearance ▸ Theme and Language, as in the C++ application.
 
 import type { RecentFile } from './core/Core';
 import type { ThemeChoice, Language, MessageKey } from './i18n/messages';
 import { MenuBar as DatumMenuBar, MenuBarMenu, MenuItem, MenuSection, MenuSeparator, Submenu } from './design';
-import { openShortcut } from './shortcuts';
+import { openShortcut, redoShortcut, undoShortcut } from './shortcuts';
 
 export interface PanelChoice {
   id: string;
@@ -24,6 +24,10 @@ interface MenuBarProps {
   /** A file is open, so there is one to close. */
   canClose: boolean;
   onClose: () => void;
+  /** What Undo and Redo can do now; null while nothing is open. */
+  history: { canUndo: boolean; canRedo: boolean } | null;
+  onUndo: () => void;
+  onRedo: () => void;
   /** The workspace's views, and the ones showing now; null while there is no workspace. */
   panels: { all: readonly PanelChoice[]; showing: readonly string[]; onChange: (showing: string[]) => void } | null;
   theme: ThemeChoice;
@@ -41,6 +45,9 @@ export function MenuBar({
   onRecent,
   canClose,
   onClose,
+  history,
+  onUndo,
+  onRedo,
   panels,
   theme,
   onThemeChange,
@@ -76,6 +83,28 @@ export function MenuBar({
         <MenuSeparator />
         <MenuItem id="close" unavailable={!canClose} onAction={onClose}>
           {t('close')}
+        </MenuItem>
+      </MenuBarMenu>
+      <MenuBarMenu id="edit" label={t('edit')}>
+        <MenuItem
+          id="undo"
+          shortcut={undoShortcut()}
+          textValue={t('undo')}
+          unavailable={!history?.canUndo}
+          note={history && !history.canUndo ? t('nothingToUndo') : undefined}
+          onAction={onUndo}
+        >
+          {t('undo')}
+        </MenuItem>
+        <MenuItem
+          id="redo"
+          shortcut={redoShortcut()}
+          textValue={t('redo')}
+          unavailable={!history?.canRedo}
+          note={history && !history.canRedo ? t('nothingToRedo') : undefined}
+          onAction={onRedo}
+        >
+          {t('redo')}
         </MenuItem>
       </MenuBarMenu>
       <MenuBarMenu id="view" label={t('view')}>

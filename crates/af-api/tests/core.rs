@@ -427,3 +427,116 @@ fn relationship_gives_the_details_panel_content() {
     assert_eq!(edge["arrowhead"], "open");
     assert_eq!(edge["toRelationship"], true);
 }
+
+#[test]
+fn an_add_from_the_menu_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
+    use af_api::contract::{EditResult, ElementKind, History};
+    let mut core = core("en");
+    assert!(core.add_choices(None).is_none(), "nothing open");
+    assert!(matches!(core.undo(), EditResult::Refused { ref code } if code == "AF-EDIT-007"));
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    assert_eq!(
+        core.history(),
+        History {
+            revision: 1,
+            can_undo: false,
+            can_redo: false
+        }
+    );
+
+    // A Solution is a leaf; the top claim takes any of the six.
+    let leaf = core
+        .add_choices(Some("ev_1"))
+        .unwrap_or_else(|| panic!("open"));
+    assert_eq!(leaf.revision, 1);
+    assert!(
+        leaf.choices
+            .iter()
+            .all(|choice| choice.refusal.as_deref() == Some("AF-EDIT-001"))
+    );
+    let top = core
+        .add_choices(Some("cl_top"))
+        .unwrap_or_else(|| panic!("open"));
+    let kinds: Vec<ElementKind> = top.choices.iter().map(|choice| choice.kind).collect();
+    assert_eq!(
+        kinds,
+        [
+            ElementKind::Goal,
+            ElementKind::Strategy,
+            ElementKind::Solution,
+            ElementKind::Context,
+            ElementKind::Assumption,
+            ElementKind::Justification
+        ]
+    );
+    assert!(top.choices.iter().all(|choice| choice.refusal.is_none()));
+    assert!(matches!(
+        core.add(Some("ev_1"), ElementKind::Goal, 1),
+        EditResult::Refused { ref code } if code == "AF-EDIT-001"
+    ));
+    assert_eq!(core.revision(), 1, "a refused add makes no revision");
+    // An add chosen from a menu of another revision is refused, and changes nothing.
+    assert!(matches!(
+        core.add(Some("cl_top"), ElementKind::Context, 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    assert_eq!(core.revision(), 1);
+
+    let before = core.diagram().unwrap_or_else(|| panic!("diagram"));
+    let EditResult::Applied {
+        revision, element, ..
+    } = core.add(Some("cl_top"), ElementKind::Context, 1)
+    else {
+        panic!("not added");
+    };
+    let element = element.unwrap_or_default();
+    assert_eq!(revision, 2);
+    let after = core.diagram().unwrap_or_else(|| panic!("diagram"));
+    assert_eq!(after.revision, 2);
+    assert!(after.layout > before.layout);
+    assert_eq!(after.diagram.nodes.len(), before.diagram.nodes.len() + 1);
+    assert!(after.diagram.edges.iter().any(|edge| edge.from == "cl_top"
+        && edge.to == element
+        && edge.kind == EdgeKind::InContextOf));
+    let details = core.element(&element).unwrap_or_else(|| panic!("details"));
+    assert_eq!(details.kind, NodeKind::Context);
+    assert_eq!(details.identifier, "C1");
+    assert_eq!(core.outline().map(|outline| outline.revision), Some(2));
+    assert_eq!(
+        core.history(),
+        History {
+            revision: 2,
+            can_undo: true,
+            can_redo: false
+        }
+    );
+
+    // Undo and redo are revisions of their own.
+    assert!(matches!(
+        core.undo(),
+        EditResult::Applied {
+            revision: 3,
+            element: None,
+            ..
+        }
+    ));
+    assert!(core.element(&element).is_none());
+    assert_eq!(
+        core.diagram().map(|at| at.diagram.nodes.len()),
+        Some(before.diagram.nodes.len())
+    );
+    assert!(matches!(
+        core.redo(),
+        EditResult::Applied { revision: 4, .. }
+    ));
+    assert!(core.element(&element).is_some());
+    assert!(matches!(core.redo(), EditResult::Refused { ref code } if code == "AF-EDIT-008"));
+
+    // A file opened after is at a later revision still.
+    let reopened = core.open(&testdata("sacm/sample.sacm.xmi"));
+    assert!(
+        matches!(reopened, OpenResult::Opened { revision: 5, .. }),
+        "{reopened:?}"
+    );
+    assert!(!core.history().can_undo, "the history is the file's");
+}

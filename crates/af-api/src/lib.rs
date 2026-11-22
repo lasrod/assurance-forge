@@ -10,21 +10,25 @@
 //! file and the fonts and hands in bytes. A file opens before the fonts
 //! arrive; the diagram is laid out once they have.
 //!
-//! With nothing edited there is one revision per opened file. An edit session
-//! (`af-session`) takes over the document with the first edit.
+//! The open document lives in an `af-session` [`Session`]: every change is a
+//! command it applies all or not at all, with one revision per opened file
+//! and one more per accepted command, undo and redo included. A revision only
+//! goes up, across files too.
 
 pub mod contract;
 
+use af_gsn::commands::{self, Target};
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
+use af_session::{ChangeRecord, Session};
 use sacm::diagnostic::Severity;
 use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions};
 
 use contract::{
-    ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, ElementDetails, MessageArgument,
-    OpenResult, Outline, OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd,
-    ViewCode,
+    AddChoice, AddChoices, ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult,
+    ElementDetails, ElementKind, History, MessageArgument, OpenResult, Outline, OutlineRow,
+    Package, Refusal, RelationshipDetails, RelationshipEnd, ViewCode,
 };
 
 mod convert;
@@ -43,7 +47,7 @@ pub struct Core {
 }
 
 struct Open {
-    document: sacm::model::Document,
+    session: Session,
     view: View,
     /// Laid out on first request, and again after the language or text size
     /// changes.
@@ -132,7 +136,7 @@ impl Core {
             view_codes: count(view.findings.len() + view.unplaced.len()),
         };
         self.open = Some(Open {
-            document,
+            session: Session::new(document, self.revision),
             view,
             diagram: None,
         });
@@ -199,7 +203,8 @@ impl Core {
         let view = &open.view;
         let edge = view.edges.iter().find(|edge| edge.relationship == id)?;
         let element = open
-            .document
+            .session
+            .document()
             .elements()
             .find(|element| element.id().as_str() == id)?;
         let end = |id: &str| {
@@ -267,7 +272,8 @@ impl Core {
         };
         let mut packages = Vec::new();
         let mut stack: Vec<(sacm::model::SacmElement<'_>, u32)> = open
-            .document
+            .session
+            .document()
             .roots()
             .filter(|root| root.kind().is_package())
             .map(|root| (root, 1))
@@ -309,8 +315,105 @@ impl Core {
         // the other language are new.
         self.layout += 1;
         if let Some(open) = self.open.as_mut() {
-            open.view = view::view(&open.document, &self.language);
+            open.view = view::view(open.session.document(), &self.language);
             open.diagram = None;
+        }
+    }
+
+    /// The add menu for the node with SACM id `parent`, or for the empty
+    /// canvas when `None`: the six kinds, each with its refusal code when it
+    /// cannot be added there. `None` when nothing is open.
+    pub fn add_choices(&self, parent: Option<&str>) -> Option<AddChoices> {
+        let open = self.open.as_ref()?;
+        let choices = commands::choices(open.session.document(), &open.view, target(parent))
+            .into_iter()
+            .filter_map(|choice| {
+                Some(AddChoice {
+                    kind: convert::element_kind(choice.kind)?,
+                    refusal: choice.refusal.map(|refusal| refusal.code().to_owned()),
+                    develops: choice.develops,
+                })
+            })
+            .collect();
+        Some(AddChoices {
+            revision: self.revision,
+            choices,
+        })
+    }
+
+    /// Adds an element of `kind` under the node `parent`, or at the top level
+    /// when `None`. `revision` is the one the add menu was made for: an add
+    /// chosen from a menu of another revision is refused (AF-EDIT-009), since
+    /// the choices it offered may no longer hold.
+    pub fn add(&mut self, parent: Option<&str>, kind: ElementKind, revision: u32) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let kind = convert::gsn_element_kind(kind);
+        match open.session.add(&open.view, target(parent), kind) {
+            Ok((added, record)) => self.changed(&record, Some(added.element)),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            // libSACM refused an operation the rules made: a bug in them, not
+            // a mapping decision. The document is unchanged.
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Takes back the last command.
+    pub fn undo(&mut self) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        match open.session.undo() {
+            Some(record) => self.changed(&record, None),
+            None => refused(NOTHING_TO_DO),
+        }
+    }
+
+    /// Makes again the last command undo took back.
+    pub fn redo(&mut self) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        match open.session.redo() {
+            Some(record) => self.changed(&record, None),
+            None => refused(NOTHING_TO_DO),
+        }
+    }
+
+    /// What Edit ▸ Undo and Redo would do. Both false when nothing is open.
+    pub fn history(&self) -> History {
+        let Some(open) = self.open.as_ref() else {
+            return History {
+                revision: self.revision,
+                ..History::default()
+            };
+        };
+        History {
+            revision: self.revision,
+            can_undo: open.session.can_undo().is_some(),
+            can_redo: open.session.can_redo().is_some(),
+        }
+    }
+
+    /// After an accepted command: the new revision, and the view and diagram
+    /// derived again from the document.
+    fn changed(&mut self, record: &ChangeRecord, element: Option<String>) -> EditResult {
+        self.revision = record.revision;
+        self.layout += 1;
+        if let Some(open) = self.open.as_mut() {
+            open.view = view::view(open.session.document(), &self.language);
+            open.diagram = None;
+        }
+        EditResult::Applied {
+            revision: record.revision,
+            element,
+            created: record.created.clone(),
+            changed: record.changed.clone(),
+            deleted: record.deleted.clone(),
         }
     }
 
@@ -330,6 +433,25 @@ impl Core {
             open.diagram = None;
         }
     }
+}
+
+/// AF-EDIT-007: nothing is open.
+const NOTHING_OPEN: &str = "AF-EDIT-007";
+/// AF-EDIT-008: there is nothing to undo, or nothing to redo.
+const NOTHING_TO_DO: &str = "AF-EDIT-008";
+/// AF-EDIT-009: the document changed after the add menu was made.
+const OUT_OF_DATE: &str = "AF-EDIT-009";
+/// AF-EDIT-010: libSACM refused the operations the writing rules made.
+const NOT_MADE: &str = "AF-EDIT-010";
+
+fn refused(code: &str) -> EditResult {
+    EditResult::Refused {
+        code: code.to_owned(),
+    }
+}
+
+fn target(parent: Option<&str>) -> Target<'_> {
+    parent.map_or(Target::Canvas, Target::Node)
 }
 
 /// The view's codes about one element or relationship.

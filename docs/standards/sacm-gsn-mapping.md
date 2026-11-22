@@ -476,3 +476,75 @@ Each carries the id of the element or relationship as an argument.
 | AF-VIEW-011 | A defeated relationship, drawn neutral |
 | AF-VIEW-012 | An assertion's `metaClaim` link is not drawn |
 | AF-VIEW-013 | A Strategy's `structure` link is not drawn |
+
+## Writing GSN as SACM
+
+How the editor adds an element: the inverse of the reading rules above, so
+that what is added reads back, by R2 to R11 and E1 to E4, as the kind chosen,
+joined to its parent as chosen. `af-gsn` (`commands`) applies these rules;
+each add is one `sacm::edit::batch`, applied all or not at all. Decided on
+21 November 2026 for milestone 2, step 1 (issue #512).
+
+What may be added where follows GSN v3 Core: `SupportedBy` from a Goal or a
+Strategy to a Goal, a Strategy or a Solution; `InContextOf` from a Goal or a
+Strategy to a Context, an Assumption or a Justification; a Solution, a Context,
+an Assumption and a Justification are leaves. The C++ application's rule
+(`CanAddChildElement`) and its conformance record (GSN3-CORE-015) agree.
+
+| Rule | Added | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W1 | Goal under a Goal | `CreateClaim` (asserted); `CreateAssertedInference` from the new claim to the goal | Decided | R2, E2 |
+| W2 | Strategy under a Goal | `CreateArgumentReasoning`; `CreateClaim` (asserted), its first sub-goal; `CreateAssertedInference` from the sub-goal to the goal, with the Strategy as `reasoning` | Decided | R8, E1; [W2](#w2-a-strategy-comes-with-its-first-sub-goal) below |
+| W3 | Goal under a Strategy | `CreateClaim` (asserted); `AddReference` of it to the `source` of the one inference whose `reasoning` is the Strategy and that E1 draws. With no such inference, or several, it is not offered (AF-EDIT-004) | Decided | E1: one Strategy's premises are one inference's sources |
+| W4 | Solution under a Goal | `CreateArtifactReference`; `CreateAssertedEvidence` from it to the goal | Decided | R9 |
+| W5 | Context under a Goal or a Strategy | `CreateArtifactReference`; `CreateAssertedContext` from it to the node | Decided | R10, E4. A Context could also be a Claim ("Context — undecidable by design" above); the editor writes the form R10 reads, an `ArtifactReference` |
+| W6 | Assumption under a Goal or a Strategy | `CreateClaim`, then `SetAssertionDeclaration` `assumed`; `CreateAssertedContext` from it to the node | Decided | R4, E4 |
+| W7 | Justification under a Goal or a Strategy | `CreateClaim`, then `SetAssertionDeclaration` `axiomatic`; `CreateAssertedContext` from it to the node | Decided | R5, E4. No `assuranceForge.gsn.role` tag: R5 reads the declaration alone |
+| W8 | A top-level Goal (from the empty canvas) | `CreateClaim` (asserted), reached by nothing | Decided | R2 |
+| W9 | Where the new elements go | The `ArgumentPackage` that holds the node, at any depth; a top-level Goal into the first `ArgumentPackage` in document order. With none, the add is not offered (AF-EDIT-005) | Decided | The C++ application's `apply_add_child` |
+| W10 | Its identifier | `CreateTaggedValue` `assuranceForge.gsn.identifier` on each new node: the kind's prefix (G, S, Sn, C, A, J) and the lowest number above every identifier in the file with that prefix and digits only after it: a drawn node's, and every element's tagged identifier and SACM id, drawn or not | Decided | T1; C++ capability AF-GSN-015 |
+| W11 | Support under an undeveloped Goal | Also `SetAssertionDeclaration` `asserted` on the goal, in the same batch. The menu says the add develops the goal | Decided | R3; GSN well-formedness: an undeveloped element has no `SupportedBy` children |
+| W12 | Name and statement | An empty `name` on every new element and relationship, and no `description`: SACM requires a name (§8.6) and libSACM accepts an empty one. The text is the author's, so the editor invents none | Decided | §8.6 `name:LangString[1]` |
+| W13 | A Solution under a Strategy | Not offered (AF-EDIT-003) | Open | GSN allows it. The SCSC transformation (*Relationship of GSN to SACM*, Annex A, `Strategy2ArgumentReasoning`) writes an `AssertedEvidence` from the Solution to the Strategy's goal with the Strategy as `reasoning`; E8 draws a `reasoning` on any relationship but an inference without it, so it would read back as a Solution under the goal. Offering it means changing E8 first |
+| W14 | A Strategy under a Strategy | Not offered (AF-EDIT-003) | Open | GSN allows it, and SACM can hold it (an asserted relationship's ends are `ArgumentAsset`s), but no source says how; the C++ application left it open too |
+
+No vendor tag records a GSN type: each kind is told by the reading rules from
+standard SACM alone.
+
+### W2: a Strategy comes with its first sub-goal
+
+GSN builds a Strategy before the goals it organises. SACM cannot hold that
+state: an `AssertedInference` needs a `source` (`source : SACMElement[1..*]`,
+SACM 2.3 §11.13), and a Strategy is held only as an inference's `reasoning`
+(the editing-time findings of `sacm-gsn-metamodel-gaps.md`). The other ways
+out each lose something:
+
+- The SCSC transformation discards the inference of a Strategy with no
+  sub-goals, which leaves an `ArgumentReasoning` joined to nothing and loses
+  the goal it was added under.
+- The C++ application kept that goal in a vendor tag (`strategyTarget`) until
+  the first sub-goal arrived, so the file held a Strategy that any other SACM
+  tool sees joined to nothing.
+
+Adding the Strategy with its first sub-goal is valid SACM and well-formed GSN
+at every step: GSN's well-formedness asks that a Strategy be supported. It is
+the SCSC transformation's own output for a Strategy with one goal premise.
+Other tools were not checked.
+
+### Codes
+
+Sent with a choice of the add menu that cannot be made, or with an edit that
+was refused. Nothing changes.
+
+| Code | Meaning |
+|---|---|
+| AF-EDIT-001 | The node is a leaf in GSN: a Solution, Context, Assumption or Justification |
+| AF-EDIT-002 | The node's GSN kind is not known (a neutral node), or there is no such node |
+| AF-EDIT-003 | GSN allows it, but no SACM form is decided for it yet (W13, W14) |
+| AF-EDIT-004 | The Strategy is the reasoning of no inference, or of several (W3) |
+| AF-EDIT-005 | There is no argument package to add to (W9) |
+| AF-EDIT-006 | Only a Goal can be added at the top level (W8) |
+| AF-EDIT-007 | Nothing is open |
+| AF-EDIT-008 | There is nothing to undo, or nothing to redo |
+| AF-EDIT-009 | The document changed after the add menu was made: its choices may no longer hold |
+| AF-EDIT-010 | libSACM refused the operations the writing rules made (a fault in the rules, not a mapping decision) |

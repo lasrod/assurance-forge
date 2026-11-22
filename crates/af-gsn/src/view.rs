@@ -753,7 +753,7 @@ fn first_content(text: Option<&sacm::model::MultiLangString>) -> Option<&str> {
 }
 
 /// The content of the tagged value with `key`, if the element has one.
-fn tagged_value<'a>(element: SacmElement<'a>, key: &str) -> Option<&'a str> {
+pub(crate) fn tagged_value<'a>(element: SacmElement<'a>, key: &str) -> Option<&'a str> {
     element
         .tagged_values()
         .find(|tag| first_content(tag.key()) == Some(key))

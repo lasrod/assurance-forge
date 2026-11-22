@@ -3,8 +3,8 @@
 use af_layout as layout;
 
 use crate::contract::{
-    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, EdgeKind, LineStyle, NodeKind, Point,
-    Rect, Shape, TextLine, TextRole,
+    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, EdgeKind, ElementKind, LineStyle,
+    NodeKind, Point, Rect, Shape, TextLine, TextRole,
 };
 
 pub(crate) fn node_kind(kind: af_gsn::view::NodeKind) -> NodeKind {
@@ -17,6 +17,33 @@ pub(crate) fn node_kind(kind: af_gsn::view::NodeKind) -> NodeKind {
         K::Assumption => NodeKind::Assumption,
         K::Justification => NodeKind::Justification,
         K::Neutral => NodeKind::Neutral,
+    }
+}
+
+/// `None` for a kind a later step adds to `af_gsn`, which is not offered
+/// until the contract names it.
+pub(crate) fn element_kind(kind: af_gsn::ElementKind) -> Option<ElementKind> {
+    use af_gsn::ElementKind as K;
+    Some(match kind {
+        K::Goal => ElementKind::Goal,
+        K::Strategy => ElementKind::Strategy,
+        K::Solution => ElementKind::Solution,
+        K::Context => ElementKind::Context,
+        K::Assumption => ElementKind::Assumption,
+        K::Justification => ElementKind::Justification,
+        _ => return None,
+    })
+}
+
+pub(crate) fn gsn_element_kind(kind: ElementKind) -> af_gsn::ElementKind {
+    use af_gsn::ElementKind as K;
+    match kind {
+        ElementKind::Goal => K::Goal,
+        ElementKind::Strategy => K::Strategy,
+        ElementKind::Solution => K::Solution,
+        ElementKind::Context => K::Context,
+        ElementKind::Assumption => K::Assumption,
+        ElementKind::Justification => K::Justification,
     }
 }
 
