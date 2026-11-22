@@ -36,8 +36,10 @@ back and bring it again. Nothing is saved yet.
 ```mermaid
 flowchart LR
     subgraph frontend["ui/ (React, DATUM, Canvas2D): the same code in both shells"]
-        app[App and panels] --> canvas[DiagramCanvas<br/>draw.ts]
-        app --> core[Core.ts<br/>one interface]
+        app[App: workspace and panels] --> view[useViewport<br/>view and selection]
+        app --> doc[useDocument<br/>answers from the core]
+        view --> canvas[DiagramCanvas<br/>draw.ts]
+        doc --> core[Core.ts<br/>one interface]
     end
     core -->|browser| wasm[af-wasm]
     core -->|desktop| desktop[af-desktop<br/>Tauri commands]
@@ -80,7 +82,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | Layout generation (`DiagramAt.layout`) | `af-api` | each new layout of the same revision: language, text sizes, fonts |
 | Fonts | the page loads DATUM's measured faces and hands their bytes to the core | start |
 | Text sizes | the frontend reads DATUM's type tokens and sends them (`setStyle`) | the user's text size |
-| Selection, hover, viewport (pan and zoom), whether the view is a fit | `ui/` (`App.tsx`, `DiagramCanvas.tsx`) | user input |
+| The answers on screen (diagram, outline, packages, details) and the order of opens | `ui/src/useDocument.ts`; which answer is newer is `ui/src/freshness.ts` | each answer from the core |
+| Selection, hover, viewport (pan and zoom), whether the view is a fit | `ui/src/canvas/useViewport.ts`, `DiagramCanvas.tsx` | user input; both start again with each new revision |
 | Panel layout | DATUM's `Workspace`, held by `App.tsx`, kept in the browser's storage (`ui/src/layout.ts`) | the user moves or hides a panel |
 | Tree expansion | `App.tsx` | the user, and a selection that must be shown |
 | Recent files | desktop: paths in the configuration directory (`af-desktop/src/recent.rs`); browser: copies in IndexedDB (`ui/src/core/webRecent.ts`) | each open |
@@ -104,7 +107,10 @@ and does no I/O. The shells read files and fonts and hand in bytes.
    lines with their arrowheads, all in CSS pixels at 100%. `af-api` keeps it
    until the language, the text sizes or the fonts change.
 5. **Render.** The frontend asks for the diagram, outline and packages, which
-   each carry the revision they belong to. `DiagramCanvas` draws the render
+   each carry the revision they belong to, and the diagram its layout
+   generation. An answer is shown only if it is of the revision on screen
+   and no older a layout than the one shown (`ui/src/freshness.ts`): answers
+   can come back in any order. `DiagramCanvas` draws the render
    model with Canvas2D (`draw.ts`): only what is in view, with DATUM's colours
    read from its tokens. Hit testing uses the same geometry.
 
@@ -144,9 +150,10 @@ Requirements editing places on the parts already built:
   the other side of its node, and keeps the user's view where it was.
 - Presentation hints (a branch's order, a side, a collapsed branch) are kept
   apart from the argument's content, never written into its SACM text.
-- The frontend drops any answer older than what it shows: by revision for a
-  new document state, and by layout generation for a new layout of the same
-  revision.
+- The frontend already drops any answer older than what it shows: by
+  revision for a new document state, and by layout generation for a new
+  layout of the same revision (`ui/src/freshness.ts`). Edits will bring
+  revisions that change without a new file, which the same rule covers.
 
 ## The planned shape
 
