@@ -8,6 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   timeout: 120_000,
+  outputDir: 'test-results/capture',
   use: { baseURL: 'http://localhost:4175', deviceScaleFactor: 1, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], deviceScaleFactor: 1 } }],
   webServer: {

@@ -11,7 +11,10 @@ export default defineConfig({
   // different test each run.
   workers: 4,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:4174' },
+  // A failure keeps its trace, which `pnpm verify` puts in its report. Its
+  // own folder: the capture run empties another.
+  outputDir: 'test-results/e2e',
+  use: { baseURL: 'http://localhost:4174', trace: 'retain-on-failure' },
   // Chromium, Firefox and WebKit (the nearest stand-in for Tauri on macOS and Linux): plan decision D1.
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

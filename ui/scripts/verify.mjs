@@ -16,7 +16,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +33,11 @@ const windows = process.platform === 'win32';
 
 function run(command, commandArgs, { cwd = ui, env = {}, log } = {}) {
   const started = Date.now();
-  const result = spawnSync(command, commandArgs, {
+  // On Windows the commands run in a shell (pnpm and cargo are .cmd and
+  // .exe shims there), which joins arguments unquoted: quote those that
+  // need it, so a path with a space stays one argument.
+  const quoted = windows ? commandArgs.map((arg) => (/[\s"&|<>^]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg)) : commandArgs;
+  const result = spawnSync(command, quoted, {
     cwd,
     encoding: 'utf8',
     shell: windows,
@@ -52,6 +56,20 @@ const text = (command, commandArgs, cwd = root) => run(command, commandArgs, { c
 const commit = text('git', ['rev-parse', 'HEAD']);
 const changed = text('git', ['status', '--porcelain']).split('\n').filter(Boolean);
 const out = resolve(option('--out') ?? join(ui, 'verification', `${commit.slice(0, 8)}${changed.length ? '-dirty' : ''}`));
+// The folder is replaced only if it is empty or an earlier report: never a
+// folder of something else named by mistake.
+if (existsSync(out) && readdirSync(out).length > 0 && !existsSync(join(out, 'report.json'))) {
+  console.error(`${out} is not empty and holds no earlier report (report.json): not replacing it. Name another folder with --out.`);
+  process.exit(2);
+}
+// An earlier report to compare with that is this folder: kept aside first.
+let earlier = option('--compare') ? resolve(option('--compare')) : null;
+if (earlier && earlier === out && existsSync(out)) {
+  const kept = `${out}-earlier`;
+  rmSync(kept, { recursive: true, force: true });
+  renameSync(out, kept);
+  earlier = kept;
+}
 rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, 'logs'), { recursive: true });
 
@@ -165,7 +183,7 @@ if (existsSync(join(out, 'gallery'))) check('Gallery images', 'node', ['scripts/
 
 // Traces of anything that failed in a browser.
 const traces = [];
-for (const folder of [join(ui, 'test-results')]) {
+for (const folder of [join(ui, 'test-results', 'e2e'), join(ui, 'test-results', 'capture')]) {
   if (!existsSync(folder)) continue;
   for (const entry of readdirSync(folder, { recursive: true })) {
     if (String(entry).endsWith('trace.zip')) {
@@ -238,7 +256,6 @@ md.push('## Limitations', '', ...limitations.map((line) => `- ${line}`), '');
 writeFileSync(join(out, 'report.md'), md.join('\n'));
 
 // index.html: the images, and beside them an earlier report's when --compare names one.
-const earlier = option('--compare') ? resolve(option('--compare')) : null;
 if (earlier && existsSync(earlier)) cpSync(earlier, join(out, 'before'), { recursive: true });
 const images = [
   ...Object.values(captures).map((entry) => `screens/${entry.file}`),
