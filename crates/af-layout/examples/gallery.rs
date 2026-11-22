@@ -13,7 +13,8 @@
 //! Japanese is only a subset.
 //!
 //! It writes `<name>.svg` for each fixture, `gallery.json` with each
-//! fixture's measurements, and `gallery.md`, the same as a table.
+//! fixture's measurements, and `gallery.md`, the same as a table. It fails
+//! when a fixture's geometry is invalid (`af_layout::Report::is_valid`).
 
 use std::fmt::Write as _;
 use std::process::ExitCode;
@@ -226,7 +227,9 @@ fn run() -> Result<(), String> {
     std::fs::write(format!("{out}/gallery.json"), json).map_err(|e| format!("{out}: {e}"))?;
     std::fs::write(format!("{out}/gallery.md"), table).map_err(|e| format!("{out}: {e}"))?;
     if invalid > 0 {
-        println!("{invalid} fixture(s) have invalid geometry");
+        return Err(format!(
+            "{invalid} fixture(s) have invalid geometry: see {out}/gallery.md"
+        ));
     }
     Ok(())
 }
