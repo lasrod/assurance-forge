@@ -12,7 +12,8 @@
 //! the row below their parent, InContextOf attachments in a lane on either
 //! side of it, a challenge beside what it challenges, siblings in document
 //! order. A node supported from more than one parent hangs from one a row
-//! above it, so it is below all of them. The line of a relationship the tree
+//! above it, so it is below all of them. Separate trees stand side by side in
+//! shelves, so a case of many is not one long strip. The line of a relationship the tree
 //! placed bends only in the clear band between two rows or between a node and
 //! its lane; every other line (a second parent's, the one that closes a
 //! cycle, a context of two nodes) is routed around the nodes (`route`).

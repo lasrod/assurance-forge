@@ -52,6 +52,13 @@ const DIAMOND: f32 = 8.0;
 const H_GAP: f32 = 40.0;
 /// Between rows.
 const V_GAP: f32 = 64.0;
+/// Between shelves of trees.
+const SHELF_GAP: f32 = 2.0 * V_GAP;
+/// A shelf of trees is never narrower than this, so a case of a few trees
+/// keeps them in one row.
+const SHELF_WIDTH: f32 = 3000.0;
+/// The width to height a case of many trees is packed towards: a screen's.
+const SHELF_ASPECT: f32 = 1.6;
 /// Between a node and the lane beside it.
 const SIDE_GAP: f32 = 40.0;
 /// The same, when a line that crosses it is challenged: room for the
@@ -928,12 +935,14 @@ fn place(tree: &Tree, sized: &[Sized]) -> Placed {
         sides.flatten().chain(&tree.below[n]).copied()
     };
 
-    // Parents before children.
+    // Parents before children, and the root each node's tree grows from.
     let mut order = Vec::with_capacity(count);
-    for &root in &tree.roots {
+    let mut tree_of = vec![0usize; count];
+    for (t, &root) in tree.roots.iter().enumerate() {
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
             order.push(node);
+            tree_of[node] = t;
             stack.extend(children(node));
         }
     }
@@ -1056,53 +1065,98 @@ fn place(tree: &Tree, sized: &[Sized]) -> Placed {
         reach[node] = all;
     }
 
-    // The rows that line up across the diagram: each as tall as its tallest
-    // node with what is beside it.
-    let rows = tree
-        .level
+    // The roots' trees side by side, in shelves: a case of many trees would
+    // otherwise be one strip, too wide to see whole. A shelf is about as wide
+    // as the trees' area at a screen's proportions, never narrower than the
+    // widest tree or than `SHELF_WIDTH`, so a few trees stay in one row. The
+    // roots keep their order, left to right and then down.
+    let widths: Vec<f32> = tree
+        .roots
         .iter()
-        .flatten()
-        .max()
-        .map_or(0, |level| level + 1);
-    let mut row_up = vec![0.0f32; rows];
-    let mut row_down = vec![0.0f32; rows];
-    for (node, level) in tree.level.iter().enumerate() {
-        if let Some(level) = *level {
-            row_up[level] = row_up[level].max(reach[node].up);
-            row_down[level] = row_down[level].max(cluster_down[node]);
+        .map(|&root| reach[root].left + reach[root].right)
+        .collect();
+    let area: f32 = tree
+        .roots
+        .iter()
+        .zip(&widths)
+        .map(|(&root, width)| (width + H_GAP) * (reach[root].up + reach[root].down + V_GAP))
+        .sum();
+    let widest = widths.iter().copied().fold(0.0, f32::max);
+    let limit = widest.max((area * SHELF_ASPECT).sqrt()).max(SHELF_WIDTH);
+    let mut shelves: Vec<Vec<usize>> = Vec::new();
+    let mut used = f32::INFINITY;
+    for (t, width) in widths.iter().enumerate() {
+        if used + H_GAP + width > limit {
+            shelves.push(Vec::new());
+            used = -H_GAP;
+        }
+        used += H_GAP + width;
+        if let Some(shelf) = shelves.last_mut() {
+            shelf.push(t);
         }
     }
-    let mut row_y = vec![0.0f32; rows];
-    let mut top = MARGIN;
-    for level in 0..rows {
-        row_y[level] = top + row_up[level];
-        top = row_y[level] + row_down[level] + V_GAP;
+    let mut shelf_of = vec![0usize; tree.roots.len()];
+    for (s, shelf) in shelves.iter().enumerate() {
+        for &t in shelf {
+            shelf_of[t] = s;
+        }
     }
 
     let mut centres = vec![Point { x: 0.0, y: 0.0 }; count];
     let mut band_top = vec![0.0f32; count];
-    let mut x = MARGIN;
-    for &root in &tree.roots {
-        centres[root] = Point {
-            x: x + reach[root].left,
-            y: 0.0,
-        };
-        x += reach[root].left + reach[root].right + H_GAP;
-    }
-    for &node in &order {
-        if let Some((parent, _, _)) = tree.parent[node] {
-            centres[node] = Point {
-                x: centres[parent].x + offset[node].x,
-                y: centres[parent].y + offset[node].y,
-            };
-        }
-        match tree.level[node] {
-            Some(level) => {
-                centres[node].y = row_y[level];
-                band_top[node] = row_y[level] + row_down[level];
+    let mut top = MARGIN;
+    for (s, shelf) in shelves.iter().enumerate() {
+        let mine = |node: &usize| shelf_of[tree_of[*node]] == s;
+        // The rows that line up across the shelf: each as tall as its
+        // tallest node with what is beside it.
+        let rows = order
+            .iter()
+            .filter(|node| mine(node))
+            .filter_map(|&node| tree.level[node])
+            .max()
+            .map_or(0, |level| level + 1);
+        let mut row_up = vec![0.0f32; rows];
+        let mut row_down = vec![0.0f32; rows];
+        for &node in order.iter().filter(|node| mine(node)) {
+            if let Some(level) = tree.level[node] {
+                row_up[level] = row_up[level].max(reach[node].up);
+                row_down[level] = row_down[level].max(cluster_down[node]);
             }
-            None => band_top[node] = centres[node].y + cluster_down[node],
         }
+        let mut row_y = vec![0.0f32; rows];
+        let mut y = top;
+        for level in 0..rows {
+            row_y[level] = y + row_up[level];
+            y = row_y[level] + row_down[level] + V_GAP;
+        }
+
+        let mut x = MARGIN;
+        for &t in shelf {
+            let root = tree.roots[t];
+            centres[root] = Point {
+                x: x + reach[root].left,
+                y: 0.0,
+            };
+            x += widths[t] + H_GAP;
+        }
+        let mut bottom = top;
+        for &node in order.iter().filter(|node| mine(node)) {
+            if let Some((parent, _, _)) = tree.parent[node] {
+                centres[node] = Point {
+                    x: centres[parent].x + offset[node].x,
+                    y: centres[parent].y + offset[node].y,
+                };
+            }
+            match tree.level[node] {
+                Some(level) => {
+                    centres[node].y = row_y[level];
+                    band_top[node] = row_y[level] + row_down[level];
+                }
+                None => band_top[node] = centres[node].y + cluster_down[node],
+            }
+            bottom = bottom.max(centres[node].y + own(node).down);
+        }
+        top = bottom + SHELF_GAP;
     }
     Placed { centres, band_top }
 }

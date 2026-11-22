@@ -1260,3 +1260,37 @@ fn a_routed_line_does_not_run_along_a_placed_line_of_another_node() {
         }
     }
 }
+
+// ===== Many trees =====
+
+#[test]
+fn many_trees_are_packed_in_shelves_in_their_order() {
+    // Forty goals that nothing joins: forty trees. In one row they would be
+    // over 11 000 px wide.
+    let body: String = (0..40)
+        .map(|i| element("Claim", &format!("g{i:02}"), ""))
+        .collect();
+    let diagram = engine().layout(&case_view(&body));
+    assert!(diagram.bounds.width < 3600.0, "{:?}", diagram.bounds);
+    assert!(diagram.bounds.height > 2.0 * 48.0);
+    // In their order: along a shelf, then the next shelf below.
+    let centres: Vec<Point> = (0..40)
+        .map(|i| node(&diagram, &format!("g{i:02}")).shape.rect.centre())
+        .collect();
+    for pair in centres.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        assert!(
+            (b.x > a.x && (b.y - a.y).abs() < 0.5) || b.y > a.y,
+            "{a:?} then {b:?}"
+        );
+    }
+    assert!(check(&diagram).is_valid());
+}
+
+#[test]
+fn a_few_trees_stay_in_one_row() {
+    let diagram = engine().layout(&sample_view("gallery-roots-and-cycle.sacm.xmi", "en"));
+    let (r1, r2) = (node(&diagram, "R1"), node(&diagram, "R2"));
+    assert!((r1.shape.rect.centre().y - r2.shape.rect.centre().y).abs() < 0.5);
+    assert!(r2.bounds.x > r1.bounds.right());
+}
