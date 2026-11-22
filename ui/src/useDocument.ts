@@ -76,7 +76,12 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   // The revision on screen, or null. A relayout (language, text size) shows a
   // diagram only of that revision, and only a newer layout of it.
   const shown = useRef<number | null>(null);
+  // A relayout answered for a revision newer than the one on screen: an edit
+  // is on its way, and reads its picture again once shown, so a language or
+  // text size chosen meanwhile is not lost.
+  const missed = useRef(false);
   const showRelayout = useCallback((next: DiagramAt | null) => {
+    if (next && shown.current !== null && next.revision > shown.current) missed.current = true;
     setDiagram((current) => newerDiagram(current, next, shown.current));
   }, []);
   const coreRef = useRef<Core | null>(null);
@@ -392,14 +397,26 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       if (request !== latest.current || !next || next.revision !== result.revision) return;
       shown.current = result.revision;
       onShown(diagramRef.current, next, anchor, added);
-      setDiagram(next);
-      setOutline(rows?.rows ?? []);
+      // As every answer: shown only if no older a layout than the one shown.
+      setDiagram((current) => newerDiagram(current, next, shown.current));
+      if (rows && rows.revision === shown.current) setOutline(rows.rows);
       setPackages(held);
       setHistory(past);
+      if (missed.current) {
+        missed.current = false;
+        void Promise.all([on.diagram(), on.outline()]).then(
+          ([again, outlineAgain]) => {
+            if (request !== latest.current) return;
+            showRelayout(again);
+            if (outlineAgain && outlineAgain.revision === shown.current) setOutline(outlineAgain.rows);
+          },
+          () => undefined,
+        );
+      }
       if (what === 'add' && details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       else if (what !== 'add') setState({ kind: what === 'undo' ? 'undone' : 'redone' });
     },
-    [],
+    [showRelayout],
   );
   // Undos and redos on their way: a key held down sends no more until they
   // are answered, since Edit ▸ Undo's state is of the revision before them.
@@ -442,6 +459,9 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
 
   // The diagram's text follows DATUM's type tokens, so the user's text size.
   const sentStyle = useRef('');
+  // Each change of text sizes is numbered: only the last one's answer says
+  // what the core holds, whatever order the answers come in.
+  const styleRequest = useRef(0);
   /**
    * Lays the diagram out again for other text sizes. Answers whether a new
    * layout is shown. A theme or pixel-ratio change gives the same sizes:
@@ -451,11 +471,12 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     async (style: TextStyle): Promise<boolean> => {
       const key = JSON.stringify(style);
       if (!core || key === sentStyle.current) return false;
+      const mine = ++styleRequest.current;
       try {
         await core.setStyle(style);
         const next = await core.diagram();
         // Kept only once the core has it, so a failure is tried again.
-        sentStyle.current = key;
+        if (mine === styleRequest.current) sentStyle.current = key;
         showRelayout(next);
         return true;
       } catch {

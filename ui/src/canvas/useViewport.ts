@@ -65,16 +65,19 @@ export function useViewport(diagram: DiagramAt | null, opened: number): ViewStat
   // The canvas takes its size from the workspace's centre surface (D5). When
   // it changes, the point at the centre of the view stays at its centre.
   const [centreSize, setCentreSize] = useState({ width: 0, height: 0 });
+  // The size last given, outside React's updaters: StrictMode calls those
+  // twice, which would move the view twice.
+  const lastSize = useRef({ width: 0, height: 0 });
   const onCentreSize = useCallback((size: { inline: number; block: number }) => {
-    setCentreSize((before) => {
-      const after = { width: size.inline, height: size.block };
-      if (before.width > 0 && before.height > 0 && after.width > 0 && after.height > 0) {
-        const dx = (after.width - before.width) / 2;
-        const dy = (after.height - before.height) / 2;
-        setViewport((view) => view && { ...view, offsetX: view.offsetX + dx, offsetY: view.offsetY + dy });
-      }
-      return after;
-    });
+    const before = lastSize.current;
+    const after = { width: size.inline, height: size.block };
+    lastSize.current = after;
+    if (before.width > 0 && before.height > 0 && after.width > 0 && after.height > 0) {
+      const dx = (after.width - before.width) / 2;
+      const dy = (after.height - before.height) / 2;
+      setViewport((view) => view && { ...view, offsetX: view.offsetX + dx, offsetY: view.offsetY + dy });
+    }
+    setCentreSize(after);
   }, []);
 
   // A new file is fitted once the canvas has a size, before it is painted.

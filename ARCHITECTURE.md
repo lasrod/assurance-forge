@@ -151,10 +151,10 @@ Requirements editing places on the parts already built:
   the other side of its node, and keeps the user's view where it was.
 - Presentation hints (a branch's order, a side, a collapsed branch) are kept
   apart from the argument's content, never written into its SACM text.
-- The frontend already drops any answer older than what it shows: by
-  revision for a new document state, and by layout generation for a new
-  layout of the same revision (`ui/src/freshness.ts`). Edits will bring
-  revisions that change without a new file, which the same rule covers.
+- The frontend drops any answer older than what it shows: by revision for
+  a new document state, and by layout generation for a new layout of the
+  same revision (`ui/src/freshness.ts`). An edit's answers go through the
+  same rule, and a relayout answered during an edit is read again after it.
 
 ## The planned shape
 

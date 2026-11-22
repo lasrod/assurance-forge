@@ -117,14 +117,17 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   } | null>(null);
   const noDiagram = diagram === null;
   useEffect(() => {
+    setAddMenu(null);
+  }, [opened]);
+  useEffect(() => {
     if (reading || noDiagram) setAddMenu(null);
   }, [reading, noDiagram]);
   /** Opens the add menu of a node, or of the empty canvas, at a client point: the node is selected first. */
   const openAddMenu = useCallback(
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
-      if (parent) setSelected(parent);
       void addChoices(parent).then((answer) => {
         if (!answer) return;
+        if (parent) setSelected(parent);
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
         setAddMenu({ revision: answer.revision, parent, about, at, source, choices: answer.choices });
       });
