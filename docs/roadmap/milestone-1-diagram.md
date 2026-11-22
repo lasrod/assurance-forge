@@ -6,6 +6,16 @@ when the last goal is done, what it decided is folded into
 [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md)
 and the mapping record, and this page is removed.
 
+## Where it stands (22 November 2026)
+
+Goals G1 to G9 are built: the reading rules, the view, the layout, the
+contract, the web and desktop applications, the workspace in the C++
+arrangement, drawing, the interaction rows and the desktop smoke test. Open are
+G10, a browser check of the large case against the budgets (the native layout
+budget is an ignored test, run by hand), and G11, folding this page into
+`ARCHITECTURE.md`, which now describes what is built. The tracking issue,
+#493, is the record of each goal.
+
 ## The outcome
 
 Open a SACM 2.3 file in the desktop application or the web application and see
