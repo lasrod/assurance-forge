@@ -202,6 +202,8 @@ export interface Drawn {
 export const SMALLEST_TEXT_PX = 7;
 /** The identifier's size on screen when zoomed far out: `type.metadata`. */
 const FAR_IDENTIFIER_PX = 12;
+/** The smallest it is set at, to fit a narrow node, before it is cut short. */
+const FAR_IDENTIFIER_MIN_PX = 9;
 
 /** The part of the diagram in view, in diagram coordinates. */
 export function visibleArea(viewport: Viewport, width: number, height: number): Rect {
@@ -378,18 +380,45 @@ function drawNode(
   }
 }
 
-/** Zoomed far out: the identifier alone, at metadata size on screen, centred, if it fits. */
+/**
+ * The identifier as it fits `room` px: whole, or its start and an ellipsis.
+ * Only what is drawn is cut; the identifier itself is not changed.
+ */
+export function fitIdentifier(text: string, room: number, measure: (text: string) => number): string {
+  if (measure(text) <= room) return text;
+  const characters = Array.from(text);
+  let [low, high] = [0, characters.length];
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (measure(`${characters.slice(0, middle).join('')}…`) <= room) low = middle;
+    else high = middle - 1;
+  }
+  return low === 0 ? '' : `${characters.slice(0, low).join('')}…`;
+}
+
+/**
+ * Zoomed far out: the identifier alone, centred, at metadata size on screen;
+ * smaller, down to 9 px, in a node too narrow for it; and past that, its
+ * start and an ellipsis. A node is never left blank while its identifier's
+ * first characters fit.
+ */
 function drawFarIdentifier(context: CanvasRenderingContext2D, node: DiagramNode, palette: Palette, families: Families, scale: number) {
   const identifier = node.text.find((line) => line.role === 'identifier');
   if (!identifier) return;
-  const size = FAR_IDENTIFIER_PX / scale;
-  context.font = `400 ${size}px ${families.identifier}`;
-  const width = context.measureText(identifier.text).width;
   const rect = node.shape.rect;
-  if (width > rect.width * 0.9 || size > rect.height * 0.9) return;
+  const room = rect.width * 0.9;
+  const fontAt = (px: number) => `400 ${px / scale}px ${families.identifier}`;
+  context.font = fontAt(FAR_IDENTIFIER_PX);
+  const whole = context.measureText(identifier.text).width;
+  const px = whole > room ? Math.max(FAR_IDENTIFIER_MIN_PX, (FAR_IDENTIFIER_PX * room) / whole) : FAR_IDENTIFIER_PX;
+  if (px / scale > rect.height * 0.9) return;
+  context.font = fontAt(px);
+  const text = fitIdentifier(identifier.text, room, (candidate) => context.measureText(candidate).width);
+  if (!text) return;
+  const width = context.measureText(text).width;
   context.fillStyle = palette.text;
   context.textBaseline = 'middle';
-  context.fillText(identifier.text, rect.x + (rect.width - width) / 2, rect.y + rect.height / 2);
+  context.fillText(text, rect.x + (rect.width - width) / 2, rect.y + rect.height / 2);
   context.textBaseline = 'alphabetic';
 }
 

@@ -5,6 +5,7 @@ import {
   keepInPlace,
   reveal,
   draw,
+  fitIdentifier,
   EDGE_REACH,
   edgeDistance,
   edgeKey,
@@ -139,6 +140,34 @@ describe('draw', () => {
     const far = recorder();
     draw(far.context, diagram, { scale: 0.4, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
     expect(far.texts).toEqual(['G1']);
+  });
+
+  it('far out, sets an identifier too wide for its node smaller, and cuts it short only past 9 px', () => {
+    // The recorder measures a character as half the font size. A node is 200
+    // wide, so 180 is the room; at 40% the 12 px identifier is a 30 px font.
+    const named = (id: string): DiagramNode => ({ ...node('G1', 0), text: [{ ...node('G1', 0).text[0], text: id }] });
+    const view = { scale: 0.4, offsetX: 0, offsetY: 0 };
+    const at = { width: 800, height: 600, dpr: 1 };
+    // 14 characters: 210 at 12 px, so set at 12 × 180 / 210 ≈ 10.3 px, whole.
+    const smaller = recorder();
+    draw(smaller.context, { nodes: [named('c_definition12')], edges: [], bounds: diagram.bounds }, view, palette, families, at);
+    expect(smaller.texts).toEqual(['c_definition12']);
+    expect(parseFloat(smaller.fonts[0].split(' ')[1])).toBeCloseTo((12 * 180) / 210 / 0.4, 3);
+    // 30 characters: past 9 px, so its start and an ellipsis, never blank.
+    const cut = recorder();
+    draw(cut.context, { nodes: [named('REQ_SYS_BRAKE_CONTROLLER_0001')], edges: [], bounds: diagram.bounds }, view, palette, families, at);
+    expect(cut.texts).toHaveLength(1);
+    expect(cut.texts[0]).toMatch(/^REQ_SYS_BRAKE_.*…$/);
+    expect(parseFloat(cut.fonts[0].split(' ')[1])).toBeCloseTo(9 / 0.4, 3);
+  });
+
+  it('cuts an identifier short only as far as it must', () => {
+    const measure = (text: string) => Array.from(text).length;
+    expect(fitIdentifier('G1', 5, measure)).toBe('G1');
+    expect(fitIdentifier('ABCDEFGH', 5, measure)).toBe('ABCD…');
+    expect(fitIdentifier('ABCDEFGH', 1, measure)).toBe('');
+    // By character, not by UTF-16 unit.
+    expect(fitIdentifier('論証ナビゲーター', 4, measure)).toBe('論証ナ…');
   });
 
   it('draws no letter decorator far out, and treats a node with only an identifier the same', () => {

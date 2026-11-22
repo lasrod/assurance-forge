@@ -10,7 +10,12 @@ const EARLIER = ['assurance-forge.workspace.v2', 'assurance-forge.workspace.v1']
 
 const DOCKS: readonly WorkspaceDockId[] = ['start', 'end', 'bottom'];
 
-export const DEFAULT_LAYOUT: WorkspaceLayout = { open: { start: true, end: true, bottom: true }, size: {} };
+/**
+ * The Problems panel starts closed, its rail showing: until the problem list
+ * exists it holds one sentence, and the canvas needs the height more. Once
+ * the user opens it, it stays open (the layout is kept).
+ */
+export const DEFAULT_LAYOUT: WorkspaceLayout = { open: { start: true, end: true, bottom: false }, size: {} };
 
 /** A size as DATUM takes it: rem above 0, or null for the default. Anything else is dropped. */
 function sizes(value: unknown): Record<string, number | null> {

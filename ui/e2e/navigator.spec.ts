@@ -182,16 +182,17 @@ test('the zoom field above the canvas shows the zoom and sets it', async ({ page
 
 test('View ▸ Panels hides and shows a panel', async ({ page }) => {
   await opened(page);
+  // Problems starts closed while it has no problem list (src/layout.ts).
   const problems = page.getByRole('region', { name: 'Problems' });
-  await expect(problems).toBeVisible();
+  await expect(problems).toBeHidden();
   await page.getByRole('menuitem', { name: 'View', exact: true }).click();
   const item = page.getByRole('menuitemcheckbox', { name: 'Problems' });
-  await expect(item).toHaveAttribute('aria-checked', 'true');
-  await item.click();
-  await expect(problems).toBeHidden();
-  // A menu of options stays open, and says what shows now.
   await expect(item).toHaveAttribute('aria-checked', 'false');
   await item.click();
   await expect(problems).toBeVisible();
+  // A menu of options stays open, and says what shows now.
   await expect(item).toHaveAttribute('aria-checked', 'true');
+  await item.click();
+  await expect(problems).toBeHidden();
+  await expect(item).toHaveAttribute('aria-checked', 'false');
 });

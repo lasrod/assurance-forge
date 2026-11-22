@@ -63,6 +63,33 @@
     white-space: nowrap;
   }
 
+  /* What is selected: its name, then its identifier and kind, smaller. */
+  .af-element-title {
+    display: grid;
+    gap: var(--datum-space-4);
+    margin-block-end: var(--datum-space-8);
+  }
+
+  .af-element-name,
+  .af-element-meta {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .af-element-name {
+    font-weight: var(--datum-font-weight-semibold);
+  }
+
+  .af-element-meta {
+    font-size: var(--datum-type-metadata-size);
+    line-height: var(--datum-type-metadata-line-height);
+    color: var(--datum-text-secondary);
+  }
+
+  .af-element-identifier {
+    font-family: var(--datum-font-family-mono);
+  }
+
   /* The statement is prose: a paragraph above the properties. */
   .af-statement {
     margin: 0 0 var(--datum-space-8);
