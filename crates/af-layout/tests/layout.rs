@@ -720,33 +720,20 @@ fn element(kind: &str, id: &str, attributes: &str) -> String {
 }
 
 #[test]
-fn a_line_the_layout_placed_crosses_no_node() {
+fn no_line_crosses_a_node() {
+    // Every line, also those that placed nothing: a second parent's, a
+    // cycle's closing line, a context of two nodes. The check itself is
+    // shown to see such a line in `the_geometry_check_finds_each_defect_made_by_hand`.
     for name in SAMPLES {
-        let diagram = engine().layout(&sample_view(name, "en"));
-        for edge in &diagram.edges {
-            if edge.placement == Placement::None {
-                continue;
-            }
-            let points = along(edge);
-            for other in &diagram.nodes {
-                if other.id == edge.from || (!edge.to_relationship && other.id == edge.to) {
-                    continue;
-                }
-                assert!(
-                    !points.iter().any(|point| well_inside(other, *point)),
-                    "{name}: {} crosses {}",
-                    edge.relationship,
-                    other.id
-                );
-            }
-        }
+        let report = check(&engine().layout(&sample_view(name, "en")));
+        assert_eq!(report.edge_node_intersections, [], "{name}");
     }
 }
 
 #[test]
-fn the_crossing_check_sees_a_line_through_a_node() {
-    // The check above passes only if it can fail: an edge that placed
-    // nothing runs straight, here through the node between its ends.
+fn a_line_that_closes_a_cycle_goes_around_the_nodes_and_keeps_its_direction() {
+    // a <- b <- c <- a: the search from a meets a again at c's line, which
+    // places nothing. It is drawn, from c to a, and not through b.
     let diagram = engine().layout(&case_view(
         &[
             element("Claim", "a", ""),
@@ -758,14 +745,83 @@ fn the_crossing_check_sees_a_line_through_a_node() {
         ]
         .concat(),
     ));
-    let straight = first_edge(&diagram, "i3");
-    assert_eq!(straight.placement, Placement::None);
+    let closing = first_edge(&diagram, "i3");
+    assert_eq!(closing.placement, Placement::None);
+    assert_eq!((closing.from.as_str(), closing.to.as_str()), ("c", "a"));
+    assert!(
+        node(&diagram, "c")
+            .shape
+            .outline_distance(closing.points[0])
+            < 0.05
+    );
+    assert!(node(&diagram, "a").shape.outline_distance(closing.head[0]) < 0.05);
     let between = node(&diagram, "b");
     assert!(
-        along(straight)
+        !along(closing)
             .iter()
             .any(|point| well_inside(between, *point))
     );
+    // The line runs across and down only, its corners rounded.
+    assert!(closing.points.len() > 2);
+}
+
+#[test]
+fn a_node_supported_from_two_rows_hangs_below_the_lower() {
+    // Sn3 supports G2 directly and through G5, a row lower. It sits below
+    // G5, so every line of support into it runs down.
+    let diagram = engine().layout(&sample_view("gallery-shared-support.sacm.xmi", "en"));
+    let (g2, g5, sn3) = (
+        node(&diagram, "G2"),
+        node(&diagram, "G5"),
+        node(&diagram, "Sn3"),
+    );
+    assert!(g5.bounds.y >= g2.bounds.bottom());
+    assert!(sn3.bounds.y >= g5.bounds.bottom());
+    let from = |parent: &str| {
+        diagram
+            .edges
+            .iter()
+            .find(|edge| edge.from == parent && edge.to == "Sn3")
+            .unwrap_or_else(|| panic!("no line {parent} to Sn3"))
+    };
+    assert_eq!(from("G5").placement, Placement::Below);
+    assert_eq!(from("G2").placement, Placement::None);
+    // Both are support, in GSN direction, ending on Sn3.
+    for parent in ["G2", "G5"] {
+        let edge = from(parent);
+        assert_eq!(edge.kind, EdgeKind::SupportedBy);
+        assert_eq!(edge.arrowhead, Arrowhead::Filled);
+        assert!(sn3.shape.outline_distance(edge.head[0]) < 0.05);
+    }
+    // The outline agrees with the picture: Sn3 under G5.
+    let view = sample_view("gallery-shared-support.sacm.xmi", "en");
+    let rows = af_layout::outline(&view);
+    let at = |id: &str| {
+        rows.iter()
+            .position(|row| view.nodes[row.node].id == id)
+            .unwrap_or_else(|| panic!("{id} not in the outline"))
+    };
+    assert_eq!(rows[at("Sn3")].level, rows[at("G5")].level + 1);
+    assert!(at("G5") < at("Sn3"));
+}
+
+#[test]
+fn two_lines_into_one_node_enter_apart() {
+    // Sn2 is supported by G4 (which places it), G6 and G3: three arrowheads,
+    // none on another.
+    let diagram = engine().layout(&sample_view("gallery-shared-support.sacm.xmi", "en"));
+    let tips: Vec<Point> = diagram
+        .edges
+        .iter()
+        .filter(|edge| edge.to == "Sn2")
+        .map(|edge| edge.head[0])
+        .collect();
+    assert_eq!(tips.len(), 3);
+    for (i, a) in tips.iter().enumerate() {
+        for b in &tips[i + 1..] {
+            assert!((a.x - b.x).hypot(a.y - b.y) > 12.0, "{a:?} and {b:?}");
+        }
+    }
 }
 
 #[test]

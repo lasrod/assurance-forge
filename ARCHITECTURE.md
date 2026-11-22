@@ -61,7 +61,7 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 |---|---|---|
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM), from crates.io | external |
 | `af-gsn` | The GSN view of a document: nodes, edges in GSN direction, and a code for each thing it could not draw; the GSN commands, as SACM operations. The reading and writing rules are in `docs/standards/sacm-gsn-mapping.md` | the view, with challenges of elements and of relationships; the commands that add an element, with what may be added where and a code for why not |
-| `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, the render model, and the checks of its geometry (`check`) | support in rows below, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; the outline the Argument Navigator shows. A relationship that placed no node (a second parent, the edge that closes a cycle) is drawn as a straight line, which can cross nodes |
+| `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, the render model, and the checks of its geometry (`check`) | support in rows below, a node with several parents below the lowest of them, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; a relationship that placed no node (a second parent, the line that closes a cycle, a context of two nodes) routed around every node; the outline the Argument Navigator shows |
 | `af-session` | The open document, a revision per command, a change record of each, and undo and redo as whole-document snapshots | yes; drafts and storage no |
 | `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, undo, redo, history |
 | `af-wasm` | The browser shell: `af-api` compiled to WebAssembly, answering in JSON | yes |
@@ -99,7 +99,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
    code saying why it is not drawn.
 4. **Lay out.** On the first `diagram()` request, `af_layout::Engine::layout`
    sizes every node from its measured text, places the nodes along a
-   spanning tree of the argument, draws a line for every relationship, and returns the render model: shapes, text lines, decorators,
+   spanning tree of the argument, routes the lines the tree did not place
+   around the nodes, and returns the render model: shapes, text lines, decorators,
    lines with their arrowheads, all in CSS pixels at 100%. `af-api` keeps it
    until the language, the text sizes or the fonts change.
 5. **Render.** The frontend asks for the diagram, outline and packages, which
