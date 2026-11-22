@@ -65,12 +65,18 @@ function ElementSection({ details, t }: { details: ElementDetails; t: T }) {
   return (
     <div data-testid="element-properties">
       <Section title={t('sectionElement')}>
-        {/* What is selected, as the diagram names it: its name, then its identifier and kind. */}
+        {/* What is selected, as the diagram names it: its name, then its
+            identifier and kind. With no name, the identifier is the title,
+            once, and the kind is under it. */}
         <div className="af-element-title" data-testid="element-title">
           <p className="af-element-name">{details.name || details.identifier}</p>
           <p className="af-element-meta">
-            <span className="af-element-identifier">{details.identifier}</span>
-            <span aria-hidden="true"> · </span>
+            {details.name && (
+              <>
+                <span className="af-element-identifier">{details.identifier}</span>
+                <span aria-hidden="true"> · </span>
+              </>
+            )}
             {kindLabel(details, t)}
           </p>
         </div>

@@ -67,6 +67,9 @@ test('a right-click on a goal lists the six kinds; choosing one adds it, selecte
   expect(added).not.toBe('cl_top');
   await expect(status(page)).toHaveText('Goal G1 added.');
   await expect(page.getByTestId('element-properties')).toContainText('Goal');
+  // It has no name yet: its identifier is the title, once, and its kind under it.
+  await expect(page.getByTestId('element-title').locator('.af-element-name')).toHaveText('G1');
+  await expect(page.getByTestId('element-title').locator('.af-element-meta')).toHaveText('Goal');
   const state = await hook(page);
   expect(state.revision).toBe(2);
   expect(state.diagram!.diagram.edges.some((edge) => edge.from === 'cl_top' && edge.to === added && edge.kind === 'supportedBy')).toBe(true);
