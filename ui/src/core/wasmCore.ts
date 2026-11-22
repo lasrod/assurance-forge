@@ -39,7 +39,7 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     outline: async () => parse<Outline>(core.outline()),
     packages: async () => JSON.parse(core.packages()) as Package[],
     addChoices: async (parent) => parse<AddChoices>(core.addChoices(parent ?? undefined)),
-    add: async (parent, kind) => JSON.parse(core.add(parent ?? undefined, kind)) as EditResult,
+    add: async (parent, kind, revision) => JSON.parse(core.add(parent ?? undefined, kind, revision)) as EditResult,
     undo: async () => JSON.parse(core.undo()) as EditResult,
     redo: async () => JSON.parse(core.redo()) as EditResult,
     history: async () => JSON.parse(core.history()) as History,

@@ -147,6 +147,8 @@ The core sends codes and the interface words them.
 | AF-EDIT-006 | Only a Goal can be added at the top level |
 | AF-EDIT-007 | Nothing is open (an edit sent with no file) |
 | AF-EDIT-008 | There is nothing to undo, or nothing to redo |
+| AF-EDIT-009 | The document changed after the add menu was made |
+| AF-EDIT-010 | libSACM refused the operations the writing rules made (a fault in the rules) |
 
 ### Revisions and the interface
 

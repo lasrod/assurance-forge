@@ -89,11 +89,17 @@ impl WasmCore {
     }
 
     /// Adds an element of `kind` (an `ElementKind`, such as `goal`) under the
-    /// node `parent`, or at the top level when `None`. `EditResult` as JSON.
-    pub fn add(&mut self, parent: Option<String>, kind: &str) -> Result<String, JsError> {
+    /// node `parent`, or at the top level when `None`, from the add menu of
+    /// `revision`. `EditResult` as JSON.
+    pub fn add(
+        &mut self,
+        parent: Option<String>,
+        kind: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
         let kind: ElementKind = serde_json::from_value(serde_json::Value::String(kind.to_owned()))
             .map_err(|_| JsError::new("core-kind"))?;
-        json(&self.core.add(parent.as_deref(), kind))
+        json(&self.core.add(parent.as_deref(), kind, revision))
     }
 
     /// Takes back the last command. `EditResult` as JSON.

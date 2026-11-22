@@ -33,8 +33,8 @@ describe('the add menu', () => {
   });
 
   it('words every code in both languages, and leaves an unknown one as it is', () => {
-    for (let n = 1; n <= 8; n += 1) {
-      const code = `AF-EDIT-00${n}`;
+    for (let n = 1; n <= 10; n += 1) {
+      const code = `AF-EDIT-${String(n).padStart(3, '0')}`;
       expect(refusalText(code, 'goal', en)).not.toBe(code);
       expect(refusalText(code, 'goal', ja)).not.toBe(code);
     }

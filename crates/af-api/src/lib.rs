@@ -17,7 +17,7 @@
 
 pub mod contract;
 
-use af_gsn::commands::{self, Refusal as AddRefusal, Target};
+use af_gsn::commands::{self, Target};
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
 use af_session::{ChangeRecord, Session};
@@ -342,18 +342,23 @@ impl Core {
     }
 
     /// Adds an element of `kind` under the node `parent`, or at the top level
-    /// when `None`.
-    pub fn add(&mut self, parent: Option<&str>, kind: ElementKind) -> EditResult {
+    /// when `None`. `revision` is the one the add menu was made for: an add
+    /// chosen from a menu of another revision is refused (AF-EDIT-009), since
+    /// the choices it offered may no longer hold.
+    pub fn add(&mut self, parent: Option<&str>, kind: ElementKind, revision: u32) -> EditResult {
         let Some(open) = self.open.as_mut() else {
             return refused(NOTHING_OPEN);
         };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
         let kind = convert::gsn_element_kind(kind);
         match open.session.add(&open.view, target(parent), kind) {
             Ok((added, record)) => self.changed(&record, Some(added.element)),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
-            // libSACM refused an operation the rules made: a bug in them. The
-            // document is unchanged, and the add is said to have no SACM form.
-            Err(commands::AddError::Edit(_)) => refused(AddRefusal::NotMapped.code()),
+            // libSACM refused an operation the rules made: a bug in them, not
+            // a mapping decision. The document is unchanged.
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
         }
     }
 
@@ -434,6 +439,10 @@ impl Core {
 const NOTHING_OPEN: &str = "AF-EDIT-007";
 /// AF-EDIT-008: there is nothing to undo, or nothing to redo.
 const NOTHING_TO_DO: &str = "AF-EDIT-008";
+/// AF-EDIT-009: the document changed after the add menu was made.
+const OUT_OF_DATE: &str = "AF-EDIT-009";
+/// AF-EDIT-010: libSACM refused the operations the writing rules made.
+const NOT_MADE: &str = "AF-EDIT-010";
 
 fn refused(code: &str) -> EditResult {
     EditResult::Refused {

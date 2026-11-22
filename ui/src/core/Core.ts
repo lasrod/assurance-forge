@@ -89,8 +89,12 @@ export interface Core {
    * there. Null when nothing is open.
    */
   addChoices(parent: string | null): Promise<AddChoices | null>;
-  /** Adds an element of `kind` under the node `parent`, or at the top level when null. */
-  add(parent: string | null, kind: ElementKind): Promise<EditResult>;
+  /**
+   * Adds an element of `kind` under the node `parent`, or at the top level
+   * when null, from the add menu of `revision`: refused (AF-EDIT-009) when
+   * the document has changed since.
+   */
+  add(parent: string | null, kind: ElementKind, revision: number): Promise<EditResult>;
   /** Takes back the last command. */
   undo(): Promise<EditResult>;
   /** Makes again the last command undo took back. */

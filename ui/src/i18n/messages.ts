@@ -128,6 +128,8 @@ const en = {
   'AF-EDIT-006': 'Only a Goal can be added at the top level.',
   'AF-EDIT-007': 'Nothing is open.',
   'AF-EDIT-008': 'There is nothing to undo or redo.',
+  'AF-EDIT-009': 'The argument changed after the menu opened. Open the menu again.',
+  'AF-EDIT-010': 'The element could not be added: the file refused the change. This is a fault in Assurance Forge.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -257,6 +259,8 @@ const ja: Record<MessageKey, string> = {
   'AF-EDIT-006': '最上位に追加できるのはゴールだけです。',
   'AF-EDIT-007': '何も開いていません。',
   'AF-EDIT-008': '元に戻す、またはやり直す操作がありません。',
+  'AF-EDIT-009': 'メニューを開いた後に論証が変わりました。もう一度メニューを開いてください。',
+  'AF-EDIT-010': '要素を追加できませんでした。ファイルが変更を受け付けませんでした。Assurance Forge の不具合です。',
 };
 
 const MESSAGES: Record<Language, Record<MessageKey, string>> = { en, ja };

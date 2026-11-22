@@ -471,15 +471,21 @@ fn an_add_from_the_menu_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
     );
     assert!(top.choices.iter().all(|choice| choice.refusal.is_none()));
     assert!(matches!(
-        core.add(Some("ev_1"), ElementKind::Goal),
+        core.add(Some("ev_1"), ElementKind::Goal, 1),
         EditResult::Refused { ref code } if code == "AF-EDIT-001"
     ));
     assert_eq!(core.revision(), 1, "a refused add makes no revision");
+    // An add chosen from a menu of another revision is refused, and changes nothing.
+    assert!(matches!(
+        core.add(Some("cl_top"), ElementKind::Context, 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    assert_eq!(core.revision(), 1);
 
     let before = core.diagram().unwrap_or_else(|| panic!("diagram"));
     let EditResult::Applied {
         revision, element, ..
-    } = core.add(Some("cl_top"), ElementKind::Context)
+    } = core.add(Some("cl_top"), ElementKind::Context, 1)
     else {
         panic!("not added");
     };

@@ -160,6 +160,67 @@ test('Shift+F10 opens the selected node’s menu from the keyboard, and Enter ad
   await expect(canvas(page)).toBeFocused();
 });
 
+test('the context-menu key opens the selected node’s menu, and the browser’s own menu stays off it', async ({ page }) => {
+  await opened(page);
+  const point = await nodeCentre(page, 'cl_sub_1');
+  await page.mouse.click(point.x, point.y);
+  await expect.poll(async () => (await hook(page)).selected).toBe('cl_sub_1');
+  await page.keyboard.press('ContextMenu');
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  const first = menu.getByRole('menuitem', { name: 'Add Goal' });
+  await expect(first).toBeFocused();
+  // On Windows the key's contextmenu event arrives after the menu has taken
+  // focus. DATUM's menu cancels it, so the browser shows no menu of its own
+  // over it; this keeps that so.
+  const cancelled = await first.evaluate((item) => {
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    item.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(cancelled).toBe(true);
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
+test('Shift+F10 with a line selected opens no menu, as a right-click on it opens none', async ({ page }) => {
+  await opened(page);
+  const box = (await canvas(page).boundingBox())!;
+  const state = await hook(page);
+  const edge = state.diagram!.diagram.edges.find((candidate) => candidate.from === 'cl_sub_1' && candidate.to === 'ev_1')!;
+  const [a, b] = [edge.points[0], edge.points[1]];
+  const view = state.viewport!;
+  await page.mouse.click(box.x + ((a.x + b.x) / 2) * view.scale + view.offsetX, box.y + ((a.y + b.y) / 2) * view.scale + view.offsetY);
+  // The line is selected: a selection that is no node's id.
+  await expect
+    .poll(async () => {
+      const { selected, diagram } = await hook(page);
+      return selected !== null && !diagram!.diagram.nodes.some((node) => node.id === selected);
+    })
+    .toBe(true);
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+});
+
+test('Ctrl+Z held down undoes every add and ends on Undone, not on a refusal', async ({ page }) => {
+  await opened(page);
+  for (let added = 1; added <= 3; added += 1) {
+    const menu = await menuOf(page, 'cl_top');
+    await menu.getByRole('menuitem', { name: 'Add Goal' }).click();
+    await expect.poll(async () => (await hook(page)).revision).toBe(1 + added);
+  }
+  await canvas(page).focus();
+  // Repeats of a key held down: more than there are adds to undo.
+  await page.keyboard.down('Control');
+  for (let repeat = 0; repeat < 8; repeat += 1) await page.keyboard.down('z');
+  await page.keyboard.up('z');
+  await page.keyboard.up('Control');
+  await expect.poll(() => counts(page)).toEqual({ nodes: 8, edges: 7 });
+  await expect(await editMenu(page, 'Undo')).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
+  await expect(status(page)).toHaveText('Undone.');
+});
+
 test('on the empty canvas only a top-level Goal can be added, and a line has no menu', async ({ page }) => {
   await opened(page);
   const box = (await canvas(page).boundingBox())!;

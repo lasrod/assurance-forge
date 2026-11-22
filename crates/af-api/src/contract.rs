@@ -455,8 +455,9 @@ pub enum EditResult {
         deleted: Vec<String>,
     },
     /// Nothing changed. `code` is an `AF-EDIT-*` code: why the add cannot be
-    /// made, nothing is open (`AF-EDIT-007`), or there is nothing to undo or
-    /// redo (`AF-EDIT-008`).
+    /// made, nothing is open (`AF-EDIT-007`), there is nothing to undo or
+    /// redo (`AF-EDIT-008`), the add menu was for another revision
+    /// (`AF-EDIT-009`), or libSACM refused the operations (`AF-EDIT-010`).
     Refused { code: String },
 }
 

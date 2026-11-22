@@ -502,7 +502,7 @@ an Assumption and a Justification are leaves. The C++ application's rule
 | W7 | Justification under a Goal or a Strategy | `CreateClaim`, then `SetAssertionDeclaration` `axiomatic`; `CreateAssertedContext` from it to the node | Decided | R5, E4. No `assuranceForge.gsn.role` tag: R5 reads the declaration alone |
 | W8 | A top-level Goal (from the empty canvas) | `CreateClaim` (asserted), reached by nothing | Decided | R2 |
 | W9 | Where the new elements go | The `ArgumentPackage` that holds the node, at any depth; a top-level Goal into the first `ArgumentPackage` in document order. With none, the add is not offered (AF-EDIT-005) | Decided | The C++ application's `apply_add_child` |
-| W10 | Its identifier | `CreateTaggedValue` `assuranceForge.gsn.identifier` on each new node: the kind's prefix (G, S, Sn, C, A, J) and the lowest number above every identifier of the view with that prefix and digits only after it | Decided | T1; C++ capability AF-GSN-015 |
+| W10 | Its identifier | `CreateTaggedValue` `assuranceForge.gsn.identifier` on each new node: the kind's prefix (G, S, Sn, C, A, J) and the lowest number above every identifier in the file with that prefix and digits only after it: a drawn node's, and every element's tagged identifier and SACM id, drawn or not | Decided | T1; C++ capability AF-GSN-015 |
 | W11 | Support under an undeveloped Goal | Also `SetAssertionDeclaration` `asserted` on the goal, in the same batch. The menu says the add develops the goal | Decided | R3; GSN well-formedness: an undeveloped element has no `SupportedBy` children |
 | W12 | Name and statement | An empty `name` on every new element and relationship, and no `description`: SACM requires a name (§8.6) and libSACM accepts an empty one. The text is the author's, so the editor invents none | Decided | §8.6 `name:LangString[1]` |
 | W13 | A Solution under a Strategy | Not offered (AF-EDIT-003) | Open | GSN allows it. The SCSC transformation (*Relationship of GSN to SACM*, Annex A, `Strategy2ArgumentReasoning`) writes an `AssertedEvidence` from the Solution to the Strategy's goal with the Strategy as `reasoning`; E8 draws a `reasoning` on any relationship but an inference without it, so it would read back as a Solution under the goal. Offering it means changing E8 first |
@@ -546,3 +546,5 @@ was refused. Nothing changes.
 | AF-EDIT-006 | Only a Goal can be added at the top level (W8) |
 | AF-EDIT-007 | Nothing is open |
 | AF-EDIT-008 | There is nothing to undo, or nothing to redo |
+| AF-EDIT-009 | The document changed after the add menu was made: its choices may no longer hold |
+| AF-EDIT-010 | libSACM refused the operations the writing rules made (a fault in the rules, not a mapping decision) |

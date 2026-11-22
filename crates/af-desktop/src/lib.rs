@@ -398,9 +398,10 @@ fn add_choices(
 fn add(
     parent: Option<String>,
     kind: af_api::contract::ElementKind,
+    revision: u32,
     state: Shared<'_>,
 ) -> Result<af_api::contract::EditResult, String> {
-    Ok(lock(&state)?.core.add(parent.as_deref(), kind))
+    Ok(lock(&state)?.core.add(parent.as_deref(), kind, revision))
 }
 
 #[tauri::command]

@@ -58,7 +58,7 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     outline: () => invoke<Outline | null>('outline'),
     packages: () => invoke<Package[]>('packages'),
     addChoices: (parent) => invoke<AddChoices | null>('add_choices', { parent }),
-    add: (parent, kind) => invoke<EditResult>('add', { parent, kind }),
+    add: (parent, kind, revision) => invoke<EditResult>('add', { parent, kind, revision }),
     undo: () => invoke<EditResult>('undo'),
     redo: () => invoke<EditResult>('redo'),
     history: () => invoke<History>('history'),

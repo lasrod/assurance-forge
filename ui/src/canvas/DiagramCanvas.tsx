@@ -265,6 +265,8 @@ export function DiagramCanvas({
       // canvas's at the canvas's centre.
       const rect = event.currentTarget.getBoundingClientRect();
       const node = selected ? diagram.diagram.nodes.find((candidate) => candidate.id === selected) : undefined;
+      // A selected line takes no menu, as a right-click on it takes none.
+      if (selected && !node) return;
       const centre = node
         ? {
             x: (node.bounds.x + node.bounds.width / 2) * viewport.scale + viewport.offsetX,

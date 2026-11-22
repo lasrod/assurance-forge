@@ -371,6 +371,33 @@ fn w10_an_identifier_is_the_lowest_number_above_those_of_its_prefix() {
     assert_eq!(identifier(&solution.element), Some("Sn5"));
 }
 
+/// W10 counts every identifier of the file, not only those of drawn nodes:
+/// an `ArgumentGroup` is not drawn (R14), and its `G9` is not given again.
+#[test]
+fn w10_an_identifier_the_view_does_not_draw_is_not_given_again() {
+    let mut document = case(
+        &[
+            element("Claim", "g", ""),
+            r#"<argumentElement xmi:type="sacm:ArgumentGroup" xmi:id="group"><name content="group"/><taggedValue xmi:id="tv_group"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="G9"/></content></taggedValue></argumentElement>"#.to_owned(),
+        ]
+        .concat(),
+    );
+    let before = view(&document, "en");
+    assert!(
+        before.nodes.iter().all(|node| node.identifier != "G9"),
+        "setup: the group is not drawn"
+    );
+    let goal = add(&mut document, &before, Target::Node("g"), ElementKind::Goal)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&document, "en");
+    let identifier = after
+        .nodes
+        .iter()
+        .find(|node| node.id == goal.element)
+        .map(|node| node.identifier.as_str());
+    assert_eq!(identifier, Some("G10"));
+}
+
 #[test]
 fn a_refused_add_changes_nothing() {
     let mut document = every_kind();

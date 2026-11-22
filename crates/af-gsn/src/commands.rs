@@ -139,7 +139,7 @@ pub fn add(
     kind: ElementKind,
 ) -> Result<Added, AddError> {
     let plan = plan(document, view, target, kind).map_err(AddError::Refused)?;
-    let mut numbers = Identifiers::of(view);
+    let mut numbers = Identifiers::of(document, view);
     let mut made: Option<(String, Option<String>)> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
         let package = plan.package.clone();
@@ -389,20 +389,28 @@ struct Identifiers {
 }
 
 impl Identifiers {
-    fn of(view: &View) -> Self {
-        Self {
-            taken: view
-                .nodes
-                .iter()
-                .map(|node| node.identifier.clone())
-                .collect(),
+    /// Every identifier the file already uses: each drawn node's, and each
+    /// element's tagged identifier and SACM id, so that an element the view
+    /// does not draw keeps its identifier to itself.
+    fn of(document: &Document, view: &View) -> Self {
+        let mut taken: Vec<String> = view
+            .nodes
+            .iter()
+            .map(|node| node.identifier.clone())
+            .collect();
+        for element in document.elements() {
+            taken.push(element.id().as_str().to_owned());
+            if let Some(identifier) = crate::view::tagged_value(element, GSN_IDENTIFIER_KEY) {
+                taken.push(identifier.to_owned());
+            }
         }
+        Self { taken }
     }
 
     /// The kind's prefix and the lowest number above every identifier of
     /// that prefix; then that one is taken too.
     fn next(&mut self, kind: ElementKind) -> String {
-        let prefix = prefix(kind);
+        let prefix = kind.identifier_prefix();
         let highest = self
             .taken
             .iter()
@@ -414,18 +422,5 @@ impl Identifiers {
         let next = format!("{prefix}{}", highest + 1);
         self.taken.push(next.clone());
         next
-    }
-}
-
-/// The GSN identifier prefix of each kind (GSN v3 examples, and the C++
-/// application's).
-fn prefix(kind: ElementKind) -> &'static str {
-    match kind {
-        ElementKind::Goal => "G",
-        ElementKind::Strategy => "S",
-        ElementKind::Solution => "Sn",
-        ElementKind::Context => "C",
-        ElementKind::Assumption => "A",
-        ElementKind::Justification => "J",
     }
 }

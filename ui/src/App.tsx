@@ -140,8 +140,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // new revision of the same one.
   const [opened, setOpened] = useState(0);
   // The add menu while it is open: for a node or the empty canvas, at a point
-  // in client coordinates.
+  // in client coordinates, with the revision its choices are of.
   const [addMenu, setAddMenu] = useState<{
+    revision: number;
     parent: string | null;
     about: NodeKind | null;
     at: { x: number; y: number };
@@ -249,6 +250,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const begin = () => {
     latest.current += 1;
     setReading(true);
+    // Its choices are of the file being replaced.
+    setAddMenu(null);
     return latest.current;
   };
   useEffect(() => {
@@ -495,20 +498,39 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         return;
       }
       if (result.result === 'refused') {
-        if (request === latest.current) setState({ kind: 'editRefused', code: result.code, about });
+        // Edit ▸ Undo and Redo are greyed when there is nothing to do, so
+        // AF-EDIT-008 comes only from keys sent before an answer: the undos
+        // the user wanted were made, and the status says so already.
+        const raced = what !== 'add' && result.code === 'AF-EDIT-008';
+        if (request === latest.current && !raced) setState({ kind: 'editRefused', code: result.code, about });
         return;
       }
       const added = result.element;
-      const [next, rows, held, past, details] = await Promise.all([
-        on.diagram(),
-        on.outline(),
-        on.packages(),
-        on.history(),
-        added ? on.element(added) : Promise.resolve(null),
-      ]);
+      let answers;
+      try {
+        answers = await Promise.all([
+          on.diagram(),
+          on.outline(),
+          on.packages(),
+          on.history(),
+          added ? on.element(added) : Promise.resolve(null),
+        ]);
+      } catch {
+        // The core made the change but its new picture could not be read. The
+        // revision on screen follows the core all the same, so the next menu
+        // and relayout are taken as current and bring the picture back.
+        if (request === latest.current) {
+          shown.current = result.revision;
+          setState({ kind: 'relayoutFailed' });
+        }
+        return;
+      }
+      const [next, rows, held, past, details] = answers;
       // Another file was opened meanwhile, or a later command is on its way.
       if (request !== latest.current || !next || next.revision !== result.revision) return;
       shown.current = result.revision;
+      // The view is moved now, not fitted: a relayout keeps it.
+      fitted.current = false;
       const before = diagramRef.current?.diagram.nodes ?? [];
       const find = (nodes: readonly DiagramNode[], id: string | null) => (id ? nodes.find((node) => node.id === id) : undefined);
       // The node to keep in place: the one asked about, else the selected one,
@@ -538,8 +560,17 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [centreSize],
   );
-  const undo = useCallback(() => void edit((on) => on.undo(), 'undo', null, null), [edit]);
-  const redo = useCallback(() => void edit((on) => on.redo(), 'redo', null, null), [edit]);
+  // Undos and redos on their way: a key held down sends no more until they
+  // are answered, since Edit ▸ Undo's state is of the revision before them.
+  const editing = useRef(0);
+  const track = useCallback((running: Promise<void>) => {
+    editing.current += 1;
+    void running.finally(() => {
+      editing.current -= 1;
+    });
+  }, []);
+  const undo = useCallback(() => track(edit((on) => on.undo(), 'undo', null, null)), [edit, track]);
+  const redo = useCallback(() => track(edit((on) => on.redo(), 'redo', null, null)), [edit, track]);
 
   /** Opens the add menu of a node, or of the empty canvas, at a client point: the node is selected first. */
   const openAddMenu = useCallback((parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
@@ -552,7 +583,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         // The document changed before the answer came: the menu would be for another revision.
         if (!answer || answer.revision !== revision || shown.current !== revision) return;
         const about = find(parent);
-        setAddMenu({ parent, about, at, source, choices: answer.choices });
+        setAddMenu({ revision, parent, about, at, source, choices: answer.choices });
       },
       () => undefined,
     );
@@ -565,7 +596,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const chooseAdd = (kind: ElementKind) => {
     const menu = addMenu;
     setAddMenu(null);
-    if (menu) void edit((on) => on.add(menu.parent, kind), 'add', menu.parent, menu.about);
+    if (menu) void edit((on) => on.add(menu.parent, kind, menu.revision), 'add', menu.parent, menu.about);
   };
 
   // What Element Properties shows: the core's details of the selected node or
@@ -722,6 +753,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       const command = editShortcut(event);
       if (command) {
         event.preventDefault();
+        if (event.repeat && editing.current > 0) return;
         if (command === 'undo' && history?.canUndo) undo();
         if (command === 'redo' && history?.canRedo) redo();
         return;
