@@ -61,7 +61,7 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 |---|---|---|
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM), from crates.io | external |
 | `af-gsn` | The GSN view of a document: nodes, edges in GSN direction, and a code for each thing it could not draw; the GSN commands, as SACM operations. The reading and writing rules are in `docs/standards/sacm-gsn-mapping.md` | the view, with challenges of elements and of relationships; the commands that add an element, with what may be added where and a code for why not |
-| `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, and the render model | support in rows below, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; the outline the Argument Navigator shows. A relationship that placed no node (a second parent, the edge that closes a cycle) is drawn as a straight line, which can cross nodes |
+| `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, the render model, and the checks of its geometry (`check`) | support in rows below, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; the outline the Argument Navigator shows. A relationship that placed no node (a second parent, the edge that closes a cycle) is drawn as a straight line, which can cross nodes |
 | `af-session` | The open document, a revision per command, a change record of each, and undo and redo as whole-document snapshots | yes; drafts and storage no |
 | `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, undo, redo, history |
 | `af-wasm` | The browser shell: `af-api` compiled to WebAssembly, answering in JSON | yes |
@@ -125,6 +125,8 @@ diagram looks, change `af-layout`, and the canvas follows.
 | The desktop shell builds and opens a sample | `af-desktop --smoke` over a placeholder page | CI, Windows. It does not check the interface |
 | The interface: types, lint, unit tests | `pnpm --dir ui check` | locally only: it needs DATUM |
 | The interface in Chromium, Firefox and WebKit | `pnpm --dir ui e2e` against the production build | locally only: it needs DATUM |
+| Layout geometry on the gallery fixtures: overlaps, lines through nodes, text outside its shape, crossings, size, time | `cargo run --release -p af-layout --example gallery` | locally; its invariants are also layout tests in CI |
+| All of the above against the real application, with screenshots and a report | `pnpm --dir ui verify` | locally only: it needs DATUM |
 
 DATUM is private and never enters CI, so **public CI does not verify the real
 interface**. Interface results are run locally and put in each pull request.
