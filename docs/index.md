@@ -6,12 +6,17 @@ stored as standard SACM 2.3 XMI.
 
 ## Where things stand
 
-Assurance Forge is being rebuilt in Rust. This site describes that work.
+Assurance Forge is being rebuilt in Rust. This site describes that work. The
+rebuild opens a SACM 2.3 file and draws its argument as a GSN diagram, in a
+desktop application and in the browser. Editing has begun: elements can be
+added, with undo and redo; saving comes next.
 
 | You want | Go to |
 |---|---|
 | A tool to use today | The C++ application: [release 0.3.0-alpha.3](https://github.com/lasrod/assurance-forge/releases/tag/0.3.0-alpha.3). Its documentation is on the [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp/docs). |
 | The plan for the rebuild | [Rust rebuild, Phase 0](roadmap/rust-rebuild-phase-0.md) |
+| The step that built the viewer | [Milestone 1, step 1: the diagram](roadmap/milestone-1-diagram.md) |
+| The first editing step | [Milestone 2, step 1: adding elements](roadmap/milestone-2-add-elements.md) |
 | The shape of the new code | [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md) |
 | How GSN is expressed in SACM | [SACM to GSN mapping](standards/sacm-gsn-mapping.md) |
 | What the C++ version can do | [Capability matrix](reference/cpp-capability-matrix.md) |

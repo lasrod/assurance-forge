@@ -8,3 +8,5 @@ src/wasm/
 test-results/
 playwright-report/
 .vite/
+# Reports written by `pnpm verify` (scripts/verify.mjs).
+verification/

@@ -7,11 +7,13 @@ stored as standard SACM 2.3 XMI, so it is never locked into the tool.
 ## Status
 
 **Assurance Forge is being rebuilt in Rust, and `main` is where that happens.**
-There is nothing to run here yet.
+The rebuild opens a SACM 2.3 file and shows its argument as a GSN diagram, in
+a desktop application and in the browser, and elements can be added to it,
+with undo and redo. It does not save yet.
 
 | | |
 |---|---|
-| This branch | The Rust rebuild, in its first phase. See the [plan](docs/roadmap/rust-rebuild-phase-0.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md). |
+| This branch | The Rust rebuild: a viewer, with editing begun. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for what is built and the [plan](docs/roadmap/rust-rebuild-phase-0.md) for what comes. |
 | A tool you can use today | The C++ application: download [release 0.3.0-alpha.3](https://github.com/lasrod/assurance-forge/releases/tag/0.3.0-alpha.3), or read its source and documentation on the [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp). It is alpha software. |
 | Licence | [MIT](LICENSE.md) |
 
@@ -31,8 +33,9 @@ There is nothing to run here yet.
   application, and the same tool as a web application. Either opens a file,
   edits it and saves it, and the case stays on your machine.
 
-The [plan](docs/roadmap/rust-rebuild-phase-0.md) says which of these arrive in
-which release.
+These describe the tool as a whole. The rebuild does the first so far: it reads
+a case and draws it. The [plan](docs/roadmap/rust-rebuild-phase-0.md) says
+which of the rest arrive in which release.
 
 ## How it is built
 
@@ -52,7 +55,10 @@ cd assurance-forge
 cargo test --workspace
 ```
 
-Rust stable is required; `rust-toolchain.toml` selects it.
+Rust stable is required; `rust-toolchain.toml` selects it. The interface in
+`ui/` is built with a design system that is not public, so it cannot be built
+from this repository alone; `CLAUDE.md` lists the commands for those who have
+it.
 
 ## Contributing
 

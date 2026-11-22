@@ -11,15 +11,23 @@
 //! The layout is a layered tree (plan decision D7): SupportedBy children in
 //! the row below their parent, InContextOf attachments in a lane on either
 //! side of it, a challenge beside what it challenges, siblings in document
-//! order. A line bends only in the clear band between two rows or between a
-//! node and its lane.
+//! order. A node supported from more than one parent hangs from one a row
+//! above it, so it is below all of them. Separate trees stand side by side in
+//! shelves, so a case of many is not one long strip. The line of a relationship the tree
+//! placed bends only in the clear band between two rows or between a node and
+//! its lane; every other line (a second parent's, the one that closes a
+//! cycle, a context of two nodes) is routed around the nodes (`route`).
+//! [`check`] measures the result.
 
+pub mod check;
 mod layout;
 mod model;
+mod route;
 mod text;
 
 use std::collections::HashMap;
 
+pub use check::{Report, check};
 pub use layout::{OutlineRow, outline};
 pub use model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,

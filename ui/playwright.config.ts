@@ -4,12 +4,17 @@ import { defineConfig, devices } from '@playwright/test';
 // which adds the test hook (src/testHook.ts) and nothing else.
 export default defineConfig({
   testDir: 'e2e',
+  // Screenshots for review, run by `pnpm verify` (playwright.capture.config.ts).
+  testIgnore: 'capture/**',
   fullyParallel: true,
   // More workers made WebKit on Windows close its browser at page.goto, in a
   // different test each run.
   workers: 4,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:4174' },
+  // A failure keeps its trace, which `pnpm verify` puts in its report. Its
+  // own folder: the capture run empties another.
+  outputDir: 'test-results/e2e',
+  use: { baseURL: 'http://localhost:4174', trace: 'retain-on-failure' },
   // Chromium, Firefox and WebKit (the nearest stand-in for Tauri on macOS and Linux): plan decision D1.
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

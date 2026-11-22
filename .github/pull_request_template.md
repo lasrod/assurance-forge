@@ -17,3 +17,4 @@ what you checked in the running application.
 - [ ] `cargo fmt`, `cargo clippy` and `cargo test --workspace` pass
 - [ ] New or changed behaviour has a test
 - [ ] `ARCHITECTURE.md` is updated if the shape of the code changed
+- [ ] For a change to the interface or the layout: `pnpm --dir ui verify` passed, and its summary and before and after images are here

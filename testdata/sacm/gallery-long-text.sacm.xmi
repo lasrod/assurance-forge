@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gallery fixture: long names, a long statement, an identifier with no break opportunity and a long unbroken token. -->
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_LongText">
+  <name content="LongText" />
+  <argumentPackage xmi:id="argpkg_LongText">
+    <name content="LongTextArgument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="REQ_SYS_BRAKE_CONTROLLER_REDUNDANT_CHANNEL_MONITORING_0001"><name content="RedundantChannelMonitoringDetectsEverySinglePointFaultOfThePrimaryChannel" /><description xmi:id="d_REQ_SYS_BRAKE_CONTROLLER_REDUNDANT_CHANNEL_MONITORING_0001"><content><value lang="en" content="The redundant brake controller channel detects every single-point fault of the primary channel, including stuck-at faults on the wheel speed inputs, corrupted CAN frames, watchdog expiry and loss of supply voltage, and takes over control within the fault tolerant time interval of 50 ms defined in the technical safety concept TSC-BRK-004 revision 7, section 4.3.2." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S_ARGUMENT_OVER_EACH_FAULT_CLASS_IDENTIFIED_IN_THE_FMEDA"><name content="ArgumentOverFaultClasses" /><description xmi:id="d_S_ARGUMENT_OVER_EACH_FAULT_CLASS_IDENTIFIED_IN_THE_FMEDA"><content><value lang="en" content="Argument over each fault class identified in the FMEDA of the primary channel." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G_STUCK"><name content="StuckAtFaultsDetected" /><description xmi:id="d_G_STUCK"><content><value lang="en" content="Stuck-at faults on the wheel speed inputs are detected." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G_CAN"><name content="CorruptedFramesDetected" /><description xmi:id="d_G_CAN"><content><value lang="en" content="Corrupted CAN frames are detected by the end-to-end protection profile." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="C_URL"><name content="Specification" /><description xmi:id="d_C_URL"><content><value lang="en" content="https://example.org/specifications/brake/technical-safety-concept/TSC-BRK-004/revision-7/section-4.3.2" /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn_FAULT_INJECTION_CAMPAIGN_REPORT_FI_2026_0042_FINAL"><name content="FaultInjectionCampaignReportFinal" /><description xmi:id="d_Sn_FAULT_INJECTION_CAMPAIGN_REPORT_FI_2026_0042_FINAL"><content><value lang="en" content="Fault injection campaign report FI-2026-0042, final issue, covering 12 400 injected faults." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn_E2E"><name content="E2eAnalysis" /><description xmi:id="d_Sn_E2E"><content><value lang="en" content="Analysis E2E-3." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="A_SHORT" assertionDeclaration="assumed"><name content="A" /><description xmi:id="d_A_SHORT"><content><value lang="en" content="x" /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i1" source="G_STUCK G_CAN" target="REQ_SYS_BRAKE_CONTROLLER_REDUNDANT_CHANNEL_MONITORING_0001" reasoning="S_ARGUMENT_OVER_EACH_FAULT_CLASS_IDENTIFIED_IN_THE_FMEDA"><name content="i1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x1" source="C_URL" target="REQ_SYS_BRAKE_CONTROLLER_REDUNDANT_CHANNEL_MONITORING_0001"><name content="x1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x2" source="A_SHORT" target="G_STUCK"><name content="x2" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e1" source="Sn_FAULT_INJECTION_CAMPAIGN_REPORT_FI_2026_0042_FINAL" target="G_STUCK"><name content="e1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e2" source="Sn_E2E" target="G_CAN"><name content="e2" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

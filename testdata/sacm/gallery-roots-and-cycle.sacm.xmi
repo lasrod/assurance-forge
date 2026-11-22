@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gallery fixture: two roots, a cycle of three goals reached from one of them, and a goal that supports itself. -->
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_RootsAndCycle">
+  <name content="RootsAndCycle" />
+  <argumentPackage xmi:id="argpkg_RootsAndCycle">
+    <name content="RootsAndCycleArgument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="R1"><name content="FirstRoot" /><description xmi:id="d_R1"><content><value lang="en" content="The first top-level claim." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="R2"><name content="SecondRoot" /><description xmi:id="d_R2"><content><value lang="en" content="A second top-level claim, sharing a premise with the first." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1"><name content="SharedPremise" /><description xmi:id="d_G1"><content><value lang="en" content="A premise both roots rely on." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="Ca"><name content="CycleA" /><description xmi:id="d_Ca"><content><value lang="en" content="A claim that relies on B." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="Cb"><name content="CycleB" /><description xmi:id="d_Cb"><content><value lang="en" content="A claim that relies on C." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="Cc"><name content="CycleC" /><description xmi:id="d_Cc"><content><value lang="en" content="A claim that relies on A, closing the cycle." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="Gs"><name content="SelfSupported" /><description xmi:id="d_Gs"><content><value lang="en" content="A claim that supports itself." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn1"><name content="Evidence" /><description xmi:id="d_Sn1"><content><value lang="en" content="Evidence for the shared premise." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i1" source="G1 Ca" target="R1"><name content="i1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i2" source="G1 Gs" target="R2"><name content="i2" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i3" source="Cb" target="Ca"><name content="i3" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i4" source="Cc" target="Cb"><name content="i4" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i5" source="Ca" target="Cc"><name content="i5" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i6" source="Gs" target="Gs"><name content="i6" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e1" source="Sn1" target="G1"><name content="e1" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

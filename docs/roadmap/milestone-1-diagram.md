@@ -6,6 +6,16 @@ when the last goal is done, what it decided is folded into
 [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md)
 and the mapping record, and this page is removed.
 
+## Where it stands (22 November 2026)
+
+Goals G1 to G9 are built: the reading rules, the view, the layout, the
+contract, the web and desktop applications, the workspace in the C++
+arrangement, drawing, the interaction rows and the desktop smoke test. Open are
+G10, a browser check of the large case against the budgets (the native layout
+budget is an ignored test, run by hand), and G11, folding this page into
+`ARCHITECTURE.md`, which now describes what is built. The tracking issue,
+#493, is the record of each goal.
+
 ## The outcome
 
 Open a SACM 2.3 file in the desktop application or the web application and see
@@ -211,6 +221,35 @@ pnpm --dir ui e2e
 ```
 
 ## What this leaves for the next steps
+
+Found while building the layout gallery and `pnpm --dir ui verify`
+(22 November 2026), each with the fixture or report that shows it:
+
+- **Crossings.** Siblings keep document order, so lines to a shared node
+  can cross (8 pairs in `gallery-shared-support`). Ordering siblings to
+  reduce crossings, without moving branches a user did not touch, is the
+  next layout change.
+- **Wide trees.** The large case's main tree is about 21,000 px wide: a
+  broad tree, not one wide fan. Fit stops at 10%, so the overview cannot
+  show it whole. Wrapping long rows of leaves, or a deeper overview, is
+  open.
+- **Routing cost.** Each routed line's search looks at every node's
+  keep-off zones and every earlier routed run at each step. The large case
+  has one routed line and lays out in about 28 ms, but a case with many
+  second parents across a wide diagram would cost much more. Indexing the
+  zones and runs by position, and a gallery fixture with many routed lines
+  to time it, are open (found in review, 23 November 2026).
+- **Tree labels in narrow panels** break inside a word (DATUM's `Tree`).
+  This belongs to DATUM, not the application.
+- **DATUM's packed tarballs are not byte for byte reproducible**: packing
+  the commit `ui/datum.json` records gives a different `@datum-ui/react`
+  tarball from the one the lockfile was made with, so
+  `pnpm install --frozen-lockfile` fails. `pnpm verify` reports it.
+- **G10 as a check.** `pnpm verify` measures the large case in Chromium
+  (open to first paint about 0.13 s against 1.5 s; panning at the display
+  rate); a browser test with the budgets would keep it.
+- **The desktop application** is built and smoke-tested in CI over a
+  placeholder page; no check drives its real interface.
 
 - Arrow keys on the canvas that move through the argument as the tree does,
   and an accessible item per node. The argument tree itself is in the left

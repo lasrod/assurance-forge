@@ -20,12 +20,17 @@ async function expectCanvasFillsCentre(page: Page) {
 // stacked above the Argument Navigator, Element Properties at the end,
 // Problems at the bottom.
 for (const dock of [
-  { name: 'Element Properties', hide: 'Hide element properties', reopen: 'Element Properties', grows: 'width' as const },
-  { name: 'Problems', hide: 'Hide problems', reopen: 'Show problems', grows: 'height' as const },
+  { name: 'Element Properties', hide: 'Hide element properties', reopen: 'Element Properties', grows: 'width' as const, startsClosed: false },
+  // Problems starts closed while it has no problem list (src/layout.ts).
+  { name: 'Problems', hide: 'Hide problems', reopen: 'Show problems', grows: 'height' as const, startsClosed: true },
 ]) {
   test(`the ${dock.name} dock closes and reopens, and the canvas fills the centre`, async ({ page }) => {
     await opened(page);
     const region = page.getByRole('region', { name: dock.name });
+    if (dock.startsClosed) {
+      await expect(region).toBeHidden();
+      await page.getByRole('button', { name: dock.reopen, exact: true }).click();
+    }
     await expect(region).toBeVisible();
     const before = await expectCanvasFillsCentre(page);
 
@@ -89,7 +94,23 @@ test('at the medium width the side panels are tabs in one dock, and the canvas f
   await expectCanvasFillsCentre(page);
 });
 
+test('the Problems panel starts closed with its rail showing, and stays open once opened', async ({ page }) => {
+  await opened(page);
+  const problems = page.getByRole('region', { name: 'Problems' });
+  await expect(problems).toBeHidden();
+  await page.getByRole('button', { name: 'Show problems', exact: true }).click();
+  await expect(problems).toBeVisible();
+  await expectCanvasFillsCentre(page);
+  // The layout is kept: the user's choice holds after a reload.
+  await opened(page);
+  await expect(problems).toBeVisible();
+});
+
 test('the panels carry the C++ application\'s names, in Japanese too', async ({ page }) => {
+  // Every panel open, Problems too, so each shows its title.
+  await page.addInitScript(() =>
+    localStorage.setItem('assurance-forge.workspace.v3', JSON.stringify({ open: { start: true, end: true, bottom: true }, size: {} })),
+  );
   await opened(page, '&lang=ja');
   for (const title of ['ケースエクスプローラー', '論証ナビゲーター', '要素プロパティ', '問題']) {
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();

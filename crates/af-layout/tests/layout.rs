@@ -6,17 +6,23 @@
 use af_gsn::view::{EdgeKind, NodeKind, View, view};
 use af_layout::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, Engine, Font, Fonts, LineStyle,
-    Placement, Point, Style, TextRole, Weight,
+    Placement, Point, Style, TextRole, Weight, check,
 };
 use sacm::xmi::{self, Mode, ReadOptions};
 
-const SAMPLES: [&str; 6] = [
+const SAMPLES: [&str; 11] = [
     "challenges.sacm.xmi",
     "sacm_example_core_argument.sacm.xmi",
     "sample.sacm.xmi",
     "open-autonomy-safety-case.updated.v2.sacm.xmi",
     "oasc-ja.sacm.xmi",
     "safety-case-sanitized-strict.sacm.xmi",
+    // The layout gallery (testdata/sacm/README.md).
+    "gallery-shared-support.sacm.xmi",
+    "gallery-attachments.sacm.xmi",
+    "gallery-long-text.sacm.xmi",
+    "gallery-japanese.sacm.xmi",
+    "gallery-roots-and-cycle.sacm.xmi",
 ];
 
 fn testdata(path: &str) -> Vec<u8> {
@@ -714,33 +720,20 @@ fn element(kind: &str, id: &str, attributes: &str) -> String {
 }
 
 #[test]
-fn a_line_the_layout_placed_crosses_no_node() {
+fn no_line_crosses_a_node() {
+    // Every line, also those that placed nothing: a second parent's, a
+    // cycle's closing line, a context of two nodes. The check itself is
+    // shown to see such a line in `the_geometry_check_finds_each_defect_made_by_hand`.
     for name in SAMPLES {
-        let diagram = engine().layout(&sample_view(name, "en"));
-        for edge in &diagram.edges {
-            if edge.placement == Placement::None {
-                continue;
-            }
-            let points = along(edge);
-            for other in &diagram.nodes {
-                if other.id == edge.from || (!edge.to_relationship && other.id == edge.to) {
-                    continue;
-                }
-                assert!(
-                    !points.iter().any(|point| well_inside(other, *point)),
-                    "{name}: {} crosses {}",
-                    edge.relationship,
-                    other.id
-                );
-            }
-        }
+        let report = check(&engine().layout(&sample_view(name, "en")));
+        assert_eq!(report.edge_node_intersections, [], "{name}");
     }
 }
 
 #[test]
-fn the_crossing_check_sees_a_line_through_a_node() {
-    // The check above passes only if it can fail: an edge that placed
-    // nothing runs straight, here through the node between its ends.
+fn a_line_that_closes_a_cycle_goes_around_the_nodes_and_keeps_its_direction() {
+    // a <- b <- c <- a: the search from a meets a again at c's line, which
+    // places nothing. It is drawn, from c to a, and not through b.
     let diagram = engine().layout(&case_view(
         &[
             element("Claim", "a", ""),
@@ -752,14 +745,83 @@ fn the_crossing_check_sees_a_line_through_a_node() {
         ]
         .concat(),
     ));
-    let straight = first_edge(&diagram, "i3");
-    assert_eq!(straight.placement, Placement::None);
+    let closing = first_edge(&diagram, "i3");
+    assert_eq!(closing.placement, Placement::None);
+    assert_eq!((closing.from.as_str(), closing.to.as_str()), ("c", "a"));
+    assert!(
+        node(&diagram, "c")
+            .shape
+            .outline_distance(closing.points[0])
+            < 0.05
+    );
+    assert!(node(&diagram, "a").shape.outline_distance(closing.head[0]) < 0.05);
     let between = node(&diagram, "b");
     assert!(
-        along(straight)
+        !along(closing)
             .iter()
             .any(|point| well_inside(between, *point))
     );
+    // The line runs across and down only, its corners rounded.
+    assert!(closing.points.len() > 2);
+}
+
+#[test]
+fn a_node_supported_from_two_rows_hangs_below_the_lower() {
+    // Sn3 supports G2 directly and through G5, a row lower. It sits below
+    // G5, so every line of support into it runs down.
+    let diagram = engine().layout(&sample_view("gallery-shared-support.sacm.xmi", "en"));
+    let (g2, g5, sn3) = (
+        node(&diagram, "G2"),
+        node(&diagram, "G5"),
+        node(&diagram, "Sn3"),
+    );
+    assert!(g5.bounds.y >= g2.bounds.bottom());
+    assert!(sn3.bounds.y >= g5.bounds.bottom());
+    let from = |parent: &str| {
+        diagram
+            .edges
+            .iter()
+            .find(|edge| edge.from == parent && edge.to == "Sn3")
+            .unwrap_or_else(|| panic!("no line {parent} to Sn3"))
+    };
+    assert_eq!(from("G5").placement, Placement::Below);
+    assert_eq!(from("G2").placement, Placement::None);
+    // Both are support, in GSN direction, ending on Sn3.
+    for parent in ["G2", "G5"] {
+        let edge = from(parent);
+        assert_eq!(edge.kind, EdgeKind::SupportedBy);
+        assert_eq!(edge.arrowhead, Arrowhead::Filled);
+        assert!(sn3.shape.outline_distance(edge.head[0]) < 0.05);
+    }
+    // The outline agrees with the picture: Sn3 under G5.
+    let view = sample_view("gallery-shared-support.sacm.xmi", "en");
+    let rows = af_layout::outline(&view);
+    let at = |id: &str| {
+        rows.iter()
+            .position(|row| view.nodes[row.node].id == id)
+            .unwrap_or_else(|| panic!("{id} not in the outline"))
+    };
+    assert_eq!(rows[at("Sn3")].level, rows[at("G5")].level + 1);
+    assert!(at("G5") < at("Sn3"));
+}
+
+#[test]
+fn two_lines_into_one_node_enter_apart() {
+    // Sn2 is supported by G4 (which places it), G6 and G3: three arrowheads,
+    // none on another.
+    let diagram = engine().layout(&sample_view("gallery-shared-support.sacm.xmi", "en"));
+    let tips: Vec<Point> = diagram
+        .edges
+        .iter()
+        .filter(|edge| edge.to == "Sn2")
+        .map(|edge| edge.head[0])
+        .collect();
+    assert_eq!(tips.len(), 3);
+    for (i, a) in tips.iter().enumerate() {
+        for b in &tips[i + 1..] {
+            assert!((a.x - b.x).hypot(a.y - b.y) > 12.0, "{a:?} and {b:?}");
+        }
+    }
 }
 
 #[test]
@@ -958,4 +1020,277 @@ fn an_assumption_reached_by_support_still_sits_beside_its_goal() {
     assert_eq!(edge.arrowhead, Arrowhead::Filled);
     // The evidence is still below.
     assert!(node(&diagram, "ev_1").bounds.y >= goal.bounds.bottom());
+}
+
+// ===== The geometry check =====
+
+#[test]
+fn the_geometry_check_passes_every_sample_on_overlap_and_text() {
+    for name in SAMPLES {
+        let language = if name.contains("ja") { "ja" } else { "en" };
+        let report = check(&engine().layout(&sample_view(name, language)));
+        assert_eq!(report.node_overlaps, [], "{name}");
+        assert_eq!(report.text_escapes, [], "{name}");
+    }
+}
+
+/// The check judges geometry, so it is shown wrong geometry: a valid layout
+/// broken by hand in each way it must find. A check that cannot fail checks
+/// nothing.
+#[test]
+fn the_geometry_check_finds_each_defect_made_by_hand() {
+    let valid = engine().layout(&sample_view("sacm_example_core_argument.sacm.xmi", "en"));
+    let report = check(&valid);
+    assert!(report.is_valid(), "{report:?}");
+    assert_eq!(report.edge_crossings, 0);
+    assert_eq!((report.nodes, report.edges), (8, 7));
+
+    // A node moved onto another.
+    let mut overlapping = valid.clone();
+    let on = node(&overlapping, "cl_sub_2").bounds;
+    let moved = overlapping
+        .nodes
+        .iter_mut()
+        .find(|node| node.id == "ev_1")
+        .map(|node| node.bounds = on);
+    assert!(moved.is_some());
+    let report = check(&overlapping);
+    assert!(!report.is_valid());
+    assert!(
+        report
+            .node_overlaps
+            .iter()
+            .any(|(a, b)| [a.as_str(), b.as_str()].contains(&"ev_1")
+                && [a.as_str(), b.as_str()].contains(&"cl_sub_2")),
+        "{report:?}"
+    );
+
+    // A line from cl_top to ar_1 sent through ev_1, which it does not join.
+    let mut through = valid.clone();
+    let detour = node(&through, "ev_1").shape.rect.centre();
+    let edge = through
+        .edges
+        .iter_mut()
+        .find(|edge| edge.from == "cl_top" && edge.to == "ar_1");
+    let Some(edge) = edge else {
+        panic!("no edge cl_top to ar_1")
+    };
+    let start = edge.points[0];
+    edge.points = vec![start, detour, edge.head[0]];
+    edge.bounds = af_layout::Rect {
+        x: -1e4,
+        y: -1e4,
+        width: 2e4,
+        height: 2e4,
+    };
+    let report = check(&through);
+    assert!(!report.is_valid());
+    assert!(
+        report
+            .edge_node_intersections
+            .iter()
+            .any(|i| i.node == "ev_1"),
+        "{report:?}"
+    );
+    // Its own ends are not counted.
+    assert!(
+        !report
+            .edge_node_intersections
+            .iter()
+            .any(|i| i.node == "cl_top" || i.node == "ar_1"),
+        "{report:?}"
+    );
+
+    // A line of text pushed out of its node.
+    let mut escaping = valid.clone();
+    escaping.nodes[0].text[0].x += 400.0;
+    let report = check(&escaping);
+    assert_eq!(report.text_escapes.len(), 1, "{report:?}");
+    assert_eq!(report.text_escapes[0].node, escaping.nodes[0].id);
+
+    // Two lines across each other: counted, not a defect.
+    let mut crossing = valid.clone();
+    let (a, b) = (Point { x: 0.0, y: 0.0 }, Point { x: 100.0, y: 100.0 });
+    let (c, d) = (Point { x: 0.0, y: 100.0 }, Point { x: 100.0, y: 0.0 });
+    let whole = af_layout::Rect {
+        x: 0.0,
+        y: 0.0,
+        width: 100.0,
+        height: 100.0,
+    };
+    for (edge, (from, to)) in crossing.edges.iter_mut().zip([(a, b), (c, d)]) {
+        edge.points = vec![from];
+        edge.head[0] = to;
+        edge.bounds = whole;
+    }
+    let report = check(&crossing);
+    assert_eq!(report.edge_crossings, 1, "{report:?}");
+    // Lines that only meet at an end do not cross.
+    let mut touching = crossing.clone();
+    touching.edges[1].points = vec![b];
+    touching.edges[1].head[0] = Point { x: 200.0, y: 0.0 };
+    assert_eq!(check(&touching).edge_crossings, 0);
+}
+
+#[test]
+fn a_neutral_link_does_not_take_a_node_from_its_support() {
+    // X is supported by the root G1, and reached neutral (a defeated
+    // inference) from G2 under G1. The support places X, in G2's row; the
+    // neutral line is routed to it.
+    let diagram = engine().layout(&case_view(
+        &[
+            element("Claim", "g1", ""),
+            element("Claim", "g2", ""),
+            element("Claim", "x", ""),
+            element("AssertedInference", "i2", r#" source="g2" target="g1""#),
+            element("AssertedInference", "i1", r#" source="x" target="g1""#),
+            element(
+                "AssertedInference",
+                "i3",
+                r#" source="x" target="g2" assertionDeclaration="defeated""#,
+            ),
+        ]
+        .concat(),
+    ));
+    assert_eq!(first_edge(&diagram, "i1").placement, Placement::Below);
+    assert_eq!(first_edge(&diagram, "i3").kind, EdgeKind::Neutral);
+    assert_ne!(first_edge(&diagram, "i3").placement, Placement::Below);
+    let (x, g2) = (node(&diagram, "x"), node(&diagram, "g2"));
+    assert!(
+        (x.shape.rect.y - g2.shape.rect.y).abs() < 0.01,
+        "x is in g2's row"
+    );
+}
+
+#[test]
+fn five_lines_into_one_node_enter_apart() {
+    // X is supported by five goals in a row: one places it, and four lines
+    // come into its top from one side. No arrowhead is on another.
+    let mut body = vec![element("Claim", "r", ""), element("Claim", "x", "")];
+    for n in 1..=5 {
+        body.push(element("Claim", &format!("g{n}"), ""));
+        body.push(element(
+            "AssertedInference",
+            &format!("r{n}"),
+            &format!(r#" source="g{n}" target="r""#),
+        ));
+    }
+    for n in 1..=5 {
+        body.push(element(
+            "AssertedInference",
+            &format!("x{n}"),
+            &format!(r#" source="x" target="g{n}""#),
+        ));
+    }
+    let diagram = engine().layout(&case_view(&body.concat()));
+    let tips: Vec<Point> = diagram
+        .edges
+        .iter()
+        .filter(|edge| edge.to == "x")
+        .map(|edge| edge.head[0])
+        .collect();
+    assert_eq!(tips.len(), 5);
+    for (i, a) in tips.iter().enumerate() {
+        for b in &tips[i + 1..] {
+            assert!((a.x - b.x).hypot(a.y - b.y) > 8.0, "{a:?} and {b:?}");
+        }
+    }
+}
+
+/// How far two straight runs lie along each other, on the same line: both
+/// across or both down, within 2 px, and overlapping.
+fn run_along(a: (Point, Point), b: (Point, Point)) -> f32 {
+    let across = |p: (Point, Point)| (p.0.y - p.1.y).abs() < 0.5;
+    let down = |p: (Point, Point)| (p.0.x - p.1.x).abs() < 0.5;
+    let overlap = |lo: f32, hi: f32, rlo: f32, rhi: f32| (hi.min(rhi) - lo.max(rlo)).max(0.0);
+    if across(a) && across(b) && (a.0.y - b.0.y).abs() < 2.0 {
+        overlap(
+            a.0.x.min(a.1.x),
+            a.0.x.max(a.1.x),
+            b.0.x.min(b.1.x),
+            b.0.x.max(b.1.x),
+        )
+    } else if down(a) && down(b) && (a.0.x - b.0.x).abs() < 2.0 {
+        overlap(
+            a.0.y.min(a.1.y),
+            a.0.y.max(a.1.y),
+            b.0.y.min(b.1.y),
+            b.0.y.max(b.1.y),
+        )
+    } else {
+        0.0
+    }
+}
+
+/// A guard: no sample has shown a routed line along a placed one (the
+/// router's penalties keep them apart), and it passed before the router was
+/// given the placed lines too.
+#[test]
+fn a_routed_line_does_not_run_along_a_placed_line_of_another_node() {
+    for name in SAMPLES {
+        let diagram = engine().layout(&sample_view(name, "en"));
+        let runs = |edge: &DiagramEdge| -> Vec<(Point, Point)> {
+            edge.points
+                .windows(2)
+                .map(|pair| (pair[0], pair[1]))
+                .collect()
+        };
+        for routed in diagram
+            .edges
+            .iter()
+            .filter(|edge| edge.placement == Placement::None)
+        {
+            for placed in diagram
+                .edges
+                .iter()
+                .filter(|edge| edge.placement != Placement::None && edge.from != routed.from)
+            {
+                for a in runs(routed) {
+                    for b in runs(placed) {
+                        let length = run_along(a, b);
+                        assert!(
+                            length < 24.0,
+                            "{name}: {} runs {length} px along {}",
+                            routed.relationship,
+                            placed.relationship
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ===== Many trees =====
+
+#[test]
+fn many_trees_are_packed_in_shelves_in_their_order() {
+    // Forty goals that nothing joins: forty trees. In one row they would be
+    // over 11 000 px wide.
+    let body: String = (0..40)
+        .map(|i| element("Claim", &format!("g{i:02}"), ""))
+        .collect();
+    let diagram = engine().layout(&case_view(&body));
+    assert!(diagram.bounds.width < 3600.0, "{:?}", diagram.bounds);
+    assert!(diagram.bounds.height > 2.0 * 48.0);
+    // In their order: along a shelf, then the next shelf below.
+    let centres: Vec<Point> = (0..40)
+        .map(|i| node(&diagram, &format!("g{i:02}")).shape.rect.centre())
+        .collect();
+    for pair in centres.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        assert!(
+            (b.x > a.x && (b.y - a.y).abs() < 0.5) || b.y > a.y,
+            "{a:?} then {b:?}"
+        );
+    }
+    assert!(check(&diagram).is_valid());
+}
+
+#[test]
+fn a_few_trees_stay_in_one_row() {
+    let diagram = engine().layout(&sample_view("gallery-roots-and-cycle.sacm.xmi", "en"));
+    let (r1, r2) = (node(&diagram, "R1"), node(&diagram, "R2"));
+    assert!((r1.shape.rect.centre().y - r2.shape.rect.centre().y).abs() < 0.5);
+    assert!(r2.bounds.x > r1.bounds.right());
 }

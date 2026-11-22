@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gallery fixture: a goal and two solutions each supporting more than one parent, at different depths; Sn3 supports G2 directly and through G5. -->
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_SharedSupport">
+  <name content="SharedSupport" />
+  <argumentPackage xmi:id="argpkg_SharedSupport">
+    <name content="SharedSupportArgument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1"><name content="SystemSafe" /><description xmi:id="d_G1"><content><value lang="en" content="The brake system is acceptably safe for public road use." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1"><name content="OverHazards" /><description xmi:id="d_S1"><content><value lang="en" content="Argument over each identified hazard." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G2"><name content="NoUnintendedBraking" /><description xmi:id="d_G2"><content><value lang="en" content="Unintended braking is acceptably unlikely." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3"><name content="NoLossOfBraking" /><description xmi:id="d_G3"><content><value lang="en" content="Loss of braking is acceptably unlikely." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G4"><name content="ControllerCorrect" /><description xmi:id="d_G4"><content><value lang="en" content="The brake controller software meets its requirements." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G5"><name content="SensorsAdequate" /><description xmi:id="d_G5"><content><value lang="en" content="Wheel speed sensing is adequate for brake control." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G6"><name content="RedundancyWorks" /><description xmi:id="d_G6"><content><value lang="en" content="The redundant channel takes over within 50 ms." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn1"><name content="UnitTests" /><description xmi:id="d_Sn1"><content><value lang="en" content="Controller unit test report UT-41." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn2"><name content="HilCampaign" /><description xmi:id="d_Sn2"><content><value lang="en" content="Hardware-in-the-loop campaign HIL-7." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn3"><name content="FmeaReport" /><description xmi:id="d_Sn3"><content><value lang="en" content="Sensor FMEA, revision C." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i1" source="G2 G3" target="G1" reasoning="S1"><name content="i1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i2" source="G4 G5" target="G2"><name content="i2" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i3" source="G4 G6" target="G3"><name content="i3" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e1" source="Sn1" target="G4"><name content="e1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e2" source="Sn2" target="G4"><name content="e2" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e3" source="Sn3" target="G5"><name content="e3" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e4" source="Sn2" target="G6"><name content="e4" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e5" source="Sn2" target="G3"><name content="e5" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e6" source="Sn3" target="G2"><name content="e6" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

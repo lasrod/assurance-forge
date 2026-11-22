@@ -1,9 +1,19 @@
-//! Sizing nodes and placing them as a layered tree (plan decision D7).
+//! Sizing nodes and placing them as a layered tree (plan decision D7), then
+//! drawing a line for every relationship.
+//!
+//! The stages: size each node from its text; classify each relationship
+//! (support below, context and challenges beside); break cycles and give each
+//! node a level, the longest chain of support above it (`deepest_parents`);
+//! build the spanning tree from those, each node under a parent a row above
+//! it; place the tree; draw the lines the tree placed in their bands and
+//! lanes, and route every other line around the nodes (`route.rs`). Nothing
+//! is dropped or turned round: a relationship left out of the tree is still
+//! drawn, from its source to its target.
 //!
 //! Spacing and placement follow the C++ application's `gsn_layout.cpp` where
 //! they fit; it is a reference, not code that was ported.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::f32::consts::SQRT_2;
 
 use af_gsn::view::{EdgeKind, Node, NodeKind, View};
@@ -12,6 +22,7 @@ use crate::model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
     Shape, ShapeKind, TextLine, TextRole,
 };
+use crate::route::{self, Dir, Port, Run};
 use crate::text::{Font, Line, Shaper};
 use crate::{Cache, Style};
 
@@ -41,6 +52,13 @@ const DIAMOND: f32 = 8.0;
 const H_GAP: f32 = 40.0;
 /// Between rows.
 const V_GAP: f32 = 64.0;
+/// Between shelves of trees.
+const SHELF_GAP: f32 = 2.0 * V_GAP;
+/// A shelf of trees is never narrower than this, so a case of a few trees
+/// keeps them in one row.
+const SHELF_WIDTH: f32 = 3000.0;
+/// The width to height a case of many trees is packed towards: a screen's.
+const SHELF_ASPECT: f32 = 1.6;
 /// Between a node and the lane beside it.
 const SIDE_GAP: f32 = 40.0;
 /// The same, when a line that crosses it is challenged: room for the
@@ -53,7 +71,10 @@ const NECK_GAP: f32 = 24.0;
 /// How far from a node's corner a line to its lane leaves its side.
 const LANE_PAD: f32 = 12.0;
 /// The straight run a bent line ends with: the arrowhead and a little more.
-const ARROW_RUN: f32 = ARROW_LENGTH + 2.0;
+pub(crate) const ARROW_RUN: f32 = ARROW_LENGTH + 2.0;
+/// Half the width of the column under and over a node's middle that a routed
+/// line keeps out of.
+const COLUMN: f32 = 24.0;
 /// The segments a curve is drawn as.
 const CURVE_STEPS: usize = 12;
 /// Around the whole diagram.
@@ -653,6 +674,19 @@ impl Tree {
                 }
             }
         }
+        // A node supported from more than one parent hangs from one a row
+        // above it, so it sits below every node it supports. The lines from
+        // its other parents are drawn all the same, routed around the nodes.
+        let neutral: Vec<bool> = links
+            .iter()
+            .map(|link| kind(link) == EdgeKind::Neutral)
+            .collect();
+        let preferred = deepest_parents(count, &candidates, &neutral);
+        for list in &mut candidates {
+            list.retain(|&(child, link, want)| {
+                !matches!(want, Want::Below) || preferred[child] == Some(link)
+            });
+        }
         let mut has_incoming = vec![false; count];
         for (child, _, _) in candidates.iter().flatten() {
             has_incoming[*child] = true;
@@ -755,6 +789,114 @@ impl Tree {
     }
 }
 
+/// For each node, the support link it hangs from: one from a parent a level
+/// above it, the first in link order. A level is the longest chain of
+/// support down from a node nothing supports. A cycle is broken where a
+/// search depth first, from those nodes and then the rest in order, first
+/// comes back to a node it is still inside: that link joins no level, and
+/// places nothing, but it is still drawn.
+///
+/// A link drawn neutral (`neutral`, by link) counts only for a node that no
+/// live support or context reaches: it places only what nothing else has,
+/// so it neither sets a node's level nor takes it from its real parent.
+fn deepest_parents(
+    count: usize,
+    candidates: &[Vec<(usize, usize, Want)>],
+    neutral: &[bool],
+) -> Vec<Option<usize>> {
+    let mut live = vec![false; count];
+    for &(child, link, want) in candidates.iter().flatten() {
+        if matches!(want, Want::Below) && !neutral[link] {
+            live[child] = true;
+        }
+    }
+    let below: Vec<Vec<(usize, usize)>> = candidates
+        .iter()
+        .map(|list| {
+            list.iter()
+                .filter(|&&(child, link, want)| {
+                    matches!(want, Want::Below) && !(neutral[link] && live[child])
+                })
+                .map(|&(child, link, _)| (child, link))
+                .collect()
+        })
+        .collect();
+    let mut supported = vec![false; count];
+    for &(child, _) in below.iter().flatten() {
+        supported[child] = true;
+    }
+
+    #[derive(Clone, Copy, PartialEq)]
+    enum Seen {
+        Not,
+        Inside,
+        Done,
+    }
+    let mut seen = vec![Seen::Not; count];
+    let mut back = HashSet::new();
+    let starts = (0..count).filter(|&n| !supported[n]).chain(0..count);
+    for start in starts {
+        if seen[start] != Seen::Not {
+            continue;
+        }
+        seen[start] = Seen::Inside;
+        let mut stack = vec![(start, 0usize)];
+        while let Some(top) = stack.last_mut() {
+            let node = top.0;
+            let Some(&(child, link)) = below[node].get(top.1) else {
+                seen[node] = Seen::Done;
+                stack.pop();
+                continue;
+            };
+            top.1 += 1;
+            match seen[child] {
+                Seen::Not => {
+                    seen[child] = Seen::Inside;
+                    stack.push((child, 0));
+                }
+                Seen::Inside => {
+                    back.insert(link);
+                }
+                Seen::Done => {}
+            }
+        }
+    }
+
+    let mut waiting = vec![0usize; count];
+    for &(child, link) in below.iter().flatten() {
+        if !back.contains(&link) {
+            waiting[child] += 1;
+        }
+    }
+    let mut level = vec![0usize; count];
+    let mut ready: VecDeque<usize> = (0..count).filter(|&n| waiting[n] == 0).collect();
+    while let Some(node) = ready.pop_front() {
+        for &(child, link) in &below[node] {
+            if back.contains(&link) {
+                continue;
+            }
+            level[child] = level[child].max(level[node] + 1);
+            waiting[child] -= 1;
+            if waiting[child] == 0 {
+                ready.push_back(child);
+            }
+        }
+    }
+
+    let mut preferred: Vec<Option<usize>> = vec![None; count];
+    for (parent, list) in below.iter().enumerate() {
+        for &(child, link) in list {
+            if back.contains(&link) || level[parent] + 1 != level[child] {
+                continue;
+            }
+            if preferred[child].is_none_or(|first| link < first) {
+                preferred[child] = Some(link);
+            }
+        }
+    }
+    preferred
+}
+
 // ===== Placing =====
 
 /// How far something reaches from a node's centre.
@@ -793,12 +935,14 @@ fn place(tree: &Tree, sized: &[Sized]) -> Placed {
         sides.flatten().chain(&tree.below[n]).copied()
     };
 
-    // Parents before children.
+    // Parents before children, and the root each node's tree grows from.
     let mut order = Vec::with_capacity(count);
-    for &root in &tree.roots {
+    let mut tree_of = vec![0usize; count];
+    for (t, &root) in tree.roots.iter().enumerate() {
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
             order.push(node);
+            tree_of[node] = t;
             stack.extend(children(node));
         }
     }
@@ -921,53 +1065,98 @@ fn place(tree: &Tree, sized: &[Sized]) -> Placed {
         reach[node] = all;
     }
 
-    // The rows that line up across the diagram: each as tall as its tallest
-    // node with what is beside it.
-    let rows = tree
-        .level
+    // The roots' trees side by side, in shelves: a case of many trees would
+    // otherwise be one strip, too wide to see whole. A shelf is about as wide
+    // as the trees' area at a screen's proportions, never narrower than the
+    // widest tree or than `SHELF_WIDTH`, so a few trees stay in one row. The
+    // roots keep their order, left to right and then down.
+    let widths: Vec<f32> = tree
+        .roots
         .iter()
-        .flatten()
-        .max()
-        .map_or(0, |level| level + 1);
-    let mut row_up = vec![0.0f32; rows];
-    let mut row_down = vec![0.0f32; rows];
-    for (node, level) in tree.level.iter().enumerate() {
-        if let Some(level) = *level {
-            row_up[level] = row_up[level].max(reach[node].up);
-            row_down[level] = row_down[level].max(cluster_down[node]);
+        .map(|&root| reach[root].left + reach[root].right)
+        .collect();
+    let area: f32 = tree
+        .roots
+        .iter()
+        .zip(&widths)
+        .map(|(&root, width)| (width + H_GAP) * (reach[root].up + reach[root].down + V_GAP))
+        .sum();
+    let widest = widths.iter().copied().fold(0.0, f32::max);
+    let limit = widest.max((area * SHELF_ASPECT).sqrt()).max(SHELF_WIDTH);
+    let mut shelves: Vec<Vec<usize>> = Vec::new();
+    let mut used = f32::INFINITY;
+    for (t, width) in widths.iter().enumerate() {
+        if used + H_GAP + width > limit {
+            shelves.push(Vec::new());
+            used = -H_GAP;
+        }
+        used += H_GAP + width;
+        if let Some(shelf) = shelves.last_mut() {
+            shelf.push(t);
         }
     }
-    let mut row_y = vec![0.0f32; rows];
-    let mut top = MARGIN;
-    for level in 0..rows {
-        row_y[level] = top + row_up[level];
-        top = row_y[level] + row_down[level] + V_GAP;
+    let mut shelf_of = vec![0usize; tree.roots.len()];
+    for (s, shelf) in shelves.iter().enumerate() {
+        for &t in shelf {
+            shelf_of[t] = s;
+        }
     }
 
     let mut centres = vec![Point { x: 0.0, y: 0.0 }; count];
     let mut band_top = vec![0.0f32; count];
-    let mut x = MARGIN;
-    for &root in &tree.roots {
-        centres[root] = Point {
-            x: x + reach[root].left,
-            y: 0.0,
-        };
-        x += reach[root].left + reach[root].right + H_GAP;
-    }
-    for &node in &order {
-        if let Some((parent, _, _)) = tree.parent[node] {
-            centres[node] = Point {
-                x: centres[parent].x + offset[node].x,
-                y: centres[parent].y + offset[node].y,
-            };
-        }
-        match tree.level[node] {
-            Some(level) => {
-                centres[node].y = row_y[level];
-                band_top[node] = row_y[level] + row_down[level];
+    let mut top = MARGIN;
+    for (s, shelf) in shelves.iter().enumerate() {
+        let mine = |node: &usize| shelf_of[tree_of[*node]] == s;
+        // The rows that line up across the shelf: each as tall as its
+        // tallest node with what is beside it.
+        let rows = order
+            .iter()
+            .filter(|node| mine(node))
+            .filter_map(|&node| tree.level[node])
+            .max()
+            .map_or(0, |level| level + 1);
+        let mut row_up = vec![0.0f32; rows];
+        let mut row_down = vec![0.0f32; rows];
+        for &node in order.iter().filter(|node| mine(node)) {
+            if let Some(level) = tree.level[node] {
+                row_up[level] = row_up[level].max(reach[node].up);
+                row_down[level] = row_down[level].max(cluster_down[node]);
             }
-            None => band_top[node] = centres[node].y + cluster_down[node],
         }
+        let mut row_y = vec![0.0f32; rows];
+        let mut y = top;
+        for level in 0..rows {
+            row_y[level] = y + row_up[level];
+            y = row_y[level] + row_down[level] + V_GAP;
+        }
+
+        let mut x = MARGIN;
+        for &t in shelf {
+            let root = tree.roots[t];
+            centres[root] = Point {
+                x: x + reach[root].left,
+                y: 0.0,
+            };
+            x += widths[t] + H_GAP;
+        }
+        let mut bottom = top;
+        for &node in order.iter().filter(|node| mine(node)) {
+            if let Some((parent, _, _)) = tree.parent[node] {
+                centres[node] = Point {
+                    x: centres[parent].x + offset[node].x,
+                    y: centres[parent].y + offset[node].y,
+                };
+            }
+            match tree.level[node] {
+                Some(level) => {
+                    centres[node].y = row_y[level];
+                    band_top[node] = row_y[level] + row_down[level];
+                }
+                None => band_top[node] = centres[node].y + cluster_down[node],
+            }
+            bottom = bottom.max(centres[node].y + own(node).down);
+        }
+        top = bottom + SHELF_GAP;
     }
     Placed { centres, band_top }
 }
@@ -1003,6 +1192,11 @@ enum Route {
     Elbow { from: usize, anchor: usize },
     /// Straight, for an edge that placed nothing.
     Straight,
+}
+
+/// Whether the tree placed the line: everything but a line it left to route.
+fn placed(route: Route) -> bool {
+    !matches!(route, Route::Straight)
 }
 
 fn route(view: &View, links: &[Link], tree: &Tree, i: usize) -> Route {
@@ -1175,6 +1369,66 @@ fn straight_path(from: &DiagramNode, aim: Point) -> Vec<Point> {
     ]
 }
 
+/// The ports a routed line may leave `from` by and enter `to` by, for an
+/// edge of `kind`: support leaves below and enters above, context leaves and
+/// enters a side, a challenge any side. Each port has a cost, so the router
+/// takes the usual one unless it is blocked or much longer. A line that
+/// enters the top of a node another line already enters there is moved
+/// aside, so the two arrowheads stay apart.
+fn ports(
+    kind: EdgeKind,
+    from: &DiagramNode,
+    to: &DiagramNode,
+    tops: &mut HashMap<String, [usize; 2]>,
+) -> (Vec<Port>, Vec<Port>) {
+    let port = |node: &DiagramNode, out: Dir, offset: f32, cost: f32| {
+        route::port(&node.shape, node.bounds, out, offset, cost)
+    };
+    let sides = |node: &DiagramNode, cost: f32| {
+        [
+            port(node, Dir::Left, 0.0, cost),
+            port(node, Dir::Right, 0.0, cost),
+        ]
+    };
+    match kind {
+        EdgeKind::SupportedBy | EdgeKind::Neutral => {
+            // Beside the middle of the top, on the side the line comes from.
+            let right = from.shape.rect.centre().x >= to.shape.rect.centre().x;
+            let used = tops.entry(to.id.clone()).or_insert([0, 0]);
+            let n = used[usize::from(right)];
+            used[usize::from(right)] += 1;
+            // Seven points on each side, the first three as before, so that
+            // an arrowhead lands on another only past seven lines.
+            let offset = [0.28, 0.4, 0.16, 0.46, 0.34, 0.22, 0.1][n % 7] * to.shape.rect.width;
+            let offset = if right { offset } else { -offset };
+            let mut starts = vec![port(from, Dir::Down, 0.0, 0.0)];
+            starts.extend(sides(from, 160.0));
+            let mut ends = vec![port(to, Dir::Up, offset, 0.0)];
+            ends.extend(sides(to, 80.0));
+            ends.push(port(to, Dir::Down, 0.0, 200.0));
+            (starts, ends)
+        }
+        EdgeKind::InContextOf => {
+            let mut starts = sides(from, 0.0).to_vec();
+            starts.push(port(from, Dir::Down, 0.0, 60.0));
+            let mut ends = sides(to, 0.0).to_vec();
+            ends.extend([port(to, Dir::Up, 0.0, 40.0), port(to, Dir::Down, 0.0, 40.0)]);
+            (starts, ends)
+        }
+        EdgeKind::Challenge => {
+            let all = |node: &DiagramNode| {
+                let mut all = sides(node, 0.0).to_vec();
+                all.extend([
+                    port(node, Dir::Up, 0.0, 20.0),
+                    port(node, Dir::Down, 0.0, 20.0),
+                ]);
+                all
+            };
+            (all(from), all(to))
+        }
+    }
+}
+
 /// Every link's line, from where it leaves its `from` node to its tip.
 fn paths(
     view: &View,
@@ -1187,13 +1441,65 @@ fn paths(
         .map(|i| route(view, links, tree, i))
         .collect();
     let mut paths: Vec<Option<Vec<Point>>> = vec![None; links.len()];
+    // What a routed line goes around, and the runs of those already routed.
+    let obstacles: Vec<Rect> = nodes.iter().map(|node| node.bounds).collect();
+    let area = obstacles
+        .iter()
+        .copied()
+        .reduce(|a, b| a.union(&b))
+        .unwrap_or(Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        });
+    // The columns under and over each node's middle, where its lines into
+    // the rows below and above run: a routed line that ran down one would
+    // be taken for that node's.
+    let column = |x: f32, y: f32, height: f32| Rect {
+        x: x - COLUMN,
+        y,
+        width: 2.0 * COLUMN,
+        height,
+    };
+    let below: Vec<Rect> = nodes
+        .iter()
+        .map(|node| {
+            let r = node.shape.rect;
+            column(r.centre().x, r.bottom(), V_GAP + route::CLEARANCE_Y)
+        })
+        .collect();
+    let above: Vec<Rect> = nodes
+        .iter()
+        .map(|node| {
+            let r = node.shape.rect;
+            column(r.centre().x, r.y - V_GAP, V_GAP)
+        })
+        .collect();
+    let zones = |from: usize| -> Vec<Rect> {
+        below
+            .iter()
+            .enumerate()
+            .filter(|&(n, _)| n != from)
+            .map(|(_, zone)| *zone)
+            .chain(above.iter().copied())
+            .collect()
+    };
+    let mut runs: Vec<Run> = Vec::new();
+    let mut tops: HashMap<String, [usize; 2]> = HashMap::new();
     // A challenge of a relationship needs that relationship's line first.
     // Challenges that point at each other in a ring never get one, and the
     // last pass draws them at the node the other leaves.
     for last in [false, true] {
         loop {
             let mut progress = false;
-            for (i, link) in links.iter().enumerate() {
+            // The lines the tree placed first, so that every routed line
+            // knows them and keeps off running along one.
+            let order = (0..links.len())
+                .filter(|&i| placed(routes[i]))
+                .chain((0..links.len()).filter(|&i| !placed(routes[i])));
+            for i in order {
+                let link = &links[i];
                 if paths[i].is_some() {
                     continue;
                 }
@@ -1271,16 +1577,53 @@ fn paths(
                             middle,
                         ]
                     }
-                    (_, _, Some(middle)) => straight_path(from, middle),
+                    (_, _, Some(middle)) => {
+                        // A challenge of a line, placed by nothing: to the
+                        // middle of that line, from whichever side is open.
+                        let (starts, _) = ports(EdgeKind::Challenge, from, from, &mut tops);
+                        let ends: Vec<Port> = [Dir::Up, Dir::Down, Dir::Left, Dir::Right]
+                            .into_iter()
+                            .map(|out| route::point_port(middle, out, 0.0))
+                            .collect();
+                        route::route(
+                            link.from,
+                            &starts,
+                            &ends,
+                            &obstacles,
+                            &zones(link.from),
+                            area,
+                            &mut runs,
+                        )
+                        .unwrap_or_else(|| straight_path(from, middle))
+                    }
                     (_, Target::Node(to), None) => {
-                        let (a, b) = (from.shape.rect.centre(), nodes[to].shape.rect.centre());
-                        vec![
-                            from.shape.outline_point(b.x - a.x, b.y - a.y),
-                            nodes[to].shape.outline_point(a.x - b.x, a.y - b.y),
-                        ]
+                        // Placed nothing: a second parent, the line that
+                        // closes a cycle, a context of two nodes. Routed
+                        // around every node.
+                        let kind = view.edges[link.edge].kind;
+                        let (starts, ends) = ports(kind, from, &nodes[to], &mut tops);
+                        route::route(
+                            link.from,
+                            &starts,
+                            &ends,
+                            &obstacles,
+                            &zones(link.from),
+                            area,
+                            &mut runs,
+                        )
+                        .unwrap_or_else(|| {
+                            let (a, b) = (from.shape.rect.centre(), nodes[to].shape.rect.centre());
+                            vec![
+                                from.shape.outline_point(b.x - a.x, b.y - a.y),
+                                nodes[to].shape.outline_point(a.x - b.x, a.y - b.y),
+                            ]
+                        })
                     }
                     (_, Target::Link(_), None) => continue,
                 };
+                if placed(routes[i]) {
+                    runs.extend(route::runs_of(&path, link.from));
+                }
                 paths[i] = Some(path);
                 progress = true;
             }
