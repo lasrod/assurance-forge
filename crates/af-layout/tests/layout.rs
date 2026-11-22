@@ -1131,3 +1131,132 @@ fn the_geometry_check_finds_each_defect_made_by_hand() {
     touching.edges[1].head[0] = Point { x: 200.0, y: 0.0 };
     assert_eq!(check(&touching).edge_crossings, 0);
 }
+
+#[test]
+fn a_neutral_link_does_not_take_a_node_from_its_support() {
+    // X is supported by the root G1, and reached neutral (a defeated
+    // inference) from G2 under G1. The support places X, in G2's row; the
+    // neutral line is routed to it.
+    let diagram = engine().layout(&case_view(
+        &[
+            element("Claim", "g1", ""),
+            element("Claim", "g2", ""),
+            element("Claim", "x", ""),
+            element("AssertedInference", "i2", r#" source="g2" target="g1""#),
+            element("AssertedInference", "i1", r#" source="x" target="g1""#),
+            element(
+                "AssertedInference",
+                "i3",
+                r#" source="x" target="g2" assertionDeclaration="defeated""#,
+            ),
+        ]
+        .concat(),
+    ));
+    assert_eq!(first_edge(&diagram, "i1").placement, Placement::Below);
+    assert_eq!(first_edge(&diagram, "i3").kind, EdgeKind::Neutral);
+    assert_ne!(first_edge(&diagram, "i3").placement, Placement::Below);
+    let (x, g2) = (node(&diagram, "x"), node(&diagram, "g2"));
+    assert!(
+        (x.shape.rect.y - g2.shape.rect.y).abs() < 0.01,
+        "x is in g2's row"
+    );
+}
+
+#[test]
+fn five_lines_into_one_node_enter_apart() {
+    // X is supported by five goals in a row: one places it, and four lines
+    // come into its top from one side. No arrowhead is on another.
+    let mut body = vec![element("Claim", "r", ""), element("Claim", "x", "")];
+    for n in 1..=5 {
+        body.push(element("Claim", &format!("g{n}"), ""));
+        body.push(element(
+            "AssertedInference",
+            &format!("r{n}"),
+            &format!(r#" source="g{n}" target="r""#),
+        ));
+    }
+    for n in 1..=5 {
+        body.push(element(
+            "AssertedInference",
+            &format!("x{n}"),
+            &format!(r#" source="x" target="g{n}""#),
+        ));
+    }
+    let diagram = engine().layout(&case_view(&body.concat()));
+    let tips: Vec<Point> = diagram
+        .edges
+        .iter()
+        .filter(|edge| edge.to == "x")
+        .map(|edge| edge.head[0])
+        .collect();
+    assert_eq!(tips.len(), 5);
+    for (i, a) in tips.iter().enumerate() {
+        for b in &tips[i + 1..] {
+            assert!((a.x - b.x).hypot(a.y - b.y) > 8.0, "{a:?} and {b:?}");
+        }
+    }
+}
+
+/// How far two straight runs lie along each other, on the same line: both
+/// across or both down, within 2 px, and overlapping.
+fn run_along(a: (Point, Point), b: (Point, Point)) -> f32 {
+    let across = |p: (Point, Point)| (p.0.y - p.1.y).abs() < 0.5;
+    let down = |p: (Point, Point)| (p.0.x - p.1.x).abs() < 0.5;
+    let overlap = |lo: f32, hi: f32, rlo: f32, rhi: f32| (hi.min(rhi) - lo.max(rlo)).max(0.0);
+    if across(a) && across(b) && (a.0.y - b.0.y).abs() < 2.0 {
+        overlap(
+            a.0.x.min(a.1.x),
+            a.0.x.max(a.1.x),
+            b.0.x.min(b.1.x),
+            b.0.x.max(b.1.x),
+        )
+    } else if down(a) && down(b) && (a.0.x - b.0.x).abs() < 2.0 {
+        overlap(
+            a.0.y.min(a.1.y),
+            a.0.y.max(a.1.y),
+            b.0.y.min(b.1.y),
+            b.0.y.max(b.1.y),
+        )
+    } else {
+        0.0
+    }
+}
+
+/// A guard: no sample has shown a routed line along a placed one (the
+/// router's penalties keep them apart), and it passed before the router was
+/// given the placed lines too.
+#[test]
+fn a_routed_line_does_not_run_along_a_placed_line_of_another_node() {
+    for name in SAMPLES {
+        let diagram = engine().layout(&sample_view(name, "en"));
+        let runs = |edge: &DiagramEdge| -> Vec<(Point, Point)> {
+            edge.points
+                .windows(2)
+                .map(|pair| (pair[0], pair[1]))
+                .collect()
+        };
+        for routed in diagram
+            .edges
+            .iter()
+            .filter(|edge| edge.placement == Placement::None)
+        {
+            for placed in diagram
+                .edges
+                .iter()
+                .filter(|edge| edge.placement != Placement::None && edge.from != routed.from)
+            {
+                for a in runs(routed) {
+                    for b in runs(placed) {
+                        let length = run_along(a, b);
+                        assert!(
+                            length < 24.0,
+                            "{name}: {} runs {length} px along {}",
+                            routed.relationship,
+                            placed.relationship
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

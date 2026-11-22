@@ -670,7 +670,11 @@ impl Tree {
         // A node supported from more than one parent hangs from one a row
         // above it, so it sits below every node it supports. The lines from
         // its other parents are drawn all the same, routed around the nodes.
-        let preferred = deepest_parents(count, &candidates);
+        let neutral: Vec<bool> = links
+            .iter()
+            .map(|link| kind(link) == EdgeKind::Neutral)
+            .collect();
+        let preferred = deepest_parents(count, &candidates, &neutral);
         for list in &mut candidates {
             list.retain(|&(child, link, want)| {
                 !matches!(want, Want::Below) || preferred[child] == Some(link)
@@ -784,12 +788,28 @@ impl Tree {
 /// search depth first, from those nodes and then the rest in order, first
 /// comes back to a node it is still inside: that link joins no level, and
 /// places nothing, but it is still drawn.
-fn deepest_parents(count: usize, candidates: &[Vec<(usize, usize, Want)>]) -> Vec<Option<usize>> {
+///
+/// A link drawn neutral (`neutral`, by link) counts only for a node that no
+/// live support or context reaches: it places only what nothing else has,
+/// so it neither sets a node's level nor takes it from its real parent.
+fn deepest_parents(
+    count: usize,
+    candidates: &[Vec<(usize, usize, Want)>],
+    neutral: &[bool],
+) -> Vec<Option<usize>> {
+    let mut live = vec![false; count];
+    for &(child, link, want) in candidates.iter().flatten() {
+        if matches!(want, Want::Below) && !neutral[link] {
+            live[child] = true;
+        }
+    }
     let below: Vec<Vec<(usize, usize)>> = candidates
         .iter()
         .map(|list| {
             list.iter()
-                .filter(|(_, _, want)| matches!(want, Want::Below))
+                .filter(|&&(child, link, want)| {
+                    matches!(want, Want::Below) && !(neutral[link] && live[child])
+                })
                 .map(|&(child, link, _)| (child, link))
                 .collect()
         })
@@ -1120,6 +1140,11 @@ enum Route {
     Straight,
 }
 
+/// Whether the tree placed the line: everything but a line it left to route.
+fn placed(route: Route) -> bool {
+    !matches!(route, Route::Straight)
+}
+
 fn route(view: &View, links: &[Link], tree: &Tree, i: usize) -> Route {
     let link = &links[i];
     let placed_by_this = |node: usize| tree.parent[node].filter(|&(_, by, _)| by == i);
@@ -1318,7 +1343,9 @@ fn ports(
             let used = tops.entry(to.id.clone()).or_insert([0, 0]);
             let n = used[usize::from(right)];
             used[usize::from(right)] += 1;
-            let offset = [0.28, 0.4, 0.16][n % 3] * to.shape.rect.width;
+            // Seven points on each side, the first three as before, so that
+            // an arrowhead lands on another only past seven lines.
+            let offset = [0.28, 0.4, 0.16, 0.46, 0.34, 0.22, 0.1][n % 7] * to.shape.rect.width;
             let offset = if right { offset } else { -offset };
             let mut starts = vec![port(from, Dir::Down, 0.0, 0.0)];
             starts.extend(sides(from, 160.0));
@@ -1412,7 +1439,13 @@ fn paths(
     for last in [false, true] {
         loop {
             let mut progress = false;
-            for (i, link) in links.iter().enumerate() {
+            // The lines the tree placed first, so that every routed line
+            // knows them and keeps off running along one.
+            let order = (0..links.len())
+                .filter(|&i| placed(routes[i]))
+                .chain((0..links.len()).filter(|&i| !placed(routes[i])));
+            for i in order {
+                let link = &links[i];
                 if paths[i].is_some() {
                     continue;
                 }
@@ -1534,6 +1567,9 @@ fn paths(
                     }
                     (_, Target::Link(_), None) => continue,
                 };
+                if placed(routes[i]) {
+                    runs.extend(route::runs_of(&path, link.from));
+                }
                 paths[i] = Some(path);
                 progress = true;
             }

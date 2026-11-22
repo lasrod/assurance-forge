@@ -206,6 +206,16 @@ pub(crate) struct Run {
     from: usize,
 }
 
+/// The straight runs of a line already drawn that leaves the node `from`,
+/// for the lines routed after it to keep off.
+pub(crate) fn runs_of(path: &[Point], from: usize) -> impl Iterator<Item = Run> + '_ {
+    path.windows(2).map(move |pair| Run {
+        a: pair[0],
+        b: pair[1],
+        from,
+    })
+}
+
 /// Coordinates, sorted, with those within a hundredth of a px merged.
 struct Axis(Vec<f32>);
 
@@ -243,9 +253,11 @@ impl Grid {
         let mut ys = vec![window.y, window.bottom()];
         let inside_window = |r: &Rect| r.overlaps(&window);
         let kept: Vec<Rect> = obstacles.iter().copied().filter(inside_window).collect();
+        // An obstacle's edges, but only within the window: past it are nodes
+        // that are not obstacles here, which a grid line there could cross.
         for r in &kept {
-            xs.extend([r.x, r.right()]);
-            ys.extend([r.y, r.bottom()]);
+            xs.extend([r.x.max(window.x), r.right().min(window.right())]);
+            ys.extend([r.y.max(window.y), r.bottom().min(window.bottom())]);
         }
         // Between neighbouring obstacles, across: a line in the middle of
         // the band between two rows. Not down the middle of a gap between
