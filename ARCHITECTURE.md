@@ -82,10 +82,10 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | Layout generation (`DiagramAt.layout`) | `af-api` | each new layout of the same revision: language, text sizes, fonts |
 | Fonts | the page loads DATUM's measured faces and hands their bytes to the core | start |
 | Text sizes | the frontend reads DATUM's type tokens and sends them (`setStyle`) | the user's text size |
-| The answers on screen (diagram, outline, packages, details) and the order of opens | `ui/src/useDocument.ts`; which answer is newer is `ui/src/freshness.ts` | each answer from the core |
-| Selection, hover, viewport (pan and zoom), whether the view is a fit | `ui/src/canvas/useViewport.ts`, `DiagramCanvas.tsx` | user input; both start again with each new revision |
+| The answers on screen (diagram, outline, packages, details, what Undo and Redo can do) and the order of opens and edits | `ui/src/useDocument.ts`; which answer is newer is `ui/src/freshness.ts` | each answer from the core |
+| Selection, hover, viewport (pan and zoom), whether the view is a fit | `ui/src/canvas/useViewport.ts`, `DiagramCanvas.tsx` | user input; both start again with each new file. An edit keeps the view, keeping a node where it was, and selects what it added |
 | Panel layout | DATUM's `Workspace`, held by `App.tsx`, kept in the browser's storage (`ui/src/layout.ts`) | the user moves or hides a panel |
-| Tree expansion | `App.tsx` | the user, and a selection that must be shown |
+| Tree expansion | `App.tsx` | the user, a selection that must be shown, and a new file (not an edit) |
 | Recent files | desktop: paths in the configuration directory (`af-desktop/src/recent.rs`); browser: copies in IndexedDB (`ui/src/core/webRecent.ts`) | each open |
 | Theme and language | `ui/`; the language is sent to the core | the user |
 
@@ -105,7 +105,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
    spanning tree of the argument, routes the lines the tree did not place
    around the nodes, and returns the render model: shapes, text lines, decorators,
    lines with their arrowheads, all in CSS pixels at 100%. `af-api` keeps it
-   until the language, the text sizes or the fonts change.
+   until the language, the text sizes or the fonts change, or a command
+   changes the document.
 5. **Render.** The frontend asks for the diagram, outline and packages, which
    each carry the revision they belong to, and the diagram its layout
    generation. An answer is shown only if it is of the revision on screen
