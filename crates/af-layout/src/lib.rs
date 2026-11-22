@@ -14,12 +14,14 @@
 //! order. A line bends only in the clear band between two rows or between a
 //! node and its lane.
 
+pub mod check;
 mod layout;
 mod model;
 mod text;
 
 use std::collections::HashMap;
 
+pub use check::{Report, check};
 pub use layout::{OutlineRow, outline};
 pub use model::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,

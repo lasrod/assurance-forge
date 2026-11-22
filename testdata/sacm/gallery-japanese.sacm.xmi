@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gallery fixture: statements in Japanese and English, Japanese mixed with Latin terms, and one statement only in English. -->
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_Japanese">
+  <name content="Japanese" />
+  <argumentPackage xmi:id="argpkg_Japanese">
+    <name content="JapaneseArgument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1"><name content="SystemSafe" /><description xmi:id="d_G1"><content><value lang="ja" content="自動運転システムは、定義された運行設計領域（ODD）において許容できる程度に安全である。" /><value lang="en" content="The automated driving system is acceptably safe within its defined ODD." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="C1"><name content="Odd" /><description xmi:id="d_C1"><content><value lang="ja" content="ODD：高速道路、晴天および小雨、最高速度 100 km/h。" /><value lang="en" content="ODD: motorways, clear weather and light rain, up to 100 km/h." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1"><name content="OverHazards" /><description xmi:id="d_S1"><content><value lang="ja" content="ISO 26262 および ISO 21448（SOTIF）に基づき、識別された各ハザードについて論証する。" /><value lang="en" content="Argument over each identified hazard, following ISO 26262 and ISO 21448 (SOTIF)." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G2"><name content="Perception" /><description xmi:id="d_G2"><content><value lang="ja" content="知覚機能は、ODD 内のすべての車両と歩行者を検出する。" /><value lang="en" content="Perception detects every vehicle and pedestrian within the ODD." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3"><name content="Planning" /><description xmi:id="d_G3"><content><value lang="ja" content="経路計画は、ASIL-D の要求事項を満たす。" /><value lang="en" content="Path planning meets its ASIL-D requirements." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="A1" assertionDeclaration="assumed"><name content="Map" /><description xmi:id="d_A1"><content><value lang="ja" content="高精度地図は最新である。" /><value lang="en" content="The HD map is up to date." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn1"><name content="Validation" /><description xmi:id="d_Sn1"><content><value lang="ja" content="走行試験報告書 VT-12（総走行距離 120 万 km）" /><value lang="en" content="Validation test report VT-12 (1.2 million km)" /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn2"><name content="Review" /><description xmi:id="d_Sn2"><content><value lang="en" content="Independent design review DR-4, English only." /></content></description></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x1" source="C1" target="G1"><name content="x1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i1" source="G2 G3" target="G1" reasoning="S1"><name content="i1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="x2" source="A1" target="G3"><name content="x2" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e1" source="Sn1" target="G2"><name content="e1" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="e2" source="Sn2" target="G3"><name content="e2" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

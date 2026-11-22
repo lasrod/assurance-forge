@@ -28,6 +28,19 @@ pnpm --dir ui wasm       # build crates/af-wasm into ui/src/wasm/
 pnpm --dir ui check      # types, lint, unit tests
 pnpm --dir ui e2e        # browser tests against the production build
 pnpm --dir ui dev        # http://localhost:5183; add /?sample=sacm_example_core_argument.sacm.xmi to open a sample
+pnpm --dir ui verify     # all of the above against the real application, with screenshots and the layout gallery
+```
+
+`verify` writes a report to `ui/verification/<commit>/` (`report.md`, and
+`index.html` with the images): the commit and DATUM it ran on, each check's
+result, the layout gallery's geometry (`af_layout::check`), screenshots of the
+application, and how long the large case takes to open and pan. Put its
+summary in the pull request. `--compare <earlier report>` sets the images
+beside an earlier run's, for a change to the layout or the look. The gallery
+alone needs no DATUM:
+
+```bash
+cargo run --release -p af-layout --example gallery -- <out-dir>
 ```
 
 The desktop application (`af-desktop`) loads the development server in a

@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 // which adds the test hook (src/testHook.ts) and nothing else.
 export default defineConfig({
   testDir: 'e2e',
+  // Screenshots for review, run by `pnpm verify` (playwright.capture.config.ts).
+  testIgnore: 'capture/**',
   fullyParallel: true,
   // More workers made WebKit on Windows close its browser at page.goto, in a
   // different test each run.

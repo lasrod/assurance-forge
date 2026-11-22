@@ -7,12 +7,18 @@ use af_gsn::view::{Code, EdgeKind, NodeKind, View, view};
 use sacm::model::{Document, ElementKind as SacmKind, MetamodelPackage};
 use sacm::xmi::{self, Mode, ReadOptions};
 
-const SAMPLES: [&str; 5] = [
+const SAMPLES: [&str; 10] = [
     "sacm_example_core_argument.sacm.xmi",
     "sample.sacm.xmi",
     "open-autonomy-safety-case.updated.v2.sacm.xmi",
     "oasc-ja.sacm.xmi",
     "safety-case-sanitized-strict.sacm.xmi",
+    // The layout gallery (testdata/sacm/README.md).
+    "gallery-shared-support.sacm.xmi",
+    "gallery-attachments.sacm.xmi",
+    "gallery-long-text.sacm.xmi",
+    "gallery-japanese.sacm.xmi",
+    "gallery-roots-and-cycle.sacm.xmi",
 ];
 
 fn read(bytes: &[u8]) -> Document {

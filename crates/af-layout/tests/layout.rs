@@ -6,17 +6,23 @@
 use af_gsn::view::{EdgeKind, NodeKind, View, view};
 use af_layout::{
     Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, Engine, Font, Fonts, LineStyle,
-    Placement, Point, Style, TextRole, Weight,
+    Placement, Point, Style, TextRole, Weight, check,
 };
 use sacm::xmi::{self, Mode, ReadOptions};
 
-const SAMPLES: [&str; 6] = [
+const SAMPLES: [&str; 11] = [
     "challenges.sacm.xmi",
     "sacm_example_core_argument.sacm.xmi",
     "sample.sacm.xmi",
     "open-autonomy-safety-case.updated.v2.sacm.xmi",
     "oasc-ja.sacm.xmi",
     "safety-case-sanitized-strict.sacm.xmi",
+    // The layout gallery (testdata/sacm/README.md).
+    "gallery-shared-support.sacm.xmi",
+    "gallery-attachments.sacm.xmi",
+    "gallery-long-text.sacm.xmi",
+    "gallery-japanese.sacm.xmi",
+    "gallery-roots-and-cycle.sacm.xmi",
 ];
 
 fn testdata(path: &str) -> Vec<u8> {
@@ -958,4 +964,114 @@ fn an_assumption_reached_by_support_still_sits_beside_its_goal() {
     assert_eq!(edge.arrowhead, Arrowhead::Filled);
     // The evidence is still below.
     assert!(node(&diagram, "ev_1").bounds.y >= goal.bounds.bottom());
+}
+
+// ===== The geometry check =====
+
+#[test]
+fn the_geometry_check_passes_every_sample_on_overlap_and_text() {
+    for name in SAMPLES {
+        let language = if name.contains("ja") { "ja" } else { "en" };
+        let report = check(&engine().layout(&sample_view(name, language)));
+        assert_eq!(report.node_overlaps, [], "{name}");
+        assert_eq!(report.text_escapes, [], "{name}");
+    }
+}
+
+/// The check judges geometry, so it is shown wrong geometry: a valid layout
+/// broken by hand in each way it must find. A check that cannot fail checks
+/// nothing.
+#[test]
+fn the_geometry_check_finds_each_defect_made_by_hand() {
+    let valid = engine().layout(&sample_view("sacm_example_core_argument.sacm.xmi", "en"));
+    let report = check(&valid);
+    assert!(report.is_valid(), "{report:?}");
+    assert_eq!(report.edge_crossings, 0);
+    assert_eq!((report.nodes, report.edges), (8, 7));
+
+    // A node moved onto another.
+    let mut overlapping = valid.clone();
+    let on = node(&overlapping, "cl_sub_2").bounds;
+    let moved = overlapping
+        .nodes
+        .iter_mut()
+        .find(|node| node.id == "ev_1")
+        .map(|node| node.bounds = on);
+    assert!(moved.is_some());
+    let report = check(&overlapping);
+    assert!(!report.is_valid());
+    assert!(
+        report
+            .node_overlaps
+            .iter()
+            .any(|(a, b)| [a.as_str(), b.as_str()].contains(&"ev_1")
+                && [a.as_str(), b.as_str()].contains(&"cl_sub_2")),
+        "{report:?}"
+    );
+
+    // A line from cl_top to ar_1 sent through ev_1, which it does not join.
+    let mut through = valid.clone();
+    let detour = node(&through, "ev_1").shape.rect.centre();
+    let edge = through
+        .edges
+        .iter_mut()
+        .find(|edge| edge.from == "cl_top" && edge.to == "ar_1");
+    let Some(edge) = edge else {
+        panic!("no edge cl_top to ar_1")
+    };
+    let start = edge.points[0];
+    edge.points = vec![start, detour, edge.head[0]];
+    edge.bounds = af_layout::Rect {
+        x: -1e4,
+        y: -1e4,
+        width: 2e4,
+        height: 2e4,
+    };
+    let report = check(&through);
+    assert!(!report.is_valid());
+    assert!(
+        report
+            .edge_node_intersections
+            .iter()
+            .any(|i| i.node == "ev_1"),
+        "{report:?}"
+    );
+    // Its own ends are not counted.
+    assert!(
+        !report
+            .edge_node_intersections
+            .iter()
+            .any(|i| i.node == "cl_top" || i.node == "ar_1"),
+        "{report:?}"
+    );
+
+    // A line of text pushed out of its node.
+    let mut escaping = valid.clone();
+    escaping.nodes[0].text[0].x += 400.0;
+    let report = check(&escaping);
+    assert_eq!(report.text_escapes.len(), 1, "{report:?}");
+    assert_eq!(report.text_escapes[0].node, escaping.nodes[0].id);
+
+    // Two lines across each other: counted, not a defect.
+    let mut crossing = valid.clone();
+    let (a, b) = (Point { x: 0.0, y: 0.0 }, Point { x: 100.0, y: 100.0 });
+    let (c, d) = (Point { x: 0.0, y: 100.0 }, Point { x: 100.0, y: 0.0 });
+    let whole = af_layout::Rect {
+        x: 0.0,
+        y: 0.0,
+        width: 100.0,
+        height: 100.0,
+    };
+    for (edge, (from, to)) in crossing.edges.iter_mut().zip([(a, b), (c, d)]) {
+        edge.points = vec![from];
+        edge.head[0] = to;
+        edge.bounds = whole;
+    }
+    let report = check(&crossing);
+    assert_eq!(report.edge_crossings, 1, "{report:?}");
+    // Lines that only meet at an end do not cross.
+    let mut touching = crossing.clone();
+    touching.edges[1].points = vec![b];
+    touching.edges[1].head[0] = Point { x: 200.0, y: 0.0 };
+    assert_eq!(check(&touching).edge_crossings, 0);
 }

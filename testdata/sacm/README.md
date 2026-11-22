@@ -9,11 +9,23 @@ Assurance cases in SACM 2.3 XMI, for tests and for trying the application.
 | `open-autonomy-safety-case.updated.v2.sacm.xmi` | 465 | The Open Autonomy Safety Case, in English. |
 | `oasc-ja.sacm.xmi` | 581 | A variant of the same case, with English and Japanese text. |
 | `safety-case-sanitized-strict.sacm.xmi` | 1,090 | The largest case: 15 argument packages. |
+| `gallery-shared-support.sacm.xmi` | 31 | Layout gallery: a goal and evidence supporting more than one parent, at different depths. |
+| `gallery-attachments.sacm.xmi` | 43 | Layout gallery: a goal and a strategy with several contexts, assumptions and justifications, and a context of two goals. |
+| `gallery-long-text.sacm.xmi` | 23 | Layout gallery: long names and a long statement, identifiers with no break opportunity, a URL. |
+| `gallery-japanese.sacm.xmi` | 23 | Layout gallery: statements in Japanese and English, Japanese mixed with Latin terms, one statement only in English. |
+| `gallery-roots-and-cycle.sacm.xmi` | 25 | Layout gallery: two roots, a cycle of three goals, and a goal that supports itself. |
 | `challenges.sacm.xmi` | 47 | Written by hand for the layout: context on both sides of a goal, and a challenge of a claim, of a context, of a line of support, of a line of context, of an inference with a Strategy and of another challenge. |
 
 "Elements" counts every element with an id, descriptions included.
 
 ## Where they come from
+
+The five `gallery-*` files were written on 2026-11-22 by `make_gallery.py`
+(`python -I testdata/sacm/make_gallery.py testdata/sacm`) for the layout
+gallery (`cargo run -p af-layout --example gallery`). They use only the
+encodings of the reading rules in `docs/standards/sacm-gsn-mapping.md`, and
+each reads strictly with no diagnostics. Change the script and run it again
+rather than editing them by hand.
 
 `challenges.sacm.xmi` was written by hand in SACM 2.3 XMI on 2026-11-21, since
 no converted case has a counter relationship. The rest of this section is
