@@ -387,6 +387,38 @@ fn relationship(
 }
 
 #[tauri::command]
+fn add_choices(
+    parent: Option<String>,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::AddChoices>, String> {
+    Ok(lock(&state)?.core.add_choices(parent.as_deref()))
+}
+
+#[tauri::command]
+fn add(
+    parent: Option<String>,
+    kind: af_api::contract::ElementKind,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.add(parent.as_deref(), kind))
+}
+
+#[tauri::command]
+fn undo(state: Shared<'_>) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.undo())
+}
+
+#[tauri::command]
+fn redo(state: Shared<'_>) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.redo())
+}
+
+#[tauri::command]
+fn history(state: Shared<'_>) -> Result<af_api::contract::History, String> {
+    Ok(lock(&state)?.core.history())
+}
+
+#[tauri::command]
 fn set_language(language: String, state: Shared<'_>) -> Result<(), String> {
     lock(&state)?.core.set_language(&language);
     Ok(())
@@ -443,6 +475,11 @@ pub fn run(args: Args) -> i32 {
             diagram,
             element,
             relationship,
+            add_choices,
+            add,
+            undo,
+            redo,
+            history,
             set_language,
             set_style
         ])

@@ -10,11 +10,13 @@ async function viewMenu(page: Page) {
   await expect(page.getByRole('menu', { name: 'View' })).toBeVisible();
 }
 
-test('the menu bar is a menu bar: File and View, moved between by the arrow keys', async ({ page }) => {
+test('the menu bar is a menu bar: File, Edit and View, moved between by the arrow keys', async ({ page }) => {
   await opened(page);
   const bar = page.getByRole('menubar', { name: 'Menu' });
-  await expect(bar.getByRole('menuitem')).toHaveText(['File', 'View']);
+  await expect(bar.getByRole('menuitem')).toHaveText(['File', 'Edit', 'View']);
   await bar.getByRole('menuitem', { name: 'File' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(bar.getByRole('menuitem', { name: 'Edit' })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(bar.getByRole('menuitem', { name: 'View' })).toBeFocused();
 });

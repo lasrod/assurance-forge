@@ -4,8 +4,12 @@
 // Rust contract in crates/af-api.
 
 import type {
+  AddChoices,
   DiagramAt,
+  EditResult,
   ElementDetails,
+  ElementKind,
+  History,
   OpenedFile,
   OpenResult,
   Outline,
@@ -79,6 +83,20 @@ export interface Core {
   outline(): Promise<Outline | null>;
   /** The open file's packages, depth first; empty when nothing is open. */
   packages(): Promise<Package[]>;
+  /**
+   * The add menu for the node with this SACM id, or for the empty canvas
+   * when null: the six kinds, each with the code of why it cannot be added
+   * there. Null when nothing is open.
+   */
+  addChoices(parent: string | null): Promise<AddChoices | null>;
+  /** Adds an element of `kind` under the node `parent`, or at the top level when null. */
+  add(parent: string | null, kind: ElementKind): Promise<EditResult>;
+  /** Takes back the last command. */
+  undo(): Promise<EditResult>;
+  /** Makes again the last command undo took back. */
+  redo(): Promise<EditResult>;
+  /** Whether Edit ▸ Undo and Redo can be chosen. */
+  history(): Promise<History>;
   /** A BCP 47 tag such as `en` or `ja`: the node text follows it. */
   setLanguage(language: string): Promise<void>;
   /** The diagram's text sizes in CSS px, from DATUM's type tokens. */

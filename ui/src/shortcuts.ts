@@ -27,3 +27,32 @@ export function isOpenShortcut(event: KeyboardEvent, mac = MAC): boolean {
   const o = latin ? event.key.toLowerCase() === 'o' : event.code === 'KeyO';
   return modifier && o && !event.shiftKey && !event.altKey && !event.isComposing && !event.repeat;
 }
+
+/** The key `letter` (lower case) by its letter, or by its place when the layout is not Latin. */
+function isLetter(event: KeyboardEvent, letter: string): boolean {
+  const latin = /^[\x20-\x7e]$/.test(event.key);
+  return latin ? event.key.toLowerCase() === letter : event.code === `Key${letter.toUpperCase()}`;
+}
+
+/** Edit ▸ Undo's shortcut as the menu shows it: `⌘Z` on macOS, `Ctrl+Z` elsewhere. */
+export function undoShortcut(mac = MAC): string {
+  return mac ? '⌘Z' : 'Ctrl+Z';
+}
+
+/** Edit ▸ Redo's shortcut as the menu shows it: `⇧⌘Z` on macOS, `Ctrl+Y` elsewhere. */
+export function redoShortcut(mac = MAC): string {
+  return mac ? '⇧⌘Z' : 'Ctrl+Y';
+}
+
+/**
+ * Whether `event` is undo or redo, or null. Undo is ⌘Z on macOS and Ctrl+Z
+ * elsewhere; redo is ⇧⌘Z on macOS, and Ctrl+Y or Ctrl+Shift+Z elsewhere.
+ * A held key repeats, as it does in other editors; not while an IME composes.
+ */
+export function editShortcut(event: KeyboardEvent, mac = MAC): 'undo' | 'redo' | null {
+  const modifier = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (!modifier || event.altKey || event.isComposing) return null;
+  if (isLetter(event, 'z')) return event.shiftKey ? 'redo' : 'undo';
+  if (!mac && !event.shiftKey && isLetter(event, 'y')) return 'redo';
+  return null;
+}

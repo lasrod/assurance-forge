@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Diagram, DiagramEdge, DiagramNode } from '../core/Core';
 import {
   boundsOf,
+  keepInPlace,
+  reveal,
   draw,
   EDGE_REACH,
   edgeDistance,
@@ -332,5 +334,22 @@ describe('relationships', () => {
     const plain = recorder();
     draw(plain.context, { ...withEdges, nodes: [] }, unit, palette, families, { width: 800, height: 600, dpr: 1 });
     expect(plain.widths).toEqual([1, 1, 1, 1]);
+  });
+});
+
+describe('reveal and keepInPlace', () => {
+  const view = { scale: 2, offsetX: 10, offsetY: 20 };
+  it('leaves a view that shows the bounds alone, and centres them otherwise', () => {
+    expect(reveal(view, { x: 0, y: 0, width: 10, height: 10 }, 100, 100)).toBe(view);
+    const moved = reveal(view, { x: 100, y: 0, width: 10, height: 10 }, 100, 100);
+    expect(moved.scale).toBe(2);
+    expect(100 * moved.scale + moved.offsetX).toBeCloseTo((100 - 20) / 2);
+    expect(0 * moved.scale + moved.offsetY).toBeCloseTo((100 - 20) / 2);
+  });
+  it('keeps a node that moved in the layout where it was on the screen', () => {
+    const kept = keepInPlace(view, { x: 5, y: 5, width: 1, height: 1 }, { x: 25, y: -5, width: 1, height: 1 });
+    expect(25 * kept.scale + kept.offsetX).toBe(5 * view.scale + view.offsetX);
+    expect(-5 * kept.scale + kept.offsetY).toBe(5 * view.scale + view.offsetY);
+    expect(kept.scale).toBe(2);
   });
 });

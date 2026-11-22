@@ -1,7 +1,18 @@
 // The browser's core: crates/af-wasm, built by `pnpm wasm` into src/wasm/.
 
 import init, { WasmCore } from '../wasm/af_wasm';
-import type { Core, DiagramAt, ElementDetails, OpenResult, Outline, Package, RelationshipDetails } from './Core';
+import type {
+  AddChoices,
+  Core,
+  DiagramAt,
+  EditResult,
+  ElementDetails,
+  History,
+  OpenResult,
+  Outline,
+  Package,
+  RelationshipDetails,
+} from './Core';
 import { createWebRecent } from './webRecent';
 import { StartError, type FontBytes } from './start';
 
@@ -27,6 +38,11 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     relationship: async (id) => parse<RelationshipDetails>(core.relationship(id)),
     outline: async () => parse<Outline>(core.outline()),
     packages: async () => JSON.parse(core.packages()) as Package[],
+    addChoices: async (parent) => parse<AddChoices>(core.addChoices(parent ?? undefined)),
+    add: async (parent, kind) => JSON.parse(core.add(parent ?? undefined, kind)) as EditResult,
+    undo: async () => JSON.parse(core.undo()) as EditResult,
+    redo: async () => JSON.parse(core.redo()) as EditResult,
+    history: async () => JSON.parse(core.history()) as History,
     setLanguage: async (language) => core.setLanguage(language),
     setStyle: async (style) =>
       core.setStyle(style.textSize, style.textLineHeight, style.identifierSize, style.identifierLineHeight),

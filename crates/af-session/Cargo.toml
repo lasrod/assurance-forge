@@ -1,0 +1,16 @@
+[package]
+name = "af-session"
+description = "The open document: its revisions, the change record of each command, and undo and redo."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+af-gsn = { path = "../af-gsn" }
+sacm = "0.3.0"
+
+[lints]
+workspace = true

@@ -216,3 +216,36 @@ head: Array<Point>,
 bounds: Rect, };
 
 export type Diagram = { nodes: Array<DiagramNode>, edges: Array<DiagramEdge>, bounds: Rect, };
+
+export type ElementKind = "goal" | "strategy" | "solution" | "context" | "assumption" | "justification";
+
+export type AddChoice = { kind: ElementKind, 
+/**
+ * Why it cannot be added there (`AF-EDIT-001` to `AF-EDIT-006`), or
+ * null when it can. The frontend words it.
+ */
+refusal: string | null, 
+/**
+ * Adding it also clears the parent Goal's undeveloped decorator, which
+ * the menu says.
+ */
+develops: boolean, };
+
+export type AddChoices = { revision: number, 
+/**
+ * The six kinds, in the order the standard introduces them.
+ */
+choices: Array<AddChoice>, };
+
+export type EditResult = { "result": "applied", revision: number, 
+/**
+ * The element the command added, which the interface selects: for
+ * a Strategy, the Strategy. Null for undo and redo.
+ */
+element: string | null, 
+/**
+ * The SACM ids the command created, changed and deleted.
+ */
+created: Array<string>, changed: Array<string>, deleted: Array<string>, } | { "result": "refused", code: string, };
+
+export type History = { revision: number, canUndo: boolean, canRedo: boolean, };

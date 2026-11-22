@@ -1,12 +1,30 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
-import { findEdge, fit, zoomAbout, type Viewport } from './canvas/draw';
-import type { Core, DiagramAt, OpenedFile, OpenResult, OutlineRow, Package, RecentFile, TextStyle } from './core/Core';
+import { findEdge, fit, keepInPlace, reveal, zoomAbout, type Viewport } from './canvas/draw';
+import type {
+  AddChoice,
+  Core,
+  DiagramAt,
+  DiagramNode,
+  EditResult,
+  ElementKind,
+  History,
+  NodeKind,
+  OpenedFile,
+  OpenResult,
+  OutlineRow,
+  Package,
+  RecentFile,
+  TextStyle,
+} from './core/Core';
+import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties, type Details } from './ElementProperties';
 import {
   ChevronDown,
   ChevronUp,
+  ContextMenu,
   DatumRoot,
+  MenuItem,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -16,6 +34,7 @@ import {
   StatusBarSpacer,
   Tree,
   Workspace,
+  type ContextMenuSource,
   type WorkspaceCopy,
   type WorkspaceHandle,
   type WorkspaceLayout,
@@ -25,7 +44,7 @@ import { initialTheme, translate, type Language, type MessageKey, type ThemeChoi
 import { StartError } from './core/start';
 import { wordRefusal } from './i18n/refusals';
 import { loadLayout, saveLayout } from './layout';
-import { isOpenShortcut } from './shortcuts';
+import { editShortcut, isOpenShortcut } from './shortcuts';
 import { MenuBar } from './MenuBar';
 import { ancestors, outlineTree, packageTree } from './outline';
 import { packageKind } from './i18n/packages';
@@ -46,7 +65,11 @@ type State =
   | { kind: 'empty' }
   | { kind: 'unreadable' }
   | { kind: 'relayoutFailed' }
-  | { kind: 'result'; result: OpenResult };
+  | { kind: 'result'; result: OpenResult }
+  | { kind: 'added'; added: NodeKind; identifier: string }
+  | { kind: 'undone' }
+  | { kind: 'redone' }
+  | { kind: 'editRefused'; code: string; about: NodeKind | null };
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -66,6 +89,14 @@ function message(state: State, t: T, language: Language): { text: string; tone?:
       return { text: t('unreadable'), tone: 'error' };
     case 'relayoutFailed':
       return { text: t('relayoutFailed'), tone: 'error' };
+    case 'added':
+      return { text: t('added', { kind: kindName(state.added, t), identifier: state.identifier }) };
+    case 'undone':
+      return { text: t('undone') };
+    case 'redone':
+      return { text: t('redone') };
+    case 'editRefused':
+      return { text: t('editRefused', { reason: refusalText(state.code, state.about, t) }), tone: 'error' };
     case 'result': {
       const result = state.result;
       if (result.result === 'opened') {
@@ -103,6 +134,20 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const [layout, setLayout] = useState<WorkspaceLayout>(loadLayout);
   const [theme, setTheme] = useState<ThemeChoice>(() => initialTheme(location.search));
   const input = useRef<HTMLInputElement>(null);
+  // What Edit ▸ Undo and Redo can do; null while nothing is open.
+  const [history, setHistory] = useState<History | null>(null);
+  // Counts the files opened: what resets for a new file does not reset for a
+  // new revision of the same one.
+  const [opened, setOpened] = useState(0);
+  // The add menu while it is open: for a node or the empty canvas, at a point
+  // in client coordinates.
+  const [addMenu, setAddMenu] = useState<{
+    parent: string | null;
+    about: NodeKind | null;
+    at: { x: number; y: number };
+    source: ContextMenuSource;
+    choices: AddChoice[];
+  } | null>(null);
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
 
   // A file given before the core is ready waits for it.
@@ -130,6 +175,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     setViewport(null);
     setSelected(null);
     setReading(false);
+    setHistory(null);
+    setAddMenu(null);
   }, []);
   /** A read that failed, unless a later request has started: nothing is open, in the core too. */
   const unreadable = useCallback(
@@ -155,14 +202,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       try {
         const { name, result } = await opening();
         const isOpen = result.result === 'opened';
-        const [next, rows, held] = isOpen ? await Promise.all([on.diagram(), on.outline(), on.packages()]) : [null, null, []];
+        const [next, rows, held, past] = isOpen
+          ? await Promise.all([on.diagram(), on.outline(), on.packages(), on.history()])
+          : [null, null, [], null];
         if (request !== latest.current) return;
         clear();
         shown.current = isOpen ? result.revision : null;
+        if (isOpen) setOpened((count) => count + 1);
         setState({ kind: 'result', result });
         setDiagram(next);
         setOutline(rows?.rows ?? []);
         setPackages(held);
+        setHistory(past);
         setFileName(isOpen ? name : null);
         refreshRecent(on);
       } catch {
@@ -418,6 +469,105 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const zoomBy = (factor: number) =>
     moveView((view) => view && zoomAbout(view, factor, centreSize.width / 2, centreSize.height / 2));
 
+  // The diagram and selection on screen, for an edit to keep a node in place.
+  const diagramRef = useRef(diagram);
+  diagramRef.current = diagram;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  /**
+   * Runs a command and shows what it gave: the new revision's diagram, with
+   * the view moved so that a node on screen before stays where it was, the
+   * added element selected and brought into view, and the trees as they were.
+   * A refusal changes nothing and says why. `anchor` is the node to keep in
+   * place first; `about` is the kind of node an add was asked for, which a
+   * refusal names.
+   */
+  const edit = useCallback(
+    async (run: (on: Core) => Promise<EditResult>, what: 'add' | 'undo' | 'redo', anchor: string | null, about: NodeKind | null) => {
+      const on = coreRef.current;
+      if (!on || shown.current === null) return;
+      const request = latest.current;
+      let result: EditResult;
+      try {
+        result = await run(on);
+      } catch {
+        if (request === latest.current) setState({ kind: 'relayoutFailed' });
+        return;
+      }
+      if (result.result === 'refused') {
+        if (request === latest.current) setState({ kind: 'editRefused', code: result.code, about });
+        return;
+      }
+      const added = result.element;
+      const [next, rows, held, past, details] = await Promise.all([
+        on.diagram(),
+        on.outline(),
+        on.packages(),
+        on.history(),
+        added ? on.element(added) : Promise.resolve(null),
+      ]);
+      // Another file was opened meanwhile, or a later command is on its way.
+      if (request !== latest.current || !next || next.revision !== result.revision) return;
+      shown.current = result.revision;
+      const before = diagramRef.current?.diagram.nodes ?? [];
+      const find = (nodes: readonly DiagramNode[], id: string | null) => (id ? nodes.find((node) => node.id === id) : undefined);
+      // The node to keep in place: the one asked about, else the selected one,
+      // else the first that is in both diagrams.
+      const kept =
+        find(before, anchor) ??
+        find(before, selectedRef.current) ??
+        before.find((node) => next.diagram.nodes.some((candidate) => candidate.id === node.id));
+      const keptAfter = kept && find(next.diagram.nodes, kept.id);
+      const addedNode = find(next.diagram.nodes, added);
+      setViewport((view) => {
+        if (!view) return view;
+        const placed = kept && keptAfter ? keepInPlace(view, kept.bounds, keptAfter.bounds) : view;
+        return addedNode ? reveal(placed, addedNode.bounds, centreSize.width, centreSize.height) : placed;
+      });
+      setDiagram(next);
+      setOutline(rows?.rows ?? []);
+      setPackages(held);
+      setHistory(past);
+      if (added) setSelected(added);
+      else {
+        const stays = (id: string) => next.diagram.nodes.some((node) => node.id === id) || findEdge(next.diagram, id) !== null;
+        setSelected((current) => (current && stays(current) ? current : null));
+      }
+      if (what === 'add' && details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
+      else if (what !== 'add') setState({ kind: what === 'undo' ? 'undone' : 'redone' });
+    },
+    [centreSize],
+  );
+  const undo = useCallback(() => void edit((on) => on.undo(), 'undo', null, null), [edit]);
+  const redo = useCallback(() => void edit((on) => on.redo(), 'redo', null, null), [edit]);
+
+  /** Opens the add menu of a node, or of the empty canvas, at a client point: the node is selected first. */
+  const openAddMenu = useCallback((parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return;
+    if (parent) setSelected(parent);
+    on.addChoices(parent).then(
+      (answer) => {
+        // The document changed before the answer came: the menu would be for another revision.
+        if (!answer || answer.revision !== revision || shown.current !== revision) return;
+        const about = find(parent);
+        setAddMenu({ parent, about, at, source, choices: answer.choices });
+      },
+      () => undefined,
+    );
+    function find(id: string | null): NodeKind | null {
+      if (!id) return null;
+      return diagramRef.current?.diagram.nodes.find((node) => node.id === id)?.kind ?? null;
+    }
+  }, []);
+  /** A kind chosen from the add menu. */
+  const chooseAdd = (kind: ElementKind) => {
+    const menu = addMenu;
+    setAddMenu(null);
+    if (menu) void edit((on) => on.add(menu.parent, kind), 'add', menu.parent, menu.about);
+  };
+
   // What Element Properties shows: the core's details of the selected node or
   // relationship, read again when the diagram is (its text follows the
   // language). An answer for a selection that has since changed is dropped.
@@ -464,14 +614,14 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const argument = useMemo(() => outlineTree(outline), [outline]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // A new file's tree starts open, as the C++ application's does. The same
-  // file in another language keeps the branches the user closed.
+  // file in another language, or at a new revision, keeps the branches the
+  // user closed.
   const expandedFor = useRef<number | null>(null);
-  const revision = diagram?.revision ?? null;
   useEffect(() => {
-    if (revision === expandedFor.current) return;
-    expandedFor.current = revision;
+    if (opened === expandedFor.current) return;
+    expandedFor.current = opened;
     setExpanded(new Set(argument.branches));
-  }, [revision, argument]);
+  }, [opened, argument]);
   // A node selected on the canvas shows in the tree: its ancestors open.
   useEffect(() => {
     if (!selected) return;
@@ -567,16 +717,30 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       // open menu or dialog, or a field being typed in.
       const target = event.target instanceof Element ? event.target : null;
       const busy = target?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"]');
-      if (event.defaultPrevented || busy || !isOpenShortcut(event)) return;
+      if (event.defaultPrevented || busy) return;
+      // Ctrl+Z and Ctrl+Y (⌘Z and ⇧⌘Z), as Edit ▸ Undo and Redo say.
+      const command = editShortcut(event);
+      if (command) {
+        event.preventDefault();
+        if (command === 'undo' && history?.canUndo) undo();
+        if (command === 'redo' && history?.canRedo) redo();
+        return;
+      }
+      if (!isOpenShortcut(event)) return;
       event.preventDefault();
       // As the File menu: nothing to open into until the core has started.
       if (core) chooseFile();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [chooseFile, core]);
+  }, [chooseFile, core, history, undo, redo]);
 
   const status = message(state, t, language);
+  // The add menu is named after what it adds to: "Goal G3", or "Add" on the empty canvas.
+  const menuNode = addMenu?.parent ? diagram?.diagram.nodes.find((node) => node.id === addMenu.parent) : undefined;
+  const menuOutline = addMenu?.parent ? outline.find((row) => row.id === addMenu.parent) : undefined;
+  const addMenuLabel =
+    menuNode && menuOutline ? `${kindName(menuNode.kind, t)} ${menuOutline.identifier}` : t('addMenu');
   const hasFile = diagram !== null;
   // The welcome page shows while nothing is open, once the shell has said
   // whether it was started with a file and no file is being read.
@@ -592,6 +756,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         onRecent={openRecent}
         canClose={hasFile}
         onClose={closeFile}
+        history={hasFile ? history : null}
+        onUndo={undo}
+        onRedo={redo}
         panels={hasFile ? { all: panelNames, showing, onChange: setPanels } : null}
         theme={theme}
         onThemeChange={setTheme}
@@ -706,8 +873,29 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               selected={selected}
               onSelect={setSelected}
               onTextStyle={onTextStyle}
+              onContextMenu={openAddMenu}
             />
           </Workspace>
+        )}
+        {hasFile && (
+          // Beside the canvas, not in it: the menu's keys must not reach the canvas.
+          <ContextMenu
+            label={addMenuLabel}
+            open={addMenu !== null}
+            position={addMenu?.at ?? null}
+            openedBy={addMenu?.source}
+            onOpenChange={(open) => {
+              if (!open) setAddMenu(null);
+            }}
+            onAction={(id) => chooseAdd(id as ElementKind)}
+          >
+            {addMenu &&
+              addItems(addMenu.choices, addMenu.about, t).map((item) => (
+                <MenuItem key={item.kind} id={item.kind} unavailable={item.unavailable} note={item.note ?? undefined}>
+                  {item.label}
+                </MenuItem>
+              ))}
+          </ContextMenu>
         )}
       </div>
       <StatusBar>

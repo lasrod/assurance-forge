@@ -10,9 +10,12 @@
 //! It does no I/O and must build for `wasm32-unknown-unknown`.
 //!
 //! Built so far: the view, [`view::view`], which follows the reading rules in
-//! `docs/standards/sacm-gsn-mapping.md` ("Reading a SACM 2.3 file as GSN").
+//! `docs/standards/sacm-gsn-mapping.md` ("Reading a SACM 2.3 file as GSN"),
+//! and the commands that add elements, [`commands`], which follow its writing
+//! rules ("Writing GSN as SACM").
 //! Rule ids in comments (R1, E5a, T3 and so on) are that section's.
 
+pub mod commands;
 pub mod view;
 
 /// The GSN element kinds of the GSN Community Standard Version 3 core notation.

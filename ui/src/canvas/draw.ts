@@ -392,3 +392,32 @@ function drawFarIdentifier(context: CanvasRenderingContext2D, node: DiagramNode,
   context.fillText(identifier.text, rect.x + (rect.width - width) / 2, rect.y + rect.height / 2);
   context.textBaseline = 'alphabetic';
 }
+
+/**
+ * The view moved so that `bounds` (diagram units) is wholly in a canvas of
+ * `width` × `height` CSS px, centred, or `viewport` itself when it already
+ * is. The zoom stays.
+ */
+export function reveal(viewport: Viewport, bounds: Rect, width: number, height: number): Viewport {
+  const left = bounds.x * viewport.scale + viewport.offsetX;
+  const top = bounds.y * viewport.scale + viewport.offsetY;
+  const [shownWidth, shownHeight] = [bounds.width * viewport.scale, bounds.height * viewport.scale];
+  if (left >= 0 && top >= 0 && left + shownWidth <= width && top + shownHeight <= height) return viewport;
+  return {
+    ...viewport,
+    offsetX: viewport.offsetX + (width - shownWidth) / 2 - left,
+    offsetY: viewport.offsetY + (height - shownHeight) / 2 - top,
+  };
+}
+
+/**
+ * The view moved so that a node laid out again from `before` to `after`
+ * (diagram units) stays where it was on the screen. The zoom stays.
+ */
+export function keepInPlace(viewport: Viewport, before: Rect, after: Rect): Viewport {
+  return {
+    ...viewport,
+    offsetX: viewport.offsetX + (before.x - after.x) * viewport.scale,
+    offsetY: viewport.offsetY + (before.y - after.y) * viewport.scale,
+  };
+}

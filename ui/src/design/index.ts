@@ -9,6 +9,7 @@ import './styles.css';
 
 export {
   Button,
+  ContextMenu,
   DatumRoot,
   ListBox,
   MenuBar,
@@ -29,6 +30,7 @@ export {
   Workspace,
 } from '@datum-ui/react';
 export type {
+  ContextMenuSource,
   QuantityDef,
   Theme,
   TreeNode,

@@ -5,6 +5,7 @@
 //! fonts and hands in bytes; nothing here touches the network or storage.
 
 use af_api::Core;
+use af_api::contract::ElementKind;
 use af_layout::{Fonts, Style};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -75,6 +76,39 @@ impl WasmCore {
             .relationship(id)
             .map(|details| json(&details))
             .transpose()
+    }
+
+    /// `AddChoices` as JSON for the node `parent`, or for the empty canvas
+    /// when `None`; `None` when nothing is open.
+    #[wasm_bindgen(js_name = addChoices)]
+    pub fn add_choices(&self, parent: Option<String>) -> Result<Option<String>, JsError> {
+        self.core
+            .add_choices(parent.as_deref())
+            .map(|choices| json(&choices))
+            .transpose()
+    }
+
+    /// Adds an element of `kind` (an `ElementKind`, such as `goal`) under the
+    /// node `parent`, or at the top level when `None`. `EditResult` as JSON.
+    pub fn add(&mut self, parent: Option<String>, kind: &str) -> Result<String, JsError> {
+        let kind: ElementKind = serde_json::from_value(serde_json::Value::String(kind.to_owned()))
+            .map_err(|_| JsError::new("core-kind"))?;
+        json(&self.core.add(parent.as_deref(), kind))
+    }
+
+    /// Takes back the last command. `EditResult` as JSON.
+    pub fn undo(&mut self) -> Result<String, JsError> {
+        json(&self.core.undo())
+    }
+
+    /// Makes again the last command undo took back. `EditResult` as JSON.
+    pub fn redo(&mut self) -> Result<String, JsError> {
+        json(&self.core.redo())
+    }
+
+    /// `History` as JSON: whether Undo and Redo can be chosen.
+    pub fn history(&self) -> Result<String, JsError> {
+        json(&self.core.history())
     }
 
     /// `Outline` as JSON, or `None` when nothing is open.
