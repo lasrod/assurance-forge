@@ -22,7 +22,7 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]
 # Pinned: the versions the desktop-shell spike ran, at least two weeks old.
-tauri-build = { version = "=2.7.4", features = [] }
+tauri-build = { version = "=2.7.6", features = [] }
 
 [dependencies]
 af-api = { path = "../af-api" }
