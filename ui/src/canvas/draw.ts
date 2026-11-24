@@ -4,20 +4,28 @@
 
 import type { Diagram, DiagramEdge, DiagramNode, Point, Rect } from '../core/Core';
 
+/**
+ * The diagram's own colours (`--af-diagram-*` in app.css): a ground apart
+ * from the panels' surfaces, with the nodes as paper on it.
+ */
 export interface Palette {
-  /** `surface.canvas`: the ground and the node fill. */
+  /** The ground the diagram is on. */
   ground: string;
-  /** `line.control`: outlines, connectors, arrowheads. */
+  /** The dots of the ground's grid. */
+  grid: string;
+  /** A node's fill. */
+  fill: string;
+  /** Outlines, connectors, arrowheads. */
   line: string;
-  /** `text.primary`. */
+  /** A node's text. */
   text: string;
-  /** `text.secondary`: the identifier. */
+  /** The identifier. */
   secondary: string;
-  /** `surface.hover`: the fill of the node under the pointer. */
+  /** The fill of the node under the pointer. */
   hover: string;
-  /** `selection.surface`: the selected node's fill. */
+  /** The selected node's fill. */
   selectedFill: string;
-  /** `selection.indicator`: the selected node's outline, and a selected line. */
+  /** The selected node's outline, and a selected line. */
   selectedLine: string;
   /** Forced colours are on: the selected outline is heavier, since there is no fill to see. */
   forced: boolean;
@@ -236,6 +244,7 @@ export function draw(
   context.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
   context.fillStyle = palette.ground;
   context.fillRect(0, 0, size.width, size.height);
+  drawGrid(context, viewport, palette, size);
   context.setTransform(size.dpr * scale, 0, 0, size.dpr * scale, size.dpr * offsetX, size.dpr * offsetY);
   context.lineWidth = 1 / scale;
   context.lineJoin = 'round';
@@ -257,6 +266,27 @@ export function draw(
     drawn.nodes += 1;
   }
   return drawn;
+}
+
+/** The grid's pitch, in diagram units. */
+export const GRID = 24;
+/** Dots closer than this, in CSS px, are not drawn: they would be a tint, not a grid. */
+const SMALLEST_GRID_PX = 12;
+
+/**
+ * The ground's dots: one each `GRID` diagram units, so they move and scale
+ * with the diagram and say where it is. Each is one CSS px at every zoom.
+ */
+function drawGrid(context: CanvasRenderingContext2D, viewport: Viewport, palette: Palette, size: { width: number; height: number }) {
+  const pitch = GRID * viewport.scale;
+  if (palette.forced || pitch < SMALLEST_GRID_PX) return;
+  context.fillStyle = palette.grid;
+  const first = (offset: number) => ((offset % pitch) + pitch) % pitch;
+  for (let y = first(viewport.offsetY); y < size.height; y += pitch) {
+    for (let x = first(viewport.offsetX); x < size.width; x += pitch) {
+      context.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+  }
 }
 
 function polyline(context: CanvasRenderingContext2D, points: Point[]) {
@@ -335,7 +365,7 @@ function drawNode(
   const selected = marks.selected === node.id;
   const hovered = marks.hovered === node.id;
   shapePath(context, node);
-  context.fillStyle = selected ? palette.selectedFill : hovered ? palette.hover : palette.ground;
+  context.fillStyle = selected ? palette.selectedFill : hovered ? palette.hover : palette.fill;
   context.fill();
   context.strokeStyle = selected ? palette.selectedLine : palette.line;
   context.lineWidth = (selected && palette.forced ? 2 : 1) / scale;

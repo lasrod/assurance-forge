@@ -43,10 +43,10 @@ describe('outlineTree', () => {
 
   it('shows the identifier after the name, and typeahead finds either', () => {
     const [node] = outlineTree([row('g1', 1)]).nodes;
-    expect(node).toMatchObject({ value: 'g1', label: 'Name of g1', textValue: 'G1 Name of g1' });
+    expect(node).toMatchObject({ value: 'g1', label: { props: { title: 'Name of g1', children: 'Name of g1' } }, textValue: 'G1 Name of g1' });
     expect(node?.meta).toMatchObject({ props: { children: 'G1' } });
     const [bare] = outlineTree([row('g1', 1, { name: null })]).nodes;
-    expect(bare).toMatchObject({ label: 'G1', meta: undefined });
+    expect(bare).toMatchObject({ label: { props: { children: 'G1' } }, meta: undefined });
   });
 });
 
@@ -59,7 +59,7 @@ describe('packageTree', () => {
       ],
       (kind) => `<${kind}>`,
     );
-    expect(nodes[0]).toMatchObject({ label: 'Braking', meta: { props: { children: '<AssuranceCasePackage>' } } });
-    expect(nodes[0]?.children?.[0]).toMatchObject({ label: 'arg', meta: { props: { children: '<ArgumentPackage>' } } });
+    expect(nodes[0]).toMatchObject({ label: { props: { title: 'Braking', children: 'Braking' } }, meta: { props: { children: '<AssuranceCasePackage>' } } });
+    expect(nodes[0]?.children?.[0]).toMatchObject({ label: { props: { children: 'arg' } }, meta: { props: { children: '<ArgumentPackage>' } } });
   });
 });

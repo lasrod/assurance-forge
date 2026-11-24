@@ -148,7 +148,7 @@ test('a recent file still being read does not replace a file chosen after it', a
   await expect(page).toHaveTitle('chosen-last.sacm.xmi – Assurance Forge');
   expect((await hook(page))!.revision).toBe(revision);
   await page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem', { name: /TopClaim/ }).click();
-  await expect(page.getByTestId('element-properties')).toContainText('cl_top');
+  await expect(page.getByTestId('element-identifier')).toHaveValue('cl_top');
 });
 
 test('Clear recent files empties the list, and it stays empty', async ({ page }) => {

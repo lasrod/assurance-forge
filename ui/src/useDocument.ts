@@ -18,6 +18,7 @@ import type {
   OutlineRow,
   Package,
   RecentFile,
+  TextField,
   TextStyle,
 } from './core/Core';
 import { StartError } from './core/start';
@@ -38,6 +39,7 @@ export type DocumentState =
   | { kind: 'relayoutFailed' }
   | { kind: 'result'; result: OpenResult }
   | { kind: 'added'; added: NodeKind; identifier: string }
+  | { kind: 'textChanged'; field: TextField }
   | { kind: 'undone' }
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null };
@@ -344,33 +346,37 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    * Runs a command and shows what it gave: the new revision's diagram, trees
    * and history, with `onShown` told in the same update so the view follows
    * before it is painted. A refusal changes nothing and says why. `about` is
-   * the kind of node an add was asked for, which a refusal names.
+   * the kind of node an add was asked for, which a refusal names. Answers
+   * whether the document changed.
    */
   const edit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo',
+      what: 'add' | 'undo' | 'redo' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
-    ) => {
+    ): Promise<boolean> => {
       const on = coreRef.current;
-      if (!on || shown.current === null) return;
+      if (!on || shown.current === null) return false;
       const request = latest.current;
       let result: EditResult;
       try {
         result = await run(on);
       } catch {
         if (request === latest.current) setState({ kind: 'relayoutFailed' });
-        return;
+        return false;
       }
+      // A text set to what it was: nothing to show.
+      if (result.result === 'unchanged') return false;
+      const history = what === 'undo' || what === 'redo';
       if (result.result === 'refused') {
         // Edit ▸ Undo and Redo are greyed when there is nothing to do, so
         // AF-EDIT-008 comes only from keys sent before an answer: the undos
         // the user wanted were made, and the status says so already.
-        const raced = what !== 'add' && result.code === 'AF-EDIT-008';
+        const raced = history && result.code === 'AF-EDIT-008';
         if (request === latest.current && !raced) setState({ kind: 'editRefused', code: result.code, about });
-        return;
+        return false;
       }
       const added = result.element;
       let answers;
@@ -390,11 +396,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
           shown.current = result.revision;
           setState({ kind: 'relayoutFailed' });
         }
-        return;
+        return true;
       }
       const [next, rows, held, past, details] = answers;
       // Another file was opened meanwhile, or a later command is on its way.
-      if (request !== latest.current || !next || next.revision !== result.revision) return;
+      if (request !== latest.current || !next || next.revision !== result.revision) return true;
       shown.current = result.revision;
       onShown(diagramRef.current, next, anchor, added);
       // As every answer: shown only if no older a layout than the one shown.
@@ -413,15 +419,18 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
           () => undefined,
         );
       }
-      if (what === 'add' && details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
-      else if (what !== 'add') setState({ kind: what === 'undo' ? 'undone' : 'redone' });
+      if (what === 'add') {
+        if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
+      } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
+      else setState({ kind: 'textChanged', field: what });
+      return true;
     },
     [showRelayout],
   );
   // Undos and redos on their way: a key held down sends no more until they
   // are answered, since Edit ▸ Undo's state is of the revision before them.
   const editing = useRef(0);
-  const track = useCallback((running: Promise<void>) => {
+  const track = useCallback((running: Promise<unknown>) => {
     editing.current += 1;
     void running.finally(() => {
       editing.current -= 1;
@@ -438,6 +447,16 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const add = useCallback(
     (parent: string | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
       void edit((on) => on.add(parent, kind, revision), 'add', parent, about, onShown),
+    [edit],
+  );
+  /**
+   * Sets the identifier, name or statement of the node `id`, of kind `about`.
+   * Answers whether the document changed: false when the text was that
+   * already, or the core refused it, which the status then says.
+   */
+  const setText = useCallback(
+    (id: string, field: TextField, text: string, about: NodeKind | null, onShown: EditShown) =>
+      edit((on) => on.setText(id, field, text), field, id, about, onShown),
     [edit],
   );
   /**
@@ -508,6 +527,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     setTextStyle,
     addChoices,
     add,
+    setText,
     undo,
     redo,
     editsPending,

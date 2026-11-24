@@ -6,6 +6,87 @@
     margin: 0;
   }
 
+  /* The panels are dense: an argument has hundreds of elements, and the
+     trees and the properties should show as many as the window can. DATUM's
+     compact density stops at 32px controls and 14px text; these are the same
+     tokens, set tighter, on every DATUM root, so menus and other overlays
+     (which are roots of their own) follow. The diagram keeps DATUM's sizes
+     (.af-canvas-host below). */
+  [data-datum] {
+    --datum-type-control-size: 0.75rem;
+    --datum-type-control-line-height: 1rem;
+    --datum-type-metadata-size: 0.6875rem;
+    --datum-type-metadata-line-height: 0.875rem;
+    --datum-control-height: 1.5rem;
+    --datum-control-pad-inline: var(--datum-space-8);
+    --datum-row-gap: 2px;
+    --datum-list-row-height: 1.25rem;
+  }
+
+  /* A panel's title is a label for its content, not a heading over it: the
+     size of the text under it, heavier, in a header one control high. */
+  .datum-panel-header {
+    min-block-size: calc(var(--datum-control-height) + var(--datum-space-4));
+    padding-inline: var(--datum-space-8);
+  }
+
+  .datum-panel-title {
+    font-size: var(--datum-type-control-size);
+    line-height: var(--datum-type-control-line-height);
+    font-weight: var(--datum-font-weight-semibold);
+  }
+
+  /* A closed dock's rail names its panels as their titles do: the same
+     weight, starting where a title starts, in a bar as high as a header. */
+  .datum-rail[data-orientation="horizontal"] {
+    padding: 2px 0;
+  }
+
+  .datum-rail > .datum-button[data-workspace-rail-view] {
+    font-weight: var(--datum-font-weight-semibold);
+  }
+
+  /* The diagram's own colours: a cool ground with a grid, apart from the
+     panels' warm surfaces, and the nodes as paper on it. Light, then dark as
+     DATUM chooses it: by the theme set on the root, else the system's. */
+  [data-datum] {
+    --af-diagram-ground: #e4e9ef;
+    --af-diagram-grid: #bcc6d2;
+    --af-diagram-fill: #ffffff;
+    --af-diagram-line: #364250;
+    --af-diagram-text: #161c23;
+    --af-diagram-secondary: #4d5a69;
+    --af-diagram-hover: #eef4fb;
+    --af-diagram-selected-fill: #d9e8fb;
+    --af-diagram-selected-line: #1a5fc4;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    [data-datum]:not([data-datum-theme="light"]) {
+      --af-diagram-ground: #0a0d12;
+      --af-diagram-grid: #232b36;
+      --af-diagram-fill: #1b232e;
+      --af-diagram-line: #93a3b5;
+      --af-diagram-text: #eef2f6;
+      --af-diagram-secondary: #a7b4c2;
+      --af-diagram-hover: #25303d;
+      --af-diagram-selected-fill: #1a3353;
+      --af-diagram-selected-line: #74b4ff;
+    }
+  }
+
+  [data-datum][data-datum-theme="dark"] {
+    --af-diagram-ground: #0a0d12;
+    --af-diagram-grid: #232b36;
+    --af-diagram-fill: #1b232e;
+    --af-diagram-line: #93a3b5;
+    --af-diagram-text: #eef2f6;
+    --af-diagram-secondary: #a7b4c2;
+    --af-diagram-hover: #25303d;
+    --af-diagram-selected-fill: #1a3353;
+    --af-diagram-selected-line: #74b4ff;
+  }
+
   /* The frame: the menu bar and the status bar sit on it, at its edges. */
   .af-app {
     display: grid;
@@ -58,41 +139,79 @@
     }
   }
 
-  /* A row's trailing text (an identifier, a kind, a count) stays on one line; the name wraps. */
+  /* A tree row is one line: a name too long for the dock is cut with an
+     ellipsis, and the dock can be widened. Its trailing text (an identifier,
+     a kind) is kept whole. */
+  .datum-tree > .datum-list-item {
+    padding-block: 0;
+    gap: var(--datum-space-4);
+  }
+
+  .datum-tree .datum-list-item-label {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .datum-tree .datum-list-item-meta {
+    flex: none;
+  }
+
   .af-tree-meta {
     white-space: nowrap;
   }
 
-  /* What is selected: its name, then its identifier and kind, smaller. */
-  .af-element-title {
+  /* The texts of the selected element that are edited: label beside field
+     for a single line, label over field for prose, which needs the width. */
+  .af-text-properties {
     display: grid;
-    gap: var(--datum-space-4);
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--datum-space-4) var(--datum-space-8);
+    align-items: center;
     margin-block-end: var(--datum-space-8);
   }
 
-  .af-element-name,
-  .af-element-meta {
-    margin: 0;
-    overflow-wrap: anywhere;
+  .af-text-property {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
   }
 
-  .af-element-name {
-    font-weight: var(--datum-font-weight-semibold);
+  .af-text-property[data-multiline] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 
-  .af-element-meta {
-    font-size: var(--datum-type-metadata-size);
-    line-height: var(--datum-type-metadata-line-height);
+  .af-text-label {
     color: var(--datum-text-secondary);
   }
 
-  .af-element-identifier {
+  /* A text that is not edited, on the fields' columns: it starts where
+     their text does. */
+  .af-text-value {
+    margin: 0;
+    padding-inline: calc(var(--datum-space-8) + var(--datum-stroke-structural));
+    overflow-wrap: anywhere;
+  }
+
+  .af-text-value[data-mono] {
     font-family: var(--datum-font-family-mono);
   }
 
-  /* The statement is prose: a paragraph above the properties. */
-  .af-statement {
-    margin: 0 0 var(--datum-space-8);
+  .af-text-input[data-mono] {
+    font-family: var(--datum-font-family-mono);
+  }
+
+  /* Prose grows with what it says, where the browser can size a field to its
+     content; elsewhere it is three lines and scrolls. */
+  textarea.af-text-input {
+    display: block;
+    padding-block: var(--datum-space-4);
+    resize: vertical;
+    field-sizing: content;
+    min-block-size: calc(3 * var(--datum-type-control-line-height) + 2 * var(--datum-space-4) + 2px);
+    max-block-size: 40vh;
     overflow-wrap: anywhere;
   }
 
@@ -180,10 +299,17 @@
     justify-content: end;
   }
 
+  /* The diagram is not dense: its text keeps DATUM's sizes, which the
+     layout measures with. */
   .af-canvas-host {
     position: absolute;
     inset: 0;
     overflow: hidden;
+    background: var(--af-diagram-ground);
+    --datum-type-control-size: 0.875rem;
+    --datum-type-control-line-height: 1.25rem;
+    --datum-type-metadata-size: 0.75rem;
+    --datum-type-metadata-line-height: 1rem;
   }
 
   .af-canvas {

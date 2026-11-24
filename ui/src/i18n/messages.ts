@@ -63,7 +63,7 @@ const en = {
   propertyType: 'Type',
   propertyId: 'ID',
   propertyName: 'Name',
-  propertyStatement: 'Statement',
+  propertyStatement: 'Description',
   propertySacmId: 'SACM ID',
   propertyCodes: 'View codes',
   propertyNone: 'None',
@@ -119,6 +119,9 @@ const en = {
   added: '{kind} {identifier} added.',
   undone: 'Undone.',
   redone: 'Redone.',
+  textChanged: '{field} changed.',
+  fieldHint: 'Enter applies, Escape cancels.',
+  statementHint: 'Ctrl+Enter applies, Escape cancels.',
   editRefused: 'Nothing changed. {reason}',
   'AF-EDIT-001': 'A {kind} is a leaf in GSN: nothing goes under it.',
   'AF-EDIT-002': 'This element’s GSN type is not known.',
@@ -129,7 +132,11 @@ const en = {
   'AF-EDIT-007': 'Nothing is open.',
   'AF-EDIT-008': 'There is nothing to undo or redo.',
   'AF-EDIT-009': 'The argument changed after the menu opened. Open the menu again.',
-  'AF-EDIT-010': 'The element could not be added: the file refused the change. This is a fault in Assurance Forge.',
+  'AF-EDIT-010': 'The change could not be made: the file refused it. This is a fault in Assurance Forge.',
+  'AF-EDIT-011': 'Only an element of the diagram has its text changed.',
+  'AF-EDIT-012': 'An ID cannot be empty.',
+  'AF-EDIT-013': 'Another element of the file has that ID.',
+  'AF-EDIT-014': 'This text is the value of a terminology expression, and is not changed here.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -194,7 +201,7 @@ const ja: Record<MessageKey, string> = {
   propertyType: '種別',
   propertyId: 'ID',
   propertyName: '名前',
-  propertyStatement: '記述',
+  propertyStatement: '説明',
   propertySacmId: 'SACM ID',
   propertyCodes: '表示コード',
   propertyNone: 'なし',
@@ -250,6 +257,9 @@ const ja: Record<MessageKey, string> = {
   added: '{kind} {identifier} を追加しました。',
   undone: '元に戻しました。',
   redone: 'やり直しました。',
+  textChanged: '{field}を変更しました。',
+  fieldHint: 'Enter で確定、Escape で取り消し。',
+  statementHint: 'Ctrl+Enter で確定、Escape で取り消し。',
   editRefused: '変更していません。{reason}',
   'AF-EDIT-001': 'GSN では{kind}は末端です。下には何も置けません。',
   'AF-EDIT-002': 'この要素の GSN の種類が分かりません。',
@@ -260,7 +270,11 @@ const ja: Record<MessageKey, string> = {
   'AF-EDIT-007': '何も開いていません。',
   'AF-EDIT-008': '元に戻す、またはやり直す操作がありません。',
   'AF-EDIT-009': 'メニューを開いた後に論証が変わりました。もう一度メニューを開いてください。',
-  'AF-EDIT-010': '要素を追加できませんでした。ファイルが変更を受け付けませんでした。Assurance Forge の不具合です。',
+  'AF-EDIT-010': '変更できませんでした。ファイルが変更を受け付けませんでした。Assurance Forge の不具合です。',
+  'AF-EDIT-011': '文字を変更できるのは図の要素だけです。',
+  'AF-EDIT-012': 'ID は空にできません。',
+  'AF-EDIT-013': 'その ID はファイルの別の要素が使っています。',
+  'AF-EDIT-014': 'この文字は用語の式の値のため、ここでは変更できません。',
 };
 
 const MESSAGES: Record<Language, Record<MessageKey, string>> = { en, ja };

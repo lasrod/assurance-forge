@@ -1,10 +1,14 @@
 // The Element Properties panel: what the selected node or connection is, read
-// from the core (`element(id)`, `relationship(id)`). Nothing here is edited
-// yet.
+// from the core (`element(id)`, `relationship(id)`). An element's identifier,
+// name and description are edited here; each change is a command of the core.
 
-import type { DiagramEdge, EdgeKind, ElementDetails, NodeKind, RelationshipDetails, RelationshipEnd } from './core/Core';
+import type { DiagramEdge, EdgeKind, ElementDetails, NodeKind, RelationshipDetails, RelationshipEnd, TextField } from './core/Core';
 import { PropertyGrid, PropertyRow, Section } from './design';
 import type { MessageKey } from './i18n/messages';
+import { TextProperty } from './TextProperty';
+
+/** Sets a text of the element `id`, of kind `about`; answers whether it is now that. */
+export type OnText = (id: string, field: TextField, text: string, about: NodeKind) => Promise<boolean>;
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -60,43 +64,55 @@ export function lineEnds(details: Extract<Details, { type: 'relationship' }>, t:
   return { from: label(edge.from, false), to: label(edge.to, edge.toRelationship) };
 }
 
-function ElementSection({ details, t }: { details: ElementDetails; t: T }) {
-  const none = t('propertyNone');
+function ElementSection({ details, t, onText }: { details: ElementDetails; t: T; onText: OnText }) {
+  const set = (field: TextField) => (text: string) => onText(details.id, field, text, details.kind);
   return (
     <div data-testid="element-properties">
       <Section title={t('sectionElement')}>
-        {/* What is selected, as the diagram names it: its name, then its
-            identifier and kind. With no name, the identifier is the title,
-            once, and the kind is under it. */}
-        <div className="af-element-title" data-testid="element-title">
-          <p className="af-element-name">{details.name || details.identifier}</p>
-          <p className="af-element-meta">
-            {details.name && (
-              <>
-                <span className="af-element-identifier">{details.identifier}</span>
-                <span aria-hidden="true"> · </span>
-              </>
-            )}
-            {kindLabel(details, t)}
-          </p>
-        </div>
-        {/* The statement is prose, so it is a paragraph that wraps, not a property value. */}
-        {details.statement && (
-          <p className="af-statement" data-testid="element-statement">
-            {details.statement}
-          </p>
-        )}
-        {/* The values are words, not quantities: they start-align and wrap. */}
-        <PropertyGrid data-values="text" className="af-properties">
-          <PropertyRow label={t('propertyType')} value={kindLabel(details, t)} />
-          <PropertyRow label={t('propertyId')} value={details.identifier} mono />
-          <PropertyRow label={t('propertyName')} value={details.name} missingLabel={none} />
-          {!details.statement && <PropertyRow label={t('propertyStatement')} value={null} missingLabel={none} />}
-          <PropertyRow label={t('propertySacmId')} value={details.id} mono />
+        {/* As the element reads: its identifier, its name, then what it says.
+            The SACM id is the file's own and is not shown: relationships
+            name it, and it never changes. The fields are keyed by the
+            element, so a draft never moves to another one. */}
+        <div className="af-text-properties" key={details.id}>
+          <TextProperty
+            label={t('propertyId')}
+            value={details.identifier}
+            onCommit={set('identifier')}
+            hint={t('fieldHint')}
+            mono
+            data-testid="element-identifier"
+          />
+          <TextProperty
+            label={t('propertyName')}
+            value={details.name ?? ''}
+            onCommit={set('name')}
+            hint={t('fieldHint')}
+            data-testid="element-name"
+          />
+          <TextProperty
+            label={t('propertyStatement')}
+            value={details.statement ?? ''}
+            onCommit={set('statement')}
+            hint={t('statementHint')}
+            multiline
+            data-testid="element-statement"
+          />
+          {/* What it is, and what the view says of it: not edited here. */}
+          <div className="af-text-property">
+            <span className="af-text-label">{t('propertyType')}</span>
+            <p className="af-text-value" data-testid="element-type">
+              {kindLabel(details, t)}
+            </p>
+          </div>
           {details.codes.length > 0 && (
-            <PropertyRow label={t('propertyCodes')} value={details.codes.map((code) => code.code).join(', ')} mono />
+            <div className="af-text-property">
+              <span className="af-text-label">{t('propertyCodes')}</span>
+              <p className="af-text-value" data-mono="">
+                {details.codes.map((code) => code.code).join(', ')}
+              </p>
+            </div>
           )}
-        </PropertyGrid>
+        </div>
       </Section>
     </div>
   );
@@ -135,10 +151,10 @@ function RelationshipSection({ selected, t }: { selected: Extract<Details, { typ
   );
 }
 
-export function ElementProperties({ details, t }: { details: Details | null; t: T }) {
+export function ElementProperties({ details, t, onText }: { details: Details | null; t: T; onText: OnText }) {
   if (!details) return <p className="datum-meta af-dock-empty">{t('elementPropertiesEmpty')}</p>;
   return details.type === 'element' ? (
-    <ElementSection details={details.element} t={t} />
+    <ElementSection details={details.element} t={t} onText={onText} />
   ) : (
     <RelationshipSection selected={details} t={t} />
   );
