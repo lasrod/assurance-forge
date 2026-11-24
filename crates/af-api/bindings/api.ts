@@ -219,6 +219,8 @@ export type Diagram = { nodes: Array<DiagramNode>, edges: Array<DiagramEdge>, bo
 
 export type ElementKind = "goal" | "strategy" | "solution" | "context" | "assumption" | "justification";
 
+export type TextField = "identifier" | "name" | "statement";
+
 export type AddChoice = { kind: ElementKind, 
 /**
  * Why it cannot be added there (`AF-EDIT-001` to `AF-EDIT-006`), or
@@ -240,12 +242,13 @@ choices: Array<AddChoice>, };
 export type EditResult = { "result": "applied", revision: number, 
 /**
  * The element the command added, which the interface selects: for
- * a Strategy, the Strategy. Null for undo and redo.
+ * a Strategy, the Strategy. Null for undo, redo and a change of
+ * text.
  */
 element: string | null, 
 /**
  * The SACM ids the command created, changed and deleted.
  */
-created: Array<string>, changed: Array<string>, deleted: Array<string>, } | { "result": "refused", code: string, };
+created: Array<string>, changed: Array<string>, deleted: Array<string>, } | { "result": "refused", code: string, } | { "result": "unchanged" };
 
 export type History = { revision: number, canUndo: boolean, canRedo: boolean, };

@@ -754,15 +754,27 @@ fn first_content(text: Option<&sacm::model::MultiLangString>) -> Option<&str> {
 
 /// The content of the tagged value with `key`, if the element has one.
 pub(crate) fn tagged_value<'a>(element: SacmElement<'a>, key: &str) -> Option<&'a str> {
+    tagged(element, key).and_then(|tag| first_content(tag.content()))
+}
+
+/// The tagged value with `key`, if the element has one.
+pub(crate) fn tagged<'a>(element: SacmElement<'a>, key: &str) -> Option<SacmElement<'a>> {
     element
         .tagged_values()
         .find(|tag| first_content(tag.key()) == Some(key))
-        .and_then(|tag| first_content(tag.content()))
 }
 
 /// T3: the value in `language`, else one with the same primary subtag, else
 /// the first.
 fn in_language<'a>(values: &'a [sacm::model::LangString], language: &str) -> Option<&'a str> {
+    in_language_index(values, language).and_then(|index| values[index].content())
+}
+
+/// T3: which of `values` is read, of those whose content is not empty.
+pub(crate) fn in_language_index(
+    values: &[sacm::model::LangString],
+    language: &str,
+) -> Option<usize> {
     let primary = |tag: &str| {
         tag.split('-')
             .next()
@@ -770,13 +782,14 @@ fn in_language<'a>(values: &'a [sacm::model::LangString], language: &str) -> Opt
             .to_ascii_lowercase()
     };
     let wanted = primary(language);
-    let values: Vec<&sacm::model::LangString> = values
+    let values: Vec<(usize, &sacm::model::LangString)> = values
         .iter()
-        .filter(|value| value.content().is_some_and(|content| !content.is_empty()))
+        .enumerate()
+        .filter(|(_, value)| value.content().is_some_and(|content| !content.is_empty()))
         .collect();
     values
         .iter()
-        .find(|value| {
+        .find(|(_, value)| {
             value
                 .lang()
                 .is_some_and(|lang| lang.eq_ignore_ascii_case(language))
@@ -784,10 +797,10 @@ fn in_language<'a>(values: &'a [sacm::model::LangString], language: &str) -> Opt
         .or_else(|| {
             values
                 .iter()
-                .find(|value| value.lang().is_some_and(|lang| primary(lang) == wanted))
+                .find(|(_, value)| value.lang().is_some_and(|lang| primary(lang) == wanted))
         })
         .or_else(|| values.first())
-        .and_then(|value| value.content())
+        .map(|(index, _)| *index)
 }
 
 /// The element kinds D4 accounts for: every kind of SACM's Argumentation

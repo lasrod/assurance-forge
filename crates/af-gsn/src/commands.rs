@@ -1,4 +1,5 @@
-//! GSN commands: what may be added where, and the SACM operations each add is.
+//! GSN commands: what may be added where, the SACM operations each add is,
+//! and the SACM operations a change of a node's text is.
 //!
 //! [`choices`] answers, for a node of the view or the empty canvas, which of
 //! the six GSN element kinds can be added there and why each other one cannot.
@@ -7,17 +8,21 @@
 //! joined to its parent as chosen. The writing rules (W1 to W14) are in
 //! `docs/standards/sacm-gsn-mapping.md` ("Writing GSN as SACM"), which the
 //! comments here cite.
+//!
+//! [`set_text`] changes a node's identifier, name or statement: the inverse of
+//! the reading rules T1 to T3, as W15 to W17 record.
 
 use std::fmt;
 
 use sacm::edit::{
     self, AddReference, BatchError, BatchMutation, CreateArgumentReasoning,
     CreateArtifactReference, CreateAssertedContext, CreateAssertedEvidence,
-    CreateAssertedInference, CreateClaim, CreateTaggedValue, SetAssertionDeclaration,
+    CreateAssertedInference, CreateClaim, CreateDescription, CreateTaggedValue,
+    SetAssertionDeclaration, SetContent, SetName,
 };
 use sacm::model::{
-    AssertionDeclaration, Document, ElementId, ElementKind as SacmKind, LangString, ReferenceEnd,
-    SacmElement,
+    AssertionDeclaration, Document, ElementId, ElementKind as SacmKind, LangString,
+    MultiLangString, ReferenceEnd, SacmElement,
 };
 
 use crate::ElementKind;
@@ -49,6 +54,15 @@ pub enum Refusal {
     NoPackage,
     /// AF-EDIT-006: only a Goal can be added at the top level.
     TopLevelGoalOnly,
+    /// AF-EDIT-011: the id is of no node the diagram draws.
+    NotANode,
+    /// AF-EDIT-012: an identifier cannot be empty.
+    IdentifierEmpty,
+    /// AF-EDIT-013: another element of the file has the identifier.
+    IdentifierTaken,
+    /// AF-EDIT-014: the text is the value of a terminology expression, which
+    /// is not edited as text.
+    TextIsExpression,
 }
 
 impl Refusal {
@@ -61,6 +75,10 @@ impl Refusal {
             Refusal::NoOneInference => "AF-EDIT-004",
             Refusal::NoPackage => "AF-EDIT-005",
             Refusal::TopLevelGoalOnly => "AF-EDIT-006",
+            Refusal::NotANode => "AF-EDIT-011",
+            Refusal::IdentifierEmpty => "AF-EDIT-012",
+            Refusal::IdentifierTaken => "AF-EDIT-013",
+            Refusal::TextIsExpression => "AF-EDIT-014",
         }
     }
 }
@@ -109,6 +127,205 @@ impl std::error::Error for AddError {}
 
 /// The tagged value that holds the GSN identifier (T1, W10).
 const GSN_IDENTIFIER_KEY: &str = "assuranceForge.gsn.identifier";
+
+/// The language a text is taken to be in when the file does not say: a name
+/// or a statement written where there was none is tagged with it (W16, W17).
+pub const DEFAULT_LANGUAGE: &str = "en";
+
+/// Tags `value` with [`DEFAULT_LANGUAGE`] when it is being written for the
+/// first time: it has no language and no content yet. A text the file
+/// already holds keeps the language it has, or none.
+fn first_written(value: &mut LangString) {
+    if value.lang().is_none() && value.content().unwrap_or_default().is_empty() {
+        value.set_lang(Some(DEFAULT_LANGUAGE.to_owned()));
+    }
+}
+
+/// A text of a node that can be changed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TextField {
+    /// The GSN identifier (T1).
+    Identifier,
+    /// The name (T2).
+    Name,
+    /// The statement (T3).
+    Statement,
+}
+
+/// What a change of text made.
+#[derive(Clone, Debug)]
+pub enum TextSet {
+    /// The document changed.
+    Changed(BatchMutation),
+    /// The text was already that: the document is as it was.
+    Unchanged,
+}
+
+/// Sets the identifier, name or statement of the node `id` to `text`, where
+/// `view` is the view of `document` as it is, made for `language`. The text
+/// then reads back as `text` by T1 to T3, but for an emptied statement, which
+/// reads back as T3 gives it from what the file still holds.
+///
+/// # Errors
+///
+/// [`AddError::Refused`] when `id` is no node of the view, the identifier is
+/// empty or another element's, or the text is an expression's value.
+pub fn set_text(
+    document: &mut Document,
+    view: &View,
+    id: &str,
+    field: TextField,
+    text: &str,
+    language: &str,
+) -> Result<TextSet, AddError> {
+    if !view.nodes.iter().any(|node| node.id == id) {
+        return Err(AddError::Refused(Refusal::NotANode));
+    }
+    let element = document
+        .get(id)
+        .ok_or(AddError::Refused(Refusal::NotANode))?;
+    let operation: Option<edit::Operation> = match field {
+        TextField::Identifier => identifier_operation(document, view, element, text)?,
+        TextField::Name => name_operation(element, text)?,
+        TextField::Statement => statement_operation(element, text, language)?,
+    };
+    let Some(operation) = operation else {
+        return Ok(TextSet::Unchanged);
+    };
+    let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
+        tx.apply(operation)?;
+        Ok(())
+    })
+    .map_err(AddError::Edit)?;
+    if mutation.created_ids().is_empty()
+        && mutation.changed_ids().is_empty()
+        && mutation.deleted_ids().is_empty()
+    {
+        return Ok(TextSet::Unchanged);
+    }
+    Ok(TextSet::Changed(mutation))
+}
+
+/// W15: the identifier's tagged value is set, or made when there is none.
+fn identifier_operation(
+    document: &Document,
+    view: &View,
+    element: SacmElement<'_>,
+    text: &str,
+) -> Result<Option<edit::Operation>, AddError> {
+    if text.trim().is_empty() {
+        return Err(AddError::Refused(Refusal::IdentifierEmpty));
+    }
+    let id = element.id().as_str();
+    // As W10 counts them: a drawn node's identifier, and every element's
+    // tagged identifier and SACM id, drawn or not.
+    let taken = view
+        .nodes
+        .iter()
+        .any(|node| node.id != id && node.identifier == text)
+        || document.elements().any(|other| {
+            other.id().as_str() != id
+                && (other.id().as_str() == text
+                    || crate::view::tagged_value(other, GSN_IDENTIFIER_KEY) == Some(text))
+        });
+    if taken {
+        return Err(AddError::Refused(Refusal::IdentifierTaken));
+    }
+    let Some(tag) = crate::view::tagged(element, GSN_IDENTIFIER_KEY) else {
+        return Ok(Some(
+            CreateTaggedValue::new(
+                element.id().clone(),
+                LangString::new(GSN_IDENTIFIER_KEY),
+                LangString::new(text),
+            )
+            .into(),
+        ));
+    };
+    // T1 reads the first value: it is the one replaced, and the others stay.
+    let mut values = tag
+        .content()
+        .map(|content| content.values().to_vec())
+        .unwrap_or_default();
+    match values.first_mut() {
+        Some(first) if first.is_expression_lang_string() => {
+            return Err(AddError::Refused(Refusal::TextIsExpression));
+        }
+        Some(first) => first.set_content(Some(text.to_owned())),
+        None => values.push(LangString::new(text)),
+    }
+    Ok(Some(
+        SetContent::new(
+            tag.id().clone(),
+            values.into_iter().collect::<MultiLangString>(),
+        )
+        .into(),
+    ))
+}
+
+/// W16: the name's content is set, and its language kept.
+fn name_operation(
+    element: SacmElement<'_>,
+    text: &str,
+) -> Result<Option<edit::Operation>, AddError> {
+    let mut name = element.name().cloned().unwrap_or_default();
+    if name.is_expression_lang_string() {
+        return Err(AddError::Refused(Refusal::TextIsExpression));
+    }
+    if name.content().unwrap_or_default() == text {
+        return Ok(None);
+    }
+    first_written(&mut name);
+    name.set_content(Some(text.to_owned()));
+    Ok(Some(SetName::new(element.id().clone(), name).into()))
+}
+
+/// W17: the value T3 reads is set, in the first description; with no
+/// description, one is made.
+fn statement_operation(
+    element: SacmElement<'_>,
+    text: &str,
+    language: &str,
+) -> Result<Option<edit::Operation>, AddError> {
+    let Some(description) = element.descriptions().next() else {
+        if text.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(
+            CreateDescription::new(
+                element.id().clone(),
+                LangString::new(text).with_lang(DEFAULT_LANGUAGE),
+            )
+            .into(),
+        ));
+    };
+    let mut values = description
+        .content()
+        .map(|content| content.values().to_vec())
+        .unwrap_or_default();
+    // The value shown; with none shown, the first value, which is empty; with
+    // no value, a new one.
+    let index = match crate::view::in_language_index(&values, language) {
+        Some(index) => index,
+        None if text.is_empty() => return Ok(None),
+        None if values.is_empty() => {
+            values.push(LangString::default());
+            0
+        }
+        None => 0,
+    };
+    if values[index].is_expression_lang_string() {
+        return Err(AddError::Refused(Refusal::TextIsExpression));
+    }
+    first_written(&mut values[index]);
+    values[index].set_content(Some(text.to_owned()));
+    Ok(Some(
+        SetContent::new(
+            description.id().clone(),
+            values.into_iter().collect::<MultiLangString>(),
+        )
+        .into(),
+    ))
+}
 
 /// The six kinds, in [`ElementKind::ALL`] order, for `target` in `view` of
 /// `document`.

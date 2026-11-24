@@ -362,6 +362,29 @@ impl Core {
         }
     }
 
+    /// Sets the identifier, name or statement of the node with SACM id `id`
+    /// to `text` (W15 to W17). The statement set is the one shown: the value
+    /// in the interface language, as T3 reads it.
+    pub fn set_text(&mut self, id: &str, field: contract::TextField, text: &str) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        let field = match field {
+            contract::TextField::Identifier => commands::TextField::Identifier,
+            contract::TextField::Name => commands::TextField::Name,
+            contract::TextField::Statement => commands::TextField::Statement,
+        };
+        match open
+            .session
+            .set_text(&open.view, id, field, text, &self.language)
+        {
+            Ok(Some(record)) => self.changed(&record, None),
+            Ok(None) => EditResult::Unchanged,
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
     /// Takes back the last command.
     pub fn undo(&mut self) -> EditResult {
         let Some(open) = self.open.as_mut() else {
