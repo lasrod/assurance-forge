@@ -341,3 +341,45 @@ test('Element Properties changes an element’s ID, name and description; each i
   await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
   await expect(page.getByRole('menu', { name: 'Edit' }).getByRole('menuitem', { name: 'Undo' })).toHaveAttribute('aria-disabled', 'true');
 });
+
+test('a field left without typing changes nothing, even when the text has space around it; typing after Enter is kept', async ({ page }) => {
+  await page.goto('/');
+  // A goal whose name the file holds with a space after it.
+  await page.getByTestId('open-file').setInputFiles({
+    name: 'spaced.sacm.xmi',
+    mimeType: 'application/xml',
+    buffer: Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="Case"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g1"><name content="Safe "/></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>`),
+  });
+  await expect.poll(async () => (await hook(page))?.revision).toBe(1);
+  const point = await nodeCentre(page, 'g1');
+  await page.mouse.click(point.x, point.y);
+  const id = page.getByTestId('element-identifier');
+  const name = page.getByTestId('element-name');
+  await expect(name).toHaveValue('Safe ');
+
+  // Through the fields and out, typing nothing: no change, no undo step.
+  await id.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await name.focus();
+  await name.press('Enter');
+  expect((await hook(page)).revision).toBe(1);
+  await expect(name).toHaveValue('Safe ');
+
+  // Enter applies, and what is typed straight after it stays in the field.
+  await name.fill('Braking');
+  await name.press('Enter');
+  await name.pressSequentially(' is safe');
+  await expect.poll(async () => (await hook(page)).revision).toBe(2);
+  await expect(name).toHaveValue('Braking is safe');
+  await name.press('Enter');
+  await expect.poll(async () => (await hook(page)).revision).toBe(3);
+  await expect(name).toHaveValue('Braking is safe');
+});

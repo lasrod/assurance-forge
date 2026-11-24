@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
 import type { DiagramAt, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
@@ -104,6 +104,9 @@ export function DiagramCanvas({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
+  // Read once for each style: a new one comes with each change of theme.
+  // The canvas is there by the time a style is: the style is read from it.
+  const colours = useMemo(() => (canvas.current && style ? palette(canvas.current, style) : null), [style]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [panning, setPanning] = useState(false);
 
@@ -125,11 +128,10 @@ export function DiagramCanvas({
   useEffect(() => {
     const element = canvas.current;
     const context = element?.getContext('2d');
-    if (!element || !context || !style || size.width === 0 || size.height === 0) return;
+    if (!element || !context || !style || !colours || size.width === 0 || size.height === 0) return;
     const dpr = style.dpr;
     element.width = Math.round(size.width * dpr);
     element.height = Math.round(size.height * dpr);
-    const colours = palette(element, style);
     if (!diagram || !viewport) {
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.fillStyle = colours.ground;
@@ -142,7 +144,7 @@ export function DiagramCanvas({
       hovered: shownHover,
     });
     report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover });
-  }, [diagram, size, style, viewport, selected, shownHover]);
+  }, [diagram, size, style, colours, viewport, selected, shownHover]);
 
   // The latest values, for the handlers below, which outlive a render.
   const latest = useRef({ diagram, viewport, size, onViewport });

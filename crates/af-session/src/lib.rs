@@ -43,6 +43,9 @@ pub enum Command {
         element: String,
         field: TextField,
         text: String,
+        /// The interface language it was set in: which of a statement's
+        /// language values it changed (W17).
+        language: String,
     },
     /// Take back the change that made `revision`.
     Undo { revision: u32 },
@@ -156,6 +159,7 @@ impl Session {
             element: element.to_owned(),
             field,
             text: text.to_owned(),
+            language: language.to_owned(),
         };
         Ok(Some(self.made(before, command, &mutation)))
     }

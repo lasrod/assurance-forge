@@ -16,6 +16,11 @@ export function openShortcut(mac = MAC): string {
   return mac ? '⌘O' : 'Ctrl+O';
 }
 
+/** `⌘Enter` on macOS, `Ctrl+Enter` elsewhere: what applies prose being written. */
+export function applyShortcut(mac = MAC): string {
+  return mac ? '⌘Enter' : 'Ctrl+Enter';
+}
+
 /**
  * Whether `event` is the open shortcut: ⌘O on macOS, Ctrl+O elsewhere. Not
  * while an IME composes, and not a held key's repeats. The key is O by its

@@ -393,3 +393,20 @@ fn every_text_reads_back_as_set_on_every_sample() {
     }
     assert!(checked > 100, "only {checked} texts were set");
 }
+
+#[test]
+fn w15_an_identifier_is_set_without_the_space_around_it() {
+    let mut document = two_goals();
+    // With its space, G1 would read as another identifier than g1's.
+    assert_eq!(
+        refusal(&mut document, "g2", TextField::Identifier, " G1 "),
+        Refusal::IdentifierTaken
+    );
+    set(&mut document, "g2", TextField::Identifier, "  G2\t", "en");
+    assert_eq!(node(&view(&document, "en"), "g2").identifier, "G2");
+    // The same identifier with space around it is no change.
+    assert!(matches!(
+        set(&mut document, "g2", TextField::Identifier, "G2 ", "en"),
+        TextSet::Unchanged
+    ));
+}

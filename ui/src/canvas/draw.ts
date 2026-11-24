@@ -273,20 +273,54 @@ export const GRID = 24;
 /** Dots closer than this, in CSS px, are not drawn: they would be a tint, not a grid. */
 const SMALLEST_GRID_PX = 12;
 
+/** One tile of the grid, made once for each size and colour, for each context. */
+const tiles = new WeakMap<CanvasRenderingContext2D, { key: string; pattern: CanvasPattern | null }>();
+
 /**
- * The ground's dots: one each `GRID` diagram units, so they move and scale
- * with the diagram and say where it is. Each is one CSS px at every zoom.
+ * A pattern of one dot of `dot` device px in a cell of `cell`, or null where
+ * there is no document to make it in (a test's context).
  */
-function drawGrid(context: CanvasRenderingContext2D, viewport: Viewport, palette: Palette, size: { width: number; height: number }) {
-  const pitch = GRID * viewport.scale;
-  if (palette.forced || pitch < SMALLEST_GRID_PX) return;
-  context.fillStyle = palette.grid;
-  const first = (offset: number) => ((offset % pitch) + pitch) % pitch;
-  for (let y = first(viewport.offsetY); y < size.height; y += pitch) {
-    for (let x = first(viewport.offsetX); x < size.width; x += pitch) {
-      context.fillRect(Math.round(x), Math.round(y), 1, 1);
+function gridTile(context: CanvasRenderingContext2D, cell: number, dot: number, colour: string): CanvasPattern | null {
+  const key = `${cell} ${dot} ${colour}`;
+  const held = tiles.get(context);
+  if (held?.key === key) return held.pattern;
+  let pattern: CanvasPattern | null = null;
+  if (typeof document !== 'undefined') {
+    const tile = document.createElement('canvas');
+    tile.width = cell;
+    tile.height = cell;
+    const drawn = tile.getContext('2d');
+    if (drawn) {
+      drawn.fillStyle = colour;
+      drawn.fillRect(0, 0, dot, dot);
+      pattern = context.createPattern(tile, 'repeat');
     }
   }
+  tiles.set(context, { key, pattern });
+  return pattern;
+}
+
+/**
+ * The ground's dots: one each `GRID` diagram units, so they move and scale
+ * with the diagram and say where it is. Each is one CSS px at every zoom. It
+ * is one fill with a pattern, whatever the number of dots.
+ */
+function drawGrid(context: CanvasRenderingContext2D, viewport: Viewport, palette: Palette, size: { width: number; height: number; dpr: number }) {
+  const pitch = GRID * viewport.scale;
+  if (palette.forced || pitch < SMALLEST_GRID_PX) return;
+  // The tile is a whole number of device px, scaled to the exact pitch so the
+  // dots stay on the diagram's grid however far it reaches.
+  const exact = pitch * size.dpr;
+  const cell = Math.round(exact);
+  const pattern = gridTile(context, cell, Math.max(1, Math.round(size.dpr)), palette.grid);
+  if (!pattern) return;
+  const first = (offset: number) => ((offset % pitch) + pitch) % pitch;
+  pattern.setTransform(
+    new DOMMatrix().translateSelf(first(viewport.offsetX) * size.dpr, first(viewport.offsetY) * size.dpr).scaleSelf(exact / cell),
+  );
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.fillStyle = pattern;
+  context.fillRect(0, 0, size.width * size.dpr, size.height * size.dpr);
 }
 
 function polyline(context: CanvasRenderingContext2D, points: Point[]) {

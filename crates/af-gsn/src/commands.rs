@@ -207,13 +207,16 @@ pub fn set_text(
 }
 
 /// W15: the identifier's tagged value is set, or made when there is none.
+/// It is set without the space around it, which no identifier has meaning in
+/// and which would let two read alike.
 fn identifier_operation(
     document: &Document,
     view: &View,
     element: SacmElement<'_>,
     text: &str,
 ) -> Result<Option<edit::Operation>, AddError> {
-    if text.trim().is_empty() {
+    let text = text.trim();
+    if text.is_empty() {
         return Err(AddError::Refused(Refusal::IdentifierEmpty));
     }
     let id = element.id().as_str();

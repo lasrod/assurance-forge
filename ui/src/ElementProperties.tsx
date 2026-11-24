@@ -6,9 +6,11 @@ import type { DiagramEdge, EdgeKind, ElementDetails, NodeKind, RelationshipDetai
 import { PropertyGrid, PropertyRow, Section } from './design';
 import type { MessageKey } from './i18n/messages';
 import { TextProperty } from './TextProperty';
+import type { TextOutcome } from './textDraft';
+import { applyShortcut } from './shortcuts';
 
-/** Sets a text of the element `id`, of kind `about`; answers whether it is now that. */
-export type OnText = (id: string, field: TextField, text: string, about: NodeKind) => Promise<boolean>;
+/** Sets a text of the element `id`, of kind `about`, and answers what the core made of it. */
+export type OnText = (id: string, field: TextField, text: string, about: NodeKind) => Promise<TextOutcome>;
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -93,7 +95,7 @@ function ElementSection({ details, t, onText }: { details: ElementDetails; t: T;
             label={t('propertyStatement')}
             value={details.statement ?? ''}
             onCommit={set('statement')}
-            hint={t('statementHint')}
+            hint={t('statementHint', { apply: applyShortcut() })}
             multiline
             data-testid="element-statement"
           />

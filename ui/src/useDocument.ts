@@ -25,6 +25,7 @@ import { StartError } from './core/start';
 import type { Details } from './ElementProperties';
 import { newerDiagram } from './freshness';
 import type { Language } from './i18n/messages';
+import type { TextOutcome } from './textDraft';
 import exampleUrl from '../../testdata/sacm/sacm_example_core_argument.sacm.xmi?url';
 
 /** The example the welcome page opens: its name, as a file would have one. */
@@ -347,7 +348,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    * and history, with `onShown` told in the same update so the view follows
    * before it is painted. A refusal changes nothing and says why. `about` is
    * the kind of node an add was asked for, which a refusal names. Answers
-   * whether the document changed.
+   * what the core made of it.
    */
   const edit = useCallback(
     async (
@@ -356,19 +357,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
-    ): Promise<boolean> => {
+    ): Promise<TextOutcome> => {
       const on = coreRef.current;
-      if (!on || shown.current === null) return false;
+      if (!on || shown.current === null) return 'refused';
       const request = latest.current;
       let result: EditResult;
       try {
         result = await run(on);
       } catch {
         if (request === latest.current) setState({ kind: 'relayoutFailed' });
-        return false;
+        return 'refused';
       }
       // A text set to what it was: nothing to show.
-      if (result.result === 'unchanged') return false;
+      if (result.result === 'unchanged') return 'unchanged';
       const history = what === 'undo' || what === 'redo';
       if (result.result === 'refused') {
         // Edit ▸ Undo and Redo are greyed when there is nothing to do, so
@@ -376,7 +377,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         // the user wanted were made, and the status says so already.
         const raced = history && result.code === 'AF-EDIT-008';
         if (request === latest.current && !raced) setState({ kind: 'editRefused', code: result.code, about });
-        return false;
+        return 'refused';
       }
       const added = result.element;
       let answers;
@@ -396,11 +397,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
           shown.current = result.revision;
           setState({ kind: 'relayoutFailed' });
         }
-        return true;
+        return 'applied';
       }
       const [next, rows, held, past, details] = answers;
       // Another file was opened meanwhile, or a later command is on its way.
-      if (request !== latest.current || !next || next.revision !== result.revision) return true;
+      if (request !== latest.current || !next || next.revision !== result.revision) return 'applied';
       shown.current = result.revision;
       onShown(diagramRef.current, next, anchor, added);
       // As every answer: shown only if no older a layout than the one shown.
@@ -423,7 +424,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
       else setState({ kind: 'textChanged', field: what });
-      return true;
+      return 'applied';
     },
     [showRelayout],
   );
@@ -451,8 +452,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   );
   /**
    * Sets the identifier, name or statement of the node `id`, of kind `about`.
-   * Answers whether the document changed: false when the text was that
-   * already, or the core refused it, which the status then says.
+   * Answers what the core made of it: a refusal is also said in the status.
    */
   const setText = useCallback(
     (id: string, field: TextField, text: string, about: NodeKind | null, onShown: EditShown) =>
