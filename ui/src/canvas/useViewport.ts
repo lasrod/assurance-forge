@@ -25,8 +25,9 @@ export interface ViewState {
   refitIfFitted: () => void;
   /**
    * After an edit: the view moves so that a node on screen before stays where
-   * it was (`anchor` first, then the selected node, then any node in both),
-   * and the added element is selected and brought into view. Without one, a
+   * it was (of those still there: `anchor` first, then the selected node,
+   * then the one to select, then any), and `added`, the element the edit
+   * gives to select, is selected and brought into view. Without one, a
    * selection that is gone is cleared.
    */
   followEdit: (before: DiagramAt | null, next: DiagramAt, anchor: string | null, added: string | null) => void;
@@ -120,10 +121,11 @@ export function useViewport(diagram: DiagramAt | null, opened: number): ViewStat
       fitted.current = false;
       const nodes = before?.diagram.nodes ?? [];
       const find = (list: readonly DiagramNode[], id: string | null) => (id ? list.find((node) => node.id === id) : undefined);
+      // The node kept in place is one that is still there: a removal takes
+      // the anchor and the selection away, and selects what they were under.
+      const survives = (node: DiagramNode | undefined) => node !== undefined && find(next.diagram.nodes, node.id) !== undefined;
       const kept =
-        find(nodes, anchor) ??
-        find(nodes, selectedRef.current) ??
-        nodes.find((node) => next.diagram.nodes.some((candidate) => candidate.id === node.id));
+        [find(nodes, anchor), find(nodes, selectedRef.current), find(nodes, added)].find(survives) ?? nodes.find(survives);
       const keptAfter = kept && find(next.diagram.nodes, kept.id);
       const addedNode = find(next.diagram.nodes, added);
       setViewport((view) => {

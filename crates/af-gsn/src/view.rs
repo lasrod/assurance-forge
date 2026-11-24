@@ -50,11 +50,14 @@ pub enum Code {
     MetaClaimNotDrawn,
     /// AF-VIEW-013: a Strategy's `structure` link is not drawn (E12).
     StructureNotDrawn,
+    /// AF-VIEW-014: the place a Strategy's first Goal will take, held for
+    /// SACM and not drawn (R16).
+    Placeholder,
 }
 
 impl Code {
     /// Every code, in the order of the mapping record's table.
-    pub const ALL: [Code; 13] = [
+    pub const ALL: [Code; 14] = [
         Code::RecordedTypeNotUsed,
         Code::DeclarationHasNoShape,
         Code::ArtifactReferenceNotPlaced,
@@ -68,6 +71,7 @@ impl Code {
         Code::Defeated,
         Code::MetaClaimNotDrawn,
         Code::StructureNotDrawn,
+        Code::Placeholder,
     ];
 
     /// The code as the mapping record writes it, such as `AF-VIEW-001`.
@@ -86,6 +90,7 @@ impl Code {
             Code::Defeated => "AF-VIEW-011",
             Code::MetaClaimNotDrawn => "AF-VIEW-012",
             Code::StructureNotDrawn => "AF-VIEW-013",
+            Code::Placeholder => "AF-VIEW-014",
         }
     }
 }
@@ -216,6 +221,10 @@ const GSN_ROLE_KEY: &str = "assuranceForge.gsn.role";
 const IMPORT_DECLARATION_KEY: &str = "sacm.import.assertionDeclaration";
 /// The GSN identifier, apart from the SACM id (T1).
 const GSN_IDENTIFIER_KEY: &str = "assuranceForge.gsn.identifier";
+/// The tagged value that marks the Claim a Strategy holds for its first Goal
+/// (W2, R16), and its value.
+pub(crate) const PLACEHOLDER_KEY: &str = "assuranceForge.gsn.placeholder";
+pub(crate) const PLACEHOLDER_VALUE: &str = "subGoal";
 /// The GSN namespaces a recorded type may name (mapping record, Namespaces).
 const GSN_NAMESPACES: [&str; 3] = [
     "http://scsc.acwg.gsn/2.0",
@@ -249,10 +258,21 @@ pub fn view(document: &Document, language: &str) -> View {
         .filter(|element| is_edge_kind(element.kind()) && !hidden.contains(element.id().as_str()))
         .map(|element| element.id().as_str())
         .collect();
+    // R16: the Claims that hold a Strategy's place for its first Goal.
+    let placeholders: HashSet<&str> = elements
+        .iter()
+        .filter(|element| {
+            !hidden.contains(element.id().as_str()) && is_placeholder(document, **element)
+        })
+        .map(|element| element.id().as_str())
+        .collect();
     // The elements a node is drawn for, and their SACM kind.
     let placeable: HashMap<&str, SacmKind> = elements
         .iter()
-        .filter(|element| is_node_kind(element.kind()) && !hidden.contains(element.id().as_str()))
+        .filter(|element| {
+            let id = element.id().as_str();
+            is_node_kind(element.kind()) && !hidden.contains(id) && !placeholders.contains(id)
+        })
         .map(|element| (element.id().as_str(), element.kind()))
         .collect();
 
@@ -263,10 +283,13 @@ pub fn view(document: &Document, language: &str) -> View {
         let id = element.id().as_str();
         if hidden.contains(id) {
             builder.unplaced(id, Code::KindNotDrawn);
+        } else if placeholders.contains(id) {
+            builder.unplaced(id, Code::Placeholder);
         } else if is_relationship(element.kind()) {
             relationship(
                 *element,
                 &placeable,
+                &placeholders,
                 &relationships,
                 &mut reach,
                 &mut builder,
@@ -418,6 +441,7 @@ impl Builder {
 fn relationship<'a>(
     element: SacmElement<'a>,
     placeable: &HashMap<&'a str, SacmKind>,
+    placeholders: &HashSet<&'a str>,
     relationships: &HashSet<&'a str>,
     reach: &mut HashMap<&'a str, Reach>,
     builder: &mut Builder,
@@ -499,6 +523,8 @@ fn relationship<'a>(
         }
         if placeable.contains_key(source) {
             sources.push(source);
+        } else if placeholders.contains(source) {
+            // R16: a Strategy with no Goal yet. The placeholder has its own code.
         } else {
             builder.finding(Code::EndNotPlaced, id, Some(source));
         }
@@ -801,6 +827,60 @@ pub(crate) fn in_language_index(
         })
         .or_else(|| values.first())
         .map(|(index, _)| *index)
+}
+
+/// R16: whether `element` is the Claim a Strategy holds for its first Goal
+/// (W2), which is not drawn. It is only while nothing about it says more than
+/// that: a Claim with the placeholder tag and no other child, no text, and no
+/// other declaration than `asserted`, that is the one source of one live
+/// inference whose reasoning is a Strategy, and that nothing else refers to.
+/// Anything else is drawn as what it is, so that nothing the file says is
+/// hidden.
+pub(crate) fn is_placeholder(document: &Document, element: SacmElement<'_>) -> bool {
+    if element.kind() != SacmKind::Claim
+        || tagged_value(element, PLACEHOLDER_KEY) != Some(PLACEHOLDER_VALUE)
+    {
+        return false;
+    }
+    let asserted = |declaration: Option<AssertionDeclaration>| {
+        declaration.is_none_or(|declaration| declaration == AssertionDeclaration::Asserted)
+    };
+    let plain = asserted(element.assertion_declaration())
+        && element
+            .name()
+            .and_then(|name| name.content())
+            .unwrap_or_default()
+            .is_empty()
+        && element.tagged_values().count() == 1
+        && element
+            .children()
+            .all(|child| child.kind() == SacmKind::TaggedValue)
+        && !element.is_citation()
+        && !element.is_abstract()
+        && element.meta_claims().is_empty();
+    if !plain {
+        return false;
+    }
+    let referrers = document.referrers(element.id().as_str());
+    let [referrer] = referrers.as_slice() else {
+        return false;
+    };
+    let inference = referrer.holder();
+    referrer.end() == sacm::model::ReferenceEnd::Source
+        && inference.kind() == SacmKind::AssertedInference
+        && inference.sources().len() == 1
+        && inference.target().is_some()
+        && !inference.is_counter()
+        && !inference.is_citation()
+        && !inference.is_abstract()
+        && asserted(inference.assertion_declaration())
+        && !is_hidden(inference)
+        && inference
+            .reasoning()
+            .and_then(|reasoning| document.get(reasoning.as_str()))
+            .is_some_and(|reasoning| {
+                reasoning.kind() == SacmKind::ArgumentReasoning && !is_hidden(reasoning)
+            })
 }
 
 /// The element kinds D4 accounts for: every kind of SACM's Argumentation

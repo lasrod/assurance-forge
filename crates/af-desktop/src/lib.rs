@@ -405,6 +405,20 @@ fn add(
 }
 
 #[tauri::command]
+fn removal(id: String, state: Shared<'_>) -> Result<Option<af_api::contract::Removal>, String> {
+    Ok(lock(&state)?.core.removal(&id))
+}
+
+#[tauri::command]
+fn remove(
+    id: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.remove(&id, revision))
+}
+
+#[tauri::command]
 fn set_text(
     id: String,
     field: af_api::contract::TextField,
@@ -488,6 +502,8 @@ pub fn run(args: Args) -> i32 {
             relationship,
             add_choices,
             add,
+            removal,
+            remove,
             set_text,
             undo,
             redo,

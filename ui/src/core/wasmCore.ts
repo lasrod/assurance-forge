@@ -12,6 +12,7 @@ import type {
   Outline,
   Package,
   RelationshipDetails,
+  Removal,
 } from './Core';
 import { createWebRecent } from './webRecent';
 import { StartError, type FontBytes } from './start';
@@ -40,6 +41,8 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     packages: async () => JSON.parse(core.packages()) as Package[],
     addChoices: async (parent) => parse<AddChoices>(core.addChoices(parent ?? undefined)),
     add: async (parent, kind, revision) => JSON.parse(core.add(parent ?? undefined, kind, revision)) as EditResult,
+    removal: async (id) => parse<Removal>(core.removal(id)),
+    remove: async (id, revision) => JSON.parse(core.remove(id, revision)) as EditResult,
     setText: async (id, field, text) => JSON.parse(core.setText(id, field, text)) as EditResult,
     undo: async () => JSON.parse(core.undo()) as EditResult,
     redo: async () => JSON.parse(core.redo()) as EditResult,

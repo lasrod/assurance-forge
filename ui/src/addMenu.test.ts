@@ -6,12 +6,12 @@ import { translate } from './i18n/messages';
 const en = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate('en', key, values);
 const ja = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate('ja', key, values);
 const KINDS: ElementKind[] = ['goal', 'strategy', 'solution', 'context', 'assumption', 'justification'];
-const choices = (refusal: string | null, develops = false): AddChoice[] =>
-  KINDS.map((kind) => ({ kind, refusal, develops: develops && ['goal', 'strategy', 'solution'].includes(kind) }));
+const choices = (refusal: (kind: ElementKind) => string | null): AddChoice[] =>
+  KINDS.map((kind) => ({ kind, refusal: refusal(kind), develops: false }));
 
 describe('the add menu', () => {
-  it('lists the six kinds, and a leaf greys each out with the reason, naming the leaf', () => {
-    const items = addItems(choices('AF-EDIT-001'), 'solution', en);
+  it('lists the kinds that can be added, in the standard’s order, with no notes', () => {
+    const items = addItems(choices(() => null), en);
     expect(items.map((item) => item.label)).toEqual([
       'Add Goal',
       'Add Strategy',
@@ -20,25 +20,25 @@ describe('the add menu', () => {
       'Add Assumption',
       'Add Justification',
     ]);
-    expect(items.every((item) => item.unavailable)).toBe(true);
-    expect(items[0].note).toBe('A Solution is a leaf in GSN: nothing goes under it.');
+    expect(items.every((item) => Object.keys(item).sort().join() === 'kind,label')).toBe(true);
   });
 
-  it('says a Strategy comes with its first sub-goal, and that support develops an undeveloped goal', () => {
-    const items = addItems(choices(null, true), 'goal', en);
-    expect(items.every((item) => !item.unavailable)).toBe(true);
-    expect(items[0].note).toBe('Develops this goal.');
-    expect(items[1].note).toBe('With its first sub-goal. Develops this goal.');
-    expect(items[3].note).toBeNull();
+  it('leaves out what cannot be added: under a Strategy, a Strategy and a Solution', () => {
+    const items = addItems(
+      choices((kind) => (kind === 'strategy' || kind === 'solution' ? 'AF-EDIT-003' : null)),
+      en,
+    );
+    expect(items.map((item) => item.kind)).toEqual(['goal', 'context', 'assumption', 'justification']);
+    expect(addItems(choices(() => 'AF-EDIT-001'), en)).toEqual([]);
   });
 
   it('words every code in both languages, and leaves an unknown one as it is', () => {
-    for (let n = 1; n <= 10; n += 1) {
+    for (let n = 1; n <= 15; n += 1) {
       const code = `AF-EDIT-${String(n).padStart(3, '0')}`;
       expect(refusalText(code, 'goal', en)).not.toBe(code);
       expect(refusalText(code, 'goal', ja)).not.toBe(code);
     }
     expect(refusalText('AF-EDIT-099', null, en)).toBe('AF-EDIT-099');
-    expect(addItems(choices(null), 'goal', ja)[0].label).toBe('ゴールを追加');
+    expect(addItems(choices(() => null), ja)[0].label).toBe('ゴールを追加');
   });
 });

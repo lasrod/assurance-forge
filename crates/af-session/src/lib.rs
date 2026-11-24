@@ -14,7 +14,7 @@
 //! It does no I/O and builds for `wasm32-unknown-unknown`.
 
 use af_gsn::ElementKind;
-use af_gsn::commands::{self, AddError, Added, Target, TextField, TextSet};
+use af_gsn::commands::{self, AddError, Added, Removed, Target, TextField, TextSet};
 use af_gsn::view::View;
 use sacm::model::Document;
 
@@ -47,6 +47,8 @@ pub enum Command {
         /// language values it changed (W17).
         language: String,
     },
+    /// Remove the node `element` and what goes with it.
+    Remove { element: String },
     /// Take back the change that made `revision`.
     Undo { revision: u32 },
     /// Make again the change that made `revision`, which was taken back.
@@ -162,6 +164,27 @@ impl Session {
             language: language.to_owned(),
         };
         Ok(Some(self.made(before, command, &mutation)))
+    }
+
+    /// Removes the node `element` and what goes with it. `view` is the view
+    /// of the document as it is now.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::remove`] refuses; the document and the revision are
+    /// then unchanged.
+    pub fn remove(
+        &mut self,
+        view: &View,
+        element: &str,
+    ) -> Result<(Removed, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let removed = commands::remove(&mut self.document, view, element)?;
+        let command = Command::Remove {
+            element: element.to_owned(),
+        };
+        let record = self.made(before, command, &removed.mutation);
+        Ok((removed, record))
     }
 
     /// Records an applied command, which undo can take back to `before`.

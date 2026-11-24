@@ -18,6 +18,7 @@ import type {
   OutlineRow,
   Package,
   RecentFile,
+  Removal,
   TextField,
   TextStyle,
 } from './core/Core';
@@ -41,6 +42,7 @@ export type DocumentState =
   | { kind: 'result'; result: OpenResult }
   | { kind: 'added'; added: NodeKind; identifier: string }
   | { kind: 'textChanged'; field: TextField }
+  | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'undone' }
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null };
@@ -48,7 +50,8 @@ export type DocumentState =
 /**
  * What an accepted edit gave, for the view to follow before it is painted:
  * the diagram on screen before, the new one, the node to keep in place first,
- * and the element added (null for undo and redo).
+ * and the element to select: the one added, or the node a removed one was
+ * under (null for undo and redo).
  */
 export type EditShown = (before: DiagramAt | null, next: DiagramAt, anchor: string | null, added: string | null) => void;
 
@@ -353,10 +356,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const edit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo' | TextField,
+      what: 'add' | 'undo' | 'redo' | 'remove' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
+      said?: DocumentState,
     ): Promise<TextOutcome> => {
       const on = coreRef.current;
       if (!on || shown.current === null) return 'refused';
@@ -420,10 +424,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
           () => undefined,
         );
       }
-      if (what === 'add') {
+      if (said) setState(said);
+      else if (what === 'add') {
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
-      else setState({ kind: 'textChanged', field: what });
+      else if (what !== 'remove') setState({ kind: 'textChanged', field: what });
       return 'applied';
     },
     [showRelayout],
@@ -448,6 +453,46 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const add = useCallback(
     (parent: string | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
       void edit((on) => on.add(parent, kind, revision), 'add', parent, about, onShown),
+    [edit],
+  );
+  /**
+   * What removing the node `id` would delete, with the revision it is of;
+   * null if the document changed before it came, or if it cannot be
+   * removed, which the status then says.
+   */
+  const removal = useCallback(async (id: string): Promise<Removal | null> => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return null;
+    try {
+      const answer = await on.removal(id);
+      if (!answer || answer.revision !== revision || shown.current !== revision) return null;
+      // A node that cannot be removed: the status says why.
+      if (answer.refusal !== null) {
+        setState({ kind: 'editRefused', code: answer.refusal, about: null });
+        return null;
+      }
+      return answer;
+    } catch {
+      return null;
+    }
+  }, []);
+  /**
+   * Removes what `shown` lists, as the core said at its revision; the core
+   * refuses it if that is not current. The status names the node chosen and
+   * counts the rest.
+   */
+  const remove = useCallback(
+    (shownRemoval: Removal, onShown: EditShown) => {
+      const [first] = shownRemoval.nodes;
+      if (!first) return;
+      void edit((on) => on.remove(first.id, shownRemoval.revision), 'remove', first.id, first.kind, onShown, {
+        kind: 'removed',
+        removed: first.kind,
+        identifier: first.identifier,
+        more: shownRemoval.nodes.length - 1,
+      });
+    },
     [edit],
   );
   /**
@@ -527,6 +572,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     setTextStyle,
     addChoices,
     add,
+    removal,
+    remove,
     setText,
     undo,
     redo,

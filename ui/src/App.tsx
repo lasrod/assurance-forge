@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import { useViewport } from './canvas/useViewport';
-import type { AddChoice, Core, ElementKind, NodeKind, TextField, TextStyle } from './core/Core';
+import type { AddChoice, Core, ElementKind, NodeKind, Removal, TextField, TextStyle } from './core/Core';
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
+import { RemoveDialog } from './RemoveDialog';
 import {
   ChevronDown,
   ChevronUp,
   ContextMenu,
   DatumRoot,
   MenuItem,
+  MenuSeparator,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -43,6 +45,8 @@ import { ZoomBar } from './ZoomBar';
 
 /** The Case Explorer's row for the file itself, above its packages. */
 const FILE_ROW = ':file';
+/** The menu item that removes the node; the others are the kinds to add. */
+const REMOVE = 'remove';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -73,6 +77,13 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('added', { kind: kindName(state.added, t), identifier: state.identifier }) };
     case 'textChanged':
       return { text: t('textChanged', { field: t(TEXT_FIELDS[state.field]) }) };
+    case 'removed':
+      return {
+        text:
+          state.more === 0
+            ? t('removed', { kind: kindName(state.removed, t), identifier: state.identifier })
+            : t('removedWithMore', { kind: kindName(state.removed, t), identifier: state.identifier, more: state.more }),
+      };
     case 'undone':
       return { text: t('undone') };
     case 'redone':
@@ -109,7 +120,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const details = useDetails(core, selected, diagram);
 
   // Edit ▸ Undo and Redo, with the view following each.
-  const { undo: undoWith, redo: redoWith, addChoices, add, setText: setTextWith } = doc;
+  const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   /** A text of an element changed in Element Properties; the view keeps the element in place. */
   const setText = useCallback(
     (id: string, field: TextField, text: string, about: NodeKind) => setTextWith(id, field, text, about, followEdit),
@@ -136,23 +147,50 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   useEffect(() => {
     if (reading || noDiagram) setAddMenu(null);
   }, [reading, noDiagram]);
-  /** Opens the add menu of a node, or of the empty canvas, at a client point: the node is selected first. */
+  /**
+   * Opens the menu of a node, or of the empty canvas, at a client point: the
+   * node is selected first. It lists what can be added there and, for a
+   * node, Remove; with nothing to list, it does not open.
+   */
   const openAddMenu = useCallback(
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
       void addChoices(parent).then((answer) => {
         if (!answer) return;
         if (parent) setSelected(parent);
+        if (!parent && answer.choices.every((choice) => choice.refusal !== null)) return;
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
         setAddMenu({ revision: answer.revision, parent, about, at, source, choices: answer.choices });
       });
     },
     [addChoices, diagram, setSelected],
   );
-  /** A kind chosen from the add menu. */
-  const chooseAdd = (kind: ElementKind) => {
+
+  // A removal that waits for the user: it deletes more than the node chosen.
+  const [confirmRemoval, setConfirmRemoval] = useState<Removal | null>(null);
+  useEffect(() => {
+    setConfirmRemoval(null);
+  }, [opened]);
+  /** Removes the node `id`: at once when it goes alone, else once the user has seen what goes with it. */
+  const askRemove = useCallback(
+    (id: string) => {
+      void removal(id).then((answer) => {
+        if (!answer) return;
+        if (answer.nodes.length > 1) setConfirmRemoval(answer);
+        else removeWith(answer, followEdit);
+      });
+    },
+    [removal, removeWith, followEdit],
+  );
+  /** A choice of the menu: a kind to add, or Remove. */
+  const chooseMenu = (id: string) => {
     const menu = addMenu;
     setAddMenu(null);
-    if (menu) add(menu.parent, kind, menu.revision, menu.about, followEdit);
+    if (!menu) return;
+    if (id === REMOVE) {
+      if (menu.parent) askRemove(menu.parent);
+      return;
+    }
+    add(menu.parent, id as ElementKind, menu.revision, menu.about, followEdit);
   };
 
   useEffect(() => {
@@ -267,7 +305,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       // Not when something else has the key: a component that handled it, an
       // open menu or dialog, or a field being typed in.
       const target = event.target instanceof Element ? event.target : null;
-      const busy = target?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"]');
+      const busy = target?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"], [role="alertdialog"]');
       if (event.defaultPrevented || busy) return;
       // Ctrl+Z and Ctrl+Y (⌘Z and ⇧⌘Z), as Edit ▸ Undo and Redo say.
       const command = editShortcut(event);
@@ -423,6 +461,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               onSelect={setSelected}
               onTextStyle={onTextStyle}
               onContextMenu={openAddMenu}
+              onRemove={askRemove}
             />
           </Workspace>
         )}
@@ -436,15 +475,27 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             onOpenChange={(open) => {
               if (!open) setAddMenu(null);
             }}
-            onAction={(id) => chooseAdd(id as ElementKind)}
+            onAction={(id) => chooseMenu(String(id))}
           >
-            {addMenu &&
-              addItems(addMenu.choices, addMenu.about, t).map((item) => (
-                <MenuItem key={item.kind} id={item.kind} unavailable={item.unavailable} note={item.note ?? undefined}>
-                  {item.label}
-                </MenuItem>
-              ))}
+            {addMenu && addItems(addMenu.choices, t).map((item) => <MenuItem key={item.kind} id={item.kind}>{item.label}</MenuItem>)}
+            {addMenu?.parent && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
+            {addMenu?.parent && (
+              <MenuItem id={REMOVE} danger shortcut={t('removeKey')}>
+                {t('remove')}
+              </MenuItem>
+            )}
           </ContextMenu>
+        )}
+        {hasFile && (
+          <RemoveDialog
+            removal={confirmRemoval}
+            t={t}
+            onCancel={() => setConfirmRemoval(null)}
+            onRemove={(answer) => {
+              setConfirmRemoval(null);
+              removeWith(answer, followEdit);
+            }}
+          />
         )}
       </div>
       <StatusBar>

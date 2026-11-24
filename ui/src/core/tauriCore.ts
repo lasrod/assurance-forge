@@ -16,6 +16,7 @@ import type {
   Package,
   RecentFile,
   RelationshipDetails,
+  Removal,
 } from './Core';
 import { StartError, type FontBytes } from './start';
 
@@ -59,6 +60,8 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     packages: () => invoke<Package[]>('packages'),
     addChoices: (parent) => invoke<AddChoices | null>('add_choices', { parent }),
     add: (parent, kind, revision) => invoke<EditResult>('add', { parent, kind, revision }),
+    removal: (id) => invoke<Removal | null>('removal', { id }),
+    remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),
     setText: (id, field, text) => invoke<EditResult>('set_text', { id, field, text }),
     undo: () => invoke<EditResult>('undo'),
     redo: () => invoke<EditResult>('redo'),

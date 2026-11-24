@@ -16,8 +16,10 @@ message: a structural violation is a defect, a quality flag is a prompt.
 1. **Solutions are leaves.** Nothing is `SupportedBy` a Solution.
 2. **Context, Assumption and Justification are leaves of `InContextOf`.** They do
    not support anything and are not supported.
-3. **`SupportedBy` sources are Goals or Strategies only.** (v2.2 OCL constrains
-   this; it is also how the notation is read.)
+3. **`SupportedBy` sources are Goals or Strategies only, and a Strategy is
+   supported only by Goals.** The permitted connections are goal-to-goal,
+   goal-to-strategy, goal-to-solution and strategy-to-goal. (v2.2 OCL
+   constrains the sources; it is also how the notation is read.)
 4. **`InContextOf` targets are Context, Assumption or Justification only.**
 5. **A Strategy must be supported.** A Strategy with no `SupportedBy` children is
    a reasoning step that reasons to nothing.

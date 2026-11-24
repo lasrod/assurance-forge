@@ -28,7 +28,7 @@ use sacm::xmi::{self, Mode, ReadOptions};
 use contract::{
     AddChoice, AddChoices, ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult,
     ElementDetails, ElementKind, History, MessageArgument, OpenResult, Outline, OutlineRow,
-    Package, Refusal, RelationshipDetails, RelationshipEnd, ViewCode,
+    Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode,
 };
 
 mod convert;
@@ -362,6 +362,53 @@ impl Core {
         }
     }
 
+    /// What removing the node with SACM id `id` would delete, for the
+    /// interface to show before it is made. `None` when nothing is open.
+    pub fn removal(&self, id: &str) -> Option<Removal> {
+        let open = self.open.as_ref()?;
+        let view = &open.view;
+        let (nodes, refusal) = match commands::removal(open.session.document(), view, id) {
+            Ok(removal) => (
+                removal
+                    .nodes
+                    .iter()
+                    .filter_map(|id| view.nodes.iter().find(|node| node.id == *id))
+                    .map(|node| RemovalNode {
+                        id: node.id.clone(),
+                        kind: convert::node_kind(node.kind),
+                        identifier: node.identifier.clone(),
+                        name: node.name.clone(),
+                        statement: node.statement.clone(),
+                    })
+                    .collect(),
+                None,
+            ),
+            Err(refusal) => (Vec::new(), Some(refusal.code().to_owned())),
+        };
+        Some(Removal {
+            revision: self.revision,
+            nodes,
+            refusal,
+        })
+    }
+
+    /// Removes the node with SACM id `id` and what goes with it, as
+    /// [`Core::removal`] said at `revision`: a removal asked for at another
+    /// revision is refused (AF-EDIT-009), since what it deletes may differ.
+    pub fn remove(&mut self, id: &str, revision: u32) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open.session.remove(&open.view, id) {
+            Ok((removed, record)) => self.changed(&record, removed.parent),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
     /// Sets the identifier, name or statement of the node with SACM id `id`
     /// to `text` (W15 to W17). The statement set is the one shown: the value
     /// in the interface language, as T3 reads it.
@@ -462,7 +509,8 @@ impl Core {
 const NOTHING_OPEN: &str = "AF-EDIT-007";
 /// AF-EDIT-008: there is nothing to undo, or nothing to redo.
 const NOTHING_TO_DO: &str = "AF-EDIT-008";
-/// AF-EDIT-009: the document changed after the add menu was made.
+/// AF-EDIT-009: the document changed after the add menu, or the removal
+/// shown, was made.
 const OUT_OF_DATE: &str = "AF-EDIT-009";
 /// AF-EDIT-010: libSACM refused the operations the writing rules made.
 const NOT_MADE: &str = "AF-EDIT-010";

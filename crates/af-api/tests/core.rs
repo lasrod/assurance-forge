@@ -542,6 +542,60 @@ fn an_add_from_the_menu_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
 }
 
 #[test]
+fn a_removal_lists_what_goes_and_undo_brings_it_back() {
+    use af_api::contract::EditResult;
+    let mut core = core("en");
+    assert!(core.removal("cl_top").is_none(), "nothing open");
+    assert!(matches!(
+        core.remove("cl_top", 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-007"
+    ));
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let before = core.diagram().unwrap_or_else(|| panic!("diagram"));
+
+    let removal = core.removal("cl_sub_1").unwrap_or_else(|| panic!("open"));
+    assert_eq!(removal.revision, 1);
+    assert_eq!(removal.refusal, None);
+    assert_eq!(removal.nodes[0].id, "cl_sub_1");
+    assert!(removal.nodes.len() > 1, "{:?}", removal.nodes);
+    let unknown = core.removal("nothing").unwrap_or_else(|| panic!("open"));
+    assert_eq!(unknown.refusal.as_deref(), Some("AF-EDIT-011"));
+    assert!(unknown.nodes.is_empty());
+
+    // A removal shown at another revision is refused.
+    assert!(matches!(
+        core.remove("cl_sub_1", 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let EditResult::Applied {
+        revision,
+        element,
+        deleted,
+        ..
+    } = core.remove("cl_sub_1", 1)
+    else {
+        panic!("not removed");
+    };
+    assert_eq!(revision, 2);
+    // The node it was drawn under is selected.
+    assert!(element.is_some());
+    assert!(deleted.iter().any(|id| id == "cl_sub_1"));
+    let after = core.diagram().unwrap_or_else(|| panic!("diagram"));
+    assert_eq!(
+        after.diagram.nodes.len(),
+        before.diagram.nodes.len() - removal.nodes.len()
+    );
+    for node in &removal.nodes {
+        assert!(core.element(&node.id).is_none(), "{}", node.id);
+    }
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(
+        core.diagram().map(|at| at.diagram.nodes.len()),
+        Some(before.diagram.nodes.len())
+    );
+}
+
+#[test]
 fn a_text_set_in_element_properties_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
     use af_api::contract::{EditResult, TextField};
     let mut core = core("en");
