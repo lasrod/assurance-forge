@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{AddError, Refusal, Target, add, removal, remove};
-use af_gsn::view::{Code, NodeKind, View, view};
+use af_gsn::view::{Code, EdgeKind, NodeKind, View, view};
 use sacm::model::Document;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
@@ -121,6 +121,27 @@ fn removed(document: &mut Document, id: &str) -> Option<String> {
     remove(document, &shown, id)
         .unwrap_or_else(|error| panic!("{id}: {error}"))
         .parent
+}
+
+/// The nodes drawn under nothing: no edge reaches them (a challenge is drawn
+/// under what it challenges).
+fn roots(view: &View) -> BTreeSet<String> {
+    let under: BTreeSet<&str> = view
+        .edges
+        .iter()
+        .map(|edge| {
+            if edge.kind == EdgeKind::Challenge {
+                edge.from.as_str()
+            } else {
+                edge.to.as_str()
+            }
+        })
+        .collect();
+    view.nodes
+        .iter()
+        .map(|node| node.id.clone())
+        .filter(|id| !under.contains(id.as_str()))
+        .collect()
 }
 
 fn placeholders(view: &View) -> Vec<String> {
@@ -303,4 +324,89 @@ fn every_removal_deletes_what_it_lists_on_every_sample() {
         }
     }
     assert!(checked > 30, "only {checked} removals were checked");
+}
+
+/// W20 holds a place only in an inference R16 would hide it in: under a
+/// challenge or an assumed inference, the placeholder would be drawn as an
+/// empty Goal nobody asked for, so the inference goes instead.
+#[test]
+fn w20_holds_no_place_that_would_be_drawn() {
+    // A challenge does not draw its reasoning (E5): the Strategy is drawn
+    // under nothing before and after. An assumed inference draws it under
+    // the goal, and nothing else would once the inference goes, so it goes
+    // too and is listed.
+    for (attributes, goes, left) in [
+        (
+            r#" source="k" target="g" reasoning="s" isCounter="true""#,
+            &["k"][..],
+            &["g", "s"][..],
+        ),
+        (
+            r#" source="k" target="g" reasoning="s" assertionDeclaration="assumed""#,
+            &["k", "s"][..],
+            &["g"][..],
+        ),
+    ] {
+        let mut document = case(
+            &[
+                element("Claim", "g", ""),
+                element("Claim", "k", ""),
+                element("ArgumentReasoning", "s", ""),
+                element("AssertedInference", "i", attributes),
+            ]
+            .concat(),
+        );
+        let before = view(&document, "en");
+        assert_eq!(listed(&document, "k"), goes, "{attributes}");
+        removed(&mut document, "k");
+        let after = view(&document, "en");
+        assert_eq!(nodes(&after), set(left), "{attributes}");
+        assert!(placeholders(&after).is_empty(), "{attributes}");
+        assert_eq!(roots(&after), roots(&before), "{attributes}");
+    }
+}
+
+/// A node whose only line goes with its relationship goes too, and is
+/// listed: under a Strategy drawn under two goals, a premise of the one
+/// removed is not left joined to nothing.
+#[test]
+fn w18_a_premise_whose_line_goes_is_listed_and_goes() {
+    let mut document = case(
+        &[
+            element("Claim", "g1", ""),
+            element("Claim", "g2", ""),
+            element("Claim", "sub", ""),
+            element("Claim", "other", ""),
+            element("ArgumentReasoning", "s", ""),
+            element(
+                "AssertedInference",
+                "i1",
+                r#" source="sub" target="g1" reasoning="s""#,
+            ),
+            element(
+                "AssertedInference",
+                "i2",
+                r#" source="other" target="g2" reasoning="s""#,
+            ),
+        ]
+        .concat(),
+    );
+    assert_eq!(listed(&document, "g1"), ["g1", "sub"]);
+    removed(&mut document, "g1");
+    assert_eq!(nodes(&view(&document, "en")), set(&["g2", "s", "other"]));
+    // And a Strategy above a premise removed stays, listed or not.
+    let document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "k", ""),
+            element("ArgumentReasoning", "s", ""),
+            element(
+                "AssertedInference",
+                "i",
+                r#" source="k" target="g" reasoning="s" assertionDeclaration="assumed""#,
+            ),
+        ]
+        .concat(),
+    );
+    assert_eq!(listed(&document, "g"), ["g", "s", "k"]);
 }

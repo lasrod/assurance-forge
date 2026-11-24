@@ -464,9 +464,16 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     const on = coreRef.current;
     const revision = shown.current;
     if (!on || revision === null) return null;
+    const request = latest.current;
     try {
       const answer = await on.removal(id);
-      if (!answer || answer.revision !== revision || shown.current !== revision) return null;
+      if (!answer || request !== latest.current) return null;
+      // The diagram on screen is not the one the answer is of: say so,
+      // rather than let Delete or Remove do nothing.
+      if (answer.revision !== revision || shown.current !== revision) {
+        setState({ kind: 'editRefused', code: 'AF-EDIT-009', about: null });
+        return null;
+      }
       // A node that cannot be removed: the status says why.
       if (answer.refusal !== null) {
         setState({ kind: 'editRefused', code: answer.refusal, about: null });

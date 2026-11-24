@@ -867,13 +867,24 @@ pub(crate) fn is_placeholder(document: &Document, element: SacmElement<'_>) -> b
     };
     let inference = referrer.holder();
     referrer.end() == sacm::model::ReferenceEnd::Source
-        && inference.kind() == SacmKind::AssertedInference
         && inference.sources().len() == 1
+        && can_hold_placeholder(document, inference)
+}
+
+/// R16: whether `inference` is one whose one source R16 would leave undrawn
+/// as a placeholder: a live `AssertedInference`, asserted and not a counter,
+/// cited or abstract, not hidden, with a target and a drawn
+/// `ArgumentReasoning` as its reasoning. W20 holds a place only in such an
+/// inference, so that the placeholder it adds is never drawn.
+pub(crate) fn can_hold_placeholder(document: &Document, inference: SacmElement<'_>) -> bool {
+    inference.kind() == SacmKind::AssertedInference
         && inference.target().is_some()
         && !inference.is_counter()
         && !inference.is_citation()
         && !inference.is_abstract()
-        && asserted(inference.assertion_declaration())
+        && inference
+            .assertion_declaration()
+            .is_none_or(|declaration| declaration == AssertionDeclaration::Asserted)
         && !is_hidden(inference)
         && inference
             .reasoning()

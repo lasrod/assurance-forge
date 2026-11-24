@@ -133,7 +133,16 @@ impl Core {
             diagnostics,
             nodes: count(view.nodes.len()),
             edges: count(view.edges.len()),
-            view_codes: count(view.findings.len() + view.unplaced.len()),
+            // A placeholder (R16) is the editor's own mark, not something
+            // the file says that the diagram leaves out.
+            view_codes: count(
+                view.findings.len()
+                    + view
+                        .unplaced
+                        .iter()
+                        .filter(|item| item.code != view::Code::Placeholder)
+                        .count(),
+            ),
         };
         self.open = Some(Open {
             session: Session::new(document, self.revision),

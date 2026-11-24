@@ -228,8 +228,8 @@ export type AddChoice = { kind: ElementKind,
  */
 refusal: string | null, 
 /**
- * Adding it also clears the parent Goal's undeveloped decorator, which
- * the menu says.
+ * Adding it also clears the parent Goal's undeveloped decorator (W11),
+ * which the diagram then shows; the menu has no notes.
  */
 develops: boolean, };
 
@@ -256,8 +256,9 @@ export type Removal = { revision: number,
  */
 nodes: Array<RemovalNode>, 
 /**
- * Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`), or null
- * when it can. The frontend words it.
+ * Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
+ * `AF-EDIT-005` when a Strategy kept has no package to hold the place
+ * of its next Goal), or null when it can. The frontend words it.
  */
 refusal: string | null, };
 

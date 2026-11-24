@@ -16,10 +16,10 @@ use sacm::edit::{
     self, AddReference, BatchError, BatchMutation, CrossPackageReferencePolicy, DeleteElement,
     ReferenceDeletePolicy, RemoveReference,
 };
-use sacm::model::{AbstractClass, Document, ElementId, ElementKind as SacmKind, ReferenceEnd};
+use sacm::model::{AbstractClass, Document, ElementId, ReferenceEnd};
 
 use super::{AddError, Refusal, argument_package, placeholder};
-use crate::view::{Code, EdgeKind, NodeKind, View};
+use crate::view::{Code, EdgeKind, NodeKind, View, can_hold_placeholder};
 
 /// What removing a node would delete, as the diagram draws it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -169,8 +169,10 @@ impl Plan {
             .collect();
 
         // What each node is drawn under: the node an edge leaves, or for a
-        // challenge, what it challenges, a node or a relationship.
-        let mut parents: HashMap<&str, Vec<&str>> = HashMap::new();
+        // challenge, what it challenges, a node or a relationship; with the
+        // relationship that draws the edge, since the line is gone when that
+        // relationship goes even if the node it leaves stays.
+        let mut parents: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
         for edge in &view.edges {
             let (child, parent) = if edge.kind == EdgeKind::Challenge {
                 (edge.from.as_str(), edge.to.as_str())
@@ -178,7 +180,10 @@ impl Plan {
                 (edge.to.as_str(), edge.from.as_str())
             };
             if child != parent {
-                parents.entry(child).or_default().push(parent);
+                parents
+                    .entry(child)
+                    .or_default()
+                    .push((parent, edge.relationship.as_str()));
             }
         }
 
@@ -197,8 +202,13 @@ impl Plan {
                 let Some(above) = parents.get(candidate) else {
                     continue;
                 };
-                let gone = |parent: &&str| {
-                    going.contains(parent) || relationships.deleted.contains(*parent)
+                // A line goes with the relationship that draws it. A
+                // Strategy's inference that holds a place (W20) stays, so a
+                // Strategy goes this way only when nothing would draw it.
+                let gone = |(parent, line): &(&str, &str)| {
+                    going.contains(parent)
+                        || relationships.deleted.contains(*parent)
+                        || relationships.deleted.contains(*line)
                 };
                 if above.iter().all(gone) {
                     nodes.push(candidate);
@@ -211,6 +221,30 @@ impl Plan {
             }
             relationships = Relationships::of(document, &strategies, &going);
         }
+
+        // Listed from the node chosen down, each after a node it is drawn
+        // under that also goes; one whose line went with its relationship
+        // and whose parents stay comes after them.
+        let mut ordered: Vec<&str> = vec![id];
+        let mut next = 0;
+        while next < ordered.len() {
+            let above = ordered[next];
+            next += 1;
+            for candidate in &nodes {
+                let under = parents
+                    .get(candidate)
+                    .is_some_and(|list| list.iter().any(|(parent, _)| *parent == above));
+                if under && !ordered.contains(candidate) {
+                    ordered.push(candidate);
+                }
+            }
+        }
+        for candidate in &nodes {
+            if !ordered.contains(candidate) {
+                ordered.push(candidate);
+            }
+        }
+        let nodes = ordered;
 
         // The relationships in document order, then the nodes, then the
         // placeholders the deleted inferences held.
@@ -291,10 +325,10 @@ impl Plan {
         let parent = parents.get(id).and_then(|above| {
             above
                 .iter()
-                .find(|parent| {
-                    !going.contains(**parent) && view.nodes.iter().any(|node| node.id == **parent)
+                .find(|(parent, _)| {
+                    !going.contains(*parent) && view.nodes.iter().any(|node| node.id == *parent)
                 })
-                .map(|parent| (*parent).to_owned())
+                .map(|(parent, _)| (*parent).to_owned())
         });
 
         Ok(Plan {
@@ -345,10 +379,12 @@ impl Relationships {
                     || relationship.reasoning().is_some_and(is_dead);
                 let sources_dead = !relationship.sources().is_empty()
                     && relationship.sources().iter().all(is_dead);
-                let keeps_strategy = relationship.kind() == SacmKind::AssertedInference
-                    && relationship
-                        .reasoning()
-                        .is_some_and(|reasoning| strategies.contains(reasoning.as_str()));
+                // Only an inference R16 would hide a placeholder in: any other
+                // would draw the placeholder W20 adds as a Goal nobody asked for.
+                let keeps_strategy = relationship
+                    .reasoning()
+                    .is_some_and(|reasoning| strategies.contains(reasoning.as_str()))
+                    && can_hold_placeholder(document, relationship);
                 if end_dead || (sources_dead && !keeps_strategy) {
                     dead.insert(relationship_id.to_owned());
                     deleted.insert(relationship_id.to_owned());

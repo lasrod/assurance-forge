@@ -434,8 +434,8 @@ pub struct AddChoice {
     /// Why it cannot be added there (`AF-EDIT-001` to `AF-EDIT-006`), or
     /// null when it can. The menu leaves out a kind that cannot be added.
     pub refusal: Option<String>,
-    /// Adding it also clears the parent Goal's undeveloped decorator, which
-    /// the menu says.
+    /// Adding it also clears the parent Goal's undeveloped decorator (W11),
+    /// which the diagram then shows; the menu has no notes.
     pub develops: bool,
 }
 
@@ -472,8 +472,9 @@ pub struct Removal {
     /// The nodes it deletes: the node chosen first, then what goes with it.
     /// Empty when it is refused.
     pub nodes: Vec<RemovalNode>,
-    /// Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`), or null
-    /// when it can. The frontend words it.
+    /// Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
+    /// `AF-EDIT-005` when a Strategy kept has no package to hold the place
+    /// of its next Goal), or null when it can. The frontend words it.
     pub refusal: Option<String>,
 }
 
@@ -500,7 +501,7 @@ pub enum EditResult {
     /// redo (`AF-EDIT-008`), the add menu was for another revision
     /// (`AF-EDIT-009`), libSACM refused the operations (`AF-EDIT-010`),
     /// why a text cannot be set (`AF-EDIT-011` to `AF-EDIT-014`), or why a
-    /// node cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`).
+    /// node cannot be removed (`AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-015`).
     Refused { code: String },
     /// A text was set to what it already was: the document, its revision and
     /// its history are as they were.
