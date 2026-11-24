@@ -66,10 +66,11 @@ test('a right-click on a goal lists the six kinds; choosing one adds it, selecte
   const added = (await hook(page)).selected!;
   expect(added).not.toBe('cl_top');
   await expect(status(page)).toHaveText('Goal G1 added.');
-  await expect(page.getByTestId('element-properties')).toContainText('Goal');
-  // It has no name yet: its identifier is the title, once, and its kind under it.
-  await expect(page.getByTestId('element-title').locator('.af-element-name')).toHaveText('G1');
-  await expect(page.getByTestId('element-title').locator('.af-element-meta')).toHaveText('Goal');
+  // Its identifier is given, and its name and description are the author's to write.
+  await expect(page.getByTestId('element-type')).toHaveText('Goal');
+  await expect(page.getByTestId('element-identifier')).toHaveValue('G1');
+  await expect(page.getByTestId('element-name')).toHaveValue('');
+  await expect(page.getByTestId('element-statement')).toHaveValue('');
   const state = await hook(page);
   expect(state.revision).toBe(2);
   expect(state.diagram!.diagram.edges.some((edge) => edge.from === 'cl_top' && edge.to === added && edge.kind === 'supportedBy')).toBe(true);
@@ -276,4 +277,109 @@ test('the menu and the edits are worded in Japanese', async ({ page }) => {
   await expect(status(page)).toHaveText('仮定 A1 を追加しました。');
   await page.keyboard.press('Control+z');
   await expect(status(page)).toHaveText('元に戻しました。');
+});
+
+test('Element Properties changes an element’s ID, name and description; each is one undo step, and a refused ID changes nothing', async ({ page }) => {
+  await opened(page);
+  const point = await nodeCentre(page, 'cl_top');
+  await page.mouse.click(point.x, point.y);
+  const id = page.getByTestId('element-identifier');
+  const name = page.getByTestId('element-name');
+  const statement = page.getByTestId('element-statement');
+  await expect(id).toHaveValue('cl_top');
+  const nameBefore = await name.inputValue();
+  const text = async () => (await hook(page)).diagram!.diagram.nodes.find((node) => node.id === 'cl_top')!.text.map((line) => line.text).join(' ');
+
+  // Enter applies a single line: the diagram and the tree show it.
+  await name.fill('Braking is safe');
+  await name.press('Enter');
+  await expect(status(page)).toHaveText('Name changed.');
+  expect((await hook(page)).revision).toBe(2);
+  expect(await text()).toContain('Braking is safe');
+  await expect(page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem', { name: /Braking is safe/ })).toBeVisible();
+
+  // Enter in the description is a new line; leaving the field applies it.
+  await statement.fill('The braking function');
+  await statement.press('Enter');
+  await statement.pressSequentially('is acceptably safe.');
+  await id.focus();
+  await expect(status(page)).toHaveText('Description changed.');
+  await expect(statement).toHaveValue('The braking function\nis acceptably safe.');
+  expect((await hook(page)).revision).toBe(3);
+
+  await id.fill('G1');
+  await id.press('Enter');
+  await expect(status(page)).toHaveText('ID changed.');
+  expect(await text()).toContain('G1');
+  // The element is the same one: the selection is by its SACM id, which stays.
+  expect((await hook(page)).selected).toBe('cl_top');
+
+  // An empty ID, and another element's, are refused: the field shows the ID again.
+  await id.fill('');
+  await id.press('Enter');
+  await expect(status(page)).toHaveText('Nothing changed. An ID cannot be empty.');
+  await expect(id).toHaveValue('G1');
+  await id.fill('cl_sub_2');
+  await id.press('Enter');
+  await expect(status(page)).toHaveText('Nothing changed. Another element of the file has that ID.');
+  await expect(id).toHaveValue('G1');
+  // Escape puts back what was there, and the same text again is no change.
+  await name.fill('Not kept');
+  await name.press('Escape');
+  await expect(name).toHaveValue('Braking is safe');
+  await name.focus();
+  await name.press('Enter');
+  expect((await hook(page)).revision).toBe(4);
+
+  // Each change is one undo step.
+  await (await editMenu(page, 'Undo')).click();
+  await expect(id).toHaveValue('cl_top');
+  await (await editMenu(page, 'Undo')).click();
+  await (await editMenu(page, 'Undo')).click();
+  await expect(name).toHaveValue(nameBefore);
+  await expect.poll(async () => (await hook(page)).revision).toBe(7);
+  await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+  await expect(page.getByRole('menu', { name: 'Edit' }).getByRole('menuitem', { name: 'Undo' })).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('a field left without typing changes nothing, even when the text has space around it; typing after Enter is kept', async ({ page }) => {
+  await page.goto('/');
+  // A goal whose name the file holds with a space after it.
+  await page.getByTestId('open-file').setInputFiles({
+    name: 'spaced.sacm.xmi',
+    mimeType: 'application/xml',
+    buffer: Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="Case"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g1"><name content="Safe "/></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>`),
+  });
+  await expect.poll(async () => (await hook(page))?.revision).toBe(1);
+  const point = await nodeCentre(page, 'g1');
+  await page.mouse.click(point.x, point.y);
+  const id = page.getByTestId('element-identifier');
+  const name = page.getByTestId('element-name');
+  await expect(name).toHaveValue('Safe ');
+
+  // Through the fields and out, typing nothing: no change, no undo step.
+  await id.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await name.focus();
+  await name.press('Enter');
+  expect((await hook(page)).revision).toBe(1);
+  await expect(name).toHaveValue('Safe ');
+
+  // Enter applies, and what is typed straight after it stays in the field.
+  await name.fill('Braking');
+  await name.press('Enter');
+  await name.pressSequentially(' is safe');
+  await expect.poll(async () => (await hook(page)).revision).toBe(2);
+  await expect(name).toHaveValue('Braking is safe');
+  await name.press('Enter');
+  await expect.poll(async () => (await hook(page)).revision).toBe(3);
+  await expect(name).toHaveValue('Braking is safe');
 });

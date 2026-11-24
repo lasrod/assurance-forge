@@ -479,7 +479,8 @@ Each carries the id of the element or relationship as an argument.
 
 ## Writing GSN as SACM
 
-How the editor adds an element: the inverse of the reading rules above, so
+How the editor adds an element, and changes a node's text (W15 to W17
+below): the inverse of the reading rules above, so
 that what is added reads back, by R2 to R11 and E1 to E4, as the kind chosen,
 joined to its parent as chosen. `af-gsn` (`commands`) applies these rules;
 each add is one `sacm::edit::batch`, applied all or not at all. Decided on
@@ -510,6 +511,24 @@ an Assumption and a Justification are leaves. The C++ application's rule
 
 No vendor tag records a GSN type: each kind is told by the reading rules from
 standard SACM alone.
+
+### Changing a node's text
+
+How Element Properties changes a node's identifier, name and statement: the
+inverse of T1 to T3, so that the text given reads back as given. `af-gsn`
+(`commands::set_text`) applies these rules; each change is one
+`sacm::edit::batch` and one undo step. The SACM id (`xmi:id`) is never
+changed: relationships name it. Decided on 24 November 2026.
+
+| Rule | Changed | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W15 | Identifier | Without the space around it. With an `assuranceForge.gsn.identifier` tagged value: `SetContent` on it, replacing the content of its first value, the one T1 reads, and keeping any others. With none: `CreateTaggedValue`, as W10. An empty identifier is refused (AF-EDIT-012): T1 would read it back as the SACM id. One another element has is refused (AF-EDIT-013), counted as W10 counts: a drawn node's identifier, and every element's tagged identifier and SACM id, drawn or not | Decided | T1, W10. GSN v3 identifies each element uniquely; a file may be read with duplicates, but the editor makes no new one |
+| W16 | Name | `SetName` with the name it has, its content replaced: its `lang` and `xmi:id` stay. A name written where there was none (no `lang` and no content, as W12 leaves a new element) is tagged `en`. An empty name is allowed | Decided | T2; W12: SACM requires a name (§8.6) and libSACM accepts an empty one |
+| W17 | Statement | In the first `description`: `SetContent`, replacing the content of the value T3 reads for the interface language, which is the one shown, and keeping every other value and each `lang`. When T3 reads none (no value, or only empty ones): the first value's content is set, or a value is added. With no `description`: `CreateDescription` with one value; an empty statement then makes nothing. A value written where there was none (added, or with no `lang` and no content) is tagged `en`. An emptied statement reads back by T3 from what the file still holds: another language's value, when there is one | Decided | T3. The value changed is the one on screen, so nothing the author did not see is rewritten. English is assumed for a text first written here (decided 24 November 2026): one language keeps the editor simple, and a text the file already holds keeps the `lang` it has, or none. Writing in several languages is a later setting |
+
+A text that is an `ExpressionLangString` (§8.4) is not changed as text
+(AF-EDIT-014): its content is the value of a terminology expression.
+Setting a text to what it already is changes nothing and makes no undo step.
 
 ### W2: a Strategy comes with its first sub-goal
 
@@ -548,3 +567,7 @@ was refused. Nothing changes.
 | AF-EDIT-008 | There is nothing to undo, or nothing to redo |
 | AF-EDIT-009 | The document changed after the add menu was made: its choices may no longer hold |
 | AF-EDIT-010 | libSACM refused the operations the writing rules made (a fault in the rules, not a mapping decision) |
+| AF-EDIT-011 | The id is of no node the diagram draws: only a node's text is set |
+| AF-EDIT-012 | An identifier cannot be empty (W15) |
+| AF-EDIT-013 | Another element of the file has the identifier (W15) |
+| AF-EDIT-014 | The text is the value of a terminology expression, which is not changed as text |

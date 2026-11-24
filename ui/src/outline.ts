@@ -46,6 +46,12 @@ export function nest<R extends Levelled>(rows: readonly R[], node: (row: R) => O
  */
 const trailing = (text: string): ReactNode => createElement('span', { className: 'af-tree-meta' }, text);
 
+/**
+ * A row's name, which the tree keeps on one line: the whole of it is its
+ * tooltip, for when the dock cuts it short.
+ */
+const named = (text: string): ReactNode => createElement('span', { title: text }, text);
+
 /** What a node is called in a list: its name, else its statement, else its identifier. */
 export function outlineLabel(row: Pick<OutlineRow, 'name' | 'statement' | 'identifier'>): string {
   return row.name || row.statement || row.identifier;
@@ -56,7 +62,7 @@ export function outlineTree(rows: readonly OutlineRow[]): Built {
   return nest(rows, (row) => {
     const label = outlineLabel(row);
     // An element with neither name nor statement is called by its identifier, once.
-    return { label, textValue: `${row.identifier} ${label}`, meta: label === row.identifier ? undefined : trailing(row.identifier) };
+    return { label: named(label), textValue: `${row.identifier} ${label}`, meta: label === row.identifier ? undefined : trailing(row.identifier) };
   });
 }
 
@@ -64,7 +70,7 @@ export function outlineTree(rows: readonly OutlineRow[]): Built {
 export function packageTree(packages: readonly Package[], kind: (sacmClass: string) => string): Built {
   return nest(packages, (item) => {
     const label = item.name || item.id;
-    return { label, textValue: label, meta: trailing(kind(item.kind)) };
+    return { label: named(label), textValue: label, meta: trailing(kind(item.kind)) };
   });
 }
 

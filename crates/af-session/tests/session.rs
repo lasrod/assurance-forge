@@ -131,3 +131,33 @@ fn undo_takes_back_the_last_hundred_commands() {
         u32::try_from(2 * HISTORY + 2).unwrap_or(0)
     );
 }
+
+#[test]
+fn a_text_set_is_recorded_with_the_language_it_was_set_in() {
+    use af_gsn::commands::TextField;
+    let mut session = Session::new(sample(), 1);
+    let now = view(session.document(), "ja");
+    let record = match session.set_text(&now, "cl_top", TextField::Statement, "安全である", "ja")
+    {
+        Ok(Some(record)) => record,
+        other => panic!("not recorded: {other:?}"),
+    };
+    assert_eq!(
+        record.command,
+        Command::SetText {
+            element: "cl_top".to_owned(),
+            field: TextField::Statement,
+            text: "安全である".to_owned(),
+            language: "ja".to_owned(),
+        }
+    );
+    assert_eq!(record.revision, 2);
+    assert_eq!(session.records().len(), 1);
+    // The same text again is no command.
+    let now = view(session.document(), "ja");
+    assert!(matches!(
+        session.set_text(&now, "cl_top", TextField::Statement, "安全である", "ja"),
+        Ok(None)
+    ));
+    assert_eq!(session.records().len(), 1);
+}

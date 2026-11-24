@@ -94,6 +94,8 @@ function recorder() {
 
 const palette: Palette = {
   ground: '#fff',
+  grid: '#ddd',
+  fill: '#fefefe',
   line: '#000',
   text: '#000',
   secondary: '#666',
@@ -243,7 +245,8 @@ describe('selected and hovered', () => {
   it('fill and outline the node, each its own way', () => {
     const plain = recorder();
     draw(plain.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 });
-    expect(plain.fills).toEqual(['#fff']);
+    // A node is filled with its own colour, not the ground's.
+    expect(plain.fills).toEqual(['#fefefe']);
 
     const selected = recorder();
     draw(selected.context, diagram, { scale: 1, offsetX: 0, offsetY: 0 }, palette, families, { width: 800, height: 600, dpr: 1 }, {

@@ -15,6 +15,7 @@ import type {
   Outline,
   Package,
   RelationshipDetails,
+  TextField,
 } from '../../../crates/af-api/bindings/api';
 
 export type * from '../../../crates/af-api/bindings/api';
@@ -95,6 +96,12 @@ export interface Core {
    * the document has changed since.
    */
   add(parent: string | null, kind: ElementKind, revision: number): Promise<EditResult>;
+  /**
+   * Sets the identifier, name or statement of the node with this SACM id.
+   * `unchanged` when it was that already; refused (AF-EDIT-011 to 014) when
+   * it cannot be set.
+   */
+  setText(id: string, field: TextField, text: string): Promise<EditResult>;
   /** Takes back the last command. */
   undo(): Promise<EditResult>;
   /** Makes again the last command undo took back. */

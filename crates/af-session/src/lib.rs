@@ -14,7 +14,7 @@
 //! It does no I/O and builds for `wasm32-unknown-unknown`.
 
 use af_gsn::ElementKind;
-use af_gsn::commands::{self, AddError, Added, Target};
+use af_gsn::commands::{self, AddError, Added, Target, TextField, TextSet};
 use af_gsn::view::View;
 use sacm::model::Document;
 
@@ -37,6 +37,15 @@ pub enum Command {
     Add {
         parent: Option<String>,
         kind: ElementKind,
+    },
+    /// Set the identifier, name or statement of the node `element` to `text`.
+    SetText {
+        element: String,
+        field: TextField,
+        text: String,
+        /// The interface language it was set in: which of a statement's
+        /// language values it changed (W17).
+        language: String,
     },
     /// Take back the change that made `revision`.
     Undo { revision: u32 },
@@ -120,6 +129,48 @@ impl Session {
             },
             kind,
         };
+        let record = self.made(before, command, &added.mutation);
+        Ok((added, record))
+    }
+
+    /// Sets the identifier, name or statement of the node `element` to
+    /// `text`. `view` is the view of the document as it is now, made for
+    /// `language`. `None` when the text was already that: nothing is recorded
+    /// and there is nothing to undo.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::set_text`] refuses; the document and the revision are
+    /// then unchanged.
+    pub fn set_text(
+        &mut self,
+        view: &View,
+        element: &str,
+        field: TextField,
+        text: &str,
+        language: &str,
+    ) -> Result<Option<ChangeRecord>, AddError> {
+        let before = self.document.clone();
+        let set = commands::set_text(&mut self.document, view, element, field, text, language)?;
+        let TextSet::Changed(mutation) = set else {
+            return Ok(None);
+        };
+        let command = Command::SetText {
+            element: element.to_owned(),
+            field,
+            text: text.to_owned(),
+            language: language.to_owned(),
+        };
+        Ok(Some(self.made(before, command, &mutation)))
+    }
+
+    /// Records an applied command, which undo can take back to `before`.
+    fn made(
+        &mut self,
+        before: Document,
+        command: Command,
+        mutation: &sacm::edit::BatchMutation,
+    ) -> ChangeRecord {
         let ids = |list: &[sacm::model::ElementId]| {
             list.iter()
                 .map(|id| id.as_str().to_owned())
@@ -127,9 +178,9 @@ impl Session {
         };
         let record = self.record(
             command,
-            ids(added.mutation.created_ids()),
-            ids(added.mutation.changed_ids()),
-            ids(added.mutation.deleted_ids()),
+            ids(mutation.created_ids()),
+            ids(mutation.changed_ids()),
+            ids(mutation.deleted_ids()),
         );
         self.undo.push(Step {
             before,
@@ -139,7 +190,7 @@ impl Session {
             self.undo.remove(0);
         }
         self.redo.clear();
-        Ok((added, record))
+        record
     }
 
     /// The revision undo would take back, if any.

@@ -232,10 +232,13 @@ test('Select: a click outlines the node, and Element Properties shows what it is
 
   const grid = page.getByTestId('element-properties');
   await expect(grid).toContainText('Goal, undeveloped');
-  await expect(grid).toContainText('cl_sub_2');
-  await expect(grid).toContainText('SubClaim_Verification');
-  await expect(grid).toContainText('Verification activities demonstrate braking requirements are satisfied.');
-  await expect(grid).toContainText('SACM ID');
+  // In the order an element reads: its identifier, its name, what it says.
+  await expect(grid.locator('label')).toHaveText(['ID', 'Name', 'Description']);
+  await expect(page.getByTestId('element-identifier')).toHaveValue('cl_sub_2');
+  await expect(page.getByTestId('element-name')).toHaveValue('SubClaim_Verification');
+  await expect(page.getByTestId('element-statement')).toHaveValue('Verification activities demonstrate braking requirements are satisfied.');
+  // The file's own id is not shown.
+  await expect(grid).not.toContainText('SACM ID');
 
   // The panel's words follow the language.
   await page.getByRole('menuitem', { name: 'View', exact: true }).click();
@@ -251,7 +254,7 @@ test('Clear: a click on empty canvas or Esc clears the selection', async ({ page
   const properties = page.getByRole('region', { name: 'Element Properties' });
   const node = await nodeCentre(page, 'cl_top');
   await page.mouse.click(node.x, node.y);
-  await expect(page.getByTestId('element-properties')).toContainText('cl_top');
+  await expect(page.getByTestId('element-identifier')).toHaveValue('cl_top');
 
   const empty = await emptyPoint(page);
   await page.mouse.click(empty.x, empty.y);

@@ -4,20 +4,28 @@
 
 import type { Diagram, DiagramEdge, DiagramNode, Point, Rect } from '../core/Core';
 
+/**
+ * The diagram's own colours (`--af-diagram-*` in app.css): a ground apart
+ * from the panels' surfaces, with the nodes as paper on it.
+ */
 export interface Palette {
-  /** `surface.canvas`: the ground and the node fill. */
+  /** The ground the diagram is on. */
   ground: string;
-  /** `line.control`: outlines, connectors, arrowheads. */
+  /** The dots of the ground's grid. */
+  grid: string;
+  /** A node's fill. */
+  fill: string;
+  /** Outlines, connectors, arrowheads. */
   line: string;
-  /** `text.primary`. */
+  /** A node's text. */
   text: string;
-  /** `text.secondary`: the identifier. */
+  /** The identifier. */
   secondary: string;
-  /** `surface.hover`: the fill of the node under the pointer. */
+  /** The fill of the node under the pointer. */
   hover: string;
-  /** `selection.surface`: the selected node's fill. */
+  /** The selected node's fill. */
   selectedFill: string;
-  /** `selection.indicator`: the selected node's outline, and a selected line. */
+  /** The selected node's outline, and a selected line. */
   selectedLine: string;
   /** Forced colours are on: the selected outline is heavier, since there is no fill to see. */
   forced: boolean;
@@ -236,6 +244,7 @@ export function draw(
   context.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
   context.fillStyle = palette.ground;
   context.fillRect(0, 0, size.width, size.height);
+  drawGrid(context, viewport, palette, size);
   context.setTransform(size.dpr * scale, 0, 0, size.dpr * scale, size.dpr * offsetX, size.dpr * offsetY);
   context.lineWidth = 1 / scale;
   context.lineJoin = 'round';
@@ -257,6 +266,61 @@ export function draw(
     drawn.nodes += 1;
   }
   return drawn;
+}
+
+/** The grid's pitch, in diagram units. */
+export const GRID = 24;
+/** Dots closer than this, in CSS px, are not drawn: they would be a tint, not a grid. */
+const SMALLEST_GRID_PX = 12;
+
+/** One tile of the grid, made once for each size and colour, for each context. */
+const tiles = new WeakMap<CanvasRenderingContext2D, { key: string; pattern: CanvasPattern | null }>();
+
+/**
+ * A pattern of one dot of `dot` device px in a cell of `cell`, or null where
+ * there is no document to make it in (a test's context).
+ */
+function gridTile(context: CanvasRenderingContext2D, cell: number, dot: number, colour: string): CanvasPattern | null {
+  const key = `${cell} ${dot} ${colour}`;
+  const held = tiles.get(context);
+  if (held?.key === key) return held.pattern;
+  let pattern: CanvasPattern | null = null;
+  if (typeof document !== 'undefined') {
+    const tile = document.createElement('canvas');
+    tile.width = cell;
+    tile.height = cell;
+    const drawn = tile.getContext('2d');
+    if (drawn) {
+      drawn.fillStyle = colour;
+      drawn.fillRect(0, 0, dot, dot);
+      pattern = context.createPattern(tile, 'repeat');
+    }
+  }
+  tiles.set(context, { key, pattern });
+  return pattern;
+}
+
+/**
+ * The ground's dots: one each `GRID` diagram units, so they move and scale
+ * with the diagram and say where it is. Each is one CSS px at every zoom. It
+ * is one fill with a pattern, whatever the number of dots.
+ */
+function drawGrid(context: CanvasRenderingContext2D, viewport: Viewport, palette: Palette, size: { width: number; height: number; dpr: number }) {
+  const pitch = GRID * viewport.scale;
+  if (palette.forced || pitch < SMALLEST_GRID_PX) return;
+  // The tile is a whole number of device px, scaled to the exact pitch so the
+  // dots stay on the diagram's grid however far it reaches.
+  const exact = pitch * size.dpr;
+  const cell = Math.round(exact);
+  const pattern = gridTile(context, cell, Math.max(1, Math.round(size.dpr)), palette.grid);
+  if (!pattern) return;
+  const first = (offset: number) => ((offset % pitch) + pitch) % pitch;
+  pattern.setTransform(
+    new DOMMatrix().translateSelf(first(viewport.offsetX) * size.dpr, first(viewport.offsetY) * size.dpr).scaleSelf(exact / cell),
+  );
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.fillStyle = pattern;
+  context.fillRect(0, 0, size.width * size.dpr, size.height * size.dpr);
 }
 
 function polyline(context: CanvasRenderingContext2D, points: Point[]) {
@@ -335,7 +399,7 @@ function drawNode(
   const selected = marks.selected === node.id;
   const hovered = marks.hovered === node.id;
   shapePath(context, node);
-  context.fillStyle = selected ? palette.selectedFill : hovered ? palette.hover : palette.ground;
+  context.fillStyle = selected ? palette.selectedFill : hovered ? palette.hover : palette.fill;
   context.fill();
   context.strokeStyle = selected ? palette.selectedLine : palette.line;
   context.lineWidth = (selected && palette.forced ? 2 : 1) / scale;

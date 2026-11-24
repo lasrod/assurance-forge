@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import { useViewport } from './canvas/useViewport';
-import type { AddChoice, Core, ElementKind, NodeKind, TextStyle } from './core/Core';
+import type { AddChoice, Core, ElementKind, NodeKind, TextField, TextStyle } from './core/Core';
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
 import {
@@ -46,6 +46,13 @@ const FILE_ROW = ':file';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
+/** A text of an element, as Element Properties labels it. */
+const TEXT_FIELDS: Record<TextField, MessageKey> = {
+  identifier: 'propertyId',
+  name: 'propertyName',
+  statement: 'propertyStatement',
+};
+
 function message(state: DocumentState, t: T, language: Language): { text: string; tone?: 'error' } {
   switch (state.kind) {
     case 'starting':
@@ -64,6 +71,8 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('relayoutFailed'), tone: 'error' };
     case 'added':
       return { text: t('added', { kind: kindName(state.added, t), identifier: state.identifier }) };
+    case 'textChanged':
+      return { text: t('textChanged', { field: t(TEXT_FIELDS[state.field]) }) };
     case 'undone':
       return { text: t('undone') };
     case 'redone':
@@ -100,7 +109,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const details = useDetails(core, selected, diagram);
 
   // Edit ▸ Undo and Redo, with the view following each.
-  const { undo: undoWith, redo: redoWith, addChoices, add } = doc;
+  const { undo: undoWith, redo: redoWith, addChoices, add, setText: setTextWith } = doc;
+  /** A text of an element changed in Element Properties; the view keeps the element in place. */
+  const setText = useCallback(
+    (id: string, field: TextField, text: string, about: NodeKind) => setTextWith(id, field, text, about, followEdit),
+    [setTextWith, followEdit],
+  );
   const undo = useCallback(() => undoWith(followEdit), [undoWith, followEdit]);
   const redo = useCallback(() => redoWith(followEdit), [redoWith, followEdit]);
 
@@ -201,7 +215,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const explorer = useMemo(() => {
     const kind = (sacmClass: string) => packageKind(sacmClass, t);
     const built = packageTree(packages, kind);
-    return fileName === null ? [] : [{ value: FILE_ROW, label: fileName, textValue: fileName, children: built.nodes }];
+    return fileName === null ? [] : [{ value: FILE_ROW, label: <span title={fileName}>{fileName}</span>, textValue: fileName, children: built.nodes }];
   }, [packages, fileName, t]);
   const explorerOpen = useMemo(() => new Set([FILE_ROW, ...packageTree(packages, () => '').branches]), [packages]);
   const [explorerExpanded, setExplorerExpanded] = useState<Set<string>>(new Set());
@@ -389,7 +403,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               nameInText: t('elementPropertiesInText'),
               min: 14,
               icons: { hide: <PanelRightClose />, show: <PanelRightOpen /> },
-              views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} /> }],
+              views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} onText={setText} /> }],
             }}
             bottom={{
               name: t('problems'),

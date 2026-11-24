@@ -540,3 +540,73 @@ fn an_add_from_the_menu_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
     );
     assert!(!core.history().can_undo, "the history is the file's");
 }
+
+#[test]
+fn a_text_set_in_element_properties_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
+    use af_api::contract::{EditResult, TextField};
+    let mut core = core("en");
+    assert!(matches!(
+        core.set_text("cl_top", TextField::Name, "x"),
+        EditResult::Refused { ref code } if code == "AF-EDIT-007"
+    ));
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let was = core.element("cl_top").unwrap_or_else(|| panic!("cl_top"));
+
+    for (field, text) in [
+        (TextField::Identifier, "G1"),
+        (TextField::Name, "Braking is safe"),
+        (
+            TextField::Statement,
+            "The braking function is acceptably safe.",
+        ),
+    ] {
+        assert!(
+            matches!(
+                core.set_text("cl_top", field, text),
+                EditResult::Applied { element: None, .. }
+            ),
+            "{field:?}"
+        );
+    }
+    assert_eq!(core.history().revision, 4);
+    let now = core.element("cl_top").unwrap_or_else(|| panic!("cl_top"));
+    assert_eq!(now.identifier, "G1");
+    assert_eq!(now.name.as_deref(), Some("Braking is safe"));
+    assert_eq!(
+        now.statement.as_deref(),
+        Some("The braking function is acceptably safe.")
+    );
+    // The diagram and the outline are of the new text.
+    let diagram = core.diagram().unwrap_or_else(|| panic!("open"));
+    let drawn = diagram
+        .diagram
+        .nodes
+        .iter()
+        .find(|node| node.id == "cl_top")
+        .unwrap_or_else(|| panic!("cl_top is drawn"));
+    assert!(drawn.text.iter().any(|line| line.text == "G1"));
+    let outline = core.outline().unwrap_or_else(|| panic!("open"));
+    assert!(outline.rows.iter().any(|row| row.identifier == "G1"));
+
+    // The same text again is no command; a refusal is none either.
+    assert_eq!(
+        core.set_text("cl_top", TextField::Name, "Braking is safe"),
+        EditResult::Unchanged
+    );
+    assert!(matches!(
+        core.set_text("cl_top", TextField::Identifier, ""),
+        EditResult::Refused { ref code } if code == "AF-EDIT-012"
+    ));
+    assert!(matches!(
+        core.set_text("cl_top", TextField::Identifier, "cl_sub_2"),
+        EditResult::Refused { ref code } if code == "AF-EDIT-013"
+    ));
+    assert_eq!(core.history().revision, 4);
+
+    // Each text is one undo step.
+    for _ in 0..3 {
+        assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    }
+    assert!(!core.history().can_undo);
+    assert_eq!(core.element("cl_top"), Some(was));
+}

@@ -413,6 +413,18 @@ pub enum ElementKind {
     Justification,
 }
 
+/// A text of a node that Element Properties changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum TextField {
+    /// The GSN identifier.
+    Identifier,
+    Name,
+    /// The statement: SACM's description.
+    Statement,
+}
+
 /// One kind the add menu lists, and whether it can be chosen.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -447,7 +459,8 @@ pub enum EditResult {
     Applied {
         revision: u32,
         /// The element the command added, which the interface selects: for
-        /// a Strategy, the Strategy. Null for undo and redo.
+        /// a Strategy, the Strategy. Null for undo, redo and a change of
+        /// text.
         element: Option<String>,
         /// The SACM ids the command created, changed and deleted.
         created: Vec<String>,
@@ -457,8 +470,12 @@ pub enum EditResult {
     /// Nothing changed. `code` is an `AF-EDIT-*` code: why the add cannot be
     /// made, nothing is open (`AF-EDIT-007`), there is nothing to undo or
     /// redo (`AF-EDIT-008`), the add menu was for another revision
-    /// (`AF-EDIT-009`), or libSACM refused the operations (`AF-EDIT-010`).
+    /// (`AF-EDIT-009`), libSACM refused the operations (`AF-EDIT-010`), or
+    /// why a text cannot be set (`AF-EDIT-011` to `AF-EDIT-014`).
     Refused { code: String },
+    /// A text was set to what it already was: the document, its revision and
+    /// its history are as they were.
+    Unchanged,
 }
 
 /// What Edit ▸ Undo and Redo would do, at `revision`.
@@ -505,6 +522,7 @@ pub fn typescript() -> String {
         DiagramEdge::decl(&cfg),
         Diagram::decl(&cfg),
         ElementKind::decl(&cfg),
+        TextField::decl(&cfg),
         AddChoice::decl(&cfg),
         AddChoices::decl(&cfg),
         EditResult::decl(&cfg),

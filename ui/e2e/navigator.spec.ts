@@ -43,7 +43,7 @@ test('a row chosen in the tree is selected on the canvas and shown in Element Pr
   await expect.poll(async () => (await hook(page)).selected).toBe('cl_sub_2');
   const properties = page.getByTestId('element-properties');
   await expect(properties).toContainText('Goal, undeveloped');
-  await expect(page.getByTestId('element-statement')).toHaveText('Verification activities demonstrate braking requirements are satisfied.');
+  await expect(page.getByTestId('element-statement')).toHaveValue('Verification activities demonstrate braking requirements are satisfied.');
 });
 
 test('a node chosen on the canvas is the selected row of the tree, with its branch open', async ({ page }) => {

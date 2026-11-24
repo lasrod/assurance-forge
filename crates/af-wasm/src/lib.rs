@@ -102,6 +102,16 @@ impl WasmCore {
         json(&self.core.add(parent.as_deref(), kind, revision))
     }
 
+    /// Sets the text `field` (a `TextField`, such as `name`) of the node
+    /// `id` to `text`. `EditResult` as JSON.
+    #[wasm_bindgen(js_name = setText)]
+    pub fn set_text(&mut self, id: &str, field: &str, text: &str) -> Result<String, JsError> {
+        let field: af_api::contract::TextField =
+            serde_json::from_value(serde_json::Value::String(field.to_owned()))
+                .map_err(|_| JsError::new("core-field"))?;
+        json(&self.core.set_text(id, field, text))
+    }
+
     /// Takes back the last command. `EditResult` as JSON.
     pub fn undo(&mut self) -> Result<String, JsError> {
         json(&self.core.undo())

@@ -405,6 +405,16 @@ fn add(
 }
 
 #[tauri::command]
+fn set_text(
+    id: String,
+    field: af_api::contract::TextField,
+    text: String,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.set_text(&id, field, &text))
+}
+
+#[tauri::command]
 fn undo(state: Shared<'_>) -> Result<af_api::contract::EditResult, String> {
     Ok(lock(&state)?.core.undo())
 }
@@ -478,6 +488,7 @@ pub fn run(args: Args) -> i32 {
             relationship,
             add_choices,
             add,
+            set_text,
             undo,
             redo,
             history,

@@ -148,7 +148,9 @@ test('a line under the pointer is marked, a node over it wins, and a click besid
   const { viewport: view, diagram } = await hook(page);
   const box = (await canvas(page).boundingBox())!;
   const rect = diagram.nodes.find((candidate) => candidate.id === 'g_top')!.shape.rect;
-  await page.mouse.click(box.x + (rect.x + 2) * view.scale + view.offsetX, box.y + (rect.y + rect.height / 2) * view.scale + view.offsetY);
+  // Three CSS px inside its edge, whatever the zoom: within the line's reach,
+  // and a whole pixel inside the node in a browser that rounds the pointer.
+  await page.mouse.click(box.x + rect.x * view.scale + view.offsetX + 3, box.y + (rect.y + rect.height / 2) * view.scale + view.offsetY);
   await expect.poll(async () => (await hook(page)).selected).toBe('g_top');
 });
 

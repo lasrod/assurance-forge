@@ -1,21 +1,30 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
 import type { DiagramAt, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Palette, type Viewport } from './draw';
 
-function palette(style: CanvasStyle): Palette {
+/**
+ * The diagram's colours, as app.css gives them to the canvas for the theme it
+ * is in (`--af-diagram-*`). `style` is read again when the theme changes, and
+ * the palette with it.
+ */
+function palette(element: Element, style: CanvasStyle): Palette {
+  const declared = getComputedStyle(element);
   // Forced colours: the system's, as DATUM's canvas rule says.
-  const color = (token: string, system: string) => (style.forced ? system : style.color(token));
+  const color = (name: string, system: string) =>
+    style.forced ? system : declared.getPropertyValue(`--af-diagram-${name}`).trim() || system;
   return {
-    ground: color('surface.canvas', 'Canvas'),
-    line: color('line.control', 'CanvasText'),
-    text: color('text.primary', 'CanvasText'),
-    secondary: color('text.secondary', 'CanvasText'),
-    hover: color('surface.hover', 'Canvas'),
-    selectedFill: color('selection.surface', 'Canvas'),
-    selectedLine: color('selection.indicator', 'Highlight'),
+    ground: color('ground', 'Canvas'),
+    grid: color('grid', 'CanvasText'),
+    fill: color('fill', 'Canvas'),
+    line: color('line', 'CanvasText'),
+    text: color('text', 'CanvasText'),
+    secondary: color('secondary', 'CanvasText'),
+    hover: color('hover', 'Canvas'),
+    selectedFill: color('selected-fill', 'Canvas'),
+    selectedLine: color('selected-line', 'Highlight'),
     forced: style.forced,
   };
 }
@@ -95,6 +104,9 @@ export function DiagramCanvas({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
+  // Read once for each style: a new one comes with each change of theme.
+  // The canvas is there by the time a style is: the style is read from it.
+  const colours = useMemo(() => (canvas.current && style ? palette(canvas.current, style) : null), [style]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [panning, setPanning] = useState(false);
 
@@ -116,23 +128,23 @@ export function DiagramCanvas({
   useEffect(() => {
     const element = canvas.current;
     const context = element?.getContext('2d');
-    if (!element || !context || !style || size.width === 0 || size.height === 0) return;
+    if (!element || !context || !style || !colours || size.width === 0 || size.height === 0) return;
     const dpr = style.dpr;
     element.width = Math.round(size.width * dpr);
     element.height = Math.round(size.height * dpr);
     if (!diagram || !viewport) {
       context.setTransform(1, 0, 0, 1, 0, 0);
-      context.fillStyle = style.forced ? 'Canvas' : style.color('surface.canvas');
+      context.fillStyle = colours.ground;
       context.fillRect(0, 0, element.width, element.height);
       report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null, viewport: null, selected, hovered: null });
       return;
     }
-    const drawn = draw(context, diagram.diagram, viewport, palette(style), measuredFamilies, { ...size, dpr }, {
+    const drawn = draw(context, diagram.diagram, viewport, colours, measuredFamilies, { ...size, dpr }, {
       selected,
       hovered: shownHover,
     });
     report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover });
-  }, [diagram, size, style, viewport, selected, shownHover]);
+  }, [diagram, size, style, colours, viewport, selected, shownHover]);
 
   // The latest values, for the handlers below, which outlive a render.
   const latest = useRef({ diagram, viewport, size, onViewport });
