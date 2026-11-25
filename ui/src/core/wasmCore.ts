@@ -17,6 +17,7 @@ import type {
   WriteResult,
 } from './Core';
 import { createWebRecent } from './webRecent';
+import { createWebRecovery, indexedDbRecovery } from './webRecovery';
 import { StartError, type FontBytes } from './start';
 
 /** Hands `text` to the browser as a download named `name`: where the browser keeps downloads. */
@@ -44,12 +45,21 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     throw match ? new StartError('font-unreadable', match[1]) : new StartError('core');
   }
   const parse = <T>(json: string | undefined): T | null => (json === undefined ? null : (JSON.parse(json) as T));
-  const open = async (bytes: Uint8Array) => JSON.parse(core.open(bytes)) as OpenResult;
+  const recovery = createWebRecovery(core, indexedDbRecovery);
+  // Opening a file gives up the one open, after the page asked about its
+  // changes: their copy goes (R3).
+  const open = async (bytes: Uint8Array) => {
+    await recovery.giveUp();
+    return JSON.parse(core.open(bytes)) as OpenResult;
+  };
   return {
     open,
     // The methods below throw `core-serialize` if the core's answer cannot be
     // written, which is the core's failure, not the file's.
-    close: async () => core.close(),
+    close: async () => {
+      await recovery.giveUp();
+      core.close();
+    },
     diagram: async () => parse<DiagramAt>(core.diagram()),
     element: async (id) => parse<ElementDetails>(core.element(id)),
     relationship: async (id) => parse<RelationshipDetails>(core.relationship(id)),
@@ -71,9 +81,10 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
       if (written.result === 'refused') return written;
       if (written.revision !== revision) return { result: 'refused', code: 'AF-SAVE-006' };
       download(written.xmi, name);
-      return core.markSaved(written.revision)
-        ? { result: 'saved', revision: written.revision, name }
-        : { result: 'refused', code: 'AF-SAVE-006' };
+      if (!core.markSaved(written.revision)) return { result: 'refused', code: 'AF-SAVE-006' };
+      // The changes are in the download: their copy goes (R3).
+      await recovery.saved(name);
+      return { result: 'saved', revision: written.revision, name };
     },
     saveAs: null,
     closeGuard: null,
@@ -85,5 +96,6 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     initialFile: async () => null,
     openDialog: null,
     recent: createWebRecent(open),
+    recovery,
   };
 }

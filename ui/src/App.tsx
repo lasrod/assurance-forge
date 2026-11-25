@@ -5,6 +5,7 @@ import type { AddChoice, Core, ElementKind, NodeKind, Removal, TextField, TextSt
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
+import { RecoveryDialog } from './RecoveryDialog';
 import { UnsavedDialog } from './UnsavedDialog';
 import {
   ChevronDown,
@@ -58,6 +59,11 @@ const TEXT_FIELDS: Record<TextField, MessageKey> = {
   statement: 'propertyStatement',
 };
 
+/** An `AF-RECOVER-*` code in words; another code as it is. */
+function recoveryReason(code: string, t: T): string {
+  return /^AF-RECOVER-00[1-4]$/.test(code) ? t(code as MessageKey) : code;
+}
+
 function message(state: DocumentState, t: T, language: Language): { text: string; tone?: 'error' } {
   switch (state.kind) {
     case 'starting':
@@ -97,6 +103,14 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       const known = /^AF-SAVE-00[1-7]$/.test(state.code);
       return { text: t('saveRefused', { reason: known ? t(state.code as MessageKey) : state.code }), tone: 'error' };
     }
+    case 'restored':
+      return { text: t('restored') };
+    case 'recoveryDiscarded':
+      return { text: t('recoveryDiscarded') };
+    case 'recoverySetAside':
+      return { text: t('recoverySetAside', { reason: recoveryReason(state.code, t) }), tone: 'error' };
+    case 'recoveryNotKept':
+      return { text: t('recoveryNotKept', { reason: recoveryReason(state.code, t) }), tone: 'error' };
     case 'result': {
       const result = state.result;
       if (result.result === 'opened') {
@@ -579,6 +593,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                 if (saved) then?.();
               });
             }}
+          />
+        )}
+        {hasFile && (
+          <RecoveryDialog
+            offered={doc.recovery}
+            time={doc.recovery ? new Date(doc.recovery.writtenAt).toLocaleString(language) : ''}
+            asksWhere={core?.saveAs != null}
+            t={t}
+            onRestore={() => doc.restoreRecovery(followEdit)}
+            onDiscard={doc.discardRecovery}
           />
         )}
         {hasFile && (

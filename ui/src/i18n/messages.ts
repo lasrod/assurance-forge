@@ -160,6 +160,21 @@ const en = {
   'AF-SAVE-005': 'The file could not be written. It may be read-only or in use.',
   'AF-SAVE-006': 'The case changed while it was being saved. Save again.',
   'AF-SAVE-007': 'The save could not be made: the application did not answer. This is a fault in Assurance Forge.',
+  recoveryTitle: 'Restore the changes to {name}?',
+  recoveryIntro: 'Changes to {name} were not saved when Assurance Forge last closed. A copy of them was kept at {time}.',
+  recoveryBaseChanged: 'The file has changed since then. Restored, the changes replace what it holds now, and Save asks for a file to save them to.',
+  recoveryBaseChangedWeb: 'The file opened is not the one the changes were made to: it holds other content. Restored, the changes replace it.',
+  recoveryUndo: 'Restore makes them one change: Edit ▸ Undo shows the file as it was saved.',
+  restore: 'Restore',
+  discard: 'Discard',
+  restored: 'Changes restored. Edit ▸ Undo takes them back.',
+  recoveryDiscarded: 'The copy of the changes was discarded.',
+  recoverySetAside: 'A copy of changes to this file was found but cannot be read, and was set aside. {reason}',
+  recoveryNotKept: 'Changes cannot be kept against a crash. {reason} Saving works as before.',
+  'AF-RECOVER-001': 'There is no copy to restore.',
+  'AF-RECOVER-002': 'It is not a copy this version of Assurance Forge reads; a later version may.',
+  'AF-RECOVER-003': 'The case it holds is not SACM 2.3 that Assurance Forge reads.',
+  'AF-RECOVER-004': 'The copy could not be written: the folder may be read-only, or the storage full or blocked.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -321,6 +336,21 @@ const ja: Record<MessageKey, string> = {
   'AF-SAVE-005': 'ファイルに書き込めませんでした。読み取り専用か、使用中の可能性があります。',
   'AF-SAVE-006': '保存中にケースが変更されました。もう一度保存してください。',
   'AF-SAVE-007': 'アプリケーションが応答しなかったため、保存できませんでした。Assurance Forge の不具合です。',
+  recoveryTitle: '{name} への変更を復元しますか？',
+  recoveryIntro: 'Assurance Forge が前回終了したとき、{name} への変更は保存されていませんでした。変更のコピーを {time} に残しています。',
+  recoveryBaseChanged: 'その後ファイルが変更されています。復元すると変更が現在の内容を置き換え、保存するときは保存先を尋ねます。',
+  recoveryBaseChangedWeb: '開いたファイルは変更を加えたファイルではなく、別の内容です。復元すると変更がその内容を置き換えます。',
+  recoveryUndo: '復元は一つの変更になります。「編集 ▸ 元に戻す」で保存したときのファイルに戻ります。',
+  restore: '復元',
+  discard: '破棄',
+  restored: '変更を復元しました。「編集 ▸ 元に戻す」で取り消せます。',
+  recoveryDiscarded: '変更のコピーを破棄しました。',
+  recoverySetAside: 'このファイルへの変更のコピーが見つかりましたが読み取れないため、別に保管しました。{reason}',
+  recoveryNotKept: '変更を異常終了に備えて残せません。{reason}保存はこれまでどおりできます。',
+  'AF-RECOVER-001': '復元するコピーがありません。',
+  'AF-RECOVER-002': 'このバージョンの Assurance Forge が読めるコピーではありません。新しいバージョンなら読める可能性があります。',
+  'AF-RECOVER-003': '含まれるケースが Assurance Forge の読める SACM 2.3 ではありません。',
+  'AF-RECOVER-004': 'コピーを書き込めませんでした。フォルダーが読み取り専用か、保存領域がいっぱいかブロックされている可能性があります。',
 };
 
 const MESSAGES: Record<Language, Record<MessageKey, string>> = { en, ja };

@@ -557,6 +557,61 @@ pub enum SaveResult {
     Cancelled,
 }
 
+/// What the core gave when the shell asked to keep a recovery copy (plan
+/// decisions R1 to R3).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(tag = "result", rename_all = "camelCase")]
+pub enum RecoveryCopy {
+    /// The copy of the document at `revision`, which has changes that are
+    /// not saved: the bytes the shell keeps, as they are.
+    #[serde(rename_all = "camelCase")]
+    Keep { revision: u32, copy: String },
+    /// The document at `revision` is in its saved state: any copy of it goes.
+    #[serde(rename_all = "camelCase")]
+    Remove { revision: u32 },
+    /// No copy was made. `code` is `AF-RECOVER-001` when nothing is open, or
+    /// `AF-RECOVER-004` when the document could not be written.
+    Refused { code: String },
+}
+
+/// What a recovery copy found beside the file just opened is.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(tag = "result", rename_all = "camelCase")]
+pub enum FoundRecovery {
+    /// A copy that can be restored: of the file `name`, written at
+    /// `written_at` (milliseconds since 1970). `base_matches` is whether the
+    /// file holds what it held when the copy's changes began (R6).
+    #[serde(rename_all = "camelCase")]
+    Found {
+        name: String,
+        written_at: f64,
+        base_matches: bool,
+    },
+    /// A copy that cannot be read (R7): not a recovery copy this version
+    /// reads (`AF-RECOVER-002`), or SACM a strict read refuses
+    /// (`AF-RECOVER-003`); `AF-RECOVER-001` when nothing is open.
+    Unreadable { code: String },
+}
+
+/// What the shell did when the page asked it to keep a recovery copy.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(tag = "result", rename_all = "camelCase")]
+pub enum KeepResult {
+    /// The copy is written.
+    Kept,
+    /// There are no changes that are not saved: the copy is removed, or there
+    /// was none.
+    Removed,
+    /// Nothing was done: the document is no longer at the revision asked
+    /// for, or a copy found on open is still to be decided (R5).
+    Skipped,
+    /// No copy could be written (`AF-RECOVER-004`, R8), or the core made none.
+    Refused { code: String },
+}
+
 /// The TypeScript declarations of every type above, in one module, as
 /// `bindings/api.ts` holds them.
 #[cfg(feature = "typescript")]
@@ -600,6 +655,9 @@ pub fn typescript() -> String {
         History::decl(&cfg),
         WriteResult::decl(&cfg),
         SaveResult::decl(&cfg),
+        RecoveryCopy::decl(&cfg),
+        FoundRecovery::decl(&cfg),
+        KeepResult::decl(&cfg),
     ];
     let mut out = String::from(
         "// Generated from crates/af-api/src/contract.rs by its tests; do not edit.\n\

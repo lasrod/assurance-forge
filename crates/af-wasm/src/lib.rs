@@ -3,6 +3,7 @@
 //! Each method answers with the contract's JSON (`crates/af-api/bindings/api.ts`
 //! declares its shapes), which the interface parses. The page reads files and
 //! fonts and hands in bytes; nothing here touches the network or storage.
+//! The page keeps the recovery copies the core makes, in IndexedDB.
 
 use af_api::Core;
 use af_api::contract::ElementKind;
@@ -144,8 +145,29 @@ impl WasmCore {
 
     /// `WriteResult` as JSON: the open document as SACM 2.3 XMI, checked to
     /// read back as the document. Nothing is marked saved.
-    pub fn write(&self) -> Result<String, JsError> {
+    pub fn write(&mut self) -> Result<String, JsError> {
         json(&self.core.write())
+    }
+
+    /// `RecoveryCopy` as JSON: the bytes to keep for the file `name` while
+    /// the document has changes that are not saved, written at `written_at`
+    /// (milliseconds since 1970), or that none is needed.
+    #[wasm_bindgen(js_name = recoveryCopy)]
+    pub fn recovery_copy(&self, name: &str, written_at: f64) -> Result<String, JsError> {
+        json(&self.core.recovery_copy(name, written_at))
+    }
+
+    /// `FoundRecovery` as JSON: what the recovery copy `copy`, found for the
+    /// file just opened, is.
+    #[wasm_bindgen(js_name = readRecovery)]
+    pub fn read_recovery(&self, copy: &[u8]) -> Result<String, JsError> {
+        json(&self.core.read_recovery(copy))
+    }
+
+    /// Replaces the document by the one the recovery copy `copy` kept, as
+    /// one command undo takes back. `EditResult` as JSON.
+    pub fn restore(&mut self, copy: &[u8]) -> Result<String, JsError> {
+        json(&self.core.restore(copy))
     }
 
     /// The page has saved (downloaded) what `write` gave at `revision`.
