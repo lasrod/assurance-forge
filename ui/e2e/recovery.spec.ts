@@ -39,7 +39,14 @@ function copies(page: Page): Promise<string[]> {
     () =>
       new Promise<string[]>((resolve, reject) => {
         const opening = indexedDB.open('assurance-forge-recovery', 1);
-        opening.onerror = () => reject(opening.error);
+        // Not made yet: no copy. Making it here, without its stores, would
+        // keep the page from making it.
+        let missing = false;
+        opening.onupgradeneeded = () => {
+          missing = true;
+          opening.transaction?.abort();
+        };
+        opening.onerror = () => (missing ? resolve([]) : reject(opening.error));
         opening.onsuccess = () => {
           const db = opening.result;
           if (!db.objectStoreNames.contains('copies')) {

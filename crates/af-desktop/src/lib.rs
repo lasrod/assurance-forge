@@ -275,6 +275,8 @@ pub struct Desktop {
     save_as_only: bool,
     /// The window has ended: no copy is kept after it.
     ended: bool,
+    /// The user chose to close the window when the page asked (`quit`).
+    quit_chosen: bool,
 }
 
 impl Desktop {
@@ -322,6 +324,7 @@ impl Desktop {
             found_said: None,
             save_as_only: false,
             ended: false,
+            quit_chosen: false,
         };
         desktop.look_for_recovery();
         (desktop, line)
@@ -342,7 +345,12 @@ impl Desktop {
         match said {
             FoundRecovery::Found { .. } => self.found = Some(bytes),
             FoundRecovery::Unreadable { .. } => {
-                let _ = recovery::set_aside(&path, recent::now());
+                // A copy that could not be set aside stays where it is, held
+                // as found: nothing is written over it or removes it, and it
+                // cannot be restored (R7).
+                if recovery::set_aside(&path, recent::now()).is_none() {
+                    self.found = Some(bytes);
+                }
             }
         }
         self.found_said = Some(said);
@@ -381,7 +389,10 @@ impl Desktop {
             };
         };
         let result = self.core.restore(bytes);
-        if !matches!(result, EditResult::Refused { .. }) {
+        if result == EditResult::Unchanged {
+            // The copy holds what the file holds: nothing to keep it for.
+            self.discard_recovery();
+        } else if !matches!(result, EditResult::Refused { .. }) {
             if matches!(
                 self.found_said,
                 Some(FoundRecovery::Found {
@@ -437,10 +448,21 @@ impl Desktop {
         }
     }
 
-    /// The window has ended by a close the user chose: the open file's copy
-    /// goes, and none is kept after (R3). A crash never comes here.
+    /// The page asked about the changes not saved, and the user chose to
+    /// close the window (`quit`).
+    pub fn choose_quit(&mut self) {
+        self.quit_chosen = true;
+    }
+
+    /// The window has ended. Its copy goes when the user chose that: there
+    /// were no changes not saved, or the page asked and the user chose to
+    /// close (R3). A close the page did not ask about (it had stopped, so the
+    /// second close was not held) leaves the copy, as a crash does. No copy is
+    /// kept after.
     pub fn end(&mut self) {
-        self.give_up_recovery();
+        if self.quit_chosen || !self.is_modified() {
+            self.give_up_recovery();
+        }
         self.ended = true;
     }
 
@@ -537,13 +559,13 @@ impl Desktop {
         if !self.core.mark_saved(revision) {
             return save_refused(CHANGED_MEANWHILE);
         }
-        // The changes are in a file now: their copy goes (R3), beside the
-        // file they were made on and beside the one saved to.
+        // The changes are in a file now: their copy goes (R3). It is beside
+        // the file they were made on; a copy beside the file saved to, when
+        // that is another, is that file's own unsaved work and stays.
         if self.found.is_none() {
             if let Some(file) = &self.file {
                 recovery::remove(&file.path);
             }
-            recovery::remove(path);
         }
         self.save_as_only = false;
         self.file = Some(FileOnDisk {
@@ -797,7 +819,8 @@ async fn save_as(
 /// The page has asked about the changes that are not saved, and the window
 /// may close: it closes without asking again.
 #[tauri::command]
-fn quit(window: tauri::WebviewWindow) -> Result<(), String> {
+fn quit(window: tauri::WebviewWindow, state: Shared<'_>) -> Result<(), String> {
+    lock(&state)?.choose_quit();
     window.destroy().map_err(|_| "window-not-closed".to_owned())
 }
 
@@ -1109,8 +1132,8 @@ pub fn run(args: Args) -> i32 {
                     let _ = window.emit(CLOSE_REQUESTED, ());
                 }
             }
-            // A close the user chose, after the question if there was one:
-            // the recovery copy goes (R3).
+            // The window's end: the recovery copy goes if the user chose it
+            // (R3).
             WindowEvent::Destroyed => {
                 if let Ok(mut desktop) = window.state::<Mutex<Desktop>>().lock() {
                     desktop.end();
@@ -1787,11 +1810,81 @@ mod tests {
         let mut desktop = opened(&file);
         change(&mut desktop);
         assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        desktop.choose_quit();
         desktop.end();
         assert!(!folder.exists(), "the window closed after Don't save");
         // A copy asked for after the window's end is not kept.
         assert_eq!(keep(&mut desktop), KeepResult::Skipped);
         assert!(!folder.exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_window_that_ends_without_the_question_answered_keeps_the_copy() {
+        let (directory, file) = scratch("recovery-unheard");
+        let copy = directory.join("case.sacm.xmi.af").join("recovery.json");
+        // The page had stopped: the second close was not held, so nobody
+        // chose to lose the changes.
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        desktop.end();
+        assert!(copy.is_file(), "kept, as a crash keeps it");
+        assert_eq!(keep(&mut desktop), KeepResult::Skipped);
+        // No changes not saved, though the page had not yet removed their
+        // copy: the window's end, unasked, takes it.
+        let mut desktop = opened(&file);
+        desktop.discard_recovery();
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        assert!(matches!(desktop.core.undo(), EditResult::Applied { .. }));
+        assert!(copy.is_file());
+        desktop.end();
+        assert!(!copy.exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn save_as_over_another_file_leaves_that_files_copy() {
+        let (directory, file) = scratch("recovery-save-as");
+        let other = directory.join("other.sacm.xmi");
+        assert!(std::fs::copy(&file, &other).is_ok());
+        crash_after_a_change(&other);
+        let theirs = directory.join("other.sacm.xmi.af").join("recovery.json");
+        assert!(theirs.is_file());
+
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        let revision = desktop.core.revision();
+        assert!(matches!(
+            desktop.save_to(&other, revision, true),
+            SaveResult::Saved { .. }
+        ));
+        // This session's copy goes; the other file's unsaved work stays.
+        assert!(!directory.join("case.sacm.xmi.af").exists());
+        assert!(theirs.is_file());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_that_holds_what_the_file_holds_restores_nothing_and_goes() {
+        let (directory, file) = scratch("recovery-unchanged");
+        let edited = crash_after_a_change(&file);
+        // The changes were saved by another program since: the file holds
+        // what the copy holds, though not what the copy began from.
+        assert!(write_whole(&file, edited.as_bytes()).is_ok());
+        let mut desktop = opened(&file);
+        assert!(matches!(
+            desktop.recovery_found(),
+            Some(FoundRecovery::Found {
+                base_matches: false,
+                ..
+            })
+        ));
+        assert_eq!(desktop.restore_recovery(), EditResult::Unchanged);
+        assert_eq!(desktop.save_path(), Some(file.as_path()));
+        assert!(!directory.join("case.sacm.xmi.af").exists());
         let _ = std::fs::remove_dir_all(&directory);
     }
 

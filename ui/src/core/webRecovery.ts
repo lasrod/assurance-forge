@@ -38,6 +38,9 @@ export function createWebRecovery(core: RecoveryCore, store: RecoveryStore, now:
   let found: { name: string; copy: string } | null = null;
   // The name of the file open, whose copy is the session's.
   let current: string | null = null;
+  // Counts the files looked for and given up: a look that a later open or
+  // close overtook must not mark its copy found for the file open now.
+  let generation = 0;
   // Writes run one after another, in the order asked.
   let writing: Promise<unknown> = Promise.resolve();
   const queue = <T>(work: () => Promise<T>): Promise<T> => {
@@ -51,28 +54,46 @@ export function createWebRecovery(core: RecoveryCore, store: RecoveryStore, now:
   return {
     found: async (name) => {
       found = null;
-      current = name;
+      // The file is the session's once the look is done: a copy found by a
+      // look still on its way is not given up unseen.
+      current = null;
+      const mine = ++generation;
       let copy: string | undefined;
       try {
         copy = await queue(() => store.get(name));
       } catch {
-        return null;
+        copy = undefined;
       }
+      if (mine !== generation) return null;
+      current = name;
       if (copy === undefined) return null;
       const said = JSON.parse(core.readRecovery(encode(copy))) as FoundRecovery;
       if (said.result === 'found') {
         found = { name, copy };
-      } else {
-        const kept = copy;
-        await queue(() => store.setAside(name, kept, now())).catch(() => undefined);
+        return said;
+      }
+      const kept = copy;
+      try {
+        await queue(() => store.setAside(name, kept, now()));
+      } catch {
+        // Not set aside: it stays where it is, held as found, so nothing is
+        // written over it or removes it; it cannot be restored (R7).
+        if (mine === generation) found = { name, copy: kept };
       }
       return said;
     },
     restore: async (): Promise<EditResult> => {
       if (!found) return { result: 'refused', code: 'AF-RECOVER-001' };
-      const result = JSON.parse(core.restore(encode(found.copy))) as EditResult;
-      // The copy is the session's now: the next one is written over it.
-      if (result.result !== 'refused') found = null;
+      const { name, copy } = found;
+      const result = JSON.parse(core.restore(encode(copy))) as EditResult;
+      if (result.result === 'unchanged') {
+        // The copy holds what the file holds: nothing to keep it for.
+        found = null;
+        await remove(name);
+      } else if (result.result !== 'refused') {
+        // The copy is the session's now: the next one is written over it.
+        found = null;
+      }
       return result;
     },
     discard: async () => {
@@ -100,18 +121,19 @@ export function createWebRecovery(core: RecoveryCore, store: RecoveryStore, now:
       }
     },
     giveUp: async () => {
+      generation += 1;
       const name = current;
       const undecided = found !== null;
       found = null;
       current = null;
       if (name !== null && !undecided) await remove(name);
     },
+    // The browser saves under the name the file has, so the session's copy
+    // is the one under that name.
     saved: async (name) => {
       if (found) return;
-      const before = current;
       current = name;
       await remove(name);
-      if (before !== null && before !== name) await remove(before);
     },
   };
 }

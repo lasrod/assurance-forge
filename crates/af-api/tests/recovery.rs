@@ -289,3 +289,41 @@ fn nothing_open_has_no_copy_and_nothing_to_restore_into() {
         EditResult::Refused { code: nothing }
     );
 }
+
+#[test]
+fn a_copy_of_other_content_restored_is_still_flagged_after_another_crash() {
+    // The copy's changes began from the core sample.
+    let (_, mut source) = core_sample();
+    assert!(edit(&mut source));
+    let kept = copy(&source);
+    // Another program saved the file since: it holds other content.
+    let theirs = testdata("sample.sacm.xmi");
+    let Some(mut core) = opened(&theirs) else {
+        panic!("setup: the sample opens");
+    };
+    assert!(matches!(
+        core.read_recovery(kept.as_bytes()),
+        FoundRecovery::Found {
+            base_matches: false,
+            ..
+        }
+    ));
+    assert!(matches!(
+        core.restore(kept.as_bytes()),
+        EditResult::Applied { .. }
+    ));
+    // Edited again, and the application ends again: the next copy still
+    // says its changes did not begin from what the file holds.
+    assert!(edit(&mut core));
+    let again = copy(&core);
+    let Some(file) = opened(&theirs) else {
+        panic!("setup: the sample opens");
+    };
+    assert!(matches!(
+        file.read_recovery(again.as_bytes()),
+        FoundRecovery::Found {
+            base_matches: false,
+            ..
+        }
+    ));
+}

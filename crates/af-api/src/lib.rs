@@ -602,12 +602,19 @@ impl Core {
         let Some(open) = self.open.as_mut() else {
             return refused(RECOVER_NOTHING_OPEN);
         };
-        let document = match read_copy(copy) {
-            Ok((_, document)) => document,
+        let (envelope, document) = match read_copy(copy) {
+            Ok(read) => read,
             Err(code) => return refused(code),
         };
         match open.session.restore(document) {
-            Some(record) => self.changed(&record, None),
+            Some(record) => {
+                // The changes began from the copy's base, not from what the
+                // file holds now: later copies say so too, until a save, so a
+                // copy of other content is still flagged after another crash
+                // (R6).
+                open.base = envelope.base;
+                self.changed(&record, None)
+            }
             None => EditResult::Unchanged,
         }
     }

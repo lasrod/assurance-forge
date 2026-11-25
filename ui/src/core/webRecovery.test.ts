@@ -107,6 +107,49 @@ describe('the browser recovery copies', () => {
     expect(await recovery.found('a.sacm')).toBeNull();
   });
 
+  it('does not mark a copy found for a file that a later open overtook', async () => {
+    const { copies, store } = memory();
+    copies.set('a.sacm', 'ok crashed');
+    let release: () => void = () => undefined;
+    const slow = store.get;
+    store.get = async (name) => {
+      if (name === 'a.sacm') await new Promise<void>((resolve) => (release = resolve));
+      return slow(name);
+    };
+    const recovery = createWebRecovery(fakeCore({ revision: 2, modified: true }).core, store);
+    const first = recovery.found('a.sacm');
+    await recovery.giveUp();
+    const second = recovery.found('b.sacm');
+    release();
+    expect(await first).toBeNull();
+    expect(await second).toBeNull();
+    // b's changes are kept: nothing is held for a.
+    expect(await recovery.keep('b.sacm', 2)).toEqual({ result: 'kept' });
+    expect(copies.get('a.sacm')).toBe('ok crashed');
+  });
+
+  it('holds a copy that cannot be read and could not be set aside, so nothing removes it', async () => {
+    const { copies, store } = memory();
+    copies.set('a.sacm', 'from a later version');
+    store.setAside = async () => Promise.reject(new Error('blocked'));
+    const recovery = createWebRecovery(fakeCore({ revision: 1, modified: false }).core, store);
+    expect(await recovery.found('a.sacm')).toEqual({ result: 'unreadable', code: 'AF-RECOVER-002' });
+    expect(await recovery.keep('a.sacm', 1)).toEqual({ result: 'skipped' });
+    await recovery.giveUp();
+    expect(copies.get('a.sacm')).toBe('from a later version');
+  });
+
+  it('removes a copy that restores nothing', async () => {
+    const { copies, store } = memory();
+    copies.set('a.sacm', 'ok same');
+    const { core } = fakeCore({ revision: 1, modified: false });
+    core.restore = () => JSON.stringify({ result: 'unchanged' });
+    const recovery = createWebRecovery(core, store);
+    await recovery.found('a.sacm');
+    expect(await recovery.restore()).toEqual({ result: 'unchanged' });
+    expect(copies.has('a.sacm')).toBe(false);
+  });
+
   it('says a copy that cannot be written is not kept', async () => {
     const { store } = memory();
     store.put = async () => Promise.reject(new Error('quota'));
