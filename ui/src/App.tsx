@@ -94,7 +94,7 @@ function message(state: DocumentState, t: T, language: Language): { text: string
     case 'saved':
       return { text: t(state.downloaded ? 'downloaded' : 'saved', { name: state.name }) };
     case 'saveRefused': {
-      const known = /^AF-SAVE-00[1-6]$/.test(state.code);
+      const known = /^AF-SAVE-00[1-7]$/.test(state.code);
       return { text: t('saveRefused', { reason: known ? t(state.code as MessageKey) : state.code }), tone: 'error' };
     }
     case 'result': {

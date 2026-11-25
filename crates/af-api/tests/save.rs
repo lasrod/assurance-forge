@@ -12,8 +12,10 @@ fn root() -> String {
     format!("{}/../..", env!("CARGO_MANIFEST_DIR"))
 }
 
-/// Every SACM file the repository holds that a strict read opens: the
-/// samples, and the C++ application's example projects but for their backups.
+/// Every SACM file the repository holds: the samples, and the C++
+/// application's example projects but for their backups. The projects are in
+/// the `examples` submodule, which a checkout without submodules (CI) leaves
+/// empty, so they are counted apart.
 fn samples() -> Vec<(String, Vec<u8>)> {
     let mut found = Vec::new();
     let mut stack = vec![
@@ -88,7 +90,8 @@ fn edit(core: &mut Core, what: &str) -> bool {
 #[test]
 fn every_sample_written_reads_back_as_itself_before_and_after_edits() {
     let samples = samples();
-    assert!(samples.len() >= 12, "setup: {} samples", samples.len());
+    let own = samples.iter().filter(|(name, _)| is_own(name)).count();
+    assert!(own >= 11, "setup: {own} samples in testdata/sacm");
     let mut edited = 0;
     for (name, bytes) in &samples {
         let mut core = Core::without_fonts(Style::default(), "en");
@@ -100,7 +103,7 @@ fn every_sample_written_reads_back_as_itself_before_and_after_edits() {
         let (_, first) = written(&core, name);
         assert!(strict(first.as_bytes(), name) == opened, "{name}: changed");
 
-        if edit(&mut core, name) {
+        if edit(&mut core, name) && is_own(name) {
             edited += 1;
         }
         let (revision, xmi) = written(&core, name);
@@ -114,7 +117,12 @@ fn every_sample_written_reads_back_as_itself_before_and_after_edits() {
         let (_, second) = written(&again, name);
         assert_eq!(second, xmi, "{name}: a second write differs");
     }
-    assert!(edited >= 10, "setup: only {edited} samples edited");
+    assert!(edited >= 11, "setup: only {edited} samples edited");
+}
+
+/// Whether `name` is one of this repository's own samples, not a submodule's.
+fn is_own(name: &str) -> bool {
+    name.replace('\\', "/").contains("/testdata/sacm/")
 }
 
 #[test]

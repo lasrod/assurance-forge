@@ -159,6 +159,7 @@ const en = {
   'AF-SAVE-004': 'The file has changed on disk since it was opened or saved, and was not overwritten. Use File ▸ Save As… to save under another name, or to replace it.',
   'AF-SAVE-005': 'The file could not be written. It may be read-only or in use.',
   'AF-SAVE-006': 'The case changed while it was being saved. Save again.',
+  'AF-SAVE-007': 'The save could not be made: the application did not answer. This is a fault in Assurance Forge.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -319,6 +320,7 @@ const ja: Record<MessageKey, string> = {
   'AF-SAVE-004': '開いた後または保存した後にファイルがディスク上で変更されたため、上書きしていません。別の名前で保存するか置き換えるには「ファイル ▸ 名前を付けて保存…」を使ってください。',
   'AF-SAVE-005': 'ファイルに書き込めませんでした。読み取り専用か、使用中の可能性があります。',
   'AF-SAVE-006': '保存中にケースが変更されました。もう一度保存してください。',
+  'AF-SAVE-007': 'アプリケーションが応答しなかったため、保存できませんでした。Assurance Forge の不具合です。',
 };
 
 const MESSAGES: Record<Language, Record<MessageKey, string>> = { en, ja };

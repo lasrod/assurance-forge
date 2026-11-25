@@ -49,23 +49,28 @@ own rule.
 | S1 | The core writes the document with libSACM's strict save, reads the bytes back by a strict read, and gives them out only if what it read is `==` to the open document. Otherwise the save is refused (AF-SAVE-003) | "Never silently change an argument": a writer fault must not reach the disk. It costs one read per save |
 | S2 | The first save of a file written by another tool or by hand rewrites its layout: libSACM writes deterministically, in its own order. Its meaning is unchanged | Accepted on 25 November 2026. A byte-preserving writer is not something libSACM offers |
 | S3 | Whether the case is saved is told by what the document is, not by its revision: undo back to the saved state is saved again | A revision only goes up, undo included, so it cannot say this |
-| S4 | The desktop writes a temporary file beside the target and renames it over the target | A crash or a full disk mid-save leaves the old file, never half a new one |
-| S5 | The desktop keeps the length and modified time of the file as it was read or last written. File ▸ Save refuses to overwrite a file that is there and has changed since (AF-SAVE-004). A file the user chose in the save dialog, which asks before it replaces one, is written; a file gone from disk is written again | Another program's change to the file is not lost without the user knowing |
+| S4 | The desktop writes a temporary file beside the target and renames it over the target. A link is followed and stays a link; the new file has the old one's permissions; a read-only file is not written (AF-SAVE-005) | A crash or a full disk mid-save leaves the old file, never half a new one. Found in review: a rename on Linux or macOS replaces a read-only file, and a link with a file |
+| S5 | The desktop keeps a hash of what the file held when it was read or last written. File ▸ Save refuses to overwrite a file that holds something else now (AF-SAVE-004). A file the user chose in the save dialog, which asks before it replaces one, is written; a file gone from disk is written again | Another program's change to the file is not lost without the user knowing. What the file holds is compared, not its time and length, so a change of the same length is seen and a file touched but not changed is not refused |
 | S6 | A file opened without a path (dropped on the window) has nowhere to be saved to: Save is Save As… | |
 | S7 | The browser's Save downloads the file under its name, and the status says it was downloaded, not saved. There is no Save As… in the browser | Downloads are where every browser can write. The page cannot tell whether the user kept the download, so the case is marked saved once it is handed over |
 | S10 | A save is of the document at the revision on screen when it was asked for. The save dialog is the window's child, so the window takes no input while it is open; a document that changed meanwhile all the same is not saved (AF-SAVE-006) | Found in review: on Windows a dialog without a parent let another file be opened, and its content written over the first file's name |
 | S8 | Asking before changes are lost: Save, Don't save, Cancel. Save that is cancelled or refused cancels what was asked for | What every editor does |
-| S9 | Closing the desktop window with unsaved changes is held in Rust and asked about in the page; the browser asks through `beforeunload` | The window's close needs no extra permission on the page |
+| S9 | Closing the desktop window with unsaved changes is held in Rust and asked about in the page; the browser asks through `beforeunload`. The page says it heard each close held for it; when it did not hear the last one (it has stopped), the next close is not held. On macOS, Quit (⌘Q) is the application's own menu item and closes the window as its close button does | The window's close needs no extra permission on the page. Found in review: a page that had stopped held the window open for good, and the system's Quit ended the application without a close |
 
 ## Known limits
 
 - Text typed in Element Properties and not yet applied (by Enter, or by
   leaving the field) is not a change: closing the window or the tab then
   loses it without asking.
-- The rename that makes a save whole replaces a symbolic link with a file, and
-  gives the file the folder's default permissions.
-- A change on disk of the same length within the file system's time
-  resolution (two seconds on FAT) is not seen.
+- The rename that makes a save whole gives the file a new identity: other
+  hard links to it keep the old content, and its owner, ACLs and extended
+  attributes are those of a new file. Only its permissions are kept.
+- On macOS, Quit from the Dock, and logging out, end the application without
+  a close of the window, so they do not ask.
+- A page that has stopped (an error took it down) cannot ask: the second
+  close of the window closes it without asking.
+- Ctrl+S in a field whose text the core refuses saves nothing; the status
+  says why, and the next Ctrl+S saves.
 
 ## Codes
 
@@ -77,6 +82,7 @@ own rule.
 | AF-SAVE-004 | The file has changed on disk since it was opened or saved (S5) |
 | AF-SAVE-005 | The file could not be written: the system refused it |
 | AF-SAVE-006 | The document changed while it was being saved |
+| AF-SAVE-007 | The shell or the core did not answer the save (the page's own code) |
 
 ## The pieces
 

@@ -355,7 +355,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    * the kind of node an add was asked for, which a refusal names. Answers
    * what the core made of it.
    */
-  const inflight = useRef(new Set<Promise<unknown>>());
+  const inflight = useRef(new Set<Promise<TextOutcome>>());
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
@@ -547,15 +547,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
 
   /**
    * File ▸ Save, or Save As… when `as` and the shell has a save dialog.
-   * Waits for the edits on their way first. Answers whether the case was
-   * saved: a cancelled dialog or a refusal is not, and the status says why.
+   * Waits for the edits on their way first; when one of them was refused (a
+   * field left by Ctrl+S with text the core does not take), nothing is
+   * saved and the status keeps saying why, so the user does not take that
+   * text to be in the file. Answers whether the case was saved: a cancelled
+   * dialog or a refusal is not, and the status says why.
    */
   const save = useCallback(
     async (as: boolean): Promise<boolean> => {
       const on = coreRef.current;
       if (!on || shown.current === null || fileName === null) return false;
       const request = latest.current;
-      await Promise.allSettled([...inflight.current]);
+      const outcomes = await Promise.allSettled([...inflight.current]);
+      if (outcomes.some((outcome) => outcome.status === 'fulfilled' && outcome.value === 'refused')) return false;
       const saving = as && on.saveAs ? on.saveAs : on.save;
       // The revision on screen once the edits on their way are answered:
       // what the user asked to save.
@@ -565,7 +569,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       try {
         result = await saving(fileName, revision);
       } catch {
-        result = { result: 'refused', code: 'AF-SAVE-005' } as const;
+        // Not the file: the shell or the core failed to answer.
+        result = { result: 'refused', code: 'AF-SAVE-007' } as const;
       }
       if (request !== latest.current) return result.result === 'saved';
       if (result.result === 'cancelled') return false;

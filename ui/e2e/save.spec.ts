@@ -98,6 +98,27 @@ test('Ctrl+S in a field saves what the field holds', async ({ page }) => {
   await expect(modified(page)).toBeHidden();
 });
 
+test('Ctrl+S in a field the core refuses saves nothing, and the status keeps saying why', async ({ page }) => {
+  await opened(page);
+  await change(page);
+  let downloads = 0;
+  page.on('download', () => (downloads += 1));
+  await page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem').first().click();
+  const id = page.getByTestId('element-identifier');
+  await expect(id).toHaveValue('cl_top');
+  await id.fill('');
+  await id.press('Control+s');
+  await expect(status(page)).toContainText('An ID cannot be empty.');
+  await expect(modified(page)).toBeVisible();
+  // Ctrl+S again, out of the field: it saves. Saves are made one after the
+  // other, so had the first saved, this would be the second download.
+  await expect(id).not.toBeFocused();
+  const file = await downloaded(page, () => page.keyboard.press('Control+s'));
+  expect(file.text).toContain('cl_top');
+  expect(downloads).toBe(1);
+  await expect(modified(page)).toBeHidden();
+});
+
 test('closing with changes not saved asks first: Cancel keeps the case, Don’t save closes it, Save saves and closes', async ({ page }) => {
   await opened(page);
   await change(page);

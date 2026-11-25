@@ -73,7 +73,13 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     // The shell holds the window's close while changes are not saved
     // (af-desktop's CLOSE_REQUESTED), and closes it on `quit`.
     closeGuard: {
-      listen: (ask) => listen('af-close-requested', ask),
+      // Rust is told the page heard, so a page that has stopped does not
+      // hold the window open for good.
+      listen: (ask) =>
+        listen('af-close-requested', () => {
+          void invoke('close_heard').catch(() => undefined);
+          ask();
+        }),
       quit: () => invoke('quit'),
     },
     setLanguage: (language) => invoke('set_language', { language }),

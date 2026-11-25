@@ -86,7 +86,7 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | Revision | `af-api` | each open, and each accepted command (undo and redo included) |
 | Undo and redo | `af-session`: a snapshot of the document per command | each accepted command |
 | Which state of the document is saved | `af-session`, named by the revision of the command that made it, so undo back to it is saved again | a file is opened, and each save the shell reports (`mark_saved`) |
-| The file Save writes, and how it was on disk | `af-desktop` | a file is opened from a path, saved, or closed; none for a dropped file, whose Save is Save As… |
+| The file Save writes, and a hash of what it held when read or written | `af-desktop` | a file is opened from a path, saved, or closed; none for a dropped file, whose Save is Save As… |
 | The GSN view | `af-api`, derived by `af-gsn` | open, language, each command |
 | The diagram (render model) | `af-api` caches what `af-layout` gives; laid out on first request | open, language, text sizes, fonts, each command |
 | Layout generation (`DiagramAt.layout`) | `af-api` | each new layout of the same revision: language, text sizes, fonts |
