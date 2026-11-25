@@ -394,3 +394,47 @@ fn the_samples_break_what_they_break_and_nothing_else() {
         assert_eq!(found, wanted, "{name}");
     }
 }
+
+#[test]
+fn nothing_is_reported_at_a_neutral_node_but_a_cycle() {
+    // A cited reasoning is drawn neutral (R12): as an inference's premise it
+    // is not "a Strategy at an end". Neutral nodes do not share identifiers
+    // either. A cycle through them is still a cycle.
+    let found = findings(&[
+        goal("g"),
+        element("ArgumentReasoning", "cited", r#" isCitation="true""#, ""),
+        inference("i1", "cited", "g"),
+        element(
+            "Claim",
+            "n1",
+            r#" isCitation="true""#,
+            r#"<taggedValue xmi:id="tv_n1"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="X"/></content></taggedValue>"#,
+        ),
+        element(
+            "Claim",
+            "n2",
+            r#" isCitation="true""#,
+            r#"<taggedValue xmi:id="tv_n2"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="X"/></content></taggedValue>"#,
+        ),
+        inference("loop1", "n2", "n1"),
+        inference("loop2", "n1", "n2"),
+    ]);
+    assert_eq!(found, [finding(Rule::Cycle, &["n1", "n2"], None)]);
+}
+
+#[test]
+fn every_bad_premise_of_one_relationship_is_named() {
+    let found = findings(&[
+        goal("g"),
+        claim("a", "assumed"),
+        claim("j", "axiomatic"),
+        element("AssertedInference", "i1", r#" source="a j" target="g""#, ""),
+    ]);
+    assert_eq!(
+        found,
+        [
+            finding(Rule::ContextualSupports, &["g", "a"], Some("i1")),
+            finding(Rule::ContextualSupports, &["g", "j"], Some("i1")),
+        ]
+    );
+}

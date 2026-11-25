@@ -108,6 +108,10 @@ fn gsn(finding: wellformed::Finding) -> Problem {
     }
 }
 
+/// The names of libSACM's arguments whose values are English prose, not
+/// names: a sentence of its own, a parser's message.
+const PROSE: [&str; 5] = ["error", "message", "reason", "detail", "label"];
+
 fn diagnostic(source: Source, diagnostic: &Diagnostic) -> Problem {
     let severity = match diagnostic.severity() {
         SacmSeverity::Error => Severity::Error,
@@ -123,9 +127,12 @@ fn diagnostic(source: Source, diagnostic: &Diagnostic) -> Problem {
             .filter(|id| !id.is_empty())
             .map(str::to_owned),
         template: Some(diagnostic.template().to_owned()),
+        // Names, ids and counts; never libSACM's English prose, since the
+        // core sends codes, not sentences (P5).
         arguments: diagnostic
             .arguments()
             .iter()
+            .filter(|argument| !PROSE.contains(&argument.name()))
             .map(|argument| {
                 let value = match argument.value() {
                     ArgumentValue::Count(count) => Value::Count(*count),

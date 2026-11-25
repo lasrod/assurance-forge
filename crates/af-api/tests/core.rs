@@ -677,10 +677,14 @@ fn a_text_set_in_element_properties_is_drawn_at_a_new_revision_and_undo_takes_it
 fn the_problem_list_names_its_elements_follows_an_edit_and_its_undo() {
     let mut core = core("en");
     let opened = core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
-    assert!(matches!(opened, OpenResult::Opened { .. }));
+    let OpenResult::Opened { diagnostics, .. } = opened else {
+        panic!("refused: {opened:?}");
+    };
     let Some(before) = core.problems() else {
         panic!("no problems list");
     };
+    // One count, the list's (P8).
+    assert_eq!(diagnostics, before.counts);
     assert_eq!(before.revision, 1);
     assert_eq!((before.counts.errors, before.counts.warnings), (1, 1));
     let first = &before.problems[0];

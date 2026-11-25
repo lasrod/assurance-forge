@@ -18,6 +18,7 @@ const en: Words = {
   'AF-GSN-005': '{a} has {b} as its context, but in GSN only a Context, Assumption or Justification is context.',
   'AF-GSN-006': '{a} is supported by {b}, but in GSN a Strategy is supported only by Goals.',
   'AF-GSN-007': '{all} is a premise or conclusion of a relationship, but in GSN a Strategy is the reasoning between a Goal and its sub-goals.',
+  'AF-GSN-007-many': '{all} are premises or conclusions of a relationship, but in GSN a Strategy is the reasoning between a Goal and its sub-goals.',
   'AF-GSN-008': '{a} supports nothing: a Strategy needs a Goal under it.',
   'AF-GSN-009': '{all} share the ID {identifier}: in GSN each element has its own.',
   'AF-GSN-010': '{a} is marked undeveloped but is supported: the mark or the support is out of date.',
@@ -29,6 +30,7 @@ const en: Words = {
   'AF-VIEW-006': '{a} is of a kind the diagram does not draw.',
   'AF-VIEW-008': 'The declaration of the relationship {a} is not drawn.',
   'AF-VIEW-009': 'An end of the relationship {a} cannot be placed in the diagram.',
+  'AF-VIEW-009-end': 'The end {end} of the relationship {a} cannot be placed in the diagram.',
   'AF-VIEW-010': 'The relationship {a} is between artifacts, which the diagram does not draw.',
   'AF-VIEW-011': 'The relationship {a} is defeated: it is drawn neutral.',
   'AF-VIEW-012': 'The meta-claims of {a} are not drawn.',
@@ -58,6 +60,7 @@ const ja: Words = {
   'AF-GSN-005': '{a} のコンテキストが {b} ですが、GSN でコンテキストになるのはコンテキスト、前提、正当化だけです。',
   'AF-GSN-006': '{a} は {b} に支持されていますが、GSN では戦略を支えられるのはゴールだけです。',
   'AF-GSN-007': '{all} が関係の前提または結論になっていますが、GSN では戦略はゴールとサブゴールの間の推論です。',
+  'AF-GSN-007-many': '{all} が関係の前提または結論になっていますが、GSN では戦略はゴールとサブゴールの間の推論です。',
   'AF-GSN-008': '{a} は何も支持していません。戦略の下にはゴールが必要です。',
   'AF-GSN-009': '{all} が ID {identifier} を共有しています。GSN では要素ごとに固有の ID を持ちます。',
   'AF-GSN-010': '{a} は未展開の印が付いていますが、支持されています。印か支持のどちらかが古くなっています。',
@@ -69,6 +72,7 @@ const ja: Words = {
   'AF-VIEW-006': '{a} は図で描かない種類の要素です。',
   'AF-VIEW-008': '関係 {a} の宣言は描いていません。',
   'AF-VIEW-009': '関係 {a} の端を図に置けません。',
+  'AF-VIEW-009-end': '関係 {a} の端 {end} を図に置けません。',
   'AF-VIEW-010': '関係 {a} は成果物どうしの関係で、図では描きません。',
   'AF-VIEW-011': '関係 {a} は反駁済みのため、中立の形で描いています。',
   'AF-VIEW-012': '{a} のメタ主張は描いていません。',
@@ -130,7 +134,8 @@ export function elementName(element: ProblemElement, language: Language): string
 export function wordProblem(problem: Problem, language: Language): string {
   const words = language === 'ja' ? ja : en;
   const [a, b] = problem.elements;
-  const key = problem.code === 'AF-GSN-001' && problem.elements.length === 1 ? 'AF-GSN-001-self' : problem.code;
+  const end = problem.arguments.find((argument) => argument.name === 'end')?.value.value;
+  const key = variant(problem, end !== undefined);
   const known = words[key];
   if (known !== undefined) {
     const values: Record<string, string> = {
@@ -140,12 +145,22 @@ export function wordProblem(problem: Problem, language: Language): string {
       kindB: KINDS[language][b?.kind ?? 'neutral'],
       all: problem.elements.map((element) => elementName(element, language)).join(LIST[language]),
       identifier: a?.identifier ?? a?.id ?? '',
+      end: end === undefined ? '' : String(end),
     };
     const sentence = known.replace(/\{(\w+)\}/g, (_, name: string) => values[name] ?? `{${name}}`);
     // libSACM's own codes are general; the arguments say what is wrong.
     return problem.code.startsWith('SACM-') ? withArguments(sentence, problem) : sentence;
   }
   return withArguments(fallback[language], problem);
+}
+
+/** Which form of the code's words fits: one element or several, an end named or not. */
+function variant(problem: Problem, hasEnd: boolean): string {
+  const many = problem.elements.length > 1;
+  if (problem.code === 'AF-GSN-001' && !many) return 'AF-GSN-001-self';
+  if (problem.code === 'AF-GSN-007' && many) return 'AF-GSN-007-many';
+  if (problem.code === 'AF-VIEW-009' && hasEnd) return 'AF-VIEW-009-end';
+  return problem.code;
 }
 
 /** `sentence`, then the arguments that name what is wrong: ids, names, counts. */

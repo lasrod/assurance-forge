@@ -137,6 +137,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     },
     [clear],
   );
+  /**
+   * Reads the problem list on its own, so that a failure to read the rest
+   * of an edit's answers does not leave it at an older revision; shown only
+   * if it is of the revision on screen.
+   */
+  const readProblems = useCallback((on: Core, request: number) => {
+    on.problems().then(
+      (listed) => {
+        if (request === latest.current && listed && listed.revision === shown.current) setProblems(listed);
+      },
+      () => undefined,
+    );
+  }, []);
   const refreshRecent = useCallback((on: Core) => {
     on.recent.list().then(setRecent, () => setRecent([]));
   }, []);
@@ -429,7 +442,6 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
           on.packages(),
           on.history(),
           added ? on.element(added) : Promise.resolve(null),
-          on.problems(),
         ]);
       } catch {
         // The core made the change but its new picture could not be read. The
@@ -438,20 +450,21 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         if (request === latest.current) {
           shown.current = result.revision;
           setState({ kind: 'relayoutFailed' });
+          readProblems(on, request);
         }
         return 'applied';
       }
-      const [next, rows, held, past, details, listed] = answers;
+      const [next, rows, held, past, details] = answers;
       // Another file was opened meanwhile, or a later command is on its way.
       if (request !== latest.current || !next || next.revision !== result.revision) return 'applied';
       shown.current = result.revision;
+      readProblems(on, request);
       onShown(diagramRef.current, next, anchor, added);
       // As every answer: shown only if no older a layout than the one shown.
       setDiagram((current) => newerDiagram(current, next, shown.current));
       if (rows && rows.revision === shown.current) setOutline(rows.rows);
       setPackages(held);
       setHistory(past);
-      if (listed && listed.revision === shown.current) setProblems(listed);
       if (missed.current) {
         missed.current = false;
         void Promise.all([on.diagram(), on.outline()]).then(
@@ -470,7 +483,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       else if (what !== 'remove' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
     },
-    [showRelayout],
+    [showRelayout, readProblems],
   );
   /**
    * `runEdit`, kept among the edits in flight until it is answered: a save

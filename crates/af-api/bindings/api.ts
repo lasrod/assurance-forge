@@ -3,7 +3,9 @@
 
 export type OpenResult = { "result": "opened", revision: number, 
 /**
- * What libSACM reported while reading and validating it.
+ * The problem list's counts (`Problems::counts`): what libSACM
+ * reported reading and validating it, the GSN checks, and, among the
+ * information, what the diagram does not draw.
  */
 diagnostics: DiagnosticCounts, nodes: number, edges: number, 
 /**
@@ -294,7 +296,8 @@ export type KeepResult = { "result": "kept" } | { "result": "removed" } | { "res
 
 export type Problems = { revision: number, problems: Array<Problem>, 
 /**
- * How many of each severity, what the status bar shows.
+ * How many of each severity, what the status bar shows: every problem,
+ * those of the diagram among the information.
  */
 counts: DiagnosticCounts, };
 

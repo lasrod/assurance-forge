@@ -146,20 +146,12 @@ impl Core {
         let read = output.diagnostics().to_vec();
         let document = output.into_document();
         let view = view::view(&document, &self.language);
-        // The counts the problem list shows (P8), but for what the diagram
-        // does not draw, which `view_codes` counts.
-        let mut diagnostics = DiagnosticCounts::default();
-        for problem in af_problems::problems(&read, &document, &view) {
-            match (problem.source, problem.severity) {
-                (af_problems::Source::Diagram, _) => {}
-                (_, af_problems::Severity::Error) => diagnostics.errors += 1,
-                (_, af_problems::Severity::Warning) => diagnostics.warnings += 1,
-                (_, af_problems::Severity::Info) => diagnostics.infos += 1,
-            }
-        }
+        // The problem list, derived once: the open's counts are its counts
+        // (P8), and `problems` answers it until the document changes.
+        let problems = derive_problems(&read, &document, &view, self.revision);
         let result = OpenResult::Opened {
             revision: self.revision,
-            diagnostics,
+            diagnostics: problems.counts,
             nodes: count(view.nodes.len()),
             edges: count(view.edges.len()),
             // A placeholder (R16) is the editor's own mark, not something
@@ -180,7 +172,7 @@ impl Core {
             base: recovery::digest(bytes),
             written: None,
             read,
-            problems: None,
+            problems: Some(problems),
         });
         result
     }
@@ -636,34 +628,7 @@ impl Core {
         let revision = self.revision;
         let open = self.open.as_mut()?;
         let problems = open.problems.get_or_insert_with(|| {
-            let view = &open.view;
-            let list = af_problems::problems(&open.read, open.session.document(), view);
-            let mut counts = DiagnosticCounts::default();
-            let problems = list
-                .into_iter()
-                .map(|problem| {
-                    let severity = match problem.severity {
-                        af_problems::Severity::Error => {
-                            counts.errors += 1;
-                            contract::ProblemSeverity::Error
-                        }
-                        af_problems::Severity::Warning => {
-                            counts.warnings += 1;
-                            contract::ProblemSeverity::Warning
-                        }
-                        af_problems::Severity::Info => {
-                            counts.infos += 1;
-                            contract::ProblemSeverity::Info
-                        }
-                    };
-                    convert::problem(problem, severity, view)
-                })
-                .collect();
-            contract::Problems {
-                revision,
-                problems,
-                counts,
-            }
+            derive_problems(&open.read, open.session.document(), &open.view, revision)
         });
         Some(problems.clone())
     }
@@ -730,6 +695,43 @@ const RECOVER_UNKNOWN: &str = "AF-RECOVER-002";
 const RECOVER_NOT_SACM: &str = "AF-RECOVER-003";
 /// AF-RECOVER-004: the copy could not be made.
 const RECOVER_NOT_WRITTEN: &str = "AF-RECOVER-004";
+
+/// The problem list of `document`, read with `read`, whose view is `view`,
+/// at `revision`: every problem counted by its severity, those of the
+/// diagram among the information.
+fn derive_problems(
+    read: &[sacm::diagnostic::Diagnostic],
+    document: &sacm::model::Document,
+    view: &View,
+    revision: u32,
+) -> contract::Problems {
+    let mut counts = DiagnosticCounts::default();
+    let problems = af_problems::problems(read, document, view)
+        .into_iter()
+        .map(|problem| {
+            let severity = match problem.severity {
+                af_problems::Severity::Error => {
+                    counts.errors += 1;
+                    contract::ProblemSeverity::Error
+                }
+                af_problems::Severity::Warning => {
+                    counts.warnings += 1;
+                    contract::ProblemSeverity::Warning
+                }
+                af_problems::Severity::Info => {
+                    counts.infos += 1;
+                    contract::ProblemSeverity::Info
+                }
+            };
+            convert::problem(problem, severity, view)
+        })
+        .collect();
+    contract::Problems {
+        revision,
+        problems,
+        counts,
+    }
+}
 
 /// `document` as XMI by the strict save, read back as `document` (S1), or
 /// the `AF-SAVE-*` code of why not.

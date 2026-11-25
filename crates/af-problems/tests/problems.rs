@@ -95,6 +95,13 @@ fn what_libsacm_reports_keeps_its_code_template_arguments_ids_and_place() {
     );
     for problem in sacm {
         assert!(problem.code.starts_with("SACM-"), "{problem:?}");
+        // Codes and names, never libSACM's English sentences.
+        for (name, _) in &problem.arguments {
+            assert!(
+                !["error", "message", "reason", "detail", "label"].contains(&name.as_str()),
+                "{problem:?}"
+            );
+        }
         assert!(problem.template.is_some(), "{problem:?}");
         assert!(!problem.elements.is_empty(), "{problem:?}");
     }

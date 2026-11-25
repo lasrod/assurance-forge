@@ -60,6 +60,21 @@ describe('problem words', () => {
     expect(wordProblem(unknown, 'ja')).toBe('libSACM がファイルについて指摘しました。');
   });
 
+  it('names the end that cannot be placed, and words several Strategies in the plural', () => {
+    const end = problem({
+      code: 'AF-VIEW-009',
+      source: 'diagram',
+      severity: 'info',
+      elements: [element('r1', null, null)],
+      arguments: [{ name: 'end', value: { type: 'text', value: 'missing_1' } }],
+    });
+    expect(wordProblem(end, 'en')).toBe('The end missing_1 of the relationship r1 cannot be placed in the diagram.');
+    const both = problem({ code: 'AF-GSN-007', elements: [element('s1', 'S1', 'strategy'), element('s2', 'S2', 'strategy')] });
+    expect(wordProblem(both, 'en')).toMatch(/^Strategy S1, Strategy S2 are premises or conclusions/);
+    const one = problem({ code: 'AF-GSN-007', elements: [element('s1', 'S1', 'strategy')] });
+    expect(wordProblem(one, 'en')).toMatch(/^Strategy S1 is a premise or conclusion/);
+  });
+
   it('shows the code, the requirement and the line as meta', () => {
     expect(problemMeta(problem({}), 'en')).toBe('AF-GSN-004 · GSN3-CORE-015');
     expect(problemMeta(problem({ code: 'SACM-XMI-004', requirement: null, line: 5 }), 'ja')).toBe('SACM-XMI-004 · 5 行');

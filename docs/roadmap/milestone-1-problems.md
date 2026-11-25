@@ -63,7 +63,7 @@ problem names the element once, not once per relationship.
 |---|---|---|
 | P1 | Four sources make one list, each problem tagged with its source. **Read**: what libSACM's strict read reported, kept from the open until the next open, since it describes the file as read. **SACM**: libSACM's `validate`, at every revision. **GSN**: `af-gsn`'s well-formedness checks (P2), at every revision. **Diagram**: the view's `AF-VIEW-*` codes, at every revision, as information; the editor's own placeholder (R16) is not listed | The C++ application never listed libSACM's diagnostics. They describe the file the user is about to save, so they belong here. Validation and the view cost under a millisecond on the largest sample, so the list is derived at every revision |
 | P2 | The GSN checks of this step, each with the GSN v3 requirement it enforces: see the table below | GSN3-VAL-001: a reader can take a problem back to the standard |
-| P3 | **Not reported**: a node under more than one parent (shared support). GSN3-CORE-014 makes a structured argument a directed acyclic support graph, not a tree. Also not reported: anything at a neutral node, whose GSN type the file leaves unknown; the view already says so with its own code | A false structural error is worse than a missing one (the C++ application's lesson) |
+| P3 | **Not reported**: a node under more than one parent (shared support). GSN3-CORE-014 makes a structured argument a directed acyclic support graph, not a tree. Also not reported: anything at a neutral node, whose GSN type the file leaves unknown; the view already says so with its own code. A cycle is the exception: support in a circle establishes nothing, whatever its nodes are | A false structural error is worse than a missing one (the C++ application's lesson) |
 | P4 | A cycle is reported once per set of nodes that support each other in a circle (a strongly connected part of the `SupportedBy` graph), naming them in document order. An element that supports itself is a cycle of one. `InContextOf` and challenges are not followed | Every elementary cycle can be exponentially many. The set is what the user has to break. Context and challenges point backwards without being support (AF-METH-008) |
 | P5 | A problem is a code with its arguments, and the SACM ids it is about, each with its identifier when it is drawn. The frontend words it in English and Japanese. A libSACM code with no words of its own yet is worded as a refusal is: a general sentence, the arguments that name what is wrong, and its code | The core sends codes, not sentences. libSACM's English message is a sentence, so it is not sent |
 | P6 | Order: errors, then warnings, then information. Within each: GSN, SACM, read, diagram. Within a source, in the order found (document order) | The structural defects the user can act on come first |
@@ -85,8 +85,8 @@ problem names the element once, not once per relationship.
 | AF-GSN-009 | Error | GSN3-CORE-010 | Two or more nodes have one identifier |
 | AF-GSN-010 | Warning | GSN3-CORE-009 | An undeveloped element is supported |
 
-- One relationship is reported for the first of AF-GSN-002 to 006 it breaks,
-  not for each.
+- Each edge is reported for the first of AF-GSN-002 to 006 it breaks, not
+  for each, so every bad premise of a relationship is named.
 - AF-GSN-008 and AF-GSN-010 are warnings. An undeveloped decorator left on an
   element that is now supported is stale, not contradictory (the C++
   application's severity). A Strategy with no Goal yet is how the editor adds a

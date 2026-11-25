@@ -18,7 +18,9 @@ pub enum OpenResult {
     #[serde(rename_all = "camelCase")]
     Opened {
         revision: u32,
-        /// What libSACM reported while reading and validating it.
+        /// The problem list's counts (`Problems::counts`): what libSACM
+        /// reported reading and validating it, the GSN checks, and, among the
+        /// information, what the diagram does not draw.
         diagnostics: DiagnosticCounts,
         nodes: u32,
         edges: u32,
@@ -621,7 +623,8 @@ pub enum KeepResult {
 pub struct Problems {
     pub revision: u32,
     pub problems: Vec<Problem>,
-    /// How many of each severity, what the status bar shows.
+    /// How many of each severity, what the status bar shows: every problem,
+    /// those of the diagram among the information.
     pub counts: DiagnosticCounts,
 }
 

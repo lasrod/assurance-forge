@@ -9,7 +9,9 @@
 //! `docs/roadmap/milestone-1-problems.md`).
 //!
 //! Nothing is reported at a neutral node, whose GSN type the file leaves
-//! unknown: a false structural error is worse than a missing one. A node
+//! unknown: a false structural error is worse than a missing one. A cycle is
+//! the exception: support that goes round in a circle establishes nothing,
+//! whatever the nodes on it are. A node
 //! under more than one parent is not reported: GSN3-CORE-014 makes an
 //! argument a directed acyclic support graph, not a tree.
 
@@ -124,11 +126,17 @@ pub fn check(document: &Document, view: &View) -> Vec<Finding> {
     let kind = |id: &str| kinds.get(id).copied().unwrap_or(NodeKind::Neutral);
     let mut findings = Vec::new();
 
-    // Per relationship: the first rule an edge breaks (AF-GSN-002 to 006).
-    // A relationship drawn as several edges is reported once.
-    let mut reported: HashSet<&str> = HashSet::new();
+    // Per edge: the first rule it breaks (AF-GSN-002 to 006), so each bad
+    // premise of a relationship is named. An edge drawn twice (the same
+    // relationship and ends) is reported once.
+    let mut reported: HashSet<(&str, &str, &str)> = HashSet::new();
     for edge in &view.edges {
-        if edge.to_relationship || reported.contains(edge.relationship.as_str()) {
+        let key = (
+            edge.relationship.as_str(),
+            edge.from.as_str(),
+            edge.to.as_str(),
+        );
+        if edge.to_relationship || reported.contains(&key) {
             continue;
         }
         let (from, to) = (kind(&edge.from), kind(&edge.to));
@@ -146,7 +154,7 @@ pub fn check(document: &Document, view: &View) -> Vec<Finding> {
             _ => None,
         };
         if let Some(rule) = rule {
-            reported.insert(edge.relationship.as_str());
+            reported.insert(key);
             findings.push(Finding {
                 rule,
                 nodes: vec![edge.from.clone(), edge.to.clone()],
@@ -183,9 +191,12 @@ pub fn check(document: &Document, view: &View) -> Vec<Finding> {
             .into_iter()
             .chain(relationship.sources().iter())
         {
+            // As the view draws it: a cited reasoning is neutral (R12), and
+            // nothing is reported at a neutral node.
             let is_strategy = elements
                 .get(end.as_str())
-                .is_some_and(|element| element.kind() == SacmKind::ArgumentReasoning);
+                .is_some_and(|element| element.kind() == SacmKind::ArgumentReasoning)
+                && kind(end.as_str()) == NodeKind::Strategy;
             if is_strategy && !strategies.iter().any(|known| known == end.as_str()) {
                 strategies.push(end.as_str().to_owned());
             }
@@ -215,7 +226,8 @@ pub fn check(document: &Document, view: &View) -> Vec<Finding> {
             });
         }
         // Once per element, however many relationships support it.
-        if node.undeveloped && supports.contains(node.id.as_str()) {
+        if node.undeveloped && node.kind != NodeKind::Neutral && supports.contains(node.id.as_str())
+        {
             findings.push(Finding {
                 rule: Rule::UndevelopedSupported,
                 nodes: vec![node.id.clone()],
@@ -227,7 +239,11 @@ pub fn check(document: &Document, view: &View) -> Vec<Finding> {
     // AF-GSN-009: identifiers, once per identifier shared.
     let mut by_identifier: HashMap<&str, Vec<&str>> = HashMap::new();
     let mut identifiers: Vec<&str> = Vec::new();
-    for node in &view.nodes {
+    for node in view
+        .nodes
+        .iter()
+        .filter(|node| node.kind != NodeKind::Neutral)
+    {
         let holders = by_identifier.entry(node.identifier.as_str()).or_default();
         if holders.is_empty() {
             identifiers.push(node.identifier.as_str());
