@@ -34,7 +34,12 @@ element is added from a right-click menu, and Edit ▸ Undo and Redo take it
 back and bring it again. A node's identifier, name and description are
 changed in Element Properties, each change one undo step. A node is removed
 from the same menu or with Delete, with what is under it after the user has
-seen the list. Nothing is saved yet.
+seen the list. Milestone 2, step 2 ([saving](docs/roadmap/milestone-2-save.md)):
+File ▸ Save writes the case back to its file in the desktop application, and
+downloads it in the browser; Save As… writes it to a file the user names. A
+save is written only once the core has read the bytes back as the document.
+The title and the status bar say when changes are not saved, and Close, Open
+and closing the window ask before losing them. There is no recovery copy yet.
 
 ```mermaid
 flowchart LR
@@ -67,11 +72,11 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM), from crates.io | external |
 | `af-gsn` | The GSN view of a document: nodes, edges in GSN direction, and a code for each thing it could not draw; the GSN commands, as SACM operations. The reading and writing rules are in `docs/standards/sacm-gsn-mapping.md` | the view, with challenges of elements and of relationships; the commands that add an element, with what may be added where and a code for why not; the command that sets a node's identifier, name or statement; the command that removes a node and what is under it, and what it would remove |
 | `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, the render model, and the checks of its geometry (`check`) | support in rows below, a node with several parents below the lowest of them, separate trees side by side in shelves about a screen's proportions wide, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; a relationship that placed no node (a second parent, the line that closes a cycle, a context of two nodes) routed around every node; the outline the Argument Navigator shows |
-| `af-session` | The open document, a revision per command, a change record of each, and undo and redo as whole-document snapshots | yes; drafts and storage no |
-| `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, what a removal deletes, remove, undo, redo, history |
+| `af-session` | The open document, a revision per command, a change record of each, undo and redo as whole-document snapshots, and which state of the document was saved | yes; drafts and storage no |
+| `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, what a removal deletes, remove, undo, redo, history with whether changes are not saved; write (the document as XMI, read back before it is given out), mark saved |
 | `af-wasm` | The browser shell: `af-api` compiled to WebAssembly, answering in JSON | yes |
-| `af-desktop` | The Tauri shell: files, the open dialog, recent files as paths, the command line, `--smoke` for CI | yes; Windows checked in CI |
-| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Remove, the confirmation of a removal, Edit ▸ Undo and Redo, the trees, welcome page, English and Japanese, dark and light |
+| `af-desktop` | The Tauri shell: files, the open and save dialogs, saving (whole or not at all, never over a file changed on disk), recent files as paths, the window's close held while changes are not saved, the command line, `--smoke` for CI | yes; Windows checked in CI |
+| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Remove, the confirmation of a removal, Edit ▸ Undo and Redo, File ▸ Save and Save As…, the mark and the question for changes not saved, the trees, welcome page, English and Japanese, dark and light |
 
 ### Who owns what state
 
@@ -80,6 +85,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | The SACM `Document` | `af-session`, held by `af-api`'s `Core` | a file is opened or closed, and each accepted command. It is the only model |
 | Revision | `af-api` | each open, and each accepted command (undo and redo included) |
 | Undo and redo | `af-session`: a snapshot of the document per command | each accepted command |
+| Which state of the document is saved | `af-session`, named by the revision of the command that made it, so undo back to it is saved again | a file is opened, and each save the shell reports (`mark_saved`) |
+| The file Save writes, and a hash of what it held when read or written | `af-desktop` | a file is opened from a path, saved, or closed; none for a dropped file, whose Save is Save As… |
 | The GSN view | `af-api`, derived by `af-gsn` | open, language, each command |
 | The diagram (render model) | `af-api` caches what `af-layout` gives; laid out on first request | open, language, text sizes, fonts, each command |
 | Layout generation (`DiagramAt.layout`) | `af-api` | each new layout of the same revision: language, text sizes, fonts |
@@ -145,9 +152,9 @@ interface**. Interface results are run locally and put in each pull request.
 
 ## What is next
 
-Milestone 2 goes on from adding elements (#512): saving and the recovery copy
-(drafts and the storage trait in **`af-session`**). An element's text is
-edited in Element Properties, and a node removed, already. Nothing else in the planned shape below is started.
+Milestone 2 goes on from saving: the recovery copy, in the working folder
+beside the file (drafts and the storage trait in **`af-session`**). Nothing
+else in the planned shape below is started.
 
 Requirements editing places on the parts already built:
 

@@ -3,8 +3,16 @@
 //!
 //! This shell, `af-mcp` and `af-wasm` are the only crates that touch the
 //! outside world. Here that is the file system (a file named on the command
-//! line, the open dialog, the list of recent files) and the window. The page loads DATUM's measured
-//! faces once and hands the same bytes to the core, as it does in the browser.
+//! line, the open and save dialogs, saving, the list of recent files) and the
+//! window. The page loads DATUM's measured faces once and hands the same bytes
+//! to the core, as it does in the browser.
+//!
+//! A save writes what the core gives (`Core::write`, checked to read back as
+//! the document) to a temporary file beside the target and renames it over
+//! the target, so a failed save leaves the file as it was (plan decision
+//! S4). A file that has changed on disk since it was read or last written is
+//! not overwritten (S5). Closing the window with changes that are not saved
+//! is held here and asked about in the page (S9).
 //!
 //! The commands are the browser core's (`ui/src/core/Core.ts`), so the
 //! interface is the same code on both (plan decision D1).
@@ -15,15 +23,19 @@
 
 pub mod recent;
 
+use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use af_api::Core;
-use af_api::contract::{OpenResult, OpenedFile as Opened};
+use af_api::contract::{OpenResult, OpenedFile as Opened, SaveResult, WriteResult};
 use af_layout::{FaceName, Fonts, Style};
 use serde::Deserialize;
 use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::{Manager, State};
+use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
 use recent::{RecentFile, RecentFiles};
@@ -141,14 +153,100 @@ fn file_name(path: &Path) -> String {
     )
 }
 
+/// What tells one content of a file from another: a hash of its bytes. It is
+/// compared only within one run of the application.
+fn digest(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// The file the open document was read from or last saved to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FileOnDisk {
+    path: PathBuf,
+    /// What it held then, as `digest` tells it.
+    content: u64,
+}
+
+/// Writes `bytes` to `path` whole or not at all: to a temporary file in the
+/// same folder, flushed to disk, then renamed over `path`. On failure the
+/// temporary file is removed and `path` is as it was.
+///
+/// A link is followed: the file it names is the one written, and the link
+/// stays. A read-only file is not written. The new file has the old one's
+/// permissions.
+///
+/// # Errors
+///
+/// What the system refused: creating, writing or renaming the file;
+/// `PermissionDenied` for a read-only file.
+pub fn write_whole(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let target = match std::fs::canonicalize(path) {
+        Ok(target) => target,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => path.to_owned(),
+        Err(error) => return Err(error),
+    };
+    let existing = std::fs::metadata(&target)
+        .ok()
+        .filter(std::fs::Metadata::is_file);
+    if existing
+        .as_ref()
+        .is_some_and(|metadata| metadata.permissions().readonly())
+    {
+        return Err(std::io::ErrorKind::PermissionDenied.into());
+    }
+    let name = target
+        .file_name()
+        .ok_or(std::io::ErrorKind::InvalidInput)?
+        .to_string_lossy();
+    let folder = target
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let temporary = folder.join(format!(".{name}.af-save-{}", std::process::id()));
+    let written = (|| {
+        let mut file = std::fs::File::create(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        if let Some(metadata) = &existing {
+            std::fs::set_permissions(&temporary, metadata.permissions())?;
+        }
+        std::fs::rename(&temporary, &target)
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    written
+}
+
+/// AF-SAVE-004: the file has changed on disk since it was read or saved.
+const CHANGED_ON_DISK: &str = "AF-SAVE-004";
+/// AF-SAVE-005: the system refused to write the file.
+const NOT_WRITABLE: &str = "AF-SAVE-005";
+/// AF-SAVE-006: the document changed while it was being saved.
+const CHANGED_MEANWHILE: &str = "AF-SAVE-006";
+
+fn save_refused(code: &str) -> SaveResult {
+    SaveResult::Refused {
+        code: code.to_owned(),
+    }
+}
+
 /// What the window's commands share: the core, the file named on the
-/// command line until the page has taken it, and the recent files.
+/// command line until the page has taken it, the file the open document is
+/// saved to, and the recent files.
 pub struct Desktop {
     core: Core,
     initial: Option<Opened>,
     /// The file named on the command line, when it opened: recorded as a
     /// recent file once the list is loaded.
     initial_path: Option<(PathBuf, OpenResult)>,
+    /// Where Save writes; `None` when nothing is open, or the open document
+    /// came without a path (a file dropped on the window): Save is then
+    /// Save As… (S6).
+    file: Option<FileOnDisk>,
     recent: RecentFiles,
 }
 
@@ -159,11 +257,18 @@ impl Desktop {
         let mut core = Core::without_fonts(Style::default(), "en");
         let mut initial = None;
         let mut initial_path = None;
+        let mut file = None;
         let mut line = None;
         if let Some(path) = &args.file {
             match std::fs::read(path) {
                 Ok(bytes) => {
                     let result = core.open(&bytes);
+                    if matches!(result, OpenResult::Opened { .. }) {
+                        file = Some(FileOnDisk {
+                            path: path.clone(),
+                            content: digest(&bytes),
+                        });
+                    }
                     line = Some(log_line(path, &result));
                     initial_path = Some((path.clone(), result.clone()));
                     initial = Some(Opened {
@@ -185,6 +290,7 @@ impl Desktop {
                 core,
                 initial,
                 initial_path,
+                file,
                 recent: RecentFiles::default(),
             },
             line,
@@ -212,14 +318,98 @@ impl Desktop {
     }
 
     /// Opens the bytes read from `path`. A file that opens becomes the most
-    /// recent one.
+    /// recent one, and the one Save writes.
     fn open_bytes(&mut self, path: &Path, bytes: &[u8]) -> Opened {
         let result = self.core.open(bytes);
         self.recent.record(path, &result, recent::now());
+        self.file = matches!(result, OpenResult::Opened { .. }).then(|| FileOnDisk {
+            path: path.to_owned(),
+            content: digest(bytes),
+        });
         Opened {
             name: file_name(path),
             result,
         }
+    }
+
+    /// Opens bytes the page read itself (a drop): there is no path to save
+    /// to, so Save is Save As… (S6).
+    pub fn open_unplaced(&mut self, bytes: &[u8]) -> OpenResult {
+        self.file = None;
+        self.core.open(bytes)
+    }
+
+    /// Closes what is open: nothing to save after.
+    pub fn close(&mut self) {
+        self.file = None;
+        self.core.close();
+    }
+
+    /// Where Save writes, or `None` when Save is Save As….
+    pub fn save_path(&self) -> Option<&Path> {
+        self.file.as_ref().map(|file| file.path.as_path())
+    }
+
+    /// Whether the open document has changes that are not saved.
+    pub fn is_modified(&self) -> bool {
+        self.core.history().modified
+    }
+
+    /// Saves the open document, as it was at `revision` when the page asked,
+    /// to `path`, whole or not at all (S4). A document that has changed
+    /// since, or another file opened meanwhile, is not saved (AF-SAVE-006):
+    /// what is written is what the user asked to save.
+    ///
+    /// `chosen` is whether the user chose `path` in the save dialog, which
+    /// asks before it replaces a file. When not (File ▸ Save), the file is
+    /// not overwritten if it holds something other than what it held when it
+    /// was read or last written (S5). The file saved to is the one Save
+    /// writes from then on, and the most recent file.
+    pub fn save_to(&mut self, path: &Path, revision: u32, chosen: bool) -> SaveResult {
+        if revision != self.core.revision() {
+            return save_refused(CHANGED_MEANWHILE);
+        }
+        let (revision, xmi) = match self.core.write() {
+            WriteResult::Written { revision, xmi } => (revision, xmi),
+            WriteResult::Refused { code } => return SaveResult::Refused { code },
+        };
+        if !chosen && self.changed_on_disk(path) {
+            return save_refused(CHANGED_ON_DISK);
+        }
+        if write_whole(path, xmi.as_bytes()).is_err() {
+            return save_refused(NOT_WRITABLE);
+        }
+        if !self.core.mark_saved(revision) {
+            return save_refused(CHANGED_MEANWHILE);
+        }
+        self.file = Some(FileOnDisk {
+            path: path.to_owned(),
+            content: digest(xmi.as_bytes()),
+        });
+        if let Some((nodes, edges)) = self.core.counts() {
+            self.recent.record_counts(path, nodes, edges, recent::now());
+        }
+        SaveResult::Saved {
+            revision,
+            name: file_name(path),
+        }
+    }
+
+    /// Whether the file at `path` holds something other than what the
+    /// document was read from or last written as: another program has
+    /// changed it (S5). What it holds is compared, not its time or length,
+    /// so a change of the same length is seen and a file touched but not
+    /// changed is not taken as changed. A file that is not there has nothing
+    /// to lose; one that cannot be read cannot be written either, and the
+    /// write is refused for it.
+    fn changed_on_disk(&self, path: &Path) -> bool {
+        let Ok(now) = std::fs::read(path) else {
+            return false;
+        };
+        self.file
+            .as_ref()
+            .filter(|file| same_file(&file.path, path))
+            .is_none_or(|file| digest(&now) != file.content)
     }
 
     /// Opens the recent file with this id. A file that is no longer there is
@@ -258,6 +448,15 @@ impl Desktop {
             })
         )
     }
+}
+
+/// Whether `a` and `b` name one file, whichever spelling of its path.
+fn same_file(a: &Path, b: &Path) -> bool {
+    a == b
+        || matches!(
+            (std::fs::canonicalize(a), std::fs::canonicalize(b)),
+            (Ok(a), Ok(b)) if a == b
+        )
 }
 
 type Shared<'a> = State<'a, Mutex<Desktop>>;
@@ -301,17 +500,24 @@ fn initial_file(state: Shared<'_>) -> Result<Option<Opened>, String> {
 #[tauri::command]
 fn open(request: Request<'_>, state: Shared<'_>) -> Result<OpenResult, String> {
     let bytes = raw(&request)?;
-    Ok(lock(&state)?.core.open(&bytes))
+    Ok(lock(&state)?.open_unplaced(&bytes))
 }
 
 /// Shows the system's open dialog and opens the file chosen, or answers
 /// `None` when the dialog is cancelled. Not on the main thread: the dialog
 /// blocks.
 #[tauri::command]
-async fn open_dialog(app: tauri::AppHandle, state: Shared<'_>) -> Result<Option<Opened>, String> {
+async fn open_dialog(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    state: Shared<'_>,
+) -> Result<Option<Opened>, String> {
+    // The window is the dialog's parent, so it takes no input while the
+    // dialog is open.
     let Some(chosen) = app
         .dialog()
         .file()
+        .set_parent(&window)
         .add_filter("SACM", &["xmi", "sacm", "xml"])
         .blocking_pick_file()
     else {
@@ -354,8 +560,194 @@ fn packages(state: Shared<'_>) -> Result<Vec<af_api::contract::Package>, String>
 
 #[tauri::command]
 fn close(state: Shared<'_>) -> Result<(), String> {
-    lock(&state)?.core.close();
+    lock(&state)?.close();
     Ok(())
+}
+
+/// The system's save dialog, starting at the file Save writes, or with
+/// `name` when there is none; `None` when it is cancelled. The window is its
+/// parent, so nothing else can be done in the window while it is open. It
+/// blocks: not on the main thread.
+fn choose_save_path(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    start: Option<PathBuf>,
+    name: &str,
+) -> Option<PathBuf> {
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_parent(window)
+        .add_filter("SACM", &["xmi", "sacm", "xml"]);
+    match start {
+        Some(path) => {
+            if let Some(folder) = path.parent() {
+                dialog = dialog.set_directory(folder);
+            }
+            dialog = dialog.set_file_name(file_name(&path));
+        }
+        None => dialog = dialog.set_file_name(name),
+    }
+    dialog.blocking_save_file()?.into_path().ok()
+}
+
+/// File ▸ Save of the document at `revision`: to the file it was read from
+/// or last saved to; Save As… when there is none (S6). `name` is the file
+/// name the page shows, which the save dialog then starts with.
+#[tauri::command]
+async fn save(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    name: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<SaveResult, String> {
+    let known = lock(&state)?.save_path().map(Path::to_owned);
+    let (path, chosen) = match known {
+        Some(path) => (path, false),
+        None => match choose_save_path(&app, &window, None, &name) {
+            Some(path) => (path, true),
+            None => return Ok(SaveResult::Cancelled),
+        },
+    };
+    Ok(lock(&state)?.save_to(&path, revision, chosen))
+}
+
+/// File ▸ Save As… of the document at `revision`: to a file the user names
+/// in the save dialog.
+#[tauri::command]
+async fn save_as(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    name: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<SaveResult, String> {
+    let known = lock(&state)?.save_path().map(Path::to_owned);
+    let Some(path) = choose_save_path(&app, &window, known, &name) else {
+        return Ok(SaveResult::Cancelled);
+    };
+    Ok(lock(&state)?.save_to(&path, revision, true))
+}
+
+/// The page has asked about the changes that are not saved, and the window
+/// may close: it closes without asking again.
+#[tauri::command]
+fn quit(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.destroy().map_err(|_| "window-not-closed".to_owned())
+}
+
+/// The event the page hears when the window is to close with changes that
+/// are not saved: it says it heard (`close_heard`), asks, and answers with
+/// `quit` or not at all.
+pub const CLOSE_REQUESTED: &str = "af-close-requested";
+
+/// Whether the page heard the last close of the window that was held for
+/// it. A page that has stopped (an error took it down, or it is reloading)
+/// hears nothing, and would hold the window open for good: the next close
+/// is then not held.
+#[derive(Debug, Default)]
+pub struct CloseHold {
+    unheard: AtomicBool,
+}
+
+impl CloseHold {
+    /// Whether to hold a close of the window, which has changes that are
+    /// not saved when `modified`, for the page to ask about first (S9).
+    pub fn hold(&self, modified: bool) -> bool {
+        modified && !self.unheard.swap(true, Ordering::SeqCst)
+    }
+
+    /// The page heard the close held for it.
+    pub fn heard(&self) {
+        self.unheard.store(false, Ordering::SeqCst);
+    }
+}
+
+/// The page heard the window's close, and asks about the changes.
+#[tauri::command]
+fn close_heard(hold: State<'_, CloseHold>) {
+    hold.heard();
+}
+
+/// The id of the application's own Quit item (macOS).
+const QUIT_ITEM: &str = "af-quit";
+
+/// The application's menu on macOS: Tauri's default, but for Quit, which is
+/// the application's own item. The system's Quit ends the process with no
+/// close of the window, so changes that are not saved would be lost without
+/// asking; this one closes the window as its close button does (S9).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn macos_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let name = app.package_info().name.clone();
+    let quit = MenuItem::with_id(
+        app,
+        QUIT_ITEM,
+        format!("Quit {name}"),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
+    let application = Submenu::with_items(
+        app,
+        name,
+        true,
+        &[
+            &PredefinedMenuItem::about(app, None, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::services(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
+    )?;
+    let edit = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+    let view = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[&PredefinedMenuItem::fullscreen(app, None)?],
+    )?;
+    let window = Submenu::with_items(
+        app,
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&application, &edit, &view, &window])
+}
+
+/// The application's own Quit: closes the window, which asks first about
+/// changes that are not saved, and the application ends with it.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn on_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>, event: &MenuEvent) {
+    if event.id() == QUIT_ITEM {
+        match app.get_webview_window("main") {
+            Some(window) => {
+                let _ = window.close();
+            }
+            None => app.exit(0),
+        }
+    }
 }
 
 /// `DiagramAt` as JSON, written from the core's diagram without copying it.
@@ -483,9 +875,10 @@ pub fn run(args: Args) -> i32 {
         2
     };
     let smoke = args.smoke;
-    let built = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(desktop))
+        .manage(CloseHold::default())
         .invoke_handler(tauri::generate_handler![
             start,
             initial_file,
@@ -508,9 +901,24 @@ pub fn run(args: Args) -> i32 {
             undo,
             redo,
             history,
+            save,
+            save_as,
+            quit,
+            close_heard,
             set_language,
             set_style
         ])
+        .on_window_event(|window, event| {
+            // Changes that are not saved: the page asks first (S9).
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let state = window.state::<Mutex<Desktop>>();
+                let modified = state.lock().is_ok_and(|desktop| desktop.is_modified());
+                if window.state::<CloseHold>().hold(modified) {
+                    api.prevent_close();
+                    let _ = window.emit(CLOSE_REQUESTED, ());
+                }
+            }
+        })
         .setup(move |app| {
             // A smoke run leaves the user's recent files alone.
             if !smoke {
@@ -528,8 +936,12 @@ pub fn run(args: Args) -> i32 {
                 app.handle().exit(if window { smoke_code } else { 3 });
             }
             Ok(())
-        })
-        .build(tauri::generate_context!());
+        });
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(|app| macos_menu(app))
+        .on_menu_event(|app, event| on_menu(app, &event));
+    let built = builder.build(tauri::generate_context!());
     let app = match built {
         Ok(app) => app,
         Err(error) => {
@@ -696,6 +1108,314 @@ mod tests {
             line.unwrap_or_default()
                 .starts_with("af-desktop unreadable file=")
         );
+    }
+
+    /// A folder of its own for one test, with a copy of the core sample.
+    fn scratch(test: &str) -> (PathBuf, PathBuf) {
+        let directory =
+            std::env::temp_dir().join(format!("af-desktop-{test}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        assert!(std::fs::create_dir_all(&directory).is_ok());
+        let copy = directory.join("case.sacm.xmi");
+        assert!(std::fs::copy(testdata("sacm/sacm_example_core_argument.sacm.xmi"), &copy).is_ok());
+        (directory, copy)
+    }
+
+    /// Adds a top-level Goal: a change to save.
+    fn change(desktop: &mut Desktop) {
+        let revision = desktop.core.revision();
+        assert!(matches!(
+            desktop
+                .core
+                .add(None, af_api::contract::ElementKind::Goal, revision),
+            af_api::contract::EditResult::Applied { .. }
+        ));
+    }
+
+    fn strict(bytes: &[u8]) -> Option<sacm::model::Document> {
+        let options = sacm::xmi::ReadOptions::default().with_mode(sacm::xmi::Mode::Strict);
+        sacm::xmi::read(bytes, &options)
+            .ok()
+            .map(|output| output.into_document())
+    }
+
+    /// File ▸ Save of the document as it is now, to `path`.
+    fn save(desktop: &mut Desktop, path: &Path) -> SaveResult {
+        let revision = desktop.core.revision();
+        desktop.save_to(path, revision, false)
+    }
+
+    #[test]
+    fn save_writes_the_file_it_was_opened_from_and_it_reads_back() {
+        let (directory, copy) = scratch("save");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&copy).is_ok());
+        assert_eq!(desktop.save_path(), Some(copy.as_path()));
+        change(&mut desktop);
+        assert!(desktop.is_modified());
+
+        let saved = save(&mut desktop, &copy);
+        assert!(
+            matches!(saved, SaveResult::Saved { ref name, .. } if name == "case.sacm.xmi"),
+            "{saved:?}"
+        );
+        assert!(!desktop.is_modified());
+        let on_disk = std::fs::read(&copy).unwrap_or_default();
+        let WriteResult::Written { xmi, .. } = desktop.core.write() else {
+            panic!("not written");
+        };
+        assert_eq!(on_disk, xmi.as_bytes(), "the file is what the core wrote");
+        assert!(strict(&on_disk).is_some());
+        // No temporary file is left beside it.
+        let left: Vec<_> = std::fs::read_dir(&directory)
+            .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+            .unwrap_or_default();
+        assert_eq!(left, ["case.sacm.xmi"]);
+
+        // Saved again with no change between: the file Save writes is still
+        // the one it last wrote, with what it wrote.
+        change(&mut desktop);
+        assert!(matches!(
+            save(&mut desktop, &copy),
+            SaveResult::Saved { .. }
+        ));
+
+        // A file gone from disk since has nothing to lose: Save writes it again.
+        change(&mut desktop);
+        assert!(std::fs::remove_file(&copy).is_ok());
+        assert!(matches!(
+            save(&mut desktop, &copy),
+            SaveResult::Saved { .. }
+        ));
+        assert!(strict(&std::fs::read(&copy).unwrap_or_default()).is_some());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_save_asked_for_before_the_document_changed_is_not_made() {
+        let (directory, copy) = scratch("stale");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&copy).is_ok());
+        let before = std::fs::read(&copy).unwrap_or_default();
+        change(&mut desktop);
+        let asked = desktop.core.revision();
+        // While the save dialog was open, the document changed, or another
+        // file was opened: what would be written is not what was asked for.
+        change(&mut desktop);
+        assert_eq!(
+            desktop.save_to(&copy, asked, true),
+            SaveResult::Refused {
+                code: "AF-SAVE-006".to_owned()
+            }
+        );
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), before);
+        assert!(desktop.is_modified());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_file_changed_on_disk_since_it_was_opened_is_not_overwritten() {
+        let (directory, copy) = scratch("changed");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&copy).is_ok());
+        change(&mut desktop);
+        // Another program writes the file meanwhile.
+        let theirs = b"<changed by another program/>";
+        assert!(std::fs::write(&copy, theirs).is_ok());
+
+        assert_eq!(
+            save(&mut desktop, &copy),
+            SaveResult::Refused {
+                code: "AF-SAVE-004".to_owned()
+            }
+        );
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), theirs);
+        assert!(desktop.is_modified(), "nothing was saved");
+
+        // Save As… to another file still saves, and Save then writes there.
+        let other = directory.join("other.sacm.xmi");
+        let revision = desktop.core.revision();
+        assert!(matches!(
+            desktop.save_to(&other, revision, true),
+            SaveResult::Saved { ref name, .. } if name == "other.sacm.xmi"
+        ));
+        assert_eq!(desktop.save_path(), Some(other.as_path()));
+        assert_eq!(desktop.recent_files()[0].name, "other.sacm.xmi");
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), theirs);
+
+        // Save As… to the changed file itself: the save dialog asked before
+        // replacing it, so it is replaced.
+        change(&mut desktop);
+        let revision = desktop.core.revision();
+        assert!(matches!(
+            desktop.save_to(&copy, revision, true),
+            SaveResult::Saved { .. }
+        ));
+        assert!(strict(&std::fs::read(&copy).unwrap_or_default()).is_some());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_change_on_disk_of_the_same_length_is_seen_and_a_file_touched_is_not_changed() {
+        let (directory, copy) = scratch("same-length");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&copy).is_ok());
+        let ours = std::fs::read(&copy).unwrap_or_default();
+
+        // Rewritten with what it held: not a change, and Save writes.
+        assert!(std::fs::write(&copy, &ours).is_ok());
+        change(&mut desktop);
+        assert!(matches!(
+            save(&mut desktop, &copy),
+            SaveResult::Saved { .. }
+        ));
+
+        // One byte changed, the length the same, straight after the save:
+        // the time on disk may not tell it, what it holds does.
+        let mut theirs = std::fs::read(&copy).unwrap_or_default();
+        let last = theirs.len() - 1;
+        theirs[last] = if theirs[last] == b' ' { b'\n' } else { b' ' };
+        assert!(std::fs::write(&copy, &theirs).is_ok());
+        change(&mut desktop);
+        assert_eq!(
+            save(&mut desktop, &copy),
+            SaveResult::Refused {
+                code: "AF-SAVE-004".to_owned()
+            }
+        );
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), theirs);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_read_only_file_is_not_written() {
+        let (directory, copy) = scratch("read-only");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&copy).is_ok());
+        let before = std::fs::read(&copy).unwrap_or_default();
+        let set_read_only = |read_only: bool| {
+            let mut permissions = std::fs::metadata(&copy).map(|m| m.permissions());
+            if let Ok(permissions) = &mut permissions {
+                permissions.set_readonly(read_only);
+                assert!(std::fs::set_permissions(&copy, permissions.clone()).is_ok());
+            }
+        };
+        set_read_only(true);
+        change(&mut desktop);
+        let revision = desktop.core.revision();
+        // Not by Save, and not by Save As… onto it either: the folder may be
+        // writable, but the file is not.
+        for chosen in [false, true] {
+            assert_eq!(
+                desktop.save_to(&copy, revision, chosen),
+                SaveResult::Refused {
+                    code: "AF-SAVE-005".to_owned()
+                }
+            );
+        }
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), before);
+        assert!(desktop.is_modified());
+        set_read_only(false);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_save_through_a_link_writes_the_file_it_names_and_keeps_its_permissions() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let (directory, copy) = scratch("link");
+        assert!(std::fs::set_permissions(&copy, std::fs::Permissions::from_mode(0o640)).is_ok());
+        let link = directory.join("link.sacm.xmi");
+        assert!(std::os::unix::fs::symlink(&copy, &link).is_ok());
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&link).is_ok());
+        change(&mut desktop);
+        assert!(matches!(
+            save(&mut desktop, &link),
+            SaveResult::Saved { .. }
+        ));
+        let linked = std::fs::symlink_metadata(&link).map(|m| m.file_type().is_symlink());
+        assert!(matches!(linked, Ok(true)), "the link is still a link");
+        let WriteResult::Written { xmi, .. } = desktop.core.write() else {
+            panic!("not written");
+        };
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), xmi.as_bytes());
+        let mode = std::fs::metadata(&copy).map(|m| m.permissions().mode() & 0o777);
+        assert!(matches!(mode, Ok(0o640)), "{mode:?}");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_close_is_held_for_the_page_until_the_page_stops_hearing_it() {
+        let hold = CloseHold::default();
+        assert!(!hold.hold(false), "nothing to lose: the window closes");
+        // The page hears each close held, asks, and the user cancels.
+        assert!(hold.hold(true));
+        hold.heard();
+        assert!(hold.hold(true));
+        hold.heard();
+        // The page has stopped: the close held last was not heard, so the
+        // next one closes the window rather than leave it stuck open.
+        assert!(hold.hold(true));
+        assert!(!hold.hold(true));
+        // A page that hears again holds again.
+        hold.heard();
+        assert!(hold.hold(true));
+    }
+
+    #[test]
+    fn a_save_the_system_refuses_leaves_the_file_as_it_was() {
+        let (directory, copy) = scratch("refused");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(&copy).is_ok());
+        change(&mut desktop);
+        // A folder where the file would go: the rename over it fails.
+        let blocked = directory.join("blocked.sacm.xmi");
+        assert!(std::fs::create_dir_all(blocked.join("inside")).is_ok());
+        let revision = desktop.core.revision();
+        assert_eq!(
+            desktop.save_to(&blocked, revision, true),
+            SaveResult::Refused {
+                code: "AF-SAVE-005".to_owned()
+            }
+        );
+        assert!(blocked.join("inside").is_dir(), "what was there is there");
+        assert!(desktop.is_modified());
+        assert_eq!(desktop.save_path(), Some(copy.as_path()));
+        let mut left: Vec<_> = std::fs::read_dir(&directory)
+            .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+            .unwrap_or_default();
+        left.sort();
+        assert_eq!(
+            left,
+            ["blocked.sacm.xmi", "case.sacm.xmi"],
+            "no temporary file"
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_dropped_file_has_no_path_to_save_to_and_close_forgets_the_path() {
+        let (directory, copy) = scratch("unplaced");
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        let bytes = std::fs::read(&copy).unwrap_or_default();
+        assert!(matches!(
+            desktop.open_unplaced(&bytes),
+            OpenResult::Opened { .. }
+        ));
+        assert_eq!(desktop.save_path(), None, "Save is Save As…");
+        assert!(desktop.open_path(&copy).is_ok());
+        assert_eq!(desktop.save_path(), Some(copy.as_path()));
+        desktop.close();
+        assert_eq!(desktop.save_path(), None);
+        assert_eq!(
+            save(&mut desktop, &copy),
+            SaveResult::Refused {
+                code: "AF-SAVE-001".to_owned()
+            }
+        );
+        assert_eq!(std::fs::read(&copy).unwrap_or_default(), bytes);
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { editShortcut, isOpenShortcut, openShortcut, redoShortcut, undoShortcut } from './shortcuts';
+import {
+  editShortcut,
+  isOpenShortcut,
+  openShortcut,
+  redoShortcut,
+  saveAsShortcut,
+  saveShortcut,
+  saveShortcutOf,
+  undoShortcut,
+} from './shortcuts';
 
 const key = (event: Partial<KeyboardEvent>) =>
   ({ ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, isComposing: false, repeat: false, key: '', code: '', ...event }) as KeyboardEvent;
@@ -54,5 +63,30 @@ describe('the undo and redo shortcuts', () => {
     expect(editShortcut(key({ ctrlKey: true, key: 'z', code: 'KeyZ', repeat: true }), false)).toBe('undo');
     expect(editShortcut(key({ ctrlKey: true, key: 'я', code: 'KeyZ' }), false)).toBe('undo');
     expect(editShortcut(key({ ctrlKey: true, key: 'z', code: 'KeyZ', isComposing: true }), false)).toBeNull();
+  });
+});
+
+describe('the save shortcuts', () => {
+  it('are Ctrl+S and Ctrl+Shift+S on Windows and Linux, as the menu says', () => {
+    expect(saveShortcut(false)).toBe('Ctrl+S');
+    expect(saveAsShortcut(false)).toBe('Ctrl+Shift+S');
+    expect(saveShortcutOf(key({ ctrlKey: true, key: 's', code: 'KeyS' }), false)).toBe('save');
+    expect(saveShortcutOf(key({ ctrlKey: true, shiftKey: true, key: 'S', code: 'KeyS' }), false)).toBe('saveAs');
+    expect(saveShortcutOf(key({ metaKey: true, key: 's', code: 'KeyS' }), false)).toBeNull();
+    expect(saveShortcutOf(key({ ctrlKey: true, altKey: true, key: 's', code: 'KeyS' }), false)).toBeNull();
+  });
+
+  it('are ⌘S and ⇧⌘S on macOS, as the menu says', () => {
+    expect(saveShortcut(true)).toBe('⌘S');
+    expect(saveAsShortcut(true)).toBe('⇧⌘S');
+    expect(saveShortcutOf(key({ metaKey: true, key: 's', code: 'KeyS' }), true)).toBe('save');
+    expect(saveShortcutOf(key({ metaKey: true, shiftKey: true, key: 'S', code: 'KeyS' }), true)).toBe('saveAs');
+    expect(saveShortcutOf(key({ ctrlKey: true, key: 's', code: 'KeyS' }), true)).toBeNull();
+  });
+
+  it('find S by its place on a layout that is not Latin, and are a held key too, kept from the browser', () => {
+    expect(saveShortcutOf(key({ ctrlKey: true, key: 'ы', code: 'KeyS' }), false)).toBe('save');
+    expect(saveShortcutOf(key({ ctrlKey: true, key: 's', code: 'KeyS', repeat: true }), false)).toBe('save');
+    expect(saveShortcutOf(key({ ctrlKey: true, key: 's', code: 'KeyS', isComposing: true }), false)).toBeNull();
   });
 });

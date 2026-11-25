@@ -516,6 +516,45 @@ pub struct History {
     pub revision: u32,
     pub can_undo: bool,
     pub can_redo: bool,
+    /// The document has changes that are not saved: it is not in the state
+    /// it was opened or last saved in. Undo back to that state is saved
+    /// again (plan decision S3).
+    pub modified: bool,
+}
+
+/// What [`crate::Core::write`] gave: the open document as SACM 2.3 XMI,
+/// checked to read back as the document (plan decision S1).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(tag = "result", rename_all = "camelCase")]
+pub enum WriteResult {
+    /// The document at `revision`, written. It is not saved until the shell
+    /// has put it somewhere and said so (`mark_saved`).
+    #[serde(rename_all = "camelCase")]
+    Written { revision: u32, xmi: String },
+    /// Nothing was written. `code` is an `AF-SAVE-*` code: nothing is open
+    /// (`AF-SAVE-001`), libSACM refused to write the document
+    /// (`AF-SAVE-002`), or what it wrote does not read back as the document
+    /// (`AF-SAVE-003`).
+    Refused { code: String },
+}
+
+/// What File ▸ Save or Save As… gave, as a shell answers it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(tag = "result", rename_all = "camelCase")]
+pub enum SaveResult {
+    /// The document at `revision` is saved, as the file `name`.
+    #[serde(rename_all = "camelCase")]
+    Saved { revision: u32, name: String },
+    /// Nothing was saved, and the file on disk is as it was. `code` is an
+    /// `AF-SAVE-*` code: those of [`WriteResult`], the file changed on disk
+    /// since it was opened or saved (`AF-SAVE-004`), the system refused to
+    /// write it (`AF-SAVE-005`), or the document changed while it was being
+    /// saved (`AF-SAVE-006`).
+    Refused { code: String },
+    /// The user cancelled the save dialog.
+    Cancelled,
 }
 
 /// The TypeScript declarations of every type above, in one module, as
@@ -559,6 +598,8 @@ pub fn typescript() -> String {
         Removal::decl(&cfg),
         EditResult::decl(&cfg),
         History::decl(&cfg),
+        WriteResult::decl(&cfg),
+        SaveResult::decl(&cfg),
     ];
     let mut out = String::from(
         "// Generated from crates/af-api/src/contract.rs by its tests; do not edit.\n\

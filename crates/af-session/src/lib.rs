@@ -11,6 +11,11 @@
 //! cannot be undone wrongly, as an inverse operation could. The history keeps
 //! the last [`HISTORY`] commands.
 //!
+//! The session also knows which state of the document was last saved, and
+//! whether the document is in that state: undo back to it is saved again
+//! (plan decision S3). A revision cannot say this, since undo makes one too;
+//! each state is named instead by the revision of the command that made it.
+//!
 //! It does no I/O and builds for `wasm32-unknown-unknown`.
 
 use af_gsn::ElementKind;
@@ -81,11 +86,16 @@ pub struct Session {
     undo: Vec<Step>,
     redo: Vec<Step>,
     records: Vec<ChangeRecord>,
+    /// The state of the document before the oldest command undo can take
+    /// back: the revision of the command that made it.
+    base: u32,
+    /// The state last saved, or `None` when none is known to be on disk.
+    saved: Option<u32>,
 }
 
 impl Session {
-    /// A session over `document`, which is at `revision`. The next change
-    /// makes `revision + 1`.
+    /// A session over `document`, which is at `revision` and is what its
+    /// file holds: it starts saved. The next change makes `revision + 1`.
     pub fn new(document: Document, revision: u32) -> Self {
         Self {
             document,
@@ -93,7 +103,29 @@ impl Session {
             undo: Vec::new(),
             redo: Vec::new(),
             records: Vec::new(),
+            base: revision,
+            saved: Some(revision),
         }
+    }
+
+    /// The state the document is in: the revision of the command that made
+    /// it, or the one it was opened at. Undo and redo return to a state, and
+    /// so to its name; a new command makes a new one.
+    pub fn state(&self) -> u32 {
+        self.undo
+            .last()
+            .map_or(self.base, |step| step.record.revision)
+    }
+
+    /// The document as it is now has been saved.
+    pub fn mark_saved(&mut self) {
+        self.saved = Some(self.state());
+    }
+
+    /// Whether the document has changes that are not saved: it is not in the
+    /// state last saved.
+    pub fn is_modified(&self) -> bool {
+        self.saved != Some(self.state())
     }
 
     pub fn document(&self) -> &Document {
@@ -210,7 +242,9 @@ impl Session {
             record: record.clone(),
         });
         if self.undo.len() > HISTORY {
-            self.undo.remove(0);
+            // The state before the oldest step left is the one it made.
+            let dropped = self.undo.remove(0);
+            self.base = dropped.record.revision;
         }
         self.redo.clear();
         record

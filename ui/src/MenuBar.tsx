@@ -1,12 +1,13 @@
 // The menu bar, arranged as the C++ application's (plan decision D9): File,
-// Edit and View. File opens a file, a recent one, and closes what is open.
+// Edit and View. File opens a file, a recent one, saves what is open (Save As…
+// where the shell has a save dialog), and closes it.
 // Edit undoes and redoes; adding is on the canvas's context menu. View holds the panels, which are DATUM Workspace's
 // views, and Appearance ▸ Theme and Language, as in the C++ application.
 
 import type { RecentFile } from './core/Core';
 import type { ThemeChoice, Language, MessageKey } from './i18n/messages';
 import { MenuBar as DatumMenuBar, MenuBarMenu, MenuItem, MenuSection, MenuSeparator, Submenu } from './design';
-import { openShortcut, redoShortcut, undoShortcut } from './shortcuts';
+import { openShortcut, redoShortcut, saveAsShortcut, saveShortcut, undoShortcut } from './shortcuts';
 
 export interface PanelChoice {
   id: string;
@@ -21,9 +22,12 @@ interface MenuBarProps {
   onOpen: () => void;
   recent: readonly RecentFile[];
   onRecent: (id: string) => void;
-  /** A file is open, so there is one to close. */
+  /** A file is open, so there is one to save and to close. */
   canClose: boolean;
   onClose: () => void;
+  onSave: () => void;
+  /** File ▸ Save As…, or null where the shell has no save dialog (the browser). */
+  onSaveAs: (() => void) | null;
   /** What Undo and Redo can do now; null while nothing is open. */
   history: { canUndo: boolean; canRedo: boolean } | null;
   onUndo: () => void;
@@ -45,6 +49,8 @@ export function MenuBar({
   onRecent,
   canClose,
   onClose,
+  onSave,
+  onSaveAs,
   history,
   onUndo,
   onRedo,
@@ -78,6 +84,15 @@ export function MenuBar({
         ) : (
           <MenuItem id="recent" unavailable note={t('noRecent')}>
             {t('openRecent')}
+          </MenuItem>
+        )}
+        <MenuSeparator />
+        <MenuItem id="save" shortcut={saveShortcut()} textValue={t('save')} unavailable={!canClose} onAction={onSave}>
+          {t('save')}
+        </MenuItem>
+        {onSaveAs && (
+          <MenuItem id="saveAs" shortcut={saveAsShortcut()} textValue={t('saveAs')} unavailable={!canClose} onAction={onSaveAs}>
+            {t('saveAs')}
           </MenuItem>
         )}
         <MenuSeparator />

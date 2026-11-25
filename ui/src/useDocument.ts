@@ -45,7 +45,9 @@ export type DocumentState =
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'undone' }
   | { kind: 'redone' }
-  | { kind: 'editRefused'; code: string; about: NodeKind | null };
+  | { kind: 'editRefused'; code: string; about: NodeKind | null }
+  | { kind: 'saved'; name: string; downloaded: boolean }
+  | { kind: 'saveRefused'; code: string };
 
 /**
  * What an accepted edit gave, for the view to follow before it is painted:
@@ -353,7 +355,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    * the kind of node an add was asked for, which a refusal names. Answers
    * what the core made of it.
    */
-  const edit = useCallback(
+  const inflight = useRef(new Set<Promise<TextOutcome>>());
+  const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
       what: 'add' | 'undo' | 'redo' | 'remove' | TextField,
@@ -432,6 +435,20 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       return 'applied';
     },
     [showRelayout],
+  );
+  /**
+   * `runEdit`, kept among the edits in flight until it is answered: a save
+   * waits for them, so a text applied just before it (a field left by
+   * Ctrl+S) is in what is saved.
+   */
+  const edit = useCallback(
+    (...args: Parameters<typeof runEdit>): Promise<TextOutcome> => {
+      const running = runEdit(...args);
+      inflight.current.add(running);
+      void running.finally(() => inflight.current.delete(running));
+      return running;
+    },
+    [runEdit],
   );
   // Undos and redos on their way: a key held down sends no more until they
   // are answered, since Edit ▸ Undo's state is of the revision before them.
@@ -528,6 +545,54 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     }
   }, []);
 
+  /**
+   * File ▸ Save, or Save As… when `as` and the shell has a save dialog.
+   * Waits for the edits on their way first; when one of them was refused (a
+   * field left by Ctrl+S with text the core does not take), nothing is
+   * saved and the status keeps saying why, so the user does not take that
+   * text to be in the file. Answers whether the case was saved: a cancelled
+   * dialog or a refusal is not, and the status says why.
+   */
+  const save = useCallback(
+    async (as: boolean): Promise<boolean> => {
+      const on = coreRef.current;
+      if (!on || shown.current === null || fileName === null) return false;
+      const request = latest.current;
+      const outcomes = await Promise.allSettled([...inflight.current]);
+      if (outcomes.some((outcome) => outcome.status === 'fulfilled' && outcome.value === 'refused')) return false;
+      const saving = as && on.saveAs ? on.saveAs : on.save;
+      // The revision on screen once the edits on their way are answered:
+      // what the user asked to save.
+      const revision = shown.current;
+      if (revision === null) return false;
+      let result;
+      try {
+        result = await saving(fileName, revision);
+      } catch {
+        // Not the file: the shell or the core failed to answer.
+        result = { result: 'refused', code: 'AF-SAVE-007' } as const;
+      }
+      if (request !== latest.current) return result.result === 'saved';
+      if (result.result === 'cancelled') return false;
+      if (result.result === 'refused') {
+        setState({ kind: 'saveRefused', code: result.code });
+        return false;
+      }
+      setFileName(result.name);
+      // The browser cannot tell whether the download was kept (S7).
+      setState({ kind: 'saved', name: result.name, downloaded: on.saveAs === null });
+      try {
+        const past = await on.history();
+        if (request === latest.current) setHistory(past);
+      } catch {
+        // The next edit's answer brings it.
+      }
+      refreshRecent(on);
+      return true;
+    },
+    [fileName, refreshRecent],
+  );
+
   // The diagram's text follows DATUM's type tokens, so the user's text size.
   const sentStyle = useRef('');
   // Each change of text sizes is numbered: only the last one's answer says
@@ -585,6 +650,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     undo,
     redo,
     editsPending,
+    save,
   };
 }
 

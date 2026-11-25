@@ -38,7 +38,7 @@ test('Ctrl+O opens the file chooser', async ({ page }) => {
   expect(await chooser).toBeTruthy();
 });
 
-test('View holds the panels and Appearance; File holds Open…, Open Recent and Close', async ({ page }) => {
+test('View holds the panels and Appearance; File holds Open…, Open Recent, Save and Close', async ({ page }) => {
   await opened(page);
   await viewMenu(page);
   const view = page.getByRole('menu', { name: 'View' });
@@ -46,7 +46,7 @@ test('View holds the panels and Appearance; File holds Open…, Open Recent and 
   await expect(view.getByRole('menuitem')).toHaveText(['Appearance']);
   await page.keyboard.press('Escape');
   await page.getByRole('menuitem', { name: 'File', exact: true }).click();
-  await expect(page.getByRole('menu', { name: 'File' }).getByRole('menuitem')).toHaveText([/^Open…/, /^Open Recent/, 'Close']);
+  await expect(page.getByRole('menu', { name: 'File' }).getByRole('menuitem')).toHaveText([/^Open…/, /^Open Recent/, /^Save/, 'Close']);
 });
 
 test('View ▸ Appearance ▸ Theme and Language switch them', async ({ page }) => {

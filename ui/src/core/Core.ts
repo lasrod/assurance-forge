@@ -16,6 +16,7 @@ import type {
   Package,
   RelationshipDetails,
   Removal,
+  SaveResult,
   TextField,
 } from '../../../crates/af-api/bindings/api';
 
@@ -119,8 +120,25 @@ export interface Core {
   undo(): Promise<EditResult>;
   /** Makes again the last command undo took back. */
   redo(): Promise<EditResult>;
-  /** Whether Edit ▸ Undo and Redo can be chosen. */
+  /** Whether Edit ▸ Undo and Redo can be chosen, and whether the document has changes not saved. */
   history(): Promise<History>;
+  /**
+   * File ▸ Save of the document at `revision`, the one on screen. The
+   * desktop application writes the file the document was read from or last
+   * saved to, or asks where when there is none; the browser downloads it as
+   * `name`. Refused with an `AF-SAVE-*` code when nothing was saved (the
+   * file on disk is then as it was), and with `AF-SAVE-006` when the
+   * document is no longer at `revision`.
+   */
+  save(name: string, revision: number): Promise<SaveResult>;
+  /** File ▸ Save As…, where the shell has a save dialog; null in the browser, which downloads. */
+  readonly saveAs: ((name: string, revision: number) => Promise<SaveResult>) | null;
+  /**
+   * The desktop window is to close while changes are not saved: the shell
+   * holds it and calls `ask`, which answers with `quit` or not at all. Null
+   * in the browser, where the page asks through `beforeunload`.
+   */
+  readonly closeGuard: { listen(ask: () => void): Promise<() => void>; quit(): Promise<void> } | null;
   /** A BCP 47 tag such as `en` or `ja`: the node text follows it. */
   setLanguage(language: string): Promise<void>;
   /** The diagram's text sizes in CSS px, from DATUM's type tokens. */

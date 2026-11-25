@@ -5,6 +5,7 @@ import type { AddChoice, Core, ElementKind, NodeKind, Removal, TextField, TextSt
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
+import { UnsavedDialog } from './UnsavedDialog';
 import {
   ChevronDown,
   ChevronUp,
@@ -30,7 +31,7 @@ import {
 import { initialTheme, translate, type Language, type MessageKey, type ThemeChoice } from './i18n/messages';
 import { wordRefusal } from './i18n/refusals';
 import { loadLayout, saveLayout } from './layout';
-import { editShortcut, isOpenShortcut } from './shortcuts';
+import { editShortcut, isOpenShortcut, saveShortcutOf } from './shortcuts';
 import { MenuBar } from './MenuBar';
 import { ancestors, outlineTree, packageTree } from './outline';
 import { packageKind } from './i18n/packages';
@@ -90,6 +91,12 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('redone') };
     case 'editRefused':
       return { text: t('editRefused', { reason: refusalText(state.code, state.about, t) }), tone: 'error' };
+    case 'saved':
+      return { text: t(state.downloaded ? 'downloaded' : 'saved', { name: state.name }) };
+    case 'saveRefused': {
+      const known = /^AF-SAVE-00[1-7]$/.test(state.code);
+      return { text: t('saveRefused', { reason: known ? t(state.code as MessageKey) : state.code }), tone: 'error' };
+    }
     case 'result': {
       const result = state.result;
       if (result.result === 'opened') {
@@ -118,6 +125,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const { viewport, selected, setSelected, centreSize, moveView, onCentreSize, fitAll, zoomBy, selectAndShow, refitIfFitted, followEdit } =
     view;
   const details = useDetails(core, selected, diagram);
+  // The case has changes that are not saved: the title and the status bar say so.
+  const modified = diagram !== null && (history?.modified ?? false);
 
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
@@ -212,7 +221,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
-    doc.openFile(event.dataTransfer.files[0]);
+    const file = event.dataTransfer.files[0];
+    if (file) guard(() => doc.openFile(file));
   };
 
   const copy: WorkspaceCopy = useMemo(
@@ -285,26 +295,89 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     if (noFile) report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null, viewport: null, selected: null, hovered: null });
   }, [noFile, state]);
 
-  // The window's title names the file.
+  // The window's title names the file, marked while changes are not saved.
   useEffect(() => {
-    document.title = fileName ? `${fileName} – Assurance Forge` : 'Assurance Forge';
-  }, [fileName]);
+    document.title = fileName ? `${modified ? '● ' : ''}${fileName} – Assurance Forge` : 'Assurance Forge';
+  }, [fileName, modified]);
 
   // DATUM's Workspace owns the layout: which docks are open, their sizes, and
   // which stacked views are hidden. The page keeps it between visits.
   useEffect(() => saveLayout(layout), [layout]);
 
+  // Changes that are not saved are asked about before anything loses them
+  // (plan decision S8): `guard` runs `then` at once, or once the user has
+  // saved or chosen not to.
+  const modifiedNow = useRef(modified);
+  modifiedNow.current = modified;
+  const [unsaved, setUnsaved] = useState<(() => void) | null>(null);
+  useEffect(() => {
+    if (!modified) setUnsaved(null);
+  }, [modified]);
+  const guard = useCallback((then: () => void) => {
+    if (modifiedNow.current) setUnsaved(() => then);
+    else then();
+  }, []);
+  const { save: saveWith } = doc;
+  const save = useCallback(() => void saveWith(false), [saveWith]);
+  const saveAs = useCallback(() => void saveWith(true), [saveWith]);
+
+  // The desktop window's close, held by the shell while changes are not saved.
+  useEffect(() => {
+    const closing = core?.closeGuard;
+    if (!closing) return;
+    let stop: (() => void) | null = null;
+    let wanted = true;
+    void closing
+      .listen(() => guard(() => void closing.quit()))
+      .then((unlisten) => {
+        if (wanted) stop = unlisten;
+        else unlisten();
+      });
+    return () => {
+      wanted = false;
+      stop?.();
+    };
+  }, [core, guard]);
+  // The browser asks itself, in words of its own, before the page goes.
+  useEffect(() => {
+    if (!modified || core?.closeGuard) return;
+    const onLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onLeave);
+    return () => window.removeEventListener('beforeunload', onLeave);
+  }, [modified, core]);
+
   // The desktop's own open dialog, which knows the file's path; in the browser,
   // the file input.
   const { chooseFile: chooseWith, editsPending } = doc;
-  const chooseFile = useCallback(() => chooseWith(() => input.current?.click()), [chooseWith]);
+  const chooseFile = useCallback(() => guard(() => chooseWith(() => input.current?.click())), [chooseWith, guard]);
+  const openRecent = (id: string) => guard(() => doc.openRecent(id));
+  const closeFile = () => guard(doc.closeFile);
 
   // Ctrl+O (⌘O on macOS) opens a file, as File ▸ Open… says.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      // Ctrl+S and Ctrl+Shift+S (⌘S and ⇧⌘S), as File ▸ Save and Save As…
+      // say: never the browser's own Save Page. Not under an open menu or
+      // dialog; from a field, once the field has applied what it holds.
+      const saving = saveShortcutOf(event);
+      if (saving) {
+        // A held key's repeats are kept from the browser too, and save once.
+        event.preventDefault();
+        if (event.repeat) return;
+        if (target?.closest('[role="menu"], [role="dialog"], [role="alertdialog"]')) return;
+        if (target instanceof HTMLElement && target.closest('input, textarea')) target.blur();
+        if (diagram !== null) {
+          if (saving === 'save') save();
+          else saveAs();
+        }
+        return;
+      }
       // Not when something else has the key: a component that handled it, an
       // open menu or dialog, or a field being typed in.
-      const target = event.target instanceof Element ? event.target : null;
       const busy = target?.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"], [role="alertdialog"]');
       if (event.defaultPrevented || busy) return;
       // Ctrl+Z and Ctrl+Y (⌘Z and ⇧⌘Z), as Edit ▸ Undo and Redo say.
@@ -323,7 +396,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [chooseFile, core, history, undo, redo, editsPending]);
+  }, [chooseFile, core, history, undo, redo, editsPending, diagram, save, saveAs]);
 
   const status = message(state, t, language);
   // The add menu is named after what it adds to: "Goal G3", or "Add" on the empty canvas.
@@ -342,9 +415,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         starting={state.kind === 'starting'}
         onOpen={chooseFile}
         recent={recent}
-        onRecent={doc.openRecent}
+        onRecent={openRecent}
         canClose={hasFile}
-        onClose={doc.closeFile}
+        onClose={closeFile}
+        onSave={save}
+        onSaveAs={core?.saveAs ? saveAs : null}
         history={hasFile ? history : null}
         onUndo={undo}
         onRedo={redo}
@@ -487,6 +562,26 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           </ContextMenu>
         )}
         {hasFile && (
+          <UnsavedDialog
+            name={fileName ?? ''}
+            open={unsaved !== null}
+            t={t}
+            onCancel={() => setUnsaved(null)}
+            onDiscard={() => {
+              const then = unsaved;
+              setUnsaved(null);
+              then?.();
+            }}
+            onSave={() => {
+              const then = unsaved;
+              setUnsaved(null);
+              void saveWith(false).then((saved) => {
+                if (saved) then?.();
+              });
+            }}
+          />
+        )}
+        {hasFile && (
           <RemoveDialog
             removal={confirmRemoval}
             t={t}
@@ -503,6 +598,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           {status.text}
         </Status>
         <StatusBarSpacer />
+        {modified && (
+          <Status title={t('modifiedTip')} data-testid="modified">
+            {t('modified')}
+          </Status>
+        )}
         {viewport && diagram && <Status data-testid="zoom">{t('zoom', { percent: Math.round(viewport.scale * 100) })}</Status>}
       </StatusBar>
     </DatumRoot>

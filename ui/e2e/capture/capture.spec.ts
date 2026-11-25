@@ -138,6 +138,20 @@ test('5 a small window with Japanese labels', async ({ page }) => {
   await shot(page, 'app-5-small-japanese', `oasc-ja.sacm.xmi in Japanese, 1024 × 680, Goal ${target.id} at 100% and selected.`);
 });
 
+test('7 changes not saved, and the question before they are lost', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await opened(page, 'sacm_example_core_argument.sacm.xmi', '&lang=en&theme=light');
+  const at = await nodeCentre(page, 'cl_top');
+  await page.mouse.click(at.x, at.y, { button: 'right' });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Add Goal' }).click();
+  await expect(page.getByTestId('modified')).toBeVisible();
+  await shot(page, 'app-7a-not-saved', 'A Goal added to the core sample: the status bar says Not saved, the title is marked.');
+  await page.getByRole('menuitem', { name: 'File', exact: true }).click();
+  await page.getByRole('menu', { name: 'File' }).getByRole('menuitem', { name: 'Close' }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await shot(page, 'app-7b-unsaved-question', 'File ▸ Close with the change not saved: Cancel, Don’t save, Save.');
+});
+
 test('6 the dark theme', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await opened(page, 'challenges.sacm.xmi', '&lang=en&theme=dark');

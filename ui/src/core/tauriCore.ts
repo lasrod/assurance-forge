@@ -3,6 +3,7 @@
 // both (plan decision D1).
 
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import type {
   AddChoices,
   Core,
@@ -17,6 +18,7 @@ import type {
   RecentFile,
   RelationshipDetails,
   Removal,
+  SaveResult,
 } from './Core';
 import { StartError, type FontBytes } from './start';
 
@@ -66,6 +68,20 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     undo: () => invoke<EditResult>('undo'),
     redo: () => invoke<EditResult>('redo'),
     history: () => invoke<History>('history'),
+    save: (name, revision) => invoke<SaveResult>('save', { name, revision }),
+    saveAs: (name, revision) => invoke<SaveResult>('save_as', { name, revision }),
+    // The shell holds the window's close while changes are not saved
+    // (af-desktop's CLOSE_REQUESTED), and closes it on `quit`.
+    closeGuard: {
+      // Rust is told the page heard, so a page that has stopped does not
+      // hold the window open for good.
+      listen: (ask) =>
+        listen('af-close-requested', () => {
+          void invoke('close_heard').catch(() => undefined);
+          ask();
+        }),
+      quit: () => invoke('quit'),
+    },
     setLanguage: (language) => invoke('set_language', { language }),
     setStyle: (style) => invoke('set_style', { style }),
     // The core lives as long as the window.

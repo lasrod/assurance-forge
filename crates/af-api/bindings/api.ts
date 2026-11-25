@@ -274,4 +274,14 @@ element: string | null,
  */
 created: Array<string>, changed: Array<string>, deleted: Array<string>, } | { "result": "refused", code: string, } | { "result": "unchanged" };
 
-export type History = { revision: number, canUndo: boolean, canRedo: boolean, };
+export type History = { revision: number, canUndo: boolean, canRedo: boolean, 
+/**
+ * The document has changes that are not saved: it is not in the state
+ * it was opened or last saved in. Undo back to that state is saved
+ * again (plan decision S3).
+ */
+modified: boolean, };
+
+export type WriteResult = { "result": "written", revision: number, xmi: string, } | { "result": "refused", code: string, };
+
+export type SaveResult = { "result": "saved", revision: number, name: string, } | { "result": "refused", code: string, } | { "result": "cancelled" };
