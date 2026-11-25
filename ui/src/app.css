@@ -348,4 +348,49 @@
     outline: var(--datum-focus-width) solid var(--datum-focus-ring);
     outline-offset: calc(-1 * var(--datum-focus-width));
   }
+
+  /* The problem list: a severity mark in DATUM's status colours, which the
+     icon's shape carries too, so colour is never the only cue. */
+  .af-problem-mark {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .af-problem-mark[data-severity='error'] {
+    color: var(--datum-status-error);
+  }
+
+  .af-problem-mark[data-severity='warning'] {
+    color: var(--datum-status-warning);
+  }
+
+  .af-problem-mark[data-severity='info'] {
+    color: var(--datum-status-info);
+  }
+
+  /* The message wraps, as DATUM's names do; the code and its requirement
+     keep to one line, or they break at every hyphen. */
+  .af-problems .datum-list-item-meta {
+    white-space: nowrap;
+    font-family: var(--datum-font-family-mono);
+  }
+
+  /* The status bar's counts open the Problems panel: text that is a button. */
+  .af-status-button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .af-status-button:hover {
+    text-decoration: underline;
+  }
+
+  .af-status-button:focus-visible {
+    outline: var(--datum-focus-width) solid var(--datum-focus-ring);
+    outline-offset: 2px;
+  }
 }

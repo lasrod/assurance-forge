@@ -16,6 +16,7 @@ import type {
   OpenResult,
   Outline,
   Package,
+  Problems,
   RelationshipDetails,
   Removal,
   SaveResult,
@@ -117,6 +118,8 @@ export interface Core {
   outline(): Promise<Outline | null>;
   /** The open file's packages, depth first; empty when nothing is open. */
   packages(): Promise<Package[]>;
+  /** The problem list at the revision: errors, then warnings, then information; null when nothing is open. */
+  problems(): Promise<Problems | null>;
   /**
    * The add menu for the node with this SACM id, or for the empty canvas
    * when null: the six kinds, each with the code of why it cannot be added

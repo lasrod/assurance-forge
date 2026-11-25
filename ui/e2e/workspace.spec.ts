@@ -112,9 +112,11 @@ test('the panels carry the C++ application\'s names, in Japanese too', async ({ 
     localStorage.setItem('assurance-forge.workspace.v3', JSON.stringify({ open: { start: true, end: true, bottom: true }, size: {} })),
   );
   await opened(page, '&lang=ja');
-  for (const title of ['ケースエクスプローラー', '論証ナビゲーター', '要素プロパティ', '問題']) {
+  for (const title of ['ケースエクスプローラー', '論証ナビゲーター', '要素プロパティ']) {
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   }
+  // Problems carries its count: the sample breaks two GSN rules.
+  await expect(page.getByRole('heading', { name: '問題 (2)', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'ファイル', exact: true })).toBeVisible();
   await expect(page.getByTestId('status')).toContainText('ノード 8 個、エッジ 7 本');
 
@@ -122,7 +124,7 @@ test('the panels carry the C++ application\'s names, in Japanese too', async ({ 
   await page.getByRole('menuitem', { name: '外観' }).click();
   await page.getByRole('menuitem', { name: '言語' }).click();
   await page.getByRole('menuitemradio', { name: 'English' }).click();
-  for (const title of ['Case Explorer', 'Argument Navigator', 'Element Properties', 'Problems']) {
+  for (const title of ['Case Explorer', 'Argument Navigator', 'Element Properties', 'Problems (2)']) {
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   }
   await expect(page.getByTestId('status')).toContainText('8 nodes, 7 edges');

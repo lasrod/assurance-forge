@@ -21,6 +21,7 @@ import type {
   OpenResult,
   OutlineRow,
   Package,
+  Problems,
   RecentFile,
   Removal,
   TextField,
@@ -76,6 +77,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   // What the left panels show: the argument's tree and the file's packages.
   const [outline, setOutline] = useState<OutlineRow[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
+  // The problem list of the revision on screen; null while nothing is open.
+  const [problems, setProblems] = useState<Problems | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentFile[]>([]);
   // A file is being read, or the shell has not yet said whether it was started
@@ -118,6 +121,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     setDiagram(null);
     setOutline([]);
     setPackages([]);
+    setProblems(null);
     setFileName(null);
     setReading(false);
     setHistory(null);
@@ -133,6 +137,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     },
     [clear],
   );
+  /**
+   * Reads the problem list on its own, so that a failure to read the rest
+   * of an edit's answers does not leave it at an older revision; shown only
+   * if it is of the revision on screen.
+   */
+  const readProblems = useCallback((on: Core, request: number) => {
+    on.problems().then(
+      (listed) => {
+        if (request === latest.current && listed && listed.revision === shown.current) setProblems(listed);
+      },
+      () => undefined,
+    );
+  }, []);
   const refreshRecent = useCallback((on: Core) => {
     on.recent.list().then(setRecent, () => setRecent([]));
   }, []);
@@ -146,7 +163,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       try {
         const { name, result } = await opening();
         const isOpen = result.result === 'opened';
-        const [next, rows, held, past, found] = isOpen
+        const [next, rows, held, past, found, listed] = isOpen
           ? await Promise.all([
               on.diagram(),
               on.outline(),
@@ -154,8 +171,9 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
               on.history(),
               // A copy that cannot be found is no copy: the file opens all the same.
               on.recovery.found(name).catch(() => null),
+              on.problems(),
             ])
-          : [null, null, [], null, null];
+          : [null, null, [], null, null, null];
         if (request !== latest.current) return;
         clear();
         shown.current = isOpen ? result.revision : null;
@@ -165,6 +183,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         setOutline(rows?.rows ?? []);
         setPackages(held);
         setHistory(past);
+        setProblems(listed);
         setFileName(isOpen ? name : null);
         if (found?.result === 'found') {
           setRecovery({ name: found.name, writtenAt: found.writtenAt, baseMatches: found.baseMatches });
@@ -431,6 +450,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         if (request === latest.current) {
           shown.current = result.revision;
           setState({ kind: 'relayoutFailed' });
+          readProblems(on, request);
         }
         return 'applied';
       }
@@ -438,6 +458,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       // Another file was opened meanwhile, or a later command is on its way.
       if (request !== latest.current || !next || next.revision !== result.revision) return 'applied';
       shown.current = result.revision;
+      readProblems(on, request);
       onShown(diagramRef.current, next, anchor, added);
       // As every answer: shown only if no older a layout than the one shown.
       setDiagram((current) => newerDiagram(current, next, shown.current));
@@ -462,7 +483,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       else if (what !== 'remove' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
     },
-    [showRelayout],
+    [showRelayout, readProblems],
   );
   /**
    * `runEdit`, kept among the edits in flight until it is answered: a save
@@ -709,6 +730,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     diagram,
     outline,
     packages,
+    problems,
     fileName,
     recent,
     reading,

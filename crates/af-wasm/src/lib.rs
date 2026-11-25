@@ -177,6 +177,15 @@ impl WasmCore {
         self.core.mark_saved(revision)
     }
 
+    /// `Problems` as JSON: the problem list at the revision, or `None` when
+    /// nothing is open.
+    pub fn problems(&mut self) -> Result<Option<String>, JsError> {
+        self.core
+            .problems()
+            .map(|problems| json(&problems))
+            .transpose()
+    }
+
     /// `Outline` as JSON, or `None` when nothing is open.
     pub fn outline(&self) -> Result<Option<String>, JsError> {
         self.core

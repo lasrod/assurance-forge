@@ -43,7 +43,10 @@ nav:
   - Roadmap:
     - Rust rebuild, Phase 0: roadmap/rust-rebuild-phase-0.md
     - "Milestone 1, step 1: the diagram": roadmap/milestone-1-diagram.md
+    - "Milestone 1, step 2: the problem list": roadmap/milestone-1-problems.md
     - "Milestone 2, step 1: adding elements": roadmap/milestone-2-add-elements.md
+    - "Milestone 2, step 2: saving": roadmap/milestone-2-save.md
+    - "Milestone 2, step 3: the recovery copy": roadmap/milestone-2-recovery.md
     - Canvas spike findings: spikes/canvas.md
     - Desktop shell spike findings: spikes/desktop-shell.md
   - Standards:
