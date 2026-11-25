@@ -161,3 +161,66 @@ fn a_text_set_is_recorded_with_the_language_it_was_set_in() {
     ));
     assert_eq!(session.records().len(), 1);
 }
+
+#[test]
+fn a_session_starts_saved_and_an_edit_is_a_change_not_saved() {
+    let mut session = Session::new(sample(), 3);
+    assert!(!session.is_modified(), "what was opened is what is on disk");
+    add_solution(&mut session);
+    assert!(session.is_modified());
+    session.mark_saved();
+    assert!(!session.is_modified());
+}
+
+#[test]
+fn undo_back_to_the_saved_state_is_saved_again() {
+    let mut session = Session::new(sample(), 1);
+    add_solution(&mut session);
+    session.mark_saved();
+    let saved = session.document().clone();
+    add_solution(&mut session);
+    assert!(session.is_modified());
+    assert!(session.undo().is_some());
+    assert!(!session.is_modified(), "the saved state, by undo");
+    assert!(session.document() == &saved);
+    assert!(session.undo().is_some());
+    assert!(session.is_modified(), "before the saved state");
+    assert!(session.redo().is_some());
+    assert!(!session.is_modified(), "the saved state, by redo");
+    assert!(session.redo().is_some());
+    assert!(session.is_modified());
+}
+
+#[test]
+fn a_saved_state_that_redo_can_no_longer_reach_is_not_saved_again() {
+    let mut session = Session::new(sample(), 1);
+    add_solution(&mut session);
+    session.mark_saved();
+    assert!(session.undo().is_some());
+    // A new command clears redo: the saved state is gone for good.
+    add_solution(&mut session);
+    assert!(session.is_modified());
+    assert!(session.undo().is_some());
+    assert!(session.is_modified(), "the state opened, not the one saved");
+}
+
+#[test]
+fn the_saved_state_is_known_past_the_end_of_the_history() {
+    let mut session = Session::new(sample(), 0);
+    add_solution(&mut session);
+    add_solution(&mut session);
+    session.mark_saved();
+    let saved = session.document().clone();
+    for _ in 0..HISTORY {
+        add_solution(&mut session);
+    }
+    // The steps that made the saved state have left the history; undo can go
+    // back exactly to it, and no further.
+    let mut undone = 0;
+    while session.undo().is_some() {
+        undone += 1;
+    }
+    assert_eq!(undone, HISTORY);
+    assert!(session.document() == &saved);
+    assert!(!session.is_modified());
+}

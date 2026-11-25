@@ -440,7 +440,8 @@ fn an_add_from_the_menu_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
         History {
             revision: 1,
             can_undo: false,
-            can_redo: false
+            can_redo: false,
+            modified: false
         }
     );
 
@@ -507,7 +508,8 @@ fn an_add_from_the_menu_is_drawn_at_a_new_revision_and_undo_takes_it_back() {
         History {
             revision: 2,
             can_undo: true,
-            can_redo: false
+            can_redo: false,
+            modified: true
         }
     );
 

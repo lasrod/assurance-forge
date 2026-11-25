@@ -142,6 +142,19 @@ impl WasmCore {
         json(&self.core.history())
     }
 
+    /// `WriteResult` as JSON: the open document as SACM 2.3 XMI, checked to
+    /// read back as the document. Nothing is marked saved.
+    pub fn write(&self) -> Result<String, JsError> {
+        json(&self.core.write())
+    }
+
+    /// The page has saved (downloaded) what `write` gave at `revision`.
+    /// `false` when the document has changed since.
+    #[wasm_bindgen(js_name = markSaved)]
+    pub fn mark_saved(&mut self, revision: u32) -> bool {
+        self.core.mark_saved(revision)
+    }
+
     /// `Outline` as JSON, or `None` when nothing is open.
     pub fn outline(&self) -> Result<Option<String>, JsError> {
         self.core

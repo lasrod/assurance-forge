@@ -61,3 +61,25 @@ export function editShortcut(event: KeyboardEvent, mac = MAC): 'undo' | 'redo' |
   if (!mac && !event.shiftKey && isLetter(event, 'y')) return 'redo';
   return null;
 }
+
+/** File ▸ Save's shortcut as the menu shows it: `⌘S` on macOS, `Ctrl+S` elsewhere. */
+export function saveShortcut(mac = MAC): string {
+  return mac ? '⌘S' : 'Ctrl+S';
+}
+
+/** File ▸ Save As…'s shortcut as the menu shows it: `⇧⌘S` on macOS, `Ctrl+Shift+S` elsewhere. */
+export function saveAsShortcut(mac = MAC): string {
+  return mac ? '⇧⌘S' : 'Ctrl+Shift+S';
+}
+
+/**
+ * Whether `event` is save or save as, or null: ⌘S and ⇧⌘S on macOS, Ctrl+S
+ * and Ctrl+Shift+S elsewhere. Not while an IME composes. A held key's
+ * repeats are the shortcut too, so the page keeps them from the browser's
+ * own Save Page; it saves once.
+ */
+export function saveShortcutOf(event: KeyboardEvent, mac = MAC): 'save' | 'saveAs' | null {
+  const modifier = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (!modifier || event.altKey || event.isComposing || !isLetter(event, 's')) return null;
+  return event.shiftKey ? 'saveAs' : 'save';
+}

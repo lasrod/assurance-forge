@@ -13,9 +13,25 @@ import type {
   Package,
   RelationshipDetails,
   Removal,
+  SaveResult,
+  WriteResult,
 } from './Core';
 import { createWebRecent } from './webRecent';
 import { StartError, type FontBytes } from './start';
+
+/** Hands `text` to the browser as a download named `name`: where the browser keeps downloads. */
+export function download(text: string, name: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/xml' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // The browser has the file once the click is handled.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
 export async function createWasmCore(fonts: FontBytes, language: string): Promise<Core> {
   await init();
@@ -47,6 +63,20 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     undo: async () => JSON.parse(core.undo()) as EditResult,
     redo: async () => JSON.parse(core.redo()) as EditResult,
     history: async () => JSON.parse(core.history()) as History,
+    // The browser downloads what the core wrote and checked (plan decision S7).
+    // It cannot tell whether the user kept the download: the page says it
+    // was downloaded, not saved.
+    save: async (name, revision): Promise<SaveResult> => {
+      const written = JSON.parse(core.write()) as WriteResult;
+      if (written.result === 'refused') return written;
+      if (written.revision !== revision) return { result: 'refused', code: 'AF-SAVE-006' };
+      download(written.xmi, name);
+      return core.markSaved(written.revision)
+        ? { result: 'saved', revision: written.revision, name }
+        : { result: 'refused', code: 'AF-SAVE-006' };
+    },
+    saveAs: null,
+    closeGuard: null,
     setLanguage: async (language) => core.setLanguage(language),
     setStyle: async (style) =>
       core.setStyle(style.textSize, style.textLineHeight, style.identifierSize, style.identifierLineHeight),

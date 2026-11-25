@@ -60,6 +60,12 @@ impl RecentFiles {
         let OpenResult::Opened { nodes, edges, .. } = result else {
             return;
         };
+        self.record_counts(path, *nodes, *edges, now);
+    }
+
+    /// Puts `path` first, once, holding `nodes` and `edges`: a file opened,
+    /// or one saved as.
+    pub fn record_counts(&mut self, path: &Path, nodes: u32, edges: u32, now: u64) {
         let path = known_path(path);
         let id = path.display().to_string();
         // A file is listed once, whichever spelling of its path it was opened
@@ -75,8 +81,8 @@ impl RecentFiles {
                 location: Some(id.clone()),
                 id,
                 opened_at: now,
-                nodes: *nodes,
-                edges: *edges,
+                nodes,
+                edges,
             },
         );
         self.files.truncate(LIMIT);

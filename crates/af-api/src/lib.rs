@@ -14,6 +14,11 @@
 //! command it applies all or not at all, with one revision per opened file
 //! and one more per accepted command, undo and redo included. A revision only
 //! goes up, across files too.
+//!
+//! [`Core::write`] gives the open document as SACM 2.3 XMI, only once it has
+//! read the bytes back as the same document (plan decision S1). The shell
+//! puts them on disk, or in the browser's downloads, and then says so with
+//! [`Core::mark_saved`].
 
 pub mod contract;
 
@@ -23,12 +28,13 @@ use af_layout::{Engine, Fonts, Style};
 use af_session::{ChangeRecord, Session};
 use sacm::diagnostic::Severity;
 use sacm::model::AbstractClass;
-use sacm::xmi::{self, Mode, ReadOptions};
+use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 use contract::{
     AddChoice, AddChoices, ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult,
     ElementDetails, ElementKind, History, MessageArgument, OpenResult, Outline, OutlineRow,
     Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode,
+    WriteResult,
 };
 
 mod convert;
@@ -158,6 +164,13 @@ impl Core {
         if let Some(engine) = self.engine.as_mut() {
             engine.clear_cache();
         }
+    }
+
+    /// How many nodes and edges the open document's view has, or `None`
+    /// when nothing is open: what a recent file is listed with.
+    pub fn counts(&self) -> Option<(u32, u32)> {
+        let view = &self.open.as_ref()?.view;
+        Some((count(view.nodes.len()), count(view.edges.len())))
     }
 
     /// The revision of what is open, or of the last refusal.
@@ -475,6 +488,42 @@ impl Core {
             revision: self.revision,
             can_undo: open.session.can_undo().is_some(),
             can_redo: open.session.can_redo().is_some(),
+            modified: open.session.is_modified(),
+        }
+    }
+
+    /// The open document as SACM 2.3 XMI, by libSACM's strict save, which
+    /// checks that the output is schema-valid. The bytes are read back by a
+    /// strict read and given out only if they are the document (S1): a
+    /// writer fault never reaches the disk. Nothing is marked saved.
+    pub fn write(&self) -> WriteResult {
+        let Some(open) = self.open.as_ref() else {
+            return write_refused(SAVE_NOTHING_OPEN);
+        };
+        let document = open.session.document();
+        let Ok(xmi) = xmi::write(document, &WriteOptions::default()) else {
+            return write_refused(SAVE_NOT_WRITTEN);
+        };
+        if !reads_back_as(&xmi, document) {
+            return write_refused(SAVE_NOT_READ_BACK);
+        }
+        WriteResult::Written {
+            revision: self.revision,
+            xmi,
+        }
+    }
+
+    /// The shell has saved what [`Core::write`] gave at `revision`: the
+    /// document is now saved, until it changes. `false`, and nothing marked,
+    /// when the document has changed since (a revision other than the one
+    /// written) or nothing is open.
+    pub fn mark_saved(&mut self, revision: u32) -> bool {
+        match self.open.as_mut() {
+            Some(open) if revision == self.revision => {
+                open.session.mark_saved();
+                true
+            }
+            _ => false,
         }
     }
 
@@ -524,6 +573,27 @@ const OUT_OF_DATE: &str = "AF-EDIT-009";
 /// AF-EDIT-010: libSACM refused the operations the writing rules made.
 const NOT_MADE: &str = "AF-EDIT-010";
 
+/// AF-SAVE-001: nothing is open to save.
+const SAVE_NOTHING_OPEN: &str = "AF-SAVE-001";
+/// AF-SAVE-002: libSACM refused to write the document.
+const SAVE_NOT_WRITTEN: &str = "AF-SAVE-002";
+/// AF-SAVE-003: what was written does not read back as the document.
+const SAVE_NOT_READ_BACK: &str = "AF-SAVE-003";
+
+/// Whether `xmi`, read as a file is opened (a strict read), is `document`.
+fn reads_back_as(xmi: &str, document: &sacm::model::Document) -> bool {
+    matches!(
+        xmi::read(xmi.as_bytes(), &ReadOptions::default().with_mode(Mode::Strict)),
+        Ok(output) if output.document() == document
+    )
+}
+
+fn write_refused(code: &str) -> WriteResult {
+    WriteResult::Refused {
+        code: code.to_owned(),
+    }
+}
+
 fn refused(code: &str) -> EditResult {
     EditResult::Refused {
         code: code.to_owned(),
@@ -558,5 +628,39 @@ fn argument(argument: &sacm::diagnostic::Argument) -> MessageArgument {
     MessageArgument {
         name: argument.name().to_owned(),
         value,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample() -> (String, sacm::model::Document) {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testdata/sacm/sacm_example_core_argument.sacm.xmi"
+        );
+        let text = std::fs::read_to_string(path).unwrap_or_else(|error| panic!("setup: {error}"));
+        let document = match xmi::read(
+            text.as_bytes(),
+            &ReadOptions::default().with_mode(Mode::Strict),
+        ) {
+            Ok(output) => output.into_document(),
+            Err(error) => panic!("setup: {error:?}"),
+        };
+        (text, document)
+    }
+
+    #[test]
+    fn bytes_that_read_back_as_another_document_are_not_given_out() {
+        let (text, document) = sample();
+        assert!(reads_back_as(&text, &document));
+        // One letter of one statement different: a writer that lost or
+        // changed anything would read back like this.
+        let changed = text.replacen("safe", "sAfe", 1);
+        assert_ne!(changed, text, "setup: the sample says `safe`");
+        assert!(!reads_back_as(&changed, &document));
+        // Bytes a strict read refuses are not the document either.
+        assert!(!reads_back_as("<not-sacm/>", &document));
     }
 }
