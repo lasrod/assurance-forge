@@ -8,8 +8,8 @@ stored as standard SACM 2.3 XMI, so it is never locked into the tool.
 
 **Assurance Forge is being rebuilt in Rust, and `main` is where that happens.**
 The rebuild opens a SACM 2.3 file and shows its argument as a GSN diagram, in
-a desktop application and in the browser. Elements can be added, their text
-edited and removed, with undo and redo, and the case saved back to SACM 2.3
+a desktop application and in the browser. Elements can be added and removed
+and their text edited, with undo and redo, and the case saved back to SACM 2.3
 XMI, with a recovery copy kept while changes are not saved.
 
 | | |
@@ -34,9 +34,11 @@ XMI, with a recovery copy kept while changes are not saved.
   application, and the same tool as a web application. Either opens a file,
   edits it and saves it, and the case stays on your machine.
 
-These describe the tool as a whole. The rebuild does the first and the last so
-far: it reads a case, draws it, edits it and saves it. The [plan](docs/roadmap/rust-rebuild-phase-0.md) says
-which of the rest arrive in which release.
+These describe the tool as a whole. So far the rebuild reads a case, draws it,
+edits its core elements and saves it, on the desktop and in the browser;
+patterns, modules and assurance claim points are not built yet. The
+[plan](docs/roadmap/rust-rebuild-phase-0.md) says which of the rest arrive in
+which release.
 
 ## How it is built
 
@@ -51,7 +53,10 @@ rules it follows.
 ## Building and starting it
 
 You need Rust stable (`rust-toolchain.toml` selects it, with the WebAssembly
-target).
+target). On Linux, the desktop application, a member of the workspace, also
+needs WebKitGTK and the other
+[prerequisites of Tauri](https://tauri.app/start/prerequisites/); without
+them, leave it out with `cargo test --workspace --exclude af-desktop`.
 
 ```bash
 git clone --recurse-submodules https://github.com/lasrod/assurance-forge.git
@@ -65,17 +70,17 @@ The interface in `ui/` is built with DATUM, a design system that is not
 public, so the application cannot be built from this repository alone. The
 core can: the layout gallery reads the sample cases in `testdata/sacm/`, lays
 each out and writes it as an SVG, with a table of what the geometry checks
-found.
+found, into a folder beside the repository.
 
 ```bash
-cargo run --release -p af-layout --example gallery -- gallery-out
+cargo run --release -p af-layout --example gallery -- ../gallery-out
 ```
 
 ### With the interface
 
 This needs a checkout of DATUM, beside this repository as `../datum-ui` or
-named by `DATUM_DIR`, and Node.js, pnpm 10 and
-[wasm-pack](https://rustwasm.github.io/wasm-pack/).
+named by `DATUM_DIR`, and Node.js, pnpm 10 and wasm-pack
+(`cargo install wasm-pack`).
 
 ```bash
 pnpm --dir ui datum      # pack DATUM into ui/vendor/, which git ignores
@@ -107,8 +112,8 @@ cargo build -p af-desktop --release --features custom-protocol
 target/release/af-desktop testdata/sacm/sacm_example_core_argument.sacm.xmi
 ```
 
-On Linux, the desktop application needs WebKitGTK and the other
-[prerequisites of Tauri](https://tauri.app/start/prerequisites/).
+The commands are written for a POSIX shell or PowerShell; in `cmd.exe` the
+last is `target\release\af-desktop.exe` with the same argument.
 
 `CLAUDE.md` lists the checks to run before a pull request.
 
