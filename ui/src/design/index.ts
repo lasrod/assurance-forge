@@ -11,6 +11,7 @@ export {
   Button,
   ContextMenu,
   DatumRoot,
+  Dialog,
   ListBox,
   MenuBar,
   MenuBarMenu,

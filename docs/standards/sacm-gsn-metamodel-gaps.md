@@ -202,7 +202,10 @@ hid:
   at all. GSN's incremental construction workflow and SACM's minimum-cardinality
   invariant are in direct conflict; a conformant tool must either defer
   materialising the inference until its first source exists, or the standard must
-  admit an incomplete-inference state.
+  admit an incomplete-inference state. The Rust editor (25 November 2026) holds
+  the place of the first source with an empty Claim tagged
+  `assuranceForge.gsn.placeholder`, which it does not draw (`sacm-gsn-mapping.md`,
+  W2 and R16): conformant, at the cost of an empty Claim other tools see.
 - **GSN Justification has no `AssertionDeclaration`.** The pure-SACM mapping for a
   Justification is `assertionDeclaration = axiomatic` (see
   `sacm-gsn-mapping.md`); SACM 2.3 has no `justification` literal. Assurance

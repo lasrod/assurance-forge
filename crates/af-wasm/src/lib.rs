@@ -102,6 +102,21 @@ impl WasmCore {
         json(&self.core.add(parent.as_deref(), kind, revision))
     }
 
+    /// `Removal` as JSON for the node `id`: what removing it would delete;
+    /// `None` when nothing is open.
+    pub fn removal(&self, id: &str) -> Result<Option<String>, JsError> {
+        self.core
+            .removal(id)
+            .map(|removal| json(&removal))
+            .transpose()
+    }
+
+    /// Removes the node `id` and what goes with it, as the removal of
+    /// `revision` said. `EditResult` as JSON.
+    pub fn remove(&mut self, id: &str, revision: u32) -> Result<String, JsError> {
+        json(&self.core.remove(id, revision))
+    }
+
     /// Sets the text `field` (a `TextField`, such as `name`) of the node
     /// `id` to `text`. `EditResult` as JSON.
     #[wasm_bindgen(js_name = setText)]

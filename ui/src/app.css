@@ -161,6 +161,26 @@
     white-space: nowrap;
   }
 
+  /* What a removal deletes, in the dialog that asks first: one line each,
+     scrolled when there are many. */
+  .af-remove-list {
+    margin: var(--datum-space-8) 0 0;
+    padding: 0;
+    list-style: none;
+    max-block-size: 16rem;
+    overflow-y: auto;
+  }
+
+  .af-remove-list > li {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .af-remove-id {
+    font-family: var(--datum-font-family-mono);
+  }
+
   /* The texts of the selected element that are edited: label beside field
      for a single line, label over field for prose, which needs the width. */
   .af-text-properties {

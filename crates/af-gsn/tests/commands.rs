@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{AddError, Choice, Refusal, Target, add, choices};
-use af_gsn::view::{EdgeKind, NodeKind, View, view};
+use af_gsn::view::{Code, EdgeKind, NodeKind, View, view};
 use sacm::model::Document;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
@@ -127,8 +127,8 @@ fn the_menu_offers_what_gsn_allows_on_each_kind_of_node() {
         refusals(&choices(&document, &view, Target::Node("s"))),
         [
             None,
-            Some(Refusal::NotMapped),
-            Some(Refusal::NotMapped),
+            Some(Refusal::NotUnderStrategy),
+            Some(Refusal::NotUnderStrategy),
             None,
             None,
             None
@@ -201,8 +201,25 @@ fn w11_support_under_an_undeveloped_goal_develops_it() {
     assert!(!added.element.is_empty());
 }
 
+/// The SACM ids of the placeholders the view does not draw (R16).
+fn placeholders(view: &View) -> Vec<String> {
+    view.unplaced
+        .iter()
+        .filter(|item| item.code == Code::Placeholder)
+        .map(|item| item.id.clone())
+        .collect()
+}
+
+fn edges_of<'a>(view: &'a View, id: &str) -> Vec<(&'a str, &'a str, EdgeKind)> {
+    view.edges
+        .iter()
+        .filter(|edge| edge.from == id || edge.to == id)
+        .map(|edge| (edge.from.as_str(), edge.to.as_str(), edge.kind))
+        .collect()
+}
+
 #[test]
-fn w2_a_strategy_is_added_with_its_first_sub_goal() {
+fn w2_a_strategy_is_added_alone_and_its_first_goal_takes_the_place_it_holds() {
     let mut document = every_kind();
     let before = view(&document, "en");
     let added = add(
@@ -213,37 +230,120 @@ fn w2_a_strategy_is_added_with_its_first_sub_goal() {
     )
     .unwrap_or_else(|error| panic!("{error}"));
     let after = view(&document, "en");
-    let sub_goal = added.sub_goal.clone().unwrap_or_default();
-    assert_eq!(kind_of(&after, &added.element), NodeKind::Strategy);
-    assert_eq!(kind_of(&after, &sub_goal), NodeKind::Goal);
-    let edges: Vec<(&str, &str, EdgeKind)> = after
-        .edges
-        .iter()
-        .filter(|edge| edge.from == added.element || edge.to == added.element)
-        .map(|edge| (edge.from.as_str(), edge.to.as_str(), edge.kind))
-        .collect();
+    let strategy = added.element.as_str();
+    assert_eq!(kind_of(&after, strategy), NodeKind::Strategy);
+    // Only the Strategy is drawn: the Claim SACM needs as its inference's
+    // source is held, not drawn, and says nothing the view reports.
+    assert_eq!(after.nodes.len(), before.nodes.len() + 1);
     assert_eq!(
-        edges,
-        [
-            ("g", added.element.as_str(), EdgeKind::SupportedBy),
-            (
-                added.element.as_str(),
-                sub_goal.as_str(),
-                EdgeKind::SupportedBy
-            ),
-        ]
+        edges_of(&after, strategy),
+        [("g", strategy, EdgeKind::SupportedBy)]
     );
-    // Its identifiers follow the ones the file has (W10): none are tagged
-    // here, so they are the first of their prefix.
-    let identifier = |id: &str| {
-        after
-            .nodes
+    let held = placeholders(&after);
+    assert_eq!(held.len(), 1);
+    assert_eq!(findings(&after), findings(&before));
+    let inference = document
+        .elements()
+        .find(|element| element.reasoning().is_some_and(|r| r.as_str() == strategy))
+        .unwrap_or_else(|| panic!("no inference of the Strategy"));
+    assert_eq!(
+        inference
+            .sources()
+            .iter()
+            .map(|id| id.as_str())
+            .collect::<Vec<_>>(),
+        [held[0].as_str()]
+    );
+    assert_eq!(inference.target().map(|id| id.as_str()), Some("g"));
+    let inference = inference.id().as_str().to_owned();
+    // The file is valid SACM, and reads back the same.
+    let diagnostics = sacm::validation::validate(&every_kind()).len();
+    assert!(sacm::validation::validate(&document).len() <= diagnostics);
+    let written =
+        xmi::write(&document, &WriteOptions::default()).unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(placeholders(&view(&read(written.as_bytes()), "en")), held);
+    // Its identifier follows the ones the file has (W10): none are tagged
+    // here, so it is the first of its prefix.
+    let identifier = |view: &View, id: &str| {
+        view.nodes
             .iter()
             .find(|node| node.id == id)
             .map(|node| node.identifier.clone())
     };
-    assert_eq!(identifier(&added.element).as_deref(), Some("S1"));
-    assert_eq!(identifier(&sub_goal).as_deref(), Some("G1"));
+    assert_eq!(identifier(&after, strategy).as_deref(), Some("S1"));
+
+    // W3: the first Goal under it is the Claim that held its place.
+    let goal = add(
+        &mut document,
+        &after,
+        Target::Node(strategy),
+        ElementKind::Goal,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let last = view(&document, "en");
+    assert_eq!(goal.element, held[0]);
+    assert_eq!(kind_of(&last, &goal.element), NodeKind::Goal);
+    assert_eq!(identifier(&last, &goal.element).as_deref(), Some("G1"));
+    assert!(placeholders(&last).is_empty());
+    assert_eq!(
+        edges_of(&last, strategy),
+        [
+            ("g", strategy, EdgeKind::SupportedBy),
+            (strategy, goal.element.as_str(), EdgeKind::SupportedBy),
+        ]
+    );
+    assert!(
+        last.edges
+            .iter()
+            .all(|edge| edge.from != strategy || edge.relationship == inference)
+    );
+    assert_eq!(findings(&last), findings(&before));
+    // A second Goal is a second source of the one inference.
+    let second = add(
+        &mut document,
+        &last,
+        Target::Node(strategy),
+        ElementKind::Goal,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_ne!(second.element, goal.element);
+    let sources = document
+        .get(&inference)
+        .map(|element| element.sources().len());
+    assert_eq!(sources, Some(2));
+}
+
+/// R16 hides a placeholder only while it says nothing more: one with a name,
+/// or one a second relationship refers to, is drawn as the Goal it is.
+#[test]
+fn r16_a_placeholder_that_says_more_is_drawn() {
+    let held = |name: &str, extra: &str| {
+        case(
+            &[
+                element("Claim", "g", ""),
+                element("ArgumentReasoning", "s", ""),
+                format!(
+                    r#"<argumentElement xmi:type="sacm:Claim" xmi:id="ph"><name content="{name}"/><taggedValue xmi:id="tv"><key><value content="assuranceForge.gsn.placeholder"/></key><content><value content="subGoal"/></content></taggedValue></argumentElement>"#
+                ),
+                element("AssertedInference", "i", r#" source="ph" target="g" reasoning="s""#),
+                extra.to_owned(),
+            ]
+            .concat(),
+        )
+    };
+    assert_eq!(placeholders(&view(&held("", ""), "en")), ["ph"]);
+    let named = view(&held("A goal someone wrote", ""), "en");
+    assert!(placeholders(&named).is_empty());
+    assert_eq!(kind_of(&named, "ph"), NodeKind::Goal);
+    let referred = view(
+        &held(
+            "",
+            &element("AssertedInference", "i2", r#" source="ph" target="g""#),
+        ),
+        "en",
+    );
+    assert!(placeholders(&referred).is_empty());
+    assert_eq!(kind_of(&referred, "ph"), NodeKind::Goal);
 }
 
 #[test]
@@ -477,9 +577,6 @@ fn every_enabled_choice_reads_back_as_chosen_on_every_sample() {
                                 && candidate.kind == edge),
                             "{what}: no {edge:?} from the parent"
                         );
-                        if let Some(sub_goal) = &made.sub_goal {
-                            assert_eq!(kind_of(&after, sub_goal), NodeKind::Goal, "{what}");
-                        }
                     } else {
                         assert!(
                             !after.edges.iter().any(|edge| edge.to == made.element),

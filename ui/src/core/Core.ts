@@ -15,6 +15,7 @@ import type {
   Outline,
   Package,
   RelationshipDetails,
+  Removal,
   TextField,
 } from '../../../crates/af-api/bindings/api';
 
@@ -96,6 +97,18 @@ export interface Core {
    * the document has changed since.
    */
   add(parent: string | null, kind: ElementKind, revision: number): Promise<EditResult>;
+  /**
+   * What removing the node with this SACM id would delete: the node, then
+   * what goes with it; or the code of why it cannot be removed. Null when
+   * nothing is open.
+   */
+  removal(id: string): Promise<Removal | null>;
+  /**
+   * Removes the node with this SACM id and what goes with it, as the
+   * removal of `revision` said: refused (AF-EDIT-009) when the document has
+   * changed since. `element` is the node it was drawn under, to select.
+   */
+  remove(id: string, revision: number): Promise<EditResult>;
   /**
    * Sets the identifier, name or statement of the node with this SACM id.
    * `unchanged` when it was that already; refused (AF-EDIT-011 to 014) when

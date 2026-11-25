@@ -432,10 +432,10 @@ pub enum TextField {
 pub struct AddChoice {
     pub kind: ElementKind,
     /// Why it cannot be added there (`AF-EDIT-001` to `AF-EDIT-006`), or
-    /// null when it can. The frontend words it.
+    /// null when it can. The menu leaves out a kind that cannot be added.
     pub refusal: Option<String>,
-    /// Adding it also clears the parent Goal's undeveloped decorator, which
-    /// the menu says.
+    /// Adding it also clears the parent Goal's undeveloped decorator (W11),
+    /// which the diagram then shows; the menu has no notes.
     pub develops: bool,
 }
 
@@ -449,6 +449,35 @@ pub struct AddChoices {
     pub choices: Vec<AddChoice>,
 }
 
+/// One node a removal deletes, as the confirmation lists it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct RemovalNode {
+    /// The SACM id.
+    pub id: String,
+    pub kind: NodeKind,
+    /// The GSN identifier.
+    pub identifier: String,
+    pub name: Option<String>,
+    pub statement: Option<String>,
+}
+
+/// What removing a node would delete, at `revision`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Removal {
+    pub revision: u32,
+    /// The nodes it deletes: the node chosen first, then what goes with it.
+    /// Empty when it is refused.
+    pub nodes: Vec<RemovalNode>,
+    /// Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
+    /// `AF-EDIT-005` when a Strategy kept has no package to hold the place
+    /// of its next Goal), or null when it can. The frontend words it.
+    pub refusal: Option<String>,
+}
+
 /// What a command gave.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -458,9 +487,9 @@ pub enum EditResult {
     #[serde(rename_all = "camelCase")]
     Applied {
         revision: u32,
-        /// The element the command added, which the interface selects: for
-        /// a Strategy, the Strategy. Null for undo, redo and a change of
-        /// text.
+        /// The element the interface selects: the one an add made, or the
+        /// node a removed one was drawn under. Null for undo, redo, a change
+        /// of text and the removal of a top-level node.
         element: Option<String>,
         /// The SACM ids the command created, changed and deleted.
         created: Vec<String>,
@@ -470,8 +499,9 @@ pub enum EditResult {
     /// Nothing changed. `code` is an `AF-EDIT-*` code: why the add cannot be
     /// made, nothing is open (`AF-EDIT-007`), there is nothing to undo or
     /// redo (`AF-EDIT-008`), the add menu was for another revision
-    /// (`AF-EDIT-009`), libSACM refused the operations (`AF-EDIT-010`), or
-    /// why a text cannot be set (`AF-EDIT-011` to `AF-EDIT-014`).
+    /// (`AF-EDIT-009`), libSACM refused the operations (`AF-EDIT-010`),
+    /// why a text cannot be set (`AF-EDIT-011` to `AF-EDIT-014`), or why a
+    /// node cannot be removed (`AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-015`).
     Refused { code: String },
     /// A text was set to what it already was: the document, its revision and
     /// its history are as they were.
@@ -525,6 +555,8 @@ pub fn typescript() -> String {
         TextField::decl(&cfg),
         AddChoice::decl(&cfg),
         AddChoices::decl(&cfg),
+        RemovalNode::decl(&cfg),
+        Removal::decl(&cfg),
         EditResult::decl(&cfg),
         History::decl(&cfg),
     ];

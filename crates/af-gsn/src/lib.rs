@@ -11,8 +11,8 @@
 //!
 //! Built so far: the view, [`view::view`], which follows the reading rules in
 //! `docs/standards/sacm-gsn-mapping.md` ("Reading a SACM 2.3 file as GSN"),
-//! and the commands that add elements, [`commands`], which follow its writing
-//! rules ("Writing GSN as SACM").
+//! and the commands that add elements, change a node's text and remove a node,
+//! [`commands`], which follow its writing rules ("Writing GSN as SACM").
 //! Rule ids in comments (R1, E5a, T3 and so on) are that section's.
 
 pub mod commands;

@@ -10,14 +10,15 @@
 //! comments here cite.
 //!
 //! [`set_text`] changes a node's identifier, name or statement: the inverse of
-//! the reading rules T1 to T3, as W15 to W17 record.
+//! the reading rules T1 to T3, as W15 to W17 record. [`removal`] and
+//! [`remove`] answer what removing a node deletes and remove it (W18 to W20).
 
 use std::fmt;
 
 use sacm::edit::{
     self, AddReference, BatchError, BatchMutation, CreateArgumentReasoning,
     CreateArtifactReference, CreateAssertedContext, CreateAssertedEvidence,
-    CreateAssertedInference, CreateClaim, CreateDescription, CreateTaggedValue,
+    CreateAssertedInference, CreateClaim, CreateDescription, CreateTaggedValue, DeleteElement,
     SetAssertionDeclaration, SetContent, SetName,
 };
 use sacm::model::{
@@ -26,7 +27,10 @@ use sacm::model::{
 };
 
 use crate::ElementKind;
-use crate::view::{EdgeKind, NodeKind, View};
+use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, View};
+
+mod remove;
+pub use remove::{Removal, Removed, removal, remove};
 
 /// Where an element is to be added.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,8 +49,9 @@ pub enum Refusal {
     Leaf,
     /// AF-EDIT-002: the node's GSN kind is not known (a neutral node).
     KindUnknown,
-    /// AF-EDIT-003: GSN allows it, but no SACM form is decided for it yet.
-    NotMapped,
+    /// AF-EDIT-003: GSN does not allow it: a Strategy is supported only by
+    /// Goals.
+    NotUnderStrategy,
     /// AF-EDIT-004: the Strategy is the reasoning of no inference, or of
     /// several, so there is no one inference to add a premise to.
     NoOneInference,
@@ -56,6 +61,10 @@ pub enum Refusal {
     TopLevelGoalOnly,
     /// AF-EDIT-011: the id is of no node the diagram draws.
     NotANode,
+    /// AF-EDIT-015: something the diagram does not draw refers to what a
+    /// removal would delete, or it holds more than its text, so it is not
+    /// removed (W19).
+    Entangled,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -71,11 +80,12 @@ impl Refusal {
         match self {
             Refusal::Leaf => "AF-EDIT-001",
             Refusal::KindUnknown => "AF-EDIT-002",
-            Refusal::NotMapped => "AF-EDIT-003",
+            Refusal::NotUnderStrategy => "AF-EDIT-003",
             Refusal::NoOneInference => "AF-EDIT-004",
             Refusal::NoPackage => "AF-EDIT-005",
             Refusal::TopLevelGoalOnly => "AF-EDIT-006",
             Refusal::NotANode => "AF-EDIT-011",
+            Refusal::Entangled => "AF-EDIT-015",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",
@@ -96,11 +106,8 @@ pub struct Choice {
 /// What an add made.
 #[derive(Clone, Debug)]
 pub struct Added {
-    /// The SACM id of the element of the kind chosen (for a Strategy, the
-    /// Strategy).
+    /// The SACM id of the element of the kind chosen.
     pub element: String,
-    /// The first sub-goal added with a Strategy (W2).
-    pub sub_goal: Option<String>,
     /// What libSACM changed: the ids created and changed.
     pub mutation: BatchMutation,
 }
@@ -360,9 +367,24 @@ pub fn add(
 ) -> Result<Added, AddError> {
     let plan = plan(document, view, target, kind).map_err(AddError::Refused)?;
     let mut numbers = Identifiers::of(document, view);
-    let mut made: Option<(String, Option<String>)> = None;
+    let mut made: Option<String> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
         let package = plan.package.clone();
+        // W3: the place a Strategy holds for its first Goal becomes that Goal.
+        if let Parent::Strategy {
+            placeholder: Some((claim, tag)),
+            ..
+        } = &plan.parent
+        {
+            tx.apply(DeleteElement::new(tag.clone()))?;
+            tx.apply(CreateTaggedValue::new(
+                claim.clone(),
+                LangString::new(GSN_IDENTIFIER_KEY),
+                LangString::new(numbers.next(ElementKind::Goal)),
+            ))?;
+            made = Some(claim.as_str().to_owned());
+            return Ok(());
+        }
         let mut create =
             |tx: &mut edit::Batch<'_>, kind: ElementKind| -> Result<ElementId, BatchError> {
                 let created = match kind {
@@ -397,23 +419,21 @@ pub fn add(
             };
 
         let element = create(tx, kind)?;
-        let mut sub_goal = None;
         match (&plan.parent, kind) {
             // W8.
             (Parent::Canvas, _) => {}
-            // W2: a Strategy comes with its first sub-goal.
+            // W2: a Strategy, and the place its first Goal will take.
             (Parent::Goal(goal), ElementKind::Strategy) => {
-                let premise = create(tx, ElementKind::Goal)?;
+                let premise = placeholder(tx, &package)?;
                 tx.apply(
                     CreateAssertedInference::new(
                         package.clone(),
                         LangString::default(),
-                        [premise.clone()],
+                        [premise],
                         goal.clone(),
                     )
                     .with_reasoning(element.clone()),
                 )?;
-                sub_goal = Some(premise.as_str().to_owned());
             }
             // W1.
             (Parent::Goal(goal), ElementKind::Goal) => {
@@ -466,16 +486,31 @@ pub fn add(
                 ))?;
             }
         }
-        made = Some((element.as_str().to_owned(), sub_goal));
+        made = Some(element.as_str().to_owned());
         Ok(())
     })
     .map_err(AddError::Edit)?;
-    let (element, sub_goal) = made.unwrap_or_default();
     Ok(Added {
-        element,
-        sub_goal,
+        element: made.unwrap_or_default(),
         mutation,
     })
+}
+
+/// W2: the Claim that holds a Strategy's place for its first Goal, which R16
+/// does not draw. It has no identifier: it takes one when it becomes the
+/// Goal (W3).
+pub(crate) fn placeholder(
+    tx: &mut edit::Batch<'_>,
+    package: &ElementId,
+) -> Result<ElementId, BatchError> {
+    let created = tx.apply(CreateClaim::new(package.clone(), LangString::default()))?;
+    let id = created.created_ids()[0].clone();
+    tx.apply(CreateTaggedValue::new(
+        id.clone(),
+        LangString::new(PLACEHOLDER_KEY),
+        LangString::new(PLACEHOLDER_VALUE),
+    ))?;
+    Ok(id)
 }
 
 /// What a node is to an add.
@@ -484,10 +519,12 @@ enum Parent {
     Canvas,
     Goal(ElementId),
     /// A Strategy, and for a sub-goal the one live inference it is the
-    /// reasoning of (W3).
+    /// reasoning of (W3), and the placeholder that inference holds for its
+    /// first Goal, with the placeholder's tag, when it has no Goal yet.
     Strategy {
         node: ElementId,
         inference: Option<ElementId>,
+        placeholder: Option<(ElementId, ElementId)>,
     },
 }
 
@@ -542,21 +579,26 @@ fn plan(
             supports && node.undeveloped,
         ),
         NodeKind::Strategy => match kind {
-            // GSN allows both; no SACM form is decided (the plan's open questions).
-            ElementKind::Strategy | ElementKind::Solution => return Err(Refusal::NotMapped),
-            ElementKind::Goal => (
-                Parent::Strategy {
-                    node: element.id().clone(),
-                    inference: Some(
-                        one_inference(document, view, id).ok_or(Refusal::NoOneInference)?,
-                    ),
-                },
-                false,
-            ),
+            // GSN: a Strategy is supported only by Goals.
+            ElementKind::Strategy | ElementKind::Solution => {
+                return Err(Refusal::NotUnderStrategy);
+            }
+            ElementKind::Goal => {
+                let inference = one_inference(document, view, id).ok_or(Refusal::NoOneInference)?;
+                (
+                    Parent::Strategy {
+                        node: element.id().clone(),
+                        placeholder: held_place(document, view, &inference),
+                        inference: Some(inference),
+                    },
+                    false,
+                )
+            }
             ElementKind::Context | ElementKind::Assumption | ElementKind::Justification => (
                 Parent::Strategy {
                     node: element.id().clone(),
                     inference: None,
+                    placeholder: None,
                 },
                 false,
             ),
@@ -589,6 +631,26 @@ fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId
         return None;
     }
     Some(first.id().clone())
+}
+
+/// The placeholder `inference` holds for a Strategy's first Goal (R16), and
+/// its tag, when the view did not draw it for that reason.
+fn held_place(
+    document: &Document,
+    view: &View,
+    inference: &ElementId,
+) -> Option<(ElementId, ElementId)> {
+    let source = document.get(inference.as_str())?.sources().first()?.clone();
+    let unplaced = view
+        .unplaced
+        .iter()
+        .any(|item| item.id == source.as_str() && item.code == Code::Placeholder);
+    if !unplaced {
+        return None;
+    }
+    let claim = document.get(source.as_str())?;
+    let tag = crate::view::tagged(claim, PLACEHOLDER_KEY)?.id().clone();
+    Some((source, tag))
 }
 
 /// The `ArgumentPackage` that holds `element`, at any depth (W9).

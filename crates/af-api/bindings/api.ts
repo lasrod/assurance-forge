@@ -224,12 +224,12 @@ export type TextField = "identifier" | "name" | "statement";
 export type AddChoice = { kind: ElementKind, 
 /**
  * Why it cannot be added there (`AF-EDIT-001` to `AF-EDIT-006`), or
- * null when it can. The frontend words it.
+ * null when it can. The menu leaves out a kind that cannot be added.
  */
 refusal: string | null, 
 /**
- * Adding it also clears the parent Goal's undeveloped decorator, which
- * the menu says.
+ * Adding it also clears the parent Goal's undeveloped decorator (W11),
+ * which the diagram then shows; the menu has no notes.
  */
 develops: boolean, };
 
@@ -239,11 +239,34 @@ export type AddChoices = { revision: number,
  */
 choices: Array<AddChoice>, };
 
+export type RemovalNode = { 
+/**
+ * The SACM id.
+ */
+id: string, kind: NodeKind, 
+/**
+ * The GSN identifier.
+ */
+identifier: string, name: string | null, statement: string | null, };
+
+export type Removal = { revision: number, 
+/**
+ * The nodes it deletes: the node chosen first, then what goes with it.
+ * Empty when it is refused.
+ */
+nodes: Array<RemovalNode>, 
+/**
+ * Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
+ * `AF-EDIT-005` when a Strategy kept has no package to hold the place
+ * of its next Goal), or null when it can. The frontend words it.
+ */
+refusal: string | null, };
+
 export type EditResult = { "result": "applied", revision: number, 
 /**
- * The element the command added, which the interface selects: for
- * a Strategy, the Strategy. Null for undo, redo and a change of
- * text.
+ * The element the interface selects: the one an add made, or the
+ * node a removed one was drawn under. Null for undo, redo, a change
+ * of text and the removal of a top-level node.
  */
 element: string | null, 
 /**

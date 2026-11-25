@@ -39,7 +39,10 @@ when the statement turns out false, it is an Assumption.
 Both run **conclusion → premise** in GSN. SACM's `AssertedInference` and
 `AssertedContext` run the other way; see `docs/sacm/sacm-gsn-mapping.md`.
 
-`SupportedBy` connects Goal/Strategy to Goal, Strategy or Solution.
+The permitted `SupportedBy` connections are goal-to-goal, goal-to-strategy,
+goal-to-solution and strategy-to-goal: a Goal is supported by a Goal, a
+Strategy or a Solution, and **a Strategy only by Goals**. A Strategy under a
+Strategy, or a Solution under a Strategy, is not GSN.
 `InContextOf` connects Goal/Strategy to Context, Assumption or Justification.
 A Solution is always a leaf.
 

@@ -59,6 +59,13 @@ and its conformance record (GSN3-CORE-015) agree.
 | A neutral node (its GSN kind is not known) | greyed | greyed | greyed | greyed |
 | The empty canvas | yes, a top-level Goal | greyed: needs a Goal | greyed: needs a Goal | greyed: needs a Goal |
 
+> **Corrected on 25 November 2026.** GSN does not allow a Strategy or a
+> Solution under a Strategy: its permitted `SupportedBy` connections are
+> goal-to-goal, goal-to-strategy, goal-to-solution and strategy-to-goal. Both
+> are now refused as GSN refusals (AF-EDIT-003, mapping record W13 and W14),
+> the menu lists only what can be added, with no notes, and a Strategy is
+> added alone (W2). The paragraphs below are the plan as it was.
+
 "Greyed: no SACM form decided" is not a GSN refusal. GSN allows a Strategy and a
 Solution under a Strategy, but this project has not recorded how SACM holds
 them:
@@ -141,7 +148,7 @@ The core sends codes and the interface words them.
 |---|---|
 | AF-EDIT-001 | The node is a leaf in GSN: a Solution, Context, Assumption or Justification |
 | AF-EDIT-002 | The node's GSN kind is not known (a neutral node) |
-| AF-EDIT-003 | GSN allows it, but no SACM form is decided yet |
+| AF-EDIT-003 | GSN does not allow it: a Strategy is supported only by Goals (corrected on 25 November 2026) |
 | AF-EDIT-004 | The Strategy is the reasoning of no inference, or of several |
 | AF-EDIT-005 | There is no argument package to add to |
 | AF-EDIT-006 | Only a Goal can be added at the top level |

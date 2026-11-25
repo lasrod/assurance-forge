@@ -78,7 +78,8 @@ type Gesture = {
  * resolve to, for the layout. `onContextMenu` asks for the add menu of a
  * node, or of the empty canvas (`null`), at a point in client coordinates:
  * from a right-click, or from the context-menu key or Shift+F10 on the
- * selected node.
+ * selected node. `onRemove` asks to remove the selected node: Delete, or
+ * Backspace, which is the key macOS calls delete.
  */
 export function DiagramCanvas({
   diagram,
@@ -90,6 +91,7 @@ export function DiagramCanvas({
   onSelect,
   onTextStyle,
   onContextMenu,
+  onRemove,
 }: {
   diagram: DiagramAt | null;
   label: string;
@@ -101,6 +103,7 @@ export function DiagramCanvas({
   onSelect: (id: string | null) => void;
   onTextStyle: (style: TextStyle) => void;
   onContextMenu: (id: string | null, at: { x: number; y: number }, source: ContextMenuSource) => void;
+  onRemove: (id: string) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
@@ -288,6 +291,15 @@ export function DiagramCanvas({
       onContextMenu(node?.id ?? null, { x: rect.left + centre.x, y: rect.top + centre.y }, 'keyboard');
       return;
     }
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if ((event.key === 'Delete' || event.key === 'Backspace') && plain && !event.nativeEvent.isComposing) {
+      // Only a node is removed: a selected line is not.
+      if (selected && diagram?.diagram.nodes.some((node) => node.id === selected)) {
+        event.preventDefault();
+        onRemove(selected);
+      }
+      return;
+    }
     const action = viewKey(event);
     if (!action || !viewport || event.nativeEvent.isComposing) return;
     event.preventDefault();
@@ -322,7 +334,7 @@ export function DiagramCanvas({
         className="af-canvas"
         role="img"
         aria-label={label}
-        aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape Shift+F10 ContextMenu"
+        aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape Shift+F10 ContextMenu Delete"
         tabIndex={0}
         style={{ cursor: panning ? 'grabbing' : shownHover ? 'pointer' : 'default' }}
         onKeyDown={onKeyDown}

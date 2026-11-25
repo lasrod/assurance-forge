@@ -287,15 +287,15 @@ not make it less of a Solution. A challenge (E5) reaches nothing either: an
 neutral by R11. Whether such counter-evidence is drawn as a Solution, as GSN v3
 draws it and the C++ application did, is not decided.
 
-**Order.** For a node: R14 and R15 first, since what is not drawn is not
+**Order.** For a node: R14, R15 and R16 first, since what is not drawn is not
 drawn whatever else it says; then R12, since a citation is neutral; then R1, a
 recorded type; then R2 to R11, by the element's class and declaration. R13 adds
 its code to whatever kind those give. For a relationship: R15 and E10 first;
 then E5, since a challenge is drawn as a challenge even when it is also cited or
 defeated; then E5a or E9; then E1 to E4. Every code whose condition holds is
 sent, whichever rule decided how the edge is drawn: a cited, defeated challenge
-carries AF-VIEW-004 and 011. An element that is not drawn (R14, R15, E10)
-carries only its own code.
+carries AF-VIEW-004 and 011. An element that is not drawn (R14, R15, R16,
+E10) carries only its own code.
 
 ### Nodes
 
@@ -316,6 +316,7 @@ carries only its own code.
 | R13 | Any element with `isAbstract` set, node or relationship | Its kind by the other rules, with code AF-VIEW-005: the uninstantiated decorator is not drawn yet | Decided | Attribute table above, `uninstantiated` ↔ `isAbstract`. Patterns are a later step, and the code keeps the omission visible |
 | R14 | `ArgumentGroup`, and any kind of the Argumentation package that no other rule names | Not drawn, code AF-VIEW-006. A group's members are references, not contents, and are drawn by their own rules | Decided | Groups are not core GSN. A kind a later SACM or libSACM adds is kept in view by its code until a rule names it |
 | R15 | `ArgumentPackageInterface`, `ArgumentPackageBinding`, and the elements they contain at any depth; and the argument elements inside an `AssuranceCasePackageInterface` or `AssuranceCasePackageBinding` | Not drawn, code AF-VIEW-006 for each | Decided | Modules and contracts are a later step. An interface's elements stand for elements of another package, so drawing them now would draw those twice |
+| R16 | A `Claim` tagged `assuranceForge.gsn.placeholder` = `subGoal` that says nothing more: no other child, no name content, no description, declared `asserted` or not at all, not cited, not abstract, no `metaClaim`; whose one referrer is an `AssertedInference`, asserted and not a counter, cited or abstract, holding it as its only source, with a target, and with a drawn `ArgumentReasoning` as its `reasoning` | Not drawn, code AF-VIEW-014. The inference draws its target's line to the Strategy (E1) and nothing below it. A placeholder that says anything more is drawn as R2 says | Decided on 25 November 2026 | W2: the place a Strategy holds for its first Goal. Drawing anything that says more keeps every statement of the file in view |
 
 A recorded type agrees with the element when: Goal is a `Claim` declared
 `asserted` or `needsSupport`; Assumption, `assumed`; Justification, `axiomatic`;
@@ -476,6 +477,7 @@ Each carries the id of the element or relationship as an argument.
 | AF-VIEW-011 | A defeated relationship, drawn neutral |
 | AF-VIEW-012 | An assertion's `metaClaim` link is not drawn |
 | AF-VIEW-013 | A Strategy's `structure` link is not drawn |
+| AF-VIEW-014 | The place a Strategy holds for its first Goal, which is not drawn (R16) |
 
 ## Writing GSN as SACM
 
@@ -486,17 +488,21 @@ joined to its parent as chosen. `af-gsn` (`commands`) applies these rules;
 each add is one `sacm::edit::batch`, applied all or not at all. Decided on
 21 November 2026 for milestone 2, step 1 (issue #512).
 
-What may be added where follows GSN v3 Core: `SupportedBy` from a Goal or a
-Strategy to a Goal, a Strategy or a Solution; `InContextOf` from a Goal or a
-Strategy to a Context, an Assumption or a Justification; a Solution, a Context,
-an Assumption and a Justification are leaves. The C++ application's rule
-(`CanAddChildElement`) and its conformance record (GSN3-CORE-015) agree.
+What may be added where follows GSN v3 Core. Its permitted `SupportedBy`
+connections are goal-to-goal, goal-to-strategy, goal-to-solution and
+strategy-to-goal: a Goal is supported by a Goal, a Strategy or a Solution, and
+a Strategy only by Goals. `InContextOf` runs from a Goal or a Strategy to a
+Context, an Assumption or a Justification; a Solution, a Context, an
+Assumption and a Justification are leaves. Until 25 November 2026 this record
+said a Strategy could also be supported by a Strategy or a Solution, as the
+C++ application's rule (`CanAddChildElement`) and its conformance record
+(GSN3-CORE-015) did; the standard does not allow either (W13, W14).
 
 | Rule | Added | SACM operations | Status | Evidence |
 |---|---|---|---|---|
 | W1 | Goal under a Goal | `CreateClaim` (asserted); `CreateAssertedInference` from the new claim to the goal | Decided | R2, E2 |
-| W2 | Strategy under a Goal | `CreateArgumentReasoning`; `CreateClaim` (asserted), its first sub-goal; `CreateAssertedInference` from the sub-goal to the goal, with the Strategy as `reasoning` | Decided | R8, E1; [W2](#w2-a-strategy-comes-with-its-first-sub-goal) below |
-| W3 | Goal under a Strategy | `CreateClaim` (asserted); `AddReference` of it to the `source` of the one inference whose `reasoning` is the Strategy and that E1 draws. With no such inference, or several, it is not offered (AF-EDIT-004) | Decided | E1: one Strategy's premises are one inference's sources |
+| W2 | Strategy under a Goal | `CreateArgumentReasoning`; `CreateClaim` (asserted, no identifier) with `CreateTaggedValue` `assuranceForge.gsn.placeholder` = `subGoal`, the place of its first Goal, which R16 does not draw; `CreateAssertedInference` from that Claim to the goal, with the Strategy as `reasoning` | Decided on 25 November 2026 (it was: the Strategy with its first sub-goal) | R8, R16, E1; [W2](#w2-a-strategy-is-added-alone) below |
+| W3 | Goal under a Strategy | `CreateClaim` (asserted); `AddReference` of it to the `source` of the one inference whose `reasoning` is the Strategy and that E1 draws. With no such inference, or several, it is not offered (AF-EDIT-004). When that inference's one source is the place R16 does not draw, that Claim becomes the Goal: `DeleteElement` of its placeholder tag, and `CreateTaggedValue` of its identifier (W10) | Decided | E1: one Strategy's premises are one inference's sources; W2 |
 | W4 | Solution under a Goal | `CreateArtifactReference`; `CreateAssertedEvidence` from it to the goal | Decided | R9 |
 | W5 | Context under a Goal or a Strategy | `CreateArtifactReference`; `CreateAssertedContext` from it to the node | Decided | R10, E4. A Context could also be a Claim ("Context — undecidable by design" above); the editor writes the form R10 reads, an `ArtifactReference` |
 | W6 | Assumption under a Goal or a Strategy | `CreateClaim`, then `SetAssertionDeclaration` `assumed`; `CreateAssertedContext` from it to the node | Decided | R4, E4 |
@@ -504,10 +510,10 @@ an Assumption and a Justification are leaves. The C++ application's rule
 | W8 | A top-level Goal (from the empty canvas) | `CreateClaim` (asserted), reached by nothing | Decided | R2 |
 | W9 | Where the new elements go | The `ArgumentPackage` that holds the node, at any depth; a top-level Goal into the first `ArgumentPackage` in document order. With none, the add is not offered (AF-EDIT-005) | Decided | The C++ application's `apply_add_child` |
 | W10 | Its identifier | `CreateTaggedValue` `assuranceForge.gsn.identifier` on each new node: the kind's prefix (G, S, Sn, C, A, J) and the lowest number above every identifier in the file with that prefix and digits only after it: a drawn node's, and every element's tagged identifier and SACM id, drawn or not | Decided | T1; C++ capability AF-GSN-015 |
-| W11 | Support under an undeveloped Goal | Also `SetAssertionDeclaration` `asserted` on the goal, in the same batch. The menu says the add develops the goal | Decided | R3; GSN well-formedness: an undeveloped element has no `SupportedBy` children |
+| W11 | Support under an undeveloped Goal | Also `SetAssertionDeclaration` `asserted` on the goal, in the same batch. The diagram then shows the goal developed; since 25 November 2026 the menu lists the kinds with no notes and does not say so beforehand | Decided | R3; GSN well-formedness: an undeveloped element has no `SupportedBy` children |
 | W12 | Name and statement | An empty `name` on every new element and relationship, and no `description`: SACM requires a name (§8.6) and libSACM accepts an empty one. The text is the author's, so the editor invents none | Decided | §8.6 `name:LangString[1]` |
-| W13 | A Solution under a Strategy | Not offered (AF-EDIT-003) | Open | GSN allows it. The SCSC transformation (*Relationship of GSN to SACM*, Annex A, `Strategy2ArgumentReasoning`) writes an `AssertedEvidence` from the Solution to the Strategy's goal with the Strategy as `reasoning`; E8 draws a `reasoning` on any relationship but an inference without it, so it would read back as a Solution under the goal. Offering it means changing E8 first |
-| W14 | A Strategy under a Strategy | Not offered (AF-EDIT-003) | Open | GSN allows it, and SACM can hold it (an asserted relationship's ends are `ArgumentAsset`s), but no source says how; the C++ application left it open too |
+| W13 | A Solution under a Strategy | Not offered (AF-EDIT-003) | Decided on 25 November 2026 | GSN does not allow it: a Strategy is supported only by Goals (strategy-to-goal). A file that holds one is drawn as it says (R8, E8) |
+| W14 | A Strategy under a Strategy | Not offered (AF-EDIT-003) | Decided on 25 November 2026 | As W13 |
 
 No vendor tag records a GSN type: each kind is told by the reading rules from
 standard SACM alone.
@@ -530,13 +536,22 @@ A text that is an `ExpressionLangString` (§8.4) is not changed as text
 (AF-EDIT-014): its content is the value of a terminology expression.
 Setting a text to what it already is changes nothing and makes no undo step.
 
-### W2: a Strategy comes with its first sub-goal
+### W2: a Strategy is added alone
 
 GSN builds a Strategy before the goals it organises. SACM cannot hold that
 state: an `AssertedInference` needs a `source` (`source : SACMElement[1..*]`,
 SACM 2.3 §11.13), and a Strategy is held only as an inference's `reasoning`
-(the editing-time findings of `sacm-gsn-metamodel-gaps.md`). The other ways
-out each lose something:
+(the editing-time findings of `sacm-gsn-metamodel-gaps.md`).
+
+Decided on 25 November 2026: the Strategy is added alone, as GSN and the
+user build it, and the file holds the place of its first Goal with a Claim
+tagged `assuranceForge.gsn.placeholder` = `subGoal`. The diagram does not
+draw it (R16), and the first Goal added under the Strategy is that Claim (W3);
+a Strategy that loses its last Goal holds a new one (W20). The file is valid
+SACM at every step. Another SACM tool sees an empty, unnamed Claim under the
+Strategy, which is what the Strategy is waiting for. Until then the Strategy
+came with its first sub-goal, which the user had not asked for. The other
+ways out each lose something:
 
 - The SCSC transformation discards the inference of a Strategy with no
   sub-goals, which leaves an `ArgumentReasoning` joined to nothing and loses
@@ -545,10 +560,26 @@ out each lose something:
   the first sub-goal arrived, so the file held a Strategy that any other SACM
   tool sees joined to nothing.
 
-Adding the Strategy with its first sub-goal is valid SACM and well-formed GSN
-at every step: GSN's well-formedness asks that a Strategy be supported. It is
-the SCSC transformation's own output for a Strategy with one goal premise.
-Other tools were not checked.
+- Adding the Strategy with its first sub-goal, which this editor did until
+  25 November 2026, adds a Goal the user did not ask for.
+
+A Strategy with no Goal is not well-formed GSN (a Strategy must be
+supported); that is for the Problems panel to say, not for the editor to
+prevent. Other tools were not checked.
+
+### Removing a node
+
+How the editor removes a node and what is under it. `af-gsn`
+(`commands::remove`) applies these rules as one `sacm::edit::batch`, one undo
+step; `commands::removal` answers what would go, which the interface lists and
+asks about before it removes more than the node chosen. Decided on 25 November
+2026.
+
+| Rule | Removed | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W18 | The node and what is under it | What goes: the node, then, until no more do, each node all of whose parents go. A node's parents are the nodes whose `SupportedBy`, `InContextOf` or neutral edges reach it, and what it challenges, a node or a relationship (E5); a node also under one that stays, stays. A line goes with the relationship that draws it, so a node whose every line goes, goes too and is listed: a premise of a removed Goal under a Strategy drawn under other Goals as well, or a Strategy whose inference goes with its last premise because W20 does not keep it. A relationship goes when its target or its `reasoning` goes, or every source does, until no more do, since a relationship can be another's target. A relationship that stays loses each source that goes (`RemoveReference`). Then `DeleteElement` of each relationship and node that goes, with `DeleteReferencingRelationships` and `ApplyReferencePolicy`; the batch is rolled back unless libSACM deletes exactly those, with what they hold. A Goal that loses all its support keeps its declaration | Decided | What is under a node is what the diagram draws below it. The decorator is the author's: removing support does not mark a Goal undeveloped |
+| W19 | What the diagram does not draw | Refused (AF-EDIT-015) when anything but a relationship's source refers to what goes, such as a `metaClaim`, a citation or a group's member, or a node holds more than utility elements | Decided | "Never silently change an argument": what the user is not shown is not changed for them |
+| W20 | The last Goal of a Strategy | The inference whose `reasoning` is the Strategy stays: a placeholder (W2) becomes its source before the last Goal is taken out. Only an inference R16 would hide the placeholder in does so; any other (a counter, cited, abstract or not asserted) goes as W18 says, since its placeholder would be drawn as a Goal. A Strategy that goes takes its placeholder with it | Decided | W2, R16 |
 
 ### Codes
 
@@ -559,15 +590,16 @@ was refused. Nothing changes.
 |---|---|
 | AF-EDIT-001 | The node is a leaf in GSN: a Solution, Context, Assumption or Justification |
 | AF-EDIT-002 | The node's GSN kind is not known (a neutral node), or there is no such node |
-| AF-EDIT-003 | GSN allows it, but no SACM form is decided for it yet (W13, W14) |
+| AF-EDIT-003 | GSN does not allow it: a Strategy is supported only by Goals (W13, W14) |
 | AF-EDIT-004 | The Strategy is the reasoning of no inference, or of several (W3) |
 | AF-EDIT-005 | There is no argument package to add to (W9) |
 | AF-EDIT-006 | Only a Goal can be added at the top level (W8) |
 | AF-EDIT-007 | Nothing is open |
 | AF-EDIT-008 | There is nothing to undo, or nothing to redo |
-| AF-EDIT-009 | The document changed after the add menu was made: its choices may no longer hold |
+| AF-EDIT-009 | The document changed after the add menu, or the removal shown, was made: what it offered may no longer hold |
 | AF-EDIT-010 | libSACM refused the operations the writing rules made (a fault in the rules, not a mapping decision) |
-| AF-EDIT-011 | The id is of no node the diagram draws: only a node's text is set |
+| AF-EDIT-011 | The id is of no node the diagram draws: only a node's text is set, and only a node is removed |
 | AF-EDIT-012 | An identifier cannot be empty (W15) |
 | AF-EDIT-013 | Another element of the file has the identifier (W15) |
 | AF-EDIT-014 | The text is the value of a terminology expression, which is not changed as text |
+| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19) |

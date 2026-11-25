@@ -32,8 +32,9 @@ Navigator, Element Properties and an empty Problems panel. Milestone 2,
 step 1 ([adding elements](docs/roadmap/milestone-2-add-elements.md)): an
 element is added from a right-click menu, and Edit ▸ Undo and Redo take it
 back and bring it again. A node's identifier, name and description are
-changed in Element Properties, each change one undo step. Nothing is saved
-yet.
+changed in Element Properties, each change one undo step. A node is removed
+from the same menu or with Delete, with what is under it after the user has
+seen the list. Nothing is saved yet.
 
 ```mermaid
 flowchart LR
@@ -64,13 +65,13 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | Crate or folder | Owns | Built |
 |---|---|---|
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM), from crates.io | external |
-| `af-gsn` | The GSN view of a document: nodes, edges in GSN direction, and a code for each thing it could not draw; the GSN commands, as SACM operations. The reading and writing rules are in `docs/standards/sacm-gsn-mapping.md` | the view, with challenges of elements and of relationships; the commands that add an element, with what may be added where and a code for why not; the command that sets a node's identifier, name or statement |
+| `af-gsn` | The GSN view of a document: nodes, edges in GSN direction, and a code for each thing it could not draw; the GSN commands, as SACM operations. The reading and writing rules are in `docs/standards/sacm-gsn-mapping.md` | the view, with challenges of elements and of relationships; the commands that add an element, with what may be added where and a code for why not; the command that sets a node's identifier, name or statement; the command that removes a node and what is under it, and what it would remove |
 | `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, the render model, and the checks of its geometry (`check`) | support in rows below, a node with several parents below the lowest of them, separate trees side by side in shelves about a screen's proportions wide, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; a relationship that placed no node (a second parent, the line that closes a cycle, a context of two nodes) routed around every node; the outline the Argument Navigator shows |
 | `af-session` | The open document, a revision per command, a change record of each, and undo and redo as whole-document snapshots | yes; drafts and storage no |
-| `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, undo, redo, history |
+| `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, what a removal deletes, remove, undo, redo, history |
 | `af-wasm` | The browser shell: `af-api` compiled to WebAssembly, answering in JSON | yes |
 | `af-desktop` | The Tauri shell: files, the open dialog, recent files as paths, the command line, `--smoke` for CI | yes; Windows checked in CI |
-| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu, Edit ▸ Undo and Redo, the trees, welcome page, English and Japanese, dark and light |
+| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Remove, the confirmation of a removal, Edit ▸ Undo and Redo, the trees, welcome page, English and Japanese, dark and light |
 
 ### Who owns what state
 
@@ -118,7 +119,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
    read from its tokens. Hit testing uses the same geometry.
 
 An edit runs the other way. The add menu asks `Core::add_choices` what may
-go under a node and why not; `Core::add`, `undo` and `redo` go to
+go under a node and why not, and `Core::removal` what removing one would
+delete; `Core::add`, `remove`, `undo` and `redo` go to
 `af-session`, which applies `af-gsn`'s operations as one SACM batch, all or
 none, and makes a new revision. A refusal is a code. The view and diagram are
 then derived again and read as at step 5, and the interface keeps its view
@@ -144,8 +146,8 @@ interface**. Interface results are run locally and put in each pull request.
 ## What is next
 
 Milestone 2 goes on from adding elements (#512): saving and the recovery copy
-(drafts and the storage trait in **`af-session`**), then deleting. An
-element's text is edited in Element Properties already. Nothing else in the planned shape below is started.
+(drafts and the storage trait in **`af-session`**). An element's text is
+edited in Element Properties, and a node removed, already. Nothing else in the planned shape below is started.
 
 Requirements editing places on the parts already built:
 
