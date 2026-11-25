@@ -12,11 +12,13 @@
 //! Built so far: the view, [`view::view`], which follows the reading rules in
 //! `docs/standards/sacm-gsn-mapping.md` ("Reading a SACM 2.3 file as GSN"),
 //! and the commands that add elements, change a node's text and remove a node,
-//! [`commands`], which follow its writing rules ("Writing GSN as SACM").
+//! [`commands`], which follow its writing rules ("Writing GSN as SACM"), and
+//! the well-formedness checks, [`wellformed::check`].
 //! Rule ids in comments (R1, E5a, T3 and so on) are that section's.
 
 pub mod commands;
 pub mod view;
+pub mod wellformed;
 
 /// The GSN element kinds of the GSN Community Standard Version 3 core notation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

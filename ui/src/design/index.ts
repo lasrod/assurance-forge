@@ -45,8 +45,10 @@ export { watchCanvasStyle, type CanvasStyle } from '@datum-ui/charts';
 export {
   ChevronDown,
   ChevronUp,
+  CircleX,
   FileText,
   FolderOpen,
+  Info,
   Maximize,
   Minus,
   PanelLeftClose,
@@ -54,6 +56,7 @@ export {
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  TriangleAlert,
 } from 'lucide-react';
 
 import sansRegular from '@datum-ui/fonts/measured/IBMPlexSans-Regular.ttf?url';

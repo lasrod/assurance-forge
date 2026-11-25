@@ -291,3 +291,51 @@ export type RecoveryCopy = { "result": "keep", revision: number, copy: string, }
 export type FoundRecovery = { "result": "found", name: string, writtenAt: number, baseMatches: boolean, } | { "result": "unreadable", code: string, };
 
 export type KeepResult = { "result": "kept" } | { "result": "removed" } | { "result": "skipped" } | { "result": "refused", code: string, };
+
+export type Problems = { revision: number, problems: Array<Problem>, 
+/**
+ * How many of each severity, what the status bar shows.
+ */
+counts: DiagnosticCounts, };
+
+export type Problem = { source: ProblemSource, severity: ProblemSeverity, 
+/**
+ * Such as `AF-GSN-001`, `SACM-REF-001` or `AF-VIEW-003`.
+ */
+code: string, 
+/**
+ * The requirement it enforces: a GSN v3 requirement, such as
+ * `GSN3-CORE-014`, or a row of libSACM's functionality matrix.
+ */
+requirement: string | null, 
+/**
+ * libSACM's template id, such as `SACM-MULT-001/too-many`: which form
+ * of the code it is, for the frontend's words.
+ */
+template: string | null, arguments: Array<MessageArgument>, 
+/**
+ * What it is about; the first is the one to show.
+ */
+elements: Array<ProblemElement>, 
+/**
+ * The SACM id of the relationship it is about, if any.
+ */
+relationship: string | null, 
+/**
+ * Where in the file, for what libSACM reported reading it.
+ */
+line: number | null, column: number | null, };
+
+export type ProblemElement = { 
+/**
+ * The SACM id.
+ */
+id: string, 
+/**
+ * Its GSN identifier and kind, when the diagram draws it as a node.
+ */
+identifier: string | null, kind: NodeKind | null, };
+
+export type ProblemSeverity = "error" | "warning" | "info";
+
+export type ProblemSource = "gsn" | "sacm" | "read" | "diagram";

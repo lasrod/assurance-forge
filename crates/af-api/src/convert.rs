@@ -167,3 +167,52 @@ pub(crate) fn diagram(diagram: &layout::Diagram) -> Diagram {
         bounds: rect(diagram.bounds),
     }
 }
+
+/// A problem of `af-problems`, with each element's identifier and kind when
+/// `view` draws it as a node.
+pub(crate) fn problem(
+    problem: af_problems::Problem,
+    severity: crate::contract::ProblemSeverity,
+    view: &af_gsn::view::View,
+) -> crate::contract::Problem {
+    use crate::contract::{ArgumentValue, MessageArgument, ProblemElement, ProblemSource};
+    let source = match problem.source {
+        af_problems::Source::Gsn => ProblemSource::Gsn,
+        af_problems::Source::Sacm => ProblemSource::Sacm,
+        af_problems::Source::Read => ProblemSource::Read,
+        af_problems::Source::Diagram => ProblemSource::Diagram,
+    };
+    crate::contract::Problem {
+        source,
+        severity,
+        code: problem.code,
+        requirement: problem.requirement,
+        template: problem.template,
+        arguments: problem
+            .arguments
+            .into_iter()
+            .map(|(name, value)| MessageArgument {
+                name,
+                value: match value {
+                    af_problems::Value::Text(text) => ArgumentValue::Text(text),
+                    af_problems::Value::Count(count) => ArgumentValue::Count(count),
+                },
+            })
+            .collect(),
+        elements: problem
+            .elements
+            .into_iter()
+            .map(|id| {
+                let node = view.nodes.iter().find(|node| node.id == id);
+                ProblemElement {
+                    identifier: node.map(|node| node.identifier.clone()),
+                    kind: node.map(|node| node_kind(node.kind)),
+                    id,
+                }
+            })
+            .collect(),
+        relationship: problem.relationship,
+        line: problem.line,
+        column: problem.column,
+    }
+}

@@ -612,6 +612,81 @@ pub enum KeepResult {
     Refused { code: String },
 }
 
+/// The problem list at a revision (plan decisions P1 to P6,
+/// `docs/roadmap/milestone-1-problems.md`): errors, then warnings, then
+/// information; within each, GSN, SACM, read, diagram.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Problems {
+    pub revision: u32,
+    pub problems: Vec<Problem>,
+    /// How many of each severity, what the status bar shows.
+    pub counts: DiagnosticCounts,
+}
+
+/// One problem: a code, the values its words take, and what it is about. The
+/// frontend words it (P5).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Problem {
+    pub source: ProblemSource,
+    pub severity: ProblemSeverity,
+    /// Such as `AF-GSN-001`, `SACM-REF-001` or `AF-VIEW-003`.
+    pub code: String,
+    /// The requirement it enforces: a GSN v3 requirement, such as
+    /// `GSN3-CORE-014`, or a row of libSACM's functionality matrix.
+    pub requirement: Option<String>,
+    /// libSACM's template id, such as `SACM-MULT-001/too-many`: which form
+    /// of the code it is, for the frontend's words.
+    pub template: Option<String>,
+    pub arguments: Vec<MessageArgument>,
+    /// What it is about; the first is the one to show.
+    pub elements: Vec<ProblemElement>,
+    /// The SACM id of the relationship it is about, if any.
+    pub relationship: Option<String>,
+    /// Where in the file, for what libSACM reported reading it.
+    pub line: Option<u32>,
+    pub column: Option<u32>,
+}
+
+/// An element a problem is about.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct ProblemElement {
+    /// The SACM id.
+    pub id: String,
+    /// Its GSN identifier and kind, when the diagram draws it as a node.
+    pub identifier: Option<String>,
+    pub kind: Option<NodeKind>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum ProblemSeverity {
+    Error,
+    Warning,
+    Info,
+}
+
+/// Where a problem comes from (P1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum ProblemSource {
+    /// Where the argument breaks GSN's rules.
+    Gsn,
+    /// What libSACM's validation finds in the document.
+    Sacm,
+    /// What libSACM reported reading the file.
+    Read,
+    /// What the diagram does not draw, or draws neutral.
+    Diagram,
+}
+
 /// The TypeScript declarations of every type above, in one module, as
 /// `bindings/api.ts` holds them.
 #[cfg(feature = "typescript")]
@@ -658,6 +733,11 @@ pub fn typescript() -> String {
         RecoveryCopy::decl(&cfg),
         FoundRecovery::decl(&cfg),
         KeepResult::decl(&cfg),
+        Problems::decl(&cfg),
+        Problem::decl(&cfg),
+        ProblemElement::decl(&cfg),
+        ProblemSeverity::decl(&cfg),
+        ProblemSource::decl(&cfg),
     ];
     let mut out = String::from(
         "// Generated from crates/af-api/src/contract.rs by its tests; do not edit.\n\

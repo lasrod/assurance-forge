@@ -77,7 +77,8 @@ impl Args {
 }
 
 /// The line written to standard error for a file named on the command line:
-/// `af-desktop opened file=… revision=1 nodes=8 edges=7 errors=0 warnings=0`,
+/// `af-desktop opened file=… revision=1 nodes=8 edges=7 errors=1 warnings=1`
+/// (the problem list's counts),
 /// or `refused` with the code and location. Codes, not sentences: it is read
 /// by scripts.
 pub fn log_line(path: &Path, result: &OpenResult) -> String {
@@ -734,6 +735,12 @@ fn forget_recent(id: String, state: Shared<'_>) -> Result<(), String> {
     Ok(())
 }
 
+/// The problem list at the revision, or `None` when nothing is open.
+#[tauri::command]
+fn problems(state: Shared<'_>) -> Result<Option<af_api::contract::Problems>, String> {
+    Ok(lock(&state)?.core.problems())
+}
+
 #[tauri::command]
 fn outline(state: Shared<'_>) -> Result<Option<af_api::contract::Outline>, String> {
     Ok(lock(&state)?.core.outline())
@@ -1098,6 +1105,7 @@ pub fn run(args: Args) -> i32 {
             open_recent,
             forget_recent,
             outline,
+            problems,
             packages,
             close,
             diagram,
@@ -1216,7 +1224,7 @@ mod tests {
         let line = line.unwrap_or_default();
         assert!(line.starts_with("af-desktop opened file="), "{line}");
         assert!(
-            line.ends_with("revision=1 nodes=8 edges=7 errors=0 warnings=0"),
+            line.ends_with("revision=1 nodes=8 edges=7 errors=1 warnings=1"),
             "{line}"
         );
         let initial = desktop.initial.take();

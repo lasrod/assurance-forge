@@ -21,6 +21,7 @@ import type {
   OpenResult,
   OutlineRow,
   Package,
+  Problems,
   RecentFile,
   Removal,
   TextField,
@@ -76,6 +77,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   // What the left panels show: the argument's tree and the file's packages.
   const [outline, setOutline] = useState<OutlineRow[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
+  // The problem list of the revision on screen; null while nothing is open.
+  const [problems, setProblems] = useState<Problems | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentFile[]>([]);
   // A file is being read, or the shell has not yet said whether it was started
@@ -118,6 +121,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     setDiagram(null);
     setOutline([]);
     setPackages([]);
+    setProblems(null);
     setFileName(null);
     setReading(false);
     setHistory(null);
@@ -146,7 +150,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       try {
         const { name, result } = await opening();
         const isOpen = result.result === 'opened';
-        const [next, rows, held, past, found] = isOpen
+        const [next, rows, held, past, found, listed] = isOpen
           ? await Promise.all([
               on.diagram(),
               on.outline(),
@@ -154,8 +158,9 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
               on.history(),
               // A copy that cannot be found is no copy: the file opens all the same.
               on.recovery.found(name).catch(() => null),
+              on.problems(),
             ])
-          : [null, null, [], null, null];
+          : [null, null, [], null, null, null];
         if (request !== latest.current) return;
         clear();
         shown.current = isOpen ? result.revision : null;
@@ -165,6 +170,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         setOutline(rows?.rows ?? []);
         setPackages(held);
         setHistory(past);
+        setProblems(listed);
         setFileName(isOpen ? name : null);
         if (found?.result === 'found') {
           setRecovery({ name: found.name, writtenAt: found.writtenAt, baseMatches: found.baseMatches });
@@ -423,6 +429,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
           on.packages(),
           on.history(),
           added ? on.element(added) : Promise.resolve(null),
+          on.problems(),
         ]);
       } catch {
         // The core made the change but its new picture could not be read. The
@@ -434,7 +441,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         }
         return 'applied';
       }
-      const [next, rows, held, past, details] = answers;
+      const [next, rows, held, past, details, listed] = answers;
       // Another file was opened meanwhile, or a later command is on its way.
       if (request !== latest.current || !next || next.revision !== result.revision) return 'applied';
       shown.current = result.revision;
@@ -444,6 +451,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       if (rows && rows.revision === shown.current) setOutline(rows.rows);
       setPackages(held);
       setHistory(past);
+      if (listed && listed.revision === shown.current) setProblems(listed);
       if (missed.current) {
         missed.current = false;
         void Promise.all([on.diagram(), on.outline()]).then(
@@ -709,6 +717,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     diagram,
     outline,
     packages,
+    problems,
     fileName,
     recent,
     reading,

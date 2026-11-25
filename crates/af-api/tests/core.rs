@@ -4,7 +4,10 @@
 //! `element` gives the details panel's content.
 
 use af_api::Core;
-use af_api::contract::{ArgumentValue, EdgeKind, NodeKind, OpenResult, Shape};
+use af_api::contract::{
+    ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult, ProblemSeverity,
+    ProblemSource, Shape,
+};
 use af_layout::{Fonts, Style};
 
 fn testdata(path: &str) -> Vec<u8> {
@@ -87,9 +90,11 @@ fn opening_the_core_sample_gives_its_counts_and_diagram() {
         panic!("refused: {opened:?}");
     };
     assert_eq!(revision, 1);
+    // The problem list's counts (P8): an Assumption as an inference's premise
+    // (AF-GSN-004) and an undeveloped Goal that is supported (AF-GSN-010).
     assert_eq!(
         (diagnostics.errors, diagnostics.warnings, diagnostics.infos),
-        (0, 0, 0)
+        (1, 1, 0)
     );
     assert_eq!((nodes, edges, view_codes), (8, 7, 0));
 
@@ -118,8 +123,9 @@ fn the_large_case_counts_its_warnings_and_view_codes() {
     else {
         panic!("refused: {opened:?}");
     };
-    // SACM-MULT-001 for each Claim with two descriptions.
-    assert_eq!((diagnostics.errors, diagnostics.warnings), (0, 162));
+    // SACM-MULT-001 for each Claim with two descriptions, and three
+    // Strategies that support nothing (AF-GSN-008).
+    assert_eq!((diagnostics.errors, diagnostics.warnings), (0, 165));
     // The 20 ArtifactReferences nothing reaches (R11).
     assert_eq!(view_codes, 20);
 }
@@ -236,7 +242,7 @@ fn the_contract_serializes_in_camel_case_with_tags() {
     let json = serde_json::to_value(&opened).unwrap_or_default();
     assert_eq!(json["result"], "opened");
     assert_eq!(json["viewCodes"], 0);
-    assert_eq!(json["diagnostics"]["warnings"], 0);
+    assert_eq!(json["diagnostics"]["warnings"], 1);
     let diagram = serde_json::to_value(core.diagram()).unwrap_or_default();
     let node = &diagram["diagram"]["nodes"][0];
     assert_eq!(node["kind"], "goal");
@@ -665,4 +671,75 @@ fn a_text_set_in_element_properties_is_drawn_at_a_new_revision_and_undo_takes_it
     }
     assert!(!core.history().can_undo);
     assert_eq!(core.element("cl_top"), Some(was));
+}
+
+#[test]
+fn the_problem_list_names_its_elements_follows_an_edit_and_its_undo() {
+    let mut core = core("en");
+    let opened = core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    assert!(matches!(opened, OpenResult::Opened { .. }));
+    let Some(before) = core.problems() else {
+        panic!("no problems list");
+    };
+    assert_eq!(before.revision, 1);
+    assert_eq!((before.counts.errors, before.counts.warnings), (1, 1));
+    let first = &before.problems[0];
+    assert_eq!(first.code, "AF-GSN-004");
+    assert_eq!(first.source, ProblemSource::Gsn);
+    assert_eq!(first.severity, ProblemSeverity::Error);
+    assert_eq!(first.requirement.as_deref(), Some("GSN3-CORE-015"));
+    let named: Vec<(&str, Option<&str>, Option<NodeKind>)> = first
+        .elements
+        .iter()
+        .map(|element| {
+            (
+                element.id.as_str(),
+                element.identifier.as_deref(),
+                element.kind,
+            )
+        })
+        .collect();
+    assert_eq!(
+        named,
+        [
+            ("cl_sub_1", Some("cl_sub_1"), Some(NodeKind::Goal)),
+            (
+                "cl_assumption_1",
+                Some("cl_assumption_1"),
+                Some(NodeKind::Assumption)
+            ),
+        ]
+    );
+
+    // A Strategy added alone supports nothing yet: a warning, at the new
+    // revision. Undo takes it back.
+    let revision = core.revision();
+    let EditResult::Applied {
+        element: Some(strategy),
+        ..
+    } = core.add(Some("cl_top"), ElementKind::Strategy, revision)
+    else {
+        panic!("not added");
+    };
+    let Some(after) = core.problems() else {
+        panic!("no problems list");
+    };
+    assert_eq!(after.revision, revision + 1);
+    assert_eq!(after.counts.warnings, 2);
+    assert!(
+        after
+            .problems
+            .iter()
+            .any(|problem| problem.code == "AF-GSN-008"
+                && problem.elements.first().map(|element| element.id.as_str())
+                    == Some(strategy.as_str()))
+    );
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    let Some(undone) = core.problems() else {
+        panic!("no problems list");
+    };
+    assert_eq!(undone.problems, before.problems);
+
+    core.close();
+    assert!(core.problems().is_none());
 }

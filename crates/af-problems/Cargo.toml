@@ -1,0 +1,16 @@
+[package]
+name = "af-problems"
+description = "The problem list: what libSACM reported reading the file, what its validation finds, where the argument breaks GSN's rules, and what the diagram does not draw, as one list."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+af-gsn = { path = "../af-gsn" }
+sacm = "0.3.0"
+
+[lints]
+workspace = true

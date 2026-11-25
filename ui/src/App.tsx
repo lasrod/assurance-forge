@@ -5,6 +5,7 @@ import type { AddChoice, Core, ElementKind, NodeKind, Removal, TextField, TextSt
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
+import { ProblemsPanel } from './ProblemsPanel';
 import { RecoveryDialog } from './RecoveryDialog';
 import { UnsavedDialog } from './UnsavedDialog';
 import {
@@ -295,6 +296,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     { id: 'elementProperties', name: t('elementProperties') },
     { id: 'problems', name: t('problems') },
   ];
+  // The dock's tab and rail carry the count (P7).
+  const problemCount = doc.problems?.problems.length ?? 0;
+  const problemsTitle = problemCount > 0 ? t('problemsCount', { count: problemCount }) : t('problems');
   const showing = measure?.docks.flatMap((dock) => dock.views.filter((item) => item.shown).map((item) => item.id)) ?? [];
   const setPanels = (ids: string[]) => {
     const change = panelNames.find((panel) => ids.includes(panel.id) !== showing.includes(panel.id));
@@ -533,11 +537,17 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} onText={setText} /> }],
             }}
             bottom={{
-              name: t('problems'),
+              name: problemsTitle,
               nameInText: t('problemsInText'),
               min: 7,
               icons: { hide: <ChevronDown />, show: <ChevronUp /> },
-              views: [{ id: 'problems', label: t('problems'), content: empty('problemsEmpty') }],
+              views: [
+                {
+                  id: 'problems',
+                  label: problemsTitle,
+                  content: <ProblemsPanel problems={doc.problems} language={language} t={t} onShow={selectAndShow} />,
+                },
+              ],
             }}
           >
             <DiagramCanvas
@@ -622,6 +632,22 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           {status.text}
         </Status>
         <StatusBarSpacer />
+        {hasFile && doc.problems && (
+          // The counts open the Problems panel (P8).
+          <Status
+            tone={doc.problems.counts.errors > 0 ? 'error' : doc.problems.counts.warnings > 0 ? 'warning' : undefined}
+            data-testid="problem-counts"
+          >
+            <button
+              type="button"
+              className="af-status-button"
+              title={t('problemsShow')}
+              onClick={() => workspace.current?.showView('problems')}
+            >
+              {t('findings', { errors: doc.problems.counts.errors, warnings: doc.problems.counts.warnings })}
+            </button>
+          </Status>
+        )}
         {modified && (
           <Status title={t('modifiedTip')} data-testid="modified">
             {t('modified')}

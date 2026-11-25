@@ -26,6 +26,10 @@
 //! the **base** of the open document, a digest of what its file held when it
 //! was opened or last saved, and a copy carries it, so that a copy of other
 //! content is told apart. The shells keep the bytes and do not read them.
+//!
+//! [`Core::problems`] gives the problem list of the open document at its
+//! revision (`af-problems`): what libSACM reported reading the file, kept
+//! from the open, and what validation, the GSN checks and the view find now.
 
 pub mod contract;
 
@@ -33,7 +37,6 @@ use af_gsn::commands::{self, Target};
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
 use af_session::{ChangeRecord, Session};
-use sacm::diagnostic::Severity;
 use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
@@ -72,6 +75,11 @@ struct Open {
     /// The revision [`Core::write`] last wrote, and a digest of what it gave:
     /// the base once the shell says it is saved.
     written: Option<(u32, String)>,
+    /// What libSACM reported reading the file: about the file as read, so
+    /// kept until the next open.
+    read: Vec<sacm::diagnostic::Diagnostic>,
+    /// The problem list, derived once per revision.
+    problems: Option<contract::Problems>,
 }
 
 impl Core {
@@ -135,19 +143,20 @@ impl Core {
                 });
             }
         };
-        // What the read reported, and what validating the document finds:
-        // the counts the problem list will show.
-        let validated = sacm::validation::validate(output.document());
-        let mut diagnostics = DiagnosticCounts::default();
-        for diagnostic in output.diagnostics().iter().chain(&validated) {
-            match diagnostic.severity() {
-                Severity::Error => diagnostics.errors += 1,
-                Severity::Warning => diagnostics.warnings += 1,
-                _ => diagnostics.infos += 1,
-            }
-        }
+        let read = output.diagnostics().to_vec();
         let document = output.into_document();
         let view = view::view(&document, &self.language);
+        // The counts the problem list shows (P8), but for what the diagram
+        // does not draw, which `view_codes` counts.
+        let mut diagnostics = DiagnosticCounts::default();
+        for problem in af_problems::problems(&read, &document, &view) {
+            match (problem.source, problem.severity) {
+                (af_problems::Source::Diagram, _) => {}
+                (_, af_problems::Severity::Error) => diagnostics.errors += 1,
+                (_, af_problems::Severity::Warning) => diagnostics.warnings += 1,
+                (_, af_problems::Severity::Info) => diagnostics.infos += 1,
+            }
+        }
         let result = OpenResult::Opened {
             revision: self.revision,
             diagnostics,
@@ -170,6 +179,8 @@ impl Core {
             diagram: None,
             base: recovery::digest(bytes),
             written: None,
+            read,
+            problems: None,
         });
         result
     }
@@ -619,6 +630,44 @@ impl Core {
         }
     }
 
+    /// The problem list of the open document at its revision, derived once
+    /// per revision. `None` when nothing is open.
+    pub fn problems(&mut self) -> Option<contract::Problems> {
+        let revision = self.revision;
+        let open = self.open.as_mut()?;
+        let problems = open.problems.get_or_insert_with(|| {
+            let view = &open.view;
+            let list = af_problems::problems(&open.read, open.session.document(), view);
+            let mut counts = DiagnosticCounts::default();
+            let problems = list
+                .into_iter()
+                .map(|problem| {
+                    let severity = match problem.severity {
+                        af_problems::Severity::Error => {
+                            counts.errors += 1;
+                            contract::ProblemSeverity::Error
+                        }
+                        af_problems::Severity::Warning => {
+                            counts.warnings += 1;
+                            contract::ProblemSeverity::Warning
+                        }
+                        af_problems::Severity::Info => {
+                            counts.infos += 1;
+                            contract::ProblemSeverity::Info
+                        }
+                    };
+                    convert::problem(problem, severity, view)
+                })
+                .collect();
+            contract::Problems {
+                revision,
+                problems,
+                counts,
+            }
+        });
+        Some(problems.clone())
+    }
+
     /// After an accepted command: the new revision, and the view and diagram
     /// derived again from the document.
     fn changed(&mut self, record: &ChangeRecord, element: Option<String>) -> EditResult {
@@ -627,6 +676,7 @@ impl Core {
         if let Some(open) = self.open.as_mut() {
             open.view = view::view(open.session.document(), &self.language);
             open.diagram = None;
+            open.problems = None;
         }
         EditResult::Applied {
             revision: record.revision,
