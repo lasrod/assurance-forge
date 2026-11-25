@@ -224,3 +224,55 @@ fn the_saved_state_is_known_past_the_end_of_the_history() {
     assert!(session.document() == &saved);
     assert!(!session.is_modified());
 }
+
+#[test]
+fn a_restore_is_one_command_that_undo_takes_back() {
+    let original = sample();
+    // The document a recovery copy kept: the sample with a Solution added.
+    let mut elsewhere = Session::new(original.clone(), 1);
+    let element = add_solution(&mut elsewhere);
+    let kept = elsewhere.document().clone();
+
+    let mut session = Session::new(original.clone(), 7);
+    let record = match session.restore(kept.clone()) {
+        Some(record) => record,
+        None => panic!("the copy differs from the file"),
+    };
+    assert_eq!(record.revision, 8);
+    assert_eq!(record.command, Command::Restore);
+    assert!(record.created.contains(&element), "{record:?}");
+    assert!(record.deleted.is_empty(), "{record:?}");
+    assert!(record.changed.iter().any(|id| id == "cl_top"), "{record:?}");
+    assert_eq!(session.document(), &kept);
+    assert!(session.is_modified());
+
+    // Undo shows the file as it was saved.
+    assert!(session.undo().is_some());
+    assert_eq!(session.document(), &original);
+    assert!(!session.is_modified());
+    assert!(session.redo().is_some());
+    assert_eq!(session.document(), &kept);
+}
+
+#[test]
+fn restoring_the_document_it_is_records_nothing() {
+    let mut session = Session::new(sample(), 1);
+    assert_eq!(session.restore(sample()), None);
+    assert_eq!(session.revision(), 1);
+    assert!(session.records().is_empty());
+    assert_eq!(session.can_undo(), None);
+    assert!(!session.is_modified());
+}
+
+#[test]
+fn a_restore_clears_redo() {
+    let mut session = Session::new(sample(), 1);
+    add_solution(&mut session);
+    assert!(session.undo().is_some());
+    assert!(session.can_redo().is_some());
+    let mut other = Session::new(sample(), 1);
+    add_solution(&mut other);
+    add_solution(&mut other);
+    assert!(session.restore(other.document().clone()).is_some());
+    assert_eq!(session.can_redo(), None);
+}

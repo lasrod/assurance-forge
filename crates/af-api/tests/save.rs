@@ -43,7 +43,7 @@ fn samples() -> Vec<(String, Vec<u8>)> {
     found
 }
 
-fn written(core: &Core, what: &str) -> (u32, String) {
+fn written(core: &mut Core, what: &str) -> (u32, String) {
     match core.write() {
         WriteResult::Written { revision, xmi } => (revision, xmi),
         WriteResult::Refused { code } => panic!("{what}: refused {code}"),
@@ -100,13 +100,13 @@ fn every_sample_written_reads_back_as_itself_before_and_after_edits() {
             continue;
         };
         let opened = strict(bytes, name);
-        let (_, first) = written(&core, name);
+        let (_, first) = written(&mut core, name);
         assert!(strict(first.as_bytes(), name) == opened, "{name}: changed");
 
         if edit(&mut core, name) && is_own(name) {
             edited += 1;
         }
-        let (revision, xmi) = written(&core, name);
+        let (revision, xmi) = written(&mut core, name);
         assert_eq!(revision, core.revision(), "{name}");
         // What was written opens again, and writes again to the same bytes.
         let mut again = Core::without_fonts(Style::default(), "en");
@@ -114,7 +114,7 @@ fn every_sample_written_reads_back_as_itself_before_and_after_edits() {
             matches!(again.open(xmi.as_bytes()), OpenResult::Opened { .. }),
             "{name}: written file refused"
         );
-        let (_, second) = written(&again, name);
+        let (_, second) = written(&mut again, name);
         assert_eq!(second, xmi, "{name}: a second write differs");
     }
     assert!(edited >= 11, "setup: only {edited} samples edited");
@@ -150,7 +150,7 @@ fn saved_follows_the_state_of_the_document_not_its_revision() {
 
     assert!(edit(&mut core, "core sample"));
     assert!(core.history().modified);
-    let (revision, _) = written(&core, "core sample");
+    let (revision, _) = written(&mut core, "core sample");
     // Written is not saved: the shell has not said it put the bytes anywhere.
     assert!(core.history().modified);
     assert!(core.mark_saved(revision));
@@ -164,7 +164,7 @@ fn saved_follows_the_state_of_the_document_not_its_revision() {
     assert_ne!(core.revision(), revision);
 
     // What was written at an earlier revision is not marked saved.
-    let (stale, _) = written(&core, "core sample");
+    let (stale, _) = written(&mut core, "core sample");
     assert!(matches!(core.undo(), EditResult::Applied { .. }));
     assert!(!core.mark_saved(stale));
     assert!(core.history().modified);

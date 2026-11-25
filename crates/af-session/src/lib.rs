@@ -54,6 +54,9 @@ pub enum Command {
     },
     /// Remove the node `element` and what goes with it.
     Remove { element: String },
+    /// Replace the document by one kept in a recovery copy (plan decision
+    /// R5).
+    Restore,
     /// Take back the change that made `revision`.
     Undo { revision: u32 },
     /// Make again the change that made `revision`, which was taken back.
@@ -219,6 +222,34 @@ impl Session {
         Ok((removed, record))
     }
 
+    /// Replaces the document by `document`, the one a recovery copy kept, as
+    /// one command that undo takes back (plan decision R5). `None` when the
+    /// document is that already: nothing is recorded.
+    ///
+    /// The record lists the ids only one of the two documents has as created
+    /// and deleted, and the ids both have as changed: an element is not
+    /// compared with its namesake.
+    pub fn restore(&mut self, document: Document) -> Option<ChangeRecord> {
+        if document == self.document {
+            return None;
+        }
+        let ids = |document: &Document| {
+            document
+                .elements()
+                .map(|element| element.id().as_str().to_owned())
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        let (old, new) = (ids(&self.document), ids(&document));
+        let before = std::mem::replace(&mut self.document, document);
+        let record = self.record(
+            Command::Restore,
+            new.difference(&old).cloned().collect(),
+            new.intersection(&old).cloned().collect(),
+            old.difference(&new).cloned().collect(),
+        );
+        Some(self.step(before, record))
+    }
+
     /// Records an applied command, which undo can take back to `before`.
     fn made(
         &mut self,
@@ -237,6 +268,11 @@ impl Session {
             ids(mutation.changed_ids()),
             ids(mutation.deleted_ids()),
         );
+        self.step(before, record)
+    }
+
+    /// Keeps a command undo can take back to `before`; redo is cleared.
+    fn step(&mut self, before: Document, record: ChangeRecord) -> ChangeRecord {
         self.undo.push(Step {
             before,
             record: record.clone(),

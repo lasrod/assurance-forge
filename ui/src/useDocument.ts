@@ -2,6 +2,10 @@
 // order, and asking the core for the views the page shows, each checked
 // against what is on screen before it is shown (freshness.ts). The document
 // itself is in the core; this keeps only the answers.
+//
+// It also asks the shell to keep a recovery copy about a second after each
+// change, while the case has changes that are not saved, and offers a copy
+// found when a file opens before anything else (plan decisions R2 and R5).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findEdge } from './canvas/draw';
@@ -24,6 +28,7 @@ import type {
 } from './core/Core';
 import { StartError } from './core/start';
 import type { Details } from './ElementProperties';
+import type { OfferedRecovery } from './RecoveryDialog';
 import { newerDiagram } from './freshness';
 import type { Language } from './i18n/messages';
 import type { TextOutcome } from './textDraft';
@@ -31,6 +36,9 @@ import exampleUrl from '../../testdata/sacm/sacm_example_core_argument.sacm.xmi?
 
 /** The example the welcome page opens: its name, as a file would have one. */
 const EXAMPLE_NAME = 'sacm_example_core_argument.sacm.xmi';
+
+/** How long after the last change a recovery copy is kept, in milliseconds (R2). */
+export const RECOVERY_DELAY = 1000;
 
 export type DocumentState =
   | { kind: 'starting' }
@@ -47,7 +55,11 @@ export type DocumentState =
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null }
   | { kind: 'saved'; name: string; downloaded: boolean }
-  | { kind: 'saveRefused'; code: string };
+  | { kind: 'saveRefused'; code: string }
+  | { kind: 'restored' }
+  | { kind: 'recoveryDiscarded' }
+  | { kind: 'recoverySetAside'; code: string }
+  | { kind: 'recoveryNotKept'; code: string };
 
 /**
  * What an accepted edit gave, for the view to follow before it is painted:
@@ -75,6 +87,9 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   // Counts the files opened: what resets for a new file (the view, the
   // selection, the tree's branches) does not reset for a new revision of it.
   const [opened, setOpened] = useState(0);
+  // A recovery copy found when the file opened, offered until it is
+  // restored or discarded (R5).
+  const [recovery, setRecovery] = useState<OfferedRecovery | null>(null);
 
   // A file given before the core is ready waits for it.
   const [pending, setPending] = useState<{ name: string; bytes: Uint8Array; request: number } | null>(null);
@@ -106,6 +121,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     setFileName(null);
     setReading(false);
     setHistory(null);
+    setRecovery(null);
   }, []);
   /** A read that failed, unless a later request has started: nothing is open, in the core too. */
   const unreadable = useCallback(
@@ -130,9 +146,16 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       try {
         const { name, result } = await opening();
         const isOpen = result.result === 'opened';
-        const [next, rows, held, past] = isOpen
-          ? await Promise.all([on.diagram(), on.outline(), on.packages(), on.history()])
-          : [null, null, [], null];
+        const [next, rows, held, past, found] = isOpen
+          ? await Promise.all([
+              on.diagram(),
+              on.outline(),
+              on.packages(),
+              on.history(),
+              // A copy that cannot be found is no copy: the file opens all the same.
+              on.recovery.found(name).catch(() => null),
+            ])
+          : [null, null, [], null, null];
         if (request !== latest.current) return;
         clear();
         shown.current = isOpen ? result.revision : null;
@@ -143,6 +166,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         setPackages(held);
         setHistory(past);
         setFileName(isOpen ? name : null);
+        if (found?.result === 'found') {
+          setRecovery({ name: found.name, writtenAt: found.writtenAt, baseMatches: found.baseMatches });
+        } else if (found?.result === 'unreadable') {
+          setState({ kind: 'recoverySetAside', code: found.code });
+        }
         refreshRecent(on);
       } catch {
         unreadable(request);
@@ -359,7 +387,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo' | 'remove' | TextField,
+      what: 'add' | 'undo' | 'redo' | 'remove' | 'restore' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
@@ -431,7 +459,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       else if (what === 'add') {
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
-      else if (what !== 'remove') setState({ kind: 'textChanged', field: what });
+      else if (what !== 'remove' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
     },
     [showRelayout],
@@ -593,6 +621,58 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [fileName, refreshRecent],
   );
 
+  /** Restores the copy offered, as one change that Edit ▸ Undo takes back (R5). */
+  const restoreRecovery = useCallback(
+    (onShown: EditShown) => {
+      setRecovery(null);
+      void edit((on) => on.recovery.restore(), 'restore', null, null, onShown, { kind: 'restored' });
+    },
+    [edit],
+  );
+  /** Discards the copy offered: the only way one is deleted. */
+  const discardRecovery = useCallback(() => {
+    const on = coreRef.current;
+    setRecovery(null);
+    if (!on) return;
+    const request = latest.current;
+    void on.recovery.discard().then(
+      () => {
+        if (request === latest.current) setState({ kind: 'recoveryDiscarded' });
+      },
+      () => undefined,
+    );
+  }, []);
+
+  // A copy of the changes not saved, about a second after the last one, and
+  // removed at once when there are none (R2, R3). A copy that cannot be kept
+  // is said once per file (R8).
+  const notKeptSaid = useRef(false);
+  useEffect(() => {
+    notKeptSaid.current = false;
+  }, [opened]);
+  useEffect(() => {
+    if (!core || !history || fileName === null || recovery !== null) return;
+    const { revision, modified } = history;
+    const name = fileName;
+    const request = latest.current;
+    const keep = () => {
+      core.recovery.keep(name, revision).then(
+        (kept) => {
+          if (kept.result !== 'refused' || notKeptSaid.current || request !== latest.current) return;
+          notKeptSaid.current = true;
+          setState({ kind: 'recoveryNotKept', code: kept.code });
+        },
+        () => undefined,
+      );
+    };
+    if (!modified) {
+      keep();
+      return;
+    }
+    const timer = setTimeout(keep, RECOVERY_DELAY);
+    return () => clearTimeout(timer);
+  }, [core, history, fileName, recovery]);
+
   // The diagram's text follows DATUM's type tokens, so the user's text size.
   const sentStyle = useRef('');
   // Each change of text sizes is numbered: only the last one's answer says
@@ -651,6 +731,9 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     redo,
     editsPending,
     save,
+    recovery,
+    restoreRecovery,
+    discardRecovery,
   };
 }
 

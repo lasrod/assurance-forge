@@ -14,6 +14,13 @@
 //! not overwritten (S5). Closing the window with changes that are not saved
 //! is held here and asked about in the page (S9).
 //!
+//! While the document has changes that are not saved, the page asks for a
+//! recovery copy about a second after each change, and this shell keeps it
+//! in the working folder beside the file (`recovery`, plan decisions R1 to
+//! R8). A copy found when a file opens is offered before anything else; the
+//! copy goes when the changes are saved, undone, or given up by the user
+//! (Close, opening another file, the window's end).
+//!
 //! The commands are the browser core's (`ui/src/core/Core.ts`), so the
 //! interface is the same code on both (plan decision D1).
 //!
@@ -22,6 +29,7 @@
 //! it is how CI checks that the application starts.
 
 pub mod recent;
+pub mod recovery;
 
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 use std::io::Write as _;
@@ -30,7 +38,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use af_api::Core;
-use af_api::contract::{OpenResult, OpenedFile as Opened, SaveResult, WriteResult};
+use af_api::contract::{
+    EditResult, FoundRecovery, KeepResult, OpenResult, OpenedFile as Opened, RecoveryCopy,
+    SaveResult, WriteResult,
+};
 use af_layout::{FaceName, Fonts, Style};
 use serde::Deserialize;
 use tauri::ipc::{InvokeBody, Request, Response};
@@ -228,6 +239,11 @@ const NOT_WRITABLE: &str = "AF-SAVE-005";
 /// AF-SAVE-006: the document changed while it was being saved.
 const CHANGED_MEANWHILE: &str = "AF-SAVE-006";
 
+/// AF-RECOVER-001: no recovery copy is there to restore.
+const NOTHING_FOUND: &str = "AF-RECOVER-001";
+/// AF-RECOVER-004: the system refused to write the recovery copy.
+const RECOVER_NOT_WRITTEN: &str = "AF-RECOVER-004";
+
 fn save_refused(code: &str) -> SaveResult {
     SaveResult::Refused {
         code: code.to_owned(),
@@ -248,6 +264,19 @@ pub struct Desktop {
     /// Save As… (S6).
     file: Option<FileOnDisk>,
     recent: RecentFiles,
+    /// A recovery copy found when the open file was opened, not yet restored
+    /// or discarded: nothing is written over it, and closing the file leaves
+    /// it (R5).
+    found: Option<Vec<u8>>,
+    /// What the page is told of the copy found: offered, or set aside.
+    found_said: Option<FoundRecovery>,
+    /// The copy restored was of other content than the file holds (R6):
+    /// File ▸ Save is Save As… until the case is saved.
+    save_as_only: bool,
+    /// The window has ended: no copy is kept after it.
+    ended: bool,
+    /// The user chose to close the window when the page asked (`quit`).
+    quit_chosen: bool,
 }
 
 impl Desktop {
@@ -285,16 +314,156 @@ impl Desktop {
                 }
             }
         }
-        (
-            Self {
-                core,
-                initial,
-                initial_path,
-                file,
-                recent: RecentFiles::default(),
+        let mut desktop = Self {
+            core,
+            initial,
+            initial_path,
+            file,
+            recent: RecentFiles::default(),
+            found: None,
+            found_said: None,
+            save_as_only: false,
+            ended: false,
+            quit_chosen: false,
+        };
+        desktop.look_for_recovery();
+        (desktop, line)
+    }
+
+    /// Looks for a recovery copy of the file just opened, when it opened: one
+    /// the core reads is offered, one it does not is set aside (R7).
+    fn look_for_recovery(&mut self) {
+        self.found = None;
+        self.found_said = None;
+        let Some(path) = self.file.as_ref().map(|file| file.path.clone()) else {
+            return;
+        };
+        let Some(bytes) = recovery::find(&path) else {
+            return;
+        };
+        let said = self.core.read_recovery(&bytes);
+        match said {
+            FoundRecovery::Found { .. } => self.found = Some(bytes),
+            FoundRecovery::Unreadable { .. } => {
+                // A copy that could not be set aside stays where it is, held
+                // as found: nothing is written over it or removes it, and it
+                // cannot be restored (R7).
+                if recovery::set_aside(&path, recent::now()).is_none() {
+                    self.found = Some(bytes);
+                }
+            }
+        }
+        self.found_said = Some(said);
+    }
+
+    /// The open file is given up by the user's choice (Close, opening
+    /// another, the window's end): its recovery copy goes, unless it is one
+    /// found on open and not yet decided on (R3, R5).
+    fn give_up_recovery(&mut self) {
+        if self.found.take().is_none() {
+            if let Some(file) = &self.file {
+                recovery::remove(&file.path);
+            }
+        }
+        self.found_said = None;
+        self.save_as_only = false;
+    }
+
+    /// What the page is told of a recovery copy of the file just opened:
+    /// one to offer, until it is restored or discarded, or one set aside,
+    /// once.
+    pub fn recovery_found(&mut self) -> Option<FoundRecovery> {
+        match &self.found_said {
+            Some(FoundRecovery::Unreadable { .. }) => self.found_said.take(),
+            said => said.clone(),
+        }
+    }
+
+    /// Restores the recovery copy found on open, as one command undo takes
+    /// back. A copy of other content than the file holds makes File ▸ Save
+    /// Save As… (R6).
+    pub fn restore_recovery(&mut self) -> EditResult {
+        let Some(bytes) = self.found.as_ref() else {
+            return EditResult::Refused {
+                code: NOTHING_FOUND.to_owned(),
+            };
+        };
+        let result = self.core.restore(bytes);
+        if result == EditResult::Unchanged {
+            // The copy holds what the file holds: nothing to keep it for.
+            self.discard_recovery();
+        } else if !matches!(result, EditResult::Refused { .. }) {
+            if matches!(
+                self.found_said,
+                Some(FoundRecovery::Found {
+                    base_matches: false,
+                    ..
+                })
+            ) {
+                self.save_as_only = true;
+            }
+            // The copy is the session's now: the next one is written over it.
+            self.found = None;
+            self.found_said = None;
+        }
+        result
+    }
+
+    /// Discards the recovery copy found on open: the only way one is deleted.
+    pub fn discard_recovery(&mut self) {
+        if self.found.take().is_some() {
+            if let Some(file) = &self.file {
+                recovery::remove(&file.path);
+            }
+        }
+        self.found_said = None;
+    }
+
+    /// Keeps a recovery copy of the document at `revision`, or removes it
+    /// when the document is in its saved state (R2, R3). Nothing is done for
+    /// a revision that is not current, while a copy found is undecided, for
+    /// a file without a path, or after the window has ended.
+    pub fn keep_recovery(&mut self, revision: u32) -> KeepResult {
+        let Some(file) = self.file.as_ref() else {
+            return KeepResult::Skipped;
+        };
+        if self.ended || self.found.is_some() || revision != self.core.revision() {
+            return KeepResult::Skipped;
+        }
+        match self
+            .core
+            .recovery_copy(&file_name(&file.path), recent::now() as f64)
+        {
+            RecoveryCopy::Keep { copy, .. } => match recovery::keep(&file.path, copy.as_bytes()) {
+                Ok(()) => KeepResult::Kept,
+                Err(_) => KeepResult::Refused {
+                    code: RECOVER_NOT_WRITTEN.to_owned(),
+                },
             },
-            line,
-        )
+            RecoveryCopy::Remove { .. } => {
+                recovery::remove(&file.path);
+                KeepResult::Removed
+            }
+            RecoveryCopy::Refused { code } => KeepResult::Refused { code },
+        }
+    }
+
+    /// The page asked about the changes not saved, and the user chose to
+    /// close the window (`quit`).
+    pub fn choose_quit(&mut self) {
+        self.quit_chosen = true;
+    }
+
+    /// The window has ended. Its copy goes when the user chose that: there
+    /// were no changes not saved, or the page asked and the user chose to
+    /// close (R3). A close the page did not ask about (it had stopped, so the
+    /// second close was not held) leaves the copy, as a crash does. No copy is
+    /// kept after.
+    pub fn end(&mut self) {
+        if self.quit_chosen || !self.is_modified() {
+            self.give_up_recovery();
+        }
+        self.ended = true;
     }
 
     /// Reads the recent files kept in `store`, and puts the file named on the
@@ -320,12 +489,14 @@ impl Desktop {
     /// Opens the bytes read from `path`. A file that opens becomes the most
     /// recent one, and the one Save writes.
     fn open_bytes(&mut self, path: &Path, bytes: &[u8]) -> Opened {
+        self.give_up_recovery();
         let result = self.core.open(bytes);
         self.recent.record(path, &result, recent::now());
         self.file = matches!(result, OpenResult::Opened { .. }).then(|| FileOnDisk {
             path: path.to_owned(),
             content: digest(bytes),
         });
+        self.look_for_recovery();
         Opened {
             name: file_name(path),
             result,
@@ -335,19 +506,25 @@ impl Desktop {
     /// Opens bytes the page read itself (a drop): there is no path to save
     /// to, so Save is Save As… (S6).
     pub fn open_unplaced(&mut self, bytes: &[u8]) -> OpenResult {
+        self.give_up_recovery();
         self.file = None;
         self.core.open(bytes)
     }
 
     /// Closes what is open: nothing to save after.
     pub fn close(&mut self) {
+        self.give_up_recovery();
         self.file = None;
         self.core.close();
     }
 
-    /// Where Save writes, or `None` when Save is Save As….
+    /// Where Save writes, or `None` when Save is Save As…: a file without a
+    /// path (S6), or one a copy of other content was restored over (R6).
     pub fn save_path(&self) -> Option<&Path> {
-        self.file.as_ref().map(|file| file.path.as_path())
+        self.file
+            .as_ref()
+            .filter(|_| !self.save_as_only)
+            .map(|file| file.path.as_path())
     }
 
     /// Whether the open document has changes that are not saved.
@@ -382,6 +559,15 @@ impl Desktop {
         if !self.core.mark_saved(revision) {
             return save_refused(CHANGED_MEANWHILE);
         }
+        // The changes are in a file now: their copy goes (R3). It is beside
+        // the file they were made on; a copy beside the file saved to, when
+        // that is another, is that file's own unsaved work and stays.
+        if self.found.is_none() {
+            if let Some(file) = &self.file {
+                recovery::remove(&file.path);
+            }
+        }
+        self.save_as_only = false;
         self.file = Some(FileOnDisk {
             path: path.to_owned(),
             content: digest(xmi.as_bytes()),
@@ -633,7 +819,8 @@ async fn save_as(
 /// The page has asked about the changes that are not saved, and the window
 /// may close: it closes without asking again.
 #[tauri::command]
-fn quit(window: tauri::WebviewWindow) -> Result<(), String> {
+fn quit(window: tauri::WebviewWindow, state: Shared<'_>) -> Result<(), String> {
+    lock(&state)?.choose_quit();
     window.destroy().map_err(|_| "window-not-closed".to_owned())
 }
 
@@ -820,6 +1007,29 @@ fn set_text(
     Ok(lock(&state)?.core.set_text(&id, field, &text))
 }
 
+/// The recovery copy found when the open file was opened, if any (R5).
+#[tauri::command]
+fn recovery_found(state: Shared<'_>) -> Result<Option<FoundRecovery>, String> {
+    Ok(lock(&state)?.recovery_found())
+}
+
+#[tauri::command]
+fn restore_recovery(state: Shared<'_>) -> Result<EditResult, String> {
+    Ok(lock(&state)?.restore_recovery())
+}
+
+#[tauri::command]
+fn discard_recovery(state: Shared<'_>) -> Result<(), String> {
+    lock(&state)?.discard_recovery();
+    Ok(())
+}
+
+/// Keeps a recovery copy of the document at `revision`, or removes it (R2).
+#[tauri::command]
+fn keep_recovery(revision: u32, state: Shared<'_>) -> Result<KeepResult, String> {
+    Ok(lock(&state)?.keep_recovery(revision))
+}
+
 #[tauri::command]
 fn undo(state: Shared<'_>) -> Result<af_api::contract::EditResult, String> {
     Ok(lock(&state)?.core.undo())
@@ -903,14 +1113,18 @@ pub fn run(args: Args) -> i32 {
             history,
             save,
             save_as,
+            recovery_found,
+            restore_recovery,
+            discard_recovery,
+            keep_recovery,
             quit,
             close_heard,
             set_language,
             set_style
         ])
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match event {
             // Changes that are not saved: the page asks first (S9).
-            if let WindowEvent::CloseRequested { api, .. } = event {
+            WindowEvent::CloseRequested { api, .. } => {
                 let state = window.state::<Mutex<Desktop>>();
                 let modified = state.lock().is_ok_and(|desktop| desktop.is_modified());
                 if window.state::<CloseHold>().hold(modified) {
@@ -918,6 +1132,14 @@ pub fn run(args: Args) -> i32 {
                     let _ = window.emit(CLOSE_REQUESTED, ());
                 }
             }
+            // The window's end: the recovery copy goes if the user chose it
+            // (R3).
+            WindowEvent::Destroyed => {
+                if let Ok(mut desktop) = window.state::<Mutex<Desktop>>().lock() {
+                    desktop.end();
+                }
+            }
+            _ => {}
         })
         .setup(move |app| {
             // A smoke run leaves the user's recent files alone.
@@ -1445,5 +1667,316 @@ mod tests {
             unpack_fonts(&broken, &lengths.join(",")).err().as_deref(),
             Some("font-unreadable:MonoRegular")
         );
+    }
+
+    /// A desktop with the file at `path` opened, as the open dialog or a
+    /// recent file opens it.
+    fn opened(path: &Path) -> Desktop {
+        let (mut desktop, _) = Desktop::start(&Args::default());
+        assert!(desktop.open_path(path).is_ok());
+        desktop
+    }
+
+    fn keep(desktop: &mut Desktop) -> KeepResult {
+        let revision = desktop.core.revision();
+        desktop.keep_recovery(revision)
+    }
+
+    /// Edits the file at `path` and keeps a copy, then ends without a close:
+    /// what a crash leaves.
+    fn crash_after_a_change(path: &Path) -> String {
+        let mut desktop = opened(path);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        let WriteResult::Written { xmi, .. } = desktop.core.write() else {
+            panic!("not written");
+        };
+        xmi
+    }
+
+    #[test]
+    fn a_copy_is_kept_while_changes_are_not_saved_and_goes_with_a_save() {
+        let (directory, file) = scratch("recovery-save");
+        let folder = directory.join("case.sacm.xmi.af");
+        let mut desktop = opened(&file);
+        // Nothing to keep for a file as saved.
+        assert_eq!(keep(&mut desktop), KeepResult::Removed);
+        assert!(!folder.exists());
+        change(&mut desktop);
+        // A revision that is no longer current is not kept.
+        assert_eq!(desktop.keep_recovery(1), KeepResult::Skipped);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        assert!(folder.join("recovery.json").is_file());
+        assert!(matches!(
+            save(&mut desktop, &file),
+            SaveResult::Saved { .. }
+        ));
+        assert!(!folder.exists(), "the copy and its folder go with a save");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn undo_back_to_the_saved_state_removes_the_copy() {
+        let (directory, file) = scratch("recovery-undo");
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        assert!(matches!(desktop.core.undo(), EditResult::Applied { .. }));
+        assert_eq!(keep(&mut desktop), KeepResult::Removed);
+        assert!(!directory.join("case.sacm.xmi.af").exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_a_crash_left_is_offered_and_restored_as_one_change() {
+        let (directory, file) = scratch("recovery-crash");
+        let edited = crash_after_a_change(&file);
+
+        let mut desktop = opened(&file);
+        let Some(FoundRecovery::Found {
+            name, base_matches, ..
+        }) = desktop.recovery_found()
+        else {
+            panic!("no copy offered");
+        };
+        assert_eq!(name, "case.sacm.xmi");
+        assert!(base_matches);
+        // Asked again, it is still to decide; nothing is written over it.
+        assert!(desktop.recovery_found().is_some());
+        assert_eq!(keep(&mut desktop), KeepResult::Skipped);
+
+        assert!(matches!(
+            desktop.restore_recovery(),
+            EditResult::Applied { .. }
+        ));
+        let WriteResult::Written { xmi, .. } = desktop.core.write() else {
+            panic!("not written");
+        };
+        assert_eq!(xmi, edited, "restored to another document");
+        assert!(desktop.is_modified());
+        assert_eq!(desktop.recovery_found(), None);
+        // The file holds what the changes began from: Save writes it.
+        assert_eq!(desktop.save_path(), Some(file.as_path()));
+        // The copy is the session's now.
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        // Undo shows the file as saved, and the copy goes.
+        assert!(matches!(desktop.core.undo(), EditResult::Applied { .. }));
+        assert!(!desktop.is_modified());
+        assert_eq!(keep(&mut desktop), KeepResult::Removed);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_found_stays_when_the_file_is_closed_and_goes_when_discarded() {
+        let (directory, file) = scratch("recovery-discard");
+        crash_after_a_change(&file);
+        let copy = directory.join("case.sacm.xmi.af").join("recovery.json");
+
+        let mut desktop = opened(&file);
+        assert!(desktop.recovery_found().is_some());
+        desktop.close();
+        assert!(copy.is_file(), "closed before deciding: the copy stays");
+        desktop.end();
+        assert!(copy.is_file(), "the window's end leaves it too");
+
+        let mut desktop = opened(&file);
+        assert!(desktop.recovery_found().is_some());
+        desktop.discard_recovery();
+        assert_eq!(desktop.recovery_found(), None);
+        assert!(!directory.join("case.sacm.xmi.af").exists());
+        assert!(!desktop.is_modified());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn changes_given_up_by_close_another_file_or_the_window_take_their_copy() {
+        let (directory, file) = scratch("recovery-give-up");
+        let folder = directory.join("case.sacm.xmi.af");
+        let other = directory.join("other.sacm.xmi");
+        assert!(std::fs::copy(&file, &other).is_ok());
+
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        desktop.close();
+        assert!(!folder.exists(), "Close after Don't save");
+
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        assert!(desktop.open_path(&other).is_ok());
+        assert!(!folder.exists(), "another file opened after Don't save");
+
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        desktop.choose_quit();
+        desktop.end();
+        assert!(!folder.exists(), "the window closed after Don't save");
+        // A copy asked for after the window's end is not kept.
+        assert_eq!(keep(&mut desktop), KeepResult::Skipped);
+        assert!(!folder.exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_window_that_ends_without_the_question_answered_keeps_the_copy() {
+        let (directory, file) = scratch("recovery-unheard");
+        let copy = directory.join("case.sacm.xmi.af").join("recovery.json");
+        // The page had stopped: the second close was not held, so nobody
+        // chose to lose the changes.
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        desktop.end();
+        assert!(copy.is_file(), "kept, as a crash keeps it");
+        assert_eq!(keep(&mut desktop), KeepResult::Skipped);
+        // No changes not saved, though the page had not yet removed their
+        // copy: the window's end, unasked, takes it.
+        let mut desktop = opened(&file);
+        desktop.discard_recovery();
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        assert!(matches!(desktop.core.undo(), EditResult::Applied { .. }));
+        assert!(copy.is_file());
+        desktop.end();
+        assert!(!copy.exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn save_as_over_another_file_leaves_that_files_copy() {
+        let (directory, file) = scratch("recovery-save-as");
+        let other = directory.join("other.sacm.xmi");
+        assert!(std::fs::copy(&file, &other).is_ok());
+        crash_after_a_change(&other);
+        let theirs = directory.join("other.sacm.xmi.af").join("recovery.json");
+        assert!(theirs.is_file());
+
+        let mut desktop = opened(&file);
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        let revision = desktop.core.revision();
+        assert!(matches!(
+            desktop.save_to(&other, revision, true),
+            SaveResult::Saved { .. }
+        ));
+        // This session's copy goes; the other file's unsaved work stays.
+        assert!(!directory.join("case.sacm.xmi.af").exists());
+        assert!(theirs.is_file());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_that_holds_what_the_file_holds_restores_nothing_and_goes() {
+        let (directory, file) = scratch("recovery-unchanged");
+        let edited = crash_after_a_change(&file);
+        // The changes were saved by another program since: the file holds
+        // what the copy holds, though not what the copy began from.
+        assert!(write_whole(&file, edited.as_bytes()).is_ok());
+        let mut desktop = opened(&file);
+        assert!(matches!(
+            desktop.recovery_found(),
+            Some(FoundRecovery::Found {
+                base_matches: false,
+                ..
+            })
+        ));
+        assert_eq!(desktop.restore_recovery(), EditResult::Unchanged);
+        assert_eq!(desktop.save_path(), Some(file.as_path()));
+        assert!(!directory.join("case.sacm.xmi.af").exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_of_other_content_is_flagged_and_save_asks_where() {
+        let (directory, file) = scratch("recovery-base");
+        crash_after_a_change(&file);
+        // Another program saved the file since: it holds other content.
+        let theirs = std::fs::read(testdata("sacm/sample.sacm.xmi")).unwrap_or_default();
+        assert!(write_whole(&file, &theirs).is_ok());
+
+        let mut desktop = opened(&file);
+        assert!(matches!(
+            desktop.recovery_found(),
+            Some(FoundRecovery::Found {
+                base_matches: false,
+                ..
+            })
+        ));
+        assert!(matches!(
+            desktop.restore_recovery(),
+            EditResult::Applied { .. }
+        ));
+        // File ▸ Save does not write over the newer file without asking.
+        assert_eq!(desktop.save_path(), None);
+        assert_eq!(std::fs::read(&file).ok(), Some(theirs));
+        // Saved as another file, Save writes that one from then on.
+        let saved = directory.join("mine.sacm.xmi");
+        let revision = desktop.core.revision();
+        assert!(matches!(
+            desktop.save_to(&saved, revision, true),
+            SaveResult::Saved { .. }
+        ));
+        assert_eq!(desktop.save_path(), Some(saved.as_path()));
+        assert!(!directory.join("case.sacm.xmi.af").exists());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_that_cannot_be_read_is_set_aside_and_said_once() {
+        let (directory, file) = scratch("recovery-unreadable");
+        let folder = directory.join("case.sacm.xmi.af");
+        assert!(
+            recovery::keep(
+                &file,
+                b"{\"format\":\"assurance-forge-recovery\",\"version\":9}"
+            )
+            .is_ok()
+        );
+
+        let mut desktop = opened(&file);
+        assert_eq!(
+            desktop.recovery_found(),
+            Some(FoundRecovery::Unreadable {
+                code: "AF-RECOVER-002".to_owned()
+            })
+        );
+        assert_eq!(desktop.recovery_found(), None, "said once");
+        assert!(!folder.join("recovery.json").exists());
+        let aside: Vec<_> = std::fs::read_dir(&folder)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert_eq!(aside.len(), 1, "{aside:?}");
+        assert!(aside[0].starts_with("recovery.unreadable-"), "{aside:?}");
+        // Editing keeps a new copy beside it, and saving leaves it.
+        change(&mut desktop);
+        assert_eq!(keep(&mut desktop), KeepResult::Kept);
+        assert!(matches!(
+            save(&mut desktop, &file),
+            SaveResult::Saved { .. }
+        ));
+        assert!(folder.join(&aside[0]).is_file());
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_file_named_at_start_is_looked_for_a_copy_too() {
+        let (directory, file) = scratch("recovery-start");
+        crash_after_a_change(&file);
+        let (mut desktop, _) = Desktop::start(&Args {
+            file: Some(file.clone()),
+            smoke: false,
+        });
+        assert!(matches!(
+            desktop.recovery_found(),
+            Some(FoundRecovery::Found { .. })
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
     }
 }

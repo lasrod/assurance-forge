@@ -19,6 +19,13 @@
 //! read the bytes back as the same document (plan decision S1). The shell
 //! puts them on disk, or in the browser's downloads, and then says so with
 //! [`Core::mark_saved`].
+//!
+//! [`Core::recovery_copy`] gives the bytes of a recovery copy while the
+//! document has changes that are not saved, and [`Core::read_recovery`] and
+//! [`Core::restore`] read one back (plan decisions R1 to R7). The core knows
+//! the **base** of the open document, a digest of what its file held when it
+//! was opened or last saved, and a copy carries it, so that a copy of other
+//! content is told apart. The shells keep the bytes and do not read them.
 
 pub mod contract;
 
@@ -36,8 +43,10 @@ use contract::{
     Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode,
     WriteResult,
 };
+pub use contract::{FoundRecovery, KeepResult, RecoveryCopy};
 
 mod convert;
+mod recovery;
 
 /// The open document and what is derived from it.
 pub struct Core {
@@ -58,6 +67,11 @@ struct Open {
     /// Laid out on first request, and again after the language or text size
     /// changes.
     diagram: Option<contract::Diagram>,
+    /// A digest of what the file held when it was opened or last saved.
+    base: String,
+    /// The revision [`Core::write`] last wrote, and a digest of what it gave:
+    /// the base once the shell says it is saved.
+    written: Option<(u32, String)>,
 }
 
 impl Core {
@@ -154,6 +168,8 @@ impl Core {
             session: Session::new(document, self.revision),
             view,
             diagram: None,
+            base: recovery::digest(bytes),
+            written: None,
         });
         result
     }
@@ -496,34 +512,110 @@ impl Core {
     /// checks that the output is schema-valid. The bytes are read back by a
     /// strict read and given out only if they are the document (S1): a
     /// writer fault never reaches the disk. Nothing is marked saved.
-    pub fn write(&self) -> WriteResult {
-        let Some(open) = self.open.as_ref() else {
+    pub fn write(&mut self) -> WriteResult {
+        let revision = self.revision;
+        let Some(open) = self.open.as_mut() else {
             return write_refused(SAVE_NOTHING_OPEN);
         };
-        let document = open.session.document();
-        let Ok(xmi) = xmi::write(document, &WriteOptions::default()) else {
-            return write_refused(SAVE_NOT_WRITTEN);
-        };
-        if !reads_back_as(&xmi, document) {
-            return write_refused(SAVE_NOT_READ_BACK);
-        }
-        WriteResult::Written {
-            revision: self.revision,
-            xmi,
+        match checked_xmi(open.session.document()) {
+            Ok(xmi) => {
+                open.written = Some((revision, recovery::digest(xmi.as_bytes())));
+                WriteResult::Written { revision, xmi }
+            }
+            Err(code) => write_refused(code),
         }
     }
 
     /// The shell has saved what [`Core::write`] gave at `revision`: the
-    /// document is now saved, until it changes. `false`, and nothing marked,
-    /// when the document has changed since (a revision other than the one
-    /// written) or nothing is open.
+    /// document is now saved, until it changes, and what was written is what
+    /// its file holds. `false`, and nothing marked, when the document has
+    /// changed since (a revision other than the one written) or nothing is
+    /// open.
     pub fn mark_saved(&mut self, revision: u32) -> bool {
         match self.open.as_mut() {
             Some(open) if revision == self.revision => {
                 open.session.mark_saved();
+                if let Some((_, written)) = open.written.take_if(|(at, _)| *at == revision) {
+                    open.base = written;
+                }
                 true
             }
             _ => false,
+        }
+    }
+
+    /// A recovery copy of the open document, the file `name`, written at
+    /// `written_at` (milliseconds since 1970, by the shell's clock): the
+    /// bytes to keep while it has changes that are not saved, or `Remove`
+    /// once it is in its saved state (R1, R3). The document is written by
+    /// the checked write (S1), so a copy restores to the document.
+    pub fn recovery_copy(&self, name: &str, written_at: f64) -> RecoveryCopy {
+        let Some(open) = self.open.as_ref() else {
+            return RecoveryCopy::Refused {
+                code: RECOVER_NOTHING_OPEN.to_owned(),
+            };
+        };
+        if !open.session.is_modified() {
+            return RecoveryCopy::Remove {
+                revision: self.revision,
+            };
+        }
+        let copy = checked_xmi(open.session.document())
+            .ok()
+            .and_then(|xmi| recovery::Envelope::new(name, &open.base, written_at, xmi).to_json());
+        match copy {
+            Some(copy) => RecoveryCopy::Keep {
+                revision: self.revision,
+                copy,
+            },
+            None => RecoveryCopy::Refused {
+                code: RECOVER_NOT_WRITTEN.to_owned(),
+            },
+        }
+    }
+
+    /// What the recovery copy in `copy`, found for the file just opened, is:
+    /// one to offer, with whether the file still holds the content its
+    /// changes began from (R6), or one that cannot be read (R7).
+    pub fn read_recovery(&self, copy: &[u8]) -> FoundRecovery {
+        let Some(open) = self.open.as_ref() else {
+            return FoundRecovery::Unreadable {
+                code: RECOVER_NOTHING_OPEN.to_owned(),
+            };
+        };
+        match read_copy(copy) {
+            Ok((envelope, _)) => FoundRecovery::Found {
+                name: envelope.name,
+                written_at: envelope.written_at,
+                base_matches: envelope.base == open.base,
+            },
+            Err(code) => FoundRecovery::Unreadable {
+                code: code.to_owned(),
+            },
+        }
+    }
+
+    /// Replaces the open document by the one the recovery copy `copy` kept,
+    /// as one command that Edit ▸ Undo takes back (R5). `Unchanged` when it
+    /// is that document already.
+    pub fn restore(&mut self, copy: &[u8]) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(RECOVER_NOTHING_OPEN);
+        };
+        let (envelope, document) = match read_copy(copy) {
+            Ok(read) => read,
+            Err(code) => return refused(code),
+        };
+        match open.session.restore(document) {
+            Some(record) => {
+                // The changes began from the copy's base, not from what the
+                // file holds now: later copies say so too, until a save, so a
+                // copy of other content is still flagged after another crash
+                // (R6).
+                open.base = envelope.base;
+                self.changed(&record, None)
+            }
+            None => EditResult::Unchanged,
         }
     }
 
@@ -579,6 +671,39 @@ const SAVE_NOTHING_OPEN: &str = "AF-SAVE-001";
 const SAVE_NOT_WRITTEN: &str = "AF-SAVE-002";
 /// AF-SAVE-003: what was written does not read back as the document.
 const SAVE_NOT_READ_BACK: &str = "AF-SAVE-003";
+
+/// AF-RECOVER-001: nothing is open.
+const RECOVER_NOTHING_OPEN: &str = "AF-RECOVER-001";
+/// AF-RECOVER-002: not a recovery copy this version reads.
+const RECOVER_UNKNOWN: &str = "AF-RECOVER-002";
+/// AF-RECOVER-003: the copy's SACM is refused by a strict read.
+const RECOVER_NOT_SACM: &str = "AF-RECOVER-003";
+/// AF-RECOVER-004: the copy could not be made.
+const RECOVER_NOT_WRITTEN: &str = "AF-RECOVER-004";
+
+/// `document` as XMI by the strict save, read back as `document` (S1), or
+/// the `AF-SAVE-*` code of why not.
+fn checked_xmi(document: &sacm::model::Document) -> Result<String, &'static str> {
+    let xmi = xmi::write(document, &WriteOptions::default()).map_err(|_| SAVE_NOT_WRITTEN)?;
+    if reads_back_as(&xmi, document) {
+        Ok(xmi)
+    } else {
+        Err(SAVE_NOT_READ_BACK)
+    }
+}
+
+/// The envelope in `copy` and the document its XMI holds, by the strict read
+/// a file is opened with, or the `AF-RECOVER-*` code of why not.
+fn read_copy(copy: &[u8]) -> Result<(recovery::Envelope, sacm::model::Document), &'static str> {
+    let envelope = recovery::Envelope::read(copy).ok_or(RECOVER_UNKNOWN)?;
+    let document = xmi::read(
+        envelope.xmi.as_bytes(),
+        &ReadOptions::default().with_mode(Mode::Strict),
+    )
+    .map_err(|_| RECOVER_NOT_SACM)?
+    .into_document();
+    Ok((envelope, document))
+}
 
 /// Whether `xmi`, read as a file is opened (a strict read), is `document`.
 fn reads_back_as(xmi: &str, document: &sacm::model::Document) -> bool {

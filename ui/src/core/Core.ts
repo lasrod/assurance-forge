@@ -9,7 +9,9 @@ import type {
   EditResult,
   ElementDetails,
   ElementKind,
+  FoundRecovery,
   History,
+  KeepResult,
   OpenedFile,
   OpenResult,
   Outline,
@@ -69,6 +71,35 @@ export interface Recent {
   remember(name: string, bytes: Uint8Array, result: OpenResult): Promise<void>;
   /** Whether the list holds copies of the files (the browser), which the welcome page says. */
   readonly keepsCopies: boolean;
+}
+
+/**
+ * Copies of the changes not saved, against a crash (plan decisions R1 to R8).
+ * The core makes and reads each copy; the shell keeps it: the desktop
+ * application in the working folder beside the file, the browser in this
+ * browser's IndexedDB. A copy goes when its changes are saved, undone or
+ * given up (Close, opening another file, closing the window); only an end
+ * without a close leaves it.
+ */
+export interface Recovery {
+  /**
+   * The copy kept for the file just opened as `name`: one to offer, until it
+   * is restored or discarded, or one that cannot be read and was set aside,
+   * said once. Null when there is none. While one is offered, no copy is
+   * written over it, and closing the file leaves it.
+   */
+  found(name: string): Promise<FoundRecovery | null>;
+  /** Restores the copy found, as one command Edit ▸ Undo takes back. */
+  restore(): Promise<EditResult>;
+  /** Discards the copy found: the only way one is deleted. */
+  discard(): Promise<void>;
+  /**
+   * Keeps a copy of the document at `revision`, the file `name`, while it
+   * has changes that are not saved, and removes it when it has none.
+   * `skipped` when the document is no longer at `revision`, or a copy found
+   * is still to be decided.
+   */
+  keep(name: string, revision: number): Promise<KeepResult>;
 }
 
 export interface Core {
@@ -154,4 +185,5 @@ export interface Core {
    */
   readonly openDialog: (() => Promise<OpenedFile | null>) | null;
   readonly recent: Recent;
+  readonly recovery: Recovery;
 }

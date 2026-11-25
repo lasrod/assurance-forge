@@ -39,7 +39,12 @@ File ▸ Save writes the case back to its file in the desktop application, and
 downloads it in the browser; Save As… writes it to a file the user names. A
 save is written only once the core has read the bytes back as the document.
 The title and the status bar say when changes are not saved, and Close, Open
-and closing the window ask before losing them. There is no recovery copy yet.
+and closing the window ask before losing them. Milestone 2, step 3
+([the recovery copy](docs/roadmap/milestone-2-recovery.md)): while changes
+are not saved, a copy of the case is kept about a second behind, in the
+working folder beside the file (`<file name>.af/`) or in the browser's
+IndexedDB. A crash leaves it, and opening the file again offers it back as
+one change that undo takes back.
 
 ```mermaid
 flowchart LR
@@ -72,11 +77,11 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | `sacm` | The SACM model, XMI, validation, edits. External: [libSACM](https://github.com/lasrod/libSACM), from crates.io | external |
 | `af-gsn` | The GSN view of a document: nodes, edges in GSN direction, and a code for each thing it could not draw; the GSN commands, as SACM operations. The reading and writing rules are in `docs/standards/sacm-gsn-mapping.md` | the view, with challenges of elements and of relationships; the commands that add an element, with what may be added where and a code for why not; the command that sets a node's identifier, name or statement; the command that removes a node and what is under it, and what it would remove |
 | `af-layout` | Text measurement (`rustybuzz`, `unicode-linebreak`), node sizing, placement, the line of every relationship, the render model, and the checks of its geometry (`check`) | support in rows below, a node with several parents below the lowest of them, separate trees side by side in shelves about a screen's proportions wide, context in a lane on either side of its node, a challenge beside the node or the relationship it challenges; a relationship that placed no node (a second parent, the line that closes a cycle, a context of two nodes) routed around every node; the outline the Argument Navigator shows |
-| `af-session` | The open document, a revision per command, a change record of each, undo and redo as whole-document snapshots, and which state of the document was saved | yes; drafts and storage no |
-| `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, what a removal deletes, remove, undo, redo, history with whether changes are not saved; write (the document as XMI, read back before it is given out), mark saved |
+| `af-session` | The open document, a revision per command, a change record of each, undo and redo as whole-document snapshots, and which state of the document was saved | yes, and a restore from a recovery copy as one command; drafts and storage no |
+| `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, what a removal deletes, remove, undo, redo, history with whether changes are not saved; write (the document as XMI, read back before it is given out), mark saved; the recovery copy (made, read, restored) and the base it carries |
 | `af-wasm` | The browser shell: `af-api` compiled to WebAssembly, answering in JSON | yes |
-| `af-desktop` | The Tauri shell: files, the open and save dialogs, saving (whole or not at all, never over a file changed on disk), recent files as paths, the window's close held while changes are not saved, the command line, `--smoke` for CI | yes; Windows checked in CI |
-| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Remove, the confirmation of a removal, Edit ▸ Undo and Redo, File ▸ Save and Save As…, the mark and the question for changes not saved, the trees, welcome page, English and Japanese, dark and light |
+| `af-desktop` | The Tauri shell: files, the open and save dialogs, saving (whole or not at all, never over a file changed on disk), recent files as paths, the window's close held while changes are not saved, the recovery copy in the working folder beside the file, the command line, `--smoke` for CI | yes; Windows checked in CI |
+| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Remove, the confirmation of a removal, Edit ▸ Undo and Redo, File ▸ Save and Save As…, the mark and the question for changes not saved, the recovery copy's timer and question, the trees, welcome page, English and Japanese, dark and light |
 
 ### Who owns what state
 
@@ -97,6 +102,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | Panel layout | DATUM's `Workspace`, held by `App.tsx`, kept in the browser's storage (`ui/src/layout.ts`) | the user moves or hides a panel |
 | Tree expansion | `App.tsx` | the user, a selection that must be shown, and a new file (not an edit) |
 | Recent files | desktop: paths in the configuration directory (`af-desktop/src/recent.rs`); browser: copies in IndexedDB (`ui/src/core/webRecent.ts`) | each open |
+| The base: a SHA-256 of what the file held when opened or last saved | `af-api`'s `Core` | open, and each save the shell reports |
+| The recovery copy (an envelope the core makes and reads) | desktop: `<file name>.af/recovery.json` beside the file (`af-desktop/src/recovery.rs`); browser: IndexedDB, by file name (`ui/src/core/webRecovery.ts`) | about a second after each change not saved (the page's timer, `useDocument.ts`); removed on save, undo to the saved state, and a close the user chose |
 | Theme and language | `ui/`; the language is sent to the core | the user |
 
 ### From a file to pixels

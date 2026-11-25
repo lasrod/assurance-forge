@@ -285,3 +285,9 @@ modified: boolean, };
 export type WriteResult = { "result": "written", revision: number, xmi: string, } | { "result": "refused", code: string, };
 
 export type SaveResult = { "result": "saved", revision: number, name: string, } | { "result": "refused", code: string, } | { "result": "cancelled" };
+
+export type RecoveryCopy = { "result": "keep", revision: number, copy: string, } | { "result": "remove", revision: number, } | { "result": "refused", code: string, };
+
+export type FoundRecovery = { "result": "found", name: string, writtenAt: number, baseMatches: boolean, } | { "result": "unreadable", code: string, };
+
+export type KeepResult = { "result": "kept" } | { "result": "removed" } | { "result": "skipped" } | { "result": "refused", code: string, };

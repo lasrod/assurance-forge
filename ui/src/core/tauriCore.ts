@@ -10,7 +10,9 @@ import type {
   DiagramAt,
   EditResult,
   ElementDetails,
+  FoundRecovery,
   History,
+  KeepResult,
   OpenedFile,
   OpenResult,
   Outline,
@@ -99,6 +101,14 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
       },
       remember: async () => undefined,
       keepsCopies: false,
+    },
+    // The shell keeps the copy in the working folder beside the file, and
+    // knows which file is open: the name is the page's, for the browser.
+    recovery: {
+      found: () => invoke<FoundRecovery | null>('recovery_found'),
+      restore: () => invoke<EditResult>('restore_recovery'),
+      discard: () => invoke('discard_recovery'),
+      keep: (_name, revision) => invoke<KeepResult>('keep_recovery', { revision }),
     },
   };
 }
