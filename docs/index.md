@@ -16,7 +16,10 @@ added, with undo and redo; saving comes next.
 | A tool to use today | The C++ application: [release 0.3.0-alpha.3](https://github.com/lasrod/assurance-forge/releases/tag/0.3.0-alpha.3). Its documentation is on the [`cpp` branch](https://github.com/lasrod/assurance-forge/tree/cpp/docs). |
 | The plan for the rebuild | [Rust rebuild, Phase 0](roadmap/rust-rebuild-phase-0.md) |
 | The step that built the viewer | [Milestone 1, step 1: the diagram](roadmap/milestone-1-diagram.md) |
+| The problem list | [Milestone 1, step 2: the problem list](roadmap/milestone-1-problems.md) |
 | The first editing step | [Milestone 2, step 1: adding elements](roadmap/milestone-2-add-elements.md) |
+| Saving | [Milestone 2, step 2: saving](roadmap/milestone-2-save.md) |
+| The recovery copy | [Milestone 2, step 3: the recovery copy](roadmap/milestone-2-recovery.md) |
 | The shape of the new code | [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md) |
 | How GSN is expressed in SACM | [SACM to GSN mapping](standards/sacm-gsn-mapping.md) |
 | What the C++ version can do | [Capability matrix](reference/cpp-capability-matrix.md) |
