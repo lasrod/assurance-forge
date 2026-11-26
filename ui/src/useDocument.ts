@@ -591,9 +591,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    */
   const moveTargets = useCallback(async (id: string): Promise<MoveTargets | null> => {
     const on = coreRef.current;
-    const revision = shown.current;
-    if (!on || revision === null) return null;
+    const asked = shown.current;
+    if (!on || asked === null) return null;
     const request = latest.current;
+    // A text left by the press that began the move is set first.
+    const revision = await followingEdits(asked);
     try {
       const answer = await on.moveTargets(id);
       if (!answer || request !== latest.current) return null;
@@ -609,7 +611,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     } catch {
       return null;
     }
-  }, []);
+  }, [followingEdits]);
   /**
    * Moves the node `targets` is of under the node `to` (null: to the top
    * level), as the core said at its revision; the core refuses it if that is
@@ -654,12 +656,12 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       about: { kind: NodeKind | null; identifier: string },
       onShown: EditShown,
     ) =>
-      void edit(async (on) => on.repairJoin(offered.element, offered.relationship, await followingEdits(revision)), 'mark', offered.element, about.kind, onShown, {
+      void edit((on) => on.repairJoin(offered.element, offered.relationship, revision), 'mark', offered.element, about.kind, onShown, {
         kind: 'repaired',
         repaired: about.kind,
         identifier: about.identifier,
       }),
-    [edit, followingEdits],
+    [edit],
   );
   /** Says why a move cannot be made to the place the user chose. */
   const moveRefused = useCallback((code: string, about: NodeKind | null) => setState({ kind: 'editRefused', code, about }), []);

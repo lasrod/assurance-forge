@@ -153,11 +153,11 @@ test('a node that cannot be moved says why at once, and nothing follows the poin
   await page.mouse.move(start.x + 30, start.y + 30, { steps: 4 });
   await expect(status(page)).toHaveText('Nothing changed. This element is under more than one element, so there is no single line to move.');
   await expect.poll(async () => (await hook(page)).dragging).toBeNull();
-  // The rest of the press does nothing: the view stays where it was.
+  // The rest of the press pans, and looks it.
   const view = (await hook(page)).viewport!;
   await page.mouse.move(start.x + 200, start.y + 120, { steps: 6 });
-  expect((await hook(page)).viewport).toEqual(view);
-  await expect(canvas(page)).not.toHaveCSS('cursor', 'grabbing');
+  await expect.poll(async () => (await hook(page)).viewport!.offsetX - view.offsetX).toBeGreaterThan(100);
+  await expect(canvas(page)).toHaveCSS('cursor', 'grabbing');
   await page.mouse.up();
   expect((await hook(page)).revision).toBe(1);
 

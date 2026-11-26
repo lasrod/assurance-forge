@@ -147,6 +147,13 @@ export function DiagramCanvas({
   const [panning, setPanning] = useState(false);
   // The node being dragged, and where the pointer is (CSS px of the canvas).
   const [drag, setDrag] = useState<{ id: string; pointer: { x: number; y: number } } | null>(null);
+  // What follows the pointer: the node's identifier, and how many come with
+  // it. Worked out once a drag, not at each move of the pointer.
+  const dragId = drag?.id ?? null;
+  const dragLabel = useMemo(() => {
+    const node = dragId && diagram ? diagram.diagram.nodes.find((candidate) => candidate.id === dragId) : undefined;
+    return node && diagram ? badgeLabel(node, comesWith(diagram.diagram, node.id)) : null;
+  }, [diagram, dragId]);
   const [armed, setArmed] = useState(false);
   const dragPointer = useRef<{ x: number; y: number } | null>(null);
 
@@ -179,10 +186,7 @@ export function DiagramCanvas({
       report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null, viewport: null, selected, hovered: null });
       return;
     }
-    // What follows the pointer: the node's identifier, and how many come with it.
-    const dragged = drag ? diagram.diagram.nodes.find((candidate) => candidate.id === drag.id) : undefined;
-    const badge: Badge | null =
-      drag && dragged ? { pointer: drag.pointer, label: badgeLabel(dragged, comesWith(diagram.diagram, drag.id)) } : null;
+    const badge: Badge | null = drag && dragLabel ? { pointer: drag.pointer, label: dragLabel } : null;
     const drawn = draw(context, diagram.diagram, viewport, colours, measuredFamilies, { ...size, dpr }, {
       selected,
       hovered: shownHover,
@@ -190,7 +194,7 @@ export function DiagramCanvas({
       badge,
     });
     report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover, dragging: drag?.id ?? null });
-  }, [diagram, size, style, colours, viewport, selected, shownHover, move, drag]);
+  }, [diagram, size, style, colours, viewport, selected, shownHover, move, drag, dragLabel]);
 
   // While a node is dragged, the view pans when the pointer nears an edge,
   // and the place under the pointer follows the view.
@@ -333,12 +337,16 @@ export function DiagramCanvas({
         dragPointer.current = point;
         setDrag({ id: node.id, pointer: point });
         // A node that cannot be moved: the drag is over at once, and the
-        // status says why. The rest of the press does nothing.
+        // status says why. The rest of the press pans, as a press on the
+        // canvas does, so a view a node fills can still be moved.
         void onDragStart?.(node.id).then((movable) => {
           if (movable || gesture.current !== current || !current.dragging) return;
           current.dragging = false;
-          current.over = true;
+          current.panning = true;
+          current.view = latest.current.viewport ?? current.view;
+          current.start = dragPointer.current ?? current.start;
           endPress(current);
+          setPanning(true);
           setHovered(null);
         });
         return;
