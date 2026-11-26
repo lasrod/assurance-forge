@@ -182,7 +182,7 @@ you lose them.**
 | `isPublic` | TaggedValue |
 | `isMany`, `isOptional` | *no SACM feature* |
 
-### `undeveloped` occupies the declaration, so it is confined to Goal and Strategy
+### `undeveloped` occupies the declaration, so it is confined to a Goal
 
 The row above is a *substitution*, not an addition: SACM has one
 `assertionDeclaration`, so `needsSupport` and `assumed` / `axiomatic` /
@@ -611,19 +611,32 @@ milestone 2, step 5.
 
 | Rule | Changed | SACM operations | Status | Evidence |
 |---|---|---|---|---|
-| W26 | The undeveloped mark of a Goal | `SetAssertionDeclaration` on the Claim: `needsSupport` to mark it, `asserted` to clear the mark. Only a Claim drawn as a Goal whose declaration is `asserted` or `needsSupport` (AF-EDIT-021 otherwise): the declaration is the one slot, and on an Assumption or a Justification it says what the element is. A Goal that a `SupportedBy` line leaves is not marked (AF-EDIT-022); clearing is always allowed, so a mark the file left on a supported Goal (AF-GSN-010) is cleared. A Strategy is not marked: see below | Decided | R3; "`undeveloped` occupies the declaration" above; GSN well-formedness: an undeveloped element has no `SupportedBy` children; W11 clears the mark the same way when support is added |
+| W26 | The undeveloped mark of a Goal | `SetAssertionDeclaration` on the Claim: `needsSupport` to mark it, `asserted` to clear the mark. Only a Claim drawn as a Goal whose declaration is `asserted` or `needsSupport` (AF-EDIT-021 otherwise): the declaration is the one slot, and on an Assumption or a Justification it says what the element is. A Goal that a `SupportedBy` line leaves is not marked (AF-EDIT-022); clearing is always allowed, so a mark the file left on a supported Goal (AF-GSN-010) is cleared. A Strategy is not marked: SACM 2.3 has no place for it (below) | Decided | R3; "`undeveloped` occupies the declaration" above; GSN well-formedness: an undeveloped element has no `SupportedBy` children; W11 clears the mark the same way when support is added |
 
-**A Strategy's mark is an open decision.** GSN v3 lets a Strategy be
-undeveloped. SACM 2.3 gives `ArgumentReasoning` no `assertionDeclaration`
-(it is an `ArgumentAsset`, not an `Assertion`), so R3 reads the mark only from
-a Claim, and no rule here writes it for a Strategy. The earlier section's
-title says the decorator is "confined to Goal and Strategy" from the C++
-application, which kept the mark in a boolean of its own; this record has no
-row that says where a Strategy's mark is held in SACM. A candidate is the
-declaration of the one inference the Strategy is the `reasoning` of
-(`needsSupport` on the `AssertedInference`), which SACM can hold. Nothing
-has established that another tool reads it so. Until a row with its evidence
-is added, the editor offers no mark on a Strategy.
+**A Strategy is not marked undeveloped: SACM 2.3 cannot hold it.** Decided
+on 26 November 2026, from the GSN Metamodel Specification v2.2 (July 2021),
+§2.1, Figure 2:
+
+- The metamodel gives `Strategy` its own attribute, `+undeveloped: boolean`,
+  as it gives `Goal` one. It is an attribute of the GSN class, not of SACM.
+  `Strategy` extends SACM `ArgumentReasoning`, which is an `ArgumentAsset`
+  and not an `Assertion`, so it has no `assertionDeclaration`.
+- The metamodel strikes `needsSupport` out of `AssertionDeclaration` and pins
+  every `Assertion` to `asserted` (OCL `Context::Assertion`). The mapping onto
+  pure SACM is left out: "If a model is transformed from GSN to SACM then the
+  appropriate AssertionDeclaration must be applied to each SACM Claim to
+  reflect the nature of the GSN element … These transformation rules are not
+  included in this metamodel specification" (page 6).
+
+A Goal's mark therefore has a SACM 2.3 carrier, `needsSupport` on its Claim
+(R3, W26), and a Strategy's has none. The candidate considered, `needsSupport`
+on the inference the Strategy is the `reasoning` of, says something else in
+SACM: that the inference from the premises to the conclusion needs support,
+not that the Strategy is undeveloped. No tool was found that reads it so, and
+writing it would invent a mapping. A Strategy offers no mark, and one in a
+file is not read from anything. The gap is row 15 of
+[`sacm-gsn-metamodel-gaps.md`](sacm-gsn-metamodel-gaps.md), with row 3
+(defeat on a Strategy), whose remedy would carry it too.
 
 ### Repairing a join
 

@@ -38,7 +38,7 @@ to the Problems panel.
 ### Out of scope
 
 The undeveloped mark of a Strategy, which GSN has and SACM 2.3 has no place
-for (see the open question below). Repairs of the other problems. A repair of
+for (below). Repairs of the other problems. A repair of
 every such join in a file at once.
 
 ## Decisions
@@ -53,16 +53,16 @@ every such join in a file at once.
 | U6 | The new context relationship takes the name of the support relationship it replaces; its `xmi:id` is new | SACM cannot change a relationship's class in place. The name is the one thing of the old relationship a reader may know it by |
 | U7 | With a Strategy as the relationship's reasoning, the join is not repaired | The element is then one of the Strategy's premises, and whether it is context of the Strategy or of its Goal is not the editor's to say |
 
-## Open question
+## The undeveloped mark of a Strategy
 
-**An undeveloped Strategy.** GSN v3 lets a Strategy be undeveloped. SACM 2.3
-gives `ArgumentReasoning` no `assertionDeclaration`, so R3 reads the mark only
-from a Claim, and no rule writes it for a Strategy. A candidate is the
-declaration of the Strategy's one inference (`needsSupport`), which SACM can
-hold; nothing has established that another tool reads it so, and no mapping
-is recorded. Until one is, a Strategy offers no mark. A Strategy added alone
-(W2) is in the same state in practice, and the problem list says so
-(AF-GSN-008).
+Not supported, because SACM 2.3 cannot hold it (decided 26 November 2026).
+The GSN Metamodel v2.2 gives `Strategy` an `undeveloped` boolean of its own,
+on a class that extends `ArgumentReasoning`, which has no
+`assertionDeclaration`; it leaves the mapping onto SACM out. The evidence is in
+[the mapping record](../standards/sacm-gsn-mapping.md#the-undeveloped-mark), and
+the gap is row 15 of
+[the metamodel gaps](../standards/sacm-gsn-metamodel-gaps.md). A Strategy that
+has no Goal yet is still reported by the problem list (AF-GSN-008).
 
 ## The pieces
 
@@ -80,4 +80,5 @@ is recorded. Until one is, a Strategy offers no mark. A Strategy added alone
 - [x] **G2.** The larger diamond.
 - [x] **G3.** The checkbox, the menu item and the Repair action, in both
       languages, with browser tests.
-- [ ] **G4.** The undeveloped mark of a Strategy decided, with its evidence.
+- [x] **G4.** The undeveloped mark of a Strategy decided, with its evidence:
+      not supported.

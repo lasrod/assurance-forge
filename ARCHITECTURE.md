@@ -181,9 +181,7 @@ interface**. Interface results are run locally and put in each pull request.
 
 ## What is next
 
-Milestone 2 goes on to assurance claim points and challenges. Whether a
-Strategy can be marked undeveloped is open
-([the plan](docs/roadmap/milestone-2-mark-and-repair.md)). Nothing else in the planned
+Milestone 2 goes on to assurance claim points and challenges. Nothing else in the planned
 shape below is started.
 
 Requirements editing places on the parts already built:
