@@ -495,7 +495,7 @@ pub struct MoveTarget {
     /// The SACM id of the node.
     pub id: String,
     /// Why the moved node cannot go under it (`AF-EDIT-001` to `AF-EDIT-004`,
-    /// `AF-EDIT-018` to `AF-EDIT-020`), or null when it can. The frontend
+    /// `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-025`), or null when it can. The frontend
     /// words it.
     pub refusal: Option<String>,
     /// Moving there also clears this Goal's undeveloped decorator.

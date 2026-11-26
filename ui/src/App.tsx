@@ -61,6 +61,13 @@ const UNDEVELOPED = 'undeveloped';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
+/**
+ * A move being chosen: the node's places at a revision, its kind and
+ * identifier for the status, and whether it is dragged (no prompt is shown,
+ * and the choice ends with the drop).
+ */
+type Moving = { targets: MoveTargets; kind: NodeKind; identifier: string; dragged: boolean };
+
 /** A text of an element, as Element Properties labels it. */
 const TEXT_FIELDS: Record<TextField, MessageKey> = {
   identifier: 'propertyId',
@@ -201,13 +208,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // A move being chosen: the node to move and where the core says it may
   // go, at a revision. Another revision on screen, or another file, ends it:
   // its targets are of the document before.
-  // `dragged`: the node is being dragged there, so no prompt is shown and
-  // the choice ends with the drop.
-  const [moving, setMoving] = useState<{ targets: MoveTargets; kind: NodeKind; identifier: string; dragged: boolean } | null>(
-    null,
-  );
+  const [moving, setMoving] = useState<Moving | null>(null);
   // The node being dragged: places that come after it was dropped are not shown.
   const dragged = useRef<string | null>(null);
+  // The move of the drag under way, as soon as the core has answered: a drop
+  // that comes before the answer is on screen still finds it.
+  const dragMove = useRef<Moving | null>(null);
   const shownRevision = diagram?.revision ?? null;
   if (moving && moving.targets.revision !== shownRevision) setMoving(null);
   const moveMarks = useMemo(
@@ -227,6 +233,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const startMove = useCallback(
     async (id: string, byDrag: boolean): Promise<boolean> => {
       dragged.current = byDrag ? id : null;
+      dragMove.current = null;
       const targets = await moveTargets(id);
       const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
       if (!targets || !node) {
@@ -238,17 +245,19 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       if (byDrag && dragged.current !== id) return true;
       const row = outline.find((candidate) => candidate.id === id);
       setSelected(id);
-      setMoving({ targets, kind: node.kind, identifier: row?.identifier ?? id, dragged: byDrag });
+      const move = { targets, kind: node.kind, identifier: row?.identifier ?? id, dragged: byDrag };
+      if (byDrag) dragMove.current = move;
+      setMoving(move);
       return true;
     },
     [moveTargets, diagram, outline, setSelected],
   );
   /** Moves the node being moved under `to` (null: to the top level), or says why it cannot go there. */
   const moveTo = useCallback(
-    (to: string | null) => {
-      if (!moving) return;
-      const place = to === null ? null : moving.targets.nodes.find((target) => target.id === to);
-      const refusal = to === null ? moving.targets.canvas : place ? place.refusal : 'AF-EDIT-011';
+    (to: string | null, current: Moving | null = moving) => {
+      if (!current) return;
+      const place = to === null ? null : current.targets.nodes.find((target) => target.id === to);
+      const refusal = to === null ? current.targets.canvas : place ? place.refusal : 'AF-EDIT-011';
       if (refusal !== null) {
         // The kind a leaf's refusal names is the place's, not the node's moved.
         const kind = to ? (diagram?.diagram.nodes.find((node) => node.id === to)?.kind ?? null) : null;
@@ -257,7 +266,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       }
       const toIdentifier = to ? (outline.find((row) => row.id === to)?.identifier ?? to) : null;
       setMoving(null);
-      moveWith(moving.targets, to, moving, toIdentifier, followEdit);
+      moveWith(current.targets, to, current, toIdentifier, followEdit);
     },
     [moving, diagram, outline, moveRefused, moveWith, followEdit],
   );
@@ -269,12 +278,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
    */
   const endDrag = useCallback(
     (end: DragEnd) => {
+      const current = dragMove.current ?? moving;
       dragged.current = null;
-      if (!moving) return;
-      if (end.on === 'node') moveTo(end.id);
+      dragMove.current = null;
       setMoving(null);
+      if (current && end.on === 'node' && current.targets.revision === shownRevision) moveTo(end.id, current);
     },
-    [moving, moveTo],
+    [moving, moveTo, shownRevision],
   );
   /**
    * Opens the menu of a node, or of the empty canvas, at a client point: the

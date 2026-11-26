@@ -368,6 +368,12 @@ impl Mover {
             | NodeKind::Context
             | NodeKind::Assumption
             | NodeKind::Justification => return Err(Refusal::Leaf),
+            // The line a misjoined element keeps is a support line: under
+            // an undeveloped Goal it would support it, and the move does not
+            // develop a Goal by a line GSN does not allow (W21).
+            NodeKind::Goal if self.role == Role::Misjoined && node.undeveloped => {
+                return Err(Refusal::WouldSupportUndeveloped);
+            }
             NodeKind::Goal => self.role == Role::Support && node.undeveloped,
             NodeKind::Strategy => {
                 // The line kept is a support line, which a Strategy takes

@@ -92,6 +92,9 @@ pub enum Refusal {
     /// AF-EDIT-024: the Strategy supports no Goal, so there is no line to
     /// move it by (W21).
     StrategyAlone,
+    /// AF-EDIT-025: the element keeps a support line where GSN has context,
+    /// and the Goal is undeveloped: the move would support it (W22).
+    WouldSupportUndeveloped,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -122,6 +125,7 @@ impl Refusal {
             Refusal::GoalSupported => "AF-EDIT-022",
             Refusal::NothingToRepair => "AF-EDIT-023",
             Refusal::StrategyAlone => "AF-EDIT-024",
+            Refusal::WouldSupportUndeveloped => "AF-EDIT-025",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

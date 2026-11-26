@@ -502,14 +502,21 @@ fn w21_a_node_joined_as_gsn_does_not_allow_keeps_its_line() {
         Some(Refusal::JoinNotMoved)
     );
 
+    // Under an undeveloped Goal the line kept would support it.
+    assert_eq!(
+        refusal(&document, "a", Target::Node("todo")),
+        Some(Refusal::WouldSupportUndeveloped)
+    );
+    assert_eq!(Refusal::WouldSupportUndeveloped.code(), "AF-EDIT-025");
+
     let before = ids(&document);
     let findings = shown.findings.len();
     let shown = view(&document, "en");
-    move_node(&mut document, &shown, "a", Target::Node("todo"))
+    move_node(&mut document, &shown, "a", Target::Node("g2"))
         .unwrap_or_else(|error| panic!("{error}"));
     // The same relationship, as wrong as it was, with a new end.
     assert_eq!(ids(&document), before);
-    assert!(has_line(&document, "todo", "a", EdgeKind::SupportedBy));
+    assert!(has_line(&document, "g2", "a", EdgeKind::SupportedBy));
     assert!(!has_line(&document, "g", "a", EdgeKind::SupportedBy));
     let after = view(&document, "en");
     assert_eq!(after.findings.len(), findings);

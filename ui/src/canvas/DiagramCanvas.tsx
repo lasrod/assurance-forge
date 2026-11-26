@@ -78,6 +78,8 @@ type Gesture = {
   dragging?: boolean;
   /** The timer of a touch being held. */
   hold?: number;
+  /** The drag was given up, or refused: the rest of the press does nothing. */
+  over?: boolean;
 };
 
 /**
@@ -310,6 +312,7 @@ export function DiagramCanvas({
       return;
     }
     pointers.current.set(event.pointerId, point);
+    if (current.over) return;
     if (current.pinch && pointers.current.size >= 2) {
       const now = twoPointers();
       const zoomed = zoomAbout(current.view, now.distance / current.pinch.distance, current.pinch.middle.x, current.pinch.middle.y);
@@ -334,11 +337,8 @@ export function DiagramCanvas({
         void onDragStart?.(node.id).then((movable) => {
           if (movable || gesture.current !== current || !current.dragging) return;
           current.dragging = false;
-          current.panning = true;
-          current.view = latest.current.viewport ?? current.view;
-          current.start = dragPointer.current ?? current.start;
+          current.over = true;
           endPress(current);
-          setPanning(true);
           setHovered(null);
         });
         return;
@@ -365,7 +365,7 @@ export function DiagramCanvas({
       onDragEnd?.(node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : { on: 'canvas' });
       return;
     }
-    if (!current || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
+    if (!current || current.over || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
     // A press that did not move is a click: it selects the node under it, or
     // the line under it, or clears the selection on empty canvas.
     const point = local(event);
@@ -406,6 +406,15 @@ export function DiagramCanvas({
   const onContext = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     if (!diagram || !viewport) return;
+    // A touch held on a node arms its drag before the browser's long press
+    // opens a menu. While the node is dragged no menu opens; held still, the
+    // menu opens and the press is over, so no drag follows it.
+    const press = gesture.current;
+    if (press?.dragging) return;
+    if (press?.node) {
+      press.over = true;
+      endPress(press);
+    }
     // The canvas takes focus, so closing the menu returns it here.
     event.currentTarget.focus();
     const point = local(event);
@@ -420,10 +429,9 @@ export function DiagramCanvas({
       event.preventDefault();
       const current = gesture.current;
       current.dragging = false;
-      current.panning = true;
-      current.view = viewport ?? current.view;
-      current.start = dragPointer.current ?? current.start;
+      current.over = true;
       endPress(current);
+      setHovered(null);
       onDragEnd?.({ on: 'cancel' });
       return;
     }

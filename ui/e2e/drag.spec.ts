@@ -112,10 +112,15 @@ test('Escape gives the drag up, and the rest of the press does nothing', async (
   await opened(page);
   await canvas(page).focus();
   const view = (await hook(page)).viewport!;
+  const end = await nodeCentre(page, 'cl_sub_1');
   await dragTo(page, 'ev_2', 'cl_sub_1');
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await hook(page)).dragging).toBeNull();
+  // Moved on, the pointer pans nothing; let go on a node, it is not selected.
+  await page.mouse.move(end.x - 200, end.y + 100, { steps: 6 });
+  await page.mouse.move(end.x, end.y, { steps: 6 });
   await page.mouse.up();
+  expect((await hook(page)).selected).toBe('ev_2');
   expect((await hook(page)).revision).toBe(1);
   expect((await hook(page)).viewport).toEqual(view);
   await expect(page.locator('.af-move-banner')).toBeHidden();
@@ -148,8 +153,11 @@ test('a node that cannot be moved says why at once, and nothing follows the poin
   await page.mouse.move(start.x + 30, start.y + 30, { steps: 4 });
   await expect(status(page)).toHaveText('Nothing changed. This element is under more than one element, so there is no single line to move.');
   await expect.poll(async () => (await hook(page)).dragging).toBeNull();
-  // The rest of the press pans, and looks it.
-  await expect(canvas(page)).toHaveCSS('cursor', 'grabbing');
+  // The rest of the press does nothing: the view stays where it was.
+  const view = (await hook(page)).viewport!;
+  await page.mouse.move(start.x + 200, start.y + 120, { steps: 6 });
+  expect((await hook(page)).viewport).toEqual(view);
+  await expect(canvas(page)).not.toHaveCSS('cursor', 'grabbing');
   await page.mouse.up();
   expect((await hook(page)).revision).toBe(1);
 
@@ -158,6 +166,32 @@ test('a node that cannot be moved says why at once, and nothing follows the poin
   const at = await nodeCentre(page, goal.id);
   await page.mouse.click(at.x, at.y, { button: 'right' });
   await expect(page.getByRole('menu')).toBeVisible();
+});
+
+test('a long press opens no menu while a node is dragged, and ends a press held still', async ({ page }) => {
+  // A touch held on a node arms its drag before the browser's long press
+  // opens a menu: the menu event is sent as that long press sends it.
+  await opened(page);
+  const longPress = (at: Point) =>
+    canvas(page).dispatchEvent('contextmenu', { clientX: at.x, clientY: at.y, button: 2, bubbles: true, cancelable: true });
+  const end = await nodeCentre(page, 'cl_sub_1');
+  await dragTo(page, 'ev_2', 'cl_sub_1');
+  await longPress(end);
+  await expect(page.getByRole('menu')).toBeHidden();
+  expect((await hook(page)).dragging).toBe('ev_2');
+  await page.mouse.up();
+  await expect.poll(async () => (await hook(page)).revision).toBe(2);
+
+  // Held still on a node: the menu opens, and no drag follows.
+  const start = await nodeCentre(page, 'cl_sub_2');
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await longPress(start);
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.mouse.move(start.x + 40, start.y + 40, { steps: 4 });
+  expect((await hook(page)).dragging ?? null).toBeNull();
+  await page.mouse.up();
+  expect((await hook(page)).revision).toBe(2);
 });
 
 test('the view pans when a dragged node nears an edge', async ({ page }) => {
