@@ -116,6 +116,26 @@
     gap: var(--datum-space-4);
   }
 
+  /* Why a Goal is, or cannot be, undeveloped: under its checkbox. */
+  .af-undeveloped-hint {
+    margin: var(--datum-space-4) 0 0;
+  }
+
+  /* The repair of the problem chosen, above the list. */
+  .af-problem-repair {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--datum-space-12);
+    padding: var(--datum-space-4) var(--datum-space-12);
+    font-size: var(--datum-type-control-size);
+    line-height: var(--datum-type-control-line-height);
+  }
+
+  .af-problem-repair .datum-button {
+    flex: none;
+  }
+
   /* The centre's header: the zoom controls, then what a move in progress
      asks of the user. */
   .af-centre-header {

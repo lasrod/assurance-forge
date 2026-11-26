@@ -50,7 +50,13 @@ export type ElementDetails = {
 /**
  * The SACM id.
  */
-id: string, kind: NodeKind, undeveloped: boolean, identifier: string, name: string | null, statement: string | null, 
+id: string, kind: NodeKind, undeveloped: boolean, 
+/**
+ * Why the undeveloped mark cannot be changed to what it is not
+ * (`AF-EDIT-021`: not a Goal; `AF-EDIT-022`: the Goal is supported), or
+ * null when it can.
+ */
+undevelopedRefusal: string | null, identifier: string, name: string | null, statement: string | null, 
 /**
  * The view's codes about this element.
  */
@@ -301,6 +307,8 @@ canvas: string | null,
  */
 nodes: Array<MoveTarget>, };
 
+export type ProblemRepair = { element: string, relationship: string, };
+
 export type EditResult = { "result": "applied", revision: number, 
 /**
  * The element the interface selects: the one an add made, the node
@@ -364,7 +372,12 @@ relationship: string | null,
 /**
  * Where in the file, for what libSACM reported reading it.
  */
-line: number | null, column: number | null, };
+line: number | null, column: number | null, 
+/**
+ * The repair the editor can make of it, or null: `Core::repair_join`
+ * with these. Only `AF-GSN-004` has one so far.
+ */
+repair: ProblemRepair | null, };
 
 export type ProblemElement = { 
 /**

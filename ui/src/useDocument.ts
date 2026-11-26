@@ -54,6 +54,8 @@ export type DocumentState =
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
+  | { kind: 'undevelopedSet'; undeveloped: boolean; identifier: string }
+  | { kind: 'repaired'; repaired: NodeKind | null; identifier: string }
   | { kind: 'undone' }
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null }
@@ -408,7 +410,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo' | 'remove' | 'move' | 'restore' | TextField,
+      what: 'add' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
@@ -482,7 +484,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       else if (what === 'add') {
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
-      else if (what !== 'remove' && what !== 'move' && what !== 'restore') setState({ kind: 'textChanged', field: what });
+      else if (what !== 'remove' && what !== 'move' && what !== 'mark' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
     },
     [showRelayout, readProblems],
@@ -615,6 +617,31 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         moved: moved.kind,
         identifier: moved.identifier,
         to: toIdentifier,
+      }),
+    [edit],
+  );
+  /** Marks the Goal `id` undeveloped, or clears the mark; the view keeps the Goal in place. */
+  const setUndeveloped = useCallback(
+    (id: string, undeveloped: boolean, identifier: string, onShown: EditShown) =>
+      void edit((on) => on.setUndeveloped(id, undeveloped), 'mark', id, 'goal', onShown, { kind: 'undevelopedSet', undeveloped, identifier }),
+    [edit],
+  );
+  /**
+   * Makes the repair a problem of `revision` offers: the element joined by a
+   * support line is joined by context. The core refuses it if the revision
+   * is not current.
+   */
+  const repair = useCallback(
+    (
+      offered: { element: string; relationship: string },
+      revision: number,
+      about: { kind: NodeKind | null; identifier: string },
+      onShown: EditShown,
+    ) =>
+      void edit((on) => on.repairJoin(offered.element, offered.relationship, revision), 'mark', offered.element, about.kind, onShown, {
+        kind: 'repaired',
+        repaired: about.kind,
+        identifier: about.identifier,
       }),
     [edit],
   );
@@ -803,6 +830,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     moveTargets,
     move,
     moveRefused,
+    setUndeveloped,
+    repair,
     setText,
     undo,
     redo,

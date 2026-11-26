@@ -159,6 +159,18 @@ export interface Core {
    */
   moveNode(id: string, to: string | null, revision: number): Promise<EditResult>;
   /**
+   * Marks the Goal with this SACM id undeveloped, or clears the mark.
+   * `unchanged` when it was that already; refused when it is not a Goal
+   * (AF-EDIT-021) or is supported (AF-EDIT-022).
+   */
+  setUndeveloped(id: string, undeveloped: boolean): Promise<EditResult>;
+  /**
+   * Joins the node with this SACM id by context in place of the support
+   * line `relationship` draws, as a problem of `revision` offered: refused
+   * (AF-EDIT-009) when the document has changed since.
+   */
+  repairJoin(id: string, relationship: string, revision: number): Promise<EditResult>;
+  /**
    * Sets the identifier, name or statement of the node with this SACM id.
    * `unchanged` when it was that already; refused (AF-EDIT-011 to 014) when
    * it cannot be set.

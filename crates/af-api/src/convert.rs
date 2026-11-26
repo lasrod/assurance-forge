@@ -214,5 +214,6 @@ pub(crate) fn problem(
         relationship: problem.relationship,
         line: problem.line,
         column: problem.column,
+        repair: None,
     }
 }

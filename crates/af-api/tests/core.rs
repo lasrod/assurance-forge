@@ -849,3 +849,88 @@ fn a_move_says_where_a_node_may_go_and_undo_takes_it_back() {
     assert!(matches!(core.undo(), EditResult::Applied { .. }));
     assert!(under(&mut core, "cl_sub_2") && !under(&mut core, "cl_sub_1"));
 }
+
+#[test]
+fn the_undeveloped_mark_is_set_where_it_can_be_and_a_wrong_join_is_repaired() {
+    use af_api::contract::EditResult;
+    let mut core = core("en");
+    assert!(matches!(
+        core.set_undeveloped("cl_sub_2", false),
+        EditResult::Refused { ref code } if code == "AF-EDIT-007"
+    ));
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let refusal = |core: &Core, id: &str| {
+        core.element(id)
+            .unwrap_or_else(|| panic!("{id}"))
+            .undeveloped_refusal
+    };
+    // A stale mark is cleared; a supported Goal is not marked again.
+    assert_eq!(refusal(&core, "cl_sub_2"), None);
+    assert_eq!(refusal(&core, "cl_top").as_deref(), Some("AF-EDIT-022"));
+    assert_eq!(refusal(&core, "ev_1").as_deref(), Some("AF-EDIT-021"));
+    assert!(matches!(
+        core.set_undeveloped("cl_top", true),
+        EditResult::Refused { ref code } if code == "AF-EDIT-022"
+    ));
+    assert!(matches!(
+        core.set_undeveloped("cl_sub_2", true),
+        EditResult::Unchanged
+    ));
+    assert!(matches!(
+        core.set_undeveloped("cl_sub_2", false),
+        EditResult::Applied { revision: 2, .. }
+    ));
+    assert_eq!(
+        core.element("cl_sub_2").map(|details| details.undeveloped),
+        Some(false)
+    );
+    assert_eq!(refusal(&core, "cl_sub_2").as_deref(), Some("AF-EDIT-022"));
+
+    // The example's Assumption is joined by a support line: the problem
+    // that reports it offers the repair.
+    let problems = core.problems().unwrap_or_else(|| panic!("open"));
+    let wrong: Vec<_> = problems
+        .problems
+        .iter()
+        .filter(|problem| problem.code == "AF-GSN-004")
+        .collect();
+    assert_eq!(wrong.len(), 1);
+    let repair = wrong[0]
+        .repair
+        .clone()
+        .unwrap_or_else(|| panic!("no repair"));
+    assert_eq!(
+        (repair.element.as_str(), repair.relationship.as_str()),
+        ("cl_assumption_1", "inf_2")
+    );
+    assert!(
+        problems
+            .problems
+            .iter()
+            .all(|problem| problem.code == "AF-GSN-004" || problem.repair.is_none())
+    );
+    assert!(matches!(
+        core.repair_join(&repair.element, &repair.relationship, 1),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let EditResult::Applied { element, .. } =
+        core.repair_join(&repair.element, &repair.relationship, 2)
+    else {
+        panic!("not repaired");
+    };
+    assert_eq!(element.as_deref(), Some("cl_assumption_1"));
+    let after = core.problems().unwrap_or_else(|| panic!("open"));
+    assert!(
+        after
+            .problems
+            .iter()
+            .all(|problem| problem.code != "AF-GSN-004")
+    );
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    let back = core.problems().unwrap_or_else(|| panic!("open"));
+    assert!(
+        back.problems
+            .iter()
+            .any(|problem| problem.code == "AF-GSN-004")
+    );
+}

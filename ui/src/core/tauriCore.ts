@@ -71,6 +71,8 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),
     moveTargets: (id) => invoke<MoveTargets | null>('move_targets', { id }),
     moveNode: (id, to, revision) => invoke<EditResult>('move_node', { id, to, revision }),
+    setUndeveloped: (id, undeveloped) => invoke<EditResult>('set_undeveloped', { id, undeveloped }),
+    repairJoin: (id, relationship, revision) => invoke<EditResult>('repair_join', { id, relationship, revision }),
     setText: (id, field, text) => invoke<EditResult>('set_text', { id, field, text }),
     undo: () => invoke<EditResult>('undo'),
     redo: () => invoke<EditResult>('redo'),

@@ -31,8 +31,10 @@ use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, 
 
 mod move_node;
 mod remove;
+mod repair;
 pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
+pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
 
 /// Where an element is to be added.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +82,13 @@ pub enum Refusal {
     AlreadyThere,
     /// AF-EDIT-020: the place is in another argument package (W22).
     OtherPackage,
+    /// AF-EDIT-021: only a Goal is marked undeveloped (W26).
+    NotAGoal,
+    /// AF-EDIT-022: the Goal is supported, and an undeveloped element has no
+    /// support (W26).
+    GoalSupported,
+    /// AF-EDIT-023: the element is not joined in a way a repair mends (W27).
+    NothingToRepair,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -106,6 +115,9 @@ impl Refusal {
             Refusal::UnderItself => "AF-EDIT-018",
             Refusal::AlreadyThere => "AF-EDIT-019",
             Refusal::OtherPackage => "AF-EDIT-020",
+            Refusal::NotAGoal => "AF-EDIT-021",
+            Refusal::GoalSupported => "AF-EDIT-022",
+            Refusal::NothingToRepair => "AF-EDIT-023",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

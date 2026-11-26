@@ -74,6 +74,8 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     remove: async (id, revision) => JSON.parse(core.remove(id, revision)) as EditResult,
     moveTargets: async (id) => parse<MoveTargets>(core.moveTargets(id)),
     moveNode: async (id, to, revision) => JSON.parse(core.moveNode(id, to ?? undefined, revision)) as EditResult,
+    setUndeveloped: async (id, undeveloped) => JSON.parse(core.setUndeveloped(id, undeveloped)) as EditResult,
+    repairJoin: async (id, relationship, revision) => JSON.parse(core.repairJoin(id, relationship, revision)) as EditResult,
     setText: async (id, field, text) => JSON.parse(core.setText(id, field, text)) as EditResult,
     undo: async () => JSON.parse(core.undo()) as EditResult,
     redo: async () => JSON.parse(core.redo()) as EditResult,

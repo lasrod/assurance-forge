@@ -56,6 +56,8 @@ const REMOVE = 'remove';
 const MOVE = 'move';
 const MOVE_HERE = 'moveHere';
 const MOVE_CANCEL = 'moveCancel';
+/** The menu item that marks a Goal undeveloped, or clears the mark. */
+const UNDEVELOPED = 'undeveloped';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -105,6 +107,10 @@ function message(state: DocumentState, t: T, language: Language): { text: string
             ? t('movedToTop', { kind: kindName(state.moved, t), identifier: state.identifier })
             : t('moved', { kind: kindName(state.moved, t), identifier: state.identifier, to: state.to }),
       };
+    case 'undevelopedSet':
+      return { text: t(state.undeveloped ? 'markedUndeveloped' : 'clearedUndeveloped', { identifier: state.identifier }) };
+    case 'repaired':
+      return { text: t('repaired', { kind: state.repaired ? kindName(state.repaired, t) : '', identifier: state.identifier }).trim() };
     case 'undone':
       return { text: t('undone') };
     case 'redone':
@@ -158,7 +164,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
-  const { moveTargets, move: moveWith, moveRefused } = doc;
+  const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
+  /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
+  const setUndeveloped = useCallback(
+    (id: string, undeveloped: boolean, identifier: string) => setUndevelopedWith(id, undeveloped, identifier, followEdit),
+    [setUndevelopedWith, followEdit],
+  );
   /** A text of an element changed in Element Properties; the view keeps the element in place. */
   const setText = useCallback(
     (id: string, field: TextField, text: string, about: NodeKind) => setTextWith(id, field, text, about, followEdit),
@@ -177,6 +188,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     at: { x: number; y: number };
     source: ContextMenuSource;
     choices: AddChoice[];
+    /** For a Goal whose undeveloped mark can be changed: what it is now, and its identifier. */
+    undeveloped?: { marked: boolean; identifier: string } | null;
   } | null>(null);
   const noDiagram = diagram === null;
   useEffect(() => {
@@ -277,10 +290,23 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         if (parent) setSelected(parent);
         if (!parent && answer.choices.every((choice) => choice.refusal !== null)) return;
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
-        setAddMenu({ revision: answer.revision, parent, about, at, source, choices: answer.choices });
+        const menu = { revision: answer.revision, parent, about, at, source, choices: answer.choices };
+        if (!parent || about !== 'goal' || !core) {
+          setAddMenu(menu);
+          return;
+        }
+        // A Goal's menu also sets or clears its undeveloped mark, where it can be.
+        void core.element(parent).then(
+          (details) =>
+            setAddMenu({
+              ...menu,
+              undeveloped: details && details.undevelopedRefusal === null ? { marked: details.undeveloped, identifier: details.identifier } : null,
+            }),
+          () => setAddMenu(menu),
+        );
       });
     },
-    [addChoices, diagram, setSelected, moving],
+    [addChoices, diagram, setSelected, moving, core],
   );
 
   // A removal that waits for the user: it deletes more than the node chosen.
@@ -318,6 +344,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     }
     if (id === MOVE_CANCEL) {
       setMoving(null);
+      return;
+    }
+    if (id === UNDEVELOPED) {
+      if (menu.parent && menu.undeveloped) setUndeveloped(menu.parent, !menu.undeveloped.marked, menu.undeveloped.identifier);
       return;
     }
     add(menu.parent, id as ElementKind, menu.revision, menu.about, followEdit);
@@ -655,7 +685,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               nameInText: t('elementPropertiesInText'),
               min: 14,
               icons: { hide: <PanelRightClose />, show: <PanelRightOpen /> },
-              views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} onText={setText} /> }],
+              views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} onText={setText} onUndeveloped={setUndeveloped} /> }],
             }}
             bottom={{
               name: problemsTitle,
@@ -666,7 +696,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                 {
                   id: 'problems',
                   label: problemsTitle,
-                  content: <ProblemsPanel problems={doc.problems} language={language} t={t} onShow={selectAndShow} />,
+                  content: (
+                    <ProblemsPanel
+                      problems={doc.problems}
+                      language={language}
+                      t={t}
+                      onShow={selectAndShow}
+                      onRepair={(repair, revision, problem) => {
+                        const element = problem.elements.find((candidate) => candidate.id === repair.element);
+                        repairWith(repair, revision, { kind: element?.kind ?? null, identifier: element?.identifier ?? repair.element }, followEdit);
+                      }}
+                    />
+                  ),
                 },
               ],
             }}
@@ -704,6 +745,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           >
             {addMenu && addItems(addMenu.choices, t).map((item) => <MenuItem key={item.kind} id={item.kind}>{item.label}</MenuItem>)}
             {addMenu?.parent && !moving && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
+            {addMenu?.parent && !moving && addMenu.undeveloped && (
+              <MenuItem id={UNDEVELOPED}>{t(addMenu.undeveloped.marked ? 'clearUndeveloped' : 'markUndeveloped')}</MenuItem>
+            )}
             {addMenu?.parent && !moving && <MenuItem id={MOVE}>{t('move')}</MenuItem>}
             {addMenu?.parent && !moving && (
               <MenuItem id={REMOVE} danger shortcut={t('removeKey')}>

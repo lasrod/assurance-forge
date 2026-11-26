@@ -15,6 +15,7 @@ const problem = (fields: Partial<Problem>): Problem => ({
   relationship: null,
   line: null,
   column: null,
+  repair: null,
   ...fields,
 });
 

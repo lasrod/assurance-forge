@@ -141,6 +141,26 @@ impl WasmCore {
         json(&self.core.move_node(id, to.as_deref(), revision))
     }
 
+    /// Marks the Goal `id` undeveloped, or clears the mark. `EditResult` as
+    /// JSON.
+    #[wasm_bindgen(js_name = setUndeveloped)]
+    pub fn set_undeveloped(&mut self, id: &str, undeveloped: bool) -> Result<String, JsError> {
+        json(&self.core.set_undeveloped(id, undeveloped))
+    }
+
+    /// Joins the node `id` by context in place of the support line that
+    /// `relationship` draws, as the problem list of `revision` offered.
+    /// `EditResult` as JSON.
+    #[wasm_bindgen(js_name = repairJoin)]
+    pub fn repair_join(
+        &mut self,
+        id: &str,
+        relationship: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(&self.core.repair_join(id, relationship, revision))
+    }
+
     /// Sets the text `field` (a `TextField`, such as `name`) of the node
     /// `id` to `text`. `EditResult` as JSON.
     #[wasm_bindgen(js_name = setText)]

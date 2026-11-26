@@ -115,6 +115,10 @@ pub struct ElementDetails {
     pub id: String,
     pub kind: NodeKind,
     pub undeveloped: bool,
+    /// Why the undeveloped mark cannot be changed to what it is not
+    /// (`AF-EDIT-021`: not a Goal; `AF-EDIT-022`: the Goal is supported), or
+    /// null when it can.
+    pub undeveloped_refusal: Option<String>,
     pub identifier: String,
     pub name: Option<String>,
     pub statement: Option<String>,
@@ -538,7 +542,9 @@ pub enum EditResult {
     /// (`AF-EDIT-009`), libSACM refused the operations (`AF-EDIT-010`),
     /// why a text cannot be set (`AF-EDIT-011` to `AF-EDIT-014`), or why a
     /// node cannot be removed (`AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-015`),
-    /// or why it cannot be moved (those of `MoveTargets`, and `AF-EDIT-015`).
+    /// or why it cannot be moved (those of `MoveTargets`, and `AF-EDIT-015`),
+    /// marked undeveloped (`AF-EDIT-021`, `AF-EDIT-022`) or repaired
+    /// (`AF-EDIT-015`, `AF-EDIT-017`, `AF-EDIT-023`).
     Refused { code: String },
     /// A text was set to what it already was: the document, its revision and
     /// its history are as they were.
@@ -687,6 +693,19 @@ pub struct Problem {
     /// Where in the file, for what libSACM reported reading it.
     pub line: Option<u32>,
     pub column: Option<u32>,
+    /// The repair the editor can make of it, or null: `Core::repair_join`
+    /// with these. Only `AF-GSN-004` has one so far.
+    pub repair: Option<ProblemRepair>,
+}
+
+/// A repair of a problem: the element joined as GSN does not allow, and the
+/// relationship that joins it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct ProblemRepair {
+    pub element: String,
+    pub relationship: String,
 }
 
 /// An element a problem is about.
@@ -766,6 +785,7 @@ pub fn typescript() -> String {
         Removal::decl(&cfg),
         MoveTarget::decl(&cfg),
         MoveTargets::decl(&cfg),
+        ProblemRepair::decl(&cfg),
         EditResult::decl(&cfg),
         History::decl(&cfg),
         WriteResult::decl(&cfg),

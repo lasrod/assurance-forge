@@ -602,6 +602,44 @@ step 4.
 A Goal that loses its support by a move keeps its declaration, as by a
 removal (W18).
 
+### The undeveloped mark
+
+How the editor marks a Goal undeveloped and clears the mark: the inverse of
+R3. `af-gsn` (`commands::set_undeveloped`) applies it as one
+`sacm::edit::batch`, one undo step. Decided on 26 November 2026 for
+milestone 2, step 5.
+
+| Rule | Changed | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W26 | The undeveloped mark of a Goal | `SetAssertionDeclaration` on the Claim: `needsSupport` to mark it, `asserted` to clear the mark. Only a Claim drawn as a Goal whose declaration is `asserted` or `needsSupport` (AF-EDIT-021 otherwise): the declaration is the one slot, and on an Assumption or a Justification it says what the element is. A Goal that a `SupportedBy` line leaves is not marked (AF-EDIT-022); clearing is always allowed, so a mark the file left on a supported Goal (AF-GSN-010) is cleared. A Strategy is not marked: see below | Decided | R3; "`undeveloped` occupies the declaration" above; GSN well-formedness: an undeveloped element has no `SupportedBy` children; W11 clears the mark the same way when support is added |
+
+**A Strategy's mark is an open decision.** GSN v3 lets a Strategy be
+undeveloped. SACM 2.3 gives `ArgumentReasoning` no `assertionDeclaration`
+(it is an `ArgumentAsset`, not an `Assertion`), so R3 reads the mark only from
+a Claim, and no rule here writes it for a Strategy. The earlier section's
+title says the decorator is "confined to Goal and Strategy" from the C++
+application, which kept the mark in a boolean of its own; this record has no
+row that says where a Strategy's mark is held in SACM. A candidate is the
+declaration of the one inference the Strategy is the `reasoning` of
+(`needsSupport` on the `AssertedInference`), which SACM can hold. Nothing
+has established that another tool reads it so. Until a row with its evidence
+is added, the editor offers no mark on a Strategy.
+
+### Repairing a join
+
+How the editor repairs a Context, an Assumption or a Justification that the
+file joins by a `SupportedBy` line, where GSN joins it by `InContextOf`
+(AF-GSN-004). `af-gsn` (`commands::repair_join`) applies it as one
+`sacm::edit::batch`, one undo step; `commands::repairable` answers whether it
+can be made, for the problem list to offer it. The repair is asked for by the
+user, from the problem: it is never made by a read, a save or a move (W21).
+Decided on 26 November 2026.
+
+| Rule | Repaired | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W27 | A Context, Assumption or Justification that is a `source` of a relationship drawn as `SupportedBy`, with no `reasoning`, whose `target` is a Goal or a Strategy | The node alone in the relationship: `DeleteElement` of the relationship, then `CreateAssertedContext` from the node to the same `target`, in the relationship's package, with the relationship's `name`. One of several sources: `RemoveReference` of the node from the `source`, then `CreateAssertedContext` with an empty name (W12); the relationship stays for the others. The new relationship has a new `xmi:id`. It then reads by E4 as `InContextOf`, and the node as the kind it was (R4, R5, R10) | Decided | E4, W5 to W7: the form an add writes. SACM cannot change an element's class in place, so the relationship is replaced. The name is kept because it is the one thing of the old relationship a reader may know it by |
+| W28 | What is not repaired | A relationship with a `reasoning` (AF-EDIT-017): the node is then one of a Strategy's premises, and whether it is context of the Strategy or of its Goal is not the editor's to say. A relationship that something refers to, or that holds more than its name, when the node is its only source (AF-EDIT-015), as W25. Anything that is not such a join (AF-EDIT-023) | Decided | W25; "Preserve rather than reinterpret" |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -625,7 +663,10 @@ was refused. Nothing changes.
 | AF-EDIT-014 | The text is the value of a terminology expression, which is not changed as text |
 | AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19); or refers to, or is held by, the line a move would replace (W25) |
 | AF-EDIT-016 | The node is drawn under several nodes (W21) |
-| AF-EDIT-017 | The node is joined in a way a move does not carry (W21) |
+| AF-EDIT-017 | The node is joined in a way a move does not carry (W21), or a repair does not mend (W28) |
 | AF-EDIT-018 | The place is the node itself, or under it (W22) |
 | AF-EDIT-019 | The node is there already (W22) |
 | AF-EDIT-020 | The place is in another argument package (W22) |
+| AF-EDIT-021 | Only a Goal is marked undeveloped (W26) |
+| AF-EDIT-022 | The Goal is supported: an undeveloped element has no support (W26) |
+| AF-EDIT-023 | The element is not joined in a way a repair mends (W28) |

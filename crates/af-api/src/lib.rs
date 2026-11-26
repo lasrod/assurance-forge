@@ -230,6 +230,14 @@ impl Core {
             id: node.id.clone(),
             kind: convert::node_kind(node.kind),
             undeveloped: node.undeveloped,
+            undeveloped_refusal: commands::undeveloped_change(
+                self.open.as_ref()?.session.document(),
+                view,
+                id,
+                !node.undeveloped,
+            )
+            .err()
+            .map(|refusal| refusal.code().to_owned()),
             identifier: node.identifier.clone(),
             name: node.name.clone(),
             statement: node.statement.clone(),
@@ -522,6 +530,37 @@ impl Core {
         }
     }
 
+    /// Marks the Goal with SACM id `id` undeveloped, or clears the mark
+    /// (W26). `Unchanged` when it was that already.
+    pub fn set_undeveloped(&mut self, id: &str, undeveloped: bool) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        match open.session.set_undeveloped(&open.view, id, undeveloped) {
+            Ok(Some(record)) => self.changed(&record, None),
+            Ok(None) => EditResult::Unchanged,
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Joins the node `id` by context in place of the support line that
+    /// `relationship` draws (W27), as the problem list of `revision` offered:
+    /// a repair asked for at another revision is refused (AF-EDIT-009).
+    pub fn repair_join(&mut self, id: &str, relationship: &str, revision: u32) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open.session.repair_join(&open.view, id, relationship) {
+            Ok((_, record)) => self.changed(&record, Some(id.to_owned())),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
     /// Takes back the last command.
     pub fn undo(&mut self) -> EditResult {
         let Some(open) = self.open.as_mut() else {
@@ -772,7 +811,24 @@ fn derive_problems(
                     contract::ProblemSeverity::Info
                 }
             };
-            convert::problem(problem, severity, view)
+            let mut problem = convert::problem(problem, severity, view);
+            // AF-GSN-004: a Context, Assumption or Justification joined by
+            // a support line, which W27 can make context.
+            if problem.code == "AF-GSN-004" {
+                if let Some(relationship) = problem.relationship.clone() {
+                    problem.repair = problem
+                        .elements
+                        .iter()
+                        .find(|element| {
+                            commands::repairable(document, view, &element.id, &relationship).is_ok()
+                        })
+                        .map(|element| contract::ProblemRepair {
+                            element: element.id.clone(),
+                            relationship,
+                        });
+                }
+            }
+            problem
         })
         .collect();
     contract::Problems {

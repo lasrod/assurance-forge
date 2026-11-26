@@ -236,8 +236,9 @@ test('Select: a click outlines the node, and Element Properties shows what it is
 
   const grid = page.getByTestId('element-properties');
   await expect(grid).toContainText('Goal, undeveloped');
-  // In the order an element reads: its identifier, its name, what it says.
-  await expect(grid.locator('label')).toHaveText(['ID', 'Name', 'Description']);
+  // In the order an element reads: its identifier, its name, what it says;
+  // then, for a Goal, whether it is undeveloped.
+  await expect(grid.locator('label')).toHaveText(['ID', 'Name', 'Description', 'Undeveloped']);
   await expect(page.getByTestId('element-identifier')).toHaveValue('cl_sub_2');
   await expect(page.getByTestId('element-name')).toHaveValue('SubClaim_Verification');
   await expect(page.getByTestId('element-statement')).toHaveValue('Verification activities demonstrate braking requirements are satisfied.');
