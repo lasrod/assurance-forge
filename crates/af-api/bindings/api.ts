@@ -56,7 +56,12 @@ id: string, kind: NodeKind, undeveloped: boolean,
  * (`AF-EDIT-021`: not a Goal; `AF-EDIT-022`: the Goal is supported), or
  * null when it can.
  */
-undevelopedRefusal: string | null, identifier: string, name: string | null, statement: string | null, 
+undevelopedRefusal: string | null, 
+/**
+ * A `SupportedBy` line leaves the node: with `undeveloped`, the mark
+ * is out of date.
+ */
+supported: boolean, identifier: string, name: string | null, statement: string | null, 
 /**
  * The view's codes about this element.
  */

@@ -310,3 +310,120 @@ fn w27_the_bundled_examples_assumption_is_repaired() {
     assert_eq!(sacm::validation::validate(&document).len(), problems);
     assert!(xmi::write(&document, &WriteOptions::default().with_mode(Mode::Strict)).is_ok());
 }
+
+#[test]
+fn w28_a_relationship_that_says_more_than_support_is_not_replaced() {
+    // `ia` is declared assumed, `ix` is abstract, `im` has a meta-claim
+    // `mc`: each says more than that the Assumption supports the Goal.
+    let mut document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "mc", ""),
+            element("Claim", "a", r#" assertionDeclaration="assumed""#),
+            element("Claim", "x", r#" assertionDeclaration="assumed""#),
+            element("Claim", "m", r#" assertionDeclaration="assumed""#),
+            element(
+                "AssertedInference",
+                "ia",
+                r#" source="a" target="g" assertionDeclaration="assumed""#,
+            ),
+            element(
+                "AssertedInference",
+                "ix",
+                r#" source="x" target="g" isAbstract="true""#,
+            ),
+            element(
+                "AssertedInference",
+                "im",
+                r#" source="m" target="g" metaClaim="mc""#,
+            ),
+        ]
+        .concat(),
+    );
+    let before = ids(&document);
+    let shown = view(&document, "en");
+    for (node, relationship) in [("a", "ia"), ("x", "ix"), ("m", "im")] {
+        // Each is drawn as a support line, so the problem list reports it.
+        assert!(
+            shown
+                .edges
+                .iter()
+                .any(|edge| edge.relationship == relationship && edge.to == node),
+            "{relationship} is not drawn"
+        );
+        assert_eq!(
+            repairable(&document, &shown, node, relationship),
+            Err(Refusal::Entangled),
+            "{relationship}"
+        );
+        assert!(matches!(
+            repair_join(&mut document, &shown, node, relationship),
+            Err(AddError::Refused(Refusal::Entangled))
+        ));
+    }
+    assert_eq!(ids(&document), before);
+}
+
+#[test]
+fn w28_one_of_several_is_not_taken_out_of_a_relationship_something_refers_to() {
+    // `k` challenges the inference that `b` and `c` share.
+    let mut document = case(
+        &[
+            element("Claim", "other", ""),
+            element("Claim", "k", ""),
+            element("Claim", "b", r#" assertionDeclaration="assumed""#),
+            element("Claim", "c", r#" assertionDeclaration="assumed""#),
+            element(
+                "AssertedInference",
+                "ibc",
+                r#" source="b c" target="other""#,
+            ),
+            element(
+                "AssertedInference",
+                "ch",
+                r#" source="k" target="ibc" isCounter="true""#,
+            ),
+        ]
+        .concat(),
+    );
+    let before = ids(&document);
+    let shown = view(&document, "en");
+    assert_eq!(
+        repairable(&document, &shown, "b", "ibc"),
+        Err(Refusal::Entangled)
+    );
+    assert!(matches!(
+        repair_join(&mut document, &shown, "b", "ibc"),
+        Err(AddError::Refused(Refusal::Entangled))
+    ));
+    assert_eq!(ids(&document), before);
+    let sources: Vec<&str> = document
+        .get("ibc")
+        .map(|held| held.sources().iter().map(|id| id.as_str()).collect())
+        .unwrap_or_default();
+    assert_eq!(sources, ["b", "c"]);
+}
+
+#[test]
+fn w27_an_element_already_context_of_the_goal_only_loses_the_support_line() {
+    let mut document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "a", r#" assertionDeclaration="assumed""#),
+            element("AssertedInference", "ia", r#" source="a" target="g""#),
+            element("AssertedContext", "ca", r#" source="a" target="g""#),
+        ]
+        .concat(),
+    );
+    let shown = view(&document, "en");
+    let repaired =
+        repair_join(&mut document, &shown, "a", "ia").unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(repaired.relationship, "ca");
+    assert!(!document.contains("ia"));
+    let contexts = document
+        .elements()
+        .filter(|element| element.kind() == sacm::model::ElementKind::AssertedContext)
+        .count();
+    assert_eq!(contexts, 1);
+    assert_eq!(line(&document, "g", "a"), Some(EdgeKind::InContextOf));
+}

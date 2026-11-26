@@ -123,7 +123,7 @@ function ElementSection({
                 onChange={(event) => onUndeveloped(details.id, event.target.checked, details.identifier)}
               />
               <p className="datum-meta af-undeveloped-hint">
-                {t(details.undevelopedRefusal === 'AF-EDIT-022' ? 'undevelopedSupported' : 'undevelopedHint')}
+                {t(!details.supported ? 'undevelopedHint' : details.undeveloped ? 'undevelopedStale' : 'undevelopedSupported')}
               </p>
             </div>
           )}

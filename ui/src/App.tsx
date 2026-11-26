@@ -277,10 +277,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
    * node is selected first. It lists what can be added there and, for a
    * node, Remove; with nothing to list, it does not open.
    */
+  // Each request for a menu: an answer to an earlier one is dropped.
+  const menuRequest = useRef(0);
   const openAddMenu = useCallback(
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
+      const request = ++menuRequest.current;
       void addChoices(parent).then((answer) => {
-        if (!answer) return;
+        if (!answer || request !== menuRequest.current) return;
         // While a move is chosen the selection stays the node moved, and
         // the menu opens even with nothing to add: it holds the move.
         if (moving) {
@@ -298,11 +301,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         // A Goal's menu also sets or clears its undeveloped mark, where it can be.
         void core.element(parent).then(
           (details) =>
+            // Not if another menu was asked for, or a move began, meanwhile.
+            request === menuRequest.current &&
+            !dragged.current &&
             setAddMenu({
               ...menu,
               undeveloped: details && details.undevelopedRefusal === null ? { marked: details.undeveloped, identifier: details.identifier } : null,
             }),
-          () => setAddMenu(menu),
+          () => {
+            if (request === menuRequest.current) setAddMenu(menu);
+          },
         );
       });
     },
@@ -739,7 +747,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             position={addMenu?.at ?? null}
             openedBy={addMenu?.source}
             onOpenChange={(open) => {
-              if (!open) setAddMenu(null);
+              if (!open) {
+                // A menu still being asked for does not open after this.
+                menuRequest.current += 1;
+                setAddMenu(null);
+              }
             }}
             onAction={(id) => chooseMenu(String(id))}
           >

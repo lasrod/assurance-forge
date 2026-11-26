@@ -62,6 +62,8 @@ test('a stale mark is cleared in Element Properties, and a supported goal is the
   const box = mark(page).getByRole('checkbox', { name: 'Undeveloped' });
   await expect(box).toBeChecked();
   await expect(box).toBeEnabled();
+  // The mark is out of date, and the panel says so.
+  await expect(mark(page)).toContainText('This Goal is supported, so the mark is out of date: clear it.');
   await box.uncheck();
   await expect.poll(async () => (await hook(page)).revision).toBe(2);
   expect(await marked(page, 'cl_sub_2')).toBe(false);

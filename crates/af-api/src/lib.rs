@@ -238,6 +238,10 @@ impl Core {
             )
             .err()
             .map(|refusal| refusal.code().to_owned()),
+            supported: view
+                .edges
+                .iter()
+                .any(|edge| edge.kind == view::EdgeKind::SupportedBy && edge.from == id),
             identifier: node.identifier.clone(),
             name: node.name.clone(),
             statement: node.statement.clone(),

@@ -22,7 +22,10 @@ use sacm::model::{
     SacmElement,
 };
 
-use super::{AddError, Refusal, Target, argument_package, held_place, placeholder};
+use super::{
+    AddError, Refusal, Target, argument_package, changeable, deletable, held_place, placeholder,
+    retargetable,
+};
 use crate::view::{EdgeKind, NodeKind, View, can_hold_placeholder};
 
 /// Whether one node can take the moved one.
@@ -437,10 +440,11 @@ impl Mover {
                     joined = true;
                 }
                 (_, _, true) => {
-                    retargetable(document, relationship)?;
+                    deletable(document, relationship)?;
                     steps.push(Step::Apply(DeleteElement::new(relationship.clone()).into()));
                 }
                 (_, _, false) => {
+                    changeable(document, relationship)?;
                     steps.push(Step::Apply(
                         RemoveReference::new(
                             relationship.clone(),
@@ -452,6 +456,7 @@ impl Mover {
                 }
             },
             Link::UnderStrategy { inference, sole } => {
+                changeable(document, inference)?;
                 if *sole {
                     // W20: the Strategy keeps its inference.
                     let held = document
@@ -477,6 +482,7 @@ impl Mover {
             let package = self.package.clone();
             let source = [self.id.clone()];
             if let Some(inference) = to_strategy {
+                changeable(document, inference)?;
                 steps.push(Step::Apply(
                     AddReference::new(inference.clone(), ReferenceEnd::Source, self.id.clone())
                         .into(),
@@ -519,21 +525,6 @@ impl Mover {
         }
         Ok(steps)
     }
-}
-
-/// W25: a line is given a new end, or deleted, only when nothing refers to
-/// it (a challenge of it, a `metaClaim`, a group) and it holds nothing but
-/// its name: what the diagram does not show on a line is not carried to
-/// another place, or lost, for the user.
-fn retargetable(document: &Document, relationship: &ElementId) -> Result<(), Refusal> {
-    let element = document
-        .get(relationship.as_str())
-        .ok_or(Refusal::JoinNotMoved)?;
-    if !document.referrers(relationship.as_str()).is_empty() || element.children().next().is_some()
-    {
-        return Err(Refusal::Entangled);
-    }
-    Ok(())
 }
 
 /// The Strategies a Goal can be added under: each with the one live

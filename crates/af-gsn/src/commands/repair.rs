@@ -13,7 +13,7 @@ use sacm::model::{
     AssertionDeclaration, Document, ElementId, ElementKind as SacmKind, LangString, ReferenceEnd,
 };
 
-use super::{AddError, Refusal, TextSet, argument_package};
+use super::{AddError, Refusal, TextSet, argument_package, changeable, deletable};
 use crate::view::{EdgeKind, NodeKind, View};
 
 /// W26: why the undeveloped mark of the node `id` cannot be set to
@@ -95,7 +95,8 @@ pub fn set_undeveloped(
 /// What a repair of a join made.
 #[derive(Clone, Debug)]
 pub struct Repaired {
-    /// The SACM id of the `AssertedContext` that now joins the node.
+    /// The SACM id of the `AssertedContext` that now joins the node: the one
+    /// made, or the one the file already had.
     pub relationship: String,
     pub mutation: BatchMutation,
 }
@@ -109,6 +110,9 @@ struct Plan {
     target: ElementId,
     package: ElementId,
     name: LangString,
+    /// A live `AssertedContext` from the node to the target the file already
+    /// has: the repair only takes the support line away.
+    joined: Option<ElementId>,
 }
 
 /// W27: the Context, Assumption or Justification `id` joined by the
@@ -158,11 +162,27 @@ fn plan(document: &Document, view: &View, id: &str, relationship: &str) -> Resul
         return Err(Refusal::JoinNotMoved);
     }
     let sole = held.sources().len() == 1;
-    // W25, as for a move: a line something refers to, or that holds more
-    // than its name, is not replaced.
-    if sole && (!document.referrers(relationship).is_empty() || held.children().next().is_some()) {
-        return Err(Refusal::Entangled);
+    // W28, as W25 for a move: a relationship something refers to, that
+    // holds more than its name, or that says more than that its sources
+    // support its target, is not replaced, nor has a source taken out.
+    if sole {
+        deletable(document, held.id())?;
+    } else {
+        changeable(document, held.id())?;
     }
+    // The node may already be context of the target as well.
+    let joined = document
+        .elements()
+        .find(|other| {
+            other.kind() == SacmKind::AssertedContext
+                && other.target() == Some(target)
+                && other.sources().iter().any(|source| source.as_str() == id)
+                && !other.is_counter()
+                && other
+                    .assertion_declaration()
+                    .is_none_or(|declaration| declaration == AssertionDeclaration::Asserted)
+        })
+        .map(|other| other.id().clone());
     Ok(Plan {
         node: element.id().clone(),
         relationship: held.id().clone(),
@@ -170,6 +190,7 @@ fn plan(document: &Document, view: &View, id: &str, relationship: &str) -> Resul
         target: target.clone(),
         package: argument_package(held).ok_or(Refusal::NoPackage)?,
         name: held.name().cloned().unwrap_or_default(),
+        joined,
     })
 }
 
@@ -215,6 +236,10 @@ pub fn repair_join(
                 ReferenceEnd::Source,
                 plan.node.clone(),
             ))?;
+        }
+        if let Some(joined) = &plan.joined {
+            made = Some(joined.as_str().to_owned());
+            return Ok(());
         }
         let created = tx.apply(CreateAssertedContext::new(
             plan.package.clone(),

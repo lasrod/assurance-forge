@@ -119,6 +119,9 @@ pub struct ElementDetails {
     /// (`AF-EDIT-021`: not a Goal; `AF-EDIT-022`: the Goal is supported), or
     /// null when it can.
     pub undeveloped_refusal: Option<String>,
+    /// A `SupportedBy` line leaves the node: with `undeveloped`, the mark
+    /// is out of date.
+    pub supported: bool,
     pub identifier: String,
     pub name: Option<String>,
     pub statement: Option<String>,

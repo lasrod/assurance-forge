@@ -685,6 +685,49 @@ pub(crate) fn held_place(
     Some((source, tag))
 }
 
+/// W25: a source may be added to, or taken out of, the relationship `id`
+/// only when nothing makes a claim about it: nothing refers to it (a
+/// challenge of it, a group) and it refers to no meta-claim. A challenge
+/// of, or a claim about, "A and B support C" is not one of "A supports C".
+pub(crate) fn changeable(document: &Document, id: &ElementId) -> Result<(), Refusal> {
+    let element = document.get(id.as_str()).ok_or(Refusal::JoinNotMoved)?;
+    if !document.referrers(id.as_str()).is_empty() || !element.meta_claims().is_empty() {
+        return Err(Refusal::Entangled);
+    }
+    Ok(())
+}
+
+/// W25: the relationship `id` may be given another target, the whole line
+/// moving, only when its sources may change and it holds nothing but its
+/// name: a description of "A supports B" is not carried to "A supports C"
+/// unseen.
+pub(crate) fn retargetable(document: &Document, id: &ElementId) -> Result<(), Refusal> {
+    changeable(document, id)?;
+    let element = document.get(id.as_str()).ok_or(Refusal::JoinNotMoved)?;
+    if element.children().next().is_some() {
+        return Err(Refusal::Entangled);
+    }
+    Ok(())
+}
+
+/// W25: the relationship `id` may be deleted only when it may be given
+/// another target and it says nothing but that its sources support its
+/// target: declared `asserted` (or not declared), not abstract and not a
+/// citation.
+pub(crate) fn deletable(document: &Document, id: &ElementId) -> Result<(), Refusal> {
+    retargetable(document, id)?;
+    let element = document.get(id.as_str()).ok_or(Refusal::JoinNotMoved)?;
+    let plain = element
+        .assertion_declaration()
+        .is_none_or(|declaration| declaration == AssertionDeclaration::Asserted)
+        && !element.is_abstract()
+        && !element.is_citation();
+    if !plain {
+        return Err(Refusal::Entangled);
+    }
+    Ok(())
+}
+
 /// The `ArgumentPackage` that holds `element`, at any depth (W9).
 fn argument_package(element: SacmElement<'_>) -> Option<ElementId> {
     let mut holder = element.parent();

@@ -575,3 +575,73 @@ fn a_move_in_each_sample_keeps_the_file_valid() {
         assert!(made > 0, "{name}: no node was moved");
     }
 }
+
+#[test]
+fn w25_a_move_does_not_change_or_lose_what_a_relationship_says() {
+    // `k` challenges the inference `m` and `n` share; `id` is declared
+    // assumed; `iu` (the Strategy `u`'s) is challenged by `k2`.
+    let mut document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "g2", ""),
+            element("Claim", "m", ""),
+            element("Claim", "n", ""),
+            element("Claim", "d", ""),
+            element("Claim", "only", ""),
+            element("Claim", "k", ""),
+            element("Claim", "k2", ""),
+            element("ArgumentReasoning", "u", ""),
+            element("AssertedInference", "im", r#" source="m n" target="g2""#),
+            element(
+                "AssertedInference",
+                "id",
+                r#" source="d" target="g2" assertionDeclaration="assumed""#,
+            ),
+            element(
+                "AssertedInference",
+                "iu",
+                r#" source="only" target="g" reasoning="u""#,
+            ),
+            element(
+                "AssertedInference",
+                "ch",
+                r#" source="k" target="im" isCounter="true""#,
+            ),
+            element(
+                "AssertedInference",
+                "ch2",
+                r#" source="k2" target="iu" isCounter="true""#,
+            ),
+        ]
+        .concat(),
+    );
+    // One of several leaves a challenged relationship.
+    assert_eq!(
+        refused(&mut document, "m", Target::Node("g")),
+        Refusal::Entangled
+    );
+    // A Goal is not added to, or taken from, a challenged Strategy's inference.
+    assert_eq!(
+        refused(&mut document, "d", Target::Node("u")),
+        Refusal::Entangled
+    );
+    assert_eq!(
+        refused(&mut document, "only", Target::Node("g2")),
+        Refusal::Entangled
+    );
+    // A declared relationship is kept when it is given a new end, and not
+    // deleted where it would have to be: under a Strategy, or at the top.
+    assert_eq!(
+        refused(&mut document, "d", Target::Canvas),
+        Refusal::Entangled
+    );
+    let shown = view(&document, "en");
+    move_node(&mut document, &shown, "d", Target::Node("g"))
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        document
+            .get("id")
+            .and_then(|held| held.assertion_declaration()),
+        Some(sacm::model::AssertionDeclaration::Assumed)
+    );
+}
