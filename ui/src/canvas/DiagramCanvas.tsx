@@ -263,6 +263,11 @@ export function DiagramCanvas({
     const point = local(event);
     pointers.current.set(event.pointerId, point);
     if (pointers.current.size === 2) {
+      // A second finger makes a pinch of the press: a drag under way is
+      // given up, as a cancelled pointer gives it up.
+      const before = gesture.current;
+      endPress(before);
+      if (before?.dragging) onDragEnd?.({ on: 'cancel' });
       gesture.current = { start: point, view: viewport, panning: true, pinch: twoPointers() };
     } else {
       gesture.current = { start: point, view: viewport, panning: event.button === 1 };
@@ -333,6 +338,8 @@ export function DiagramCanvas({
           current.view = latest.current.viewport ?? current.view;
           current.start = dragPointer.current ?? current.start;
           endPress(current);
+          setPanning(true);
+          setHovered(null);
         });
         return;
       }

@@ -427,3 +427,41 @@ fn w27_an_element_already_context_of_the_goal_only_loses_the_support_line() {
     assert_eq!(contexts, 1);
     assert_eq!(line(&document, "g", "a"), Some(EdgeKind::InContextOf));
 }
+
+#[test]
+fn w28_a_context_line_that_is_not_drawn_as_plain_context_is_not_leaned_on() {
+    // Cited, the line is drawn neutral; abstract, it is a pattern's. Either
+    // way the repair makes a context line of its own.
+    for attributes in [r#" isCitation="true""#, r#" isAbstract="true""#] {
+        let mut document = case(
+            &[
+                element("Claim", "g", ""),
+                element("Claim", "a", r#" assertionDeclaration="assumed""#),
+                element("AssertedInference", "ia", r#" source="a" target="g""#),
+                element(
+                    "AssertedContext",
+                    "ca",
+                    &format!(r#" source="a" target="g"{attributes}"#),
+                ),
+            ]
+            .concat(),
+        );
+        let shown = view(&document, "en");
+        let repaired = repair_join(&mut document, &shown, "a", "ia")
+            .unwrap_or_else(|error| panic!("{attributes}: {error}"));
+        assert_ne!(repaired.relationship, "ca", "{attributes}");
+        assert!(!document.contains("ia"), "{attributes}");
+        assert!(document.contains("ca"), "{attributes}");
+        let after = view(&document, "en");
+        assert!(
+            after
+                .edges
+                .iter()
+                .any(|edge| edge.relationship == repaired.relationship
+                    && edge.kind == EdgeKind::InContextOf
+                    && edge.from == "g"
+                    && edge.to == "a"),
+            "{attributes}: the new context line is drawn"
+        );
+    }
+}

@@ -511,8 +511,8 @@ pub struct MoveTargets {
     /// The SACM id of the node to move.
     pub id: String,
     /// Why the node cannot be moved at all (`AF-EDIT-002`, `AF-EDIT-004`,
-    /// `AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-016`, `AF-EDIT-017`), or null
-    /// when it can. `nodes` is then empty.
+    /// `AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-016`, `AF-EDIT-017`,
+    /// `AF-EDIT-024`), or null when it can. `nodes` is then empty.
     pub refusal: Option<String>,
     /// Why it cannot be moved to the top level (`AF-EDIT-006`,
     /// `AF-EDIT-019`), or null when it can.

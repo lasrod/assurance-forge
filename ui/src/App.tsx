@@ -229,7 +229,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       dragged.current = byDrag ? id : null;
       const targets = await moveTargets(id);
       const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
-      if (!targets || !node) return false;
+      if (!targets || !node) {
+        // Not movable: the drag is over, and a Goal's menu opens again.
+        if (dragged.current === id) dragged.current = null;
+        return false;
+      }
       // Dropped, or given up, before the core answered.
       if (byDrag && dragged.current !== id) return true;
       const row = outline.find((candidate) => candidate.id === id);

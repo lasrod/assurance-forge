@@ -62,7 +62,8 @@ pub struct Moved {
 ///
 /// Why the node cannot be moved at all: [`Refusal::NotANode`],
 /// [`Refusal::KindUnknown`], [`Refusal::SeveralParents`],
-/// [`Refusal::JoinNotMoved`] or [`Refusal::NoOneInference`].
+/// [`Refusal::JoinNotMoved`], [`Refusal::NoOneInference`] or
+/// [`Refusal::StrategyAlone`].
 pub fn move_targets(document: &Document, view: &View, id: &str) -> Result<MoveTargets, Refusal> {
     let mover = Mover::of(document, view, id)?;
     let under = mover.under(view);
@@ -224,7 +225,7 @@ impl Mover {
                 NodeKind::Context | NodeKind::Assumption | NodeKind::Justification => Role::Context,
                 // A Strategy at the top level is the reasoning of no
                 // inference: there is none to give a target.
-                NodeKind::Strategy => return Err(Refusal::NoOneInference),
+                NodeKind::Strategy => return Err(Refusal::StrategyAlone),
                 NodeKind::Neutral => return Err(Refusal::KindUnknown),
             };
             return Ok(Mover {

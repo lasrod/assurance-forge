@@ -170,14 +170,22 @@ fn plan(document: &Document, view: &View, id: &str, relationship: &str) -> Resul
     } else {
         changeable(document, held.id())?;
     }
-    // The node may already be context of the target as well.
-    let joined = document
-        .elements()
+    // The node may already be context of the target as well: a context line
+    // the diagram draws, so that the node stays joined where it is seen. One
+    // it does not draw (cited, abstract, hidden, or not plain) is not leaned on.
+    let joined = view
+        .edges
+        .iter()
+        .filter(|line| {
+            line.kind == EdgeKind::InContextOf && line.from == edge.from && line.to == id
+        })
+        .filter_map(|line| document.get(&line.relationship))
         .find(|other| {
             other.kind() == SacmKind::AssertedContext
                 && other.target() == Some(target)
-                && other.sources().iter().any(|source| source.as_str() == id)
-                && !other.is_counter()
+                && other.reasoning().is_none()
+                && !other.is_abstract()
+                && !other.is_citation()
                 && other
                     .assertion_declaration()
                     .is_none_or(|declaration| declaration == AssertionDeclaration::Asserted)

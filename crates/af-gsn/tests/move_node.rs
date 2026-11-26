@@ -645,3 +645,20 @@ fn w25_a_move_does_not_change_or_lose_what_a_relationship_says() {
         Some(sacm::model::AssertionDeclaration::Assumed)
     );
 }
+
+#[test]
+fn w21_a_strategy_that_supports_no_goal_has_no_line_to_move() {
+    let document = case(
+        &[
+            element("Claim", "g", ""),
+            element("ArgumentReasoning", "s", ""),
+        ]
+        .concat(),
+    );
+    let shown = view(&document, "en");
+    assert_eq!(
+        move_targets(&document, &shown, "s").err(),
+        Some(Refusal::StrategyAlone)
+    );
+    assert_eq!(Refusal::StrategyAlone.code(), "AF-EDIT-024");
+}

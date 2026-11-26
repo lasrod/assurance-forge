@@ -148,8 +148,16 @@ test('a node that cannot be moved says why at once, and nothing follows the poin
   await page.mouse.move(start.x + 30, start.y + 30, { steps: 4 });
   await expect(status(page)).toHaveText('Nothing changed. This element is under more than one element, so there is no single line to move.');
   await expect.poll(async () => (await hook(page)).dragging).toBeNull();
+  // The rest of the press pans, and looks it.
+  await expect(canvas(page)).toHaveCSS('cursor', 'grabbing');
   await page.mouse.up();
   expect((await hook(page)).revision).toBe(1);
+
+  // A Goal's menu still opens.
+  const goal = diagram!.diagram.nodes.find((node) => node.kind === 'goal')!;
+  const at = await nodeCentre(page, goal.id);
+  await page.mouse.click(at.x, at.y, { button: 'right' });
+  await expect(page.getByRole('menu')).toBeVisible();
 });
 
 test('the view pans when a dragged node nears an edge', async ({ page }) => {
@@ -221,4 +229,31 @@ test('a touch on a node pans, and moves it only once it has been held', async ({
   await touch('touchEnd');
   await expect.poll(async () => (await hook(page)).revision).toBe(2);
   expect(await parents(page, 'ev_2')).toEqual(['cl_sub_1']);
+});
+
+test('a second finger during a touch drag gives the drag up', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'touch input is driven over CDP');
+  await opened(page);
+  const client = await page.context().newCDPSession(page);
+  const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', points: Point[]) =>
+    client.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: points.map((point, id) => ({ x: Math.round(point.x), y: Math.round(point.y), id })),
+    });
+  const start = await nodeCentre(page, 'ev_2');
+  await touch('touchStart', [start]);
+  await page.waitForTimeout(450);
+  for (let step = 1; step <= 4; step += 1) await touch('touchMove', [{ x: start.x + step * 10, y: start.y + step * 10 }]);
+  await expect.poll(async () => (await hook(page)).dragging).toBe('ev_2');
+  const first = { x: start.x + 40, y: start.y + 40 };
+  await touch('touchStart', [first, { x: first.x + 120, y: first.y }]);
+  await touch('touchMove', [first, { x: first.x + 160, y: first.y }]);
+  await touch('touchEnd', []);
+  await expect.poll(async () => (await hook(page)).dragging ?? null).toBeNull();
+
+  // No move is left under way: a click on a Goal selects it and moves nothing.
+  const goal = await nodeCentre(page, 'cl_sub_1');
+  await page.mouse.click(goal.x, goal.y);
+  await expect.poll(async () => (await hook(page)).selected).toBe('cl_sub_1');
+  expect((await hook(page)).revision).toBe(1);
 });
