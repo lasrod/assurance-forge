@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 af-gsn = { path = "../af-gsn" }
-sacm = "0.3.0"
+sacm = "0.4.0"
 
 [lints]
 workspace = true

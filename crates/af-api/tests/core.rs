@@ -177,6 +177,36 @@ fn a_refusal_carries_its_arguments() {
 }
 
 #[test]
+fn a_file_in_an_older_sacm_revision_is_refused_not_read_as_sacm_2_3() {
+    // A strict read refuses SACM 2.2's namespace (SACM-XMI-008) rather than
+    // reading it as SACM 2.3, which only a tolerant read does.
+    let text = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/2.2" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="C"/>
+</sacm:AssuranceCasePackage>"#;
+    let OpenResult::Refused(refusal) = core("en").open(text.as_bytes()) else {
+        panic!("a SACM 2.2 file was read");
+    };
+    assert_eq!(refusal.code, "SACM-XMI-008", "{refusal:?}");
+}
+
+#[test]
+fn a_file_past_the_read_limits_is_refused() {
+    // Nested deeper than libSACM's default limit of 256 (SACM-SEC-003).
+    let mut text = String::from(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">"#,
+    );
+    text.push_str(&"<x>".repeat(300));
+    text.push_str(&"</x>".repeat(300));
+    text.push_str("</sacm:AssuranceCasePackage>");
+    let OpenResult::Refused(refusal) = core("en").open(text.as_bytes()) else {
+        panic!("a file nested 300 deep was read");
+    };
+    assert_eq!(refusal.code, "SACM-SEC-003", "{refusal:?}");
+}
+
+#[test]
 fn element_gives_the_details_panel_content() {
     let mut core = core("en");
     core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));

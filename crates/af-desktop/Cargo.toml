@@ -33,7 +33,7 @@ tauri = { version = "=2.12.5", features = [] }
 tauri-plugin-dialog = "=2.8.4"
 
 [dev-dependencies]
-sacm = "0.3.0"
+sacm = "0.4.0"
 
 [lints]
 workspace = true
