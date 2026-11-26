@@ -146,6 +146,20 @@ test('the problem of an assumption joined by a support line offers its repair, w
   await expect(rows.filter({ hasText: 'AF-GSN-004' })).toHaveCount(1);
 });
 
+test('a text left by a click on the mark is set, and then the mark is changed', async ({ page }) => {
+  await opened(page);
+  // The Undeveloped checkbox, clicked with a Goal's name still being typed.
+  await select(page, 'cl_sub_2');
+  const box = mark(page).getByRole('checkbox', { name: 'Undeveloped' });
+  await expect(box).toBeChecked();
+  await page.getByTestId('element-name').fill('Renamed while marking');
+  await box.click();
+  await expect.poll(async () => (await hook(page)).revision).toBe(3);
+  expect(await marked(page, 'cl_sub_2')).toBe(false);
+  await expect(page.getByTestId('element-name')).toHaveValue('Renamed while marking');
+  await expect(status(page)).toHaveText(/^Undeveloped mark of .+ cleared.$/);
+});
+
 test('the mark and the repair are worded in Japanese', async ({ page }) => {
   await opened(page, '&lang=ja');
   await select(page, 'cl_sub_2');

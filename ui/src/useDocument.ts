@@ -503,6 +503,18 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     },
     [runEdit],
   );
+  /**
+   * The revision a command asked at `revision` is sent with. Asked at the
+   * revision on screen while edits are on their way, it follows them: they
+   * are the user's own, made just before (a text field left by the click
+   * that asked), and the command is of the argument they make. Asked at
+   * another revision, it stays out of date and the core refuses it.
+   */
+  const followingEdits = useCallback(async (revision: number): Promise<number> => {
+    if (revision !== shown.current || inflight.current.size === 0) return revision;
+    await Promise.allSettled([...inflight.current]);
+    return shown.current ?? revision;
+  }, []);
   // Undos and redos on their way: a key held down sends no more until they
   // are answered, since Edit ▸ Undo's state is of the revision before them.
   const editing = useRef(0);
@@ -627,8 +639,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    */
   const setUndeveloped = useCallback(
     (id: string, undeveloped: boolean, revision: number, identifier: string, onShown: EditShown) =>
-      void edit((on) => on.setUndeveloped(id, undeveloped, revision), 'mark', id, 'goal', onShown, { kind: 'undevelopedSet', undeveloped, identifier }),
-    [edit],
+      void edit(async (on) => on.setUndeveloped(id, undeveloped, await followingEdits(revision)), 'mark', id, 'goal', onShown, { kind: 'undevelopedSet', undeveloped, identifier }),
+    [edit, followingEdits],
   );
   /**
    * Makes the repair a problem of `revision` offers: the element joined by a
@@ -642,12 +654,12 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       about: { kind: NodeKind | null; identifier: string },
       onShown: EditShown,
     ) =>
-      void edit((on) => on.repairJoin(offered.element, offered.relationship, revision), 'mark', offered.element, about.kind, onShown, {
+      void edit(async (on) => on.repairJoin(offered.element, offered.relationship, await followingEdits(revision)), 'mark', offered.element, about.kind, onShown, {
         kind: 'repaired',
         repaired: about.kind,
         identifier: about.identifier,
       }),
-    [edit],
+    [edit, followingEdits],
   );
   /** Says why a move cannot be made to the place the user chose. */
   const moveRefused = useCallback((code: string, about: NodeKind | null) => setState({ kind: 'editRefused', code, about }), []);

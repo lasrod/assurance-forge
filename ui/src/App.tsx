@@ -215,6 +215,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // The move of the drag under way, as soon as the core has answered: a drop
   // that comes before the answer is on screen still finds it.
   const dragMove = useRef<Moving | null>(null);
+  // A drop that came before the core's answer, kept for it.
+  const earlyDrop = useRef<{ id: string; end: DragEnd } | null>(null);
   const shownRevision = diagram?.revision ?? null;
   if (moving && moving.targets.revision !== shownRevision) setMoving(null);
   const moveMarks = useMemo(
@@ -226,32 +228,6 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           }
         : null,
     [moving],
-  );
-  /**
-   * Starts choosing where the node `id` goes, from the menu or by a drag;
-   * the status says why when it cannot be moved. Answers whether it can.
-   */
-  const startMove = useCallback(
-    async (id: string, byDrag: boolean): Promise<boolean> => {
-      dragged.current = byDrag ? id : null;
-      dragMove.current = null;
-      const targets = await moveTargets(id);
-      const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
-      if (!targets || !node) {
-        // Not movable: the drag is over, and a Goal's menu opens again.
-        if (dragged.current === id) dragged.current = null;
-        return false;
-      }
-      // Dropped, or given up, before the core answered.
-      if (byDrag && dragged.current !== id) return true;
-      const row = outline.find((candidate) => candidate.id === id);
-      setSelected(id);
-      const move = { targets, kind: node.kind, identifier: row?.identifier ?? id, dragged: byDrag };
-      if (byDrag) dragMove.current = move;
-      setMoving(move);
-      return true;
-    },
-    [moveTargets, diagram, outline, setSelected],
   );
   /** Moves the node being moved under `to` (null: to the top level), or says why it cannot go there. */
   const moveTo = useCallback(
@@ -272,6 +248,40 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     [moving, diagram, outline, moveRefused, moveWith, followEdit],
   );
   /**
+   * Starts choosing where the node `id` goes, from the menu or by a drag;
+   * the status says why when it cannot be moved. Answers whether it can.
+   */
+  const startMove = useCallback(
+    async (id: string, byDrag: boolean): Promise<boolean> => {
+      dragged.current = byDrag ? id : null;
+      dragMove.current = null;
+      earlyDrop.current = null;
+      const targets = await moveTargets(id);
+      const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
+      if (!targets || !node) {
+        // Not movable: the drag is over, and a Goal's menu opens again.
+        if (dragged.current === id) dragged.current = null;
+        return false;
+      }
+      const row = outline.find((candidate) => candidate.id === id);
+      const move = { targets, kind: node.kind, identifier: row?.identifier ?? id, dragged: byDrag };
+      // Dropped, or given up, before the core answered: a drop on a node is
+      // made now, as it would have been.
+      if (byDrag && dragged.current !== id) {
+        // Set by the drop while the core was answering, which narrowing does not see.
+        const early = earlyDrop.current as { id: string; end: DragEnd } | null;
+        earlyDrop.current = null;
+        if (early?.id === id && early.end.on === 'node') moveTo(early.end.id, move);
+        return true;
+      }
+      setSelected(id);
+      if (byDrag) dragMove.current = move;
+      setMoving(move);
+      return true;
+    },
+    [moveTargets, diagram, outline, setSelected, moveTo],
+  );
+  /**
    * A dragged node was dropped: on a place it may go, it moves there; on one
    * it may not, the status says why. A drop on nothing gives the drag up: a
    * Goal goes to the top level from the menu, not by a drop that missed.
@@ -280,10 +290,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const endDrag = useCallback(
     (end: DragEnd) => {
       const current = dragMove.current ?? moving;
+      const id = dragged.current;
       dragged.current = null;
       dragMove.current = null;
       setMoving(null);
-      if (!current || end.on !== 'node') return;
+      if (!current) {
+        // The core has not answered yet: the drop waits for it.
+        if (id !== null) earlyDrop.current = { id, end };
+        return;
+      }
+      if (end.on !== 'node') return;
       // The argument changed under the drag: its places are of before.
       if (current.targets.revision !== shownRevision) moveRefused('AF-EDIT-009', null);
       else moveTo(end.id, current);

@@ -459,6 +459,12 @@ fn w25_a_line_something_refers_to_is_not_replaced() {
         refusal(&document, "d", Target::Node("g")),
         Some(Refusal::Entangled)
     );
+    // `kr` hangs from the line `g2` draws: it is under `g2`, which is not
+    // moved under it.
+    assert_eq!(
+        refusal(&document, "g2", Target::Node("kr")),
+        Some(Refusal::UnderItself)
+    );
     assert_eq!(
         refused(&mut document, "d", Target::Node("g")),
         Refusal::Entangled

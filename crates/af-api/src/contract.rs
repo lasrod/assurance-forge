@@ -495,7 +495,9 @@ pub struct MoveTarget {
     /// The SACM id of the node.
     pub id: String,
     /// Why the moved node cannot go under it (`AF-EDIT-001` to `AF-EDIT-004`,
-    /// `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-025`), or null when it can. The frontend
+    /// `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-025`; and, from the
+    /// operations the move would make there, `AF-EDIT-005`, `AF-EDIT-015` or
+    /// `AF-EDIT-017`), or null when it can. The frontend
     /// words it.
     pub refusal: Option<String>,
     /// Moving there also clears this Goal's undeveloped decorator.
@@ -515,7 +517,8 @@ pub struct MoveTargets {
     /// `AF-EDIT-024`), or null when it can. `nodes` is then empty.
     pub refusal: Option<String>,
     /// Why it cannot be moved to the top level (`AF-EDIT-006`,
-    /// `AF-EDIT-019`), or null when it can.
+    /// `AF-EDIT-019`; and, from the operations the move would make,
+    /// `AF-EDIT-005`, `AF-EDIT-015` or `AF-EDIT-017`), or null when it can.
     pub canvas: Option<String>,
     /// Every node of the diagram, in its order.
     pub nodes: Vec<MoveTarget>,

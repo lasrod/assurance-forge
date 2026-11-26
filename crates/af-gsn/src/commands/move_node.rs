@@ -319,6 +319,9 @@ impl Mover {
     /// What challenges a node counts as under it, as a removal counts it.
     fn under<'a>(&'a self, view: &'a View) -> HashSet<&'a str> {
         let mut below: HashMap<&str, Vec<&str>> = HashMap::new();
+        // The node each relationship's line hangs from: a line is drawn
+        // under its conclusion, a challenge under what it challenges.
+        let mut hangs: HashMap<&str, Vec<&str>> = HashMap::new();
         for edge in &view.edges {
             if edge.to_relationship {
                 continue;
@@ -329,6 +332,32 @@ impl Mover {
                 (edge.from.as_str(), edge.to.as_str())
             };
             below.entry(parent).or_default().push(child);
+            hangs
+                .entry(edge.relationship.as_str())
+                .or_default()
+                .push(parent);
+        }
+        // A challenge of a line is under the node the line hangs from, as a
+        // removal counts it (W18): a node is not moved under its own
+        // challenger's line. A challenge of such a challenge, in turn.
+        let mut grew = true;
+        while grew {
+            grew = false;
+            for edge in view.edges.iter().filter(|edge| edge.to_relationship) {
+                let parents = hangs.get(edge.to.as_str()).cloned().unwrap_or_default();
+                for parent in parents {
+                    let children = below.entry(parent).or_default();
+                    if !children.contains(&edge.from.as_str()) {
+                        children.push(edge.from.as_str());
+                        grew = true;
+                    }
+                    let held = hangs.entry(edge.relationship.as_str()).or_default();
+                    if !held.contains(&parent) {
+                        held.push(parent);
+                        grew = true;
+                    }
+                }
+            }
         }
         let mut under: HashSet<&str> = HashSet::from([self.id.as_str()]);
         let mut queue: Vec<&str> = vec![self.id.as_str()];

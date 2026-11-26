@@ -29,12 +29,21 @@ export function edgePan(point: { x: number; y: number }, size: { width: number; 
 /** How many nodes the diagram draws under the node `id`, at any depth: what a move takes with it. */
 export function comesWith(diagram: Diagram, id: string): number {
   const under = new Set([id]);
+  // The relationships whose lines are under the node: a challenge of one of
+  // them comes too, as the core counts it.
+  const lines = new Set<string>();
   for (let grew = true; grew; ) {
     grew = false;
     for (const edge of diagram.edges) {
-      // A challenge is drawn under what it challenges.
+      // A challenge is drawn under what it challenges: a node, or a line.
       const [parent, child] = edge.kind === 'challenge' ? [edge.to, edge.from] : [edge.from, edge.to];
-      if (under.has(parent) && !under.has(child)) {
+      const hangs = edge.toRelationship ? lines.has(parent) : under.has(parent);
+      if (!hangs) continue;
+      if (!lines.has(edge.relationship)) {
+        lines.add(edge.relationship);
+        grew = true;
+      }
+      if (!under.has(child)) {
         under.add(child);
         grew = true;
       }

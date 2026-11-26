@@ -52,6 +52,16 @@ describe('comesWith', () => {
     expect(comesWith(shown, 'sn')).toBe(0);
   });
 
+  it('counts a challenge of a line under the node the line hangs from', () => {
+    // `k` challenges the line from `g` to `d`; `k2` challenges that challenge.
+    const line = { ...edge('g', 'd'), relationship: 'id' } as DiagramEdge;
+    const challenge = { ...edge('k', 'id', 'challenge'), relationship: 'ch', toRelationship: true } as DiagramEdge;
+    const again = { ...edge('k2', 'ch', 'challenge'), relationship: 'ch2', toRelationship: true } as DiagramEdge;
+    const shownLines = diagram([line, challenge, again]);
+    expect(comesWith(shownLines, 'g')).toBe(3);
+    expect(comesWith(shownLines, 'd')).toBe(0);
+  });
+
   it('counts a node under two parents once, and ends in a cycle', () => {
     expect(comesWith(diagram([edge('g', 'a'), edge('g', 'b'), edge('a', 'x'), edge('b', 'x'), edge('x', 'g')]), 'g')).toBe(3);
   });
