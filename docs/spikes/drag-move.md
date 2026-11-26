@@ -70,13 +70,15 @@ chose between three variants, with a delay of 0, 150, 350 or 700 ms:
    stays as it is: the places and the badge, and the layout made again at the
    drop. Edit ▸ Undo is the way back from a move that was not wanted.
 
-## Not tried, or not decided
+8. **No drop on a line, for now.** The second spike let a node dropped on a
+   line go between the line's two ends, made as two moves. Tried in the
+   application, it is not needed as it is. A line may become a place to drop
+   on once challenges are edited: a challenge of a Goal could be dragged to a
+   line to challenge the relationship instead. That waits for challenges.
 
-- **A drop on a line**, to put a node between the line's two ends. The second
-  spike built it as two moves, so it takes two undo steps, and a refused
-  second move leaves the first made. Whether it is wanted is not decided; if
-  it is, it needs one command in the core.
-- **An animated change of layout** after the drop. Not tried.
+## Not tried
+
+An animated change of layout after the drop.
 
 ## Consequences
 

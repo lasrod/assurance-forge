@@ -177,9 +177,9 @@ interface**. Interface results are run locally and put in each pull request.
 
 ## What is next
 
-Milestone 2 goes on from moving an element: whether a node dropped on a
-line goes between its ends is still open
-([the plan](docs/roadmap/milestone-2-move.md)). Nothing else in the planned
+Milestone 2 goes on from moving an element: repairing an element the file
+joins as GSN does not allow, from the Problems panel, and setting the
+undeveloped mark. Nothing else in the planned
 shape below is started.
 
 Requirements editing places on the parts already built:

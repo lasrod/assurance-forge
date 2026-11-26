@@ -77,11 +77,10 @@ element's kind.
 
 | M14 | No preview of the result before the drop | Tried as the whole result and as the branch alone, faint: both felt off, and showing nothing more felt better ([the findings](../spikes/drag-move.md#a-preview-of-the-move)). Edit ▸ Undo is the way back |
 
+| M15 | A line is not a place to drop on | Tried as putting the node between the line's two ends, it is not needed as it is. To be opened again with challenges: a challenge of a Goal dragged to a line would challenge the relationship instead |
+
 ## Still open
 
-- **Dropping on a line.** Whether a node dropped on a line goes between its
-  two ends. Tried as two moves; if it is wanted it needs one command in the
-  core, so that it is one undo step and made whole or not at all.
 - **After the drop.** Whether the change of layout is animated. Not tried.
 
 ## The pieces
@@ -106,4 +105,5 @@ element's kind.
 - [x] **G4.** The findings written, and this page's goals for the drag.
 - [x] **G5.** The drag as chosen (M8 to M13), with browser tests.
 - [x] **G6.** A preview of the move, tried and decided against (M14).
-- [ ] **G7.** The drop on a line and the animation, each decided.
+- [x] **G7.** A drop on a line, tried and put off until challenges are
+      edited (M15).
