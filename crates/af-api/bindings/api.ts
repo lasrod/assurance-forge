@@ -264,11 +264,48 @@ nodes: Array<RemovalNode>,
  */
 refusal: string | null, };
 
+export type MoveTarget = { 
+/**
+ * The SACM id of the node.
+ */
+id: string, 
+/**
+ * Why the moved node cannot go under it (`AF-EDIT-001` to `AF-EDIT-004`,
+ * `AF-EDIT-018` to `AF-EDIT-020`), or null when it can. The frontend
+ * words it.
+ */
+refusal: string | null, 
+/**
+ * Moving there also clears this Goal's undeveloped decorator.
+ */
+develops: boolean, };
+
+export type MoveTargets = { revision: number, 
+/**
+ * The SACM id of the node to move.
+ */
+id: string, 
+/**
+ * Why the node cannot be moved at all (`AF-EDIT-002`, `AF-EDIT-004`,
+ * `AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-016`, `AF-EDIT-017`), or null
+ * when it can. `nodes` is then empty.
+ */
+refusal: string | null, 
+/**
+ * Why it cannot be moved to the top level (`AF-EDIT-006`,
+ * `AF-EDIT-019`), or null when it can.
+ */
+canvas: string | null, 
+/**
+ * Every node of the diagram, in its order.
+ */
+nodes: Array<MoveTarget>, };
+
 export type EditResult = { "result": "applied", revision: number, 
 /**
- * The element the interface selects: the one an add made, or the
- * node a removed one was drawn under. Null for undo, redo, a change
- * of text and the removal of a top-level node.
+ * The element the interface selects: the one an add made, the node
+ * a removed one was drawn under, or the node moved. Null for undo,
+ * redo, a change of text and the removal of a top-level node.
  */
 element: string | null, 
 /**

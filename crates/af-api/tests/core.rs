@@ -777,3 +777,75 @@ fn the_problem_list_names_its_elements_follows_an_edit_and_its_undo() {
     core.close();
     assert!(core.problems().is_none());
 }
+
+#[test]
+fn a_move_says_where_a_node_may_go_and_undo_takes_it_back() {
+    use af_api::contract::EditResult;
+    let mut core = core("en");
+    assert!(core.move_targets("ev_2").is_none(), "nothing open");
+    assert!(matches!(
+        core.move_node("ev_2", Some("cl_sub_1"), 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-007"
+    ));
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let under = |core: &mut Core, parent: &str| {
+        let diagram = core.diagram().unwrap_or_else(|| panic!("diagram")).diagram;
+        diagram
+            .edges
+            .iter()
+            .any(|edge| edge.from == parent && edge.to == "ev_2")
+    };
+    assert!(under(&mut core, "cl_sub_2"));
+
+    let targets = core.move_targets("ev_2").unwrap_or_else(|| panic!("open"));
+    assert_eq!((targets.revision, targets.refusal.as_deref()), (1, None));
+    // Evidence is not a top-level element.
+    assert_eq!(targets.canvas.as_deref(), Some("AF-EDIT-006"));
+    let refusal = |id: &str| {
+        targets
+            .nodes
+            .iter()
+            .find(|target| target.id == id)
+            .unwrap_or_else(|| panic!("{id}"))
+            .refusal
+            .as_deref()
+    };
+    assert_eq!(refusal("cl_sub_1"), None);
+    assert_eq!(refusal("cl_sub_2"), Some("AF-EDIT-019"));
+    assert_eq!(refusal("ev_2"), Some("AF-EDIT-018"));
+    assert_eq!(refusal("ar_1"), Some("AF-EDIT-003"));
+    assert_eq!(refusal("ev_1"), Some("AF-EDIT-001"));
+    let unknown = core
+        .move_targets("nothing")
+        .unwrap_or_else(|| panic!("open"));
+    assert_eq!(unknown.refusal.as_deref(), Some("AF-EDIT-011"));
+    assert!(unknown.nodes.is_empty());
+
+    // Targets shown at another revision, and a place that was refused.
+    assert!(matches!(
+        core.move_node("ev_2", Some("cl_sub_1"), 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    assert!(matches!(
+        core.move_node("ev_2", Some("ar_1"), 1),
+        EditResult::Refused { ref code } if code == "AF-EDIT-003"
+    ));
+    let EditResult::Applied {
+        revision,
+        element,
+        created,
+        deleted,
+        ..
+    } = core.move_node("ev_2", Some("cl_sub_1"), 1)
+    else {
+        panic!("not moved");
+    };
+    assert_eq!(revision, 2);
+    // The node moved stays selected, and its line was given a new end.
+    assert_eq!(element.as_deref(), Some("ev_2"));
+    assert!(created.is_empty() && deleted.is_empty());
+    assert!(under(&mut core, "cl_sub_1") && !under(&mut core, "cl_sub_2"));
+
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert!(under(&mut core, "cl_sub_2") && !under(&mut core, "cl_sub_1"));
+}

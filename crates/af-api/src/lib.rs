@@ -42,9 +42,9 @@ use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 use contract::{
     AddChoice, AddChoices, ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult,
-    ElementDetails, ElementKind, History, MessageArgument, OpenResult, Outline, OutlineRow,
-    Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode,
-    WriteResult,
+    ElementDetails, ElementKind, History, MessageArgument, MoveTarget, MoveTargets, OpenResult,
+    Outline, OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal,
+    RemovalNode, ViewCode, WriteResult,
 };
 pub use contract::{FoundRecovery, KeepResult, RecoveryCopy};
 
@@ -431,6 +431,55 @@ impl Core {
             nodes,
             refusal,
         })
+    }
+
+    /// Where the node with SACM id `id` may be moved, for the interface to
+    /// show while the user chooses. `None` when nothing is open.
+    pub fn move_targets(&self, id: &str) -> Option<MoveTargets> {
+        let open = self.open.as_ref()?;
+        let code = |refusal: commands::Refusal| refusal.code().to_owned();
+        let (refusal, canvas, nodes) =
+            match commands::move_targets(open.session.document(), &open.view, id) {
+                Ok(targets) => (
+                    None,
+                    targets.canvas.map(code),
+                    targets
+                        .nodes
+                        .into_iter()
+                        .map(|target| MoveTarget {
+                            id: target.node,
+                            refusal: target.refusal.map(code),
+                            develops: target.develops,
+                        })
+                        .collect(),
+                ),
+                Err(refusal) => (Some(code(refusal)), None, Vec::new()),
+            };
+        Some(MoveTargets {
+            revision: self.revision,
+            id: id.to_owned(),
+            refusal,
+            canvas,
+            nodes,
+        })
+    }
+
+    /// Moves the node with SACM id `id`, with what is under it, under the
+    /// node `to`, or to the top level when `None`, as [`Core::move_targets`]
+    /// said at `revision`: a move asked for at another revision is refused
+    /// (AF-EDIT-009).
+    pub fn move_node(&mut self, id: &str, to: Option<&str>, revision: u32) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open.session.move_node(&open.view, id, target(to)) {
+            Ok((_, record)) => self.changed(&record, Some(id.to_owned())),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
     }
 
     /// Removes the node with SACM id `id` and what goes with it, as

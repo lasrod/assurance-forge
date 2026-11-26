@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import { useViewport } from './canvas/useViewport';
-import type { AddChoice, Core, ElementKind, NodeKind, Removal, TextField, TextStyle } from './core/Core';
+import type { AddChoice, Core, ElementKind, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
@@ -9,6 +9,7 @@ import { ProblemsPanel } from './ProblemsPanel';
 import { RecoveryDialog } from './RecoveryDialog';
 import { UnsavedDialog } from './UnsavedDialog';
 import {
+  Button,
   ChevronDown,
   ChevronUp,
   ContextMenu,
@@ -50,6 +51,10 @@ import { ZoomBar } from './ZoomBar';
 const FILE_ROW = ':file';
 /** The menu item that removes the node; the others are the kinds to add. */
 const REMOVE = 'remove';
+/** The menu items of a move: start one, make it here, give it up. */
+const MOVE = 'move';
+const MOVE_HERE = 'moveHere';
+const MOVE_CANCEL = 'moveCancel';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -91,6 +96,13 @@ function message(state: DocumentState, t: T, language: Language): { text: string
           state.more === 0
             ? t('removed', { kind: kindName(state.removed, t), identifier: state.identifier })
             : t('removedWithMore', { kind: kindName(state.removed, t), identifier: state.identifier, more: state.more }),
+      };
+    case 'moved':
+      return {
+        text:
+          state.to === null
+            ? t('movedToTop', { kind: kindName(state.moved, t), identifier: state.identifier })
+            : t('moved', { kind: kindName(state.moved, t), identifier: state.identifier, to: state.to }),
       };
     case 'undone':
       return { text: t('undone') };
@@ -145,6 +157,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
+  const { moveTargets, move: moveWith, moveRefused } = doc;
   /** A text of an element changed in Element Properties; the view keeps the element in place. */
   const setText = useCallback(
     (id: string, field: TextField, text: string, about: NodeKind) => setTextWith(id, field, text, about, followEdit),
@@ -171,6 +184,54 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   useEffect(() => {
     if (reading || noDiagram) setAddMenu(null);
   }, [reading, noDiagram]);
+  // A move being chosen: the node to move and where the core says it may
+  // go, at a revision. Another revision on screen, or another file, ends it:
+  // its targets are of the document before.
+  const [moving, setMoving] = useState<{ targets: MoveTargets; kind: NodeKind; identifier: string } | null>(null);
+  const shownRevision = diagram?.revision ?? null;
+  if (moving && moving.targets.revision !== shownRevision) setMoving(null);
+  const moveMarks = useMemo(
+    () =>
+      moving
+        ? {
+            source: moving.targets.id,
+            allowed: new Set(moving.targets.nodes.filter((target) => target.refusal === null).map((target) => target.id)),
+          }
+        : null,
+    [moving],
+  );
+  /** Starts choosing where the node `id` goes; the status says why when it cannot be moved. */
+  const startMove = useCallback(
+    (id: string) => {
+      void moveTargets(id).then((targets) => {
+        if (!targets) return;
+        const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
+        const row = outline.find((candidate) => candidate.id === id);
+        if (!node) return;
+        setSelected(id);
+        setMoving({ targets, kind: node.kind, identifier: row?.identifier ?? id });
+      });
+    },
+    [moveTargets, diagram, outline, setSelected],
+  );
+  /** Moves the node being moved under `to` (null: to the top level), or says why it cannot go there. */
+  const moveTo = useCallback(
+    (to: string | null) => {
+      if (!moving) return;
+      const place = to === null ? null : moving.targets.nodes.find((target) => target.id === to);
+      const refusal = to === null ? moving.targets.canvas : place ? place.refusal : 'AF-EDIT-011';
+      if (refusal !== null) {
+        // The kind a leaf's refusal names is the place's, not the node's moved.
+        const kind = to ? (diagram?.diagram.nodes.find((node) => node.id === to)?.kind ?? null) : null;
+        moveRefused(refusal, kind);
+        return;
+      }
+      const toIdentifier = to ? (outline.find((row) => row.id === to)?.identifier ?? to) : null;
+      setMoving(null);
+      moveWith(moving.targets, to, moving, toIdentifier, followEdit);
+    },
+    [moving, diagram, outline, moveRefused, moveWith, followEdit],
+  );
   /**
    * Opens the menu of a node, or of the empty canvas, at a client point: the
    * node is selected first. It lists what can be added there and, for a
@@ -180,13 +241,19 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
       void addChoices(parent).then((answer) => {
         if (!answer) return;
+        // While a move is chosen the selection stays the node moved, and
+        // the menu opens even with nothing to add: it holds the move.
+        if (moving) {
+          setAddMenu({ revision: answer.revision, parent, about: null, at, source, choices: [] });
+          return;
+        }
         if (parent) setSelected(parent);
         if (!parent && answer.choices.every((choice) => choice.refusal !== null)) return;
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
         setAddMenu({ revision: answer.revision, parent, about, at, source, choices: answer.choices });
       });
     },
-    [addChoices, diagram, setSelected],
+    [addChoices, diagram, setSelected, moving],
   );
 
   // A removal that waits for the user: it deletes more than the node chosen.
@@ -205,13 +272,25 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [removal, removeWith, followEdit],
   );
-  /** A choice of the menu: a kind to add, or Remove. */
+  /** A choice of the menu: a kind to add, Remove, or a step of a move. */
   const chooseMenu = (id: string) => {
     const menu = addMenu;
     setAddMenu(null);
     if (!menu) return;
     if (id === REMOVE) {
       if (menu.parent) askRemove(menu.parent);
+      return;
+    }
+    if (id === MOVE) {
+      if (menu.parent) startMove(menu.parent);
+      return;
+    }
+    if (id === MOVE_HERE) {
+      moveTo(menu.parent);
+      return;
+    }
+    if (id === MOVE_CANCEL) {
+      setMoving(null);
       return;
     }
     add(menu.parent, id as ElementKind, menu.revision, menu.about, followEdit);
@@ -481,7 +560,22 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             layout={layout}
             onLayoutChange={setLayout}
             copy={copy}
-            centreHeader={<ZoomBar t={t} scale={viewport?.scale ?? null} onZoomBy={zoomBy} onFit={fitAll} step={ZOOM_STEP} />}
+            centreHeader={
+              // Beside the zoom controls, not over the diagram: a prompt on
+              // the canvas would cover the places to choose from.
+              <div className="af-centre-header">
+                <ZoomBar t={t} scale={viewport?.scale ?? null} onZoomBy={zoomBy} onFit={fitAll} step={ZOOM_STEP} />
+                {moving && (
+                  <div className="af-move-banner" role="status">
+                    <span className="af-move-prompt">{t('movePrompt', { kind: kindName(moving.kind, t), identifier: moving.identifier })}</span>
+                    {moving.targets.canvas === null && (
+                      <Button onClick={() => moveTo(null)}>{t('moveToTop', { identifier: moving.identifier })}</Button>
+                    )}
+                    <Button onClick={() => setMoving(null)}>{t('moveCancel')}</Button>
+                  </div>
+                )}
+              </div>
+            }
             start={{
               // Both C++ panels, stacked; the dock's own name is for its rail.
               name: t('startDock'),
@@ -561,6 +655,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               onTextStyle={onTextStyle}
               onContextMenu={openAddMenu}
               onRemove={askRemove}
+              move={moveMarks}
+              onMoveTo={moveTo}
+              onMoveCancel={() => setMoving(null)}
             />
           </Workspace>
         )}
@@ -577,12 +674,19 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             onAction={(id) => chooseMenu(String(id))}
           >
             {addMenu && addItems(addMenu.choices, t).map((item) => <MenuItem key={item.kind} id={item.kind}>{item.label}</MenuItem>)}
-            {addMenu?.parent && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
-            {addMenu?.parent && (
+            {addMenu?.parent && !moving && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
+            {addMenu?.parent && !moving && <MenuItem id={MOVE}>{t('move')}</MenuItem>}
+            {addMenu?.parent && !moving && (
               <MenuItem id={REMOVE} danger shortcut={t('removeKey')}>
                 {t('remove')}
               </MenuItem>
             )}
+            {addMenu && moving && (addMenu.parent ? moveMarks?.allowed.has(addMenu.parent) : moving.targets.canvas === null) && (
+              <MenuItem id={MOVE_HERE}>
+                {t(addMenu.parent ? 'moveHere' : 'moveToTop', { identifier: moving.identifier })}
+              </MenuItem>
+            )}
+            {addMenu && moving && <MenuItem id={MOVE_CANCEL}>{t('moveCancel')}</MenuItem>}
           </ContextMenu>
         )}
         {hasFile && (

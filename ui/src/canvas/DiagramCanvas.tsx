@@ -3,7 +3,7 @@ import type { DiagramAt, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
-import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -80,6 +80,10 @@ type Gesture = {
  * from a right-click, or from the context-menu key or Shift+F10 on the
  * selected node. `onRemove` asks to remove the selected node: Delete, or
  * Backspace, which is the key macOS calls delete.
+ *
+ * While a move is being chosen (`move`), the canvas draws where the node may
+ * go; a click on a node says so (`onMoveTo`) in place of selecting it, and
+ * Escape gives the move up (`onMoveCancel`).
  */
 export function DiagramCanvas({
   diagram,
@@ -92,6 +96,9 @@ export function DiagramCanvas({
   onTextStyle,
   onContextMenu,
   onRemove,
+  move = null,
+  onMoveTo,
+  onMoveCancel,
 }: {
   diagram: DiagramAt | null;
   label: string;
@@ -104,6 +111,10 @@ export function DiagramCanvas({
   onTextStyle: (style: TextStyle) => void;
   onContextMenu: (id: string | null, at: { x: number; y: number }, source: ContextMenuSource) => void;
   onRemove: (id: string) => void;
+  move?: MoveMarks | null;
+  /** A node was clicked while a move is chosen: one it may go under, or not. */
+  onMoveTo?: (id: string) => void;
+  onMoveCancel?: () => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
@@ -145,9 +156,10 @@ export function DiagramCanvas({
     const drawn = draw(context, diagram.diagram, viewport, colours, measuredFamilies, { ...size, dpr }, {
       selected,
       hovered: shownHover,
+      move,
     });
     report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover });
-  }, [diagram, size, style, colours, viewport, selected, shownHover]);
+  }, [diagram, size, style, colours, viewport, selected, shownHover, move]);
 
   // The latest values, for the handlers below, which outlive a render.
   const latest = useRef({ diagram, viewport, size, onViewport });
@@ -238,6 +250,13 @@ export function DiagramCanvas({
     // A press that did not move is a click: it selects the node under it, or
     // the line under it, or clears the selection on empty canvas.
     const point = local(event);
+    if (move) {
+      // A move is being chosen: a click on a node is where it goes, and a
+      // click on a line or on the empty canvas changes nothing.
+      const node = hitTest(diagram.diagram, viewport, point.x, point.y);
+      if (node && node.id !== move.source) onMoveTo?.(node.id);
+      return;
+    }
     onSelect(hitId(diagram.diagram, viewport, point.x, point.y));
   };
 
@@ -293,8 +312,8 @@ export function DiagramCanvas({
     }
     const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
     if ((event.key === 'Delete' || event.key === 'Backspace') && plain && !event.nativeEvent.isComposing) {
-      // Only a node is removed: a selected line is not.
-      if (selected && diagram?.diagram.nodes.some((node) => node.id === selected)) {
+      // Only a node is removed: a selected line is not. Not while a move is chosen.
+      if (!move && selected && diagram?.diagram.nodes.some((node) => node.id === selected)) {
         event.preventDefault();
         onRemove(selected);
       }
@@ -322,7 +341,8 @@ export function DiagramCanvas({
         onViewport(zoomAbout(viewport, 1 / ZOOM_STEP, centre.x, centre.y));
         break;
       case 'clear':
-        onSelect(null);
+        if (move) onMoveCancel?.();
+        else onSelect(null);
         break;
     }
   };
@@ -336,7 +356,7 @@ export function DiagramCanvas({
         aria-label={label}
         aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape Shift+F10 ContextMenu Delete"
         tabIndex={0}
-        style={{ cursor: panning ? 'grabbing' : shownHover ? 'pointer' : 'default' }}
+        style={{ cursor: panning ? 'grabbing' : !shownHover ? 'default' : !move || move.allowed.has(shownHover) ? 'pointer' : 'not-allowed' }}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

@@ -581,6 +581,27 @@ asks about before it removes more than the node chosen. Decided on 25 November
 | W19 | What the diagram does not draw | Refused (AF-EDIT-015) when anything but a relationship's source refers to what goes, such as a `metaClaim`, a citation or a group's member, or a node holds more than utility elements | Decided | "Never silently change an argument": what the user is not shown is not changed for them |
 | W20 | The last Goal of a Strategy | The inference whose `reasoning` is the Strategy stays: a placeholder (W2) becomes its source before the last Goal is taken out. Only an inference R16 would hide the placeholder in does so; any other (a counter, cited, abstract or not asserted) goes as W18 says, since its placeholder would be drawn as a Goal. A Strategy that goes takes its placeholder with it | Decided | W2, R16 |
 
+### Moving a node
+
+How the editor moves a node, with what is under it, to another place.
+`af-gsn` (`commands::move_node`) applies these rules as one
+`sacm::edit::batch`, one undo step; `commands::move_targets` answers where a
+node may go and why not elsewhere, which the interface shows while the user
+chooses. A move changes one line of the diagram: the node, its text and what
+is under it are as they were. Decided on 26 November 2026 for milestone 2,
+step 4.
+
+| Rule | Moved | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W21 | Which node | A node of a known kind that the diagram draws under one node, by a `SupportedBy` or an `InContextOf` line, or under none. Under several, it is not moved (AF-EDIT-016): there is no one line to move, and the editor makes no second parent. A node that challenges something, a node whose line is neutral (E5a, E9), a `SupportedBy` line to a Context, Assumption or Justification, and a relationship that names the node twice are not moved (AF-EDIT-017). A Strategy moves with the one inference it is the `reasoning` of (AF-EDIT-004 otherwise) | Decided | The view: the line a node is drawn under is the relationship changed |
+| W22 | Where | What may be added where (W1 to W8), with the node's join kept: what is reached by `SupportedBy` goes where support may, and what is reached by `InContextOf` goes where context may, whatever its kind (R6: a Goal reached as context stays context). Not under itself or what is drawn under it, challenges included (AF-EDIT-018), not where it is (AF-EDIT-019), and not into another `ArgumentPackage` (AF-EDIT-020). To the top level: a Goal only (AF-EDIT-006) | Decided | GSN v3 Core's permitted connections, as W1 to W8; a relationship across packages is the Modular Extension's, which is not built |
+| W23 | The line it has | Where the node is the only `source` of its relationship and the new parent takes the same kind of relationship, the relationship is kept: `SetReferences` of its `target` to the new parent. A Strategy's inference is always kept so, with its Goals. Otherwise the node leaves the line: `RemoveReference` of it from the `source`, or, when it is the only source, `DeleteElement` of the relationship. A Goal that is the last under a Strategy leaves a placeholder behind, as W20 | Decided | The relationship's identity, name and `xmi:id` are kept where SACM can hold the result in the same element. An `AssertedInference` with a `reasoning` is a different shape from one without (E1, E2), so a Goal moving between a Goal and a Strategy changes relationship |
+| W24 | The line it gets | Where W23 did not keep the relationship: as an add makes it. Under a Goal, `CreateAssertedInference` (a Goal), `CreateAssertedEvidence` (a Solution) or `CreateAssertedContext` (context), from the node to the Goal. A Goal under a Strategy: `AddReference` of it to the `source` of the Strategy's one inference; a placeholder held there (W2) is taken out and deleted, since the Goal moved has its own identity. Support moved under an undeveloped Goal develops it, as W11 | Decided | W1, W3 to W7, W11 |
+| W25 | What the diagram does not draw | A relationship is given a new `target`, or deleted, only when nothing refers to it and it holds nothing but its name: otherwise the move is refused (AF-EDIT-015). A challenge of the line, a `metaClaim` and a group's membership are what refer to one | Decided | "Never silently change an argument": a challenge of "A supports B" is not a challenge of "A supports C", and a description of a line is not deleted unseen. To be opened again when challenges are edited |
+
+A Goal that loses its support by a move keeps its declaration, as by a
+removal (W18).
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -602,4 +623,9 @@ was refused. Nothing changes.
 | AF-EDIT-012 | An identifier cannot be empty (W15) |
 | AF-EDIT-013 | Another element of the file has the identifier (W15) |
 | AF-EDIT-014 | The text is the value of a terminology expression, which is not changed as text |
-| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19) |
+| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19); or refers to, or is held by, the line a move would replace (W25) |
+| AF-EDIT-016 | The node is drawn under several nodes (W21) |
+| AF-EDIT-017 | The node is joined in a way a move does not carry (W21) |
+| AF-EDIT-018 | The place is the node itself, or under it (W22) |
+| AF-EDIT-019 | The node is there already (W22) |
+| AF-EDIT-020 | The place is in another argument package (W22) |

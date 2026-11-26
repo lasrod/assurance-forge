@@ -19,7 +19,7 @@
 //! It does no I/O and builds for `wasm32-unknown-unknown`.
 
 use af_gsn::ElementKind;
-use af_gsn::commands::{self, AddError, Added, Removed, Target, TextField, TextSet};
+use af_gsn::commands::{self, AddError, Added, Moved, Removed, Target, TextField, TextSet};
 use af_gsn::view::View;
 use sacm::model::Document;
 
@@ -54,6 +54,9 @@ pub enum Command {
     },
     /// Remove the node `element` and what goes with it.
     Remove { element: String },
+    /// Move the node `element`, with what is under it, under the node `to`,
+    /// or to the top level when `None`.
+    Move { element: String, to: Option<String> },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
     Restore,
@@ -220,6 +223,32 @@ impl Session {
         };
         let record = self.made(before, command, &removed.mutation);
         Ok((removed, record))
+    }
+
+    /// Moves the node `element`, with what is under it, to `target`. `view`
+    /// is the view of the document as it is now.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::move_node`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn move_node(
+        &mut self,
+        view: &View,
+        element: &str,
+        target: Target<'_>,
+    ) -> Result<(Moved, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let moved = commands::move_node(&mut self.document, view, element, target)?;
+        let command = Command::Move {
+            element: element.to_owned(),
+            to: match target {
+                Target::Canvas => None,
+                Target::Node(id) => Some(id.to_owned()),
+            },
+        };
+        let record = self.made(before, command, &moved.mutation);
+        Ok((moved, record))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

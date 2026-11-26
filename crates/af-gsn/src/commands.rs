@@ -29,7 +29,9 @@ use sacm::model::{
 use crate::ElementKind;
 use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, View};
 
+mod move_node;
 mod remove;
+pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
 
 /// Where an element is to be added.
@@ -65,6 +67,19 @@ pub enum Refusal {
     /// removal would delete, or it holds more than its text, so it is not
     /// removed (W19).
     Entangled,
+    /// AF-EDIT-016: the node is drawn under several nodes, so there is no
+    /// one line to move (W21).
+    SeveralParents,
+    /// AF-EDIT-017: the node is joined in a way a move does not carry: it
+    /// challenges something, or its line is not a plain `SupportedBy` or
+    /// `InContextOf` (W21).
+    JoinNotMoved,
+    /// AF-EDIT-018: the place is the node itself or under it (W22).
+    UnderItself,
+    /// AF-EDIT-019: the node is there already (W22).
+    AlreadyThere,
+    /// AF-EDIT-020: the place is in another argument package (W22).
+    OtherPackage,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -86,6 +101,11 @@ impl Refusal {
             Refusal::TopLevelGoalOnly => "AF-EDIT-006",
             Refusal::NotANode => "AF-EDIT-011",
             Refusal::Entangled => "AF-EDIT-015",
+            Refusal::SeveralParents => "AF-EDIT-016",
+            Refusal::JoinNotMoved => "AF-EDIT-017",
+            Refusal::UnderItself => "AF-EDIT-018",
+            Refusal::AlreadyThere => "AF-EDIT-019",
+            Refusal::OtherPackage => "AF-EDIT-020",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",
@@ -614,7 +634,7 @@ fn plan(
 
 /// The one live inference whose reasoning is the Strategy `id` and that the
 /// view draws through it (E1), or `None` when there is not exactly one.
-fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId> {
+pub(crate) fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId> {
     let mut found = document.elements().filter(|element| {
         element.kind() == SacmKind::AssertedInference
             && element
@@ -635,7 +655,7 @@ fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId
 
 /// The placeholder `inference` holds for a Strategy's first Goal (R16), and
 /// its tag, when the view did not draw it for that reason.
-fn held_place(
+pub(crate) fn held_place(
     document: &Document,
     view: &View,
     inference: &ElementId,

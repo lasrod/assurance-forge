@@ -116,6 +116,34 @@
     gap: var(--datum-space-4);
   }
 
+  /* The centre's header: the zoom controls, then what a move in progress
+     asks of the user. */
+  .af-centre-header {
+    display: flex;
+    align-items: center;
+    gap: var(--datum-space-16);
+    min-inline-size: 0;
+  }
+
+  .af-move-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--datum-space-8);
+    min-inline-size: 0;
+  }
+
+  .af-move-prompt {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--datum-font-weight-semibold);
+  }
+
+  .af-move-banner .datum-button {
+    flex: none;
+  }
+
   .af-zoom-bar .datum-quantity-cell {
     inline-size: 6rem;
   }

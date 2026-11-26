@@ -38,7 +38,17 @@ export interface Palette {
 export interface Marks {
   selected: string | null;
   hovered: string | null;
+  /** A move being chosen: the node to move, and the nodes it may go under. The rest is drawn faint. */
+  move?: MoveMarks | null;
 }
+
+export interface MoveMarks {
+  source: string;
+  allowed: ReadonlySet<string>;
+}
+
+/** How faint what a move cannot go to is drawn. */
+const FAINT = 0.35;
 
 /** Diagram coordinates to CSS pixels: `x * scale + offsetX`. */
 export interface Viewport {
@@ -255,6 +265,8 @@ export function draw(
   // A marked line goes over the others, the selected one last.
   const rank = (edge: DiagramEdge) => (edgeKey(edge) === marks.selected ? 2 : edgeKey(edge) === marks.hovered ? 1 : 0);
   const edges = marks.selected || marks.hovered ? [...diagram.edges].sort((a, b) => rank(a) - rank(b)) : diagram.edges;
+  const move = marks.move ?? null;
+  if (move) context.globalAlpha = FAINT;
   for (const edge of edges) {
     if (!overlaps(edge.bounds, visible)) continue;
     drawEdge(context, edge, palette, scale, marks);
@@ -262,9 +274,13 @@ export function draw(
   }
   for (const node of diagram.nodes) {
     if (!overlaps(node.bounds, visible)) continue;
+    // While a move is chosen, only the node moved and where it may go are
+    // drawn in full.
+    if (move) context.globalAlpha = node.id === move.source || move.allowed.has(node.id) ? 1 : FAINT;
     drawNode(context, node, palette, families, scale, marks);
     drawn.nodes += 1;
   }
+  context.globalAlpha = 1;
   return drawn;
 }
 
@@ -396,13 +412,16 @@ function drawNode(
 ) {
   // Selected and hovered are told apart by fill and outline, never by the
   // outline's colour alone (DATUM's list treatment).
-  const selected = marks.selected === node.id;
-  const hovered = marks.hovered === node.id;
+  // While a move is chosen the node moved is the marked one, and a place it
+  // may go has the heavier outline: by weight, not by colour alone.
+  const target = marks.move?.allowed.has(node.id) ?? false;
+  const selected = marks.move ? marks.move.source === node.id : marks.selected === node.id;
+  const hovered = marks.hovered === node.id && (!marks.move || target);
   shapePath(context, node);
   context.fillStyle = selected ? palette.selectedFill : hovered ? palette.hover : palette.fill;
   context.fill();
-  context.strokeStyle = selected ? palette.selectedLine : palette.line;
-  context.lineWidth = (selected && palette.forced ? 2 : 1) / scale;
+  context.strokeStyle = selected || target ? palette.selectedLine : palette.line;
+  context.lineWidth = (target ? (hovered ? 3 : 2) : selected && palette.forced ? 2 : 1) / scale;
   context.setLineDash(node.shape.type === 'neutral' ? [4 / scale, 3 / scale] : []);
   context.stroke();
   context.setLineDash([]);

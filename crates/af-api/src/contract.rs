@@ -480,6 +480,40 @@ pub struct Removal {
     pub refusal: Option<String>,
 }
 
+/// Whether one node can take a moved one.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct MoveTarget {
+    /// The SACM id of the node.
+    pub id: String,
+    /// Why the moved node cannot go under it (`AF-EDIT-001` to `AF-EDIT-004`,
+    /// `AF-EDIT-018` to `AF-EDIT-020`), or null when it can. The frontend
+    /// words it.
+    pub refusal: Option<String>,
+    /// Moving there also clears this Goal's undeveloped decorator.
+    pub develops: bool,
+}
+
+/// Where the node `id` may be moved, at `revision`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct MoveTargets {
+    pub revision: u32,
+    /// The SACM id of the node to move.
+    pub id: String,
+    /// Why the node cannot be moved at all (`AF-EDIT-002`, `AF-EDIT-004`,
+    /// `AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-016`, `AF-EDIT-017`), or null
+    /// when it can. `nodes` is then empty.
+    pub refusal: Option<String>,
+    /// Why it cannot be moved to the top level (`AF-EDIT-006`,
+    /// `AF-EDIT-019`), or null when it can.
+    pub canvas: Option<String>,
+    /// Every node of the diagram, in its order.
+    pub nodes: Vec<MoveTarget>,
+}
+
 /// What a command gave.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -489,9 +523,9 @@ pub enum EditResult {
     #[serde(rename_all = "camelCase")]
     Applied {
         revision: u32,
-        /// The element the interface selects: the one an add made, or the
-        /// node a removed one was drawn under. Null for undo, redo, a change
-        /// of text and the removal of a top-level node.
+        /// The element the interface selects: the one an add made, the node
+        /// a removed one was drawn under, or the node moved. Null for undo,
+        /// redo, a change of text and the removal of a top-level node.
         element: Option<String>,
         /// The SACM ids the command created, changed and deleted.
         created: Vec<String>,
@@ -503,7 +537,8 @@ pub enum EditResult {
     /// redo (`AF-EDIT-008`), the add menu was for another revision
     /// (`AF-EDIT-009`), libSACM refused the operations (`AF-EDIT-010`),
     /// why a text cannot be set (`AF-EDIT-011` to `AF-EDIT-014`), or why a
-    /// node cannot be removed (`AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-015`).
+    /// node cannot be removed (`AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-015`),
+    /// or why it cannot be moved (those of `MoveTargets`, and `AF-EDIT-015`).
     Refused { code: String },
     /// A text was set to what it already was: the document, its revision and
     /// its history are as they were.
@@ -729,6 +764,8 @@ pub fn typescript() -> String {
         AddChoices::decl(&cfg),
         RemovalNode::decl(&cfg),
         Removal::decl(&cfg),
+        MoveTarget::decl(&cfg),
+        MoveTargets::decl(&cfg),
         EditResult::decl(&cfg),
         History::decl(&cfg),
         WriteResult::decl(&cfg),
