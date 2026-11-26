@@ -53,8 +53,9 @@ IndexedDB. A crash leaves it, and opening the file again offers it back as
 one change that undo takes back. Milestone 2, step 4
 ([moving an element](docs/roadmap/milestone-2-move.md)), its first part: an
 element is moved, with what is under it, under another Goal or Strategy or
-to the top level, from **Move…** in its menu. The canvas shows where it may
-go, and a click on a place, or the place's own menu, moves it there.
+to the top level, by dragging it there or from **Move…** in its menu. The
+canvas shows where it may go, and a drop or a click on a place, or the
+place's own menu, moves it there.
 
 ```mermaid
 flowchart LR
@@ -94,7 +95,7 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | `af-api` | The frontend contract: `Core` holds the session, the revision and the derived views, answers queries and runs commands. TypeScript types generated into `crates/af-api/bindings/api.ts` | open, close, diagram, element, relationship, outline, packages, language, text sizes, fonts; the add menu's choices, add, set a text, what a removal deletes, remove, where a node may be moved, move, undo, redo, history with whether changes are not saved; write (the document as XMI, read back before it is given out), mark saved; the recovery copy (made, read, restored) and the base it carries; the problem list at the revision, with the read diagnostics kept from the open |
 | `af-wasm` | The browser shell: `af-api` compiled to WebAssembly, answering in JSON | yes |
 | `af-desktop` | The Tauri shell: files, the open and save dialogs, saving (whole or not at all, never over a file changed on disk), recent files as paths, the window's close held while changes are not saved, the recovery copy in the working folder beside the file, the command line, `--smoke` for CI | yes; Windows checked in CI |
-| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Move… and Remove, the confirmation of a removal, the places a move may go and its prompt, Edit ▸ Undo and Redo, File ▸ Save and Save As…, the mark and the question for changes not saved, the recovery copy's timer and question, the Problems panel and the status bar's counts, the trees, welcome page, English and Japanese, dark and light |
+| `ui/` | React and DATUM. Draws the render model on a Canvas2D; owns selection, hover, pan, zoom and panels | open, draw, pan, zoom, fit, select nodes and relationships, Element Properties with its editable identifier, name and description, the add menu with Move… and Remove, the confirmation of a removal, the places a move may go and its prompt, a drag of a node to another place, Edit ▸ Undo and Redo, File ▸ Save and Save As…, the mark and the question for changes not saved, the recovery copy's timer and question, the Problems panel and the status bar's counts, the trees, welcome page, English and Japanese, dark and light |
 
 ### Who owns what state
 
@@ -112,7 +113,8 @@ and does no I/O. The shells read files and fonts and hand in bytes.
 | Text sizes | the frontend reads DATUM's type tokens and sends them (`setStyle`) | the user's text size |
 | The answers on screen (diagram, outline, packages, details, what Undo and Redo can do) and the order of opens and edits | `ui/src/useDocument.ts`; which answer is newer is `ui/src/freshness.ts` | each answer from the core |
 | Selection, hover, viewport (pan and zoom), whether the view is a fit | `ui/src/canvas/useViewport.ts`, `DiagramCanvas.tsx` | user input; both start again with each new file. An edit keeps the view, keeping a node where it was, and selects what it added |
-| A move being chosen: the node, and where the core said it may go at a revision | `ui/src/App.tsx` | **Move…**; ended by the move, Escape, Cancel, or any other revision or file on screen |
+| A move being chosen: the node, and where the core said it may go at a revision | `ui/src/App.tsx` | **Move…**, or a drag that begins on a node; ended by the move, the drop, Escape, Cancel, or any other revision or file on screen |
+| A drag of a node: the node and where the pointer is | `ui/src/canvas/DiagramCanvas.tsx` | a press on a node that moves (held first, for a touch), until it is let go |
 | Panel layout | DATUM's `Workspace`, held by `App.tsx`, kept in the browser's storage (`ui/src/layout.ts`) | the user moves or hides a panel |
 | Tree expansion | `App.tsx` | the user, a selection that must be shown, and a new file (not an edit) |
 | The problem list | `af-api`, derived by `af-problems` once per revision; what libSACM reported reading the file is kept from the open | open, each command |
@@ -175,8 +177,8 @@ interface**. Interface results are run locally and put in each pull request.
 
 ## What is next
 
-Milestone 2 goes on from moving an element: moving by dragging, tried in
-the application before it is designed
+Milestone 2 goes on from moving an element: a preview of a move, and a drop
+on a line, each tried in the application before it is designed
 ([the plan](docs/roadmap/milestone-2-move.md)). Nothing else in the planned
 shape below is started.
 

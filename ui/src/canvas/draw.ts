@@ -40,11 +40,18 @@ export interface Marks {
   hovered: string | null;
   /** A move being chosen: the node to move, and the nodes it may go under. The rest is drawn faint. */
   move?: MoveMarks | null;
+  /** What follows the pointer while a node is dragged: where the pointer is, in CSS px of the canvas, and what it says. */
+  badge?: Badge | null;
 }
 
 export interface MoveMarks {
   source: string;
   allowed: ReadonlySet<string>;
+}
+
+export interface Badge {
+  pointer: Point;
+  label: string;
 }
 
 /** How faint what a move cannot go to is drawn. */
@@ -281,7 +288,36 @@ export function draw(
     drawn.nodes += 1;
   }
   context.globalAlpha = 1;
+  if (marks.badge) drawBadge(context, marks.badge, palette, families, size.dpr);
   return drawn;
+}
+
+/** Beside the pointer, not under it: the place below stays readable. */
+const BADGE_OFFSET = 14;
+const BADGE_HEIGHT = 24;
+const BADGE_PAD = 8;
+
+/**
+ * The mark that follows the pointer while a node is dragged: its identifier
+ * and how many elements come with it, in CSS px whatever the zoom.
+ */
+function drawBadge(context: CanvasRenderingContext2D, badge: Badge, palette: Palette, families: Families, dpr: number) {
+  context.save();
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.font = `600 12px ${families.text}`;
+  const width = context.measureText(badge.label).width + 2 * BADGE_PAD;
+  const [x, y] = [badge.pointer.x + BADGE_OFFSET, badge.pointer.y + BADGE_OFFSET];
+  context.fillStyle = palette.selectedFill;
+  context.strokeStyle = palette.selectedLine;
+  context.lineWidth = palette.forced ? 2 : 1;
+  context.beginPath();
+  context.rect(x, y, width, BADGE_HEIGHT);
+  context.fill();
+  context.stroke();
+  context.fillStyle = palette.text;
+  context.textBaseline = 'middle';
+  context.fillText(badge.label, x + BADGE_PAD, y + BADGE_HEIGHT / 2);
+  context.restore();
 }
 
 /** The grid's pitch, in diagram units. */

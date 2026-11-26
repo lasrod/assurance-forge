@@ -50,6 +50,7 @@ nav:
     - "Milestone 2, step 4: moving an element": roadmap/milestone-2-move.md
     - Canvas spike findings: spikes/canvas.md
     - Desktop shell spike findings: spikes/desktop-shell.md
+    - Moving by dragging spike findings: spikes/drag-move.md
   - Standards:
     - SACM to GSN mapping: standards/sacm-gsn-mapping.md
     - GSN metamodel gaps: standards/sacm-gsn-metamodel-gaps.md

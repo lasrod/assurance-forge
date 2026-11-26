@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
+import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
 import type { AddChoice, Core, ElementKind, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
 import { addItems, kindName, refusalText } from './addMenu';
@@ -187,7 +188,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // A move being chosen: the node to move and where the core says it may
   // go, at a revision. Another revision on screen, or another file, ends it:
   // its targets are of the document before.
-  const [moving, setMoving] = useState<{ targets: MoveTargets; kind: NodeKind; identifier: string } | null>(null);
+  // `dragged`: the node is being dragged there, so no prompt is shown and
+  // the choice ends with the drop.
+  const [moving, setMoving] = useState<{ targets: MoveTargets; kind: NodeKind; identifier: string; dragged: boolean } | null>(
+    null,
+  );
+  // The node being dragged: places that come after it was dropped are not shown.
+  const dragged = useRef<string | null>(null);
   const shownRevision = diagram?.revision ?? null;
   if (moving && moving.targets.revision !== shownRevision) setMoving(null);
   const moveMarks = useMemo(
@@ -200,17 +207,22 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         : null,
     [moving],
   );
-  /** Starts choosing where the node `id` goes; the status says why when it cannot be moved. */
+  /**
+   * Starts choosing where the node `id` goes, from the menu or by a drag;
+   * the status says why when it cannot be moved. Answers whether it can.
+   */
   const startMove = useCallback(
-    (id: string) => {
-      void moveTargets(id).then((targets) => {
-        if (!targets) return;
-        const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
-        const row = outline.find((candidate) => candidate.id === id);
-        if (!node) return;
-        setSelected(id);
-        setMoving({ targets, kind: node.kind, identifier: row?.identifier ?? id });
-      });
+    async (id: string, byDrag: boolean): Promise<boolean> => {
+      dragged.current = byDrag ? id : null;
+      const targets = await moveTargets(id);
+      const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
+      if (!targets || !node) return false;
+      // Dropped, or given up, before the core answered.
+      if (byDrag && dragged.current !== id) return true;
+      const row = outline.find((candidate) => candidate.id === id);
+      setSelected(id);
+      setMoving({ targets, kind: node.kind, identifier: row?.identifier ?? id, dragged: byDrag });
+      return true;
     },
     [moveTargets, diagram, outline, setSelected],
   );
@@ -231,6 +243,21 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       moveWith(moving.targets, to, moving, toIdentifier, followEdit);
     },
     [moving, diagram, outline, moveRefused, moveWith, followEdit],
+  );
+  /**
+   * A dragged node was dropped: on a place it may go, it moves there; on one
+   * it may not, the status says why. A drop on nothing gives the drag up: a
+   * Goal goes to the top level from the menu, not by a drop that missed.
+   * The choice ends with the drop either way.
+   */
+  const endDrag = useCallback(
+    (end: DragEnd) => {
+      dragged.current = null;
+      if (!moving) return;
+      if (end.on === 'node') moveTo(end.id);
+      setMoving(null);
+    },
+    [moving, moveTo],
   );
   /**
    * Opens the menu of a node, or of the empty canvas, at a client point: the
@@ -282,7 +309,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       return;
     }
     if (id === MOVE) {
-      if (menu.parent) startMove(menu.parent);
+      if (menu.parent) void startMove(menu.parent, false);
       return;
     }
     if (id === MOVE_HERE) {
@@ -565,7 +592,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               // the canvas would cover the places to choose from.
               <div className="af-centre-header">
                 <ZoomBar t={t} scale={viewport?.scale ?? null} onZoomBy={zoomBy} onFit={fitAll} step={ZOOM_STEP} />
-                {moving && (
+                {moving && !moving.dragged && (
                   <div className="af-move-banner" role="status">
                     <span className="af-move-prompt">{t('movePrompt', { kind: kindName(moving.kind, t), identifier: moving.identifier })}</span>
                     {moving.targets.canvas === null && (
@@ -658,6 +685,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               move={moveMarks}
               onMoveTo={moveTo}
               onMoveCancel={() => setMoving(null)}
+              onDragStart={(id) => startMove(id, true)}
+              onDragEnd={endDrag}
             />
           </Workspace>
         )}

@@ -16,8 +16,8 @@ place was removed and written again.
 It is the fourth step of milestone 2 (Edit) in the
 [Phase 0 release plan](rust-rebuild-phase-0.md#releases). It has two parts.
 The first is the move itself and a plain way to make it, from the menu. The
-second is moving by dragging, which is tried out in the application before it
-is designed: how a drag should feel cannot be settled on paper.
+second is moving by dragging, which was tried out in the application before
+it was designed: how a drag should feel cannot be settled on paper.
 
 ### Done when
 
@@ -34,9 +34,18 @@ Part 1, the move from the menu:
    application, in English and Japanese, with browser tests in Chromium,
    Firefox and WebKit.
 
-Part 2, moving by dragging: the questions below are answered from trying the
-variants in the application, the findings are written under `docs/spikes/`,
-and this page is given the goals that follow from them.
+Part 2, moving by dragging:
+
+6. A drag that begins on a node moves it to the place it is dropped on, by
+   the same rules and the same command as the menu's move. A drag that begins
+   anywhere else pans.
+7. A node that cannot be moved says why at once, and nothing follows the
+   pointer. A drop on a place the node cannot go says why. A drop on nothing,
+   and Escape, change nothing.
+8. The view pans while a dragged node is near an edge, so a place out of view
+   is reached.
+9. A touch moves a node once it has been held, and pans otherwise.
+10. Browser tests in Chromium, Firefox and WebKit; touch in Chromium.
 
 ### Out of scope
 
@@ -59,25 +68,23 @@ element's kind.
 
 | M7 | An element the file joins in a way GSN does not allow (an Assumption by a support line) is moved with its line as it is. The move does not repair it; the repair is offered from the Problems panel, as its own action | A drag that also changed the kind of a line would change the argument unasked. The sample `sacm_example_core_argument` has such an Assumption |
 
-## Questions for part 2
+| M8 | A drag that begins on a node moves it. It no longer pans: a drag on the empty canvas, the middle button and the wheel do | Tried against the menu's move, it is much the more convenient. A node is where the hand goes to rearrange; the canvas is still mostly ground to pan by |
+| M9 | A badge follows the pointer, beside it: the node's identifier, and how many elements come with it. The node itself stays where it is until the drop | A faint copy of the node hid the text of the place it was over. The count says a branch is being moved, not one element |
+| M10 | While a node is dragged the places it may go are drawn as for the menu's move, with no prompt. A drop on a place it may not go says why and ends the drag | One picture of where an element may go, however the move is made |
+| M11 | A drop on the empty canvas, a drop back on the node, and Escape give the drag up. A Goal goes to the top level from the menu | A drop that missed must not take a branch out of the argument |
+| M12 | The view pans while the pointer is within 56 px of an edge, faster the nearer it is. The place dropped on stays where it was on screen after the drop | A place out of view is reached without letting go; the user was looking at the place they chose |
+| M13 | A touch on a node pans, as a touch anywhere does, unless it is held for 300 ms first; then it moves the node. Zoomed out too far for a node's text to be drawn, a drag on it pans with any pointer | A touch cannot both pan and move. A node that cannot be read is not moved by a slip of the hand, and far out the canvas is mostly nodes |
 
-Each is a variant to try, not a decision:
+## Still to try
 
-- **What starts a drag.** A drag on a node now pans, as a drag anywhere does.
-  A drag on a node could move it at once, after a held press, or only with a
-  modifier key.
-- **What follows the pointer.** The node, a small mark with a count of what
-  comes with it, or nothing but the highlighted places.
-- **A long way.** The view pans when the pointer nears an edge; how fast, and
-  whether zooming during a drag is wanted.
-- **After the drop.** What stays in place while the layout is made again, and
-  whether the change is animated.
-- **Dropping on nothing.** Whether a drop on the empty canvas moves a Goal to
-  the top level, or is too easy to do by accident.
+Each needs its own try in the application, as the drag did
+([the findings](../spikes/drag-move.md)):
+
 - **A preview.** Whether the result is shown, faint, while the pointer rests
   on a place.
 - **Dropping on a line.** Whether a Strategy dropped on a line goes between
   its two ends.
+- **After the drop.** Whether the change of layout is animated.
 
 ## The pieces
 
@@ -87,6 +94,7 @@ Each is a variant to try, not a decision:
 | The command, as one revision and one undo step | `af-session` (`Session::move_node`) |
 | The contract: `MoveTargets`, `move_targets`, `move_node` | `af-api`, `af-wasm`, `af-desktop` |
 | The places drawn, and the click | `ui/src/canvas` (`Marks.move`) |
+| The drag: the press, the badge, the pan at the edges | `ui/src/canvas/DiagramCanvas.tsx`, `drag.ts`, `draw.ts` (`Marks.badge`) |
 | The menu items, the prompt and the status | `ui/src/App.tsx`, `ui/src/useDocument.ts` |
 
 ## The goals
@@ -95,6 +103,9 @@ Each is a variant to try, not a decision:
       fixtures and on every sample.
 - [x] **G2.** The move from the menu, in both shells and both languages, with
       browser tests.
-- [ ] **G3.** The drag variants, behind a switch for development, tried in
+- [x] **G3.** The drag variants, behind a switch for development, tried in
       the application.
-- [ ] **G4.** The findings written, and this page's goals for the drag.
+- [x] **G4.** The findings written, and this page's goals for the drag.
+- [x] **G5.** The drag as chosen (M8 to M13), with browser tests.
+- [ ] **G6.** The preview, the drop on a line and the animation, each tried
+      and then decided.
