@@ -177,8 +177,8 @@ interface**. Interface results are run locally and put in each pull request.
 
 ## What is next
 
-Milestone 2 goes on from moving an element: a preview of a move, and a drop
-on a line, each tried in the application before it is designed
+Milestone 2 goes on from moving an element: whether a node dropped on a
+line goes between its ends is still open
 ([the plan](docs/roadmap/milestone-2-move.md)). Nothing else in the planned
 shape below is started.
 

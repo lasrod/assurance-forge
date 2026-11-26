@@ -75,16 +75,14 @@ element's kind.
 | M12 | The view pans while the pointer is within 56 px of an edge, faster the nearer it is. The place dropped on stays where it was on screen after the drop | A place out of view is reached without letting go; the user was looking at the place they chose |
 | M13 | A touch on a node pans, as a touch anywhere does, unless it is held for 300 ms first; then it moves the node. Zoomed out too far for a node's text to be drawn, a drag on it pans with any pointer | A touch cannot both pan and move. A node that cannot be read is not moved by a slip of the hand, and far out the canvas is mostly nodes |
 
-## Still to try
+| M14 | No preview of the result before the drop | Tried as the whole result and as the branch alone, faint: both felt off, and showing nothing more felt better ([the findings](../spikes/drag-move.md#a-preview-of-the-move)). Edit ▸ Undo is the way back |
 
-Each needs its own try in the application, as the drag did
-([the findings](../spikes/drag-move.md)):
+## Still open
 
-- **A preview.** Whether the result is shown, faint, while the pointer rests
-  on a place.
-- **Dropping on a line.** Whether a Strategy dropped on a line goes between
-  its two ends.
-- **After the drop.** Whether the change of layout is animated.
+- **Dropping on a line.** Whether a node dropped on a line goes between its
+  two ends. Tried as two moves; if it is wanted it needs one command in the
+  core, so that it is one undo step and made whole or not at all.
+- **After the drop.** Whether the change of layout is animated. Not tried.
 
 ## The pieces
 
@@ -107,5 +105,5 @@ Each needs its own try in the application, as the drag did
       the application.
 - [x] **G4.** The findings written, and this page's goals for the drag.
 - [x] **G5.** The drag as chosen (M8 to M13), with browser tests.
-- [ ] **G6.** The preview, the drop on a line and the animation, each tried
-      and then decided.
+- [x] **G6.** A preview of the move, tried and decided against (M14).
+- [ ] **G7.** The drop on a line and the animation, each decided.

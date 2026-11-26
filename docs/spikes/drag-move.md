@@ -1,8 +1,8 @@
 # Moving by dragging spike: findings
 
-**Authority: evidence.** A record of what an experiment in the application
-showed on 2026-11-26. The spike code is on the branch `spike/drag-move` and is
-not merged.
+**Authority: evidence.** A record of what two experiments in the application
+showed on 2026-11-26. The spike code is on the branches `spike/drag-move` and
+`spike/move-preview`, and is not merged.
 
 ## The question
 
@@ -51,11 +51,32 @@ only the gesture.
    a pan and a held drag short. Found by the touch test, and fixed with the
    drag.
 
-## Not tried
+## A preview of the move
 
-The preview of the result while the pointer rests on a place, a drop on a line
-to put a Strategy between its two ends, and an animated change of layout. Each
-needs its own try in the application.
+A second spike asked whether the result of a move should be shown before the
+drop, while the pointer rests on a place the node may go. The core answered
+with the diagram of the move made on a copy of the document, and a panel
+chose between three variants, with a delay of 0, 150, 350 or 700 ms:
+
+| Variant | What it showed |
+|---|---|
+| The whole result | The diagram as the move would make it, with the place under the pointer kept where it was |
+| Only the branch | The diagram as it is, with the branch moved drawn faint where it would land |
+| Nothing more | The places the node may go, and the badge |
+
+7. **No preview.** Tried in the application, the whole result and the faint
+   branch both felt off, and showing nothing more felt better. The faint
+   branch also lands on nodes that have not moved out of its way. The drag
+   stays as it is: the places and the badge, and the layout made again at the
+   drop. Edit ▸ Undo is the way back from a move that was not wanted.
+
+## Not tried, or not decided
+
+- **A drop on a line**, to put a node between the line's two ends. The second
+  spike built it as two moves, so it takes two undo steps, and a refused
+  second move leaves the first made. Whether it is wanted is not decided; if
+  it is, it needs one command in the core.
+- **An animated change of layout** after the drop. Not tried.
 
 ## Consequences
 
