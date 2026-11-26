@@ -620,10 +620,14 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       }),
     [edit],
   );
-  /** Marks the Goal `id` undeveloped, or clears the mark; the view keeps the Goal in place. */
+  /**
+   * Marks the Goal `id` undeveloped, or clears the mark, as asked at
+   * `revision`; the view keeps the Goal in place. The core refuses it if the
+   * revision is not current.
+   */
   const setUndeveloped = useCallback(
-    (id: string, undeveloped: boolean, identifier: string, onShown: EditShown) =>
-      void edit((on) => on.setUndeveloped(id, undeveloped), 'mark', id, 'goal', onShown, { kind: 'undevelopedSet', undeveloped, identifier }),
+    (id: string, undeveloped: boolean, revision: number, identifier: string, onShown: EditShown) =>
+      void edit((on) => on.setUndeveloped(id, undeveloped, revision), 'mark', id, 'goal', onShown, { kind: 'undevelopedSet', undeveloped, identifier }),
     [edit],
   );
   /**
@@ -860,7 +864,7 @@ export function useDetails(core: Core | null, selected: string | null, diagram: 
     const edge = diagram.diagram.nodes.some((node) => node.id === selected) ? null : findEdge(diagram.diagram, selected);
     const read: Promise<Details | null> = edge
       ? core.relationship(edge.relationship).then((relationship) => relationship && { type: 'relationship', relationship, edge })
-      : core.element(selected).then((element) => element && { type: 'element', element });
+      : core.element(selected).then((element) => element && { type: 'element', element, revision: diagram.revision });
     read.then(
       (next) => {
         if (current) setDetails(next);

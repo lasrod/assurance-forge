@@ -12,8 +12,8 @@ import { applyShortcut } from './shortcuts';
 /** Sets a text of the element `id`, of kind `about`, and answers what the core made of it. */
 export type OnText = (id: string, field: TextField, text: string, about: NodeKind) => Promise<TextOutcome>;
 
-/** Marks the Goal `id` undeveloped, or clears the mark. */
-export type OnUndeveloped = (id: string, undeveloped: boolean, identifier: string) => void;
+/** Marks the Goal `id` undeveloped, or clears the mark, as asked at `revision`. */
+export type OnUndeveloped = (id: string, undeveloped: boolean, revision: number, identifier: string) => void;
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -22,7 +22,7 @@ type T = (key: MessageKey, values?: Record<string, string | number>) => string;
  * relationship the line is drawn for.
  */
 export type Details =
-  | { type: 'element'; element: ElementDetails }
+  | { type: 'element'; element: ElementDetails; revision: number }
   | { type: 'relationship'; relationship: RelationshipDetails; edge: Pick<DiagramEdge, 'from' | 'to' | 'toRelationship'> };
 
 const KINDS: Record<NodeKind, MessageKey> = {
@@ -71,11 +71,14 @@ export function lineEnds(details: Extract<Details, { type: 'relationship' }>, t:
 
 function ElementSection({
   details,
+  revision,
   t,
   onText,
   onUndeveloped,
 }: {
   details: ElementDetails;
+  /** The revision the details are of. */
+  revision: number;
   t: T;
   onText: OnText;
   onUndeveloped: OnUndeveloped;
@@ -120,7 +123,7 @@ function ElementSection({
                 label={t('undeveloped')}
                 checked={details.undeveloped}
                 disabled={details.undevelopedRefusal !== null}
-                onChange={(event) => onUndeveloped(details.id, event.target.checked, details.identifier)}
+                onChange={(event) => onUndeveloped(details.id, event.target.checked, revision, details.identifier)}
               />
               <p className="datum-meta af-undeveloped-hint">
                 {t(!details.supported ? 'undevelopedHint' : details.undeveloped ? 'undevelopedStale' : 'undevelopedSupported')}
@@ -194,7 +197,7 @@ export function ElementProperties({
 }) {
   if (!details) return <p className="datum-meta af-dock-empty">{t('elementPropertiesEmpty')}</p>;
   return details.type === 'element' ? (
-    <ElementSection details={details.element} t={t} onText={onText} onUndeveloped={onUndeveloped} />
+    <ElementSection details={details.element} revision={details.revision} t={t} onText={onText} onUndeveloped={onUndeveloped} />
   ) : (
     <RelationshipSection selected={details} t={t} />
   );

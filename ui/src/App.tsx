@@ -174,7 +174,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
   /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
   const setUndeveloped = useCallback(
-    (id: string, undeveloped: boolean, identifier: string) => setUndevelopedWith(id, undeveloped, identifier, followEdit),
+    (id: string, undeveloped: boolean, revision: number, identifier: string) =>
+      setUndevelopedWith(id, undeveloped, revision, identifier, followEdit),
     [setUndevelopedWith, followEdit],
   );
   /** A text of an element changed in Element Properties; the view keeps the element in place. */
@@ -282,9 +283,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       dragged.current = null;
       dragMove.current = null;
       setMoving(null);
-      if (current && end.on === 'node' && current.targets.revision === shownRevision) moveTo(end.id, current);
+      if (!current || end.on !== 'node') return;
+      // The argument changed under the drag: its places are of before.
+      if (current.targets.revision !== shownRevision) moveRefused('AF-EDIT-009', null);
+      else moveTo(end.id, current);
     },
-    [moving, moveTo, shownRevision],
+    [moving, moveTo, moveRefused, shownRevision],
   );
   /**
    * Opens the menu of a node, or of the empty canvas, at a client point: the
@@ -293,6 +297,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
    */
   // Each request for a menu: an answer to an earlier one is dropped.
   const menuRequest = useRef(0);
+  // A move begun or ended drops an answer asked for before: the menu it
+  // would open is of the other state.
+  useEffect(() => {
+    menuRequest.current += 1;
+  }, [moving]);
   const openAddMenu = useCallback(
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
       const request = ++menuRequest.current;
@@ -369,7 +378,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       return;
     }
     if (id === UNDEVELOPED) {
-      if (menu.parent && menu.undeveloped) setUndeveloped(menu.parent, !menu.undeveloped.marked, menu.undeveloped.identifier);
+      if (menu.parent && menu.undeveloped) setUndeveloped(menu.parent, !menu.undeveloped.marked, menu.revision, menu.undeveloped.identifier);
       return;
     }
     add(menu.parent, id as ElementKind, menu.revision, menu.about, followEdit);

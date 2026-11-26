@@ -163,7 +163,7 @@ export interface Core {
    * `unchanged` when it was that already; refused when it is not a Goal
    * (AF-EDIT-021) or is supported (AF-EDIT-022).
    */
-  setUndeveloped(id: string, undeveloped: boolean): Promise<EditResult>;
+  setUndeveloped(id: string, undeveloped: boolean, revision: number): Promise<EditResult>;
   /**
    * Joins the node with this SACM id by context in place of the support
    * line `relationship` draws, as a problem of `revision` offered: refused

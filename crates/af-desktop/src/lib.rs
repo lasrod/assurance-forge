@@ -1012,9 +1012,12 @@ fn move_node(
 fn set_undeveloped(
     id: String,
     undeveloped: bool,
+    revision: u32,
     state: Shared<'_>,
 ) -> Result<af_api::contract::EditResult, String> {
-    Ok(lock(&state)?.core.set_undeveloped(&id, undeveloped))
+    Ok(lock(&state)?
+        .core
+        .set_undeveloped(&id, undeveloped, revision))
 }
 
 #[tauri::command]

@@ -535,11 +535,15 @@ impl Core {
     }
 
     /// Marks the Goal with SACM id `id` undeveloped, or clears the mark
-    /// (W26). `Unchanged` when it was that already.
-    pub fn set_undeveloped(&mut self, id: &str, undeveloped: bool) -> EditResult {
+    /// (W26), as asked at `revision`: asked at another, it is refused
+    /// (AF-EDIT-009). `Unchanged` when it was that already.
+    pub fn set_undeveloped(&mut self, id: &str, undeveloped: bool, revision: u32) -> EditResult {
         let Some(open) = self.open.as_mut() else {
             return refused(NOTHING_OPEN);
         };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
         match open.session.set_undeveloped(&open.view, id, undeveloped) {
             Ok(Some(record)) => self.changed(&record, None),
             Ok(None) => EditResult::Unchanged,

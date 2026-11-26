@@ -68,11 +68,23 @@ pub fn move_targets(document: &Document, view: &View, id: &str) -> Result<MoveTa
     let mover = Mover::of(document, view, id)?;
     let under = mover.under(view);
     let strategies = Strategies::of(document, view);
+    // What a place is offered with is what the move would do: the steps are
+    // worked out for it too, so a line W25 would not change, or a place W20
+    // could not hold, is refused here and not only once the move is made.
+    let answer = |target: Target<'_>| {
+        mover
+            .onto(document, view, &under, &strategies, target)
+            .and_then(|develops| {
+                mover
+                    .steps(document, view, &strategies, target, develops)
+                    .map(|_| develops)
+            })
+    };
     let nodes = view
         .nodes
         .iter()
         .map(|node| {
-            let answer = mover.onto(document, view, &under, &strategies, Target::Node(&node.id));
+            let answer = answer(Target::Node(&node.id));
             MoveTarget {
                 node: node.id.clone(),
                 refusal: answer.err(),
@@ -81,9 +93,7 @@ pub fn move_targets(document: &Document, view: &View, id: &str) -> Result<MoveTa
         })
         .collect();
     Ok(MoveTargets {
-        canvas: mover
-            .onto(document, view, &under, &strategies, Target::Canvas)
-            .err(),
+        canvas: answer(Target::Canvas).err(),
         nodes,
     })
 }
@@ -92,7 +102,7 @@ pub fn move_targets(document: &Document, view: &View, id: &str) -> Result<MoveTa
 ///
 /// # Errors
 ///
-/// What [`move_targets`] refuses, as [`AddError::Refused`], and
+/// What [`move_targets`] refuses, as [`AddError::Refused`], among them
 /// [`Refusal::Entangled`] when the line that would be replaced holds or is
 /// referred to by something the diagram does not draw (W25);
 /// [`AddError::Edit`] when libSACM refused an operation, which is a fault in

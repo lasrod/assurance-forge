@@ -141,11 +141,16 @@ impl WasmCore {
         json(&self.core.move_node(id, to.as_deref(), revision))
     }
 
-    /// Marks the Goal `id` undeveloped, or clears the mark. `EditResult` as
-    /// JSON.
+    /// Marks the Goal `id` undeveloped, or clears the mark, as asked at
+    /// `revision`. `EditResult` as JSON.
     #[wasm_bindgen(js_name = setUndeveloped)]
-    pub fn set_undeveloped(&mut self, id: &str, undeveloped: bool) -> Result<String, JsError> {
-        json(&self.core.set_undeveloped(id, undeveloped))
+    pub fn set_undeveloped(
+        &mut self,
+        id: &str,
+        undeveloped: bool,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(&self.core.set_undeveloped(id, undeveloped, revision))
     }
 
     /// Joins the node `id` by context in place of the support line that

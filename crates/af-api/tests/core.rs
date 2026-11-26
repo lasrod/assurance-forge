@@ -855,7 +855,7 @@ fn the_undeveloped_mark_is_set_where_it_can_be_and_a_wrong_join_is_repaired() {
     use af_api::contract::EditResult;
     let mut core = core("en");
     assert!(matches!(
-        core.set_undeveloped("cl_sub_2", false),
+        core.set_undeveloped("cl_sub_2", false, 0),
         EditResult::Refused { ref code } if code == "AF-EDIT-007"
     ));
     core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
@@ -869,15 +869,20 @@ fn the_undeveloped_mark_is_set_where_it_can_be_and_a_wrong_join_is_repaired() {
     assert_eq!(refusal(&core, "cl_top").as_deref(), Some("AF-EDIT-022"));
     assert_eq!(refusal(&core, "ev_1").as_deref(), Some("AF-EDIT-021"));
     assert!(matches!(
-        core.set_undeveloped("cl_top", true),
+        core.set_undeveloped("cl_top", true, 1),
         EditResult::Refused { ref code } if code == "AF-EDIT-022"
     ));
     assert!(matches!(
-        core.set_undeveloped("cl_sub_2", true),
+        core.set_undeveloped("cl_sub_2", true, 1),
         EditResult::Unchanged
     ));
+    // Asked at another revision, it is refused.
     assert!(matches!(
-        core.set_undeveloped("cl_sub_2", false),
+        core.set_undeveloped("cl_sub_2", false, 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    assert!(matches!(
+        core.set_undeveloped("cl_sub_2", false, 1),
         EditResult::Applied { revision: 2, .. }
     ));
     assert_eq!(

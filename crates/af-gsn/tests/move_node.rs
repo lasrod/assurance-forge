@@ -158,15 +158,22 @@ fn moved(document: &mut Document, id: &str, to: Target<'_>) {
     assert!(after.findings.is_empty(), "{:?}", after.findings);
 }
 
-/// What a refused move is refused with, the document left as it was.
+/// What a refused move is refused with, the document left as it was. The
+/// places offered say so beforehand: the menu and the drag show no place
+/// that the move then refuses.
 fn refused(document: &mut Document, id: &str, to: Target<'_>) -> Refusal {
     let shown = view(document, "en");
     let before = ids(document);
     let lines_before = lines(&shown);
+    let offered = match move_targets(document, &shown, id) {
+        Err(refusal) => refusal,
+        Ok(_) => refusal(document, id, to).unwrap_or_else(|| panic!("{id} to {to:?} is offered")),
+    };
     let refusal = match move_node(document, &shown, id, to) {
         Err(AddError::Refused(refusal)) => refusal,
         other => panic!("{id} to {to:?}: {other:?}"),
     };
+    assert_eq!(offered, refusal, "{id} to {to:?}");
     assert_eq!(ids(document), before);
     assert_eq!(lines(&view(document, "en")), lines_before);
     refusal
@@ -448,7 +455,10 @@ fn w25_a_line_something_refers_to_is_not_replaced() {
         ]
         .concat(),
     );
-    assert_eq!(refusal(&document, "d", Target::Node("g")), None);
+    assert_eq!(
+        refusal(&document, "d", Target::Node("g")),
+        Some(Refusal::Entangled)
+    );
     assert_eq!(
         refused(&mut document, "d", Target::Node("g")),
         Refusal::Entangled
@@ -542,15 +552,29 @@ fn a_move_in_each_sample_keeps_the_file_valid() {
             let Ok(targets) = move_targets(&original, &shown, &node.id) else {
                 continue;
             };
-            let Some(target) = targets.nodes.iter().find(|target| target.refusal.is_none()) else {
+            // Each place offered is a move that is made (a few per node).
+            let offered: Vec<_> = targets
+                .nodes
+                .iter()
+                .filter(|target| target.refusal.is_none())
+                .take(8)
+                .collect();
+            for other in offered.iter().skip(1) {
+                let mut document = original.clone();
+                if let Err(error) =
+                    move_node(&mut document, &shown, &node.id, Target::Node(&other.node))
+                {
+                    panic!("{name}: {} to {} is offered: {error}", node.id, other.node);
+                }
+            }
+            let Some(target) = offered.first() else {
                 continue;
             };
             let mut document = original.clone();
-            match move_node(&mut document, &shown, &node.id, Target::Node(&target.node)) {
-                Ok(_) => {}
-                // W25 is known only when the move is made.
-                Err(AddError::Refused(Refusal::Entangled)) => continue,
-                Err(error) => panic!("{name}: {} to {}: {error}", node.id, target.node),
+            if let Err(error) =
+                move_node(&mut document, &shown, &node.id, Target::Node(&target.node))
+            {
+                panic!("{name}: {} to {} is offered: {error}", node.id, target.node);
             }
             made += 1;
             let after = view(&document, "en");
