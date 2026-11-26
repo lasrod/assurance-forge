@@ -2708,9 +2708,9 @@ dependencies = [
 
 [[package]]
 name = "sacm"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5bc60cbc0bb008070fb323ade26e1ac8f4032cbc659f8890405c179bace3d50"
+checksum = "6f7db22888827ff99b4e28e868d829f5b75901a8bb5362dde54e3fb076a87d42"
 dependencies = [
  "roxmltree",
 ]

@@ -19,7 +19,7 @@ af-gsn = { path = "../af-gsn" }
 af-layout = { path = "../af-layout" }
 af-problems = { path = "../af-problems" }
 af-session = { path = "../af-session" }
-sacm = "0.3.0"
+sacm = "0.4.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.10.9"

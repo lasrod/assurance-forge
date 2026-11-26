@@ -30,6 +30,13 @@ describe('wordRefusal', () => {
     expect(wordRefusal(refusal, 'ja')).toBe('ファイルがこのバージョンで扱える大きさや深さを超えています。 (element: x, unit: 55296) [SACM-SEC-002 1 行 2 列]');
   });
 
+  it('words the refusals libSACM 0.4.0 added', () => {
+    const limit = { code: 'SACM-SEC-003', template: 'SACM-SEC-003/depth', arguments: [], line: 2, column: 1 };
+    expect(wordRefusal(limit, 'en')).toMatch(/^The file passes a limit of what this version reads/);
+    const revision = { code: 'SACM-XMI-008', template: 'SACM-XMI-008/other-revision-root', arguments: [], line: null, column: null };
+    expect(wordRefusal(revision, 'ja')).toBe('ファイルが別の SACM 版の名前空間にあります。このバージョンが読むのは SACM 2.3 です。 [SACM-XMI-008]');
+  });
+
   it('falls back for a code it does not word, and leaves out what has no place', () => {
     const unknown = { code: 'SACM-NEW-001', template: 'SACM-NEW-001/x', arguments: [], line: null, column: null };
     expect(wordRefusal(unknown, 'en')).toBe('The file was not read. [SACM-NEW-001]');
