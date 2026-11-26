@@ -459,6 +459,68 @@ fn w25_a_line_something_refers_to_is_not_replaced() {
     );
 }
 
+#[test]
+fn w21_a_node_joined_as_gsn_does_not_allow_keeps_its_line() {
+    // The Assumption `a` supports `g`, and `b` and `c` support `g2` in one
+    // inference: GSN reaches an Assumption only as context.
+    let mut document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "g2", ""),
+            element("Claim", "todo", r#" assertionDeclaration="needsSupport""#),
+            element("Claim", "sub", ""),
+            element("Claim", "a", r#" assertionDeclaration="assumed""#),
+            element("Claim", "b", r#" assertionDeclaration="assumed""#),
+            element("Claim", "c", r#" assertionDeclaration="assumed""#),
+            element("ArgumentReasoning", "s", ""),
+            element("AssertedInference", "ia", r#" source="a" target="g""#),
+            element("AssertedInference", "ibc", r#" source="b c" target="g2""#),
+            element(
+                "AssertedInference",
+                "is",
+                r#" source="sub" target="g" reasoning="s""#,
+            ),
+        ]
+        .concat(),
+    );
+    assert!(has_line(&document, "g", "a", EdgeKind::SupportedBy));
+    assert_eq!(
+        refusal(&document, "a", Target::Node("s")),
+        Some(Refusal::NotUnderStrategy)
+    );
+    assert_eq!(
+        refusal(&document, "a", Target::Canvas),
+        Some(Refusal::TopLevelGoalOnly)
+    );
+    // The line is the file's, not support the editor made: it develops nothing.
+    let shown = view(&document, "en");
+    let targets = move_targets(&document, &shown, "a").unwrap_or_else(|why| panic!("{why:?}"));
+    assert!(targets.nodes.iter().all(|target| !target.develops));
+    // One of several in a relationship would need a new line of that kind.
+    assert_eq!(
+        move_targets(&document, &shown, "b").err(),
+        Some(Refusal::JoinNotMoved)
+    );
+
+    let before = ids(&document);
+    let findings = shown.findings.len();
+    let shown = view(&document, "en");
+    move_node(&mut document, &shown, "a", Target::Node("todo"))
+        .unwrap_or_else(|error| panic!("{error}"));
+    // The same relationship, as wrong as it was, with a new end.
+    assert_eq!(ids(&document), before);
+    assert!(has_line(&document, "todo", "a", EdgeKind::SupportedBy));
+    assert!(!has_line(&document, "g", "a", EdgeKind::SupportedBy));
+    let after = view(&document, "en");
+    assert_eq!(after.findings.len(), findings);
+    let node = |id: &str| after.nodes.iter().find(|node| node.id == id);
+    assert_eq!(
+        node("a").map(|node| node.kind),
+        Some(af_gsn::view::NodeKind::Assumption)
+    );
+    assert_eq!(node("todo").map(|node| node.undeveloped), Some(true));
+}
+
 /// In every sample, each node that can be moved goes to the first place it
 /// may, and the file stays valid, reads back with the node there and no new
 /// finding, and writes strictly.

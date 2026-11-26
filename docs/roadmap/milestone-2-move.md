@@ -57,6 +57,8 @@ element's kind.
 | M5 | After a move the place the element went to stays where it was on screen, and the element moved is selected and brought into view | The user was looking at the place they chose |
 | M6 | A line that anything refers to, or that holds a description, is not given a new end or replaced (AF-EDIT-015) | What the diagram does not show on a line is not carried elsewhere, or lost, for the user. A challenge of a line is the case that will come up; it waits for challenges to be edited |
 
+| M7 | An element the file joins in a way GSN does not allow (an Assumption by a support line) is moved with its line as it is. The move does not repair it; the repair is offered from the Problems panel, as its own action | A drag that also changed the kind of a line would change the argument unasked. The sample `sacm_example_core_argument` has such an Assumption |
+
 ## Questions for part 2
 
 Each is a variant to try, not a decision:

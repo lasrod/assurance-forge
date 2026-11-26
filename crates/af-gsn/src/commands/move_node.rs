@@ -151,6 +151,10 @@ enum Role {
     Support,
     /// By `InContextOf`, or a top-level node that would be.
     Context,
+    /// By a `SupportedBy` line that GSN does not allow it: a Context, an
+    /// Assumption or a Justification joined as support. The line is kept as
+    /// it is and given a new end (W21): the move does not repair it.
+    Misjoined,
 }
 
 /// The line the moved node is drawn under.
@@ -234,6 +238,10 @@ impl Mover {
                 Role::Support
             }
             (EdgeKind::InContextOf, kind) if kind != NodeKind::Strategy => Role::Context,
+            (
+                EdgeKind::SupportedBy,
+                NodeKind::Context | NodeKind::Assumption | NodeKind::Justification,
+            ) => Role::Misjoined,
             _ => return Err(Refusal::JoinNotMoved),
         };
         let relationship = document
@@ -278,6 +286,11 @@ impl Mover {
         } else {
             return Err(Refusal::JoinNotMoved);
         };
+        // A line GSN does not allow is only given a new end: no new one is
+        // made, so the node must be alone in a relationship of its own.
+        if role == Role::Misjoined && !matches!(link, Link::Direct { sole: true, .. }) {
+            return Err(Refusal::JoinNotMoved);
+        }
         Ok(Mover {
             id: element.id().clone(),
             kind: node.kind,
@@ -353,6 +366,11 @@ impl Mover {
             | NodeKind::Justification => return Err(Refusal::Leaf),
             NodeKind::Goal => self.role == Role::Support && node.undeveloped,
             NodeKind::Strategy => {
+                // The line kept is a support line, which a Strategy takes
+                // only from a Goal.
+                if self.role == Role::Misjoined {
+                    return Err(Refusal::NotUnderStrategy);
+                }
                 if self.role == Role::Support {
                     // GSN: a Strategy is supported only by Goals.
                     if self.kind != NodeKind::Goal {
@@ -477,6 +495,8 @@ impl Mover {
                 }
             } else {
                 let operation: edit::Operation = match (self.role, self.kind) {
+                    // Never reached: its line is always kept (W23).
+                    (Role::Misjoined, _) => return Err(Refusal::JoinNotMoved),
                     (Role::Context, _) => {
                         CreateAssertedContext::new(package, name(), source, to.clone()).into()
                     }
