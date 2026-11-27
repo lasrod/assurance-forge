@@ -215,6 +215,23 @@ export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: n
 }
 
 /**
+ * The assurance claim points on `edge`: each a solid square on the line, in
+ * the line's colour, and its label beside it as an identifier is drawn. Far
+ * out, the squares alone.
+ */
+function drawAcps(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, families: Families, scale: number) {
+  for (const acp of edge.acps) {
+    const { square, label } = acp;
+    context.fillStyle = palette.line;
+    context.fillRect(square.x, square.y, square.width, square.height);
+    if (label.size * scale < SMALLEST_TEXT_PX) continue;
+    context.fillStyle = palette.secondary;
+    context.font = `${label.weight} ${label.size}px ${families.identifier}`;
+    context.fillText(label.text, label.x, label.baseline);
+  }
+}
+
+/**
  * The other argument package whose name is under the canvas point: a node of
  * another package, in a package's diagram, shows it in its `package` lines,
  * and a click there opens that package. Null anywhere else.
@@ -324,6 +341,7 @@ export function draw(
     // A line a moved challenge may go to is drawn in full.
     if (move) context.globalAlpha = move.lines?.has(edgeKey(edge)) ? 1 : FAINT;
     drawEdge(context, edge, palette, scale, marks);
+    drawAcps(context, edge, palette, families, scale);
     drawn.edges += 1;
   }
   for (const node of diagram.nodes) {

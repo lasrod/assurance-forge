@@ -176,7 +176,22 @@ export type Rect = { x: number, y: number, width: number, height: number, };
 
 export type Shape = { "type": "rectangle", rect: Rect, } | { "type": "parallelogram", rect: Rect, skew: number, } | { "type": "roundedRectangle", rect: Rect, radius: number, } | { "type": "ellipse", rect: Rect, } | { "type": "circle", rect: Rect, } | { "type": "neutral", rect: Rect, };
 
-export type TextRole = "identifier" | "name" | "statement" | "package";
+export type TextRole = "identifier" | "name" | "statement" | "package" | "acp";
+
+export type AcpMark = { 
+/**
+ * The SACM id of the confidence Claim.
+ */
+claim: string, 
+/**
+ * The SACM id of its argument package when another than the edge's:
+ * what a click opens. Null for a description.
+ */
+package: string | null, 
+/**
+ * The square, centred on the line.
+ */
+square: Rect, label: TextLine, };
 
 export type TextLine = { text: string, role: TextRole, x: number, baseline: number, 
 /**
@@ -234,6 +249,11 @@ points: Array<Point>, arrowhead: Arrowhead,
  * The tip, on what the arrow points at, then the other two corners.
  */
 head: Array<Point>, 
+/**
+ * The assurance claim points on the line, each a solid square with its
+ * label beside it; on a relationship's first edge only.
+ */
+acps: Array<AcpMark>, 
 /**
  * Everything drawn for the edge, for culling.
  */

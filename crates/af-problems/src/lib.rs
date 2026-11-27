@@ -166,7 +166,7 @@ fn diagram(view: &View) -> impl Iterator<Item = Problem> + '_ {
     let unplaced = view
         .unplaced
         .iter()
-        .filter(|item| item.code != ViewCode::Placeholder)
+        .filter(|item| !matches!(item.code, ViewCode::Placeholder | ViewCode::AcpDescription))
         .map(|item| info(item.code, item.id.clone(), Vec::new()));
     findings.chain(unplaced)
 }

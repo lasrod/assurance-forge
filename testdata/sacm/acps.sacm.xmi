@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_acps">
+  <name content="AcpsCase" />
+  <argumentPackage xmi:id="argpkg_main">
+    <name content="MainArgument" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1">
+      <name content="SafeToOperate" />
+      <description xmi:id="d_G1"><content><value lang="en" content="The system is acceptably safe to operate." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1">
+      <name content="OverHazards" />
+      <description xmi:id="d_S1"><content><value lang="en" content="Argument over all identified hazards." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G2">
+      <name content="Hazard1" />
+      <description xmi:id="d_G2"><content><value lang="en" content="Hazard 1 is mitigated." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3">
+      <name content="Hazard2" />
+      <description xmi:id="d_G3"><content><value lang="en" content="Hazard 2 is mitigated." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="C1">
+      <name content="HazardList" />
+      <description xmi:id="d_C1"><content><value lang="en" content="The hazard log, revision 3." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn1">
+      <name content="Hazard1Evidence" />
+      <description xmi:id="d_Sn1"><content><value lang="en" content="Fault tree analysis of hazard 1." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn2">
+      <name content="Hazard2Evidence" />
+      <description xmi:id="d_Sn2"><content><value lang="en" content="Test report for hazard 2." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="ACP1">
+      <name content="HazardsIdentified" />
+      <description xmi:id="d_ACP1"><content><value lang="en" content="The hazards were identified by a HAZOP of the final design, reviewed independently." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="ACP4">
+      <name content="HazardLogTrusted" />
+      <description xmi:id="d_ACP4"><content><value lang="en" content="The hazard log is complete and current." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn4">
+      <name content="HazardLogAudit" />
+      <description xmi:id="d_Sn4"><content><value lang="en" content="Audit of the hazard log, March." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="I1" source="G2 G3" target="G1" reasoning="S1" metaClaim="ACP1">
+      <name content="I1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E1" source="Sn1" target="G2" metaClaim="ACP2">
+      <name content="E1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E2" source="Sn2" target="G3">
+      <name content="E2" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="X1" source="C1" target="G1" metaClaim="ACP4">
+      <name content="X1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E4" source="Sn4" target="ACP4">
+      <name content="E4" />
+    </argumentElement>
+  </argumentPackage>
+  <argumentPackage xmi:id="argpkg_confidence">
+    <name content="Confidence" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="ACP2">
+      <name content="Hazard1EvidenceTrusted" />
+      <description xmi:id="d_ACP2"><content><value lang="en" content="The fault tree analysis of hazard 1 is trustworthy." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn3">
+      <name content="FtaReview" />
+      <description xmi:id="d_Sn3"><content><value lang="en" content="Independent review of the fault tree analysis." /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3" source="Sn3" target="ACP2">
+      <name content="E3" />
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

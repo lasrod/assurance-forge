@@ -164,7 +164,12 @@ impl Core {
                     + view
                         .unplaced
                         .iter()
-                        .filter(|item| item.code != view::Code::Placeholder)
+                        .filter(|item| {
+                            !matches!(
+                                item.code,
+                                view::Code::Placeholder | view::Code::AcpDescription
+                            )
+                        })
                         .count(),
             ),
         };

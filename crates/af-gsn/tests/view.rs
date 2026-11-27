@@ -957,11 +957,17 @@ fn every_code_whose_condition_holds_is_sent() {
     );
     assert_eq!(
         codes_of(&view, "abstract_meta"),
-        [Code::UninstantiatedNotDrawn, Code::MetaClaimNotDrawn]
+        [Code::UninstantiatedNotDrawn]
     );
     assert!(
         edges(&view).contains(&edge("top", "sub", EdgeKind::SupportedBy, "abstract_meta")),
         "an abstract relationship with a metaClaim is still live support"
+    );
+    // E11: its metaClaim is an ACP on the line.
+    assert!(
+        view.acps
+            .iter()
+            .any(|acp| acp.relationship == "abstract_meta" && acp.claim == "sub")
     );
 }
 

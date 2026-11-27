@@ -283,6 +283,7 @@ function edge(relationship: string, points: { x: number; y: number }[], tip: { x
     points,
     arrowhead: line === 'solid' ? 'filled' : 'open',
     head: [tip, { x: tip.x - 5, y: tip.y - 10 }, { x: tip.x + 5, y: tip.y - 10 }],
+    acps: [],
     bounds: { x: Math.min(...xs) - 5, y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs) + 10, height: Math.max(...ys) - Math.min(...ys) },
   };
 }

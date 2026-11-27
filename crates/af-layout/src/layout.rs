@@ -20,8 +20,8 @@ use std::f32::consts::SQRT_2;
 use af_gsn::view::{EdgeKind, Node, NodeKind, View};
 
 use crate::model::{
-    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
-    Shape, ShapeKind, TextLine, TextRole,
+    AcpMark, Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point,
+    Rect, Shape, ShapeKind, TextLine, TextRole,
 };
 use crate::route::{self, Dir, Port, Run};
 use crate::text::{Font, Line, Shaper};
@@ -125,7 +125,7 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
         })
         .collect();
 
-    let diagram_edges: Vec<DiagramEdge> = links
+    let mut diagram_edges: Vec<DiagramEdge> = links
         .iter()
         .zip(paths(view, &links, &tree, &nodes, &placed.band_top))
         .enumerate()
@@ -151,6 +151,8 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
             edge_geometry(edge, path, placement)
         })
         .collect();
+
+    place_acps(view, &mut diagram_edges, shaper, style);
 
     // Everything drawn: the nodes, and the edges, which a loop takes outside
     // its node.
@@ -209,7 +211,7 @@ fn texts(node: &Node) -> Vec<(TextRole, Cow<'_, str>)> {
 
 fn role_style(role: TextRole, style: Style) -> (f32, f32, Font) {
     match role {
-        TextRole::Identifier | TextRole::Package => (
+        TextRole::Identifier | TextRole::Package | TextRole::Acp => (
             style.identifier_size,
             style.identifier_line_height,
             Font::Mono,
@@ -1725,6 +1727,118 @@ fn edge_geometry(
         arrowhead,
         head,
         placement,
+        acps: Vec::new(),
         bounds,
     }
+}
+
+/// Half the side of an ACP's square.
+const ACP_HALF: f32 = 5.0;
+/// Between an ACP's square and its label.
+const ACP_GAP: f32 = 4.0;
+
+/// E11: each ACP on its relationship's first edge, halfway along its line,
+/// with its label to the right; a second ACP of the same relationship below
+/// the first.
+fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style: Style) {
+    let (size, line_height, font) = role_style(TextRole::Acp, style);
+    let (ascent, descent) = shaper.ascent_descent();
+    for acp in &view.acps {
+        let Some(edge) = edges
+            .iter_mut()
+            .find(|edge| edge.relationship == acp.relationship)
+        else {
+            continue;
+        };
+        let (middle, across) = halfway(&edge.points);
+        let row = edge.acps.len() as f32;
+        // Beside a line that runs down, above one that runs across, so the
+        // label never lies along the line.
+        let centre = Point {
+            x: middle.x,
+            y: middle.y + row * line_height,
+        };
+        let square = Rect {
+            x: centre.x - ACP_HALF,
+            y: centre.y - ACP_HALF,
+            width: 2.0 * ACP_HALF,
+            height: 2.0 * ACP_HALF,
+        };
+        let width = shaper.width(&acp.label, size, font);
+        let (x, baseline) = if across {
+            // Above the square, centred on it; a second ACP to the right of
+            // the first, its label further up.
+            let square_top = middle.y - ACP_HALF;
+            (
+                middle.x + row * (2.0 * ACP_HALF + ACP_GAP) - width / 2.0,
+                square_top - ACP_GAP - descent * size - row * line_height,
+            )
+        } else {
+            // Centred on the square, as a line of a node is in its line height.
+            (
+                square.x + square.width + ACP_GAP,
+                centre.y - (ascent + descent) * size / 2.0 + ascent * size,
+            )
+        };
+        let square = if across {
+            Rect {
+                x: middle.x - ACP_HALF + row * (2.0 * ACP_HALF + ACP_GAP),
+                y: middle.y - ACP_HALF,
+                ..square
+            }
+        } else {
+            square
+        };
+        let label = TextLine {
+            text: acp.label.clone(),
+            role: TextRole::Acp,
+            x,
+            baseline,
+            width,
+            size,
+            weight: font.weight(),
+        };
+        let drawn = Rect {
+            x: label.x,
+            y: baseline - ascent * size,
+            width,
+            height: (ascent + descent) * size,
+        };
+        edge.bounds = edge.bounds.union(&square).union(&drawn);
+        edge.acps.push(AcpMark {
+            claim: acp.claim.clone(),
+            package: acp.package.clone(),
+            square,
+            label,
+        });
+    }
+}
+
+/// The point halfway along a line, by its length, and whether the line runs
+/// more across than down there.
+fn halfway(points: &[Point]) -> (Point, bool) {
+    let length: f32 = points
+        .windows(2)
+        .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+        .sum();
+    let mut left = length / 2.0;
+    for pair in points.windows(2) {
+        let step = (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
+        if step >= left && step > 0.0 {
+            let t = left / step;
+            let across = (pair[1].x - pair[0].x).abs() > (pair[1].y - pair[0].y).abs();
+            return (
+                Point {
+                    x: pair[0].x + (pair[1].x - pair[0].x) * t,
+                    y: pair[0].y + (pair[1].y - pair[0].y) * t,
+                },
+                across,
+            );
+        }
+        left -= step;
+    }
+    (
+        points.first().copied().unwrap_or(Point { x: 0.0, y: 0.0 }),
+        false,
+    )
 }

@@ -135,6 +135,24 @@ pub fn svg(diagram: &Diagram, faces: Option<&str>, report: Option<&Report>) -> S
                 );
             }
         }
+        // Assurance claim points: a solid square, its label beside it.
+        for acp in &edge.acps {
+            let square = acp.square;
+            let label = &acp.label;
+            let _ = writeln!(
+                svg,
+                r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{colour}"/>"#,
+                square.x, square.y, square.width, square.height
+            );
+            let _ = writeln!(
+                svg,
+                r##"<text x="{}" y="{}" font-size="{}" fill="#666" font-family="{mono}">{}</text>"##,
+                label.x,
+                label.baseline,
+                label.size,
+                escape(&label.text)
+            );
+        }
     }
     for node in &diagram.nodes {
         let r = node.shape.rect;
@@ -222,7 +240,10 @@ pub fn svg(diagram: &Diagram, faces: Option<&str>, report: Option<&Report>) -> S
             } else {
                 400
             };
-            let (fill, family) = if matches!(line.role, TextRole::Identifier | TextRole::Package) {
+            let (fill, family) = if matches!(
+                line.role,
+                TextRole::Identifier | TextRole::Package | TextRole::Acp
+            ) {
                 ("#666", format!(r#" font-family="{mono}""#))
             } else {
                 ("#111", String::new())

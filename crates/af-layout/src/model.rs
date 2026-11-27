@@ -213,6 +213,8 @@ pub enum TextRole {
     /// The other argument package the node belongs to, in a package's
     /// diagram, as `[name]` at metadata size.
     Package,
+    /// An assurance claim point's label, beside its square, at metadata size.
+    Acp,
 }
 
 /// One line of text, drawn with the measured faces in their order.
@@ -316,8 +318,24 @@ pub struct DiagramEdge {
     /// line, then its two other corners.
     pub head: [Point; 3],
     pub placement: Placement,
-    /// Everything drawn for the edge: its line and arrowhead.
+    /// The assurance claim points on the line (E11): on a relationship's
+    /// first edge only.
+    pub acps: Vec<AcpMark>,
+    /// Everything drawn for the edge: its line, arrowhead and ACPs.
     pub bounds: Rect,
+}
+
+/// An assurance claim point on an edge (GSN v3 Table 1:5-1): a solid square
+/// on its line, with its label beside it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AcpMark {
+    /// The SACM id of the confidence `Claim`.
+    pub claim: String,
+    /// Its argument package, when another than the edge's: what it opens.
+    pub package: Option<String>,
+    /// The square, centred on the line.
+    pub square: Rect,
+    pub label: TextLine,
 }
 
 #[derive(Clone, Debug, PartialEq)]

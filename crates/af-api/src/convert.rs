@@ -3,8 +3,8 @@
 use af_layout as layout;
 
 use crate::contract::{
-    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, EdgeKind, ElementKind, LineStyle,
-    NodeKind, Point, Rect, Shape, TextLine, TextRole,
+    AcpMark, Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, EdgeKind, ElementKind,
+    LineStyle, NodeKind, Point, Rect, Shape, TextLine, TextRole,
 };
 
 pub(crate) fn node_kind(kind: af_gsn::view::NodeKind) -> NodeKind {
@@ -95,6 +95,7 @@ fn text_line(line: &layout::TextLine) -> TextLine {
             layout::TextRole::Name => TextRole::Name,
             layout::TextRole::Statement => TextRole::Statement,
             layout::TextRole::Package => TextRole::Package,
+            layout::TextRole::Acp => TextRole::Acp,
         },
         x: line.x,
         baseline: line.baseline,
@@ -146,6 +147,16 @@ fn edge(edge: &layout::DiagramEdge) -> DiagramEdge {
             layout::Arrowhead::Open => Arrowhead::Open,
         },
         head: edge.head.iter().copied().map(point).collect(),
+        acps: edge
+            .acps
+            .iter()
+            .map(|acp| AcpMark {
+                claim: acp.claim.clone(),
+                package: acp.package.clone(),
+                square: rect(acp.square),
+                label: text_line(&acp.label),
+            })
+            .collect(),
         bounds: rect(edge.bounds),
     }
 }

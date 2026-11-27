@@ -302,6 +302,8 @@ pub enum TextRole {
     /// In a package's diagram, `[name]` of the other package a node belongs
     /// to.
     Package,
+    /// An assurance claim point's label.
+    Acp,
 }
 
 /// One line of text, drawn with the measured faces in their order:
@@ -407,6 +409,9 @@ pub struct DiagramEdge {
     pub arrowhead: Arrowhead,
     /// The tip, on what the arrow points at, then the other two corners.
     pub head: Vec<Point>,
+    /// The assurance claim points on the line, each a solid square with its
+    /// label beside it; on a relationship's first edge only.
+    pub acps: Vec<AcpMark>,
     /// Everything drawn for the edge, for culling.
     pub bounds: Rect,
 }
@@ -530,6 +535,21 @@ pub struct MoveLine {
     /// `AF-EDIT-027`), or
     /// null when it can.
     pub refusal: Option<String>,
+}
+
+/// An assurance claim point on an edge (GSN v3 Table 1:5-1).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpMark {
+    /// The SACM id of the confidence Claim.
+    pub claim: String,
+    /// The SACM id of its argument package when another than the edge's:
+    /// what a click opens. Null for a description.
+    pub package: Option<String>,
+    /// The square, centred on the line.
+    pub square: Rect,
+    pub label: TextLine,
 }
 
 /// Where the node `id` may be moved, at `revision`.
@@ -807,6 +827,7 @@ pub fn typescript() -> String {
         Rect::decl(&cfg),
         Shape::decl(&cfg),
         TextRole::decl(&cfg),
+        AcpMark::decl(&cfg),
         TextLine::decl(&cfg),
         Decorator::decl(&cfg),
         DiagramNode::decl(&cfg),
