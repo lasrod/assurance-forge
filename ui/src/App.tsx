@@ -217,6 +217,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const dragMove = useRef<Moving | null>(null);
   // A drop that came before the core's answer, kept for it.
   const earlyDrop = useRef<{ id: string; end: DragEnd } | null>(null);
+  // With no diagram there is no drag: one the canvas took away with it is over.
+  useEffect(() => {
+    if (diagram) return;
+    dragged.current = null;
+    dragMove.current = null;
+    earlyDrop.current = null;
+  }, [diagram]);
   const shownRevision = diagram?.revision ?? null;
   if (moving && moving.targets.revision !== shownRevision) setMoving(null);
   const moveMarks = useMemo(

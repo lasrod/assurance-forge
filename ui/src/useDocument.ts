@@ -656,12 +656,12 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       about: { kind: NodeKind | null; identifier: string },
       onShown: EditShown,
     ) =>
-      void edit((on) => on.repairJoin(offered.element, offered.relationship, revision), 'mark', offered.element, about.kind, onShown, {
+      void edit(async (on) => on.repairJoin(offered.element, offered.relationship, await followingEdits(revision)), 'mark', offered.element, about.kind, onShown, {
         kind: 'repaired',
         repaired: about.kind,
         identifier: about.identifier,
       }),
-    [edit],
+    [edit, followingEdits],
   );
   /** Says why a move cannot be made to the place the user chose. */
   const moveRefused = useCallback((code: string, about: NodeKind | null) => setState({ kind: 'editRefused', code, about }), []);

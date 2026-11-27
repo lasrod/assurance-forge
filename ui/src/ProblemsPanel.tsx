@@ -36,9 +36,10 @@ export function ProblemsPanel({
 }) {
   // The row chosen, by its place in the list of the revision it was chosen in.
   const [chosen, setChosen] = useState<{ revision: number; row: string } | null>(null);
-  // The revision a repair was asked at: its button is off until the list of
-  // the repaired revision comes, so a second click does not ask again.
-  const [repairing, setRepairing] = useState<number | null>(null);
+  // The problem a repair was asked for, by its row in the revision it was
+  // asked at: its button is off until the list of the repaired revision
+  // comes, so a second click does not ask again. Other problems keep theirs.
+  const [repairing, setRepairing] = useState<{ revision: number; row: string } | null>(null);
   if (!problems || problems.problems.length === 0) {
     return <p className="datum-meta af-dock-empty">{t('problemsNone')}</p>;
   }
@@ -58,9 +59,9 @@ export function ProblemsPanel({
         <div className="af-problem-repair" data-testid="problem-repair">
           <span>{t('repairJoin', { identifier: repaired?.identifier ?? repair.element })}</span>
           <Button
-            disabled={repairing === problems.revision}
+            disabled={repairing?.revision === problems.revision && repairing.row === value}
             onClick={() => {
-              setRepairing(problems.revision);
+              if (value !== null) setRepairing({ revision: problems.revision, row: value });
               onRepair(repair, problems.revision, picked);
             }}
           >
