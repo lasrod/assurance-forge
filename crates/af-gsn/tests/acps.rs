@@ -469,3 +469,30 @@ fn r17_what_building_a_description_finds_is_not_said() {
             .all(|finding| finding.element != "ACP1")
     );
 }
+
+#[test]
+fn r17_a_description_on_a_line_with_a_declaration_is_one() {
+    // An assumed inference is drawn live (E6): its ACP's description is not
+    // a node either.
+    let mut document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g" assertionDeclaration="assumed"><name content="i" /></argumentElement>"#,
+        "",
+    );
+    let shown = view(&document, "en");
+    let added = add_acp(
+        &mut document,
+        &shown,
+        line("i", "g", "sub"),
+        AcpKind::Description,
+        "x",
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&document, "en");
+    assert!(
+        after
+            .descriptions
+            .iter()
+            .any(|node| node.id == added.element)
+    );
+    assert!(!after.nodes.iter().any(|node| node.id == added.element));
+}

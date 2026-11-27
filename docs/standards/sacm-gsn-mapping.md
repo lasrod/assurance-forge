@@ -730,7 +730,7 @@ was refused. Nothing changes.
 | AF-EDIT-012 | An identifier cannot be empty (W15) |
 | AF-EDIT-013 | Another element of the file has the identifier (W15) |
 | AF-EDIT-014 | The text is the value of a terminology expression, which is not changed as text |
-| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19); or refers to, or is held by, the line a move would replace (W25) |
+| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19); or refers to, or is held by, the line a move would replace, an ACP on it among them (W25) |
 | AF-EDIT-016 | The node is drawn under several nodes (W21) |
 | AF-EDIT-017 | The node is joined in a way a move does not carry (W21), or a repair does not mend (W28) |
 | AF-EDIT-018 | The place is the node itself, or under it (W22) |

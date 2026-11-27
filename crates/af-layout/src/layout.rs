@@ -152,7 +152,7 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
         })
         .collect();
 
-    place_acps(view, &mut diagram_edges, shaper, style);
+    place_acps(view, &nodes, &mut diagram_edges, shaper, style);
 
     // Everything drawn: the nodes, and the edges, which a loop takes outside
     // its node.
@@ -1740,7 +1740,13 @@ const ACP_GAP: f32 = 4.0;
 /// E11: each ACP on its relationship's first edge, halfway along its line,
 /// with its label to the right; a second ACP of the same relationship below
 /// the first.
-fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style: Style) {
+fn place_acps(
+    view: &View,
+    nodes: &[DiagramNode],
+    edges: &mut [DiagramEdge],
+    shaper: &Shaper<'_>,
+    style: Style,
+) {
     let (size, line_height, font) = role_style(TextRole::Acp, style);
     let (ascent, descent) = shaper.ascent_descent();
     // How many ACPs each line carries: they are centred on its midpoint.
@@ -1787,12 +1793,22 @@ fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style
         };
         let width = shaper.width(&acp.label, size, font);
         let (x, baseline) = if across {
-            // Above the square, centred on it; a second ACP to the right of
-            // the first, its label further up.
-            let square_top = middle.y - ACP_HALF;
+            // Above the square, centred on it, and clear of the two nodes
+            // the line joins, which a short line runs between; a second
+            // ACP to the right of the first, its label further up.
+            let shape_top = |id: &str| {
+                nodes
+                    .iter()
+                    .find(|node| node.id == id)
+                    .map(|node| node.shape.rect.y)
+            };
+            let top = [shape_top(&edge.from), shape_top(&edge.to)]
+                .into_iter()
+                .flatten()
+                .fold(middle.y - ACP_HALF, f32::min);
             (
                 middle.x + offset * (2.0 * ACP_HALF + ACP_GAP) - width / 2.0,
-                square_top - ACP_GAP - descent * size - row * line_height,
+                top - ACP_GAP - descent * size - row * line_height,
             )
         } else {
             // Centred on the square, as a line of a node is in its line height.

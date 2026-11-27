@@ -453,11 +453,11 @@ fn acps(document: &Document, builder: &mut Builder) {
     }
 }
 
-/// R17: a `Claim` an ACP shows as its description, and the diagram not as a
-/// node. Only `metaClaim` references name it, each from a relationship of its
-/// own argument package that is drawn live (asserted, or declared nothing;
-/// not a counter or a citation); it is not cited, not abstract, and makes no
-/// claim about anything itself. Anything that also supports it, or that it
+/// R17: a `Claim` an ACP may show as its description, and the diagram not as
+/// a node. Only `metaClaim` references name it, each from a relationship of
+/// its own argument package that is not a counter or a citation; it is not
+/// cited, not abstract, and makes no claim about anything itself. The view
+/// then keeps those an ACP is drawn for: E11 draws one only on a live line. Anything that also supports it, or that it
 /// supports, makes it a Goal of the argument, drawn as R2 says.
 fn is_acp_description(document: &Document, element: SacmElement<'_>) -> bool {
     if element.kind() != SacmKind::Claim
@@ -481,10 +481,6 @@ fn is_acp_description(document: &Document, element: SacmElement<'_>) -> bool {
                 )
                 && !holder.is_counter()
                 && !holder.is_citation()
-                && matches!(
-                    holder.assertion_declaration(),
-                    None | Some(AssertionDeclaration::Asserted)
-                )
                 && package_of(holder).map(|package| package.id().clone()) == home
         })
 }

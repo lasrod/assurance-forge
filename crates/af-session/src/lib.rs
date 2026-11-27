@@ -224,7 +224,10 @@ impl Session {
                 Target::Node(id) => Some(id.to_owned()),
             },
             kind,
-            package: home.map(str::to_owned),
+            package: match target {
+                Target::Canvas => home.map(str::to_owned),
+                Target::Node(_) => None,
+            },
         };
         let record = self.made(before, command, &added.mutation);
         Ok((added, record))

@@ -1175,3 +1175,38 @@ fn a_removal_lists_an_acp_description_as_one() {
         .collect();
     assert_eq!(listed, [("Sn2".to_owned(), false), (claim, true)]);
 }
+
+#[test]
+fn an_acp_label_on_a_line_that_runs_across_is_clear_of_its_nodes() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    // A long label, on the short context line from G1 to C1.
+    assert!(matches!(
+        core.add_acp("X1", "G1", "C1", AcpKind::Argument, "Confidence ACP5", 1),
+        EditResult::Applied { .. }
+    ));
+    let at = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let x1 = at
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == "X1")
+        .unwrap_or_else(|| panic!("no X1"));
+    assert_eq!(x1.acps.len(), 2);
+    for acp in &x1.acps {
+        let label = &acp.label;
+        let (left, right) = (label.x, label.x + label.width);
+        let (top, bottom) = (
+            label.baseline - label.size,
+            label.baseline + label.size * 0.3,
+        );
+        for node in &at.diagram.nodes {
+            let shape = node.bounds;
+            let apart = right <= shape.x
+                || left >= shape.x + shape.width
+                || bottom <= shape.y
+                || top >= shape.y + shape.height;
+            assert!(apart, "{} lies on {}", label.text, node.id);
+        }
+    }
+}
