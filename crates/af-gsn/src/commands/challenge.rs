@@ -18,7 +18,7 @@ use super::{
     retargetable,
 };
 use crate::ElementKind;
-use crate::view::{Edge, EdgeKind, NodeKind, View};
+use crate::view::{Edge, EdgeKind, Node, NodeKind, View};
 
 /// What a challenge is added to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,7 +41,7 @@ pub const CHALLENGERS: [ElementKind; 2] = [ElementKind::Goal, ElementKind::Solut
 /// W29, W30: whether `kind` may challenge `at`, for the menu: the two kinds
 /// of [`CHALLENGERS`], each with why it cannot, or `None` when it can.
 pub fn challenge_choices(document: &Document, view: &View, at: Challenged<'_>) -> Vec<Choice> {
-    let lines = Lines::of(view);
+    let lines = Places::of(view);
     CHALLENGERS
         .iter()
         .map(|&kind| Choice {
@@ -65,7 +65,7 @@ pub fn challenge(
     at: Challenged<'_>,
     kind: ElementKind,
 ) -> Result<Added, AddError> {
-    let plan = plan(document, view, &Lines::of(view), at, kind).map_err(AddError::Refused)?;
+    let plan = plan(document, view, &Places::of(view), at, kind).map_err(AddError::Refused)?;
     let mut numbers = Identifiers::of(document, view);
     let mut made: Option<String> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
@@ -122,18 +122,27 @@ struct Plan {
     package: ElementId,
 }
 
-/// The lines of a view by their ends, and the first line of each
-/// relationship: made once, for the many places a move asks about.
-pub(crate) struct Lines<'a> {
+/// The nodes and lines of a view by their ids and ends, the first line of
+/// each relationship, and, once asked for, the inference of each Strategy:
+/// made once, for the many places a move asks about.
+pub(crate) struct Places<'a> {
+    nodes: HashMap<&'a str, &'a Node>,
     by_ends: HashMap<(&'a str, &'a str, &'a str), &'a Edge>,
     first: HashMap<&'a str, &'a Edge>,
+    strategies: Option<HashMap<&'a str, Option<ElementId>>>,
 }
 
-impl<'a> Lines<'a> {
+impl<'a> Places<'a> {
     pub(crate) fn of(view: &'a View) -> Self {
-        let mut lines = Lines {
+        let mut lines = Places {
+            nodes: view
+                .nodes
+                .iter()
+                .map(|node| (node.id.as_str(), node))
+                .collect(),
             by_ends: HashMap::with_capacity(view.edges.len()),
             first: HashMap::new(),
+            strategies: None,
         };
         for edge in &view.edges {
             let relationship = edge.relationship.as_str();
@@ -145,31 +154,42 @@ impl<'a> Lines<'a> {
         }
         lines
     }
+
+    /// With the inference of every Strategy found once, for the places a
+    /// move asks about.
+    fn with_strategies(mut self, document: &Document, view: &'a View) -> Self {
+        self.strategies = Some(
+            view.nodes
+                .iter()
+                .filter(|node| node.kind == NodeKind::Strategy)
+                .map(|node| (node.id.as_str(), one_inference(document, view, &node.id)))
+                .collect(),
+        );
+        self
+    }
 }
 
 /// W29: what is challenged, and W30: what challenges.
 fn plan(
     document: &Document,
     view: &View,
-    lines: &Lines<'_>,
+    lines: &Places<'_>,
     at: Challenged<'_>,
     kind: ElementKind,
 ) -> Result<Plan, Refusal> {
     let target = match at {
         Challenged::Node(id) => {
-            let node = view
-                .nodes
-                .iter()
-                .find(|node| node.id == id)
-                .ok_or(Refusal::NotANode)?;
+            let node = *lines.nodes.get(id).ok_or(Refusal::NotANode)?;
             match node.kind {
                 NodeKind::Neutral => return Err(Refusal::KindUnknown),
                 // A Strategy is challenged through the inference it is the
                 // reasoning of, as E5 draws a challenge of that inference at
                 // the Strategy (GSN v3 §1:6.3.12).
-                NodeKind::Strategy => {
-                    one_inference(document, view, id).ok_or(Refusal::NoOneInference)?
+                NodeKind::Strategy => match &lines.strategies {
+                    Some(found) => found.get(id).cloned().flatten(),
+                    None => one_inference(document, view, id),
                 }
+                .ok_or(Refusal::NoOneInference)?,
                 NodeKind::Goal
                 | NodeKind::Assumption
                 | NodeKind::Justification
@@ -300,7 +320,7 @@ pub(crate) fn counter_of(
 /// (AF-EDIT-028).
 pub(crate) fn counter_targets(document: &Document, view: &View, counter: &Counter) -> MoveTargets {
     let under = below(view, counter.id.as_str());
-    let lines = Lines::of(view);
+    let lines = Places::of(view).with_strategies(document, view);
     let nodes = view
         .nodes
         .iter()
@@ -349,7 +369,7 @@ pub(crate) fn counter_targets(document: &Document, view: &View, counter: &Counte
 fn place_refusal(
     document: &Document,
     view: &View,
-    lines: &Lines<'_>,
+    lines: &Places<'_>,
     counter: &Counter,
     under: &super::move_node::Below<'_>,
     at: Challenged<'_>,
@@ -398,7 +418,7 @@ pub fn move_challenge(
         .ok_or(AddError::Refused(Refusal::NotAChallenger))?
         .map_err(AddError::Refused)?;
     let under = below(view, counter.id.as_str());
-    let lines = Lines::of(view);
+    let lines = Places::of(view);
     if let Some(refusal) = place_refusal(document, view, &lines, &counter, &under, to) {
         return Err(AddError::Refused(refusal));
     }

@@ -551,7 +551,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    */
   const challenge = useCallback(
     (at: string, line: LineEnds | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
-      void edit((on) => on.challenge(at, line, kind, revision), 'challenge', line ? null : at, about, onShown),
+      // The view keeps what is challenged in place: the node, or the line's upper end.
+      void edit((on) => on.challenge(at, line, kind, revision), 'challenge', line ? line.from : at, about, onShown),
     [edit],
   );
   /**

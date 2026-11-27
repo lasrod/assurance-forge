@@ -289,8 +289,14 @@ export function draw(
   const visible = visibleArea(viewport, size.width, size.height);
   const drawn = { nodes: 0, edges: 0 };
   // A marked line goes over the others, the selected one last.
-  const rank = (edge: DiagramEdge) => (edgeKey(edge) === marks.selected ? 2 : edgeKey(edge) === marks.hovered ? 1 : 0);
-  const edges = marks.selected || marks.hovered ? [...diagram.edges].sort((a, b) => rank(a) - rank(b)) : diagram.edges;
+  // Drawn last, so over the rest: the selected line, the hovered, and the
+  // lines a moved challenge may go to over the faint ones.
+  const places = marks.move?.lines;
+  const rank = (edge: DiagramEdge) => {
+    const key = edgeKey(edge);
+    return key === marks.selected ? 3 : key === marks.hovered ? 2 : places?.has(key) ? 1 : 0;
+  };
+  const edges = marks.selected || marks.hovered || places ? [...diagram.edges].sort((a, b) => rank(a) - rank(b)) : diagram.edges;
   const move = marks.move ?? null;
   if (move) context.globalAlpha = FAINT;
   for (const edge of edges) {

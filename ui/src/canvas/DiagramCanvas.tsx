@@ -318,7 +318,13 @@ export function DiagramCanvas({
     const point = local(event);
     const current = gesture.current;
     if (!current) {
-      if (diagram && viewport) setHovered(hitId(diagram.diagram, viewport, point.x, point.y));
+      if (diagram && viewport) {
+        // While a challenge's move is chosen, the line marked is the one a
+        // click would take: none on a trunk several relationships share.
+        const node = move?.lines ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
+        const line = move?.lines && !node ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
+        setHovered(move?.lines ? (node?.id ?? (line ? edgeKey(line) : null)) : hitId(diagram.diagram, viewport, point.x, point.y));
+      }
       return;
     }
     pointers.current.set(event.pointerId, point);
