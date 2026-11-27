@@ -54,6 +54,7 @@ export function RemoveDialog({
             <li key={node.id}>
               <span className="af-remove-id">
                 {node.acpDescription ? t('acpDescription') : kindName(node.kind, t)} {node.identifier}
+                {node.acp && ` ${t('withItsAcp')}`}
               </span>
               {text ? <span className="af-remove-text"> {text}</span> : null}
             </li>

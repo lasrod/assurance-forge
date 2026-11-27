@@ -224,8 +224,9 @@ impl Session {
                 Target::Node(id) => Some(id.to_owned()),
             },
             kind,
+            // The package a top-level Goal went into, as made.
             package: match target {
-                Target::Canvas => home.map(str::to_owned),
+                Target::Canvas => af_gsn::view::argument_package_of(&self.document, &added.element),
                 Target::Node(_) => None,
             },
         };

@@ -315,6 +315,11 @@ export type RemovalNode = {
  */
 acpDescription: boolean, 
 /**
+ * The confidence Claim of an ACP on a line that stays: the ACP goes
+ * with it.
+ */
+acp: boolean, 
+/**
  * The SACM id.
  */
 id: string, kind: NodeKind, 

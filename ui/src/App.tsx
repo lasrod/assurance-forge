@@ -503,7 +503,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     (id: string) => {
       void removal(id).then((answer) => {
         if (!answer) return;
-        if (answer.nodes.length > 1) setConfirmRemoval(answer);
+        // More than the node, or an ACP on a line that stays: asked first.
+        if (answer.nodes.length > 1 || answer.nodes.some((node) => node.acp)) setConfirmRemoval(answer);
         else removeWith(answer, followEdit);
       });
     },

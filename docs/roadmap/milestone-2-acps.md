@@ -115,3 +115,8 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
 - [x] **G4.** A click on an ACP: the confidence argument's diagram with its
       goal selected, or the description in Element Properties. Both
       languages, browser tests.
+
+Known limits, found in review: a package's diagram decides a relationship's
+first line against the whole case, so a line whose relationship begins in
+another package says to use a first line that diagram does not draw; the
+whole case draws it.

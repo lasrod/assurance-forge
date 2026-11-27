@@ -1793,19 +1793,24 @@ fn place_acps(
         };
         let width = shaper.width(&acp.label, size, font);
         let (x, baseline) = if across {
-            // Above the square, centred on it, and clear of the two nodes
-            // the line joins, which a short line runs between; a second
-            // ACP to the right of the first, its label further up.
-            let shape_top = |id: &str| {
+            // Above the square, centred on it; a second ACP to the right of
+            // the first, its label further up. Between two nodes side by
+            // side, which a short line joins, above both, which would cover
+            // it otherwise.
+            let shape = |id: &str| {
                 nodes
                     .iter()
                     .find(|node| node.id == id)
-                    .map(|node| node.shape.rect.y)
+                    .map(|node| node.shape.rect)
             };
-            let top = [shape_top(&edge.from), shape_top(&edge.to)]
-                .into_iter()
-                .flatten()
-                .fold(middle.y - ACP_HALF, f32::min);
+            let side_by_side = match (shape(&edge.from), shape(&edge.to)) {
+                (Some(a), Some(b)) => a.y < b.y + b.height && b.y < a.y + a.height,
+                _ => false,
+            };
+            let top = match (side_by_side, shape(&edge.from), shape(&edge.to)) {
+                (true, Some(a), Some(b)) => a.y.min(b.y).min(middle.y - ACP_HALF),
+                _ => middle.y - ACP_HALF,
+            };
             (
                 middle.x + offset * (2.0 * ACP_HALF + ACP_GAP) - width / 2.0,
                 top - ACP_GAP - descent * size - row * line_height,

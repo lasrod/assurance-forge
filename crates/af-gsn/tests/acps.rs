@@ -435,6 +435,8 @@ fn w19_a_confidence_goal_is_removed_with_its_acp() {
     let shown = view(&document, "en");
     let listed = removal(&document, &shown, "ACP4").unwrap_or_else(|why| panic!("{why:?}"));
     assert_eq!(listed.nodes, ["ACP4".to_owned(), "Sn4".to_owned()]);
+    // Its ACP, on X1, which stays, goes with it, and is listed.
+    assert_eq!(listed.acps, ["ACP4".to_owned()]);
     remove(&mut document, &shown, "ACP4").unwrap_or_else(|error| panic!("{error}"));
     let after = view(&strict(&document), "en");
     assert!(!after.acps.iter().any(|acp| acp.claim == "ACP4"));
@@ -495,4 +497,24 @@ fn r17_a_description_on_a_line_with_a_declaration_is_one() {
             .any(|node| node.id == added.element)
     );
     assert!(!after.nodes.iter().any(|node| node.id == added.element));
+}
+
+#[test]
+fn w19_a_meta_claim_the_diagram_does_not_draw_still_refuses() {
+    // The challenge ch names c by metaClaim, which E11 does not draw on a
+    // challenge: removing c would change it unseen.
+    let mut document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g"><name content="i" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="ch" source="k" target="g" isCounter="true" metaClaim="c"><name content="ch" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="c"><name content="c" /></argumentElement>"#,
+    );
+    let shown = view(&document, "en");
+    assert_eq!(
+        removal(&document, &shown, "c").err(),
+        Some(Refusal::Entangled)
+    );
+    assert!(matches!(
+        remove(&mut document, &shown, "c"),
+        Err(AddError::Refused(Refusal::Entangled))
+    ));
 }

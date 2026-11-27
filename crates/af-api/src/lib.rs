@@ -609,6 +609,7 @@ impl Core {
                             .descriptions
                             .iter()
                             .any(|described| described.id == node.id),
+                        acp: removal.acps.contains(&node.id),
                         id: node.id.clone(),
                         kind: convert::node_kind(node.kind),
                         identifier: node.identifier.clone(),

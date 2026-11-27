@@ -1210,3 +1210,20 @@ fn an_acp_label_on_a_line_that_runs_across_is_clear_of_its_nodes() {
         }
     }
 }
+
+#[test]
+fn an_acp_label_on_a_line_that_runs_down_is_beside_its_square() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let at = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let e1 = at
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == "E1")
+        .unwrap_or_else(|| panic!("no E1"));
+    let acp = &e1.acps[0];
+    assert!(acp.label.x > acp.square.x + acp.square.width);
+    let middle = acp.square.y + acp.square.height / 2.0;
+    assert!((acp.label.baseline - acp.label.size / 2.0 - middle).abs() < acp.label.size);
+}
