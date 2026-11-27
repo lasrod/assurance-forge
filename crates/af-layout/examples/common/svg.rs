@@ -222,7 +222,7 @@ pub fn svg(diagram: &Diagram, faces: Option<&str>, report: Option<&Report>) -> S
             } else {
                 400
             };
-            let (fill, family) = if line.role == TextRole::Identifier {
+            let (fill, family) = if matches!(line.role, TextRole::Identifier | TextRole::Package) {
                 ("#666", format!(r#" font-family="{mono}""#))
             } else {
                 ("#111", String::new())

@@ -177,6 +177,8 @@ export interface Core {
    * the node moved.
    */
   moveNode(id: string, to: string | null, revision: number): Promise<EditResult>;
+  /** Shows the argument package `id` as the diagram, or the whole case for null. Whether it is shown. */
+  showPackage(id: string | null): Promise<boolean>;
   /** Moves the challenge the node `id` makes onto the line `line` of a relationship, as the targets of `revision` said. */
   moveToLine(id: string, line: { relationship: string } & LineEnds, revision: number): Promise<EditResult>;
   /**

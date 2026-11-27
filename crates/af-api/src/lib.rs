@@ -68,8 +68,11 @@ struct Open {
     session: Session,
     view: View,
     /// Laid out on first request, and again after the language or text size
-    /// changes.
+    /// changes, or another package is shown.
     diagram: Option<contract::Diagram>,
+    /// The argument package the diagram is of, or `None` for the whole case
+    /// (A5 of the ACP plan).
+    package: Option<String>,
     /// A digest of what the file held when it was opened or last saved.
     base: String,
     /// The revision [`Core::write`] last wrote, and a digest of what it gave:
@@ -169,6 +172,7 @@ impl Core {
             session: Session::new(document, self.revision),
             view,
             diagram: None,
+            package: None,
             base: recovery::digest(bytes),
             written: None,
             read,
@@ -203,6 +207,7 @@ impl Core {
         self.diagram_ref().map(|at| DiagramAt {
             revision: at.revision,
             layout: at.layout,
+            package: at.package.map(str::to_owned),
             diagram: at.diagram.clone(),
         })
     }
@@ -212,14 +217,45 @@ impl Core {
     pub fn diagram_ref(&mut self) -> Option<DiagramAtRef<'_>> {
         let open = self.open.as_mut()?;
         let engine = self.engine.as_mut()?;
-        let diagram = open
-            .diagram
-            .get_or_insert_with(|| convert::diagram(&engine.layout(&open.view)));
+        let diagram = open.diagram.get_or_insert_with(|| {
+            let shown = open
+                .package
+                .as_deref()
+                .and_then(|package| view::of_package(open.session.document(), &open.view, package));
+            convert::diagram(&engine.layout(shown.as_ref().unwrap_or(&open.view)))
+        });
         Some(DiagramAtRef {
             revision: self.revision,
             layout: self.layout,
+            package: open.package.as_deref(),
             diagram,
         })
+    }
+
+    /// Shows the argument package with SACM id `package` as the diagram, or
+    /// the whole case when `None` (A5 of the ACP plan). Answers whether it is
+    /// shown: `false` when nothing is open or `package` is no argument
+    /// package, and the diagram is then as it was. Another package than the
+    /// one shown is a new layout of the same revision.
+    pub fn show_package(&mut self, package: Option<&str>) -> bool {
+        let Some(open) = self.open.as_mut() else {
+            return false;
+        };
+        if let Some(id) = package {
+            let is_package =
+                open.session.document().get(id).is_some_and(|element| {
+                    element.kind() == sacm::model::ElementKind::ArgumentPackage
+                });
+            if !is_package {
+                return false;
+            }
+        }
+        if open.package.as_deref() != package {
+            open.package = package.map(str::to_owned);
+            open.diagram = None;
+            self.layout += 1;
+        }
+        true
     }
 
     /// What the details panel shows for the node with SACM id `id`.
@@ -827,6 +863,15 @@ impl Core {
             open.view = view::view(open.session.document(), &self.language);
             open.diagram = None;
             open.problems = None;
+            // A package the command took away, as an undo of the add that
+            // made it: the whole case is shown.
+            let gone = open
+                .package
+                .as_deref()
+                .is_some_and(|package| open.session.document().get(package).is_none());
+            if gone {
+                open.package = None;
+            }
         }
         EditResult::Applied {
             revision: record.revision,

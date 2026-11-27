@@ -215,6 +215,26 @@ export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: n
 }
 
 /**
+ * The other argument package whose name is under the canvas point: a node of
+ * another package, in a package's diagram, shows it in its `package` lines,
+ * and a click there opens that package. Null anywhere else.
+ */
+export function hitPackage(diagram: Diagram, viewport: Viewport, x: number, y: number): string | null {
+  const node = hitTest(diagram, viewport, x, y);
+  if (!node?.package) return null;
+  const point = toDiagram(viewport, x, y);
+  const on = node.text.some(
+    (line) =>
+      line.role === 'package' &&
+      point.x >= line.x &&
+      point.x <= line.x + line.width &&
+      point.y >= line.baseline - line.size &&
+      point.y <= line.baseline + line.size * 0.3,
+  );
+  return on ? node.package : null;
+}
+
+/**
  * What is under the canvas point: the id of a node, which is drawn over the
  * lines, or else the key of the edge whose line is there.
  */
@@ -496,7 +516,7 @@ function drawNode(
 
   // Zoomed far out the text is not drawn, the A and J included: only the
   // identifier, at metadata size (DATUM's canvas rule 5).
-  const sized = node.text.find((line) => line.role !== 'identifier') ?? node.text[0];
+  const sized = node.text.find((line) => line.role !== 'identifier' && line.role !== 'package') ?? node.text[0];
   const far = sized !== undefined && sized.size * scale < SMALLEST_TEXT_PX;
 
   for (const decorator of node.decorators) {
@@ -524,9 +544,14 @@ function drawNode(
     return;
   }
   for (const line of node.text) {
-    context.fillStyle = line.role === 'identifier' ? palette.secondary : palette.text;
-    context.font = `${line.weight} ${line.size}px ${line.role === 'identifier' ? families.identifier : families.text}`;
+    const metadata = line.role === 'identifier' || line.role === 'package';
+    context.fillStyle = metadata ? palette.secondary : palette.text;
+    context.font = `${line.weight} ${line.size}px ${metadata ? families.identifier : families.text}`;
     context.fillText(line.text, line.x, line.baseline);
+    // The other package's name opens it: drawn as a link is.
+    if (line.role === 'package') {
+      context.fillRect(line.x, line.baseline + 2 / scale, line.width, 1 / scale);
+    }
   }
 }
 

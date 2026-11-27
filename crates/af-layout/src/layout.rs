@@ -13,6 +13,7 @@
 //! Spacing and placement follow the C++ application's `gsn_layout.cpp` where
 //! they fit; it is a reference, not code that was ported.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::f32::consts::SQRT_2;
 
@@ -182,25 +183,33 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
 
 // ===== Sizing =====
 
-/// The texts a node shows, in order: identifier, name, statement (T1 to T3).
-/// A statement that repeats the name is shown once.
-fn texts(node: &Node) -> Vec<(TextRole, &str)> {
-    let mut texts = vec![(TextRole::Identifier, node.identifier.as_str())];
+/// The texts a node shows, in order: identifier, name, statement (T1 to T3),
+/// and in a package's diagram the other package it belongs to. A statement
+/// that repeats the name is shown once.
+fn texts(node: &Node) -> Vec<(TextRole, Cow<'_, str>)> {
+    let mut texts = vec![(TextRole::Identifier, Cow::from(node.identifier.as_str()))];
     let name = node.name.as_deref().filter(|name| !name.trim().is_empty());
     if let Some(name) = name {
-        texts.push((TextRole::Name, name));
+        texts.push((TextRole::Name, Cow::from(name)));
     }
     if let Some(statement) = node.statement.as_deref() {
         if !statement.trim().is_empty() && Some(statement) != name {
-            texts.push((TextRole::Statement, statement));
+            texts.push((TextRole::Statement, Cow::from(statement)));
         }
+    }
+    if let Some(elsewhere) = node.elsewhere.as_ref() {
+        // GSN's module identifier, as §1:5.2.3 delimits it.
+        texts.push((
+            TextRole::Package,
+            Cow::from(format!("[{}]", elsewhere.name)),
+        ));
     }
     texts
 }
 
 fn role_style(role: TextRole, style: Style) -> (f32, f32, Font) {
     match role {
-        TextRole::Identifier => (
+        TextRole::Identifier | TextRole::Package => (
             style.identifier_size,
             style.identifier_line_height,
             Font::Mono,
@@ -225,7 +234,7 @@ fn content(
     for (role, text) in &texts {
         let (size, line_height, font) = role_style(*role, style);
         let wrapped = cache
-            .entry(((*text).to_owned(), *role, width.to_bits()))
+            .entry((text.to_string(), *role, width.to_bits()))
             .or_insert_with(|| shaper.wrap(text, size, font, width));
         // A gap between groups that have lines, as `size` places them.
         if wrapped.is_empty() {
@@ -382,6 +391,10 @@ fn translate(node: &Node, sized: &Sized, origin: Point) -> DiagramNode {
     };
     DiagramNode {
         id: node.id.clone(),
+        package: node
+            .elsewhere
+            .as_ref()
+            .map(|elsewhere| elsewhere.package.clone()),
         kind: node.kind,
         shape: Shape {
             kind: sized.shape.kind,

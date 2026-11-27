@@ -210,6 +210,9 @@ pub enum TextRole {
     Name,
     /// The statement.
     Statement,
+    /// The other argument package the node belongs to, in a package's
+    /// diagram, as `[name]` at metadata size.
+    Package,
 }
 
 /// One line of text, drawn with the measured faces in their order.
@@ -243,6 +246,9 @@ pub enum Decorator {
 pub struct DiagramNode {
     /// The SACM id.
     pub id: String,
+    /// In a package's diagram, the SACM id of the other argument package the
+    /// node belongs to, whose name its `Package` line shows.
+    pub package: Option<String>,
     pub kind: NodeKind,
     pub shape: Shape,
     pub text: Vec<TextLine>,

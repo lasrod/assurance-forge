@@ -111,6 +111,7 @@ function node(id: string, x: number): DiagramNode {
   const rect = { x, y: 0, width: 200, height: 80 };
   return {
     id,
+    package: null,
     kind: 'goal',
     shape: { type: 'rectangle', rect },
     text: [

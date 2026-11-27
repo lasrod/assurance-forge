@@ -42,9 +42,15 @@ export type DiagramAt = {
 revision: number, 
 /**
  * Which layout of it: it changes when the language or the text sizes
- * do, which change the diagram but not the document.
+ * do, or another package is shown, which change the diagram but not the
+ * document.
  */
-layout: number, diagram: Diagram, };
+layout: number, 
+/**
+ * The SACM id of the argument package the diagram is of, or null for
+ * the whole case.
+ */
+package: string | null, diagram: Diagram, };
 
 export type ElementDetails = { 
 /**
@@ -170,7 +176,7 @@ export type Rect = { x: number, y: number, width: number, height: number, };
 
 export type Shape = { "type": "rectangle", rect: Rect, } | { "type": "parallelogram", rect: Rect, skew: number, } | { "type": "roundedRectangle", rect: Rect, radius: number, } | { "type": "ellipse", rect: Rect, } | { "type": "circle", rect: Rect, } | { "type": "neutral", rect: Rect, };
 
-export type TextRole = "identifier" | "name" | "statement";
+export type TextRole = "identifier" | "name" | "statement" | "package";
 
 export type TextLine = { text: string, role: TextRole, x: number, baseline: number, 
 /**
@@ -188,7 +194,12 @@ export type DiagramNode = {
 /**
  * The SACM id.
  */
-id: string, kind: NodeKind, shape: Shape, text: Array<TextLine>, decorators: Array<Decorator>, 
+id: string, 
+/**
+ * In a package's diagram, the SACM id of the other argument package the
+ * node belongs to, whose name its `package` lines show; null otherwise.
+ */
+package: string | null, kind: NodeKind, shape: Shape, text: Array<TextLine>, decorators: Array<Decorator>, 
 /**
  * Everything drawn for the node. No two nodes' bounds overlap.
  */

@@ -160,6 +160,19 @@ pub struct Node {
     pub name: Option<String>,
     /// The statement (T3).
     pub statement: Option<String>,
+    /// In a package's diagram, the other argument package a node drawn
+    /// there belongs to (A6 of the ACP plan); `None` for a node of the
+    /// package shown, and in the whole case.
+    pub elsewhere: Option<Elsewhere>,
+}
+
+/// The argument package a node of another package's diagram belongs to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Elsewhere {
+    /// Its SACM id.
+    pub package: String,
+    /// Its name, or its id when it has none.
+    pub name: String,
 }
 
 /// How an edge is drawn.
@@ -648,6 +661,7 @@ fn node(element: SacmElement<'_>, reached: Reach, language: &str, builder: &mut 
 
     builder.nodes.push(Node {
         id: id.to_owned(),
+        elsewhere: None,
         kind,
         undeveloped,
         identifier: tagged_value(element, GSN_IDENTIFIER_KEY)
@@ -961,6 +975,125 @@ fn is_hidden(element: SacmElement<'_>) -> bool {
         parent = ancestor.parent();
     }
     false
+}
+
+/// The argument package an element is held in, nearest first.
+fn package_of(element: SacmElement<'_>) -> Option<SacmElement<'_>> {
+    let mut holder = element.parent();
+    while let Some(container) = holder {
+        if container.kind() == SacmKind::ArgumentPackage {
+            return Some(container);
+        }
+        holder = container.parent();
+    }
+    None
+}
+
+/// The diagram of the argument package `package` (A5 and A6 of the ACP
+/// plan, `docs/roadmap/milestone-2-acps.md`): its nodes, every edge with an
+/// end among them, and the nodes of other packages those edges reach, each
+/// with the name of its package. A challenge of a relationship comes with
+/// that relationship's edges. `None` when `package` is no argument package
+/// of `document`.
+///
+/// Nothing is placed that the whole view does not place, and nothing of the
+/// document changes: the package's name on a node is of the diagram.
+pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<View> {
+    let shown = document.get(package)?;
+    if shown.kind() != SacmKind::ArgumentPackage {
+        return None;
+    }
+    let holder = |id: &str| document.get(id).and_then(package_of);
+    let own: HashSet<&str> = whole
+        .nodes
+        .iter()
+        .filter(|node| holder(&node.id).is_some_and(|found| found.id().as_str() == package))
+        .map(|node| node.id.as_str())
+        .collect();
+    // The edges with an end among the package's nodes, then the challenges
+    // of the relationships those edges draw, and of those, to any depth.
+    let mut kept: Vec<bool> = whole
+        .edges
+        .iter()
+        .map(|edge| {
+            own.contains(edge.from.as_str())
+                || (!edge.to_relationship && own.contains(edge.to.as_str()))
+        })
+        .collect();
+    loop {
+        let drawn: HashSet<&str> = whole
+            .edges
+            .iter()
+            .zip(&kept)
+            .filter(|(_, kept)| **kept)
+            .map(|(edge, _)| edge.relationship.as_str())
+            .collect();
+        let mut grew = false;
+        for (edge, kept) in whole.edges.iter().zip(kept.iter_mut()) {
+            if !*kept && edge.to_relationship && drawn.contains(edge.to.as_str()) {
+                *kept = true;
+                grew = true;
+            }
+        }
+        if !grew {
+            break;
+        }
+    }
+    let edges: Vec<Edge> = whole
+        .edges
+        .iter()
+        .zip(&kept)
+        .filter(|(_, kept)| **kept)
+        .map(|(edge, _)| edge.clone())
+        .collect();
+    let reached: HashSet<&str> = edges
+        .iter()
+        .flat_map(|edge| {
+            let to = (!edge.to_relationship).then_some(edge.to.as_str());
+            std::iter::once(edge.from.as_str()).chain(to)
+        })
+        .collect();
+    let nodes = whole
+        .nodes
+        .iter()
+        .filter(|node| own.contains(node.id.as_str()) || reached.contains(node.id.as_str()))
+        .map(|node| {
+            let mut node = node.clone();
+            if !own.contains(node.id.as_str()) {
+                node.elsewhere = holder(&node.id).map(|found| Elsewhere {
+                    package: found.id().as_str().to_owned(),
+                    name: found
+                        .name()
+                        .and_then(|name| name.content())
+                        .filter(|name| !name.trim().is_empty())
+                        .unwrap_or(found.id().as_str())
+                        .to_owned(),
+                });
+            }
+            node
+        })
+        .collect::<Vec<_>>();
+    let ids: HashSet<&str> = nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .chain(edges.iter().map(|edge| edge.relationship.as_str()))
+        .collect();
+    Some(View {
+        findings: whole
+            .findings
+            .iter()
+            .filter(|finding| ids.contains(finding.element.as_str()))
+            .cloned()
+            .collect(),
+        unplaced: whole
+            .unplaced
+            .iter()
+            .filter(|item| holder(&item.id).is_some_and(|found| found.id().as_str() == package))
+            .cloned()
+            .collect(),
+        nodes,
+        edges,
+    })
 }
 
 #[cfg(test)]

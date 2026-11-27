@@ -74,6 +74,7 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),
     moveTargets: (id) => invoke<MoveTargets | null>('move_targets', { id }),
     moveNode: (id, to, revision) => invoke<EditResult>('move_node', { id, to, revision }),
+    showPackage: (id) => invoke<boolean>('show_package', { package: id }),
     moveToLine: (id, line, revision) =>
       invoke<EditResult>('move_to_line', { id, relationship: line.relationship, from: line.from, to: line.to, revision }),
     setUndeveloped: (id, undeveloped, revision) => invoke<EditResult>('set_undeveloped', { id, undeveloped, revision }),

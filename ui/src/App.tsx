@@ -4,7 +4,7 @@ import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
 import type { AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
 import { addItems, challengeItems, kindName, refusalText } from './addMenu';
-import { edgeKey } from './canvas/draw';
+import { boundsOf, edgeKey } from './canvas/draw';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
 import { ProblemsPanel } from './ProblemsPanel';
@@ -168,7 +168,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const t: T = useCallback((key, values) => translate(language, key, values), [language]);
 
   const doc = useDocument(start, initialLanguage, language);
-  const { core, state, diagram, outline, packages, fileName, recent, reading, asked, history, opened } = doc;
+  const { core, state, diagram, outline, packages, fileName, recent, reading, asked, history, opened, showPackage } = doc;
   const view = useViewport(diagram, opened);
   const { viewport, selected, setSelected, centreSize, moveView, onCentreSize, fitAll, zoomBy, selectAndShow, refitIfFitted, followEdit } =
     view;
@@ -611,6 +611,37 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   useEffect(() => setExplorerExpanded(explorerOpen), [explorerOpen]);
   const [explorerSelected, setExplorerSelected] = useState<string | null>(FILE_ROW);
   useEffect(() => setExplorerSelected(FILE_ROW), [fileName]);
+  // The diagram is of the whole case, or of one argument package (A5 of the
+  // ACP plan): the Case Explorer's row for it is the selected one, whatever
+  // showed it.
+  const shownPackage = diagram?.package ?? null;
+  useEffect(() => setExplorerSelected(shownPackage ?? FILE_ROW), [shownPackage]);
+  /** The file's row shows the whole case, an argument package's row that package; another row is only selected. */
+  const chooseExplorerRow = (row: string | null) => {
+    setExplorerSelected(row);
+    if (row === FILE_ROW) void showPackage(null);
+    else if (row && packages.some((item) => item.id === row && item.kind === 'ArgumentPackage')) void showPackage(row);
+  };
+  // A node asked for that the package shown does not draw: the whole case
+  // is shown, and it is selected there.
+  const wanted = useRef<string | null>(null);
+  const showNode = (id: string) => {
+    const drawn = diagram ? boundsOf(diagram.diagram, id) !== null : false;
+    if (drawn || shownPackage === null) {
+      selectAndShow(id);
+      return;
+    }
+    wanted.current = id;
+    void showPackage(null);
+  };
+  useEffect(() => {
+    const id = wanted.current;
+    if (id === null || shownPackage !== null) return;
+    wanted.current = null;
+    selectAndShow(id);
+    // Only once the whole case is the diagram.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diagram]);
 
   // The View menu's panels are the workspace's views. The workspace says which
   // show, at whatever tier it is in, and shows or hides one.
@@ -848,7 +879,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                         label={t('caseExplorer')}
                         nodes={explorer}
                         selected={explorerSelected}
-                        onSelect={setExplorerSelected}
+                        onSelect={chooseExplorerRow}
                         expanded={explorerExpanded}
                         onExpandedChange={setExplorerExpanded}
                       />
@@ -866,7 +897,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                         label={t('argumentNavigator')}
                         nodes={argument.nodes}
                         selected={selected}
-                        onSelect={selectAndShow}
+                        onSelect={showNode}
                         expanded={expanded}
                         onExpandedChange={setExpanded}
                       />
@@ -895,7 +926,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                       problems={doc.problems}
                       language={language}
                       t={t}
-                      onShow={selectAndShow}
+                      onShow={showNode}
                       onRepair={(repair, revision, problem) => {
                         const element = problem.elements.find((candidate) => candidate.id === repair.element);
                         repairWith(repair, revision, { kind: element?.kind ?? null, identifier: element?.identifier ?? repair.element }, followEdit);
@@ -921,6 +952,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               move={moveMarks}
               onMoveTo={moveTo}
               onMoveToLine={moveToLine}
+              onOpenPackage={(id) => void showPackage(id)}
               onMoveCancel={() => setMoving(null)}
               onDragStart={(id) => startMove(id, true)}
               onDragEnd={endDrag}

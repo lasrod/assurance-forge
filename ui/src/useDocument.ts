@@ -880,9 +880,29 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [core, showRelayout],
   );
 
+  /**
+   * Shows the argument package `id` as the diagram, or the whole case for
+   * null. Answers whether it is shown; the diagram comes as a new layout of
+   * the same revision.
+   */
+  const showPackage = useCallback(
+    async (id: string | null): Promise<boolean> => {
+      if (!core) return false;
+      try {
+        if (!(await core.showPackage(id))) return false;
+        showRelayout(await core.diagram());
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [core, showRelayout],
+  );
+
   return {
     core,
     state,
+    showPackage,
     diagram,
     outline,
     packages,

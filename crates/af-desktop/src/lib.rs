@@ -991,6 +991,11 @@ fn add(
 }
 
 #[tauri::command]
+fn show_package(package: Option<String>, state: Shared<'_>) -> Result<bool, String> {
+    Ok(lock(&state)?.core.show_package(package.as_deref()))
+}
+
+#[tauri::command]
 fn move_to_line(
     id: String,
     relationship: String,
@@ -1200,6 +1205,7 @@ pub fn run(args: Args) -> i32 {
             challenge_choices,
             challenge,
             move_to_line,
+            show_package,
             set_text,
             undo,
             redo,

@@ -91,8 +91,12 @@ pub struct DiagramAt {
     /// The document's revision.
     pub revision: u32,
     /// Which layout of it: it changes when the language or the text sizes
-    /// do, which change the diagram but not the document.
+    /// do, or another package is shown, which change the diagram but not the
+    /// document.
     pub layout: u32,
+    /// The SACM id of the argument package the diagram is of, or null for
+    /// the whole case.
+    pub package: Option<String>,
     pub diagram: Diagram,
 }
 
@@ -103,6 +107,7 @@ pub struct DiagramAt {
 pub struct DiagramAtRef<'a> {
     pub revision: u32,
     pub layout: u32,
+    pub package: Option<&'a str>,
     pub diagram: &'a Diagram,
 }
 
@@ -294,6 +299,9 @@ pub enum TextRole {
     Identifier,
     Name,
     Statement,
+    /// In a package's diagram, `[name]` of the other package a node belongs
+    /// to.
+    Package,
 }
 
 /// One line of text, drawn with the measured faces in their order:
@@ -334,6 +342,9 @@ pub enum Decorator {
 pub struct DiagramNode {
     /// The SACM id.
     pub id: String,
+    /// In a package's diagram, the SACM id of the other argument package the
+    /// node belongs to, whose name its `package` lines show; null otherwise.
+    pub package: Option<String>,
     pub kind: NodeKind,
     pub shape: Shape,
     pub text: Vec<TextLine>,

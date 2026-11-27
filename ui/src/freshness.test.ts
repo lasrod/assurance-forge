@@ -5,6 +5,7 @@ import { newerDiagram } from './freshness';
 const at = (revision: number, layout: number): DiagramAt => ({
   revision,
   layout,
+  package: null,
   diagram: { nodes: [], edges: [], bounds: { x: 0, y: 0, width: 0, height: 0 } },
 });
 

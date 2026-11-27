@@ -175,6 +175,13 @@ impl WasmCore {
         json(&self.core.move_node(id, to.as_deref(), revision))
     }
 
+    /// Shows the argument package `package` as the diagram, or the whole
+    /// case without one. Whether it is shown.
+    #[wasm_bindgen(js_name = showPackage)]
+    pub fn show_package(&mut self, package: Option<String>) -> bool {
+        self.core.show_package(package.as_deref())
+    }
+
     /// Moves the challenge the node `id` makes onto the line from `from` to
     /// `to` of `relationship`, as the targets of `revision` said.
     /// `EditResult` as JSON.

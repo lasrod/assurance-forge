@@ -94,6 +94,7 @@ fn text_line(line: &layout::TextLine) -> TextLine {
             layout::TextRole::Identifier => TextRole::Identifier,
             layout::TextRole::Name => TextRole::Name,
             layout::TextRole::Statement => TextRole::Statement,
+            layout::TextRole::Package => TextRole::Package,
         },
         x: line.x,
         baseline: line.baseline,
@@ -156,6 +157,7 @@ pub(crate) fn diagram(diagram: &layout::Diagram) -> Diagram {
             .iter()
             .map(|node| DiagramNode {
                 id: node.id.clone(),
+                package: node.package.clone(),
                 kind: node_kind(node.kind),
                 shape: shape(node.shape),
                 text: node.text.iter().map(text_line).collect(),

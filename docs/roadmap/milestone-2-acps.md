@@ -85,11 +85,8 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
 | A2 | Only on lines, and on an inference through a Strategy only on its first line. A Solution or a Context says it comes with SACM 2.4 | Table 1:5-1 and §1:5.3.3; gap row 7. Decided by the user on 27 November 2026, after reading that SACM 2.4 closes the gap with a different carrier |
 | A3 | Added as one of two: **a description**, a `Claim` in the line's package that holds the text and is drawn only as the ACP; or **a confidence argument**, a new `ArgumentPackage` whose top goal is that `Claim` | §1:5.2.3's "paragraph of accompanying text" and "goal in a separate module". Decided by the user on 27 November 2026 |
 | A4 | The confidence `Claim` is numbered `ACP1`, `ACP2`…, and the ACP is labelled with its identifier, with `[package name]` when it is in another package | §1:5.3.2 and §1:5.2.3: the identifier is the reference to the goal, so nothing else is stored, and renaming the goal renames the ACP. Decided by the user on 27 November 2026 |
-| A5 | One diagram per argument package. The Case Explorer opens a package's diagram; a click on an ACP opens its confidence argument's diagram with the goal selected | Decided by the user on 27 November 2026: a confidence argument is usually a diagram of its own (§1:5.3.1: "a separate confidence argument module") |
-
-To decide in G1, with the evidence in the mapping record: what a package's
-diagram draws of another package (a line from one of its nodes to a node
-elsewhere), and which diagram a file opens on.
+| A5 | The whole case is a diagram, as now, and what a file opens on; each argument package is also a diagram of its own. The Case Explorer's file row opens the whole case and a package's row that package; a click on an ACP opens its confidence argument's package with the goal selected | Decided by the user on 27 November 2026: a confidence argument is usually a diagram of its own (§1:5.3.1: "a separate confidence argument module"). The whole case stays because real files split one argument across packages: 8 of the 49 relationships of `oasc-ja` and 23 of the 128 of the large case join nodes of two packages |
+| A6 | A package's diagram draws its nodes and every line with an end among them. A node of another package that such a line reaches is drawn too, marked with its package's name, and the mark opens that package | A line is not cut in two: what the package says about a node elsewhere stays in view, with where that node is. Nothing in the file changes: the mark is of the diagram, not a citation (an away goal is `isCitation`, E9) |
 
 ## The pieces
 
@@ -103,8 +100,10 @@ elsewhere), and which diagram a file opens on.
 
 ## The goals
 
-- [ ] **G1.** One diagram per argument package: the view of one package, the
+- [x] **G1.** One diagram per argument package: the view of one package, the
       Case Explorer opening it, and what a diagram draws of another package.
+      The Argument Navigator still lists the whole case; a row the package
+      does not draw shows the whole case.
 - [ ] **G2.** Reading and drawing ACPs: a `metaClaim` of a relationship drawn
       as a square with its label on the line; a description's `Claim` drawn
       only as the ACP; E11 changed and recorded with its evidence.

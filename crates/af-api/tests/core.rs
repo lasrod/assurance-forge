@@ -6,7 +6,7 @@
 use af_api::Core;
 use af_api::contract::{
     ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult, ProblemSeverity,
-    ProblemSource, Shape,
+    ProblemSource, Shape, TextRole,
 };
 use af_layout::{Fonts, Style};
 
@@ -1014,4 +1014,49 @@ fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
     assert_eq!(challenges(&mut core), 1);
     assert!(matches!(core.undo(), EditResult::Applied { .. }));
     assert_eq!(challenges(&mut core), 0);
+}
+
+#[test]
+fn a_package_is_shown_as_its_own_diagram_and_the_whole_case_again_without_one() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/oasc-ja.sacm.xmi"));
+    let whole = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    assert_eq!(whole.package, None);
+
+    assert!(core.show_package(Some("ARG_VehicleSafety")));
+    let vehicle = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    // A new layout of the same revision, of the package.
+    assert_eq!(vehicle.revision, whole.revision);
+    assert!(vehicle.layout > whole.layout);
+    assert_eq!(vehicle.package.as_deref(), Some("ARG_VehicleSafety"));
+    assert!(vehicle.diagram.nodes.len() < whole.diagram.nodes.len());
+    // G4 of the main argument is drawn, marked with its package.
+    let g4 = vehicle
+        .diagram
+        .nodes
+        .iter()
+        .find(|node| node.id == "G4")
+        .unwrap_or_else(|| panic!("no G4"));
+    // The package it belongs to, which a click on the mark opens.
+    assert_eq!(g4.package.as_deref(), Some("ARG_Main"));
+    // Wrapped as any text is: the lines, read together, are the name.
+    let package: Vec<&str> = g4
+        .text
+        .iter()
+        .filter(|line| line.role == TextRole::Package)
+        .map(|line| line.text.trim())
+        .collect();
+    assert_eq!(
+        package.join(" "),
+        "[Open Autonomy Safety Case - Main Argument]"
+    );
+
+    // Not a package: the diagram stays as it was.
+    assert!(!core.show_package(Some("G4")));
+    assert_eq!(core.diagram().map(|at| at.layout), Some(vehicle.layout));
+
+    assert!(core.show_package(None));
+    let again = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    assert_eq!(again.package, None);
+    assert_eq!(again.diagram.nodes.len(), whole.diagram.nodes.len());
 }
