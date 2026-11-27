@@ -267,6 +267,24 @@ impl Plan {
             }
         }
         deleted.extend(placeholders_going);
+        // R17: a description only the deleted relationships named goes with
+        // them, and is listed: it would otherwise be drawn as a Goal of its
+        // own, which nobody asked for.
+        let mut described: Vec<&str> = Vec::new();
+        for description in &view.descriptions {
+            let referrers = document.referrers(description.id.as_str());
+            let only_ours = !referrers.is_empty()
+                && referrers.iter().all(|referrer| {
+                    referrer.end() == ReferenceEnd::MetaClaim
+                        && relationships
+                            .deleted
+                            .contains(referrer.holder().id().as_str())
+                });
+            if let (true, Some(element)) = (only_ours, document.get(description.id.as_str())) {
+                deleted.push(element.id().clone());
+                described.push(description.id.as_str());
+            }
+        }
         let all: HashSet<&str> = deleted.iter().map(ElementId::as_str).collect();
 
         // W19: what refers to what goes. A relationship that stays loses the
@@ -332,7 +350,11 @@ impl Plan {
         });
 
         Ok(Plan {
-            nodes: nodes.into_iter().map(str::to_owned).collect(),
+            nodes: nodes
+                .into_iter()
+                .chain(described)
+                .map(str::to_owned)
+                .collect(),
             deleted,
             held_within,
             scrubbed,

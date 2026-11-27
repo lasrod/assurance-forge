@@ -216,12 +216,13 @@ export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: n
 }
 
 /**
- * The assurance claim point under the canvas point: on its square, within
- * reach as a line is, or on its label. Null anywhere else.
+ * The assurance claim point under the canvas point: on its square, with a
+ * margin of 2 px on screen, or on its label. Null anywhere else.
  */
 export function hitAcp(diagram: Diagram, viewport: Viewport, x: number, y: number): AcpMark | null {
   const point = toDiagram(viewport, x, y);
-  const reach = EDGE_REACH / viewport.scale;
+  // A small margin on screen, so a click on the line beside it is the line's.
+  const reach = 2 / viewport.scale;
   for (const edge of diagram.edges) {
     for (const acp of edge.acps) {
       const { square, label } = acp;

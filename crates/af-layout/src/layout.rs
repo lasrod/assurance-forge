@@ -1744,10 +1744,10 @@ fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style
     let (size, line_height, font) = role_style(TextRole::Acp, style);
     let (ascent, descent) = shaper.ascent_descent();
     for acp in &view.acps {
-        let Some(edge) = edges
-            .iter_mut()
-            .find(|edge| edge.relationship == acp.relationship)
-        else {
+        // On the relationship's first edge only (GSN v3 §1:5.3.3).
+        let Some(edge) = edges.iter_mut().find(|edge| {
+            edge.relationship == acp.relationship && edge.from == acp.from && edge.to == acp.to
+        }) else {
             continue;
         };
         let (middle, across) = halfway(&edge.points);

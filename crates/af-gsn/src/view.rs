@@ -220,6 +220,10 @@ pub struct Edge {
 pub struct Acp {
     /// The SACM id of the relationship.
     pub relationship: String,
+    /// The ends of the relationship's first edge, which carries it: a
+    /// package's diagram that does not draw that edge does not draw it.
+    pub from: String,
+    pub to: String,
     /// The SACM id of the confidence `Claim`.
     pub claim: String,
     /// The label: the Claim's GSN identifier, with `[package name]` when it
@@ -311,8 +315,9 @@ pub fn view(document: &Document, language: &str) -> View {
         })
         .map(|element| element.id().as_str())
         .collect();
-    // R17: the confidence Claims an ACP shows as its description.
-    let descriptions: HashSet<&str> = elements
+    // R17: the confidence Claims an ACP may show as its description. Only
+    // those an ACP is drawn for are, which the relationships decide below.
+    let candidates: HashSet<&str> = elements
         .iter()
         .filter(|element| {
             !hidden.contains(element.id().as_str()) && is_acp_description(document, **element)
@@ -324,10 +329,7 @@ pub fn view(document: &Document, language: &str) -> View {
         .iter()
         .filter(|element| {
             let id = element.id().as_str();
-            is_node_kind(element.kind())
-                && !hidden.contains(id)
-                && !placeholders.contains(id)
-                && !descriptions.contains(id)
+            is_node_kind(element.kind()) && !hidden.contains(id) && !placeholders.contains(id)
         })
         .map(|element| (element.id().as_str(), element.kind()))
         .collect();
@@ -341,8 +343,6 @@ pub fn view(document: &Document, language: &str) -> View {
             builder.unplaced(id, Code::KindNotDrawn);
         } else if placeholders.contains(id) {
             builder.unplaced(id, Code::Placeholder);
-        } else if descriptions.contains(id) {
-            builder.unplaced(id, Code::AcpDescription);
         } else if is_relationship(element.kind()) {
             relationship(
                 *element,
@@ -355,9 +355,32 @@ pub fn view(document: &Document, language: &str) -> View {
         }
     }
     builder.drop_challenges_of_nothing();
+    // R17: a candidate is a description when an ACP is drawn for it, and
+    // every relationship that names it draws one.
+    let linked: HashSet<&str> = builder
+        .acp_links
+        .iter()
+        .map(|(relationship, _)| relationship.as_str())
+        .collect();
+    let descriptions: HashSet<&str> = candidates
+        .iter()
+        .copied()
+        .filter(|id| {
+            document
+                .referrers(*id)
+                .iter()
+                .all(|referrer| linked.contains(referrer.holder().id().as_str()))
+        })
+        .collect();
     for element in &elements {
         let id = element.id().as_str();
-        if placeable.contains_key(id) {
+        if descriptions.contains(id) {
+            builder.unplaced(id, Code::AcpDescription);
+        }
+    }
+    for element in &elements {
+        let id = element.id().as_str();
+        if placeable.contains_key(id) && !descriptions.contains(id) {
             let reached = reach.get(id).copied().unwrap_or_default();
             node(*element, reached, language, &mut builder);
         } else if descriptions.contains(id) {
@@ -408,8 +431,18 @@ fn acps(document: &Document, builder: &mut Builder) {
             }
             None => identifier.to_owned(),
         };
+        let Some((from, to)) = builder
+            .edges
+            .iter()
+            .find(|edge| edge.relationship == relationship)
+            .map(|edge| (edge.from.clone(), edge.to.clone()))
+        else {
+            continue;
+        };
         builder.acps.push(Acp {
             relationship,
+            from,
+            to,
             claim,
             label,
             package: elsewhere.map(|package| package.id().as_str().to_owned()),
@@ -1189,9 +1222,19 @@ pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<Vi
             .filter(|(_, kept)| **kept)
             .map(|(edge, _)| edge.relationship.as_str())
             .collect();
+        // What a kept challenge points at, so it has a line to point at.
+        let challenged: HashSet<&str> = whole
+            .edges
+            .iter()
+            .zip(&kept)
+            .filter(|(edge, kept)| **kept && edge.to_relationship)
+            .map(|(edge, _)| edge.to.as_str())
+            .collect();
         let mut grew = false;
         for (edge, kept) in whole.edges.iter().zip(kept.iter_mut()) {
-            if !*kept && edge.to_relationship && drawn.contains(edge.to.as_str()) {
+            let wanted = (edge.to_relationship && drawn.contains(edge.to.as_str()))
+                || challenged.contains(edge.relationship.as_str());
+            if !*kept && wanted {
                 *kept = true;
                 grew = true;
             }
@@ -1243,9 +1286,9 @@ pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<Vi
         .acps
         .iter()
         .filter(|acp| {
-            edges
-                .iter()
-                .any(|edge| edge.relationship == acp.relationship)
+            edges.iter().any(|edge| {
+                edge.relationship == acp.relationship && edge.from == acp.from && edge.to == acp.to
+            })
         })
         .cloned()
         .collect();

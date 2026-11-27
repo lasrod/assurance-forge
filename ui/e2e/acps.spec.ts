@@ -106,6 +106,19 @@ test('a click on an ACP shows its confidence argument, or its description', asyn
   await page.mouse.click(described.x, described.y);
   await expect.poll(async () => (await hook(page)).selected).toBe('ACP1');
   await expect(page.getByTestId('element-statement')).toHaveValue(/HAZOP of the final design/);
+  // Named as what it is: not a Goal, and with no undeveloped mark.
+  await expect(page.getByText('ACP description')).toBeVisible();
+  await expect(page.getByTestId('element-undeveloped')).toHaveCount(0);
+});
+
+test('a click on the line beside an ACP selects the line', async ({ page }) => {
+  await opened(page);
+  const square = await onAcp(page, 'ACP2');
+  // E1 runs down: 9 px below the square's centre is on the line, off the square.
+  await page.mouse.click(square.x, square.y + 9);
+  const edge = (await hook(page)).diagram!.diagram.edges.find((candidate) => candidate.relationship === 'E1')!;
+  await expect.poll(async () => (await hook(page)).selected).toBe(`${edge.relationship} ${edge.from} ${edge.to}`);
+  expect(await shown(page)).toBeNull();
 });
 
 test("a Solution's Add ACP says it comes with SACM 2.4", async ({ page }) => {

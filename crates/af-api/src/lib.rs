@@ -593,7 +593,12 @@ impl Core {
                 removal
                     .nodes
                     .iter()
-                    .filter_map(|id| view.nodes.iter().find(|node| node.id == *id))
+                    .filter_map(|id| {
+                        view.nodes
+                            .iter()
+                            .chain(&view.descriptions)
+                            .find(|node| node.id == *id)
+                    })
                     .map(|node| RemovalNode {
                         id: node.id.clone(),
                         kind: convert::node_kind(node.kind),

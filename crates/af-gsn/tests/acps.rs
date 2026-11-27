@@ -3,7 +3,7 @@
 //! `docs/roadmap/milestone-2-acps.md`).
 
 use af_gsn::commands::{
-    AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, add_acp,
+    AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, add_acp, removal, remove,
 };
 use af_gsn::view::{Acp, Code, argument_package_of, of_package, view};
 use sacm::model::{Document, ElementKind as SacmKind};
@@ -23,8 +23,18 @@ fn sample(name: &str) -> Document {
 }
 
 fn acp(relationship: &str, claim: &str, label: &str, package: Option<&str>) -> Acp {
+    // The first edge of each relationship of the fixture.
+    let (from, to) = match relationship {
+        "I1" => ("G1", "S1"),
+        "E1" => ("G2", "Sn1"),
+        "E2" => ("G3", "Sn2"),
+        "X1" => ("G1", "C1"),
+        other => panic!("no first edge known for {other}"),
+    };
     Acp {
         relationship: relationship.to_owned(),
+        from: from.to_owned(),
+        to: to.to_owned(),
         claim: claim.to_owned(),
         label: label.to_owned(),
         package: package.map(str::to_owned),
@@ -303,4 +313,116 @@ fn w34_a_refused_acp_changes_nothing() {
         other => panic!("{other:?}"),
     }
     assert_eq!(document.elements().count(), original.elements().count());
+}
+
+#[test]
+fn w18_a_removal_takes_the_description_only_its_lines_named() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let mut document = original.clone();
+    let added = add_acp(
+        &mut document,
+        &shown,
+        line("E2", "G3", "Sn2"),
+        AcpKind::Description,
+        "unused",
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let shown = view(&document, "en");
+    // Removing Sn2 deletes E2, the only line naming the description: it is
+    // listed, and goes too.
+    let listed = removal(&document, &shown, "Sn2").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(listed.nodes, ["Sn2".to_owned(), added.element.clone()]);
+    remove(&mut document, &shown, "Sn2").unwrap_or_else(|error| panic!("{error}"));
+    assert!(document.get(added.element.as_str()).is_none());
+    let after = view(&document, "en");
+    assert!(!after.nodes.iter().any(|node| node.identifier == "ACP5"));
+    // ACP1, on I1, which stays, is kept.
+    assert!(after.descriptions.iter().any(|node| node.id == "ACP1"));
+}
+
+#[test]
+fn r17_a_claim_no_acp_is_drawn_for_is_a_node() {
+    // The relationship's source is inside an interface (R15): it draws no
+    // edge, so no ACP, and the Claim it names stays in view as a node.
+    let document = read(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <argumentPackage xmi:id="p">
+    <name content="P" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="c1"><name content="c1" /></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="d"><name content="d" /></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentPackageInterface" xmi:id="i1" implements="p">
+      <name content="i1" />
+      <argumentElement xmi:type="sacm:Claim" xmi:id="inside"><name content="inside" /></argumentElement>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="r" source="inside" target="c1" metaClaim="d"><name content="r" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>"#,
+    );
+    let shown = view(&document, "en");
+    assert!(shown.acps.is_empty());
+    assert!(shown.nodes.iter().any(|node| node.id == "d"));
+    assert!(
+        shown
+            .findings
+            .iter()
+            .any(|finding| finding.element == "r" && finding.code == Code::MetaClaimNotDrawn)
+    );
+}
+
+fn two_packages(a: &str, b: &str) -> Document {
+    read(format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <argumentPackage xmi:id="a"><name content="A" />{a}</argumentPackage>
+  <argumentPackage xmi:id="b"><name content="B" />{b}</argumentPackage>
+</sacm:AssuranceCasePackage>"#
+    )
+    .as_bytes())
+}
+
+#[test]
+fn a_package_diagram_keeps_what_its_challenges_point_at() {
+    // CG1, in A, challenges the inference i of B.
+    let document = two_packages(
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="cg"><name content="cg" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="ch" source="cg" target="i" isCounter="true"><name content="ch" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="g"><name content="g" /></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="sub"><name content="sub" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g"><name content="i" /></argumentElement>"#,
+    );
+    let whole = view(&document, "en");
+    let a = of_package(&document, &whole, "a").unwrap_or_else(|| panic!("a package"));
+    assert!(a.edges.iter().any(|edge| edge.relationship == "ch"));
+    assert!(a.edges.iter().any(|edge| edge.relationship == "i"));
+    let elsewhere = |id: &str| {
+        a.nodes
+            .iter()
+            .find(|node| node.id == id)
+            .and_then(|node| node.elsewhere.as_ref())
+            .map(|elsewhere| elsewhere.package.clone())
+    };
+    assert_eq!(elsewhere("g").as_deref(), Some("b"));
+    assert_eq!(elsewhere("sub").as_deref(), Some("b"));
+}
+
+#[test]
+fn a_package_diagram_draws_an_acp_only_with_its_first_edge() {
+    // The inference runs from G1 through S1, of A, to G2, of B; its ACP is
+    // on the line into S1, which B's diagram does not draw.
+    let document = two_packages(
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="G1"><name content="G1" /></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1"><name content="S1" /></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="c"><name content="c" /></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="I1" source="G2" target="G1" reasoning="S1" metaClaim="c"><name content="I1" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="G2"><name content="G2" /></argumentElement>"#,
+    );
+    let whole = view(&document, "en");
+    assert_eq!(whole.acps.len(), 1);
+    let a = of_package(&document, &whole, "a").unwrap_or_else(|| panic!("a package"));
+    assert_eq!(a.acps.len(), 1);
+    let b = of_package(&document, &whole, "b").unwrap_or_else(|| panic!("b package"));
+    assert!(b.edges.iter().any(|edge| edge.relationship == "I1"));
+    assert!(b.acps.is_empty());
 }

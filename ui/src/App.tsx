@@ -662,8 +662,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // ready to type when asked.
   const wanted = useRef<{ id: string; package: string | null; field?: 'name' | 'statement' } | null>(null);
   const showIn = (id: string, pkg: string | null, field?: 'name' | 'statement') => {
+    // The package is shown already: no new diagram will come.
+    if (pkg === shownPackage) {
+      selectAndShow(id);
+      if (field) typeAfter.current = { id, field };
+      return;
+    }
     wanted.current = { id, package: pkg, field };
-    void showPackage(pkg);
+    void showPackage(pkg).then((done) => {
+      if (!done && wanted.current?.id === id) wanted.current = null;
+    });
   };
   /** A node asked for: in the diagram shown, or else in the whole case. */
   const showNode = (id: string) => {

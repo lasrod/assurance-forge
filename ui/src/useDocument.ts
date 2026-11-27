@@ -550,11 +550,6 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       void edit((on) => on.add(parent, kind, revision), 'add', parent, about, onShown),
     [edit],
   );
-  /**
-   * Challenges the node `at`, or with `line` that line of the relationship
-   * `at`, with a new element of `kind`, from the menu of `revision`: a
-   * counter goal or counter evidence, which the status names.
-   */
   /** The ACPs a line's menu may offer, with the revision they are of; null if the document changed before they came. */
   const acpChoices = useCallback(async (relationship: string, line: LineEnds): Promise<AcpChoices | null> => {
     const on = coreRef.current;
@@ -577,6 +572,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       void edit((on) => on.addAcp(relationship, line, kind, packageName, revision), 'acp', line.from, null, onShown),
     [edit],
   );
+  /**
+   * Challenges the node `at`, or with `line` that line of the relationship
+   * `at`, with a new element of `kind`, from the menu of `revision`: a
+   * counter goal or counter evidence, which the status names.
+   */
   const challenge = useCallback(
     (at: string, line: LineEnds | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
       // The view keeps what is challenged in place: the node, or the line's upper end.
