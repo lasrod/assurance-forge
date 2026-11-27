@@ -1128,3 +1128,50 @@ fn an_acp_is_added_in_one_undo_step_and_its_package_shown_until_undone() {
     assert!(core.element(&goal).is_none());
     assert_eq!(core.diagram().map(|at| at.package), Some(None));
 }
+
+#[test]
+fn a_top_level_goal_goes_into_the_package_shown() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    assert!(core.show_package(Some("argpkg_confidence")));
+    let EditResult::Applied {
+        element: Some(goal),
+        ..
+    } = core.add(None, ElementKind::Goal, 1)
+    else {
+        panic!("not added");
+    };
+    assert_eq!(
+        core.element(&goal)
+            .and_then(|details| details.package)
+            .as_deref(),
+        Some("argpkg_confidence")
+    );
+    assert!(
+        core.diagram()
+            .is_some_and(|at| at.diagram.nodes.iter().any(|node| node.id == goal)),
+        "drawn in the diagram shown"
+    );
+}
+
+#[test]
+fn a_removal_lists_an_acp_description_as_one() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let EditResult::Applied {
+        element: Some(claim),
+        ..
+    } = core.add_acp("E2", "G3", "Sn2", AcpKind::Description, "x", 1)
+    else {
+        panic!("not added");
+    };
+    let removal = core
+        .removal("Sn2")
+        .unwrap_or_else(|| panic!("nothing open"));
+    let listed: Vec<(String, bool)> = removal
+        .nodes
+        .iter()
+        .map(|node| (node.id.clone(), node.acp_description))
+        .collect();
+    assert_eq!(listed, [("Sn2".to_owned(), false), (claim, true)]);
+}

@@ -416,7 +416,7 @@ pub fn choices(document: &Document, view: &View, target: Target<'_>) -> Vec<Choi
     ElementKind::ALL
         .iter()
         .map(|&kind| {
-            let plan = plan(document, view, target, kind);
+            let plan = plan(document, view, target, kind, None);
             Choice {
                 kind,
                 refusal: plan.as_ref().err().copied(),
@@ -438,7 +438,23 @@ pub fn add(
     target: Target<'_>,
     kind: ElementKind,
 ) -> Result<Added, AddError> {
-    let plan = plan(document, view, target, kind).map_err(AddError::Refused)?;
+    add_in(document, view, target, kind, None)
+}
+
+/// [`add`], with a top-level Goal going into the argument package `home`
+/// when it is one: the package whose diagram is shown (W9).
+///
+/// # Errors
+///
+/// As [`add`].
+pub fn add_in(
+    document: &mut Document,
+    view: &View,
+    target: Target<'_>,
+    kind: ElementKind,
+    home: Option<&str>,
+) -> Result<Added, AddError> {
+    let plan = plan(document, view, target, kind, home).map_err(AddError::Refused)?;
     let mut numbers = Identifiers::of(document, view);
     let mut made: Option<String> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
@@ -622,15 +638,23 @@ fn plan(
     view: &View,
     target: Target<'_>,
     kind: ElementKind,
+    home: Option<&str>,
 ) -> Result<Plan, Refusal> {
     let Target::Node(id) = target else {
         if kind != ElementKind::Goal {
             return Err(Refusal::TopLevelGoalOnly);
         }
-        // W9: the first ArgumentPackage in document order.
-        let package = document
-            .elements()
-            .find(|element| element.kind() == SacmKind::ArgumentPackage)
+        // W9: the package whose diagram is shown, or else the first
+        // ArgumentPackage in document order.
+        let shown = home
+            .and_then(|home| document.get(home))
+            .filter(|element| element.kind() == SacmKind::ArgumentPackage);
+        let package = shown
+            .or_else(|| {
+                document
+                    .elements()
+                    .find(|element| element.kind() == SacmKind::ArgumentPackage)
+            })
             .ok_or(Refusal::NoPackage)?;
         return Ok(Plan {
             parent: Parent::Canvas,

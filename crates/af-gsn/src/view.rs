@@ -384,8 +384,11 @@ pub fn view(document: &Document, language: &str) -> View {
             let reached = reach.get(id).copied().unwrap_or_default();
             node(*element, reached, language, &mut builder);
         } else if descriptions.contains(id) {
-            // R17: built as a Goal is, and kept apart, not drawn.
+            // R17: built as a Goal is, and kept apart, not drawn; what the
+            // building found is of no node, and is not said.
+            let found = builder.findings.len();
             node(*element, Reach::default(), language, &mut builder);
+            builder.findings.truncate(found);
             if let Some(described) = builder.nodes.pop() {
                 builder.descriptions.push(described);
             }

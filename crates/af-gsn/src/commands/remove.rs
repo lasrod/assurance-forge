@@ -73,11 +73,11 @@ pub fn remove(document: &mut Document, view: &View, id: &str) -> Result<Removed,
             ))?;
         }
         // W18: a relationship that stays loses only the sources that go.
-        for (relationship, source) in &plan.scrubbed {
+        for (relationship, end, element) in &plan.scrubbed {
             tx.apply(RemoveReference::new(
                 relationship.clone(),
-                ReferenceEnd::Source,
-                source.clone(),
+                *end,
+                element.clone(),
             ))?;
         }
         // Relationships first, so that what they name is no longer referred
@@ -143,7 +143,7 @@ struct Plan {
     /// may delete.
     held_within: HashSet<String>,
     /// A relationship that stays, and a source of it that goes.
-    scrubbed: Vec<(ElementId, ElementId)>,
+    scrubbed: Vec<(ElementId, ReferenceEnd, ElementId)>,
     /// An inference that stays with its Strategy and loses every Goal, and
     /// the package its placeholder goes into.
     held: Vec<(ElementId, ElementId)>,
@@ -289,7 +289,7 @@ impl Plan {
 
         // W19: what refers to what goes. A relationship that stays loses the
         // source; anything else, which the diagram does not draw, refuses.
-        let mut scrubbed: Vec<(ElementId, ElementId)> = Vec::new();
+        let mut scrubbed: Vec<(ElementId, ReferenceEnd, ElementId)> = Vec::new();
         let mut held_within: HashSet<String> = HashSet::new();
         for element_id in &deleted {
             let Some(element) = document.get(element_id.as_str()) else {
@@ -320,12 +320,15 @@ impl Plan {
                 if goes {
                     continue;
                 }
+                // A relationship that stays loses the source, or the ACP
+                // whose confidence Claim this is (E11): the ACP goes with it.
+                let end = referrer.end();
                 if holder.kind().is_a(AbstractClass::AssertedRelationship)
-                    && referrer.end() == ReferenceEnd::Source
+                    && matches!(end, ReferenceEnd::Source | ReferenceEnd::MetaClaim)
                 {
-                    let pair = (holder.id().clone(), element_id.clone());
-                    if !scrubbed.contains(&pair) {
-                        scrubbed.push(pair);
+                    let held = (holder.id().clone(), end, element_id.clone());
+                    if !scrubbed.contains(&held) {
+                        scrubbed.push(held);
                     }
                 } else {
                     return Err(Refusal::Entangled);

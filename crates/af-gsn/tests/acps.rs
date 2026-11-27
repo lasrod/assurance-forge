@@ -426,3 +426,46 @@ fn a_package_diagram_draws_an_acp_only_with_its_first_edge() {
     assert!(b.edges.iter().any(|edge| edge.relationship == "I1"));
     assert!(b.acps.is_empty());
 }
+
+#[test]
+fn w19_a_confidence_goal_is_removed_with_its_acp() {
+    // ACP4 is a local confidence goal: the line X1 names it. Removing it
+    // takes it out of X1's metaClaim, and the ACP goes with it.
+    let mut document = sample("acps.sacm.xmi");
+    let shown = view(&document, "en");
+    let listed = removal(&document, &shown, "ACP4").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(listed.nodes, ["ACP4".to_owned(), "Sn4".to_owned()]);
+    remove(&mut document, &shown, "ACP4").unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&strict(&document), "en");
+    assert!(!after.acps.iter().any(|acp| acp.claim == "ACP4"));
+    assert!(after.edges.iter().any(|edge| edge.relationship == "X1"));
+    // The other ACPs stay.
+    assert_eq!(after.acps.len(), 2);
+}
+
+#[test]
+fn r17_what_building_a_description_finds_is_not_said() {
+    // ACP1 records a GSN type that does not agree with its class: as a node
+    // it would say so, but it is not drawn.
+    let text = std::fs::read_to_string(format!(
+        "{}/../../testdata/sacm/acps.sacm.xmi",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap_or_else(|error| panic!("setup: {error}"));
+    let tagged = text.replacen(
+        r#"<name content="HazardsIdentified" />"#,
+        r#"<name content="HazardsIdentified" />
+      <taggedValue xmi:id="tv_acp1"><key><value content="sacm.import.extensionType" /></key><content><value content="{http://acwg.org/3.0/gsn}Solution" /></content></taggedValue>"#,
+        1,
+    );
+    assert_ne!(tagged, text, "setup: the name is where it was");
+    let document = read(tagged.as_bytes());
+    let shown = view(&document, "en");
+    assert!(shown.descriptions.iter().any(|node| node.id == "ACP1"));
+    assert!(
+        shown
+            .findings
+            .iter()
+            .all(|finding| finding.element != "ACP1")
+    );
+}

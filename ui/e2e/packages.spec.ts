@@ -75,3 +75,23 @@ test('a node the package does not draw, chosen in the Argument Navigator, is sho
   await expect.poll(() => shown(page)).toBeNull();
   await expect.poll(async () => (await hook(page)).selected).toBe('G1');
 });
+
+test("an element added under another package's node is shown in that package", async ({ page }) => {
+  await opened(page);
+  await explorer(page).getByRole('treeitem', { name: /Vehicle Safety/ }).click();
+  await expect.poll(() => shown(page)).toBe('ARG_VehicleSafety');
+  await expect.poll(async () => (await hook(page)).viewport?.scale ?? null).not.toBeNull();
+  // G4 is of the main argument: what is added under it goes there.
+  const box = (await canvas(page).boundingBox())!;
+  const state = await hook(page);
+  const g4 = state.diagram!.diagram.nodes.find((node) => node.id === 'G4')!;
+  const view = state.viewport!;
+  await page.mouse.click(box.x + (g4.bounds.x + g4.bounds.width / 2) * view.scale + view.offsetX, box.y + (g4.bounds.y + 8) * view.scale + view.offsetY, {
+    button: 'right',
+  });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Add Solution' }).click();
+  await expect.poll(async () => (await hook(page)).revision).toBe(2);
+  await expect.poll(() => shown(page)).toBe('ARG_Main');
+  const selected = (await hook(page)).selected;
+  expect((await hook(page)).diagram!.diagram.nodes.some((node) => node.id === selected)).toBe(true);
+});

@@ -452,7 +452,12 @@ impl Core {
             return refused(OUT_OF_DATE);
         }
         let kind = convert::gsn_element_kind(kind);
-        match open.session.add(&open.view, target(parent), kind) {
+        // A top-level Goal goes into the package shown (W9).
+        let home = open.package.clone();
+        match open
+            .session
+            .add_in(&open.view, target(parent), kind, home.as_deref())
+        {
             Ok((added, record)) => self.changed(&record, Some(added.element)),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             // libSACM refused an operation the rules made: a bug in them, not
@@ -600,6 +605,10 @@ impl Core {
                             .find(|node| node.id == *id)
                     })
                     .map(|node| RemovalNode {
+                        acp_description: view
+                            .descriptions
+                            .iter()
+                            .any(|described| described.id == node.id),
                         id: node.id.clone(),
                         kind: convert::node_kind(node.kind),
                         identifier: node.identifier.clone(),

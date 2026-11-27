@@ -43,7 +43,8 @@ fn an_add_makes_a_revision_and_one_record_of_it() {
         record.command,
         Command::Add {
             parent: Some("cl_top".to_owned()),
-            kind: ElementKind::Goal
+            kind: ElementKind::Goal,
+            package: None,
         }
     );
     assert_eq!(record.origin, Origin::User);

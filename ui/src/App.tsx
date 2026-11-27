@@ -514,13 +514,25 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // details are shown. Set only when the add is shown: a refused add leaves
   // nothing to type in.
   const typeAfter = useRef<{ id: string; field: 'name' | 'statement' } | null>(null);
-  const challenged = useCallback<EditShown>(
-    (before, next, anchor, added) => {
-      typeAfter.current = added ? { id: added, field: 'name' } : null;
-      followEdit(before, next, anchor, added);
-    },
-    [followEdit],
+  // `showIn`, which is declared below with the package diagrams.
+  const showInRef = useRef<(id: string, pkg: string | null, field?: 'name' | 'statement') => void>(() => undefined);
+  /**
+   * The view follows an add. One the package shown does not draw, made
+   * under a node of another package, is shown in its own package.
+   */
+  const followAdded = useCallback(
+    (field?: 'name'): EditShown =>
+      (before, next, anchor, added) => {
+        typeAfter.current = added && field ? { id: added, field } : null;
+        followEdit(before, next, anchor, added);
+        if (!added || next.package === null || next.diagram.nodes.some((node) => node.id === added)) return;
+        void core?.element(added).then((made) => {
+          if (made && !made.acpDescription) showInRef.current(added, made.package ?? null, field);
+        });
+      },
+    [followEdit, core],
   );
+  const challenged = useMemo(() => followAdded('name'), [followAdded]);
   // Another element selected before the details came: nothing is typed in.
   useEffect(() => {
     if (typeAfter.current !== null && selected !== typeAfter.current.id) typeAfter.current = null;
@@ -575,7 +587,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       if (menu.parent && menu.undeveloped) setUndeveloped(menu.parent, !menu.undeveloped.marked, menu.revision, menu.undeveloped.identifier);
       return;
     }
-    add(menu.parent, id as ElementKind, menu.revision, menu.about, followEdit);
+    add(menu.parent, id as ElementKind, menu.revision, menu.about, followAdded());
   };
 
   useEffect(() => {
@@ -673,6 +685,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       if (!done && wanted.current?.id === id) wanted.current = null;
     });
   };
+  showInRef.current = showIn;
   /** A node asked for: in the diagram shown, or else in the whole case. */
   const showNode = (id: string) => {
     const drawn = diagram ? boundsOf(diagram.diagram, id) !== null : false;
@@ -710,7 +723,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const openAcp = (acp: AcpMark) => {
     if (acp.package) showIn(acp.claim, acp.package);
     else if (diagram?.diagram.nodes.some((node) => node.id === acp.claim)) selectAndShow(acp.claim);
-    else setSelected(acp.claim);
+    else {
+      // A description is shown in Element Properties; a goal the diagram
+      // does not draw, in its own package.
+      void core?.element(acp.claim).then((claim) => {
+        if (!claim) return;
+        if (claim.acpDescription) setSelected(acp.claim);
+        else showIn(acp.claim, claim.package ?? null);
+      });
+    }
   };
 
   // The View menu's panels are the workspace's views. The workspace says which

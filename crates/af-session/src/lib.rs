@@ -45,6 +45,9 @@ pub enum Command {
     Add {
         parent: Option<String>,
         kind: ElementKind,
+        /// For a top-level Goal: the package it went into, when one was
+        /// shown.
+        package: Option<String>,
     },
     /// Set the identifier, name or statement of the node `element` to `text`.
     SetText {
@@ -197,14 +200,31 @@ impl Session {
         target: Target<'_>,
         kind: ElementKind,
     ) -> Result<(Added, ChangeRecord), AddError> {
+        self.add_in(view, target, kind, None)
+    }
+
+    /// [`Session::add`], with a top-level Goal going into the argument
+    /// package `home`, the one whose diagram is shown (W9).
+    ///
+    /// # Errors
+    ///
+    /// As [`Session::add`].
+    pub fn add_in(
+        &mut self,
+        view: &View,
+        target: Target<'_>,
+        kind: ElementKind,
+        home: Option<&str>,
+    ) -> Result<(Added, ChangeRecord), AddError> {
         let before = self.document.clone();
-        let added = commands::add(&mut self.document, view, target, kind)?;
+        let added = commands::add_in(&mut self.document, view, target, kind, home)?;
         let command = Command::Add {
             parent: match target {
                 Target::Canvas => None,
                 Target::Node(id) => Some(id.to_owned()),
             },
             kind,
+            package: home.map(str::to_owned),
         };
         let record = self.made(before, command, &added.mutation);
         Ok((added, record))

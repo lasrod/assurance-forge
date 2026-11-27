@@ -310,6 +310,11 @@ choices: Array<AddChoice>, };
 
 export type RemovalNode = { 
 /**
+ * A confidence Claim an ACP shows as its description, which is not
+ * drawn: it goes with the line that carries the ACP.
+ */
+acpDescription: boolean, 
+/**
  * The SACM id.
  */
 id: string, kind: NodeKind, 

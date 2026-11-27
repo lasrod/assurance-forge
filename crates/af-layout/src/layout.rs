@@ -1743,7 +1743,26 @@ const ACP_GAP: f32 = 4.0;
 fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style: Style) {
     let (size, line_height, font) = role_style(TextRole::Acp, style);
     let (ascent, descent) = shaper.ascent_descent();
+    // How many ACPs each line carries: they are centred on its midpoint.
+    let mut carried: HashMap<(&str, &str, &str), usize> = HashMap::new();
     for acp in &view.acps {
+        *carried
+            .entry((
+                acp.relationship.as_str(),
+                acp.from.as_str(),
+                acp.to.as_str(),
+            ))
+            .or_default() += 1;
+    }
+    for acp in &view.acps {
+        let count = carried
+            .get(&(
+                acp.relationship.as_str(),
+                acp.from.as_str(),
+                acp.to.as_str(),
+            ))
+            .copied()
+            .unwrap_or(1) as f32;
         // On the relationship's first edge only (GSN v3 §1:5.3.3).
         let Some(edge) = edges.iter_mut().find(|edge| {
             edge.relationship == acp.relationship && edge.from == acp.from && edge.to == acp.to
@@ -1753,10 +1772,12 @@ fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style
         let (middle, across) = halfway(&edge.points);
         let row = edge.acps.len() as f32;
         // Beside a line that runs down, above one that runs across, so the
-        // label never lies along the line.
+        // label never lies along the line; several are centred on the
+        // midpoint, so the stack stays on the line.
+        let offset = row - (count - 1.0) / 2.0;
         let centre = Point {
             x: middle.x,
-            y: middle.y + row * line_height,
+            y: middle.y + offset * line_height,
         };
         let square = Rect {
             x: centre.x - ACP_HALF,
@@ -1770,7 +1791,7 @@ fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style
             // the first, its label further up.
             let square_top = middle.y - ACP_HALF;
             (
-                middle.x + row * (2.0 * ACP_HALF + ACP_GAP) - width / 2.0,
+                middle.x + offset * (2.0 * ACP_HALF + ACP_GAP) - width / 2.0,
                 square_top - ACP_GAP - descent * size - row * line_height,
             )
         } else {
@@ -1782,7 +1803,7 @@ fn place_acps(view: &View, edges: &mut [DiagramEdge], shaper: &Shaper<'_>, style
         };
         let square = if across {
             Rect {
-                x: middle.x - ACP_HALF + row * (2.0 * ACP_HALF + ACP_GAP),
+                x: middle.x - ACP_HALF + offset * (2.0 * ACP_HALF + ACP_GAP),
                 y: middle.y - ACP_HALF,
                 ..square
             }

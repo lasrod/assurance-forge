@@ -484,6 +484,9 @@ pub struct AddChoices {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RemovalNode {
+    /// A confidence Claim an ACP shows as its description, which is not
+    /// drawn: it goes with the line that carries the ACP.
+    pub acp_description: bool,
     /// The SACM id.
     pub id: String,
     pub kind: NodeKind,
