@@ -181,8 +181,9 @@ interface**. Interface results are run locally and put in each pull request.
 
 ## What is next
 
-Milestone 2 goes on to assurance claim points and challenges. Nothing else in the planned
-shape below is started.
+Milestone 2 goes on to challenges
+([the plan](docs/roadmap/milestone-2-challenges.md)), then assurance claim
+points. Nothing else in the planned shape below is started.
 
 Requirements editing places on the parts already built:
 
