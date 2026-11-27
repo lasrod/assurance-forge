@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
+import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
-import type { AddChoice, Core, ElementKind, NodeKind, Removal, TextField, TextStyle } from './core/Core';
+import type { AddChoice, Core, ElementKind, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
 import { addItems, kindName, refusalText } from './addMenu';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
@@ -9,6 +10,7 @@ import { ProblemsPanel } from './ProblemsPanel';
 import { RecoveryDialog } from './RecoveryDialog';
 import { UnsavedDialog } from './UnsavedDialog';
 import {
+  Button,
   ChevronDown,
   ChevronUp,
   ContextMenu,
@@ -50,8 +52,21 @@ import { ZoomBar } from './ZoomBar';
 const FILE_ROW = ':file';
 /** The menu item that removes the node; the others are the kinds to add. */
 const REMOVE = 'remove';
+/** The menu items of a move: start one, make it here, give it up. */
+const MOVE = 'move';
+const MOVE_HERE = 'moveHere';
+const MOVE_CANCEL = 'moveCancel';
+/** The menu item that marks a Goal undeveloped, or clears the mark. */
+const UNDEVELOPED = 'undeveloped';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
+
+/**
+ * A move being chosen: the node's places at a revision, its kind and
+ * identifier for the status, and whether it is dragged (no prompt is shown,
+ * and the choice ends with the drop).
+ */
+type Moving = { targets: MoveTargets; kind: NodeKind; identifier: string; dragged: boolean };
 
 /** A text of an element, as Element Properties labels it. */
 const TEXT_FIELDS: Record<TextField, MessageKey> = {
@@ -92,6 +107,17 @@ function message(state: DocumentState, t: T, language: Language): { text: string
             ? t('removed', { kind: kindName(state.removed, t), identifier: state.identifier })
             : t('removedWithMore', { kind: kindName(state.removed, t), identifier: state.identifier, more: state.more }),
       };
+    case 'moved':
+      return {
+        text:
+          state.to === null
+            ? t('movedToTop', { kind: kindName(state.moved, t), identifier: state.identifier })
+            : t('moved', { kind: kindName(state.moved, t), identifier: state.identifier, to: state.to }),
+      };
+    case 'undevelopedSet':
+      return { text: t(state.undeveloped ? 'markedUndeveloped' : 'clearedUndeveloped', { identifier: state.identifier }) };
+    case 'repaired':
+      return { text: t('repaired', { kind: state.repaired ? kindName(state.repaired, t) : '', identifier: state.identifier }).trim() };
     case 'undone':
       return { text: t('undone') };
     case 'redone':
@@ -145,6 +171,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
 
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
+  const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
+  /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
+  const setUndeveloped = useCallback(
+    (id: string, undeveloped: boolean, revision: number, identifier: string) =>
+      setUndevelopedWith(id, undeveloped, revision, identifier, followEdit),
+    [setUndevelopedWith, followEdit],
+  );
   /** A text of an element changed in Element Properties; the view keeps the element in place. */
   const setText = useCallback(
     (id: string, field: TextField, text: string, about: NodeKind) => setTextWith(id, field, text, about, followEdit),
@@ -163,6 +196,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     at: { x: number; y: number };
     source: ContextMenuSource;
     choices: AddChoice[];
+    /** For a Goal whose undeveloped mark can be changed: what it is now, and its identifier. */
+    undeveloped?: { marked: boolean; identifier: string } | null;
   } | null>(null);
   const noDiagram = diagram === null;
   useEffect(() => {
@@ -171,22 +206,161 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   useEffect(() => {
     if (reading || noDiagram) setAddMenu(null);
   }, [reading, noDiagram]);
+  // A move being chosen: the node to move and where the core says it may
+  // go, at a revision. Another revision on screen, or another file, ends it:
+  // its targets are of the document before.
+  const [moving, setMoving] = useState<Moving | null>(null);
+  // The node being dragged: places that come after it was dropped are not shown.
+  const dragged = useRef<string | null>(null);
+  // The move of the drag under way, as soon as the core has answered: a drop
+  // that comes before the answer is on screen still finds it.
+  const dragMove = useRef<Moving | null>(null);
+  // A drop that came before the core's answer, kept for it.
+  const earlyDrop = useRef<{ id: string; end: DragEnd } | null>(null);
+  // With no diagram there is no drag: one the canvas took away with it is over.
+  useEffect(() => {
+    if (diagram) return;
+    dragged.current = null;
+    dragMove.current = null;
+    earlyDrop.current = null;
+  }, [diagram]);
+  const shownRevision = diagram?.revision ?? null;
+  if (moving && moving.targets.revision !== shownRevision) setMoving(null);
+  const moveMarks = useMemo(
+    () =>
+      moving
+        ? {
+            source: moving.targets.id,
+            allowed: new Set(moving.targets.nodes.filter((target) => target.refusal === null).map((target) => target.id)),
+          }
+        : null,
+    [moving],
+  );
+  /** Moves the node being moved under `to` (null: to the top level), or says why it cannot go there. */
+  const moveTo = useCallback(
+    (to: string | null, current: Moving | null = moving) => {
+      if (!current) return;
+      const place = to === null ? null : current.targets.nodes.find((target) => target.id === to);
+      const refusal = to === null ? current.targets.canvas : place ? place.refusal : 'AF-EDIT-011';
+      if (refusal !== null) {
+        // The kind a leaf's refusal names is the place's, not the node's moved.
+        const kind = to ? (diagram?.diagram.nodes.find((node) => node.id === to)?.kind ?? null) : null;
+        moveRefused(refusal, kind);
+        return;
+      }
+      const toIdentifier = to ? (outline.find((row) => row.id === to)?.identifier ?? to) : null;
+      setMoving(null);
+      moveWith(current.targets, to, current, toIdentifier, followEdit);
+    },
+    [moving, diagram, outline, moveRefused, moveWith, followEdit],
+  );
+  /**
+   * Starts choosing where the node `id` goes, from the menu or by a drag;
+   * the status says why when it cannot be moved. Answers whether it can.
+   */
+  const startMove = useCallback(
+    async (id: string, byDrag: boolean): Promise<boolean> => {
+      dragged.current = byDrag ? id : null;
+      dragMove.current = null;
+      earlyDrop.current = null;
+      const targets = await moveTargets(id);
+      const node = diagram?.diagram.nodes.find((candidate) => candidate.id === id);
+      if (!targets || !node) {
+        // Not movable: the drag is over, and a Goal's menu opens again.
+        if (dragged.current === id) dragged.current = null;
+        return false;
+      }
+      const row = outline.find((candidate) => candidate.id === id);
+      const move = { targets, kind: node.kind, identifier: row?.identifier ?? id, dragged: byDrag };
+      // Dropped, or given up, before the core answered: a drop on a node is
+      // made now, as it would have been.
+      if (byDrag && dragged.current !== id) {
+        // Set by the drop while the core was answering, which narrowing does not see.
+        const early = earlyDrop.current as { id: string; end: DragEnd } | null;
+        earlyDrop.current = null;
+        if (early?.id === id && early.end.on === 'node') moveTo(early.end.id, move);
+        return true;
+      }
+      setSelected(id);
+      if (byDrag) dragMove.current = move;
+      setMoving(move);
+      return true;
+    },
+    [moveTargets, diagram, outline, setSelected, moveTo],
+  );
+  /**
+   * A dragged node was dropped: on a place it may go, it moves there; on one
+   * it may not, the status says why. A drop on nothing gives the drag up: a
+   * Goal goes to the top level from the menu, not by a drop that missed.
+   * The choice ends with the drop either way.
+   */
+  const endDrag = useCallback(
+    (end: DragEnd) => {
+      const current = dragMove.current ?? moving;
+      const id = dragged.current;
+      dragged.current = null;
+      dragMove.current = null;
+      setMoving(null);
+      if (!current) {
+        // The core has not answered yet: the drop waits for it.
+        if (id !== null) earlyDrop.current = { id, end };
+        return;
+      }
+      if (end.on !== 'node') return;
+      // The argument changed under the drag: its places are of before.
+      if (current.targets.revision !== shownRevision) moveRefused('AF-EDIT-009', null);
+      else moveTo(end.id, current);
+    },
+    [moving, moveTo, moveRefused, shownRevision],
+  );
   /**
    * Opens the menu of a node, or of the empty canvas, at a client point: the
    * node is selected first. It lists what can be added there and, for a
    * node, Remove; with nothing to list, it does not open.
    */
+  // Each request for a menu: an answer to an earlier one is dropped.
+  const menuRequest = useRef(0);
+  // A move begun or ended drops an answer asked for before: the menu it
+  // would open is of the other state.
+  useEffect(() => {
+    menuRequest.current += 1;
+  }, [moving]);
   const openAddMenu = useCallback(
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
+      const request = ++menuRequest.current;
       void addChoices(parent).then((answer) => {
-        if (!answer) return;
+        if (!answer || request !== menuRequest.current) return;
+        // While a move is chosen the selection stays the node moved, and
+        // the menu opens even with nothing to add: it holds the move.
+        if (moving) {
+          setAddMenu({ revision: answer.revision, parent, about: null, at, source, choices: [] });
+          return;
+        }
         if (parent) setSelected(parent);
         if (!parent && answer.choices.every((choice) => choice.refusal !== null)) return;
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
-        setAddMenu({ revision: answer.revision, parent, about, at, source, choices: answer.choices });
+        const menu = { revision: answer.revision, parent, about, at, source, choices: answer.choices };
+        if (!parent || about !== 'goal' || !core) {
+          setAddMenu(menu);
+          return;
+        }
+        // A Goal's menu also sets or clears its undeveloped mark, where it can be.
+        void core.element(parent).then(
+          (details) =>
+            // Not if another menu was asked for, or a move began, meanwhile.
+            request === menuRequest.current &&
+            !dragged.current &&
+            setAddMenu({
+              ...menu,
+              undeveloped: details && details.undevelopedRefusal === null ? { marked: details.undeveloped, identifier: details.identifier } : null,
+            }),
+          () => {
+            if (request === menuRequest.current) setAddMenu(menu);
+          },
+        );
       });
     },
-    [addChoices, diagram, setSelected],
+    [addChoices, diagram, setSelected, moving, core],
   );
 
   // A removal that waits for the user: it deletes more than the node chosen.
@@ -205,13 +379,29 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [removal, removeWith, followEdit],
   );
-  /** A choice of the menu: a kind to add, or Remove. */
+  /** A choice of the menu: a kind to add, Remove, or a step of a move. */
   const chooseMenu = (id: string) => {
     const menu = addMenu;
     setAddMenu(null);
     if (!menu) return;
     if (id === REMOVE) {
       if (menu.parent) askRemove(menu.parent);
+      return;
+    }
+    if (id === MOVE) {
+      if (menu.parent) void startMove(menu.parent, false);
+      return;
+    }
+    if (id === MOVE_HERE) {
+      moveTo(menu.parent);
+      return;
+    }
+    if (id === MOVE_CANCEL) {
+      setMoving(null);
+      return;
+    }
+    if (id === UNDEVELOPED) {
+      if (menu.parent && menu.undeveloped) setUndeveloped(menu.parent, !menu.undeveloped.marked, menu.revision, menu.undeveloped.identifier);
       return;
     }
     add(menu.parent, id as ElementKind, menu.revision, menu.about, followEdit);
@@ -481,7 +671,22 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             layout={layout}
             onLayoutChange={setLayout}
             copy={copy}
-            centreHeader={<ZoomBar t={t} scale={viewport?.scale ?? null} onZoomBy={zoomBy} onFit={fitAll} step={ZOOM_STEP} />}
+            centreHeader={
+              // Beside the zoom controls, not over the diagram: a prompt on
+              // the canvas would cover the places to choose from.
+              <div className="af-centre-header">
+                <ZoomBar t={t} scale={viewport?.scale ?? null} onZoomBy={zoomBy} onFit={fitAll} step={ZOOM_STEP} />
+                {moving && !moving.dragged && (
+                  <div className="af-move-banner" role="status">
+                    <span className="af-move-prompt">{t('movePrompt', { kind: kindName(moving.kind, t), identifier: moving.identifier })}</span>
+                    {moving.targets.canvas === null && (
+                      <Button onClick={() => moveTo(null)}>{t('moveToTop', { identifier: moving.identifier })}</Button>
+                    )}
+                    <Button onClick={() => setMoving(null)}>{t('moveCancel')}</Button>
+                  </div>
+                )}
+              </div>
+            }
             start={{
               // Both C++ panels, stacked; the dock's own name is for its rail.
               name: t('startDock'),
@@ -534,7 +739,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               nameInText: t('elementPropertiesInText'),
               min: 14,
               icons: { hide: <PanelRightClose />, show: <PanelRightOpen /> },
-              views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} onText={setText} /> }],
+              views: [{ id: 'elementProperties', label: t('elementProperties'), content: <ElementProperties details={details} t={t} onText={setText} onUndeveloped={setUndeveloped} /> }],
             }}
             bottom={{
               name: problemsTitle,
@@ -545,7 +750,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                 {
                   id: 'problems',
                   label: problemsTitle,
-                  content: <ProblemsPanel problems={doc.problems} language={language} t={t} onShow={selectAndShow} />,
+                  content: (
+                    <ProblemsPanel
+                      problems={doc.problems}
+                      language={language}
+                      t={t}
+                      onShow={selectAndShow}
+                      onRepair={(repair, revision, problem) => {
+                        const element = problem.elements.find((candidate) => candidate.id === repair.element);
+                        repairWith(repair, revision, { kind: element?.kind ?? null, identifier: element?.identifier ?? repair.element }, followEdit);
+                      }}
+                    />
+                  ),
                 },
               ],
             }}
@@ -561,6 +777,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               onTextStyle={onTextStyle}
               onContextMenu={openAddMenu}
               onRemove={askRemove}
+              move={moveMarks}
+              onMoveTo={moveTo}
+              onMoveCancel={() => setMoving(null)}
+              onDragStart={(id) => startMove(id, true)}
+              onDragEnd={endDrag}
             />
           </Workspace>
         )}
@@ -572,17 +793,31 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
             position={addMenu?.at ?? null}
             openedBy={addMenu?.source}
             onOpenChange={(open) => {
-              if (!open) setAddMenu(null);
+              if (!open) {
+                // A menu still being asked for does not open after this.
+                menuRequest.current += 1;
+                setAddMenu(null);
+              }
             }}
             onAction={(id) => chooseMenu(String(id))}
           >
             {addMenu && addItems(addMenu.choices, t).map((item) => <MenuItem key={item.kind} id={item.kind}>{item.label}</MenuItem>)}
-            {addMenu?.parent && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
-            {addMenu?.parent && (
+            {addMenu?.parent && !moving && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
+            {addMenu?.parent && !moving && addMenu.undeveloped && (
+              <MenuItem id={UNDEVELOPED}>{t(addMenu.undeveloped.marked ? 'clearUndeveloped' : 'markUndeveloped')}</MenuItem>
+            )}
+            {addMenu?.parent && !moving && <MenuItem id={MOVE}>{t('move')}</MenuItem>}
+            {addMenu?.parent && !moving && (
               <MenuItem id={REMOVE} danger shortcut={t('removeKey')}>
                 {t('remove')}
               </MenuItem>
             )}
+            {addMenu && moving && (addMenu.parent ? moveMarks?.allowed.has(addMenu.parent) : moving.targets.canvas === null) && (
+              <MenuItem id={MOVE_HERE}>
+                {t(addMenu.parent ? 'moveHere' : 'moveToTop', { identifier: moving.identifier })}
+              </MenuItem>
+            )}
+            {addMenu && moving && <MenuItem id={MOVE_CANCEL}>{t('moveCancel')}</MenuItem>}
           </ContextMenu>
         )}
         {hasFile && (

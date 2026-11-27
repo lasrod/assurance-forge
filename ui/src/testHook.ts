@@ -16,6 +16,8 @@ export interface TestState {
   selected: string | null;
   /** The node or the edge under the pointer, named the same way. */
   hovered: string | null;
+  /** The node being dragged to another place, or null. */
+  dragging?: string | null;
   /** How many times the canvas was painted. */
   paints: number;
 }

@@ -1,6 +1,6 @@
 // Adding and removing elements from the canvas's context menu, and Edit ▸
 // Undo and Redo (milestone 2). The menu lists the GSN kinds that can be
-// added there, with no notes, and Remove for a node.
+// added there, with no notes, and Move… and Remove for a node.
 
 import { expect, test, type Page } from '@playwright/test';
 
@@ -48,11 +48,11 @@ async function editMenu(page: Page, item: 'Undo' | 'Redo') {
   return page.getByRole('menu', { name: 'Edit' }).getByRole('menuitem', { name: item });
 }
 
-test('a right-click on a goal lists the six kinds and Remove; choosing one adds it, selected, and Undo and Redo take it back and bring it again', async ({ page }) => {
+test('a right-click on a goal lists the six kinds, Move and Remove; choosing one adds it, selected, and Undo and Redo take it back and bring it again', async ({ page }) => {
   await opened(page);
   const menu = await menuOf(page, 'cl_top');
   await expect(menu).toHaveAccessibleName('Goal cl_top');
-  await expect(menu.getByRole('menuitem')).toHaveText([...KINDS, 'Remove'].map((kind) => new RegExp(`^${kind}`)));
+  await expect(menu.getByRole('menuitem')).toHaveText([...KINDS, 'Move…', 'Remove'].map((kind) => new RegExp(`^${kind}`)));
   for (const item of await menu.getByRole('menuitem').all()) await expect(item).not.toHaveAttribute('aria-disabled', 'true');
   // No notes: an add item says only what it adds. Remove names its key.
   for (const kind of KINDS) await expect(menu.getByRole('menuitem', { name: kind })).toHaveAccessibleDescription('');
@@ -95,10 +95,10 @@ test('a right-click on a goal lists the six kinds and Remove; choosing one adds 
   await page.keyboard.press('Escape');
 });
 
-test('a leaf offers nothing to add, only Remove', async ({ page }) => {
+test('a leaf offers nothing to add, only Move and Remove', async ({ page }) => {
   await opened(page);
   const menu = await menuOf(page, 'ev_1');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Remove/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Move…/, /^Remove/]);
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   expect((await hook(page)).revision).toBe(1);
@@ -122,7 +122,7 @@ test('a Strategy is added alone, takes only Goals under it, and develops an unde
 
   // Under the Strategy: a Goal and its context, never a Strategy or a Solution.
   menu = await menuOf(page, strategy);
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Add Goal/, /^Add Context/, /^Add Assumption/, /^Add Justification/, /^Remove/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Add Goal/, /^Add Context/, /^Add Assumption/, /^Add Justification/, /^Move…/, /^Remove/]);
   await menu.getByRole('menuitem', { name: 'Add Goal' }).click();
   await expect.poll(() => counts(page)).toEqual({ nodes: 10, edges: 9 });
   await expect(status(page)).toHaveText('Goal G1 added.');
@@ -307,7 +307,7 @@ test('an edit keeps the Argument Navigator’s closed branches closed', async ({
 test('the menu and the edits are worded in Japanese', async ({ page }) => {
   await opened(page, '&lang=ja');
   const menu = await menuOf(page, 'ev_1');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^削除/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^移動…/, /^削除/]);
   await page.keyboard.press('Escape');
   await (await menuOf(page, 'cl_top')).getByRole('menuitem', { name: '仮定を追加' }).click();
   await expect(status(page)).toHaveText('仮定 A1 を追加しました。');

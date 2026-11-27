@@ -3,7 +3,8 @@ import type { DiagramAt, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
-import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Palette, type Viewport } from './draw';
+import { badgeLabel, comesWith, edgePan, HOLD_MS, readableAt, type DragEnd } from './drag';
+import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -69,6 +70,16 @@ type Gesture = {
   view: Viewport;
   panning: boolean;
   pinch?: { distance: number; middle: { x: number; y: number } };
+  /** The node the press began on, when a drag of it would move it. */
+  node?: string;
+  /** The drag would move it: at once with a mouse or a pen, once held with a touch. */
+  armed?: boolean;
+  /** The node is being dragged. */
+  dragging?: boolean;
+  /** The timer of a touch being held. */
+  hold?: number;
+  /** The drag was given up, or refused: the rest of the press does nothing. */
+  over?: boolean;
 };
 
 /**
@@ -80,6 +91,16 @@ type Gesture = {
  * from a right-click, or from the context-menu key or Shift+F10 on the
  * selected node. `onRemove` asks to remove the selected node: Delete, or
  * Backspace, which is the key macOS calls delete.
+ *
+ * While a move is being chosen (`move`), the canvas draws where the node may
+ * go; a click on a node says so (`onMoveTo`) in place of selecting it, and
+ * Escape gives the move up (`onMoveCancel`).
+ *
+ * A drag that begins on a node moves it (`onDragStart`, which answers
+ * whether the node can be moved, then `onDragEnd` with where it was
+ * dropped); a drag that begins anywhere else pans. A touch moves a node only
+ * once it has been held, since a touch on a node is also how the view is
+ * panned. Zoomed out too far to read a node, a drag on it pans.
  */
 export function DiagramCanvas({
   diagram,
@@ -92,6 +113,11 @@ export function DiagramCanvas({
   onTextStyle,
   onContextMenu,
   onRemove,
+  move = null,
+  onMoveTo,
+  onMoveCancel,
+  onDragStart,
+  onDragEnd,
 }: {
   diagram: DiagramAt | null;
   label: string;
@@ -104,6 +130,13 @@ export function DiagramCanvas({
   onTextStyle: (style: TextStyle) => void;
   onContextMenu: (id: string | null, at: { x: number; y: number }, source: ContextMenuSource) => void;
   onRemove: (id: string) => void;
+  move?: MoveMarks | null;
+  /** A node was clicked while a move is chosen: one it may go under, or not. */
+  onMoveTo?: (id: string) => void;
+  onMoveCancel?: () => void;
+  /** A drag of a node began: answers whether the node can be moved, having asked where. */
+  onDragStart?: (id: string) => Promise<boolean>;
+  onDragEnd?: (end: DragEnd) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [style, setStyle] = useState<CanvasStyle | null>(null);
@@ -112,6 +145,17 @@ export function DiagramCanvas({
   const colours = useMemo(() => (canvas.current && style ? palette(canvas.current, style) : null), [style]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [panning, setPanning] = useState(false);
+  // The node being dragged, and where the pointer is (CSS px of the canvas).
+  const [drag, setDrag] = useState<{ id: string; pointer: { x: number; y: number } } | null>(null);
+  // What follows the pointer: the node's identifier, and how many come with
+  // it. Worked out once a drag, not at each move of the pointer.
+  const dragId = drag?.id ?? null;
+  const dragLabel = useMemo(() => {
+    const node = dragId && diagram ? diagram.diagram.nodes.find((candidate) => candidate.id === dragId) : undefined;
+    return node && diagram ? badgeLabel(node, comesWith(diagram.diagram, node.id)) : null;
+  }, [diagram, dragId]);
+  const [armed, setArmed] = useState(false);
+  const dragPointer = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const element = canvas.current;
@@ -142,12 +186,38 @@ export function DiagramCanvas({
       report({ revision: null, drawn: { nodes: 0, edges: 0 }, diagram: null, viewport: null, selected, hovered: null });
       return;
     }
+    const badge: Badge | null = drag && dragLabel ? { pointer: drag.pointer, label: dragLabel } : null;
     const drawn = draw(context, diagram.diagram, viewport, colours, measuredFamilies, { ...size, dpr }, {
       selected,
       hovered: shownHover,
+      move,
+      badge,
     });
-    report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover });
-  }, [diagram, size, style, colours, viewport, selected, shownHover]);
+    report({ revision: diagram.revision, drawn, diagram, viewport, selected, hovered: shownHover, dragging: drag?.id ?? null });
+  }, [diagram, size, style, colours, viewport, selected, shownHover, move, drag, dragLabel]);
+
+  // While a node is dragged, the view pans when the pointer nears an edge,
+  // and the place under the pointer follows the view.
+  const isDragging = drag !== null;
+  useEffect(() => {
+    if (!isDragging) return;
+    let frame = 0;
+    const tick = () => {
+      const { diagram: shown, viewport: view, size: area, onViewport: change } = latest.current;
+      const point = dragPointer.current;
+      if (shown && view && point) {
+        const { dx, dy } = edgePan(point, area);
+        if (dx !== 0 || dy !== 0) {
+          const next = pan(view, dx, dy);
+          change(next);
+          setHovered(hitTest(shown.diagram, next, point.x, point.y)?.id ?? null);
+        }
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [isDragging]);
 
   // The latest values, for the handlers below, which outlive a render.
   const latest = useRef({ diagram, viewport, size, onViewport });
@@ -199,11 +269,43 @@ export function DiagramCanvas({
     const point = local(event);
     pointers.current.set(event.pointerId, point);
     if (pointers.current.size === 2) {
+      // A second finger makes a pinch of the press: a drag under way is
+      // given up, as a cancelled pointer gives it up.
+      const before = gesture.current;
+      endPress(before);
+      if (before?.dragging) onDragEnd?.({ on: 'cancel' });
       gesture.current = { start: point, view: viewport, panning: true, pinch: twoPointers() };
     } else {
       gesture.current = { start: point, view: viewport, panning: event.button === 1 };
+      // A press on a node may move it. Not while a move is being chosen
+      // from the menu, and not on a node too small to read.
+      const wanted = event.button === 0 && !move && onDragStart !== undefined;
+      const node = wanted && diagram ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
+      if (node && readableAt(node, viewport.scale)) {
+        const current = gesture.current;
+        current.node = node.id;
+        // A touch on a node pans, as a touch anywhere does, unless it is held first.
+        const held = event.pointerType === 'touch';
+        current.armed = !held;
+        if (held) {
+          current.hold = window.setTimeout(() => {
+            if (gesture.current === current && !current.panning) {
+              current.armed = true;
+              setArmed(true);
+            }
+          }, HOLD_MS);
+        }
+      }
     }
     setPanning(gesture.current.panning);
+  };
+
+  /** Ends a press that might have moved a node. */
+  const endPress = (current: Gesture | null) => {
+    if (current?.hold !== undefined) window.clearTimeout(current.hold);
+    setArmed(false);
+    setDrag(null);
+    dragPointer.current = null;
   };
 
   const onPointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -214,13 +316,42 @@ export function DiagramCanvas({
       return;
     }
     pointers.current.set(event.pointerId, point);
+    if (current.over) return;
     if (current.pinch && pointers.current.size >= 2) {
       const now = twoPointers();
       const zoomed = zoomAbout(current.view, now.distance / current.pinch.distance, current.pinch.middle.x, current.pinch.middle.y);
       onViewport(pan(zoomed, now.middle.x - current.pinch.middle.x, now.middle.y - current.pinch.middle.y));
       return;
     }
+    if (current.dragging) {
+      // The badge follows the pointer, and the place under it is marked.
+      dragPointer.current = point;
+      setDrag((held) => (held ? { ...held, pointer: point } : held));
+      if (diagram && viewport) setHovered(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+      return;
+    }
     if (!current.panning && Math.hypot(point.x - current.start.x, point.y - current.start.y) > DRAG_SLOP) {
+      const node = current.node && current.armed ? diagram?.diagram.nodes.find((candidate) => candidate.id === current.node) : undefined;
+      if (node) {
+        current.dragging = true;
+        dragPointer.current = point;
+        setDrag({ id: node.id, pointer: point });
+        // A node that cannot be moved: the drag is over at once, and the
+        // status says why. The rest of the press pans, as a press on the
+        // canvas does, so a view a node fills can still be moved.
+        void onDragStart?.(node.id).then((movable) => {
+          if (movable || gesture.current !== current || !current.dragging) return;
+          current.dragging = false;
+          current.panning = true;
+          current.view = latest.current.viewport ?? current.view;
+          current.start = dragPointer.current ?? current.start;
+          endPress(current);
+          setPanning(true);
+          setHovered(null);
+        });
+        return;
+      }
+      if (current.hold !== undefined) window.clearTimeout(current.hold);
       current.panning = true;
       setPanning(true);
       setHovered(null);
@@ -234,18 +365,36 @@ export function DiagramCanvas({
     if (pointers.current.size > 0) return;
     gesture.current = null;
     setPanning(false);
-    if (!current || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
+    endPress(current);
+    if (current?.dragging) {
+      // Dropped on a node, on itself (given up), or on nothing.
+      const point = local(event);
+      const node = diagram && viewport ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
+      onDragEnd?.(node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : { on: 'canvas' });
+      return;
+    }
+    if (!current || current.over || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
     // A press that did not move is a click: it selects the node under it, or
     // the line under it, or clears the selection on empty canvas.
     const point = local(event);
+    if (move) {
+      // A move is being chosen: a click on a node is where it goes, and a
+      // click on a line or on the empty canvas changes nothing.
+      const node = hitTest(diagram.diagram, viewport, point.x, point.y);
+      if (node && node.id !== move.source) onMoveTo?.(node.id);
+      return;
+    }
     onSelect(hitId(diagram.diagram, viewport, point.x, point.y));
   };
 
   const onPointerCancel = (event: PointerEvent<HTMLCanvasElement>) => {
     pointers.current.delete(event.pointerId);
     if (pointers.current.size === 0) {
+      const current = gesture.current;
       gesture.current = null;
       setPanning(false);
+      endPress(current);
+      if (current?.dragging) onDragEnd?.({ on: 'cancel' });
     }
   };
 
@@ -265,6 +414,15 @@ export function DiagramCanvas({
   const onContext = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     if (!diagram || !viewport) return;
+    // A touch held on a node arms its drag before the browser's long press
+    // opens a menu. While the node is dragged no menu opens; held still, the
+    // menu opens and the press is over, so no drag follows it.
+    const press = gesture.current;
+    if (press?.dragging) return;
+    if (press?.node) {
+      press.over = true;
+      endPress(press);
+    }
     // The canvas takes focus, so closing the menu returns it here.
     event.currentTarget.focus();
     const point = local(event);
@@ -274,6 +432,17 @@ export function DiagramCanvas({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
+    // Escape gives a drag up: the rest of the press does nothing.
+    if (event.key === 'Escape' && gesture.current?.dragging) {
+      event.preventDefault();
+      const current = gesture.current;
+      current.dragging = false;
+      current.over = true;
+      endPress(current);
+      setHovered(null);
+      onDragEnd?.({ on: 'cancel' });
+      return;
+    }
     if (isMenuKey(event) && diagram && viewport && !event.nativeEvent.isComposing) {
       event.preventDefault();
       // The selected node's menu at its centre; with no node selected, the
@@ -293,8 +462,8 @@ export function DiagramCanvas({
     }
     const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
     if ((event.key === 'Delete' || event.key === 'Backspace') && plain && !event.nativeEvent.isComposing) {
-      // Only a node is removed: a selected line is not.
-      if (selected && diagram?.diagram.nodes.some((node) => node.id === selected)) {
+      // Only a node is removed: a selected line is not. Not while a move is chosen.
+      if (!move && selected && diagram?.diagram.nodes.some((node) => node.id === selected)) {
         event.preventDefault();
         onRemove(selected);
       }
@@ -322,7 +491,8 @@ export function DiagramCanvas({
         onViewport(zoomAbout(viewport, 1 / ZOOM_STEP, centre.x, centre.y));
         break;
       case 'clear':
-        onSelect(null);
+        if (move) onMoveCancel?.();
+        else onSelect(null);
         break;
     }
   };
@@ -336,7 +506,18 @@ export function DiagramCanvas({
         aria-label={label}
         aria-keyshortcuts="+ - Shift+1 Shift+2 Shift+0 Escape Shift+F10 ContextMenu Delete"
         tabIndex={0}
-        style={{ cursor: panning ? 'grabbing' : shownHover ? 'pointer' : 'default' }}
+        style={{
+          cursor:
+            panning || (drag && (!shownHover || !move || move.allowed.has(shownHover)))
+              ? 'grabbing'
+              : armed
+                ? 'grab'
+                : !shownHover
+                  ? 'default'
+                  : !move || move.allowed.has(shownHover)
+                    ? 'pointer'
+                    : 'not-allowed',
+        }}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

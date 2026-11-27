@@ -91,10 +91,13 @@ merely a GSN one, and it is the most consequential technical result here.
 | 12 | Element identifier now mandatory | **(b)** | Maps to `name`; needs only a multiplicity constraint |
 | 13 | Pattern Definition (v3 §1:3.4) | **(c)** | No GSN or SACM class |
 | 14 | **Off-diagram decorator** (v3 §1:2.2.20) | **(c)** | v3 introduces "off diagram" notation "to link separate diagrams that illustrate fragments of a goal structure", and §1:2.2.20 is an "added normative part of the standard" requiring the decorator be "distinct from the GSN elements". Its payload is a reference to another *diagram*, and neither GSN v2.2 nor SACM 2.3 defines any diagram, view or presentation construct for it to reference. Source: v2→v3 changes deck slides 27–28 |
+| 15 | **Undeveloped on Strategy** | **(c)** | GSN Metamodel v2.2 §2.1 Figure 2 gives `Strategy` a `+undeveloped: boolean` of its own, as it gives `Goal`. `Strategy` extends `ArgumentReasoning`, an `ArgumentAsset` and not an `Assertion`, so **no `assertionDeclaration`**: a Goal's mark has a pure SACM carrier (`needsSupport` on its `Claim`) and a Strategy's has none. v2.2 strikes `needsSupport` out and says the GSN→SACM transformation rules "are not included in this metamodel specification" (page 6), so the gap is not visible inside the GSN metamodel, only on transformation. The remedy that fixes row 3 (a flag on `ArgumentAsset`, SACM24-82's `Targetable`) would fix this too |
 
 Rows 1–9 are verified against **GSN Community Standard v3 (May 2021)** directly.
 Rows 10–14 derive from the public v2→v3 changes deck and the v3 contents; they are
-sound but were not traced to a specific normative clause.
+sound but were not traced to a specific normative clause. Row 15 is verified
+against the GSN Metamodel Specification v2.2, Figure 2 and page 6, on
+2026-11-26; the v3 clause for an undeveloped Strategy was not traced.
 
 The two strongest items are rows 3 and 7, because in both cases GSN v3 *normatively
 requires* a decoration on an element that SACM 2.3 structurally cannot carry. These

@@ -182,7 +182,7 @@ you lose them.**
 | `isPublic` | TaggedValue |
 | `isMany`, `isOptional` | *no SACM feature* |
 
-### `undeveloped` occupies the declaration, so it is confined to Goal and Strategy
+### `undeveloped` occupies the declaration, so it is confined to a Goal
 
 The row above is a *substitution*, not an addition: SACM has one
 `assertionDeclaration`, so `needsSupport` and `assumed` / `axiomatic` /
@@ -581,6 +581,78 @@ asks about before it removes more than the node chosen. Decided on 25 November
 | W19 | What the diagram does not draw | Refused (AF-EDIT-015) when anything but a relationship's source refers to what goes, such as a `metaClaim`, a citation or a group's member, or a node holds more than utility elements | Decided | "Never silently change an argument": what the user is not shown is not changed for them |
 | W20 | The last Goal of a Strategy | The inference whose `reasoning` is the Strategy stays: a placeholder (W2) becomes its source before the last Goal is taken out. Only an inference R16 would hide the placeholder in does so; any other (a counter, cited, abstract or not asserted) goes as W18 says, since its placeholder would be drawn as a Goal. A Strategy that goes takes its placeholder with it | Decided | W2, R16 |
 
+### Moving a node
+
+How the editor moves a node, with what is under it, to another place.
+`af-gsn` (`commands::move_node`) applies these rules as one
+`sacm::edit::batch`, one undo step; `commands::move_targets` answers where a
+node may go and why not elsewhere, which the interface shows while the user
+chooses. A move changes one line of the diagram: the node, its text and what
+is under it are as they were. Decided on 26 November 2026 for milestone 2,
+step 4.
+
+| Rule | Moved | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W21 | Which node | A node of a known kind that the diagram draws under one node, by a `SupportedBy` or an `InContextOf` line, or under none. Under several, it is not moved (AF-EDIT-016): there is no one line to move, and the editor makes no second parent. A node that challenges something, a node whose line is neutral (E5a, E9), and a relationship that names the node twice are not moved (AF-EDIT-017). A Context, Assumption or Justification that the file joins by a `SupportedBy` line, which GSN does not allow, is moved with that line as it is: alone in its relationship, and to a Goal only (W23's `SetReferences`), and not to an undeveloped one (AF-EDIT-025), which the line kept would support; the move does not repair the line, which the problem list reports and where its repair belongs, and it develops no Goal (decided 26 November 2026). One of several sources of such a relationship is not moved (AF-EDIT-017): that would make a new line GSN does not allow. A Strategy moves with the one inference it is the `reasoning` of (AF-EDIT-004 otherwise); one that supports no Goal has no line to move it by (AF-EDIT-024) | Decided | The view: the line a node is drawn under is the relationship changed |
+| W22 | Where | What may be added where (W1 to W8), with the node's join kept: what is reached by `SupportedBy` goes where support may, and what is reached by `InContextOf` goes where context may, whatever its kind (R6: a Goal reached as context stays context). Not under itself or what is drawn under it, challenges included (AF-EDIT-018), not where it is (AF-EDIT-019), and not into another `ArgumentPackage` (AF-EDIT-020). To the top level: a Goal only (AF-EDIT-006) | Decided | GSN v3 Core's permitted connections, as W1 to W8; a relationship across packages is the Modular Extension's, which is not built |
+| W23 | The line it has | Where the node is the only `source` of its relationship and the new parent takes the same kind of relationship, the relationship is kept: `SetReferences` of its `target` to the new parent. A Strategy's inference is always kept so, with its Goals. Otherwise the node leaves the line: `RemoveReference` of it from the `source`, or, when it is the only source, `DeleteElement` of the relationship. A Goal that is the last under a Strategy leaves a placeholder behind, as W20 | Decided | The relationship's identity, name and `xmi:id` are kept where SACM can hold the result in the same element. An `AssertedInference` with a `reasoning` is a different shape from one without (E1, E2), so a Goal moving between a Goal and a Strategy changes relationship |
+| W24 | The line it gets | Where W23 did not keep the relationship: as an add makes it. Under a Goal, `CreateAssertedInference` (a Goal), `CreateAssertedEvidence` (a Solution) or `CreateAssertedContext` (context), from the node to the Goal. A Goal under a Strategy: `AddReference` of it to the `source` of the Strategy's one inference; a placeholder held there (W2) is taken out and deleted, since the Goal moved has its own identity. Support moved under an undeveloped Goal develops it, as W11 | Decided | W1, W3 to W7, W11 |
+| W25 | What the diagram does not draw | Otherwise the move is refused (AF-EDIT-015). A source is added to, or taken out of, a relationship only when nothing makes a claim about it: nothing refers to it (a challenge of it, a group's membership) and it refers to no `metaClaim`. A relationship is given a new `target` only when, besides, it holds nothing but its name. It is deleted only when, besides, it is declared `asserted` (or not declared), is not abstract and is not a citation | Decided | "Never silently change an argument": a challenge of, or a claim about, "A and B support C" is not one of "A supports C"; a description of a line is not carried to another line unseen; and a relationship's declaration, abstractness and citation are not lost with it. A description of an inference that gains or loses a premise stays with it, as it does when a premise is added or removed. A relationship a move deletes takes its name with it, as one a removal deletes does (W18): the name is of the link that goes, and the line the node is joined by afterwards is its own (decided 27 November 2026, from a review; refusing it would refuse almost every such move, since the samples name nearly every inference). Widened on 26 November 2026, from a review: a source was taken out of a challenged relationship, and a declared one deleted. To be opened again when challenges are edited |
+
+A Goal that loses its support by a move keeps its declaration, as by a
+removal (W18).
+
+### The undeveloped mark
+
+How the editor marks a Goal undeveloped and clears the mark: the inverse of
+R3. `af-gsn` (`commands::set_undeveloped`) applies it as one
+`sacm::edit::batch`, one undo step. Decided on 26 November 2026 for
+milestone 2, step 5.
+
+| Rule | Changed | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W26 | The undeveloped mark of a Goal | `SetAssertionDeclaration` on the Claim: `needsSupport` to mark it, `asserted` to clear the mark. Only a Claim drawn as a Goal whose declaration is `asserted` or `needsSupport` (AF-EDIT-021 otherwise): the declaration is the one slot, and on an Assumption or a Justification it says what the element is. A Goal that a `SupportedBy` line leaves is not marked (AF-EDIT-022); clearing is always allowed, so a mark the file left on a supported Goal (AF-GSN-010) is cleared. A Strategy is not marked: SACM 2.3 has no place for it (below) | Decided | R3; "`undeveloped` occupies the declaration" above; GSN well-formedness: an undeveloped element has no `SupportedBy` children; W11 clears the mark the same way when support is added |
+
+**A Strategy is not marked undeveloped: SACM 2.3 cannot hold it.** Decided
+on 26 November 2026, from the GSN Metamodel Specification v2.2 (July 2021),
+§2.1, Figure 2:
+
+- The metamodel gives `Strategy` its own attribute, `+undeveloped: boolean`,
+  as it gives `Goal` one. It is an attribute of the GSN class, not of SACM.
+  `Strategy` extends SACM `ArgumentReasoning`, which is an `ArgumentAsset`
+  and not an `Assertion`, so it has no `assertionDeclaration`.
+- The metamodel strikes `needsSupport` out of `AssertionDeclaration` and pins
+  every `Assertion` to `asserted` (OCL `Context::Assertion`). The mapping onto
+  pure SACM is left out: "If a model is transformed from GSN to SACM then the
+  appropriate AssertionDeclaration must be applied to each SACM Claim to
+  reflect the nature of the GSN element … These transformation rules are not
+  included in this metamodel specification" (page 6).
+
+A Goal's mark therefore has a SACM 2.3 carrier, `needsSupport` on its Claim
+(R3, W26), and a Strategy's has none. The candidate considered, `needsSupport`
+on the inference the Strategy is the `reasoning` of, says something else in
+SACM: that the inference from the premises to the conclusion needs support,
+not that the Strategy is undeveloped. No tool was found that reads it so, and
+writing it would invent a mapping. A Strategy offers no mark, and one in a
+file is not read from anything. The gap is row 15 of
+[`sacm-gsn-metamodel-gaps.md`](sacm-gsn-metamodel-gaps.md), with row 3
+(defeat on a Strategy), whose remedy would carry it too.
+
+### Repairing a join
+
+How the editor repairs a Context, an Assumption or a Justification that the
+file joins by a `SupportedBy` line, where GSN joins it by `InContextOf`
+(AF-GSN-004). `af-gsn` (`commands::repair_join`) applies it as one
+`sacm::edit::batch`, one undo step; `commands::repairable` answers whether it
+can be made, for the problem list to offer it. The repair is asked for by the
+user, from the problem: it is never made by a read, a save or a move (W21).
+Decided on 26 November 2026.
+
+| Rule | Repaired | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W27 | A Context, Assumption or Justification that is a `source` of a relationship drawn as `SupportedBy`, with no `reasoning`, whose `target` is a Goal or a Strategy | The node alone in the relationship: `DeleteElement` of the relationship, then `CreateAssertedContext` from the node to the same `target`, in the relationship's package, with the relationship's `name`. One of several sources: `RemoveReference` of the node from the `source`, then `CreateAssertedContext` with an empty name (W12); the relationship stays for the others. The new relationship has a new `xmi:id`. It then reads by E4 as `InContextOf`, and the node as the kind it was (R4, R5, R10) | Decided | E4, W5 to W7: the form an add writes. SACM cannot change an element's class in place, so the relationship is replaced. The name is kept because it is the one thing of the old relationship a reader may know it by |
+| W28 | What is not repaired, and a context already there | A relationship with a `reasoning` (AF-EDIT-017): the node is then one of a Strategy's premises, and whether it is context of the Strategy or of its Goal is not the editor's to say. A relationship W25 would not delete, when the node is its only source, or would not take a source out of, when it is one of several (AF-EDIT-015). Anything that is not such a join (AF-EDIT-023). When the file already has an `AssertedContext` from the node to the same target that the diagram draws as context, and that is plain (not cited, abstract or declared otherwise, and with no `reasoning`), the repair takes the support line away and makes no second one; one that is not plain is left as it is, and the repair makes a context line of its own | Decided | W25; "Preserve rather than reinterpret" |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -602,4 +674,14 @@ was refused. Nothing changes.
 | AF-EDIT-012 | An identifier cannot be empty (W15) |
 | AF-EDIT-013 | Another element of the file has the identifier (W15) |
 | AF-EDIT-014 | The text is the value of a terminology expression, which is not changed as text |
-| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19) |
+| AF-EDIT-015 | Something the diagram does not draw refers to what a removal would delete, or a node holds more than its text (W19); or refers to, or is held by, the line a move would replace (W25) |
+| AF-EDIT-016 | The node is drawn under several nodes (W21) |
+| AF-EDIT-017 | The node is joined in a way a move does not carry (W21), or a repair does not mend (W28) |
+| AF-EDIT-018 | The place is the node itself, or under it (W22) |
+| AF-EDIT-019 | The node is there already (W22) |
+| AF-EDIT-020 | The place is in another argument package (W22) |
+| AF-EDIT-021 | Only a Goal is marked undeveloped (W26) |
+| AF-EDIT-022 | The Goal is supported: an undeveloped element has no support (W26) |
+| AF-EDIT-023 | The element is not joined in a way a repair mends (W28) |
+| AF-EDIT-024 | The Strategy supports no Goal, so there is no line to move it by (W21) |
+| AF-EDIT-025 | The element keeps a support line where GSN has context, and the Goal is undeveloped (W21) |

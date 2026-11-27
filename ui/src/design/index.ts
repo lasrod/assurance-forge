@@ -9,6 +9,7 @@ import './styles.css';
 
 export {
   Button,
+  Checkbox,
   ContextMenu,
   DatumRoot,
   Dialog,

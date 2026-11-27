@@ -46,8 +46,10 @@ const MIN_HEIGHT: f32 = 48.0;
 const MIN_ELLIPSE_WIDTH: f32 = 96.0;
 /// Between the identifier, the name and the statement.
 const GROUP_GAP: f32 = 4.0;
-/// Half the diagonal of the undeveloped diamond.
-const DIAMOND: f32 = 8.0;
+/// Half the diagonal of the undeveloped diamond. A quarter of the space
+/// between rows on each side of its centre: the mark says the argument stops
+/// here unfinished, so it is read at the zoom a whole branch is seen at.
+const DIAMOND: f32 = 16.0;
 /// Between sibling subtrees.
 const H_GAP: f32 = 40.0;
 /// Between rows.

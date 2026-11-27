@@ -991,6 +991,46 @@ fn add(
 }
 
 #[tauri::command]
+fn move_targets(
+    id: String,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::MoveTargets>, String> {
+    Ok(lock(&state)?.core.move_targets(&id))
+}
+
+#[tauri::command]
+fn move_node(
+    id: String,
+    to: Option<String>,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.move_node(&id, to.as_deref(), revision))
+}
+
+#[tauri::command]
+fn set_undeveloped(
+    id: String,
+    undeveloped: bool,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .set_undeveloped(&id, undeveloped, revision))
+}
+
+#[tauri::command]
+fn repair_join(
+    id: String,
+    relationship: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.repair_join(&id, &relationship, revision))
+}
+
+#[tauri::command]
 fn removal(id: String, state: Shared<'_>) -> Result<Option<af_api::contract::Removal>, String> {
     Ok(lock(&state)?.core.removal(&id))
 }
@@ -1115,6 +1155,10 @@ pub fn run(args: Args) -> i32 {
             add,
             removal,
             remove,
+            move_targets,
+            move_node,
+            set_undeveloped,
+            repair_join,
             set_text,
             undo,
             redo,

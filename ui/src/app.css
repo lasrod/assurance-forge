@@ -116,6 +116,54 @@
     gap: var(--datum-space-4);
   }
 
+  /* Why a Goal is, or cannot be, undeveloped: under its checkbox. */
+  .af-undeveloped-hint {
+    margin: var(--datum-space-4) 0 0;
+  }
+
+  /* The repair of the problem chosen, above the list. */
+  .af-problem-repair {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--datum-space-12);
+    padding: var(--datum-space-4) var(--datum-space-12);
+    font-size: var(--datum-type-control-size);
+    line-height: var(--datum-type-control-line-height);
+  }
+
+  .af-problem-repair .datum-button {
+    flex: none;
+  }
+
+  /* The centre's header: the zoom controls, then what a move in progress
+     asks of the user. */
+  .af-centre-header {
+    display: flex;
+    align-items: center;
+    gap: var(--datum-space-16);
+    min-inline-size: 0;
+  }
+
+  .af-move-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--datum-space-8);
+    min-inline-size: 0;
+  }
+
+  .af-move-prompt {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--datum-font-weight-semibold);
+  }
+
+  .af-move-banner .datum-button {
+    flex: none;
+  }
+
   .af-zoom-bar .datum-quantity-cell {
     inline-size: 6rem;
   }
@@ -336,6 +384,9 @@
     display: block;
     width: 100%;
     height: 100%;
+    /* The canvas pans, zooms and moves nodes by touch itself: the browser
+       would otherwise take a touch over for its own scrolling. */
+    touch-action: none;
   }
 
   /* The canvas is one Tab stop: DATUM's focus ring when the keyboard reached

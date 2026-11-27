@@ -64,7 +64,7 @@ function expectViewport(actual: { scale: number; offsetX: number; offsetY: numbe
   expect(actual.offsetY).toBeCloseTo(expected.offsetY, 3);
 }
 
-test('Pan: a drag on empty canvas, a middle-button drag and the wheel move the view, and select nothing', async ({ page }) => {
+test('Pan: a drag on empty canvas, a middle-button drag and the wheel move the view, and select nothing; a drag on a node does not pan', async ({ page }) => {
   await opened(page);
   const start = await viewport(page);
   const from = await emptyPoint(page);
@@ -78,14 +78,18 @@ test('Pan: a drag on empty canvas, a middle-button drag and the wheel move the v
   expect(dragged.scale).toBe(start.scale);
   expect((await hook(page)).selected).toBeNull();
 
-  // A drag that starts on a node pans too, and does not select it.
+  // A drag that starts on a node does not pan: it moves the node
+  // (drag.spec.ts). Dropped on nothing, it changes nothing.
   const node = await nodeCentre(page, 'cl_top');
   await page.mouse.move(node.x, node.y);
   await page.mouse.down();
   await page.mouse.move(node.x - 30, node.y + 20, { steps: 5 });
   await page.mouse.up();
-  expect((await viewport(page)).offsetX - dragged.offsetX).toBeCloseTo(-30, 3);
-  expect((await hook(page)).selected).toBeNull();
+  expectViewport(await viewport(page), dragged);
+  // The node dragged is selected, as one clicked is.
+  await expect.poll(async () => (await hook(page)).selected).toBe('cl_top');
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await hook(page)).selected).toBeNull();
 
   // The middle button pans from the first move.
   const middle = await viewport(page);
@@ -232,8 +236,9 @@ test('Select: a click outlines the node, and Element Properties shows what it is
 
   const grid = page.getByTestId('element-properties');
   await expect(grid).toContainText('Goal, undeveloped');
-  // In the order an element reads: its identifier, its name, what it says.
-  await expect(grid.locator('label')).toHaveText(['ID', 'Name', 'Description']);
+  // In the order an element reads: its identifier, its name, what it says;
+  // then, for a Goal, whether it is undeveloped.
+  await expect(grid.locator('label')).toHaveText(['ID', 'Name', 'Description', 'Undeveloped']);
   await expect(page.getByTestId('element-identifier')).toHaveValue('cl_sub_2');
   await expect(page.getByTestId('element-name')).toHaveValue('SubClaim_Verification');
   await expect(page.getByTestId('element-statement')).toHaveValue('Verification activities demonstrate braking requirements are satisfied.');

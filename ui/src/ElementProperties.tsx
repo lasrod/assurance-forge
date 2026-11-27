@@ -3,7 +3,7 @@
 // name and description are edited here; each change is a command of the core.
 
 import type { DiagramEdge, EdgeKind, ElementDetails, NodeKind, RelationshipDetails, RelationshipEnd, TextField } from './core/Core';
-import { PropertyGrid, PropertyRow, Section } from './design';
+import { Checkbox, PropertyGrid, PropertyRow, Section } from './design';
 import type { MessageKey } from './i18n/messages';
 import { TextProperty } from './TextProperty';
 import type { TextOutcome } from './textDraft';
@@ -12,6 +12,9 @@ import { applyShortcut } from './shortcuts';
 /** Sets a text of the element `id`, of kind `about`, and answers what the core made of it. */
 export type OnText = (id: string, field: TextField, text: string, about: NodeKind) => Promise<TextOutcome>;
 
+/** Marks the Goal `id` undeveloped, or clears the mark, as asked at `revision`. */
+export type OnUndeveloped = (id: string, undeveloped: boolean, revision: number, identifier: string) => void;
+
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
 /**
@@ -19,7 +22,7 @@ type T = (key: MessageKey, values?: Record<string, string | number>) => string;
  * relationship the line is drawn for.
  */
 export type Details =
-  | { type: 'element'; element: ElementDetails }
+  | { type: 'element'; element: ElementDetails; revision: number }
   | { type: 'relationship'; relationship: RelationshipDetails; edge: Pick<DiagramEdge, 'from' | 'to' | 'toRelationship'> };
 
 const KINDS: Record<NodeKind, MessageKey> = {
@@ -66,7 +69,20 @@ export function lineEnds(details: Extract<Details, { type: 'relationship' }>, t:
   return { from: label(edge.from, false), to: label(edge.to, edge.toRelationship) };
 }
 
-function ElementSection({ details, t, onText }: { details: ElementDetails; t: T; onText: OnText }) {
+function ElementSection({
+  details,
+  revision,
+  t,
+  onText,
+  onUndeveloped,
+}: {
+  details: ElementDetails;
+  /** The revision the details are of. */
+  revision: number;
+  t: T;
+  onText: OnText;
+  onUndeveloped: OnUndeveloped;
+}) {
   const set = (field: TextField) => (text: string) => onText(details.id, field, text, details.kind);
   return (
     <div data-testid="element-properties">
@@ -99,6 +115,21 @@ function ElementSection({ details, t, onText }: { details: ElementDetails; t: T;
             multiline
             data-testid="element-statement"
           />
+          {/* Only a Goal is undeveloped. One that is supported cannot be
+              marked, and says why; a mark the file left on one is cleared. */}
+          {details.kind === 'goal' && details.undevelopedRefusal !== 'AF-EDIT-021' && (
+            <div className="af-text-property" data-testid="element-undeveloped">
+              <Checkbox
+                label={t('undeveloped')}
+                checked={details.undeveloped}
+                disabled={details.undevelopedRefusal !== null}
+                onChange={(event) => onUndeveloped(details.id, event.target.checked, revision, details.identifier)}
+              />
+              <p className="datum-meta af-undeveloped-hint">
+                {t(!details.supported ? 'undevelopedHint' : details.undeveloped ? 'undevelopedStale' : 'undevelopedSupported')}
+              </p>
+            </div>
+          )}
           {/* What it is, and what the view says of it: not edited here. */}
           <div className="af-text-property">
             <span className="af-text-label">{t('propertyType')}</span>
@@ -153,10 +184,20 @@ function RelationshipSection({ selected, t }: { selected: Extract<Details, { typ
   );
 }
 
-export function ElementProperties({ details, t, onText }: { details: Details | null; t: T; onText: OnText }) {
+export function ElementProperties({
+  details,
+  t,
+  onText,
+  onUndeveloped,
+}: {
+  details: Details | null;
+  t: T;
+  onText: OnText;
+  onUndeveloped: OnUndeveloped;
+}) {
   if (!details) return <p className="datum-meta af-dock-empty">{t('elementPropertiesEmpty')}</p>;
   return details.type === 'element' ? (
-    <ElementSection details={details.element} t={t} onText={onText} />
+    <ElementSection details={details.element} revision={details.revision} t={t} onText={onText} onUndeveloped={onUndeveloped} />
   ) : (
     <RelationshipSection selected={details} t={t} />
   );

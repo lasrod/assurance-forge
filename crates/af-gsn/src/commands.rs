@@ -29,8 +29,12 @@ use sacm::model::{
 use crate::ElementKind;
 use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, View};
 
+mod move_node;
 mod remove;
+mod repair;
+pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
+pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
 
 /// Where an element is to be added.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,6 +69,32 @@ pub enum Refusal {
     /// removal would delete, or it holds more than its text, so it is not
     /// removed (W19).
     Entangled,
+    /// AF-EDIT-016: the node is drawn under several nodes, so there is no
+    /// one line to move (W21).
+    SeveralParents,
+    /// AF-EDIT-017: the node is joined in a way a move does not carry: it
+    /// challenges something, or its line is not a plain `SupportedBy` or
+    /// `InContextOf` (W21).
+    JoinNotMoved,
+    /// AF-EDIT-018: the place is the node itself or under it (W22).
+    UnderItself,
+    /// AF-EDIT-019: the node is there already (W22).
+    AlreadyThere,
+    /// AF-EDIT-020: the place is in another argument package (W22).
+    OtherPackage,
+    /// AF-EDIT-021: only a Goal is marked undeveloped (W26).
+    NotAGoal,
+    /// AF-EDIT-022: the Goal is supported, and an undeveloped element has no
+    /// support (W26).
+    GoalSupported,
+    /// AF-EDIT-023: the element is not joined in a way a repair mends (W27).
+    NothingToRepair,
+    /// AF-EDIT-024: the Strategy supports no Goal, so there is no line to
+    /// move it by (W21).
+    StrategyAlone,
+    /// AF-EDIT-025: the element keeps a support line where GSN has context,
+    /// and the Goal is undeveloped: the move would support it (W22).
+    WouldSupportUndeveloped,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -86,6 +116,16 @@ impl Refusal {
             Refusal::TopLevelGoalOnly => "AF-EDIT-006",
             Refusal::NotANode => "AF-EDIT-011",
             Refusal::Entangled => "AF-EDIT-015",
+            Refusal::SeveralParents => "AF-EDIT-016",
+            Refusal::JoinNotMoved => "AF-EDIT-017",
+            Refusal::UnderItself => "AF-EDIT-018",
+            Refusal::AlreadyThere => "AF-EDIT-019",
+            Refusal::OtherPackage => "AF-EDIT-020",
+            Refusal::NotAGoal => "AF-EDIT-021",
+            Refusal::GoalSupported => "AF-EDIT-022",
+            Refusal::NothingToRepair => "AF-EDIT-023",
+            Refusal::StrategyAlone => "AF-EDIT-024",
+            Refusal::WouldSupportUndeveloped => "AF-EDIT-025",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",
@@ -614,7 +654,7 @@ fn plan(
 
 /// The one live inference whose reasoning is the Strategy `id` and that the
 /// view draws through it (E1), or `None` when there is not exactly one.
-fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId> {
+pub(crate) fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId> {
     let mut found = document.elements().filter(|element| {
         element.kind() == SacmKind::AssertedInference
             && element
@@ -635,7 +675,7 @@ fn one_inference(document: &Document, view: &View, id: &str) -> Option<ElementId
 
 /// The placeholder `inference` holds for a Strategy's first Goal (R16), and
 /// its tag, when the view did not draw it for that reason.
-fn held_place(
+pub(crate) fn held_place(
     document: &Document,
     view: &View,
     inference: &ElementId,
@@ -651,6 +691,49 @@ fn held_place(
     let claim = document.get(source.as_str())?;
     let tag = crate::view::tagged(claim, PLACEHOLDER_KEY)?.id().clone();
     Some((source, tag))
+}
+
+/// W25: a source may be added to, or taken out of, the relationship `id`
+/// only when nothing makes a claim about it: nothing refers to it (a
+/// challenge of it, a group) and it refers to no meta-claim. A challenge
+/// of, or a claim about, "A and B support C" is not one of "A supports C".
+pub(crate) fn changeable(document: &Document, id: &ElementId) -> Result<(), Refusal> {
+    let element = document.get(id.as_str()).ok_or(Refusal::JoinNotMoved)?;
+    if !document.referrers(id.as_str()).is_empty() || !element.meta_claims().is_empty() {
+        return Err(Refusal::Entangled);
+    }
+    Ok(())
+}
+
+/// W25: the relationship `id` may be given another target, the whole line
+/// moving, only when its sources may change and it holds nothing but its
+/// name: a description of "A supports B" is not carried to "A supports C"
+/// unseen.
+pub(crate) fn retargetable(document: &Document, id: &ElementId) -> Result<(), Refusal> {
+    changeable(document, id)?;
+    let element = document.get(id.as_str()).ok_or(Refusal::JoinNotMoved)?;
+    if element.children().next().is_some() {
+        return Err(Refusal::Entangled);
+    }
+    Ok(())
+}
+
+/// W25: the relationship `id` may be deleted only when it may be given
+/// another target and it says nothing but that its sources support its
+/// target: declared `asserted` (or not declared), not abstract and not a
+/// citation.
+pub(crate) fn deletable(document: &Document, id: &ElementId) -> Result<(), Refusal> {
+    retargetable(document, id)?;
+    let element = document.get(id.as_str()).ok_or(Refusal::JoinNotMoved)?;
+    let plain = element
+        .assertion_declaration()
+        .is_none_or(|declaration| declaration == AssertionDeclaration::Asserted)
+        && !element.is_abstract()
+        && !element.is_citation();
+    if !plain {
+        return Err(Refusal::Entangled);
+    }
+    Ok(())
 }
 
 /// The `ArgumentPackage` that holds `element`, at any depth (W9).

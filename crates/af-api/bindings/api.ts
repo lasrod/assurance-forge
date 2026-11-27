@@ -50,7 +50,18 @@ export type ElementDetails = {
 /**
  * The SACM id.
  */
-id: string, kind: NodeKind, undeveloped: boolean, identifier: string, name: string | null, statement: string | null, 
+id: string, kind: NodeKind, undeveloped: boolean, 
+/**
+ * Why the undeveloped mark cannot be changed to what it is not
+ * (`AF-EDIT-021`: not a Goal; `AF-EDIT-022`: the Goal is supported), or
+ * null when it can.
+ */
+undevelopedRefusal: string | null, 
+/**
+ * A `SupportedBy` line leaves the node: with `undeveloped`, the mark
+ * is out of date.
+ */
+supported: boolean, identifier: string, name: string | null, statement: string | null, 
 /**
  * The view's codes about this element.
  */
@@ -264,11 +275,53 @@ nodes: Array<RemovalNode>,
  */
 refusal: string | null, };
 
+export type MoveTarget = { 
+/**
+ * The SACM id of the node.
+ */
+id: string, 
+/**
+ * Why the moved node cannot go under it (`AF-EDIT-001` to `AF-EDIT-004`,
+ * `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-025`; and, from the
+ * operations the move would make there, `AF-EDIT-005`, `AF-EDIT-015` or
+ * `AF-EDIT-017`), or null when it can. The frontend
+ * words it.
+ */
+refusal: string | null, 
+/**
+ * Moving there also clears this Goal's undeveloped decorator.
+ */
+develops: boolean, };
+
+export type MoveTargets = { revision: number, 
+/**
+ * The SACM id of the node to move.
+ */
+id: string, 
+/**
+ * Why the node cannot be moved at all (`AF-EDIT-002`, `AF-EDIT-004`,
+ * `AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-016`, `AF-EDIT-017`,
+ * `AF-EDIT-024`), or null when it can. `nodes` is then empty.
+ */
+refusal: string | null, 
+/**
+ * Why it cannot be moved to the top level (`AF-EDIT-006`,
+ * `AF-EDIT-019`; and, from the operations the move would make,
+ * `AF-EDIT-005`, `AF-EDIT-015` or `AF-EDIT-017`), or null when it can.
+ */
+canvas: string | null, 
+/**
+ * Every node of the diagram, in its order.
+ */
+nodes: Array<MoveTarget>, };
+
+export type ProblemRepair = { element: string, relationship: string, };
+
 export type EditResult = { "result": "applied", revision: number, 
 /**
- * The element the interface selects: the one an add made, or the
- * node a removed one was drawn under. Null for undo, redo, a change
- * of text and the removal of a top-level node.
+ * The element the interface selects: the one an add made, the node
+ * a removed one was drawn under, or the node moved. Null for undo,
+ * redo, a change of text and the removal of a top-level node.
  */
 element: string | null, 
 /**
@@ -327,7 +380,12 @@ relationship: string | null,
 /**
  * Where in the file, for what libSACM reported reading it.
  */
-line: number | null, column: number | null, };
+line: number | null, column: number | null, 
+/**
+ * The repair the editor can make of it, or null: `Core::repair_join`
+ * with these. Only `AF-GSN-004` has one so far.
+ */
+repair: ProblemRepair | null, };
 
 export type ProblemElement = { 
 /**

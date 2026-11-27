@@ -23,6 +23,7 @@ import type {
   Package,
   Problems,
   RecentFile,
+  MoveTargets,
   Removal,
   TextField,
   TextStyle,
@@ -52,6 +53,9 @@ export type DocumentState =
   | { kind: 'added'; added: NodeKind; identifier: string }
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
+  | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
+  | { kind: 'undevelopedSet'; undeveloped: boolean; identifier: string }
+  | { kind: 'repaired'; repaired: NodeKind | null; identifier: string }
   | { kind: 'undone' }
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null }
@@ -406,7 +410,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo' | 'remove' | 'restore' | TextField,
+      what: 'add' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
@@ -480,7 +484,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       else if (what === 'add') {
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
-      else if (what !== 'remove' && what !== 'restore') setState({ kind: 'textChanged', field: what });
+      else if (what !== 'remove' && what !== 'move' && what !== 'mark' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
     },
     [showRelayout, readProblems],
@@ -499,6 +503,18 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     },
     [runEdit],
   );
+  /**
+   * The revision a command asked at `revision` is sent with. Asked at the
+   * revision on screen while edits are on their way, it follows them: they
+   * are the user's own, made just before (a text field left by the click
+   * that asked), and the command is of the argument they make. Asked at
+   * another revision, it stays out of date and the core refuses it.
+   */
+  const followingEdits = useCallback(async (revision: number): Promise<number> => {
+    if (revision !== shown.current || inflight.current.size === 0) return revision;
+    await Promise.allSettled([...inflight.current]);
+    return shown.current ?? revision;
+  }, []);
   // Undos and redos on their way: a key held down sends no more until they
   // are answered, since Edit ▸ Undo's state is of the revision before them.
   const editing = useRef(0);
@@ -568,6 +584,87 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     },
     [edit],
   );
+  /**
+   * Where the node `id` may be moved, with the revision it is of; null if
+   * the document changed before it came, or if the node cannot be moved,
+   * which the status then says.
+   */
+  const moveTargets = useCallback(async (id: string): Promise<MoveTargets | null> => {
+    const on = coreRef.current;
+    const asked = shown.current;
+    if (!on || asked === null) return null;
+    const request = latest.current;
+    // A text left by the press that began the move is set first.
+    const revision = await followingEdits(asked);
+    try {
+      const answer = await on.moveTargets(id);
+      if (!answer || request !== latest.current) return null;
+      if (answer.revision !== revision || shown.current !== revision) {
+        setState({ kind: 'editRefused', code: 'AF-EDIT-009', about: null });
+        return null;
+      }
+      if (answer.refusal !== null) {
+        setState({ kind: 'editRefused', code: answer.refusal, about: null });
+        return null;
+      }
+      return answer;
+    } catch {
+      return null;
+    }
+  }, [followingEdits]);
+  /**
+   * Moves the node `targets` is of under the node `to` (null: to the top
+   * level), as the core said at its revision; the core refuses it if that is
+   * not current. `moved` and `toIdentifier` are for the status to say.
+   */
+  const move = useCallback(
+    (
+      targets: MoveTargets,
+      to: string | null,
+      moved: { kind: NodeKind; identifier: string },
+      toIdentifier: string | null,
+      onShown: EditShown,
+    ) =>
+      // The place it goes to is kept where it is, and the node moved is shown.
+      void edit((on) => on.moveNode(targets.id, to, targets.revision), 'move', to ?? targets.id, moved.kind, onShown, {
+        kind: 'moved',
+        moved: moved.kind,
+        identifier: moved.identifier,
+        to: toIdentifier,
+      }),
+    [edit],
+  );
+  /**
+   * Marks the Goal `id` undeveloped, or clears the mark, as asked at
+   * `revision`; the view keeps the Goal in place. The core refuses it if the
+   * revision is not current.
+   */
+  const setUndeveloped = useCallback(
+    (id: string, undeveloped: boolean, revision: number, identifier: string, onShown: EditShown) =>
+      void edit(async (on) => on.setUndeveloped(id, undeveloped, await followingEdits(revision)), 'mark', id, 'goal', onShown, { kind: 'undevelopedSet', undeveloped, identifier }),
+    [edit, followingEdits],
+  );
+  /**
+   * Makes the repair a problem of `revision` offers: the element joined by a
+   * support line is joined by context. The core refuses it if the revision
+   * is not current.
+   */
+  const repair = useCallback(
+    (
+      offered: { element: string; relationship: string },
+      revision: number,
+      about: { kind: NodeKind | null; identifier: string },
+      onShown: EditShown,
+    ) =>
+      void edit(async (on) => on.repairJoin(offered.element, offered.relationship, await followingEdits(revision)), 'mark', offered.element, about.kind, onShown, {
+        kind: 'repaired',
+        repaired: about.kind,
+        identifier: about.identifier,
+      }),
+    [edit, followingEdits],
+  );
+  /** Says why a move cannot be made to the place the user chose. */
+  const moveRefused = useCallback((code: string, about: NodeKind | null) => setState({ kind: 'editRefused', code, about }), []);
   /**
    * Sets the identifier, name or statement of the node `id`, of kind `about`.
    * Answers what the core made of it: a refusal is also said in the status.
@@ -748,6 +845,11 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     add,
     removal,
     remove,
+    moveTargets,
+    move,
+    moveRefused,
+    setUndeveloped,
+    repair,
     setText,
     undo,
     redo,
@@ -776,7 +878,7 @@ export function useDetails(core: Core | null, selected: string | null, diagram: 
     const edge = diagram.diagram.nodes.some((node) => node.id === selected) ? null : findEdge(diagram.diagram, selected);
     const read: Promise<Details | null> = edge
       ? core.relationship(edge.relationship).then((relationship) => relationship && { type: 'relationship', relationship, edge })
-      : core.element(selected).then((element) => element && { type: 'element', element });
+      : core.element(selected).then((element) => element && { type: 'element', element, revision: diagram.revision });
     read.then(
       (next) => {
         if (current) setDetails(next);

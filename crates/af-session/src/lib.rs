@@ -19,7 +19,9 @@
 //! It does no I/O and builds for `wasm32-unknown-unknown`.
 
 use af_gsn::ElementKind;
-use af_gsn::commands::{self, AddError, Added, Removed, Target, TextField, TextSet};
+use af_gsn::commands::{
+    self, AddError, Added, Moved, Removed, Repaired, Target, TextField, TextSet,
+};
 use af_gsn::view::View;
 use sacm::model::Document;
 
@@ -54,6 +56,17 @@ pub enum Command {
     },
     /// Remove the node `element` and what goes with it.
     Remove { element: String },
+    /// Move the node `element`, with what is under it, under the node `to`,
+    /// or to the top level when `None`.
+    Move { element: String, to: Option<String> },
+    /// Mark the Goal `element` undeveloped, or clear the mark.
+    SetUndeveloped { element: String, undeveloped: bool },
+    /// Join the node `element` by context in place of the support line that
+    /// `relationship` draws.
+    RepairJoin {
+        element: String,
+        relationship: String,
+    },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
     Restore,
@@ -220,6 +233,80 @@ impl Session {
         };
         let record = self.made(before, command, &removed.mutation);
         Ok((removed, record))
+    }
+
+    /// Moves the node `element`, with what is under it, to `target`. `view`
+    /// is the view of the document as it is now.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::move_node`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn move_node(
+        &mut self,
+        view: &View,
+        element: &str,
+        target: Target<'_>,
+    ) -> Result<(Moved, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let moved = commands::move_node(&mut self.document, view, element, target)?;
+        let command = Command::Move {
+            element: element.to_owned(),
+            to: match target {
+                Target::Canvas => None,
+                Target::Node(id) => Some(id.to_owned()),
+            },
+        };
+        let record = self.made(before, command, &moved.mutation);
+        Ok((moved, record))
+    }
+
+    /// Marks the Goal `element` undeveloped, or clears the mark. `None` when
+    /// it was that already.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::set_undeveloped`] refuses; the document and the
+    /// revision are then unchanged.
+    pub fn set_undeveloped(
+        &mut self,
+        view: &View,
+        element: &str,
+        undeveloped: bool,
+    ) -> Result<Option<ChangeRecord>, AddError> {
+        let before = self.document.clone();
+        let set = commands::set_undeveloped(&mut self.document, view, element, undeveloped)?;
+        let TextSet::Changed(mutation) = set else {
+            return Ok(None);
+        };
+        let command = Command::SetUndeveloped {
+            element: element.to_owned(),
+            undeveloped,
+        };
+        Ok(Some(self.made(before, command, &mutation)))
+    }
+
+    /// Joins the node `element` by context in place of the support line
+    /// that `relationship` draws.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::repair_join`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn repair_join(
+        &mut self,
+        view: &View,
+        element: &str,
+        relationship: &str,
+    ) -> Result<(Repaired, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let repaired = commands::repair_join(&mut self.document, view, element, relationship)?;
+        let command = Command::RepairJoin {
+            element: element.to_owned(),
+            relationship: relationship.to_owned(),
+        };
+        let record = self.made(before, command, &repaired.mutation);
+        Ok((repaired, record))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

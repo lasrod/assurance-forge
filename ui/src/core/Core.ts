@@ -12,6 +12,7 @@ import type {
   FoundRecovery,
   History,
   KeepResult,
+  MoveTargets,
   OpenedFile,
   OpenResult,
   Outline,
@@ -144,6 +145,31 @@ export interface Core {
    * changed since. `element` is the node it was drawn under, to select.
    */
   remove(id: string, revision: number): Promise<EditResult>;
+  /**
+   * Where the node with this SACM id may be moved: for every node of the
+   * diagram, and for the top level, the code of why not, or null; or the
+   * code of why it cannot be moved at all. Null when nothing is open.
+   */
+  moveTargets(id: string): Promise<MoveTargets | null>;
+  /**
+   * Moves the node with this SACM id, with what is under it, under the node
+   * `to`, or to the top level when null, as the targets of `revision` said:
+   * refused (AF-EDIT-009) when the document has changed since. `element` is
+   * the node moved.
+   */
+  moveNode(id: string, to: string | null, revision: number): Promise<EditResult>;
+  /**
+   * Marks the Goal with this SACM id undeveloped, or clears the mark.
+   * `unchanged` when it was that already; refused when it is not a Goal
+   * (AF-EDIT-021) or is supported (AF-EDIT-022).
+   */
+  setUndeveloped(id: string, undeveloped: boolean, revision: number): Promise<EditResult>;
+  /**
+   * Joins the node with this SACM id by context in place of the support
+   * line `relationship` draws, as a problem of `revision` offered: refused
+   * (AF-EDIT-009) when the document has changed since.
+   */
+  repairJoin(id: string, relationship: string, revision: number): Promise<EditResult>;
   /**
    * Sets the identifier, name or statement of the node with this SACM id.
    * `unchanged` when it was that already; refused (AF-EDIT-011 to 014) when
