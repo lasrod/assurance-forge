@@ -274,6 +274,10 @@ const GSN_IDENTIFIER_KEY: &str = "assuranceForge.gsn.identifier";
 /// (W2, R16), and its value.
 pub(crate) const PLACEHOLDER_KEY: &str = "assuranceForge.gsn.placeholder";
 pub(crate) const PLACEHOLDER_VALUE: &str = "subGoal";
+/// R17: the tag of a confidence Claim the editor made as an ACP's
+/// description (W34).
+pub const ACP_KEY: &str = "assuranceForge.gsn.acp";
+pub const ACP_DESCRIPTION: &str = "description";
 /// The GSN namespaces a recorded type may name (mapping record, Namespaces).
 const GSN_NAMESPACES: [&str; 3] = [
     "http://scsc.acwg.gsn/2.0",
@@ -384,11 +388,9 @@ pub fn view(document: &Document, language: &str) -> View {
             let reached = reach.get(id).copied().unwrap_or_default();
             node(*element, reached, language, &mut builder);
         } else if descriptions.contains(id) {
-            // R17: built as a Goal is, and kept apart, not drawn; what the
-            // building found is of no node, and is not said.
-            let found = builder.findings.len();
+            // R17: built as a Goal is, and kept apart, not drawn. What the
+            // building finds is said: it is about the element.
             node(*element, Reach::default(), language, &mut builder);
-            builder.findings.truncate(found);
             if let Some(described) = builder.nodes.pop() {
                 builder.descriptions.push(described);
             }
@@ -408,9 +410,10 @@ fn acps(document: &Document, builder: &mut Builder) {
             .get(claim.as_str())
             .filter(|element| element.kind() == SacmKind::Claim);
         let Some(named) = named else {
-            if !unnamed.contains(&relationship) {
-                builder.finding(Code::MetaClaimNotDrawn, &relationship, None);
-                unnamed.push(relationship);
+            // The one it names, which is not drawn, while others may be.
+            if !unnamed.contains(&claim) {
+                builder.finding(Code::MetaClaimNotDrawn, &relationship, Some(&claim));
+                unnamed.push(claim);
             }
             continue;
         };
@@ -454,13 +457,20 @@ fn acps(document: &Document, builder: &mut Builder) {
 }
 
 /// R17: a `Claim` an ACP may show as its description, and the diagram not as
-/// a node. Only `metaClaim` references name it, each from a relationship of
-/// its own argument package that is not a counter or a citation; it is not
-/// cited, not abstract, and makes no claim about anything itself. The view
+/// a node. The editor made it so (W34), tagged `assuranceForge.gsn.acp` =
+/// `description`; it is declared asserted or not at all, not cited, not
+/// abstract, and makes no claim about anything itself; and only `metaClaim`
+/// references name it, each from a relationship of its own argument package
+/// that is not a counter or a citation. The view
 /// then keeps those an ACP is drawn for: E11 draws one only on a live line. Anything that also supports it, or that it
 /// supports, makes it a Goal of the argument, drawn as R2 says.
 fn is_acp_description(document: &Document, element: SacmElement<'_>) -> bool {
     if element.kind() != SacmKind::Claim
+        || tagged_value(element, ACP_KEY) != Some(ACP_DESCRIPTION)
+        || !matches!(
+            element.assertion_declaration(),
+            None | Some(AssertionDeclaration::Asserted)
+        )
         || element.is_citation()
         || element.is_abstract()
         || !element.meta_claims().is_empty()

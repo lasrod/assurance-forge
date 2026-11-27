@@ -8,12 +8,12 @@
 //! package or in a new one beside it; and the relationship's `metaClaim`
 //! gains it, which E11 reads back as the ACP.
 
-use sacm::edit::{self, BatchError, CreateArgumentPackage, SetReferences};
+use sacm::edit::{self, BatchError, CreateArgumentPackage, CreateTaggedValue, SetReferences};
 use sacm::model::{Document, ElementId, ElementKind as SacmKind, LangString, ReferenceEnd};
 
 use super::{AddError, Added, Identifiers, Refusal, argument_package, new_node};
 use crate::ElementKind;
-use crate::view::{EdgeKind, NodeKind, View};
+use crate::view::{ACP_DESCRIPTION, ACP_KEY, EdgeKind, NodeKind, View};
 
 /// The prefix of a confidence Claim's identifier (A4).
 pub const ACP_PREFIX: &str = "ACP";
@@ -150,6 +150,14 @@ pub fn add_acp(
             }
         };
         let claim = new_node(tx, &package, ElementKind::Goal, identifier.clone())?;
+        // R17: a description, marked so, which the view shows as the ACP.
+        if kind == AcpKind::Description {
+            tx.apply(CreateTaggedValue::new(
+                claim.clone(),
+                LangString::new(ACP_KEY),
+                LangString::new(ACP_DESCRIPTION),
+            ))?;
+        }
         let mut claims = named.clone();
         claims.push(claim.clone());
         tx.apply(SetReferences::new(

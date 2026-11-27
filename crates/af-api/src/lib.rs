@@ -620,7 +620,11 @@ impl Core {
                 removal
                     .acps
                     .iter()
-                    .filter_map(|claim| view.acps.iter().find(|acp| acp.claim == *claim))
+                    .filter_map(|(relationship, claim)| {
+                        view.acps
+                            .iter()
+                            .find(|acp| acp.relationship == *relationship && acp.claim == *claim)
+                    })
                     .map(|acp| acp.label.clone())
                     .collect(),
                 None,
@@ -969,10 +973,11 @@ impl Core {
             open.problems = None;
             // A package the command took away, as an undo of the add that
             // made it: the whole case is shown.
-            let gone = open
-                .package
-                .as_deref()
-                .is_some_and(|package| open.session.document().get(package).is_none());
+            let gone = open.package.as_deref().is_some_and(|package| {
+                open.session.document().get(package).is_none_or(|element| {
+                    element.kind() != sacm::model::ElementKind::ArgumentPackage
+                })
+            });
             if gone {
                 open.package = None;
             }

@@ -27,10 +27,11 @@ pub struct Removal {
     /// The SACM ids of the nodes it deletes: the node chosen first, then
     /// what goes with it, each after a node it is drawn under.
     pub nodes: Vec<String>,
-    /// The confidence Claims of the ACPs it takes, other than descriptions,
-    /// which `nodes` lists: one whose Claim goes from a line that stays, or
-    /// whose line goes while its Claim stays (W19).
-    pub acps: Vec<String>,
+    /// The ACPs it takes, as the relationship and the confidence Claim,
+    /// other than descriptions, which `nodes` lists: one whose Claim goes
+    /// from a line that stays, or whose line goes while its Claim stays
+    /// (W19).
+    pub acps: Vec<(String, String)>,
 }
 
 /// What a removal made.
@@ -151,8 +152,8 @@ struct Plan {
     held_within: HashSet<String>,
     /// A relationship that stays, and a source of it that goes.
     scrubbed: Vec<(ElementId, ReferenceEnd, ElementId)>,
-    /// The confidence Claims that go whose ACP on a line that stays goes too.
-    acps: Vec<String>,
+    /// The ACPs that go, as the relationship and the confidence Claim.
+    acps: Vec<(String, String)>,
     /// An inference that stays with its Strategy and loses every Goal, and
     /// the package its placeholder goes into.
     held: Vec<(ElementId, ElementId)>,
@@ -297,14 +298,14 @@ impl Plan {
         let all: HashSet<&str> = deleted.iter().map(ElementId::as_str).collect();
         // The ACPs whose line goes and whose Claim stays: a confidence
         // argument elsewhere, or a goal of the argument, loses its ACP.
-        let mut acps: Vec<String> = view
+        let mut acps: Vec<(String, String)> = view
             .acps
             .iter()
             .filter(|acp| {
                 relationships.deleted.contains(acp.relationship.as_str())
                     && !all.contains(acp.claim.as_str())
             })
-            .map(|acp| acp.claim.clone())
+            .map(|acp| (acp.relationship.clone(), acp.claim.clone()))
             .collect();
 
         // W19: what refers to what goes. A relationship that stays loses the
@@ -350,7 +351,10 @@ impl Plan {
                         acp.relationship == holder.id().as_str() && acp.claim == element_id.as_str()
                     });
                 if drawn_acp {
-                    acps.push(element_id.as_str().to_owned());
+                    acps.push((
+                        holder.id().as_str().to_owned(),
+                        element_id.as_str().to_owned(),
+                    ));
                 }
                 if holder.kind().is_a(AbstractClass::AssertedRelationship)
                     && (end == ReferenceEnd::Source || drawn_acp)

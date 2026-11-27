@@ -690,8 +690,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   /** A node asked for: in the diagram shown, or else in the whole case, if it draws it. */
   const showNode = (id: string) => {
     const drawn = diagram ? boundsOf(diagram.diagram, id) !== null : false;
-    const anywhere = outline.some((row) => row.id === id);
-    if (drawn || shownPackage === null || !anywhere) {
+    // An ACP's Claim is shown by its ACP, not as a node: selected here.
+    const acpClaim = diagram?.diagram.edges.some((edge) => edge.acps.some((acp) => acp.claim === id)) ?? false;
+    if (drawn || shownPackage === null || acpClaim) {
       selectAndShow(id);
       return;
     }
@@ -1078,6 +1079,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                   {item.label}
                 </MenuItem>
               ))}
+            {addMenu?.line && !moving && challengeItems(addMenu.challenges ?? [], t).length > 0 && acpItems(addMenu.acps?.choices ?? [], t).length > 0 && (
+              <MenuSeparator />
+            )}
             {addMenu?.line &&
               !moving &&
               acpItems(addMenu.acps?.choices ?? [], t).map((item) => (

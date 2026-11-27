@@ -447,7 +447,7 @@ fn w19_a_confidence_goal_is_removed_with_its_acp() {
     let listed = removal(&document, &shown, "ACP4").unwrap_or_else(|why| panic!("{why:?}"));
     assert_eq!(listed.nodes, ["ACP4".to_owned(), "Sn4".to_owned()]);
     // Its ACP, on X1, which stays, goes with it, and is listed.
-    assert_eq!(listed.acps, ["ACP4".to_owned()]);
+    assert_eq!(listed.acps, [("X1".to_owned(), "ACP4".to_owned())]);
     remove(&mut document, &shown, "ACP4").unwrap_or_else(|error| panic!("{error}"));
     let after = view(&strict(&document), "en");
     assert!(!after.acps.iter().any(|acp| acp.claim == "ACP4"));
@@ -457,9 +457,9 @@ fn w19_a_confidence_goal_is_removed_with_its_acp() {
 }
 
 #[test]
-fn r17_what_building_a_description_finds_is_not_said() {
-    // ACP1 records a GSN type that does not agree with its class: as a node
-    // it would say so, but it is not drawn.
+fn r17_what_building_a_description_finds_is_said() {
+    // ACP1 records a GSN type that does not agree with its class: the file
+    // says it, so the problem list does, though ACP1 is not drawn.
     let text = std::fs::read_to_string(format!(
         "{}/../../testdata/sacm/acps.sacm.xmi",
         env!("CARGO_MANIFEST_DIR")
@@ -479,7 +479,7 @@ fn r17_what_building_a_description_finds_is_not_said() {
         shown
             .findings
             .iter()
-            .all(|finding| finding.element != "ACP1")
+            .any(|finding| finding.element == "ACP1" && finding.code == Code::RecordedTypeNotUsed)
     );
 }
 
@@ -538,5 +538,37 @@ fn w19_a_removal_lists_an_acp_whose_line_goes() {
     let shown = view(&document, "en");
     let listed = removal(&document, &shown, "Sn1").unwrap_or_else(|why| panic!("{why:?}"));
     assert_eq!(listed.nodes, ["Sn1".to_owned()]);
-    assert_eq!(listed.acps, ["ACP2".to_owned()]);
+    assert_eq!(listed.acps, [("E1".to_owned(), "ACP2".to_owned())]);
+}
+
+#[test]
+fn r17_only_a_claim_the_editor_marked_is_a_description() {
+    // ACP4 is a confidence goal: removing its only support leaves it named
+    // by X1's metaClaim alone, and it stays a Goal of the argument.
+    let mut document = sample("acps.sacm.xmi");
+    let shown = view(&document, "en");
+    remove(&mut document, &shown, "Sn4").unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&document, "en");
+    assert!(after.nodes.iter().any(|node| node.id == "ACP4"));
+    assert!(!after.descriptions.iter().any(|node| node.id == "ACP4"));
+    // A Claim another tool wrote, named only by a metaClaim, is a Goal.
+    let document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g" metaClaim="c"><name content="i" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="c"><name content="c" /></argumentElement>"#,
+    );
+    let shown = view(&document, "en");
+    assert_eq!(shown.acps.len(), 1);
+    assert!(shown.nodes.iter().any(|node| node.id == "c"));
+    // A marked one declared needing support is an undeveloped Goal, drawn.
+    let document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g" metaClaim="c"><name content="i" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="c" assertionDeclaration="needsSupport"><name content="c" /><taggedValue xmi:id="tv_c"><key><value content="assuranceForge.gsn.acp" /></key><content><value content="description" /></content></taggedValue></argumentElement>"#,
+    );
+    let shown = view(&document, "en");
+    assert!(
+        shown
+            .nodes
+            .iter()
+            .any(|node| node.id == "c" && node.undeveloped)
+    );
 }

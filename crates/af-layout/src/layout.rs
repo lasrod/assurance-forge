@@ -1780,7 +1780,14 @@ fn place_acps(
         // label never lies along the line; several are spaced along the
         // line around its midpoint, each on it.
         let offset = row - (count - 1.0) / 2.0;
-        let (middle, across) = along(&edge.points, offset * line_height);
+        // Closer together on a line too short for them, kept off its ends.
+        let length: f32 = edge
+            .points
+            .windows(2)
+            .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+            .sum();
+        let spacing = line_height.min(length / (count + 1.0));
+        let (middle, across) = along(&edge.points, offset * spacing);
         let centre = middle;
         let square = Rect {
             x: centre.x - ACP_HALF,

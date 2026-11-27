@@ -33,6 +33,7 @@
     </argumentElement>
     <argumentElement xmi:type="sacm:Claim" xmi:id="ACP1">
       <name content="HazardsIdentified" />
+      <taggedValue xmi:id="tv_ACP1_acp"><key><value content="assuranceForge.gsn.acp" /></key><content><value content="description" /></content></taggedValue>
       <description xmi:id="d_ACP1"><content><value lang="en" content="The hazards were identified by a HAZOP of the final design, reviewed independently." /></content></description>
     </argumentElement>
     <argumentElement xmi:type="sacm:Claim" xmi:id="ACP4">
