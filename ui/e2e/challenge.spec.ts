@@ -1,5 +1,5 @@
 // Adding a challenge (milestone 2, step 6): a node's menu and a line's menu
-// offer Challenge with a Goal and Challenge with a Solution. The new
+// offer Add Counter Goal and Add Counter Evidence. The new
 // challenger is drawn beside what it challenges, with a challenge line to it,
 // is selected, and is one undo step.
 
@@ -53,16 +53,17 @@ test('a node is challenged by a Goal from its menu, and Undo takes it back', asy
   const at = await nodeCentre(page, 'cl_sub_1');
   await page.mouse.click(at.x, at.y, { button: 'right' });
   const menu = page.getByRole('menu');
-  await expect(menu.getByRole('menuitem', { name: 'Challenge with a Goal' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Challenge with a Solution' })).toBeVisible();
-  await menu.getByRole('menuitem', { name: 'Challenge with a Goal' }).click();
+  await expect(menu.getByRole('menuitem', { name: 'Add Counter Goal' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Add Counter Evidence' })).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Add Counter Goal' }).click();
 
   await expect.poll(async () => (await hook(page)).revision).toBe(2);
   const challenger = (await hook(page)).selected!;
   expect(await challenges(page)).toEqual([{ from: challenger, to: 'cl_sub_1' }]);
   const node = (await hook(page)).diagram!.diagram.nodes.find((candidate) => candidate.id === challenger)!;
   expect(node.kind).toBe('goal');
-  await expect(status(page)).toHaveText(/^Goal G\d+ added\.$/);
+  expect(node.text.find((line) => line.role === 'identifier')?.text).toBe('CG1');
+  await expect(status(page)).toHaveText('Counter goal CG1 added.');
 
   await canvas(page).focus();
   await page.keyboard.press('ControlOrMeta+z');
@@ -78,9 +79,9 @@ test('a line is challenged by a Solution from its menu, by a right-click or the 
   const menu = page.getByRole('menu', { name: 'Line' });
   await expect(menu).toBeVisible();
   // A line's menu only challenges it: nothing is added under a line.
-  await expect(menu.getByRole('menuitem')).toHaveText(['Challenge with a Goal', 'Challenge with a Solution']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Add Counter Goal', 'Add Counter Evidence']);
   expect((await hook(page)).selected).toBe(`${edge.relationship} ${edge.from} ${edge.to}`);
-  await menu.getByRole('menuitem', { name: 'Challenge with a Solution' }).click();
+  await menu.getByRole('menuitem', { name: 'Add Counter Evidence' }).click();
 
   await expect.poll(async () => (await hook(page)).revision).toBe(2);
   const challenger = (await hook(page)).selected!;
@@ -116,6 +117,6 @@ test('the challenge items are worded in Japanese', async ({ page }) => {
   const at = await nodeCentre(page, 'cl_sub_1');
   await page.mouse.click(at.x, at.y, { button: 'right' });
   const menu = page.getByRole('menu');
-  await expect(menu.getByRole('menuitem', { name: 'ゴールで異議を唱える' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'ソリューションで異議を唱える' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: '反論ゴールを追加' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: '反証を追加' })).toBeVisible();
 });

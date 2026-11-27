@@ -101,6 +101,8 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('relayoutFailed'), tone: 'error' };
     case 'added':
       return { text: t('added', { kind: kindName(state.added, t), identifier: state.identifier }) };
+    case 'challenged':
+      return { text: t(state.added === 'solution' ? 'counterEvidenceAdded' : 'counterGoalAdded', { identifier: state.identifier }) };
     case 'textChanged':
       return { text: t('textChanged', { field: t(TEXT_FIELDS[state.field]) }) };
     case 'removed':

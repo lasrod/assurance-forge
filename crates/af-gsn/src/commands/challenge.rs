@@ -62,7 +62,7 @@ pub fn challenge(
     let mut numbers = Identifiers::of(document, view);
     let mut made: Option<String> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
-        let challenger = new_node(tx, &plan.package, kind, &mut numbers)?;
+        let challenger = new_node(tx, &plan.package, kind, numbers.next_prefixed(prefix(kind)))?;
         // W31: the counter relationship, from the challenger to what it
         // challenges.
         if kind == ElementKind::Solution {
@@ -94,6 +94,17 @@ pub fn challenge(
         element: made.unwrap_or_default(),
         mutation,
     })
+}
+
+/// W31: the identifier prefix of a challenger: `CG` for a counter goal and
+/// `CSn` for counter evidence, as GSN v3's dialectic figures number them
+/// (Figures 1:6-1 to 1:6-5).
+pub fn prefix(kind: ElementKind) -> &'static str {
+    if kind == ElementKind::Solution {
+        "CSn"
+    } else {
+        "CG"
+    }
 }
 
 /// A challenge that may be made.

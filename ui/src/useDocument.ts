@@ -52,6 +52,8 @@ export type DocumentState =
   | { kind: 'relayoutFailed' }
   | { kind: 'result'; result: OpenResult }
   | { kind: 'added'; added: NodeKind; identifier: string }
+  /** A counter goal or counter evidence added: a challenge. */
+  | { kind: 'challenged'; added: NodeKind; identifier: string }
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
@@ -411,7 +413,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
+      what: 'add' | 'challenge' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
@@ -484,6 +486,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       if (said) setState(said);
       else if (what === 'add') {
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
+      } else if (what === 'challenge') {
+        if (details) setState({ kind: 'challenged', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
       else if (what !== 'remove' && what !== 'move' && what !== 'mark' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
@@ -540,12 +544,12 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   );
   /**
    * Challenges the node `at`, or with `line` that line of the relationship
-   * `at`, with a new element of `kind`, from the menu of `revision`. The
-   * status says what was added, as for an add.
+   * `at`, with a new element of `kind`, from the menu of `revision`: a
+   * counter goal or counter evidence, which the status names.
    */
   const challenge = useCallback(
     (at: string, line: LineEnds | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
-      void edit((on) => on.challenge(at, line, kind, revision), 'add', line ? null : at, about, onShown),
+      void edit((on) => on.challenge(at, line, kind, revision), 'challenge', line ? null : at, about, onShown),
     [edit],
   );
   /**

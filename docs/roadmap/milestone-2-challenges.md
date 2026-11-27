@@ -70,15 +70,34 @@ Decided in G1, with the evidence in
   and a challenge of it was drawn on the line into the Strategy, not on the
   line chosen. Such a line says why and points to the first line or the
   Strategy.
-- **What challenges (W30).** A Goal or a Solution (AF-EDIT-026 otherwise).
+- **What challenges (W30).** A counter goal or counter evidence: a Goal or a
+  Solution, GSN v3's "dialectic uses of the following core elements" (§1:6.2.2;
+  AF-EDIT-026 otherwise). The menu says **Add Counter Goal** and **Add Counter
+  Evidence**.
 - **The challenge (W31).** The challenger is made as an add makes a node, in
-  the package of what is challenged, with the next identifier of its kind.
+  the package of what is challenged, numbered `CG1`, `CG2`… or `CSn1`,
+  `CSn2`…, as the standard's dialectic figures number them (asked for by the
+  user on 27 November 2026, after the first screenshots).
 - **Counter-evidence is a Solution (R9).** R11 no longer makes it neutral.
 
 Still to decide, in G4: **how a challenger is moved.** Proposed: its counter
 relationship gets a new target (`SetReferences`), with W25's guards, and what
 is under the challenger comes with it. This lifts AF-EDIT-017 for a node that
 challenges one thing.
+
+### For the next step: the ACP identifier
+
+Read on 27 November 2026, for the step after this one. GSN Metamodel v2.2 has
+no ACP class, strikes `metaClaim` out and forbids tagged values, so it gives no
+carrier for an ACP's identifier. GSN v3 does not need one: "The {ACP
+identifier} may be a reference to a goal, a section in a document, or other
+form of unique reference that can be followed by the reader of the argument"
+(§1:5.3.2), with the module alongside, as `ACP1[Confidence]`, when the
+argument is in another module (§1:5.2.3). An ACP labelled with the identifier
+of its `metaClaim` goal is therefore the standard's own option, and writes
+nothing new. The same section puts ACPs on `SupportedBy` and `InContextOf`
+lines and on elements that reference an artefact (a Solution, a Context), and
+calls an ACP on one line below a Strategy "ambiguous" (§1:5.3.3).
 
 ## Trying it out
 

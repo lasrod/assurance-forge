@@ -433,10 +433,11 @@ Decided by the user on 27 November 2026, for milestone 2, step 6. An
 `ArtifactReference` that is the source of a counter `AssertedEvidence` the view
 draws (E5), and is reached in no other way, is a Solution: counter-evidence.
 
-- **GSN v3.** The Dialectic Extension expresses counter-evidence by a Solution
-  at the tail of a challenge, as it expresses a counter-argument by a Goal
-  (the C++ application's conformance matrix, GSN3-DIA-002; the clause was not
-  traced to the text of the standard here).
+- **GSN v3.** "GSN defines dialectic uses of the following core elements:
+  Goal, Solution" (§1:6.2.2). Table 1:6-1: "A solution, (core element) can be
+  used to present a reference to an evidence item that asserts a challenge to
+  part of the argument", and §1:6.3.5 speaks of "Counter evidence (via a
+  solution)". Counter-evidence is a Solution, not a kind of its own.
 - **SACM.** The pair is the one SACM gives for evidence, `ArtifactReference`
   and `AssertedEvidence` (R9, §11.15), with `isCounter` set (§11.13): evidence
   against its target instead of for it. Nothing else in the file is read
@@ -683,9 +684,9 @@ Figure 2); GSN v3 requires challenges, and the gap is row 4 of
 
 | Rule | Challenged, and by what | SACM operations | Status | Evidence |
 |---|---|---|---|---|
-| W29 | What is challenged | A Goal, an Assumption, a Justification, a Solution or a Context node: the element is the `target`. A line drawn as `SupportedBy`, `InContextOf` or a challenge: the relationship is the `target`, since a challenge may point at a relationship and may itself be challenged. Only the relationship's first line offers it, where E5 draws a challenge of that relationship; its other lines, such as a premise's under a Strategy or one of several sources', have no relationship of their own in SACM and are refused (AF-EDIT-027), since the challenge would be drawn on another line than the one chosen. A Strategy: the one inference it is the `reasoning` of and that the view draws through it (AF-EDIT-004 otherwise), which E5 draws at the Strategy when it reads one. A neutral node or line is not challenged (AF-EDIT-002) | Decided | E5; GSN v3 §1:6.3.12 puts a challenge of an inference with several premises at its Strategy; SACM 2.3 §11.13 lets the `target` of an `AssertedRelationship` be any `ArgumentAsset`, a relationship among them |
-| W30 | What challenges | A Goal (a counter-argument) or a Solution (counter-evidence), the two of GSN v3's Dialectic Extension; any other kind is refused (AF-EDIT-026) | Decided | R9: counter-evidence is a Solution; the C++ application's GSN3-DIA-001 and 002 |
-| W31 | The challenge | The challenger as an add makes a node of its kind (W9, W10), in the `ArgumentPackage` of what is challenged; then, with `isCounter` set, `CreateAssertedInference` from a Goal or `CreateAssertedEvidence` from a Solution, to the `target` of W29. Nothing that is challenged is changed | Decided | E5 reads it back as a challenge; R9 reads counter-evidence as a Solution |
+| W29 | What is challenged | A Goal, an Assumption, a Justification, a Solution or a Context node: the element is the `target`. A line drawn as `SupportedBy`, `InContextOf` or a challenge: the relationship is the `target`, since a challenge may point at a relationship and may itself be challenged. Only the relationship's first line offers it, where E5 draws a challenge of that relationship; its other lines, such as a premise's under a Strategy or one of several sources', have no relationship of their own in SACM and are refused (AF-EDIT-027), since the challenge would be drawn on another line than the one chosen. A Strategy: the one inference it is the `reasoning` of and that the view draws through it (AF-EDIT-004 otherwise), which E5 draws at the Strategy when it reads one. A neutral node or line is not challenged (AF-EDIT-002) | Decided | E5. GSN v3 Table 1:6-2: "Permitted connections are: goal-to-any element, solution-to-any element, goal-to-any relationship, solution-to-any relationship"; §1:6.3.5 names "goal, solution, strategy, context, assumption, justification", and §1:6.3.9 "SupportedBy, InContextOf, Challenges". §1:6.3.12: "it is only possible to challenge the inference relationship in its entirety. A challenge cannot be made directly to multiple SupportedBy relationships, so challenges to this inference require a strategy to be inserted", the challenge then applied to the Strategy. SACM 2.3 §11.13 lets the `target` of an `AssertedRelationship` be any `ArgumentAsset`, a relationship among them |
+| W30 | What challenges | A counter goal (a Goal: "an evidenced counter argument (via a goal)") or counter evidence (a Solution); any other kind is refused (AF-EDIT-026). The menu says **Add Counter Goal** and **Add Counter Evidence** | Decided | GSN v3 §1:6.2.2: "GSN defines dialectic uses of the following core elements: Goal, Solution"; §1:6.3.5 and §1:6.3.14 ("a counter claim (via the goal)"); R9 |
+| W31 | The challenge | The challenger as an add makes a node of its kind (W9), in the `ArgumentPackage` of what is challenged, with the next identifier of the prefix `CG` for a counter goal and `CSn` for counter evidence (W10's numbering); then, with `isCounter` set, `CreateAssertedInference` from a Goal or `CreateAssertedEvidence` from a Solution, to the `target` of W29. Nothing that is challenged is changed | Decided (prefixes on 27 November 2026, asked for by the user) | E5 reads it back as a challenge; R9 reads counter-evidence as a Solution. GSN v3's dialectic figures number them so: CSn1 (Figures 1:6-1, 1:6-3, 1:6-4), CG1 and CG2 (Figures 1:6-2, 1:6-5). An example, not a rule: §1:2.1.2 asks only that an identifier be unique in its module |
 
 ### Codes
 

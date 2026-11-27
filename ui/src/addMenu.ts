@@ -37,7 +37,7 @@ export function kindName(kind: ElementKind | NodeKind, t: T): string {
 export function challengeItems(choices: readonly AddChoice[], t: T): AddItem[] {
   return choices
     .filter((choice) => choice.refusal === null)
-    .map((choice) => ({ kind: choice.kind, label: t(choice.kind === 'solution' ? 'challengeWithSolution' : 'challengeWithGoal') }));
+    .map((choice) => ({ kind: choice.kind, label: t(choice.kind === 'solution' ? 'addCounterEvidence' : 'addCounterGoal') }));
 }
 
 /** The menu's items for `choices`: the kinds that can be added, in the core's order. */

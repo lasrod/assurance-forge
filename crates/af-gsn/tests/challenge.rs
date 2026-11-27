@@ -348,7 +348,7 @@ fn w29_a_strategy_with_no_one_inference_is_not_challenged() {
 }
 
 #[test]
-fn w31_the_challenger_takes_the_next_identifier_of_its_kind() {
+fn w31_a_counter_takes_the_next_cg_or_csn_identifier() {
     let mut document = argument();
     let shown = view(&document, "en");
     let added = challenge(
@@ -364,7 +364,33 @@ fn w31_the_challenger_takes_the_next_identifier_of_its_kind() {
         .iter()
         .find(|node| node.id == added.element)
         .unwrap_or_else(|| panic!("not drawn"));
-    assert_eq!(node.identifier, "Sn1");
+    assert_eq!(node.identifier, "CSn1");
+    let shown = view(&document, "en");
+    let added = challenge(
+        &mut document,
+        &shown,
+        Challenged::Node("g"),
+        ElementKind::Goal,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let shown = view(&document, "en");
+    let again = challenge(
+        &mut document,
+        &shown,
+        Challenged::Node("g"),
+        ElementKind::Goal,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&document, "en");
+    let identifier = |id: &str| {
+        after
+            .nodes
+            .iter()
+            .find(|node| node.id == id)
+            .map(|node| node.identifier.clone())
+    };
+    assert_eq!(identifier(&added.element).as_deref(), Some("CG1"));
+    assert_eq!(identifier(&again.element).as_deref(), Some("CG2"));
 }
 
 /// In every sample, each node and each line drawn is challenged once by a

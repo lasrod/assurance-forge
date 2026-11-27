@@ -434,7 +434,7 @@ pub fn add(
             made = Some(claim.as_str().to_owned());
             return Ok(());
         }
-        let element = new_node(tx, &package, kind, &mut numbers)?;
+        let element = new_node(tx, &package, kind, numbers.next(kind))?;
         match (&plan.parent, kind) {
             // W8.
             (Parent::Canvas, _) => {}
@@ -514,12 +514,12 @@ pub fn add(
 
 /// A new node of `kind` in `package`, as an add makes one: the SACM element
 /// its kind is written as, the declaration that tells an Assumption and a
-/// Justification from a Goal (R4, R5), and its identifier (W10).
+/// Justification from a Goal (R4, R5), and `identifier` (W10).
 pub(crate) fn new_node(
     tx: &mut edit::Batch<'_>,
     package: &ElementId,
     kind: ElementKind,
-    numbers: &mut Identifiers,
+    identifier: String,
 ) -> Result<ElementId, BatchError> {
     let created = match kind {
         ElementKind::Strategy => tx.apply(CreateArgumentReasoning::new(
@@ -546,7 +546,7 @@ pub(crate) fn new_node(
     tx.apply(CreateTaggedValue::new(
         id.clone(),
         LangString::new(GSN_IDENTIFIER_KEY),
-        LangString::new(numbers.next(kind)),
+        LangString::new(identifier),
     ))?;
     Ok(id)
 }
@@ -790,7 +790,11 @@ impl Identifiers {
     /// The kind's prefix and the lowest number above every identifier of
     /// that prefix; then that one is taken too.
     pub(crate) fn next(&mut self, kind: ElementKind) -> String {
-        let prefix = kind.identifier_prefix();
+        self.next_prefixed(kind.identifier_prefix())
+    }
+
+    /// The same, for `prefix`, such as `CG` for a counter goal (W31).
+    pub(crate) fn next_prefixed(&mut self, prefix: &str) -> String {
         let highest = self
             .taken
             .iter()
