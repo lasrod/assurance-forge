@@ -34,19 +34,25 @@ describe('nest', () => {
 });
 
 describe('outlineTree', () => {
-  it('calls a node by its name, else its statement, else its identifier', () => {
-    expect(outlineLabel({ name: 'Top', statement: 'The system is safe', identifier: 'G1' })).toBe('Top');
-    expect(outlineLabel({ name: null, statement: 'The system is safe', identifier: 'G1' })).toBe('The system is safe');
-    expect(outlineLabel({ name: null, statement: null, identifier: 'G1' })).toBe('G1');
-    expect(outlineLabel({ name: '', statement: '', identifier: 'G1' })).toBe('G1');
+  it('calls a node by its name, else its statement, else nothing', () => {
+    expect(outlineLabel({ name: 'Top', statement: 'The system is safe' })).toBe('Top');
+    expect(outlineLabel({ name: null, statement: 'The system is safe' })).toBe('The system is safe');
+    expect(outlineLabel({ name: null, statement: null })).toBe('');
+    expect(outlineLabel({ name: '', statement: '' })).toBe('');
   });
 
   it('shows the identifier after the name, and typeahead finds either', () => {
     const [node] = outlineTree([row('g1', 1)]).nodes;
     expect(node).toMatchObject({ value: 'g1', label: { props: { title: 'Name of g1', children: 'Name of g1' } }, textValue: 'G1 Name of g1' });
     expect(node?.meta).toMatchObject({ props: { children: 'G1' } });
+  });
+
+  it('keeps the identifier in its column for an element with no text, as a new one has', () => {
     const [bare] = outlineTree([row('g1', 1, { name: null })]).nodes;
-    expect(bare).toMatchObject({ label: { props: { children: 'G1' } }, meta: undefined });
+    expect(bare).toMatchObject({ label: { props: { children: '' } }, textValue: 'G1' });
+    expect(bare?.meta).toMatchObject({ props: { children: 'G1' } });
+    const [blank] = outlineTree([row('g1', 1, { name: '', statement: '' })]).nodes;
+    expect(blank?.meta).toMatchObject({ props: { children: 'G1' } });
   });
 });
 

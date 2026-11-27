@@ -315,6 +315,15 @@ test('an edit keeps the Argument Navigator’s closed branches closed', async ({
   await expect(branch).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('a new element’s ID is in the Argument Navigator’s ID column, not where its description goes', async ({ page }) => {
+  await opened(page);
+  await (await menuOf(page, 'cl_top')).getByRole('menuitem', { name: 'Add Assumption' }).click();
+  await expect(status(page)).toHaveText('Assumption A1 added.');
+  const row = page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem', { name: /A1/ });
+  await expect(row.locator('.af-tree-meta')).toHaveText('A1');
+  await expect(row.getByText('A1', { exact: true })).toHaveCount(1);
+});
+
 test('the menu and the edits are worded in Japanese', async ({ page }) => {
   await opened(page, '&lang=ja');
   const menu = await menuOf(page, 'ev_1');
