@@ -29,13 +29,17 @@ async function nodeCentre(page: Page, id: string) {
   };
 }
 
-/** A point on the line that ends at `to`: the middle of its first segment. */
-async function onLineTo(page: Page, to: string) {
+/**
+ * A point on the line, not a challenge's, that ends at `to`: the middle of
+ * its first segment, or of its last, which is its own where lines share a
+ * trunk.
+ */
+async function onLineTo(page: Page, to: string, segment: 'first' | 'last' = 'first') {
   const box = (await canvas(page).boundingBox())!;
   const state = await hook(page);
-  const edge = state.diagram!.diagram.edges.find((candidate) => candidate.to === to)!;
+  const edge = state.diagram!.diagram.edges.find((candidate) => candidate.to === to && candidate.kind !== 'challenge')!;
   const view = state.viewport!;
-  const [a, b] = edge.points;
+  const [a, b] = segment === 'first' ? edge.points : edge.points.slice(-2);
   return {
     edge,
     at: { x: box.x + ((a.x + b.x) / 2) * view.scale + view.offsetX, y: box.y + ((a.y + b.y) / 2) * view.scale + view.offsetY },
@@ -119,4 +123,105 @@ test('the challenge items are worded in Japanese', async ({ page }) => {
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: '反論ゴールを追加' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: '反証を追加' })).toBeVisible();
+});
+
+/** Adds a counter goal to `at` from its menu; its SACM id. */
+async function counterGoal(page: Page, at: string) {
+  const centre = await nodeCentre(page, at);
+  await page.mouse.click(centre.x, centre.y, { button: 'right' });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Add Counter Goal' }).click();
+  await expect.poll(async () => (await hook(page)).revision).toBe(2);
+  return (await hook(page)).selected!;
+}
+
+/** Presses on the node `from` and moves to `to` without letting go. */
+async function dragTo(page: Page, from: string, to: { x: number; y: number }) {
+  const start = await nodeCentre(page, from);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 8, start.y + 8, { steps: 2 });
+  await expect.poll(async () => (await hook(page)).dragging).toBe(from);
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+}
+
+test('a new counter goal has its name ready to type', async ({ page }) => {
+  await opened(page);
+  const challenger = await counterGoal(page, 'cl_sub_1');
+  const name = page.getByTestId('element-name');
+  await expect(name).toBeFocused();
+  await page.keyboard.type('Sensor fails silently');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await hook(page)).revision).toBe(3);
+  expect((await hook(page)).selected).toBe(challenger);
+});
+
+// The view follows the new counter goal, beside cl_sub_1: the places it is
+// dragged to are those near it, in view on a larger page.
+test.describe('moving a challenge by dragging its challenger', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } });
+
+  test('a counter goal dragged onto a node challenges it instead, and Undo takes it back', async ({ page }) => {
+    await opened(page);
+    const challenger = await counterGoal(page, 'cl_sub_1');
+    await dragTo(page, challenger, await nodeCentre(page, 'ev_1'));
+    await expect.poll(async () => (await hook(page)).hovered).toBe('ev_1');
+    await page.mouse.up();
+
+    await expect.poll(async () => (await hook(page)).revision).toBe(3);
+    expect(await challenges(page)).toEqual([{ from: challenger, to: 'ev_1' }]);
+    await expect(status(page)).toHaveText(/^CG1 now challenges \S+\.$/);
+    // Still a counter goal: nothing else about it changed.
+    const nodes = (await hook(page)).diagram!.diagram.nodes;
+    expect(nodes.find((node) => node.id === challenger)!.kind).toBe('goal');
+
+    await canvas(page).focus();
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(async () => (await hook(page)).revision).toBe(4);
+    expect(await challenges(page)).toEqual([{ from: challenger, to: 'cl_sub_1' }]);
+  });
+
+  test('a counter goal dragged onto a line challenges that line, and every line it may go to is marked', async ({ page }) => {
+    await opened(page);
+    const challenger = await counterGoal(page, 'cl_sub_1');
+    const { edge, at } = await onLineTo(page, 'ev_1');
+    await dragTo(page, challenger, at);
+    await expect.poll(async () => (await hook(page)).hovered).toBe(`${edge.relationship} ${edge.from} ${edge.to}`);
+    await page.mouse.up();
+
+    await expect.poll(async () => (await hook(page)).revision).toBe(3);
+    const drawn = (await hook(page)).diagram!.diagram;
+    expect(drawn.edges.filter((candidate) => candidate.kind === 'challenge')).toEqual([
+      expect.objectContaining({ from: challenger, to: edge.relationship, toRelationship: true }),
+    ]);
+    await expect(status(page)).toHaveText(/^CG1 now challenges the line from \S+ to \S+\.$/);
+  });
+
+  test('Move… then a click on a line moves the challenge there, without a drag', async ({ page }) => {
+    await opened(page);
+    const challenger = await counterGoal(page, 'cl_sub_1');
+    const centre = await nodeCentre(page, challenger);
+    await page.mouse.click(centre.x, centre.y, { button: 'right' });
+    await page.getByRole('menu').getByRole('menuitem', { name: 'Move…' }).click();
+    // A challenge stays a challenge: there is no top level to move it to.
+    await expect(page.locator('.af-move-banner').getByRole('button', { name: /top level/ })).toHaveCount(0);
+    const { edge, at } = await onLineTo(page, 'ev_1');
+    await page.mouse.click(at.x, at.y);
+
+    await expect.poll(async () => (await hook(page)).revision).toBe(3);
+    const drawn = (await hook(page)).diagram!.diagram;
+    expect(drawn.edges.filter((candidate) => candidate.kind === 'challenge')).toEqual([
+      expect.objectContaining({ from: challenger, to: edge.relationship, toRelationship: true }),
+    ]);
+  });
+
+  test('a counter goal dropped on a premise line under a Strategy says why it stays', async ({ page }) => {
+    await opened(page);
+    const challenger = await counterGoal(page, 'cl_sub_1');
+    const { at } = await onLineTo(page, 'cl_sub_1', 'last');
+    await dragTo(page, challenger, at);
+    await page.mouse.up();
+    await expect(status(page)).toHaveText(/^Nothing changed\./);
+    expect((await hook(page)).revision).toBe(2);
+    expect(await challenges(page)).toEqual([{ from: challenger, to: 'cl_sub_1' }]);
+  });
 });

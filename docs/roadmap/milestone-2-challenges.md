@@ -54,7 +54,7 @@ with its challenger, as a removal already takes it (W18).
 |---|---|---|
 | C1 | A counter-Goal is a new `Claim` and an `AssertedInference` with `isCounter` from it to what is challenged; counter-evidence is a new `ArtifactReference` and an `AssertedEvidence` with `isCounter`. Each is one `sacm::edit::batch` | `isCounter` is what carries a challenge in SACM (gap row 4, E5). The GSN Metamodel v2.2 forbids it (`self.isCounter = false`, Figure 2), and the project follows GSN v3, which requires challenges, and records the gap |
 | C2 | Counter-evidence is drawn as a Solution: an `ArtifactReference` that is the source of a counter `AssertedEvidence` and is not otherwise reached is a Solution, not neutral (R11 changes) | Decided by the user on 27 November 2026. GSN v3's Dialectic Extension expresses counter-evidence by a Solution, and the C++ application drew it so (GSN3-DIA-002). R11 left it undecided |
-| C3 | A challenge is offered from the node's menu and the line's menu: **Challenge with a Goal** and **Challenge with a Solution**. The new challenger is selected, as an added element is | The menu is where the diagram is edited (step 1). A way that needs no drag (WCAG 2.5.7) |
+| C3 | A challenge is offered from the node's menu and the line's menu: **Add Counter Goal** and **Add Counter Evidence** (renamed after the first screenshots, as GSN v3 names them). The new challenger is selected, with its name ready to type (G3) | The menu is where the diagram is edited (step 1). A way that needs no drag (WCAG 2.5.7) |
 | C4 | A line takes a menu, as a node does: a right-click on it, or the menu key with it selected | A line is what a challenge of an inference points at; until now nothing was added to a line |
 
 Decided in G1, with the evidence in
@@ -80,10 +80,17 @@ Decided in G1, with the evidence in
   user on 27 November 2026, after the first screenshots).
 - **Counter-evidence is a Solution (R9).** R11 no longer makes it neutral.
 
-Still to decide, in G4: **how a challenger is moved.** Proposed: its counter
-relationship gets a new target (`SetReferences`), with W25's guards, and what
-is under the challenger comes with it. This lifts AF-EDIT-017 for a node that
-challenges one thing.
+Decided in G3 and G4, from [the spike](../spikes/challenge-move.md):
+
+- **How a challenger is moved (W32).** Its counter relationship gets a new
+  target (`SetReferences`), with W25's guards, and what is under the
+  challenger comes with it. This lifts AF-EDIT-017 for a node that challenges
+  one thing. It is moved by the menu's Move… and by a drag, onto a node or a
+  line, never to the top level (AF-EDIT-028).
+- **While it is dragged**, every line it may go to is marked, and the one
+  under the pointer is drawn heavier.
+- **After Add Counter Goal or Add Counter Evidence**, the new node's name is
+  ready to type.
 
 ### For the next step: the ACP identifier
 
@@ -110,8 +117,8 @@ designed. A spike on a local branch puts variants behind a panel:
 - **What follows an add.** The new challenger selected with its text ready to
   type, or only selected.
 
-What is chosen is built in G4, and the spike's findings are recorded in
-`docs/spikes/`.
+The findings, and what was chosen, are in
+[`docs/spikes/challenge-move.md`](../spikes/challenge-move.md).
 
 ## The pieces
 
@@ -129,6 +136,7 @@ What is chosen is built in G4, and the spike's findings are recorded in
       recorded with their evidence.
 - [x] **G2.** The menus: a line's menu, and the two challenge items on nodes
       and lines, in both languages, with browser tests.
-- [ ] **G3.** The spike: moving a challenge by dragging, and what follows an
+- [x] **G3.** The spike: moving a challenge by dragging, and what follows an
       add.
-- [ ] **G4.** Moving a challenger, by the menu and by the drag as chosen.
+- [x] **G4.** Moving a challenger, by the menu and by the drag as chosen,
+      with browser tests.

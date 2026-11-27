@@ -177,6 +177,8 @@ export interface Core {
    * the node moved.
    */
   moveNode(id: string, to: string | null, revision: number): Promise<EditResult>;
+  /** Moves the challenge the node `id` makes onto the line `line` of a relationship, as the targets of `revision` said. */
+  moveToLine(id: string, line: { relationship: string } & LineEnds, revision: number): Promise<EditResult>;
   /**
    * Marks the Goal with this SACM id undeveloped, or clears the mark.
    * `unchanged` when it was that already; refused when it is not a Goal

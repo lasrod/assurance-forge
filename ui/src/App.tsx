@@ -41,7 +41,7 @@ import { MenuBar } from './MenuBar';
 import { ancestors, outlineTree, packageTree } from './outline';
 import { packageKind } from './i18n/packages';
 import { report } from './testHook';
-import { useDetails, useDocument, type DocumentState } from './useDocument';
+import { useDetails, useDocument, type DocumentState, type EditShown } from './useDocument';
 import { Welcome } from './Welcome';
 import { ZoomBar } from './ZoomBar';
 
@@ -119,6 +119,8 @@ function message(state: DocumentState, t: T, language: Language): { text: string
             ? t('movedToTop', { kind: kindName(state.moved, t), identifier: state.identifier })
             : t('moved', { kind: kindName(state.moved, t), identifier: state.identifier, to: state.to }),
       };
+    case 'challengeMoved':
+      return { text: t('challengeMoved', { identifier: state.identifier, to: state.to }) };
     case 'undevelopedSet':
       return { text: t(state.undeveloped ? 'markedUndeveloped' : 'clearedUndeveloped', { identifier: state.identifier }) };
     case 'repaired':
@@ -177,7 +179,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
-  const { challengeChoices, challenge: challengeWith } = doc;
+  const { challengeChoices, challenge: challengeWith, moveChallenge: moveChallengeWith } = doc;
   /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
   const setUndeveloped = useCallback(
     (id: string, undeveloped: boolean, revision: number, identifier: string) =>
@@ -242,6 +244,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         ? {
             source: moving.targets.id,
             allowed: new Set(moving.targets.nodes.filter((target) => target.refusal === null).map((target) => target.id)),
+            lines: moving.targets.lines.length
+              ? new Set(moving.targets.lines.filter((line) => line.refusal === null).map((line) => edgeKey(line)))
+              : undefined,
           }
         : null,
     [moving],
@@ -260,9 +265,35 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       }
       const toIdentifier = to ? (outline.find((row) => row.id === to)?.identifier ?? to) : null;
       setMoving(null);
-      moveWith(current.targets, to, current, toIdentifier, followEdit);
+      // A counter goal or counter evidence: its challenge is moved.
+      if (to && current.targets.lines.length) moveChallengeWith(current.targets, to, current, toIdentifier ?? to, followEdit);
+      else moveWith(current.targets, to, current, toIdentifier, followEdit);
     },
-    [moving, diagram, outline, moveRefused, moveWith, followEdit],
+    [moving, diagram, outline, moveRefused, moveWith, moveChallengeWith, followEdit],
+  );
+  /** Moves the challenge being moved onto the line `edge`, or says why it cannot go there. */
+  const moveToLine = useCallback(
+    (edge: DiagramEdge, current: Moving | null = moving) => {
+      if (!current) return;
+      const line = current.targets.lines.find(
+        (candidate) => candidate.relationship === edge.relationship && candidate.from === edge.from && candidate.to === edge.to,
+      );
+      const refusal = line ? line.refusal : 'AF-EDIT-011';
+      if (refusal !== null) {
+        moveRefused(refusal, null);
+        return;
+      }
+      const name = (id: string) => outline.find((row) => row.id === id)?.identifier ?? id;
+      setMoving(null);
+      moveChallengeWith(
+        current.targets,
+        { relationship: edge.relationship, from: edge.from, to: edge.to },
+        current,
+        t('lineBetween', { from: name(edge.from), to: name(edge.to) }),
+        followEdit,
+      );
+    },
+    [moving, outline, moveRefused, moveChallengeWith, followEdit, t],
   );
   /**
    * Starts choosing where the node `id` goes, from the menu or by a drag;
@@ -289,6 +320,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         const early = earlyDrop.current as { id: string; end: DragEnd } | null;
         earlyDrop.current = null;
         if (early?.id === id && early.end.on === 'node') moveTo(early.end.id, move);
+        if (early?.id === id && early.end.on === 'line') moveToLine(early.end.edge, move);
         return true;
       }
       setSelected(id);
@@ -296,7 +328,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       setMoving(move);
       return true;
     },
-    [moveTargets, diagram, outline, setSelected, moveTo],
+    [moveTargets, diagram, outline, setSelected, moveTo, moveToLine],
   );
   /**
    * A dragged node was dropped: on a place it may go, it moves there; on one
@@ -316,12 +348,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         if (id !== null) earlyDrop.current = { id, end };
         return;
       }
-      if (end.on !== 'node') return;
+      if (end.on !== 'node' && end.on !== 'line') return;
       // The argument changed under the drag: its places are of before.
       if (current.targets.revision !== shownRevision) moveRefused('AF-EDIT-009', null);
+      else if (end.on === 'line') moveToLine(end.edge, current);
       else moveTo(end.id, current);
     },
-    [moving, moveTo, moveRefused, shownRevision],
+    [moving, moveTo, moveToLine, moveRefused, shownRevision],
   );
   /**
    * Opens the menu of a node, or of the empty canvas, at a client point: the
@@ -423,6 +456,25 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [removal, removeWith, followEdit],
   );
+  // A counter goal or counter evidence just added, whose name is to be ready
+  // to type once its details are shown. Set only when the add is shown: a
+  // refused add leaves nothing to type in.
+  const nameAfter = useRef<string | null>(null);
+  const challenged = useCallback<EditShown>(
+    (before, next, anchor, added) => {
+      nameAfter.current = added;
+      followEdit(before, next, anchor, added);
+    },
+    [followEdit],
+  );
+  useEffect(() => {
+    const wanted = nameAfter.current;
+    if (wanted === null || details?.type !== 'element' || details.element.id !== wanted) return;
+    nameAfter.current = null;
+    const input = document.querySelector<HTMLInputElement>('[data-testid="element-name"]');
+    input?.focus();
+    input?.select();
+  }, [details]);
   /** A choice of the menu: a kind to add, Remove, or a step of a move. */
   const chooseMenu = (id: string) => {
     const menu = addMenu;
@@ -446,8 +498,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     }
     if (id.startsWith(CHALLENGE)) {
       const kind = id.slice(CHALLENGE.length) as ElementKind;
-      if (menu.line) challengeWith(menu.line.relationship, menu.line, kind, menu.revision, null, followEdit);
-      else if (menu.parent) challengeWith(menu.parent, null, kind, menu.revision, menu.about, followEdit);
+      if (menu.line) challengeWith(menu.line.relationship, menu.line, kind, menu.revision, null, challenged);
+      else if (menu.parent) challengeWith(menu.parent, null, kind, menu.revision, menu.about, challenged);
       return;
     }
     if (id === UNDEVELOPED) {
@@ -834,6 +886,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               onRemove={askRemove}
               move={moveMarks}
               onMoveTo={moveTo}
+              onMoveToLine={moveToLine}
               onMoveCancel={() => setMoving(null)}
               onDragStart={(id) => startMove(id, true)}
               onDragEnd={endDrag}

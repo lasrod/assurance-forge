@@ -2,7 +2,10 @@
 //! `docs/standards/sacm-gsn-mapping.md`.
 
 use af_gsn::ElementKind;
-use af_gsn::commands::{AddError, Challenged, Refusal, challenge, challenge_choices};
+use af_gsn::commands::{
+    AddError, Challenged, Refusal, Target, challenge, challenge_choices, move_challenge, move_node,
+    move_targets,
+};
 use af_gsn::view::{EdgeKind, NodeKind, view};
 use sacm::model::{Document, ElementKind as SacmKind};
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
@@ -439,4 +442,155 @@ fn a_challenge_in_each_sample_keeps_the_file_valid() {
         }
         assert!(made > 0, "{name}: nothing was challenged");
     }
+}
+
+/// `k` challenges `sub`, in [`argument`]; `cg` is a counter goal of its own
+/// under `k`, supported by `ksub`.
+fn challenged_argument() -> Document {
+    let mut document = argument();
+    let shown = view(&document, "en");
+    let added = challenge(
+        &mut document,
+        &shown,
+        Challenged::Node("k"),
+        ElementKind::Goal,
+    )
+    .unwrap_or_else(|error| panic!("setup: {error}"));
+    assert!(!added.element.is_empty());
+    document
+}
+
+#[test]
+fn w32_a_counter_goal_moves_its_challenge_to_a_node_or_a_first_line() {
+    let original = argument();
+    let shown = view(&original, "en");
+    let targets = move_targets(&original, &shown, "k").unwrap_or_else(|why| panic!("{why:?}"));
+    let node = |id: &str| {
+        targets
+            .nodes
+            .iter()
+            .find(|target| target.node == id)
+            .unwrap_or_else(|| panic!("no {id}"))
+            .refusal
+    };
+    let line = |relationship: &str, from: &str, to: &str| {
+        targets
+            .lines
+            .iter()
+            .find(|target| {
+                target.relationship == relationship && target.from == from && target.to == to
+            })
+            .unwrap_or_else(|| panic!("no line {relationship}"))
+            .refusal
+    };
+    assert_eq!(node("g"), None);
+    assert_eq!(node("e"), None);
+    assert_eq!(node("sub"), Some(Refusal::AlreadyThere));
+    assert_eq!(node("k"), Some(Refusal::UnderItself));
+    assert_eq!(node("n"), Some(Refusal::KindUnknown));
+    assert_eq!(line("ev", "g", "e"), None);
+    assert_eq!(line("is", "g", "s"), None);
+    assert_eq!(line("is", "s", "sub"), Some(Refusal::NotTheFirstLine));
+    // Its own challenge line.
+    assert_eq!(line("ch", "k", "sub"), Some(Refusal::UnderItself));
+    assert_eq!(targets.canvas, Some(Refusal::ChallengeStays));
+
+    // To a node, by the menu's move.
+    let mut document = original.clone();
+    move_node(&mut document, &shown, "k", Target::Node("g"))
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        counter_from(&document, "k"),
+        (SacmKind::AssertedInference, "g".to_owned())
+    );
+    assert_eq!(document.elements().count(), original.elements().count());
+    // To a line.
+    let mut document = original.clone();
+    move_challenge(
+        &mut document,
+        &shown,
+        "k",
+        Challenged::Line {
+            relationship: "ev",
+            from: "g",
+            to: "e",
+        },
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        counter_from(&document, "k"),
+        (SacmKind::AssertedInference, "ev".to_owned())
+    );
+    let after = view(&document, "en");
+    assert!(
+        after
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Challenge
+                && edge.from == "k"
+                && edge.to == "ev"
+                && edge.to_relationship)
+    );
+    assert_eq!(after.findings.len(), shown.findings.len());
+    assert!(xmi::write(&document, &WriteOptions::default().with_mode(Mode::Strict)).is_ok());
+    // Not to the top level.
+    let mut document = original.clone();
+    match move_node(&mut document, &shown, "k", Target::Canvas) {
+        Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::ChallengeStays),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(Refusal::ChallengeStays.code(), "AF-EDIT-028");
+}
+
+#[test]
+fn w32_a_challenge_is_not_moved_under_itself_and_one_that_is_challenged_stays() {
+    // A counter goal of k's challenge line: it cannot be moved onto k, which
+    // it is under, and k's challenge, now challenged, is not moved (W25).
+    let document = challenged_argument();
+    let shown = view(&document, "en");
+    let counter = shown
+        .nodes
+        .iter()
+        .find(|node| node.identifier == "CG1")
+        .map(|node| node.id.clone())
+        .unwrap_or_else(|| panic!("no CG1"));
+    let targets = move_targets(&document, &shown, &counter).unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(
+        targets
+            .nodes
+            .iter()
+            .find(|target| target.node == "k")
+            .and_then(|target| target.refusal),
+        Some(Refusal::AlreadyThere)
+    );
+    assert_eq!(
+        targets
+            .nodes
+            .iter()
+            .find(|target| target.node == "g")
+            .and_then(|target| target.refusal),
+        None
+    );
+    // k challenges sub, and is itself challenged: k's challenge line is not
+    // what is challenged here, k is, so k still moves.
+    assert!(move_targets(&document, &shown, "k").is_ok());
+    // A challenge of the line k draws makes that line entangled.
+    let mut lined = argument();
+    let shown = view(&lined, "en");
+    challenge(
+        &mut lined,
+        &shown,
+        Challenged::Line {
+            relationship: "ch",
+            from: "k",
+            to: "sub",
+        },
+        ElementKind::Goal,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let shown = view(&lined, "en");
+    assert_eq!(
+        move_targets(&lined, &shown, "k").err(),
+        Some(Refusal::Entangled)
+    );
 }

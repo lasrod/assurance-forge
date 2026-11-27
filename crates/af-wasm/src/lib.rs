@@ -175,6 +175,21 @@ impl WasmCore {
         json(&self.core.move_node(id, to.as_deref(), revision))
     }
 
+    /// Moves the challenge the node `id` makes onto the line from `from` to
+    /// `to` of `relationship`, as the targets of `revision` said.
+    /// `EditResult` as JSON.
+    #[wasm_bindgen(js_name = moveToLine)]
+    pub fn move_to_line(
+        &mut self,
+        id: &str,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(&self.core.move_to_line(id, relationship, from, to, revision))
+    }
+
     /// Marks the Goal `id` undeveloped, or clears the mark, as asked at
     /// `revision`. `EditResult` as JSON.
     #[wasm_bindgen(js_name = setUndeveloped)]

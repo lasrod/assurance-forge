@@ -4,7 +4,7 @@ import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { badgeLabel, comesWith, edgePan, HOLD_MS, readableAt, type DragEnd } from './drag';
-import { boundsOf, draw, findEdge, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, edgeKey, findEdge, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -116,6 +116,7 @@ export function DiagramCanvas({
   onRemove,
   move = null,
   onMoveTo,
+  onMoveToLine,
   onMoveCancel,
   onDragStart,
   onDragEnd,
@@ -136,6 +137,8 @@ export function DiagramCanvas({
   move?: MoveMarks | null;
   /** A node was clicked while a move is chosen: one it may go under, or not. */
   onMoveTo?: (id: string) => void;
+  /** A line was clicked while a challenge's move is chosen. */
+  onMoveToLine?: (edge: DiagramEdge) => void;
   onMoveCancel?: () => void;
   /** A drag of a node began: answers whether the node can be moved, having asked where. */
   onDragStart?: (id: string) => Promise<boolean>;
@@ -330,7 +333,12 @@ export function DiagramCanvas({
       // The badge follows the pointer, and the place under it is marked.
       dragPointer.current = point;
       setDrag((held) => (held ? { ...held, pointer: point } : held));
-      if (diagram && viewport) setHovered(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+      if (diagram && viewport) {
+        const node = hitTest(diagram.diagram, viewport, point.x, point.y);
+        // A line, for a challenge that may be dropped on one.
+        const line = !node && move?.lines ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+        setHovered(node?.id ?? (line ? edgeKey(line) : null));
+      }
       return;
     }
     if (!current.panning && Math.hypot(point.x - current.start.x, point.y - current.start.y) > DRAG_SLOP) {
@@ -373,7 +381,10 @@ export function DiagramCanvas({
       // Dropped on a node, on itself (given up), or on nothing.
       const point = local(event);
       const node = diagram && viewport ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
-      onDragEnd?.(node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : { on: 'canvas' });
+      const line = !node && move?.lines && diagram && viewport ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+      onDragEnd?.(
+        node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : line ? { on: 'line', edge: line } : { on: 'canvas' },
+      );
       return;
     }
     if (!current || current.over || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
@@ -385,6 +396,8 @@ export function DiagramCanvas({
       // click on a line or on the empty canvas changes nothing.
       const node = hitTest(diagram.diagram, viewport, point.x, point.y);
       if (node && node.id !== move.source) onMoveTo?.(node.id);
+      const line = !node && move.lines ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+      if (line) onMoveToLine?.(line);
       return;
     }
     onSelect(hitId(diagram.diagram, viewport, point.x, point.y));
@@ -525,13 +538,13 @@ export function DiagramCanvas({
         tabIndex={0}
         style={{
           cursor:
-            panning || (drag && (!shownHover || !move || move.allowed.has(shownHover)))
+            panning || (drag && (!shownHover || !move || move.allowed.has(shownHover) || move.lines?.has(shownHover)))
               ? 'grabbing'
               : armed
                 ? 'grab'
                 : !shownHover
                   ? 'default'
-                  : !move || move.allowed.has(shownHover)
+                  : !move || move.allowed.has(shownHover) || move.lines?.has(shownHover)
                     ? 'pointer'
                     : 'not-allowed',
         }}

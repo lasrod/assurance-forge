@@ -500,7 +500,7 @@ impl Core {
     pub fn move_targets(&self, id: &str) -> Option<MoveTargets> {
         let open = self.open.as_ref()?;
         let code = |refusal: commands::Refusal| refusal.code().to_owned();
-        let (refusal, canvas, nodes) =
+        let (refusal, canvas, nodes, lines) =
             match commands::move_targets(open.session.document(), &open.view, id) {
                 Ok(targets) => (
                     None,
@@ -514,8 +514,18 @@ impl Core {
                             develops: target.develops,
                         })
                         .collect(),
+                    targets
+                        .lines
+                        .into_iter()
+                        .map(|line| contract::MoveLine {
+                            relationship: line.relationship,
+                            from: line.from,
+                            to: line.to,
+                            refusal: line.refusal.map(code),
+                        })
+                        .collect(),
                 ),
-                Err(refusal) => (Some(code(refusal)), None, Vec::new()),
+                Err(refusal) => (Some(code(refusal)), None, Vec::new(), Vec::new()),
             };
         Some(MoveTargets {
             revision: self.revision,
@@ -523,6 +533,7 @@ impl Core {
             refusal,
             canvas,
             nodes,
+            lines,
         })
     }
 
@@ -538,6 +549,34 @@ impl Core {
             return refused(OUT_OF_DATE);
         }
         match open.session.move_node(&open.view, id, target(to)) {
+            Ok((_, record)) => self.changed(&record, Some(id.to_owned())),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Moves the challenge the node `id` makes onto the line from `from` to
+    /// `to` of `relationship` (W32), as [`Core::move_targets`] said at
+    /// `revision`: one asked for at another revision is refused
+    /// (AF-EDIT-009).
+    pub fn move_to_line(
+        &mut self,
+        id: &str,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open
+            .session
+            .move_to_line(&open.view, id, relationship, from, to)
+        {
             Ok((_, record)) => self.changed(&record, Some(id.to_owned())),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             Err(commands::AddError::Edit(_)) => refused(NOT_MADE),

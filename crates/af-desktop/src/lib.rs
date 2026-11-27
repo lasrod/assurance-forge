@@ -991,6 +991,20 @@ fn add(
 }
 
 #[tauri::command]
+fn move_to_line(
+    id: String,
+    relationship: String,
+    from: String,
+    to: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .move_to_line(&id, &relationship, &from, &to, revision))
+}
+
+#[tauri::command]
 fn challenge_choices(
     at: String,
     from: Option<String>,
@@ -1185,6 +1199,7 @@ pub fn run(args: Args) -> i32 {
             repair_join,
             challenge_choices,
             challenge,
+            move_to_line,
             set_text,
             undo,
             redo,

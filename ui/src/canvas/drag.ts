@@ -2,7 +2,7 @@
 // node moves it, with what is under it; DiagramCanvas.tsx follows the pointer
 // and App.tsx asks the core where the node may go.
 
-import type { Diagram, DiagramNode } from '../core/Core';
+import type { Diagram, DiagramEdge, DiagramNode } from '../core/Core';
 import { SMALLEST_TEXT_PX } from './draw';
 
 /** How long a touch is held on a node before a drag moves it and does not pan, in milliseconds. */
@@ -13,7 +13,7 @@ export const EDGE = 56;
 export const EDGE_SPEED = 16;
 
 /** Where a drag of a node ended: on a node, on the empty canvas, or given up. */
-export type DragEnd = { on: 'node'; id: string } | { on: 'canvas' } | { on: 'cancel' };
+export type DragEnd = { on: 'node'; id: string } | { on: 'line'; edge: DiagramEdge } | { on: 'canvas' } | { on: 'cancel' };
 
 /**
  * How far the view pans in a frame with the pointer at `point` in a canvas of

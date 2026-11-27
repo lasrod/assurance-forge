@@ -59,6 +59,14 @@ pub enum Command {
     /// Move the node `element`, with what is under it, under the node `to`,
     /// or to the top level when `None`.
     Move { element: String, to: Option<String> },
+    /// Move the challenge the node `element` makes onto the line from `from`
+    /// to `to` of `relationship`.
+    MoveToLine {
+        element: String,
+        relationship: String,
+        from: String,
+        to: String,
+    },
     /// Mark the Goal `element` undeveloped, or clear the mark.
     SetUndeveloped { element: String, undeveloped: bool },
     /// Join the node `element` by context in place of the support line that
@@ -264,6 +272,38 @@ impl Session {
                 Target::Canvas => None,
                 Target::Node(id) => Some(id.to_owned()),
             },
+        };
+        let record = self.made(before, command, &moved.mutation);
+        Ok((moved, record))
+    }
+
+    /// Moves the challenge the node `element` makes onto `line`, one line of
+    /// a relationship (W32), as one command.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::move_challenge`] refuses; the document and the
+    /// revision are then unchanged.
+    pub fn move_to_line(
+        &mut self,
+        view: &View,
+        element: &str,
+        relationship: &str,
+        from: &str,
+        to: &str,
+    ) -> Result<(Moved, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let line = Challenged::Line {
+            relationship,
+            from,
+            to,
+        };
+        let moved = commands::move_challenge(&mut self.document, view, element, line)?;
+        let command = Command::MoveToLine {
+            element: element.to_owned(),
+            relationship: relationship.to_owned(),
+            from: from.to_owned(),
+            to: to.to_owned(),
         };
         let record = self.made(before, command, &moved.mutation);
         Ok((moved, record))

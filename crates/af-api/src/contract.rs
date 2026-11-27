@@ -504,6 +504,22 @@ pub struct MoveTarget {
     pub develops: bool,
 }
 
+/// Whether one line can take a moved challenge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct MoveLine {
+    /// The SACM id of the relationship the line is drawn for.
+    pub relationship: String,
+    /// The nodes the line runs from and to.
+    pub from: String,
+    pub to: String,
+    /// Why the challenge cannot go there (`AF-EDIT-002`, `AF-EDIT-004`,
+    /// `AF-EDIT-011`, `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-027`), or
+    /// null when it can.
+    pub refusal: Option<String>,
+}
+
 /// Where the node `id` may be moved, at `revision`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -522,6 +538,10 @@ pub struct MoveTargets {
     pub canvas: Option<String>,
     /// Every node of the diagram, in its order.
     pub nodes: Vec<MoveTarget>,
+    /// For a counter goal or counter evidence, every line of the diagram, in
+    /// its order: a challenge may be moved onto a line (W32). Empty for any
+    /// other node.
+    pub lines: Vec<MoveLine>,
 }
 
 /// What a command gave.
@@ -790,6 +810,7 @@ pub fn typescript() -> String {
         RemovalNode::decl(&cfg),
         Removal::decl(&cfg),
         MoveTarget::decl(&cfg),
+        MoveLine::decl(&cfg),
         MoveTargets::decl(&cfg),
         ProblemRepair::decl(&cfg),
         EditResult::decl(&cfg),

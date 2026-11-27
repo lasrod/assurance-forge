@@ -47,6 +47,8 @@ export interface Marks {
 export interface MoveMarks {
   source: string;
   allowed: ReadonlySet<string>;
+  /** For a moved challenge: the lines (`edgeKey`) it may go to. */
+  lines?: ReadonlySet<string>;
 }
 
 export interface Badge {
@@ -276,6 +278,8 @@ export function draw(
   if (move) context.globalAlpha = FAINT;
   for (const edge of edges) {
     if (!overlaps(edge.bounds, visible)) continue;
+    // A line a moved challenge may go to is drawn in full.
+    if (move) context.globalAlpha = move.lines?.has(edgeKey(edge)) ? 1 : FAINT;
     drawEdge(context, edge, palette, scale, marks);
     drawn.edges += 1;
   }
@@ -383,15 +387,19 @@ function polyline(context: CanvasRenderingContext2D, points: Point[]) {
 /** The dashes of each line style, in CSS px: a challenge is dashed, a neutral edge dotted. */
 const DASHES = { solid: [], dashed: [6, 4], dotted: [1.5, 3.5] } as const;
 /** A line's width in CSS px: plain, under the pointer, and selected. */
-const EDGE_WIDTH = { plain: 1, hovered: 2, selected: 2.5 } as const;
+const EDGE_WIDTH = { plain: 1, hovered: 2, selected: 2.5, dropOn: 4 } as const;
 
 function drawEdge(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, scale: number, marks: Marks) {
   // Selected and hovered are told apart by weight as well as colour.
-  const selected = marks.selected === edgeKey(edge);
   const hovered = marks.hovered === edgeKey(edge);
+  // Every line a moved challenge may go to is marked as a place, and the
+  // one under the pointer, where it would be dropped, the more.
+  const place = marks.move?.lines?.has(edgeKey(edge)) === true;
+  const selected = marks.selected === edgeKey(edge) || place;
   const stroke = selected ? palette.selectedLine : palette.line;
   context.strokeStyle = stroke;
-  context.lineWidth = (selected ? EDGE_WIDTH.selected : hovered ? EDGE_WIDTH.hovered : EDGE_WIDTH.plain) / scale;
+  const width = place && hovered ? EDGE_WIDTH.dropOn : selected ? EDGE_WIDTH.selected : hovered ? EDGE_WIDTH.hovered : EDGE_WIDTH.plain;
+  context.lineWidth = width / scale;
   context.lineCap = edge.line === 'dotted' ? 'round' : 'butt';
   context.setLineDash(DASHES[edge.line].map((length) => length / scale));
   polyline(context, edge.points);

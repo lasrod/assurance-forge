@@ -293,6 +293,22 @@ refusal: string | null,
  */
 develops: boolean, };
 
+export type MoveLine = { 
+/**
+ * The SACM id of the relationship the line is drawn for.
+ */
+relationship: string, 
+/**
+ * The nodes the line runs from and to.
+ */
+from: string, to: string, 
+/**
+ * Why the challenge cannot go there (`AF-EDIT-002`, `AF-EDIT-004`,
+ * `AF-EDIT-011`, `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-027`), or
+ * null when it can.
+ */
+refusal: string | null, };
+
 export type MoveTargets = { revision: number, 
 /**
  * The SACM id of the node to move.
@@ -313,7 +329,13 @@ canvas: string | null,
 /**
  * Every node of the diagram, in its order.
  */
-nodes: Array<MoveTarget>, };
+nodes: Array<MoveTarget>, 
+/**
+ * For a counter goal or counter evidence, every line of the diagram, in
+ * its order: a challenge may be moved onto a line (W32). Empty for any
+ * other node.
+ */
+lines: Array<MoveLine>, };
 
 export type ProblemRepair = { element: string, relationship: string, };
 

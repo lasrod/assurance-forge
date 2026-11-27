@@ -256,16 +256,17 @@ fn w22_a_solution_and_a_strategy_go_only_under_a_goal() {
 }
 
 #[test]
-fn w21_a_node_under_several_or_that_challenges_is_not_moved() {
+fn w21_a_node_under_several_is_not_moved_and_a_challenger_moves_its_challenge() {
     let mut document = argument();
     let shown = view(&document, "en");
     assert_eq!(
         move_targets(&document, &shown, "shared").err(),
         Some(Refusal::SeveralParents)
     );
+    // W32: a counter goal moves its challenge, never to the top level.
     assert_eq!(
-        move_targets(&document, &shown, "k").err(),
-        Some(Refusal::JoinNotMoved)
+        move_targets(&document, &shown, "k").map(|targets| targets.canvas),
+        Ok(Some(Refusal::ChallengeStays))
     );
     assert_eq!(
         move_targets(&document, &shown, "nothing").err(),
@@ -584,11 +585,15 @@ fn a_move_in_each_sample_keeps_the_file_valid() {
             }
             made += 1;
             let after = view(&document, "en");
+            // Under its new parent, or, for a challenger, challenging it.
             assert!(
                 after
                     .edges
                     .iter()
-                    .any(|edge| edge.from == target.node && edge.to == node.id),
+                    .any(|edge| (edge.from == target.node && edge.to == node.id)
+                        || (edge.kind == EdgeKind::Challenge
+                            && edge.from == node.id
+                            && edge.to == target.node)),
                 "{name}: {} to {}",
                 node.id,
                 target.node

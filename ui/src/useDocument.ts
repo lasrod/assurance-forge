@@ -57,6 +57,8 @@ export type DocumentState =
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
+  /** A counter goal or counter evidence moved: what it challenges now. */
+  | { kind: 'challengeMoved'; identifier: string; to: string }
   | { kind: 'undevelopedSet'; undeveloped: boolean; identifier: string }
   | { kind: 'repaired'; repaired: NodeKind | null; identifier: string }
   | { kind: 'undone' }
@@ -650,6 +652,29 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
+   * Moves the challenge `targets` is of to the node `to`, or onto a line;
+   * the status says what it challenges now, `toLabel`.
+   */
+  const moveChallenge = useCallback(
+    (
+      targets: MoveTargets,
+      to: string | ({ relationship: string } & LineEnds),
+      moved: { kind: NodeKind; identifier: string },
+      toLabel: string,
+      onShown: EditShown,
+    ) =>
+      void edit(
+        (on) => (typeof to === 'string' ? on.moveNode(targets.id, to, targets.revision) : on.moveToLine(targets.id, to, targets.revision)),
+        'move',
+        // The place it goes to is kept where it is: the node, or the line's upper end.
+        typeof to === 'string' ? to : to.from,
+        moved.kind,
+        onShown,
+        { kind: 'challengeMoved', identifier: moved.identifier, to: toLabel },
+      ),
+    [edit],
+  );
+  /**
    * Marks the Goal `id` undeveloped, or clears the mark, as asked at
    * `revision`; the view keeps the Goal in place. The core refuses it if the
    * revision is not current.
@@ -873,6 +898,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     chooseFile,
     setTextStyle,
     addChoices,
+    moveChallenge,
     challengeChoices,
     challenge,
     add,
