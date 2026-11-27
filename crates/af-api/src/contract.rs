@@ -132,6 +132,11 @@ pub struct ElementDetails {
     pub statement: Option<String>,
     /// The view's codes about this element.
     pub codes: Vec<ViewCode>,
+    /// The SACM id of the argument package it is held in, or null.
+    pub package: Option<String>,
+    /// A confidence Claim an ACP shows as its description (R17): it is not
+    /// drawn as a node, and its text is the ACP's.
+    pub acp_description: bool,
 }
 
 /// What the details panel shows for a relationship: one the diagram draws an
@@ -537,6 +542,40 @@ pub struct MoveLine {
     pub refusal: Option<String>,
 }
 
+/// What an assurance claim point's argument is (A3 of the ACP plan).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum AcpKind {
+    /// A text, drawn only as the ACP.
+    Description,
+    /// A confidence argument in a new argument package.
+    Argument,
+}
+
+/// One ACP a line's menu may offer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpChoice {
+    pub kind: AcpKind,
+    /// Why it cannot be added (`AF-EDIT-002`, `AF-EDIT-005`, `AF-EDIT-011`,
+    /// `AF-EDIT-027`, `AF-EDIT-029`), or null when it can.
+    pub refusal: Option<String>,
+}
+
+/// The ACPs a line's menu may offer, at `revision`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpChoices {
+    pub revision: u32,
+    /// The identifier the next ACP takes, such as `ACP1`: what the interface
+    /// names a confidence argument's package after.
+    pub identifier: String,
+    pub choices: Vec<AcpChoice>,
+}
+
 /// An assurance claim point on an edge (GSN v3 Table 1:5-1).
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -828,6 +867,9 @@ pub fn typescript() -> String {
         Shape::decl(&cfg),
         TextRole::decl(&cfg),
         AcpMark::decl(&cfg),
+        AcpKind::decl(&cfg),
+        AcpChoice::decl(&cfg),
+        AcpChoices::decl(&cfg),
         TextLine::decl(&cfg),
         Decorator::decl(&cfg),
         DiagramNode::decl(&cfg),

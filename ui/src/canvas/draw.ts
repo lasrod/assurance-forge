@@ -2,7 +2,8 @@
 // (af-layout); this only paints it. Lines keep 1 CSS px at every zoom, and
 // shapes, text and arrowheads scale (DATUM's rule for a diagram canvas).
 
-import type { Diagram, DiagramEdge, DiagramNode, Point, Rect } from '../core/Core';
+import type {
+  AcpMark, Diagram, DiagramEdge, DiagramNode, Point, Rect } from '../core/Core';
 
 /**
  * The diagram's own colours (`--af-diagram-*` in app.css): a ground apart
@@ -212,6 +213,29 @@ export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: n
   const nearest = edgeDistance(found, point) + 1 / viewport.scale;
   const ambiguous = diagram.edges.some((edge) => edge.relationship !== found.relationship && edgeDistance(edge, point) <= nearest);
   return ambiguous ? { edge: null, ambiguous } : { edge: found, ambiguous };
+}
+
+/**
+ * The assurance claim point under the canvas point: on its square, within
+ * reach as a line is, or on its label. Null anywhere else.
+ */
+export function hitAcp(diagram: Diagram, viewport: Viewport, x: number, y: number): AcpMark | null {
+  const point = toDiagram(viewport, x, y);
+  const reach = EDGE_REACH / viewport.scale;
+  for (const edge of diagram.edges) {
+    for (const acp of edge.acps) {
+      const { square, label } = acp;
+      const onSquare =
+        point.x >= square.x - reach &&
+        point.x <= square.x + square.width + reach &&
+        point.y >= square.y - reach &&
+        point.y <= square.y + square.height + reach;
+      const onLabel =
+        point.x >= label.x && point.x <= label.x + label.width && point.y >= label.baseline - label.size && point.y <= label.baseline + label.size * 0.3;
+      if (onSquare || onLabel) return acp;
+    }
+  }
+  return null;
 }
 
 /**

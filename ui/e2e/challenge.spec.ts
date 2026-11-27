@@ -82,8 +82,13 @@ test('a line is challenged by a Solution from its menu, by a right-click or the 
   await page.mouse.click(at.x, at.y, { button: 'right' });
   const menu = page.getByRole('menu', { name: 'Line' });
   await expect(menu).toBeVisible();
-  // A line's menu only challenges it: nothing is added under a line.
-  await expect(menu.getByRole('menuitem')).toHaveText(['Add Counter Goal', 'Add Counter Evidence']);
+  // A line's menu challenges it or adds an ACP: nothing is added under a line.
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Add Counter Goal',
+    'Add Counter Evidence',
+    'Add ACP with Description',
+    'Add ACP with Confidence Argument',
+  ]);
   expect((await hook(page)).selected).toBe(`${edge.relationship} ${edge.from} ${edge.to}`);
   await menu.getByRole('menuitem', { name: 'Add Counter Evidence' }).click();
 

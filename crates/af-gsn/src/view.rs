@@ -252,6 +252,10 @@ pub struct View {
     /// In document order of their relationships, then of each one's
     /// `metaClaim` references.
     pub acps: Vec<Acp>,
+    /// The confidence Claims ACPs show as their description (R17), as a
+    /// Goal would be drawn, though they are not: their text is edited as a
+    /// node's is. In document order.
+    pub descriptions: Vec<Node>,
 }
 
 /// The tagged value that records an element's GSN type on import.
@@ -356,6 +360,12 @@ pub fn view(document: &Document, language: &str) -> View {
         if placeable.contains_key(id) {
             let reached = reach.get(id).copied().unwrap_or_default();
             node(*element, reached, language, &mut builder);
+        } else if descriptions.contains(id) {
+            // R17: built as a Goal is, and kept apart, not drawn.
+            node(*element, Reach::default(), language, &mut builder);
+            if let Some(described) = builder.nodes.pop() {
+                builder.descriptions.push(described);
+            }
         }
     }
     acps(document, &mut builder);
@@ -480,6 +490,7 @@ struct Builder {
     /// named element is known to be a `Claim` (E11).
     acp_links: Vec<(String, String)>,
     acps: Vec<Acp>,
+    descriptions: Vec<Node>,
 }
 
 impl Builder {
@@ -576,6 +587,7 @@ impl Builder {
             unplaced: self.unplaced,
             findings: self.findings,
             acps: self.acps,
+            descriptions: self.descriptions,
         }
     }
 }
@@ -1117,6 +1129,15 @@ fn is_hidden(element: SacmElement<'_>) -> bool {
     false
 }
 
+/// The SACM id of the argument package the element `id` is held in,
+/// nearest first; `None` when it is in none.
+pub fn argument_package_of(document: &Document, id: &str) -> Option<String> {
+    document
+        .get(id)
+        .and_then(package_of)
+        .map(|package| package.id().as_str().to_owned())
+}
+
 /// The argument package an element is held in, nearest first.
 fn package_of(element: SacmElement<'_>) -> Option<SacmElement<'_>> {
     let mut holder = element.parent();
@@ -1218,7 +1239,7 @@ pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<Vi
         .map(|node| node.id.as_str())
         .chain(edges.iter().map(|edge| edge.relationship.as_str()))
         .collect();
-    let acps = whole
+    let acps: Vec<Acp> = whole
         .acps
         .iter()
         .filter(|acp| {
@@ -1228,8 +1249,15 @@ pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<Vi
         })
         .cloned()
         .collect();
+    let descriptions = whole
+        .descriptions
+        .iter()
+        .filter(|node| acps.iter().any(|acp: &Acp| acp.claim == node.id))
+        .cloned()
+        .collect();
     Some(View {
         acps,
+        descriptions,
         findings: whole
             .findings
             .iter()

@@ -10,6 +10,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findEdge } from './canvas/draw';
 import type {
+  AcpChoices,
+  AcpKind,
   AddChoice,
   Core,
   DiagramAt,
@@ -54,6 +56,8 @@ export type DocumentState =
   | { kind: 'added'; added: NodeKind; identifier: string }
   /** A counter goal or counter evidence added: a challenge. */
   | { kind: 'challenged'; added: NodeKind; identifier: string }
+  /** An assurance claim point added: its identifier. */
+  | { kind: 'acpAdded'; identifier: string }
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
@@ -415,7 +419,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'challenge' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
+      what: 'add' | 'challenge' | 'acp' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
@@ -490,6 +494,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
       } else if (what === 'challenge') {
         if (details) setState({ kind: 'challenged', added: details.kind, identifier: details.identifier });
+      } else if (what === 'acp') {
+        if (details) setState({ kind: 'acpAdded', identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
       else if (what !== 'remove' && what !== 'move' && what !== 'mark' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
@@ -549,6 +555,28 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    * `at`, with a new element of `kind`, from the menu of `revision`: a
    * counter goal or counter evidence, which the status names.
    */
+  /** The ACPs a line's menu may offer, with the revision they are of; null if the document changed before they came. */
+  const acpChoices = useCallback(async (relationship: string, line: LineEnds): Promise<AcpChoices | null> => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return null;
+    try {
+      const answer = await on.acpChoices(relationship, line);
+      if (!answer || answer.revision !== revision || shown.current !== revision) return null;
+      return answer;
+    } catch {
+      return null;
+    }
+  }, []);
+  /**
+   * Adds an ACP of `kind` to the line `line` of `relationship`, from the
+   * menu of `revision`; the view keeps the line's upper end in place.
+   */
+  const addAcp = useCallback(
+    (relationship: string, line: LineEnds, kind: AcpKind, packageName: string, revision: number, onShown: EditShown) =>
+      void edit((on) => on.addAcp(relationship, line, kind, packageName, revision), 'acp', line.from, null, onShown),
+    [edit],
+  );
   const challenge = useCallback(
     (at: string, line: LineEnds | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
       // The view keeps what is challenged in place: the node, or the line's upper end.
@@ -924,6 +952,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     moveChallenge,
     challengeChoices,
     challenge,
+    acpChoices,
+    addAcp,
     add,
     removal,
     remove,

@@ -2,9 +2,12 @@
 //! `docs/standards/sacm-gsn-mapping.md`; G2 of
 //! `docs/roadmap/milestone-2-acps.md`).
 
-use af_gsn::view::{Acp, Code, of_package, view};
-use sacm::model::Document;
-use sacm::xmi::{self, Mode, ReadOptions};
+use af_gsn::commands::{
+    AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, add_acp,
+};
+use af_gsn::view::{Acp, Code, argument_package_of, of_package, view};
+use sacm::model::{Document, ElementKind as SacmKind};
+use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 fn read(bytes: &[u8]) -> Document {
     match xmi::read(bytes, &ReadOptions::default().with_mode(Mode::Strict)) {
@@ -131,4 +134,173 @@ fn r17_a_claim_also_named_by_a_claim_is_drawn() {
     let shown = view(&document, "en");
     assert_eq!(shown.acps.len(), 1);
     assert!(shown.nodes.iter().any(|node| node.id == "c"));
+}
+
+fn line<'a>(relationship: &'a str, from: &'a str, to: &'a str) -> AcpLine<'a> {
+    AcpLine {
+        relationship,
+        from,
+        to,
+    }
+}
+
+fn refusals(document: &Document, at: AcpLine<'_>) -> Vec<Option<Refusal>> {
+    let shown = view(document, "en");
+    acp_choices(document, &shown, at)
+        .choices
+        .into_iter()
+        .map(|(_, refusal)| refusal)
+        .collect()
+}
+
+#[test]
+fn w33_a_support_or_context_line_takes_an_acp_on_its_first_line_only() {
+    let document = sample("acps.sacm.xmi");
+    let shown = view(&document, "en");
+    // The next identifier is above every ACP the file has.
+    assert_eq!(
+        acp_choices(&document, &shown, line("E2", "G3", "Sn2")).identifier,
+        "ACP5"
+    );
+    assert_eq!(refusals(&document, line("E2", "G3", "Sn2")), [None, None]);
+    assert_eq!(refusals(&document, line("X1", "G1", "C1")), [None, None]);
+    // An inference through a Strategy: on its first line, into S1, and not
+    // on a premise's below it (GSN v3 §1:5.3.3).
+    assert_eq!(refusals(&document, line("I1", "G1", "S1")), [None, None]);
+    assert_eq!(
+        refusals(&document, line("I1", "S1", "G2")),
+        [Some(Refusal::NotTheFirstLine); 2]
+    );
+    assert_eq!(
+        refusals(&document, line("E2", "G1", "Sn2")),
+        [Some(Refusal::NotANode); 2]
+    );
+    // Not on a node, other than one SACM 2.4 will let it on.
+    assert_eq!(acp_node_refusal(&shown, "Sn1"), Refusal::AcpNeedsSacm24);
+    assert_eq!(acp_node_refusal(&shown, "C1"), Refusal::AcpNeedsSacm24);
+    assert_eq!(acp_node_refusal(&shown, "G1"), Refusal::NotAnAcpPlace);
+    assert_eq!(Refusal::NotAnAcpPlace.code(), "AF-EDIT-029");
+    assert_eq!(Refusal::AcpNeedsSacm24.code(), "AF-EDIT-030");
+}
+
+#[test]
+fn w33_a_challenge_takes_no_acp() {
+    let document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g" />
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="ch" source="k" target="g" isCounter="true" />"#,
+        "",
+    );
+    assert_eq!(
+        refusals(&document, line("ch", "k", "g")),
+        [Some(Refusal::NotAnAcpPlace); 2]
+    );
+    assert_eq!(refusals(&document, line("i", "g", "sub")), [None, None]);
+}
+
+fn strict(document: &Document) -> Document {
+    let written = xmi::write(document, &WriteOptions::default().with_mode(Mode::Strict))
+        .unwrap_or_else(|error| panic!("a strict write refused it: {error:?}"));
+    read(written.as_bytes())
+}
+
+#[test]
+fn w34_a_description_is_a_claim_of_the_lines_package_shown_by_the_acp() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let mut document = original.clone();
+    let added = add_acp(
+        &mut document,
+        &shown,
+        line("E2", "G3", "Sn2"),
+        AcpKind::Description,
+        "unused",
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&strict(&document), "en");
+    assert!(
+        after
+            .acps
+            .contains(&acp("E2", &added.element, "ACP5", None))
+    );
+    // Not a node: the ACP shows it, and its text is edited as a node's is.
+    assert!(!after.nodes.iter().any(|node| node.id == added.element));
+    assert!(
+        after
+            .descriptions
+            .iter()
+            .any(|node| node.id == added.element)
+    );
+    assert_eq!(
+        argument_package_of(&document, &added.element).as_deref(),
+        Some("argpkg_main")
+    );
+    // No package is made, and nothing else changed.
+    let packages = |document: &Document| {
+        document
+            .elements()
+            .filter(|element| element.kind() == SacmKind::ArgumentPackage)
+            .count()
+    };
+    assert_eq!(packages(&document), packages(&original));
+    assert_eq!(after.nodes.len(), shown.nodes.len());
+    assert_eq!(after.findings.len(), shown.findings.len());
+}
+
+#[test]
+fn w34_a_confidence_argument_is_a_new_package_beside_the_lines() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let mut document = original.clone();
+    let added = add_acp(
+        &mut document,
+        &shown,
+        line("X1", "G1", "C1"),
+        AcpKind::Argument,
+        "Confidence ACP5",
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let read_back = strict(&document);
+    let after = view(&read_back, "en");
+    let package = argument_package_of(&read_back, &added.element)
+        .unwrap_or_else(|| panic!("the Claim is in a package"));
+    assert_ne!(package, "argpkg_main");
+    // Beside the line's package, in the assurance case.
+    let holder = read_back
+        .get(package.as_str())
+        .and_then(|found| found.parent())
+        .map(|parent| parent.id().as_str().to_owned());
+    assert_eq!(holder.as_deref(), Some("case_acps"));
+    // The ACP already on X1 stays, and the new one is labelled with the
+    // package (§1:5.2.3); its Claim is that package's top goal, a node.
+    let on_x1: Vec<&Acp> = after
+        .acps
+        .iter()
+        .filter(|acp| acp.relationship == "X1")
+        .collect();
+    assert_eq!(on_x1.len(), 2);
+    assert_eq!(on_x1[0].claim, "ACP4");
+    assert_eq!(on_x1[1].label, "ACP5[Confidence ACP5]");
+    assert_eq!(on_x1[1].package.as_deref(), Some(package.as_str()));
+    assert!(after.nodes.iter().any(|node| node.id == added.element));
+    let confidence =
+        of_package(&read_back, &after, &package).unwrap_or_else(|| panic!("a package"));
+    assert_eq!(confidence.nodes.len(), 1);
+}
+
+#[test]
+fn w34_a_refused_acp_changes_nothing() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let mut document = original.clone();
+    match add_acp(
+        &mut document,
+        &shown,
+        line("I1", "S1", "G2"),
+        AcpKind::Argument,
+        "x",
+    ) {
+        Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::NotTheFirstLine),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(document.elements().count(), original.elements().count());
 }

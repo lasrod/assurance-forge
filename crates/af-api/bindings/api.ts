@@ -71,7 +71,16 @@ supported: boolean, identifier: string, name: string | null, statement: string |
 /**
  * The view's codes about this element.
  */
-codes: Array<ViewCode>, };
+codes: Array<ViewCode>, 
+/**
+ * The SACM id of the argument package it is held in, or null.
+ */
+package: string | null, 
+/**
+ * A confidence Claim an ACP shows as its description (R17): it is not
+ * drawn as a node, and its text is the ACP's.
+ */
+acpDescription: boolean, };
 
 export type RelationshipDetails = { 
 /**
@@ -192,6 +201,22 @@ package: string | null,
  * The square, centred on the line.
  */
 square: Rect, label: TextLine, };
+
+export type AcpKind = "description" | "argument";
+
+export type AcpChoice = { kind: AcpKind, 
+/**
+ * Why it cannot be added (`AF-EDIT-002`, `AF-EDIT-005`, `AF-EDIT-011`,
+ * `AF-EDIT-027`, `AF-EDIT-029`), or null when it can.
+ */
+refusal: string | null, };
+
+export type AcpChoices = { revision: number, 
+/**
+ * The identifier the next ACP takes, such as `ACP1`: what the interface
+ * names a confidence argument's package after.
+ */
+identifier: string, choices: Array<AcpChoice>, };
 
 export type TextLine = { text: string, role: TextRole, x: number, baseline: number, 
 /**

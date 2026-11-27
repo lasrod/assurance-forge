@@ -5,8 +5,8 @@
 
 use af_api::Core;
 use af_api::contract::{
-    ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult, ProblemSeverity,
-    ProblemSource, Shape, TextRole,
+    AcpKind, ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult,
+    ProblemSeverity, ProblemSource, Shape, TextRole,
 };
 use af_layout::{Fonts, Style};
 
@@ -1059,4 +1059,72 @@ fn a_package_is_shown_as_its_own_diagram_and_the_whole_case_again_without_one() 
     let again = core.diagram().unwrap_or_else(|| panic!("no diagram"));
     assert_eq!(again.package, None);
     assert_eq!(again.diagram.nodes.len(), whole.diagram.nodes.len());
+}
+
+#[test]
+fn an_acp_is_added_in_one_undo_step_and_its_package_shown_until_undone() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let choices = core
+        .acp_choices("E2", "G3", "Sn2")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(choices.identifier, "ACP5");
+    assert!(
+        choices
+            .choices
+            .iter()
+            .all(|choice| choice.refusal.is_none())
+    );
+    assert_eq!(core.acp_node_refusal("Sn1").as_deref(), Some("AF-EDIT-030"));
+
+    // A description: the Claim is answered, and shown in the details panel.
+    let EditResult::Applied {
+        element: Some(claim),
+        ..
+    } = core.add_acp("E2", "G3", "Sn2", AcpKind::Description, "x", 1)
+    else {
+        panic!("not added");
+    };
+    let details = core.element(&claim).unwrap_or_else(|| panic!("no details"));
+    assert!(details.acp_description);
+    assert_eq!(details.identifier, "ACP5");
+    assert_eq!(details.package.as_deref(), Some("argpkg_main"));
+    let drawn = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let on = drawn
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == "E2")
+        .unwrap_or_else(|| panic!("no E2"));
+    assert_eq!(on.acps.len(), 1);
+    assert_eq!(on.acps[0].label.text, "ACP5");
+
+    // A confidence argument, at a later revision: a stale menu is refused.
+    assert!(matches!(
+        core.add_acp("X1", "G1", "C1", AcpKind::Argument, "Confidence ACP6", 1),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let EditResult::Applied {
+        element: Some(goal),
+        revision,
+        ..
+    } = core.add_acp("X1", "G1", "C1", AcpKind::Argument, "Confidence ACP6", 2)
+    else {
+        panic!("not added");
+    };
+    assert_eq!(revision, 3);
+    let package = core
+        .element(&goal)
+        .and_then(|details| details.package)
+        .unwrap_or_else(|| panic!("no package"));
+    assert!(core.show_package(Some(&package)));
+    assert_eq!(
+        core.diagram().map(|at| at.diagram.nodes.len()),
+        Some(1),
+        "the confidence argument's diagram holds its goal"
+    );
+    // Undone in one step: the package goes, and the whole case is shown.
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert!(core.element(&goal).is_none());
+    assert_eq!(core.diagram().map(|at| at.package), Some(None));
 }

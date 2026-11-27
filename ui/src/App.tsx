@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
-import type { AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
-import { addItems, challengeItems, kindName, refusalText } from './addMenu';
+import type { AcpChoice, AcpKind, AcpMark, AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
+import { acpItems, addItems, challengeItems, kindName, refusalText } from './addMenu';
 import { boundsOf, edgeKey } from './canvas/draw';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
@@ -61,6 +61,9 @@ const MOVE_CANCEL = 'moveCancel';
 const UNDEVELOPED = 'undeveloped';
 /** The menu items that challenge a node or a line: this prefix and the challenger's kind. */
 const CHALLENGE = 'challenge:';
+const ACP = 'acp:';
+/** A Solution's or Context's Add ACP, which says why it is not yet. */
+const ACP_NODE = 'acpNode';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -101,6 +104,8 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('relayoutFailed'), tone: 'error' };
     case 'added':
       return { text: t('added', { kind: kindName(state.added, t), identifier: state.identifier }) };
+    case 'acpAdded':
+      return { text: t('acpAdded', { identifier: state.identifier }) };
     case 'challenged':
       return { text: t(state.added === 'solution' ? 'counterEvidenceAdded' : 'counterGoalAdded', { identifier: state.identifier }) };
     case 'textChanged':
@@ -179,6 +184,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
+  const { acpChoices, addAcp: addAcpWith } = doc;
   const { challengeChoices, challenge: challengeWith, moveChallenge: moveChallengeWith } = doc;
   /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
   const setUndeveloped = useCallback(
@@ -210,6 +216,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     line?: ({ relationship: string } & LineEnds) | null;
     /** The challengers that may challenge the node or the line. */
     challenges?: AddChoice[];
+    /** A line's ACPs, and the identifier the next one takes. */
+    acps?: { identifier: string; choices: AcpChoice[] } | null;
+    /** A Solution's or a Context's menu offers Add ACP, which says why not yet. */
+    acpNode?: boolean;
   } | null>(null);
   const noDiagram = diagram === null;
   useEffect(() => {
@@ -398,7 +408,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
         // Challenges of another revision than the add choices are not offered.
         const challenges = challenged && challenged.revision === answer.revision ? challenged.choices : [];
-        const menu = { revision: answer.revision, parent, about, at, source, choices: answer.choices, challenges };
+        const menu = {
+          revision: answer.revision,
+          parent,
+          about,
+          at,
+          source,
+          choices: answer.choices,
+          challenges,
+          acpNode: about === 'solution' || about === 'context',
+        };
         if (!parent || about !== 'goal' || !core) {
           setAddMenu(menu);
           return;
@@ -445,12 +464,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         return;
       }
       setSelected(edgeKey(edge));
-      void challengeChoices(edge.relationship, { from: edge.from, to: edge.to }).then((answer) => {
+      const ends = { from: edge.from, to: edge.to };
+      void Promise.all([challengeChoices(edge.relationship, ends), acpChoices(edge.relationship, ends)]).then(([answer, acps]) => {
         // A move begun meanwhile changed the request: the answer is dropped.
         if (!answer || request !== menuRequest.current) return;
-        // Nothing may challenge it: the status says why.
-        const refused = answer.choices.find((choice) => choice.refusal !== null);
-        if (answer.choices.every((choice) => choice.refusal !== null)) {
+        // ACPs of another revision than the challenges are not offered.
+        const acpChoices = acps && acps.revision === answer.revision ? acps : null;
+        const all = [...answer.choices, ...(acpChoices?.choices ?? [])];
+        // Nothing may go on it: the status says why.
+        const refused = all.find((choice) => choice.refusal !== null);
+        if (all.every((choice) => choice.refusal !== null)) {
           if (refused?.refusal) moveRefused(refused.refusal, null);
           return;
         }
@@ -463,10 +486,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           choices: [],
           line: { relationship: edge.relationship, from: edge.from, to: edge.to },
           challenges: answer.choices,
+          acps: acpChoices && { identifier: acpChoices.identifier, choices: acpChoices.choices },
         });
       });
     },
-    [challengeChoices, setSelected, moving, moveRefused],
+    [challengeChoices, acpChoices, setSelected, moving, moveRefused],
   );
 
   // A removal that waits for the user: it deletes more than the node chosen.
@@ -485,26 +509,27 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [removal, removeWith, followEdit],
   );
-  // A counter goal or counter evidence just added, whose name is to be ready
-  // to type once its details are shown. Set only when the add is shown: a
-  // refused add leaves nothing to type in.
-  const nameAfter = useRef<string | null>(null);
+  // A counter goal, counter evidence or confidence Claim just added, whose
+  // name, or an ACP description's text, is to be ready to type once its
+  // details are shown. Set only when the add is shown: a refused add leaves
+  // nothing to type in.
+  const typeAfter = useRef<{ id: string; field: 'name' | 'statement' } | null>(null);
   const challenged = useCallback<EditShown>(
     (before, next, anchor, added) => {
-      nameAfter.current = added;
+      typeAfter.current = added ? { id: added, field: 'name' } : null;
       followEdit(before, next, anchor, added);
     },
     [followEdit],
   );
-  // Another node selected before the details came: its name is not typed.
+  // Another element selected before the details came: nothing is typed in.
   useEffect(() => {
-    if (nameAfter.current !== null && selected !== nameAfter.current) nameAfter.current = null;
+    if (typeAfter.current !== null && selected !== typeAfter.current.id) typeAfter.current = null;
   }, [selected]);
   useEffect(() => {
-    const wanted = nameAfter.current;
-    if (wanted === null || details?.type !== 'element' || details.element.id !== wanted) return;
-    nameAfter.current = null;
-    const input = document.querySelector<HTMLInputElement>('[data-testid="element-name"]');
+    const wanted = typeAfter.current;
+    if (wanted === null || details?.type !== 'element' || details.element.id !== wanted.id) return;
+    typeAfter.current = null;
+    const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-testid="element-${wanted.field}"]`);
     input?.focus();
     input?.select();
   }, [details]);
@@ -528,6 +553,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     }
     if (id === MOVE_CANCEL) {
       setMoving(null);
+      return;
+    }
+    if (id.startsWith(ACP) && menu.line && menu.acps) {
+      const kind = id.slice(ACP.length) as AcpKind;
+      const { relationship, ...ends } = menu.line;
+      addAcpWith(relationship, ends, kind, t('confidencePackage', { identifier: menu.acps.identifier }), menu.revision, acpAdded(kind));
+      return;
+    }
+    if (id === ACP_NODE) {
+      if (menu.parent && core) void core.acpNodeRefusal(menu.parent).then((code) => code && moveRefused(code, null));
       return;
     }
     if (id.startsWith(CHALLENGE)) {
@@ -622,26 +657,53 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     if (row === FILE_ROW) void showPackage(null);
     else if (row && packages.some((item) => item.id === row && item.kind === 'ArgumentPackage')) void showPackage(row);
   };
-  // A node asked for that the package shown does not draw: the whole case
-  // is shown, and it is selected there.
-  const wanted = useRef<string | null>(null);
+  // An element asked for in another diagram than the one shown: that
+  // diagram is shown, and the element selected there, its name or text
+  // ready to type when asked.
+  const wanted = useRef<{ id: string; package: string | null; field?: 'name' | 'statement' } | null>(null);
+  const showIn = (id: string, pkg: string | null, field?: 'name' | 'statement') => {
+    wanted.current = { id, package: pkg, field };
+    void showPackage(pkg);
+  };
+  /** A node asked for: in the diagram shown, or else in the whole case. */
   const showNode = (id: string) => {
     const drawn = diagram ? boundsOf(diagram.diagram, id) !== null : false;
     if (drawn || shownPackage === null) {
       selectAndShow(id);
       return;
     }
-    wanted.current = id;
-    void showPackage(null);
+    showIn(id, null);
   };
   useEffect(() => {
-    const id = wanted.current;
-    if (id === null || shownPackage !== null) return;
+    const asked = wanted.current;
+    if (asked === null || shownPackage !== asked.package) return;
     wanted.current = null;
-    selectAndShow(id);
-    // Only once the whole case is the diagram.
+    selectAndShow(asked.id);
+    if (asked.field) typeAfter.current = { id: asked.id, field: asked.field };
+    // Only once the diagram asked for is the one shown.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diagram]);
+  /**
+   * After an ACP is added: a description's text is ready to type; a
+   * confidence argument's package is shown, with its goal selected and its
+   * name ready to type.
+   */
+  const acpAdded = (kind: AcpKind): EditShown => (before, next, anchor, added) => {
+    followEdit(before, next, anchor, null);
+    if (!added) return;
+    if (kind === 'description') {
+      setSelected(added);
+      typeAfter.current = { id: added, field: 'statement' };
+      return;
+    }
+    void core?.element(added).then((made) => made?.package && showIn(added, made.package, 'name'));
+  };
+  /** A click on an ACP: its confidence argument, in its package, or its description, in Element Properties. */
+  const openAcp = (acp: AcpMark) => {
+    if (acp.package) showIn(acp.claim, acp.package);
+    else if (diagram?.diagram.nodes.some((node) => node.id === acp.claim)) selectAndShow(acp.claim);
+    else setSelected(acp.claim);
+  };
 
   // The View menu's panels are the workspace's views. The workspace says which
   // show, at whatever tier it is in, and shows or hides one.
@@ -953,6 +1015,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               onMoveTo={moveTo}
               onMoveToLine={moveToLine}
               onOpenPackage={(id) => void showPackage(id)}
+              onAcp={openAcp}
               onMoveCancel={() => setMoving(null)}
               onDragStart={(id) => startMove(id, true)}
               onDragEnd={endDrag}
@@ -984,7 +1047,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                   {item.label}
                 </MenuItem>
               ))}
-            {addMenu?.parent && !moving && challengeItems(addMenu.challenges ?? [], t).length > 0 && <MenuSeparator />}
+            {addMenu?.line &&
+              !moving &&
+              acpItems(addMenu.acps?.choices ?? [], t).map((item) => (
+                <MenuItem key={`${ACP}${item.kind}`} id={`${ACP}${item.kind}`}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            {addMenu?.parent && !moving && addMenu.acpNode && <MenuItem id={ACP_NODE}>{t('addAcp')}</MenuItem>}
+            {addMenu?.parent && !moving && (challengeItems(addMenu.challenges ?? [], t).length > 0 || addMenu.acpNode) && <MenuSeparator />}
             {addMenu?.parent && !moving && addMenu.undeveloped && (
               <MenuItem id={UNDEVELOPED}>{t(addMenu.undeveloped.marked ? 'clearUndeveloped' : 'markUndeveloped')}</MenuItem>
             )}

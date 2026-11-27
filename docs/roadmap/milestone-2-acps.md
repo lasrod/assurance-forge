@@ -108,8 +108,10 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
       as a square with its label on the line; a description's `Claim` drawn
       only as the ACP; E11 changed and R17 added, with their evidence, and
       the gallery's `acps` fixture.
-- [ ] **G3.** Adding an ACP from a line's menu, as a description or as a new
-      confidence argument, with tests; what may not carry one, and why.
-- [ ] **G4.** A click on an ACP: the confidence argument's diagram with its
+- [x] **G3.** Adding an ACP from a line's menu, as a description or as a new
+      confidence argument, with tests; what may not carry one, and why
+      (W33, W34). A confidence argument's package is named "Confidence
+      ACP1" in the interface's language.
+- [x] **G4.** A click on an ACP: the confidence argument's diagram with its
       goal selected, or the description in Element Properties. Both
       languages, browser tests.

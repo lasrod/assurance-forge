@@ -991,6 +991,37 @@ fn add(
 }
 
 #[tauri::command]
+fn acp_choices(
+    relationship: String,
+    from: String,
+    to: String,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::AcpChoices>, String> {
+    Ok(lock(&state)?.core.acp_choices(&relationship, &from, &to))
+}
+
+#[tauri::command]
+fn acp_node_refusal(id: String, state: Shared<'_>) -> Result<Option<String>, String> {
+    Ok(lock(&state)?.core.acp_node_refusal(&id))
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn add_acp(
+    relationship: String,
+    from: String,
+    to: String,
+    kind: af_api::contract::AcpKind,
+    package_name: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .add_acp(&relationship, &from, &to, kind, &package_name, revision))
+}
+
+#[tauri::command]
 fn show_package(package: Option<String>, state: Shared<'_>) -> Result<bool, String> {
     Ok(lock(&state)?.core.show_package(package.as_deref()))
 }
@@ -1206,6 +1237,9 @@ pub fn run(args: Args) -> i32 {
             challenge,
             move_to_line,
             show_package,
+            acp_choices,
+            acp_node_refusal,
+            add_acp,
             set_text,
             undo,
             redo,

@@ -29,10 +29,14 @@ use sacm::model::{
 use crate::ElementKind;
 use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, View};
 
+mod acp;
 mod challenge;
 mod move_node;
 mod remove;
 mod repair;
+pub use acp::{
+    ACP_KINDS, ACP_PREFIX, AcpChoices, AcpKind, AcpLine, acp_choices, acp_node_refusal, add_acp,
+};
 pub use challenge::{
     CHALLENGERS, Challenged, LineTarget, challenge, challenge_choices, move_challenge,
 };
@@ -107,6 +111,12 @@ pub enum Refusal {
     /// AF-EDIT-028: a counter goal or counter evidence stays a challenge: it
     /// is moved onto what it is to challenge, not to the top level (W32).
     ChallengeStays,
+    /// AF-EDIT-029: an ACP goes on a `SupportedBy` or `InContextOf` line, or
+    /// a Solution or a Context; GSN v3 puts none elsewhere (W33).
+    NotAnAcpPlace,
+    /// AF-EDIT-030: an ACP on a Solution or a Context comes with SACM 2.4:
+    /// SACM 2.3 cannot hold it (W33, gap row 7).
+    AcpNeedsSacm24,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -141,6 +151,8 @@ impl Refusal {
             Refusal::NotAChallenger => "AF-EDIT-026",
             Refusal::NotTheFirstLine => "AF-EDIT-027",
             Refusal::ChallengeStays => "AF-EDIT-028",
+            Refusal::NotAnAcpPlace => "AF-EDIT-029",
+            Refusal::AcpNeedsSacm24 => "AF-EDIT-030",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",
@@ -240,7 +252,13 @@ pub fn set_text(
     text: &str,
     language: &str,
 ) -> Result<TextSet, AddError> {
-    if !view.nodes.iter().any(|node| node.id == id) {
+    // A node, or a confidence Claim an ACP shows (R17).
+    if !view
+        .nodes
+        .iter()
+        .chain(&view.descriptions)
+        .any(|node| node.id == id)
+    {
         return Err(AddError::Refused(Refusal::NotANode));
     }
     let element = document

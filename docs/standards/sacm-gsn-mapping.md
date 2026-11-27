@@ -694,6 +694,21 @@ Figure 2); GSN v3 requires challenges, and the gap is row 4 of
 | W31 | The challenge | The challenger as an add makes a node of its kind (W9), in the `ArgumentPackage` of what is challenged, with the next identifier of the prefix `CG` for a counter goal and `CSn` for counter evidence (W10's numbering); then, with `isCounter` set, `CreateAssertedInference` from a Goal or `CreateAssertedEvidence` from a Solution, to the `target` of W29. Nothing that is challenged is changed | Decided (prefixes on 27 November 2026, asked for by the user) | E5 reads it back as a challenge; R9 reads counter-evidence as a Solution. GSN v3's dialectic figures number them so: CSn1 (Figures 1:6-1, 1:6-3, 1:6-4), CG1 and CG2 (Figures 1:6-2, 1:6-5). An example, not a rule: §1:2.1.2 asks only that an identifier be unique in its module |
 | W32 | Moving a challenge | A counter goal or counter evidence that challenges one thing, alone as the source of its counter relationship, and is drawn under nothing else, moves its challenge: the relationship gets the new `target` (`SetReferences`, `ReferenceEnd::Target`), a node or a line by W29's rules, and the challenger, what is under it and the relationship's `isCounter` stay as they are. The menu's Move… and a drag both make it, a drag dropped on a node or on a line. It is not moved onto itself, what is under it, its own line or a line that hangs from a node under it (AF-EDIT-018), onto what it challenges already (AF-EDIT-019), into another argument package (AF-EDIT-020), or to the top level (AF-EDIT-028): with nothing to challenge it is no longer a counter. A counter relationship that something else refers to, such as a challenge of the challenge, or that holds more than its name, stays (W25, AF-EDIT-015); a challenger of several things, or one that is also supported or is context, is not moved (AF-EDIT-017) | Decided (27 November 2026, from the spike) | W25: a challenge of a challenge is about that challenge's target, and is not carried to another one unseen. GSN v3 §1:6.2.2: the dialectic uses of a Goal and a Solution are counters, which have something to challenge. The findings are in [`docs/spikes/challenge-move.md`](../spikes/challenge-move.md) |
 
+### Adding an assurance claim point
+
+How the editor adds an ACP to a line (milestone 2, step 7). `af-gsn`
+(`commands::add_acp`) applies it as one `sacm::edit::batch`, one undo step;
+`commands::acp_choices` answers, for the line's menu, whether it may and
+which identifier it takes. Decided on 27 November 2026 with the user (A1 to
+A4 of [the ACP plan](../roadmap/milestone-2-acps.md)). The GSN Metamodel v2.2
+has no ACP class and strikes `metaClaim` out (gap rows 5 and 8); SACM 2.4
+removes `metaClaim` for a Claim's `subject` (SACM24-38, -50, -83).
+
+| Rule | Where, and with what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W33 | Where an ACP goes | A line drawn as `SupportedBy` or `InContextOf`, the first of its relationship: an inference through a Strategy takes it on its line into the Strategy, not on a premise's below it (AF-EDIT-027). A challenge, or anything GSN v3 does not name, does not (AF-EDIT-029); a line drawn neutral does not (AF-EDIT-002). A Solution or a Context does in GSN v3 but not in SACM 2.3, and its menu says it comes with SACM 2.4 (AF-EDIT-030) | Decided | GSN v3 Table 1:5-1 and §1:5.3.3; Table 1:5-2 for a Solution or a Context, which are `ArtifactReference`s without `metaClaim` in SACM 2.3 (gap row 7) |
+| W34 | The ACP | A confidence `Claim` made as an add makes a Goal (W9), numbered with the next identifier of the prefix `ACP` (W10's numbering): **a description**, in the line's `ArgumentPackage`, which R17 then shows only as the ACP; or **a confidence argument**, in a new `ArgumentPackage` (`CreateArgumentPackage`) beside the line's, under what holds it, named as the interface words it ("Confidence ACP1"), of which the Claim is the top goal. Then `SetReferences(relationship, MetaClaim, …)` adds the Claim to the relationship's `metaClaim`, after any it names. Nothing else changes | Decided | E11 reads it back as the ACP. GSN v3 §1:5.2.3: "Each ACP should have a unique identifier, e.g. 'ACP1'", and the argument is "a paragraph of accompanying text, a goal in the local argument, or a goal in a separate module"; §1:5.3.2: the identifier "may be a reference to a goal" |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -727,5 +742,7 @@ was refused. Nothing changes.
 | AF-EDIT-024 | The Strategy supports no Goal, so there is no line to move it by (W21) |
 | AF-EDIT-025 | The element keeps a support line where GSN has context, and the Goal is undeveloped (W21) |
 | AF-EDIT-026 | Only a Goal or a Solution challenges (W30) |
-| AF-EDIT-027 | The line is not the first of the relationship it is drawn for, where a challenge of it is drawn (W29) |
+| AF-EDIT-027 | The line is not the first of the relationship it is drawn for, where a challenge or an ACP of it is drawn (W29, W33) |
 | AF-EDIT-028 | A challenge is moved to another node or line, never to the top level (W32) |
+| AF-EDIT-029 | GSN puts no ACP there: only on a `SupportedBy` or `InContextOf` line, or a Solution or a Context (W33) |
+| AF-EDIT-030 | An ACP on a Solution or a Context comes with SACM 2.4: SACM 2.3 cannot hold it (W33, gap row 7) |

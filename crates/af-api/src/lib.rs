@@ -41,10 +41,10 @@ use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 use contract::{
-    AddChoice, AddChoices, ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult,
-    ElementDetails, ElementKind, History, MessageArgument, MoveTarget, MoveTargets, OpenResult,
-    Outline, OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal,
-    RemovalNode, ViewCode, WriteResult,
+    AcpChoice, AcpChoices, AcpKind, AddChoice, AddChoices, ArgumentValue, DiagnosticCounts,
+    DiagramAt, DiagramAtRef, EditResult, ElementDetails, ElementKind, History, MessageArgument,
+    MoveTarget, MoveTargets, OpenResult, Outline, OutlineRow, Package, Refusal,
+    RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode, WriteResult,
 };
 pub use contract::{FoundRecovery, KeepResult, RecoveryCopy};
 
@@ -265,9 +265,14 @@ impl Core {
 
     /// What the details panel shows for the node with SACM id `id`.
     pub fn element(&self, id: &str) -> Option<ElementDetails> {
-        let view = &self.open.as_ref()?.view;
-        let node = view.nodes.iter().find(|node| node.id == id)?;
+        let open = self.open.as_ref()?;
+        let view = &open.view;
+        // A node, or a confidence Claim an ACP shows (R17).
+        let described = view.descriptions.iter().find(|node| node.id == id);
+        let node = view.nodes.iter().find(|node| node.id == id).or(described)?;
         Some(ElementDetails {
+            package: view::argument_package_of(open.session.document(), id),
+            acp_description: described.is_some(),
             id: node.id.clone(),
             kind: convert::node_kind(node.kind),
             undeveloped: node.undeveloped,
@@ -476,6 +481,78 @@ impl Core {
             revision: self.revision,
             choices,
         })
+    }
+
+    /// The ACPs the line from `from` to `to` of `relationship` may take
+    /// (W33), and the identifier the next one takes. `None` when nothing is
+    /// open.
+    pub fn acp_choices(&self, relationship: &str, from: &str, to: &str) -> Option<AcpChoices> {
+        let open = self.open.as_ref()?;
+        let line = commands::AcpLine {
+            relationship,
+            from,
+            to,
+        };
+        let answer = commands::acp_choices(open.session.document(), &open.view, line);
+        Some(AcpChoices {
+            revision: self.revision,
+            identifier: answer.identifier,
+            choices: answer
+                .choices
+                .into_iter()
+                .map(|(kind, refusal)| AcpChoice {
+                    kind: match kind {
+                        commands::AcpKind::Description => AcpKind::Description,
+                        commands::AcpKind::Argument => AcpKind::Argument,
+                    },
+                    refusal: refusal.map(|refusal| refusal.code().to_owned()),
+                })
+                .collect(),
+        })
+    }
+
+    /// Why the node `id` cannot take an ACP (W33): `AF-EDIT-030` for a
+    /// Solution or a Context, which comes with SACM 2.4; `AF-EDIT-029` for
+    /// another kind. `None` when nothing is open.
+    pub fn acp_node_refusal(&self, id: &str) -> Option<String> {
+        let open = self.open.as_ref()?;
+        Some(commands::acp_node_refusal(&open.view, id).code().to_owned())
+    }
+
+    /// Adds an ACP of `kind` to the line from `from` to `to` of
+    /// `relationship` (W34), as the menu of `revision` offered: one asked
+    /// for at another revision is refused (AF-EDIT-009). A confidence
+    /// argument's package is named `package_name`. The confidence Claim is
+    /// the element answered.
+    pub fn add_acp(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        kind: AcpKind,
+        package_name: &str,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let line = commands::AcpLine {
+            relationship,
+            from,
+            to,
+        };
+        let kind = match kind {
+            AcpKind::Description => commands::AcpKind::Description,
+            AcpKind::Argument => commands::AcpKind::Argument,
+        };
+        match open.session.add_acp(&open.view, line, kind, package_name) {
+            Ok((added, record)) => self.changed(&record, Some(added.element)),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
     }
 
     /// Challenges `at`, a node or with `line` a line, with a new element of
