@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
-import type { AddChoice, Core, ElementKind, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
-import { addItems, kindName, refusalText } from './addMenu';
+import type { AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
+import { addItems, challengeItems, kindName, refusalText } from './addMenu';
+import { edgeKey } from './canvas/draw';
 import { ElementProperties } from './ElementProperties';
 import { RemoveDialog } from './RemoveDialog';
 import { ProblemsPanel } from './ProblemsPanel';
@@ -58,6 +59,8 @@ const MOVE_HERE = 'moveHere';
 const MOVE_CANCEL = 'moveCancel';
 /** The menu item that marks a Goal undeveloped, or clears the mark. */
 const UNDEVELOPED = 'undeveloped';
+/** The menu items that challenge a node or a line: this prefix and the challenger's kind. */
+const CHALLENGE = 'challenge:';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
 
@@ -172,6 +175,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
+  const { challengeChoices, challenge: challengeWith } = doc;
   /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
   const setUndeveloped = useCallback(
     (id: string, undeveloped: boolean, revision: number, identifier: string) =>
@@ -198,6 +202,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     choices: AddChoice[];
     /** For a Goal whose undeveloped mark can be changed: what it is now, and its identifier. */
     undeveloped?: { marked: boolean; identifier: string } | null;
+    /** A line's menu: the relationship its line is drawn for, and its ends. `parent` is then null. */
+    line?: ({ relationship: string } & LineEnds) | null;
+    /** The challengers that may challenge the node or the line. */
+    challenges?: AddChoice[];
   } | null>(null);
   const noDiagram = diagram === null;
   useEffect(() => {
@@ -328,7 +336,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const openAddMenu = useCallback(
     (parent: string | null, at: { x: number; y: number }, source: ContextMenuSource) => {
       const request = ++menuRequest.current;
-      void addChoices(parent).then((answer) => {
+      // A node's menu also challenges it.
+      const challengers = parent && !moving ? challengeChoices(parent, null) : Promise.resolve(null);
+      void Promise.all([addChoices(parent), challengers]).then(([answer, challenged]) => {
         if (!answer || request !== menuRequest.current) return;
         // While a move is chosen the selection stays the node moved, and
         // the menu opens even with nothing to add: it holds the move.
@@ -339,7 +349,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         if (parent) setSelected(parent);
         if (!parent && answer.choices.every((choice) => choice.refusal !== null)) return;
         const about = parent ? (diagram?.diagram.nodes.find((node) => node.id === parent)?.kind ?? null) : null;
-        const menu = { revision: answer.revision, parent, about, at, source, choices: answer.choices };
+        // Challenges of another revision than the add choices are not offered.
+        const challenges = challenged && challenged.revision === answer.revision ? challenged.choices : [];
+        const menu = { revision: answer.revision, parent, about, at, source, choices: answer.choices, challenges };
         if (!parent || about !== 'goal' || !core) {
           setAddMenu(menu);
           return;
@@ -360,7 +372,37 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         );
       });
     },
-    [addChoices, diagram, setSelected, moving, core],
+    [addChoices, challengeChoices, diagram, setSelected, moving, core],
+  );
+  /**
+   * Opens the menu of a line at a client point: the line is selected first.
+   * It lists what may challenge it; with nothing to list, it does not open.
+   */
+  const openLineMenu = useCallback(
+    (edge: DiagramEdge, at: { x: number; y: number }, source: ContextMenuSource) => {
+      const request = ++menuRequest.current;
+      setSelected(edgeKey(edge));
+      void challengeChoices(edge.relationship, { from: edge.from, to: edge.to }).then((answer) => {
+        if (!answer || request !== menuRequest.current || moving) return;
+        // Nothing may challenge it: the status says why.
+        const refused = answer.choices.find((choice) => choice.refusal !== null);
+        if (answer.choices.every((choice) => choice.refusal !== null)) {
+          if (refused?.refusal) moveRefused(refused.refusal, null);
+          return;
+        }
+        setAddMenu({
+          revision: answer.revision,
+          parent: null,
+          about: null,
+          at,
+          source,
+          choices: [],
+          line: { relationship: edge.relationship, from: edge.from, to: edge.to },
+          challenges: answer.choices,
+        });
+      });
+    },
+    [challengeChoices, setSelected, moving, moveRefused],
   );
 
   // A removal that waits for the user: it deletes more than the node chosen.
@@ -398,6 +440,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     }
     if (id === MOVE_CANCEL) {
       setMoving(null);
+      return;
+    }
+    if (id.startsWith(CHALLENGE)) {
+      const kind = id.slice(CHALLENGE.length) as ElementKind;
+      if (menu.line) challengeWith(menu.line.relationship, menu.line, kind, menu.revision, null, followEdit);
+      else if (menu.parent) challengeWith(menu.parent, null, kind, menu.revision, menu.about, followEdit);
       return;
     }
     if (id === UNDEVELOPED) {
@@ -610,7 +658,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // The add menu is named after what it adds to: "Goal G3", or "Add" on the empty canvas.
   const menuNode = addMenu?.parent ? diagram?.diagram.nodes.find((node) => node.id === addMenu.parent) : undefined;
   const menuOutline = addMenu?.parent ? outline.find((row) => row.id === addMenu.parent) : undefined;
-  const addMenuLabel = menuNode && menuOutline ? `${kindName(menuNode.kind, t)} ${menuOutline.identifier}` : t('addMenu');
+  const addMenuLabel = addMenu?.line
+    ? t('lineMenu')
+    : menuNode && menuOutline
+      ? `${kindName(menuNode.kind, t)} ${menuOutline.identifier}`
+      : t('addMenu');
   const hasFile = diagram !== null;
   // The welcome page shows while nothing is open, once the shell has said
   // whether it was started with a file and no file is being read.
@@ -776,6 +828,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               onSelect={setSelected}
               onTextStyle={onTextStyle}
               onContextMenu={openAddMenu}
+              onLineMenu={openLineMenu}
               onRemove={askRemove}
               move={moveMarks}
               onMoveTo={moveTo}
@@ -803,6 +856,14 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           >
             {addMenu && addItems(addMenu.choices, t).map((item) => <MenuItem key={item.kind} id={item.kind}>{item.label}</MenuItem>)}
             {addMenu?.parent && !moving && addItems(addMenu.choices, t).length > 0 && <MenuSeparator />}
+            {addMenu &&
+              !moving &&
+              challengeItems(addMenu.challenges ?? [], t).map((item) => (
+                <MenuItem key={`${CHALLENGE}${item.kind}`} id={`${CHALLENGE}${item.kind}`}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            {addMenu?.parent && !moving && challengeItems(addMenu.challenges ?? [], t).length > 0 && <MenuSeparator />}
             {addMenu?.parent && !moving && addMenu.undeveloped && (
               <MenuItem id={UNDEVELOPED}>{t(addMenu.undeveloped.marked ? 'clearUndeveloped' : 'markUndeveloped')}</MenuItem>
             )}

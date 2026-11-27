@@ -25,12 +25,19 @@ export interface AddItem {
 
 /** The words for an `AF-EDIT-*` code, about a node of `kind` (null for the canvas). */
 export function refusalText(code: string, kind: NodeKind | null, t: T): string {
-  const known = /^AF-EDIT-0(0[1-9]|1[0-9]|2[0-5])$/.test(code);
+  const known = /^AF-EDIT-0(0[1-9]|1[0-9]|2[0-7])$/.test(code);
   return known ? t(code as MessageKey, { kind: kind ? t(KINDS[kind]) : '' }) : code;
 }
 
 export function kindName(kind: ElementKind | NodeKind, t: T): string {
   return t(KINDS[kind]);
+}
+
+/** The menu's challenge items: the challengers that may challenge there, in the core's order. */
+export function challengeItems(choices: readonly AddChoice[], t: T): AddItem[] {
+  return choices
+    .filter((choice) => choice.refusal === null)
+    .map((choice) => ({ kind: choice.kind, label: t(choice.kind === 'solution' ? 'challengeWithSolution' : 'challengeWithGoal') }));
 }
 
 /** The menu's items for `choices`: the kinds that can be added, in the core's order. */

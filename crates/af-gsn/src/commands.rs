@@ -99,6 +99,9 @@ pub enum Refusal {
     WouldSupportUndeveloped,
     /// AF-EDIT-026: only a Goal or a Solution challenges (W30).
     NotAChallenger,
+    /// AF-EDIT-027: the line is not the first of the relationship it is
+    /// drawn for, where a challenge of that relationship is drawn (W29).
+    NotTheFirstLine,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -131,6 +134,7 @@ impl Refusal {
             Refusal::StrategyAlone => "AF-EDIT-024",
             Refusal::WouldSupportUndeveloped => "AF-EDIT-025",
             Refusal::NotAChallenger => "AF-EDIT-026",
+            Refusal::NotTheFirstLine => "AF-EDIT-027",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

@@ -993,20 +993,24 @@ fn add(
 #[tauri::command]
 fn challenge_choices(
     at: String,
-    line: bool,
+    from: Option<String>,
+    to: Option<String>,
     state: Shared<'_>,
 ) -> Result<Option<af_api::contract::AddChoices>, String> {
+    let line = from.as_deref().zip(to.as_deref());
     Ok(lock(&state)?.core.challenge_choices(&at, line))
 }
 
 #[tauri::command]
 fn challenge(
     at: String,
-    line: bool,
+    from: Option<String>,
+    to: Option<String>,
     kind: af_api::contract::ElementKind,
     revision: u32,
     state: Shared<'_>,
 ) -> Result<af_api::contract::EditResult, String> {
+    let line = from.as_deref().zip(to.as_deref());
     Ok(lock(&state)?.core.challenge(&at, line, kind, revision))
 }
 

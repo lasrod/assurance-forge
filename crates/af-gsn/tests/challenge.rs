@@ -172,12 +172,47 @@ fn w29_each_kind_of_node_and_line_is_challenged_by_a_goal_and_by_evidence() {
         (Challenged::Node("k"), "k"),
         // A Strategy, through the inference it is the reasoning of.
         (Challenged::Node("s"), "is"),
-        (Challenged::Line("is"), "is"),
-        (Challenged::Line("ev"), "ev"),
-        (Challenged::Line("cx"), "cx"),
-        (Challenged::Line("ca"), "ca"),
+        (
+            Challenged::Line {
+                relationship: "is",
+                from: "g",
+                to: "s",
+            },
+            "is",
+        ),
+        (
+            Challenged::Line {
+                relationship: "ev",
+                from: "g",
+                to: "e",
+            },
+            "ev",
+        ),
+        (
+            Challenged::Line {
+                relationship: "cx",
+                from: "g",
+                to: "x",
+            },
+            "cx",
+        ),
+        (
+            Challenged::Line {
+                relationship: "ca",
+                from: "g",
+                to: "a",
+            },
+            "ca",
+        ),
         // A challenge is challenged.
-        (Challenged::Line("ch"), "ch"),
+        (
+            Challenged::Line {
+                relationship: "ch",
+                from: "k",
+                to: "sub",
+            },
+            "ch",
+        ),
     ];
     for (at, target) in cases {
         for kind in [ElementKind::Goal, ElementKind::Solution] {
@@ -231,7 +266,14 @@ fn w29_what_is_of_no_gsn_kind_or_not_drawn_is_not_challenged() {
         Refusal::KindUnknown
     );
     assert_eq!(
-        refused(&mut document, Challenged::Line("cited")),
+        refused(
+            &mut document,
+            Challenged::Line {
+                relationship: "cited",
+                from: "g",
+                to: "other"
+            }
+        ),
         Refusal::KindUnknown
     );
     assert_eq!(
@@ -239,12 +281,52 @@ fn w29_what_is_of_no_gsn_kind_or_not_drawn_is_not_challenged() {
         Refusal::NotANode
     );
     assert_eq!(
-        refused(&mut document, Challenged::Line("nothing")),
+        refused(
+            &mut document,
+            Challenged::Line {
+                relationship: "nothing",
+                from: "g",
+                to: "sub"
+            }
+        ),
         Refusal::NotANode
     );
+    // A line the relationship does not have.
+    assert_eq!(
+        refused(
+            &mut document,
+            Challenged::Line {
+                relationship: "ev",
+                from: "g",
+                to: "sub"
+            }
+        ),
+        Refusal::NotANode
+    );
+    // A premise's line under a Strategy is part of the inference, which is
+    // challenged at its first line.
+    assert_eq!(
+        refused(
+            &mut document,
+            Challenged::Line {
+                relationship: "is",
+                from: "s",
+                to: "sub"
+            }
+        ),
+        Refusal::NotTheFirstLine
+    );
+    assert_eq!(Refusal::NotTheFirstLine.code(), "AF-EDIT-027");
     // A node's id is not a line.
     assert_eq!(
-        refused(&mut document, Challenged::Line("g")),
+        refused(
+            &mut document,
+            Challenged::Line {
+                relationship: "g",
+                from: "g",
+                to: "sub"
+            }
+        ),
         Refusal::NotANode
     );
     assert_eq!(document, before);
@@ -298,18 +380,22 @@ fn a_challenge_in_each_sample_keeps_the_file_valid() {
         let shown = view(&original, "en");
         let problems = sacm::validation::validate(&original).len();
         let mut made = 0;
-        let lines: Vec<&str> = shown
+        let lines: Vec<Challenged<'_>> = shown
             .edges
             .iter()
             .filter(|edge| edge.kind != EdgeKind::Neutral)
-            .map(|edge| edge.relationship.as_str())
+            .map(|edge| Challenged::Line {
+                relationship: &edge.relationship,
+                from: &edge.from,
+                to: &edge.to,
+            })
             .collect();
         let targets = shown
             .nodes
             .iter()
             .take(40)
             .map(|node| Challenged::Node(&node.id))
-            .chain(lines.into_iter().take(40).map(Challenged::Line));
+            .chain(lines.into_iter().take(40));
         for at in targets {
             let mut document = original.clone();
             match challenge(&mut document, &shown, at, ElementKind::Goal) {

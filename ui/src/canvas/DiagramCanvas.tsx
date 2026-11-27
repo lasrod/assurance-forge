@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
-import type { DiagramAt, TextStyle } from '../core/Core';
+import type { DiagramAt, DiagramEdge, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { badgeLabel, comesWith, edgePan, HOLD_MS, readableAt, type DragEnd } from './drag';
-import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, findEdge, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -112,6 +112,7 @@ export function DiagramCanvas({
   onSelect,
   onTextStyle,
   onContextMenu,
+  onLineMenu,
   onRemove,
   move = null,
   onMoveTo,
@@ -129,6 +130,8 @@ export function DiagramCanvas({
   onSelect: (id: string | null) => void;
   onTextStyle: (style: TextStyle) => void;
   onContextMenu: (id: string | null, at: { x: number; y: number }, source: ContextMenuSource) => void;
+  /** The menu of a line: it is selected, and the menu asked for at `at`. */
+  onLineMenu?: (edge: DiagramEdge, at: { x: number; y: number }, source: ContextMenuSource) => void;
   onRemove: (id: string) => void;
   move?: MoveMarks | null;
   /** A node was clicked while a move is chosen: one it may go under, or not. */
@@ -409,8 +412,8 @@ export function DiagramCanvas({
     [],
   );
 
-  // A right-click on a node, or on the empty canvas. A line takes no menu:
-  // nothing is added to a line.
+  // A right-click on a node, on a line, or on the empty canvas. A line's
+  // menu challenges it; not while a move is chosen, which places nodes.
   const onContext = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     if (!diagram || !viewport) return;
@@ -427,7 +430,11 @@ export function DiagramCanvas({
     event.currentTarget.focus();
     const point = local(event);
     const node = hitTest(diagram.diagram, viewport, point.x, point.y);
-    if (!node && hitEdge(diagram.diagram, viewport, point.x, point.y)) return;
+    const line = node ? null : hitEdge(diagram.diagram, viewport, point.x, point.y);
+    if (line) {
+      if (!move) onLineMenu?.(line, { x: event.clientX, y: event.clientY }, 'pointer');
+      return;
+    }
     onContextMenu(node?.id ?? null, { x: event.clientX, y: event.clientY }, 'pointer');
   };
 
@@ -445,11 +452,21 @@ export function DiagramCanvas({
     }
     if (isMenuKey(event) && diagram && viewport && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      // The selected node's menu at its centre; with no node selected, the
-      // canvas's at the canvas's centre.
+      // The selected node's menu at its centre, or the selected line's at
+      // the middle of its bounds; with nothing selected, the canvas's at the
+      // canvas's centre.
       const rect = event.currentTarget.getBoundingClientRect();
       const node = selected ? diagram.diagram.nodes.find((candidate) => candidate.id === selected) : undefined;
-      // A selected line takes no menu, as a right-click on it takes none.
+      const line = selected && !node ? findEdge(diagram.diagram, selected) : null;
+      if (line) {
+        if (move) return;
+        const middle = {
+          x: (line.bounds.x + line.bounds.width / 2) * viewport.scale + viewport.offsetX,
+          y: (line.bounds.y + line.bounds.height / 2) * viewport.scale + viewport.offsetY,
+        };
+        onLineMenu?.(line, { x: rect.left + middle.x, y: rect.top + middle.y }, 'keyboard');
+        return;
+      }
       if (selected && !node) return;
       const centre = node
         ? {

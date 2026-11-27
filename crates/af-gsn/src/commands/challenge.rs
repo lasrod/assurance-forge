@@ -19,8 +19,13 @@ use crate::view::{EdgeKind, NodeKind, View};
 pub enum Challenged<'a> {
     /// The node with this SACM id.
     Node(&'a str),
-    /// The line drawn for the relationship with this SACM id.
-    Line(&'a str),
+    /// One line of the relationship with this SACM id: the one from the node
+    /// `from` to `to`, as the view draws it.
+    Line {
+        relationship: &'a str,
+        from: &'a str,
+        to: &'a str,
+    },
 }
 
 /// The kinds that challenge, in menu order (W30): a counter-Goal and
@@ -128,19 +133,29 @@ fn plan(
                 | NodeKind::Context => document.get(id).ok_or(Refusal::NotANode)?.id().clone(),
             }
         }
-        Challenged::Line(relationship) => {
-            let drawn: Vec<EdgeKind> = view
+        Challenged::Line {
+            relationship,
+            from,
+            to,
+        } => {
+            let mut drawn = view
                 .edges
                 .iter()
-                .filter(|edge| edge.relationship == relationship)
-                .map(|edge| edge.kind)
-                .collect();
-            if drawn.is_empty() {
-                return Err(Refusal::NotANode);
-            }
+                .filter(|edge| edge.relationship == relationship);
+            let first = drawn.next().ok_or(Refusal::NotANode)?;
+            let line = std::iter::once(first)
+                .chain(drawn)
+                .find(|edge| edge.from == from && edge.to == to)
+                .ok_or(Refusal::NotANode)?;
             // A line drawn neutral is of no GSN kind to challenge.
-            if drawn.contains(&EdgeKind::Neutral) {
+            if line.kind == EdgeKind::Neutral {
                 return Err(Refusal::KindUnknown);
+            }
+            // The relationship is challenged, and E5 draws that at its first
+            // line: another of its lines, such as a premise's under a
+            // Strategy, has no relationship of its own to challenge.
+            if !std::ptr::eq(line, first) {
+                return Err(Refusal::NotTheFirstLine);
             }
             document
                 .get(relationship)

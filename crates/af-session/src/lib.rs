@@ -71,7 +71,8 @@ pub enum Command {
     /// element of `kind`.
     Challenge {
         at: String,
-        line: bool,
+        /// For a line: the nodes it runs from and to.
+        line: Option<(String, String)>,
         kind: ElementKind,
     },
     /// Replace the document by one kept in a recovery copy (plan decision
@@ -332,8 +333,12 @@ impl Session {
         let before = self.document.clone();
         let added = commands::challenge(&mut self.document, view, at, kind)?;
         let (id, line) = match at {
-            Challenged::Node(id) => (id, false),
-            Challenged::Line(id) => (id, true),
+            Challenged::Node(id) => (id, None),
+            Challenged::Line {
+                relationship,
+                from,
+                to,
+            } => (relationship, Some((from.to_owned(), to.to_owned()))),
         };
         let command = Command::Challenge {
             at: id.to_owned(),

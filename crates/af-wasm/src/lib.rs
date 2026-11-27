@@ -104,28 +104,36 @@ impl WasmCore {
     }
 
     /// `AddChoices` as JSON: which challengers may challenge the node `at`,
-    /// or with `line` the line of the relationship `at`; `None` when nothing
-    /// is open.
+    /// or, with `from` and `to`, the line between those nodes of the
+    /// relationship `at`; `None` when nothing is open.
     #[wasm_bindgen(js_name = challengeChoices)]
-    pub fn challenge_choices(&self, at: &str, line: bool) -> Result<Option<String>, JsError> {
+    pub fn challenge_choices(
+        &self,
+        at: &str,
+        from: Option<String>,
+        to: Option<String>,
+    ) -> Result<Option<String>, JsError> {
         self.core
-            .challenge_choices(at, line)
+            .challenge_choices(at, from.as_deref().zip(to.as_deref()))
             .map(|choices| json(&choices))
             .transpose()
     }
 
-    /// Challenges the node `at`, or with `line` the line of the relationship
-    /// `at`, with a new element of `kind` (`goal` or `solution`), from the
-    /// menu of `revision`. `EditResult` as JSON.
+    /// Challenges the node `at`, or, with `from` and `to`, the line between
+    /// those nodes of the relationship `at`, with a new element of `kind`
+    /// (`goal` or `solution`), from the menu of `revision`. `EditResult` as
+    /// JSON.
     pub fn challenge(
         &mut self,
         at: &str,
-        line: bool,
+        from: Option<String>,
+        to: Option<String>,
         kind: &str,
         revision: u32,
     ) -> Result<String, JsError> {
         let kind: ElementKind = serde_json::from_value(serde_json::Value::String(kind.to_owned()))
             .map_err(|_| JsError::new("core-kind"))?;
+        let line = from.as_deref().zip(to.as_deref());
         json(&self.core.challenge(at, line, kind, revision))
     }
 

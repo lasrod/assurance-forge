@@ -16,6 +16,7 @@ import type {
   EditResult,
   ElementKind,
   History,
+  LineEnds,
   NodeKind,
   OpenedFile,
   OpenResult,
@@ -538,6 +539,16 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
+   * Challenges the node `at`, or with `line` that line of the relationship
+   * `at`, with a new element of `kind`, from the menu of `revision`. The
+   * status says what was added, as for an add.
+   */
+  const challenge = useCallback(
+    (at: string, line: LineEnds | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
+      void edit((on) => on.challenge(at, line, kind, revision), 'add', line ? null : at, about, onShown),
+    [edit],
+  );
+  /**
    * What removing the node `id` would delete, with the revision it is of;
    * null if the document changed before it came, or if it cannot be
    * removed, which the status then says.
@@ -678,6 +689,22 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
    * The add menu's choices for `parent` (null: the empty canvas), with the
    * revision they are of; null if the document changed before they came.
    */
+  /**
+   * The challenge items of a node's or a line's menu, with the revision they
+   * are of; null if the document changed before they came.
+   */
+  const challengeChoices = useCallback(async (at: string, line: LineEnds | null): Promise<{ revision: number; choices: AddChoice[] } | null> => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return null;
+    try {
+      const answer = await on.challengeChoices(at, line);
+      if (!answer || answer.revision !== revision || shown.current !== revision) return null;
+      return { revision, choices: answer.choices };
+    } catch {
+      return null;
+    }
+  }, []);
   const addChoices = useCallback(async (parent: string | null): Promise<{ revision: number; choices: AddChoice[] } | null> => {
     const on = coreRef.current;
     const revision = shown.current;
@@ -842,6 +869,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     chooseFile,
     setTextStyle,
     addChoices,
+    challengeChoices,
+    challenge,
     add,
     removal,
     remove,

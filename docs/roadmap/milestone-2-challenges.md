@@ -65,6 +65,11 @@ Decided in G1, with the evidence in
   line. A Strategy is challenged through the one inference it is the
   `reasoning` of, which E5 draws at the Strategy (GSN v3 §1:6.3.12). A
   neutral node or line is not.
+- **Only a relationship's first line is challenged (W29, AF-EDIT-027).**
+  Found in G2: a premise's line under a Strategy is part of one inference,
+  and a challenge of it was drawn on the line into the Strategy, not on the
+  line chosen. Such a line says why and points to the first line or the
+  Strategy.
 - **What challenges (W30).** A Goal or a Solution (AF-EDIT-026 otherwise).
 - **The challenge (W31).** The challenger is made as an add makes a node, in
   the package of what is challenged, with the next identifier of its kind.
@@ -103,7 +108,7 @@ What is chosen is built in G4, and the spike's findings are recorded in
 - [x] **G1.** The rules and the commands in the core: adding a challenge, and
       counter-evidence drawn as a Solution, with tests. The decisions above
       recorded with their evidence.
-- [ ] **G2.** The menus: a line's menu, and the two challenge items on nodes
+- [x] **G2.** The menus: a line's menu, and the two challenge items on nodes
       and lines, in both languages, with browser tests.
 - [ ] **G3.** The spike: moving a challenge by dragging, and what follows an
       add.

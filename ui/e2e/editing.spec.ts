@@ -48,11 +48,13 @@ async function editMenu(page: Page, item: 'Undo' | 'Redo') {
   return page.getByRole('menu', { name: 'Edit' }).getByRole('menuitem', { name: item });
 }
 
-test('a right-click on a goal lists the six kinds, Move and Remove; choosing one adds it, selected, and Undo and Redo take it back and bring it again', async ({ page }) => {
+test('a right-click on a goal lists the six kinds, the two challenges, Move and Remove; choosing one adds it, selected, and Undo and Redo take it back and bring it again', async ({ page }) => {
   await opened(page);
   const menu = await menuOf(page, 'cl_top');
   await expect(menu).toHaveAccessibleName('Goal cl_top');
-  await expect(menu.getByRole('menuitem')).toHaveText([...KINDS, 'Move…', 'Remove'].map((kind) => new RegExp(`^${kind}`)));
+  await expect(menu.getByRole('menuitem')).toHaveText(
+    [...KINDS, 'Challenge with a Goal', 'Challenge with a Solution', 'Move…', 'Remove'].map((kind) => new RegExp(`^${kind}`)),
+  );
   for (const item of await menu.getByRole('menuitem').all()) await expect(item).not.toHaveAttribute('aria-disabled', 'true');
   // No notes: an add item says only what it adds. Remove names its key.
   for (const kind of KINDS) await expect(menu.getByRole('menuitem', { name: kind })).toHaveAccessibleDescription('');
@@ -95,10 +97,10 @@ test('a right-click on a goal lists the six kinds, Move and Remove; choosing one
   await page.keyboard.press('Escape');
 });
 
-test('a leaf offers nothing to add, only Move and Remove', async ({ page }) => {
+test('a leaf offers nothing to add, only its challenges, Move and Remove', async ({ page }) => {
   await opened(page);
   const menu = await menuOf(page, 'ev_1');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Move…/, /^Remove/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Challenge with a Goal/, /^Challenge with a Solution/, /^Move…/, /^Remove/]);
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   expect((await hook(page)).revision).toBe(1);
@@ -122,7 +124,16 @@ test('a Strategy is added alone, takes only Goals under it, and develops an unde
 
   // Under the Strategy: a Goal and its context, never a Strategy or a Solution.
   menu = await menuOf(page, strategy);
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Add Goal/, /^Add Context/, /^Add Assumption/, /^Add Justification/, /^Move…/, /^Remove/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    /^Add Goal/,
+    /^Add Context/,
+    /^Add Assumption/,
+    /^Add Justification/,
+    /^Challenge with a Goal/,
+    /^Challenge with a Solution/,
+    /^Move…/,
+    /^Remove/,
+  ]);
   await menu.getByRole('menuitem', { name: 'Add Goal' }).click();
   await expect.poll(() => counts(page)).toEqual({ nodes: 10, edges: 9 });
   await expect(status(page)).toHaveText('Goal G1 added.');
@@ -225,7 +236,7 @@ test('the context-menu key opens the selected node’s menu, and the browser’s
   await page.keyboard.press('Escape');
 });
 
-test('Shift+F10 with a line selected opens no menu, as a right-click on it opens none', async ({ page }) => {
+test('Shift+F10 with a line selected opens the line’s menu, as a right-click on it does', async ({ page }) => {
   await opened(page);
   const box = (await canvas(page).boundingBox())!;
   const state = await hook(page);
@@ -241,7 +252,7 @@ test('Shift+F10 with a line selected opens no menu, as a right-click on it opens
     })
     .toBe(true);
   await page.keyboard.press('Shift+F10');
-  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.getByRole('menu', { name: 'Line' })).toBeVisible();
 });
 
 test('Ctrl+Z held down undoes every add and ends on Undone, not on a refusal', async ({ page }) => {
@@ -307,7 +318,7 @@ test('an edit keeps the Argument Navigator’s closed branches closed', async ({
 test('the menu and the edits are worded in Japanese', async ({ page }) => {
   await opened(page, '&lang=ja');
   const menu = await menuOf(page, 'ev_1');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^移動…/, /^削除/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^ゴールで異議を唱える/, /^ソリューションで異議を唱える/, /^移動…/, /^削除/]);
   await page.keyboard.press('Escape');
   await (await menuOf(page, 'cl_top')).getByRole('menuitem', { name: '仮定を追加' }).click();
   await expect(status(page)).toHaveText('仮定 A1 を追加しました。');

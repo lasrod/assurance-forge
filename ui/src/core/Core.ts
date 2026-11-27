@@ -104,6 +104,12 @@ export interface Recovery {
   keep(name: string, revision: number): Promise<KeepResult>;
 }
 
+/** A line of a relationship: the nodes it runs from and to. */
+export interface LineEnds {
+  from: string;
+  to: string;
+}
+
 export interface Core {
   /** Reads a SACM 2.3 XMI file. A refused file leaves nothing open. */
   open(bytes: Uint8Array): Promise<OpenResult>;
@@ -133,6 +139,19 @@ export interface Core {
    * the document has changed since.
    */
   add(parent: string | null, kind: ElementKind, revision: number): Promise<EditResult>;
+  /**
+   * Which challengers, a Goal and a Solution, may challenge the node with
+   * this SACM id, or with `line` the line between those two nodes of the
+   * relationship with this id, each with the code of why it cannot. Null
+   * when nothing is open.
+   */
+  challengeChoices(at: string, line: LineEnds | null): Promise<AddChoices | null>;
+  /**
+   * Challenges the node or line `at` with a new element of `kind`, from the
+   * menu of `revision`: refused (AF-EDIT-009) when the document has changed
+   * since. The element answered is the new challenger.
+   */
+  challenge(at: string, line: LineEnds | null, kind: ElementKind, revision: number): Promise<EditResult>;
   /**
    * What removing the node with this SACM id would delete: the node, then
    * what goes with it; or the code of why it cannot be removed. Null when

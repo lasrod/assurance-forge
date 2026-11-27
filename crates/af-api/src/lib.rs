@@ -416,9 +416,9 @@ impl Core {
     }
 
     /// Which challengers, a Goal and a Solution, may challenge `at`: the node
-    /// with that SACM id, or with `line` the line of the relationship with
-    /// that id (W29, W30). `None` when nothing is open.
-    pub fn challenge_choices(&self, at: &str, line: bool) -> Option<AddChoices> {
+    /// with that SACM id, or with `line` the line from one node to another of
+    /// the relationship with that id (W29, W30). `None` when nothing is open.
+    pub fn challenge_choices(&self, at: &str, line: Option<(&str, &str)>) -> Option<AddChoices> {
         let open = self.open.as_ref()?;
         let choices =
             commands::challenge_choices(open.session.document(), &open.view, challenged(at, line))
@@ -444,7 +444,7 @@ impl Core {
     pub fn challenge(
         &mut self,
         at: &str,
-        line: bool,
+        line: Option<(&str, &str)>,
         kind: ElementKind,
         revision: u32,
     ) -> EditResult {
@@ -944,12 +944,16 @@ fn target(parent: Option<&str>) -> Target<'_> {
     parent.map_or(Target::Canvas, Target::Node)
 }
 
-/// The node `at`, or with `line` the line of the relationship `at`.
-fn challenged(at: &str, line: bool) -> Challenged<'_> {
-    if line {
-        Challenged::Line(at)
-    } else {
-        Challenged::Node(at)
+/// The node `at`, or with `line` the line from one node to another of the
+/// relationship `at`.
+fn challenged<'a>(at: &'a str, line: Option<(&'a str, &'a str)>) -> Challenged<'a> {
+    match line {
+        Some((from, to)) => Challenged::Line {
+            relationship: at,
+            from,
+            to,
+        },
+        None => Challenged::Node(at),
     }
 }
 

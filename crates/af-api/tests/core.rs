@@ -943,7 +943,7 @@ fn the_undeveloped_mark_is_set_where_it_can_be_and_a_wrong_join_is_repaired() {
 #[test]
 fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
     let mut core = core("en");
-    assert!(core.challenge_choices("cl_top", false).is_none());
+    assert!(core.challenge_choices("cl_top", None).is_none());
     core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
     let challenges = |core: &mut Core| {
         core.diagram()
@@ -955,7 +955,7 @@ fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
             .count()
     };
     let choices = core
-        .challenge_choices("cl_sub_1", false)
+        .challenge_choices("cl_sub_1", None)
         .unwrap_or_else(|| panic!("open"));
     let kinds: Vec<_> = choices.choices.iter().map(|choice| choice.kind).collect();
     assert_eq!(kinds, [ElementKind::Goal, ElementKind::Solution]);
@@ -967,12 +967,12 @@ fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
     );
     // A menu of another revision is out of date.
     assert!(matches!(
-        core.challenge("cl_sub_1", false, ElementKind::Goal, 0),
+        core.challenge("cl_sub_1", None, ElementKind::Goal, 0),
         EditResult::Refused { ref code } if code == "AF-EDIT-009"
     ));
     let EditResult::Applied {
         revision, element, ..
-    } = core.challenge("cl_sub_1", false, ElementKind::Goal, 1)
+    } = core.challenge("cl_sub_1", None, ElementKind::Goal, 1)
     else {
         panic!("not challenged");
     };
@@ -991,9 +991,16 @@ fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
         .edges
         .iter()
         .find(|edge| edge.from == challenger)
-        .map(|edge| edge.relationship.clone())
+        .map(|edge| {
+            (
+                edge.relationship.clone(),
+                edge.from.clone(),
+                edge.to.clone(),
+            )
+        })
         .unwrap_or_else(|| panic!("no line"));
-    let EditResult::Applied { element, .. } = core.challenge(&line, true, ElementKind::Solution, 2)
+    let EditResult::Applied { element, .. } =
+        core.challenge(&line.0, Some((&line.1, &line.2)), ElementKind::Solution, 2)
     else {
         panic!("the line is not challenged");
     };
