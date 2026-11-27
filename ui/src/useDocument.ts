@@ -715,10 +715,6 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
-   * The add menu's choices for `parent` (null: the empty canvas), with the
-   * revision they are of; null if the document changed before they came.
-   */
-  /**
    * The challenge items of a node's or a line's menu, with the revision they
    * are of; null if the document changed before they came.
    */
@@ -734,6 +730,10 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       return null;
     }
   }, []);
+  /**
+   * The add menu's choices for `parent` (null: the empty canvas), with the
+   * revision they are of; null if the document changed before they came.
+   */
   const addChoices = useCallback(async (parent: string | null): Promise<{ revision: number; choices: AddChoice[] } | null> => {
     const on = coreRef.current;
     const revision = shown.current;

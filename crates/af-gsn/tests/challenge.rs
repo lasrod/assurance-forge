@@ -504,6 +504,15 @@ fn w32_a_counter_goal_moves_its_challenge_to_a_node_or_a_first_line() {
         (SacmKind::AssertedInference, "g".to_owned())
     );
     assert_eq!(document.elements().count(), original.elements().count());
+    // To a Strategy: the inference it is the reasoning of.
+    assert_eq!(node("s"), None);
+    let mut document = original.clone();
+    move_node(&mut document, &shown, "k", Target::Node("s"))
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        counter_from(&document, "k"),
+        (SacmKind::AssertedInference, "is".to_owned())
+    );
     // To a line.
     let mut document = original.clone();
     move_challenge(

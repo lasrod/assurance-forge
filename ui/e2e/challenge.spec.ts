@@ -214,6 +214,31 @@ test.describe('moving a challenge by dragging its challenger', () => {
     ]);
   });
 
+  test("Move… then a line's menu moves the challenge there, and offers no move onto a line that does not take it", async ({ page }) => {
+    await opened(page);
+    const challenger = await counterGoal(page, 'cl_sub_1');
+    const centre = await nodeCentre(page, challenger);
+    await page.mouse.click(centre.x, centre.y, { button: 'right' });
+    await page.getByRole('menu').getByRole('menuitem', { name: 'Move…' }).click();
+    // A premise's line under a Strategy: only Cancel.
+    const premise = await onLineTo(page, 'cl_sub_1', 'last');
+    await page.mouse.click(premise.at.x, premise.at.y, { button: 'right' });
+    await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Cancel move']);
+    await page.keyboard.press('Escape');
+    // The line into ev_1 takes it.
+    const { edge, at } = await onLineTo(page, 'ev_1');
+    await page.mouse.click(at.x, at.y, { button: 'right' });
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem')).toHaveText(['Move CG1 here', 'Cancel move']);
+    await menu.getByRole('menuitem', { name: 'Move CG1 here' }).click();
+
+    await expect.poll(async () => (await hook(page)).revision).toBe(3);
+    const drawn = (await hook(page)).diagram!.diagram;
+    expect(drawn.edges.filter((candidate) => candidate.kind === 'challenge')).toEqual([
+      expect.objectContaining({ from: challenger, to: edge.relationship, toRelationship: true }),
+    ]);
+  });
+
   test('a counter goal dropped on a premise line under a Strategy says why it stays', async ({ page }) => {
     await opened(page);
     const challenger = await counterGoal(page, 'cl_sub_1');

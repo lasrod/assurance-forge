@@ -381,7 +381,9 @@ export function DiagramCanvas({
       // Dropped on a node, on itself (given up), or on nothing.
       const point = local(event);
       const node = diagram && viewport ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
-      const line = !node && move?.lines && diagram && viewport ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+      // A line, for a challenge, or before the core has said what is moved:
+      // the places it answers decide then.
+      const line = !node && (move === null || move.lines) && diagram && viewport ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
       onDragEnd?.(
         node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : line ? { on: 'line', edge: line } : { on: 'canvas' },
       );
@@ -445,7 +447,7 @@ export function DiagramCanvas({
     const node = hitTest(diagram.diagram, viewport, point.x, point.y);
     const line = node ? null : hitEdge(diagram.diagram, viewport, point.x, point.y);
     if (line) {
-      if (!move) onLineMenu?.(line, { x: event.clientX, y: event.clientY }, 'pointer');
+      onLineMenu?.(line, { x: event.clientX, y: event.clientY }, 'pointer');
       return;
     }
     onContextMenu(node?.id ?? null, { x: event.clientX, y: event.clientY }, 'pointer');
@@ -472,7 +474,6 @@ export function DiagramCanvas({
       const node = selected ? diagram.diagram.nodes.find((candidate) => candidate.id === selected) : undefined;
       const line = selected && !node ? findEdge(diagram.diagram, selected) : null;
       if (line) {
-        if (move) return;
         const middle = {
           x: (line.bounds.x + line.bounds.width / 2) * viewport.scale + viewport.offsetX,
           y: (line.bounds.y + line.bounds.height / 2) * viewport.scale + viewport.offsetY,

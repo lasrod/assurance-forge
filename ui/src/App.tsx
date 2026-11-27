@@ -273,8 +273,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   );
   /** Moves the challenge being moved onto the line `edge`, or says why it cannot go there. */
   const moveToLine = useCallback(
-    (edge: DiagramEdge, current: Moving | null = moving) => {
-      if (!current) return;
+    (edge: { relationship: string } & LineEnds, current: Moving | null = moving) => {
+      // Only a challenge goes onto a line: for another node, a drop on one
+      // is a drop on the canvas, and is given up.
+      if (!current || !current.targets.lines.length) return;
       const line = current.targets.lines.find(
         (candidate) => candidate.relationship === edge.relationship && candidate.from === edge.from && candidate.to === edge.to,
       );
@@ -284,16 +286,18 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         return;
       }
       const name = (id: string) => outline.find((row) => row.id === id)?.identifier ?? id;
+      // A challenge line ends at a relationship, which has no identifier.
+      const ofChallenge = diagram?.diagram.edges.find((drawn) => edgeKey(drawn) === edgeKey(edge))?.toRelationship === true;
       setMoving(null);
       moveChallengeWith(
         current.targets,
         { relationship: edge.relationship, from: edge.from, to: edge.to },
         current,
-        t('lineBetween', { from: name(edge.from), to: name(edge.to) }),
+        ofChallenge ? t('challengeBy', { from: name(edge.from) }) : t('lineBetween', { from: name(edge.from), to: name(edge.to) }),
         followEdit,
       );
     },
-    [moving, outline, moveRefused, moveChallengeWith, followEdit, t],
+    [moving, diagram, outline, moveRefused, moveChallengeWith, followEdit, t],
   );
   /**
    * Starts choosing where the node `id` goes, from the menu or by a drag;
@@ -416,6 +420,20 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const openLineMenu = useCallback(
     (edge: DiagramEdge, at: { x: number; y: number }, source: ContextMenuSource) => {
       const request = ++menuRequest.current;
+      // While a move is chosen the selection stays the node moved, and the
+      // menu holds the move: Move here, where the line takes it, and Cancel.
+      if (moving) {
+        setAddMenu({
+          revision: moving.targets.revision,
+          parent: null,
+          about: null,
+          at,
+          source,
+          choices: [],
+          line: { relationship: edge.relationship, from: edge.from, to: edge.to },
+        });
+        return;
+      }
       setSelected(edgeKey(edge));
       void challengeChoices(edge.relationship, { from: edge.from, to: edge.to }).then((answer) => {
         if (!answer || request !== menuRequest.current || moving) return;
@@ -467,6 +485,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [followEdit],
   );
+  // Another node selected before the details came: its name is not typed.
+  useEffect(() => {
+    if (nameAfter.current !== null && selected !== nameAfter.current) nameAfter.current = null;
+  }, [selected]);
   useEffect(() => {
     const wanted = nameAfter.current;
     if (wanted === null || details?.type !== 'element' || details.element.id !== wanted) return;
@@ -489,7 +511,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       return;
     }
     if (id === MOVE_HERE) {
-      moveTo(menu.parent);
+      if (menu.line) moveToLine(menu.line);
+      else moveTo(menu.parent);
       return;
     }
     if (id === MOVE_CANCEL) {
@@ -928,9 +951,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                 {t('remove')}
               </MenuItem>
             )}
-            {addMenu && moving && (addMenu.parent ? moveMarks?.allowed.has(addMenu.parent) : moving.targets.canvas === null) && (
+            {addMenu &&
+              moving &&
+              (addMenu.line
+                ? moveMarks?.lines?.has(edgeKey(addMenu.line))
+                : addMenu.parent
+                  ? moveMarks?.allowed.has(addMenu.parent)
+                  : moving.targets.canvas === null) && (
               <MenuItem id={MOVE_HERE}>
-                {t(addMenu.parent ? 'moveHere' : 'moveToTop', { identifier: moving.identifier })}
+                {t(addMenu.parent || addMenu.line ? 'moveHere' : 'moveToTop', { identifier: moving.identifier })}
               </MenuItem>
             )}
             {addMenu && moving && <MenuItem id={MOVE_CANCEL}>{t('moveCancel')}</MenuItem>}

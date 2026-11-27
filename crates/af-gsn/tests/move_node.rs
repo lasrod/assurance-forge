@@ -585,7 +585,16 @@ fn a_move_in_each_sample_keeps_the_file_valid() {
             }
             made += 1;
             let after = view(&document, "en");
-            // Under its new parent, or, for a challenger, challenging it.
+            // Under its new parent, or, for a challenger, challenging it:
+            // the node, or, for a Strategy, the inference drawn through it.
+            let challenges = |to: &str, relationship: bool| {
+                to == target.node
+                    || (relationship
+                        && after.edges.iter().any(|line| {
+                            line.relationship == to
+                                && (line.from == target.node || line.to == target.node)
+                        }))
+            };
             assert!(
                 after
                     .edges
@@ -593,7 +602,7 @@ fn a_move_in_each_sample_keeps_the_file_valid() {
                     .any(|edge| (edge.from == target.node && edge.to == node.id)
                         || (edge.kind == EdgeKind::Challenge
                             && edge.from == node.id
-                            && edge.to == target.node)),
+                            && challenges(&edge.to, edge.to_relationship))),
                 "{name}: {} to {}",
                 node.id,
                 target.node
