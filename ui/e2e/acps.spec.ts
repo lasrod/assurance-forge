@@ -65,6 +65,10 @@ test('a line takes an ACP with a description, whose text is ready to type, and U
   await page.keyboard.type('The test rig was calibrated before each run.');
   await canvas(page).focus();
   await expect.poll(async () => (await hook(page)).revision).toBe(3);
+  // The description stays selected: its text is kept in view.
+  const claim = (await hook(page)).selected;
+  expect(claim).not.toBeNull();
+  await expect(description).toHaveValue('The test rig was calibrated before each run.');
 
   await page.keyboard.press('ControlOrMeta+z');
   await page.keyboard.press('ControlOrMeta+z');

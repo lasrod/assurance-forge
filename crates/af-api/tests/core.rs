@@ -1272,3 +1272,15 @@ fn every_acp_square_is_on_its_line_however_many_it_carries() {
     }
     assert_eq!(seen, 5);
 }
+
+#[test]
+fn a_removal_names_the_acps_it_takes() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let removal = core
+        .removal("Sn1")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(removal.acps, ["ACP2[Confidence]".to_owned()]);
+    let removal = core.removal("G2").unwrap_or_else(|| panic!("nothing open"));
+    assert!(removal.acps.contains(&"ACP2[Confidence]".to_owned()));
+}

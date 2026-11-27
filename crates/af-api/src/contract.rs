@@ -487,9 +487,6 @@ pub struct RemovalNode {
     /// A confidence Claim an ACP shows as its description, which is not
     /// drawn: it goes with the line that carries the ACP.
     pub acp_description: bool,
-    /// The confidence Claim of an ACP on a line that stays: the ACP goes
-    /// with it.
-    pub acp: bool,
     /// The SACM id.
     pub id: String,
     pub kind: NodeKind,
@@ -508,6 +505,9 @@ pub struct Removal {
     /// The nodes it deletes: the node chosen first, then what goes with it.
     /// Empty when it is refused.
     pub nodes: Vec<RemovalNode>,
+    /// The labels of the assurance claim points it takes, such as
+    /// `ACP2[Confidence]`, other than descriptions, which `nodes` lists.
+    pub acps: Vec<String>,
     /// Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
     /// `AF-EDIT-005` when a Strategy kept has no package to hold the place
     /// of its next Goal), or null when it can. The frontend words it.

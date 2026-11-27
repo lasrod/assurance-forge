@@ -504,7 +504,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       void removal(id).then((answer) => {
         if (!answer) return;
         // More than the node, or an ACP on a line that stays: asked first.
-        if (answer.nodes.length > 1 || answer.nodes.some((node) => node.acp)) setConfirmRemoval(answer);
+        if (answer.nodes.length > 1 || answer.acps.length > 0) setConfirmRemoval(answer);
         else removeWith(answer, followEdit);
       });
     },
@@ -687,10 +687,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     });
   };
   showInRef.current = showIn;
-  /** A node asked for: in the diagram shown, or else in the whole case. */
+  /** A node asked for: in the diagram shown, or else in the whole case, if it draws it. */
   const showNode = (id: string) => {
     const drawn = diagram ? boundsOf(diagram.diagram, id) !== null : false;
-    if (drawn || shownPackage === null) {
+    const anywhere = outline.some((row) => row.id === id);
+    if (drawn || shownPackage === null || !anywhere) {
       selectAndShow(id);
       return;
     }

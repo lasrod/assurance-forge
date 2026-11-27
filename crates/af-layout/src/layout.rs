@@ -1852,10 +1852,12 @@ fn along(points: &[Point], from_middle: f32) -> (Point, bool) {
         .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
         .sum();
     let mut left = (length / 2.0 + from_middle).clamp(0.0, length);
-    for pair in points.windows(2) {
+    let last = points.len().saturating_sub(2);
+    for (index, pair) in points.windows(2).enumerate() {
         let step = (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
-        if step >= left && step > 0.0 {
-            let t = left / step;
+        // The last segment takes what rounding leaves past its end.
+        if step > 0.0 && (step >= left || index == last) {
+            let t = (left / step).min(1.0);
             let across = (pair[1].x - pair[0].x).abs() > (pair[1].y - pair[0].y).abs();
             return (
                 Point {
@@ -1868,7 +1870,7 @@ fn along(points: &[Point], from_middle: f32) -> (Point, bool) {
         left -= step;
     }
     (
-        points.first().copied().unwrap_or(Point { x: 0.0, y: 0.0 }),
+        points.last().copied().unwrap_or(Point { x: 0.0, y: 0.0 }),
         false,
     )
 }

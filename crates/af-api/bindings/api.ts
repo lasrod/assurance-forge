@@ -315,11 +315,6 @@ export type RemovalNode = {
  */
 acpDescription: boolean, 
 /**
- * The confidence Claim of an ACP on a line that stays: the ACP goes
- * with it.
- */
-acp: boolean, 
-/**
  * The SACM id.
  */
 id: string, kind: NodeKind, 
@@ -334,6 +329,11 @@ export type Removal = { revision: number,
  * Empty when it is refused.
  */
 nodes: Array<RemovalNode>, 
+/**
+ * The labels of the assurance claim points it takes, such as
+ * `ACP2[Confidence]`, other than descriptions, which `nodes` lists.
+ */
+acps: Array<string>, 
 /**
  * Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
  * `AF-EDIT-005` when a Strategy kept has no package to hold the place

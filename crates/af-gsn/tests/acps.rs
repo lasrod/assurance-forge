@@ -529,3 +529,14 @@ fn w19_a_meta_claim_the_diagram_does_not_draw_still_refuses() {
         Err(AddError::Refused(Refusal::Entangled))
     ));
 }
+
+#[test]
+fn w19_a_removal_lists_an_acp_whose_line_goes() {
+    // Removing Sn1 deletes E1, which carries ACP2 to the confidence package:
+    // the Claim stays, its ACP goes, and the removal says so.
+    let document = sample("acps.sacm.xmi");
+    let shown = view(&document, "en");
+    let listed = removal(&document, &shown, "Sn1").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(listed.nodes, ["Sn1".to_owned()]);
+    assert_eq!(listed.acps, ["ACP2".to_owned()]);
+}

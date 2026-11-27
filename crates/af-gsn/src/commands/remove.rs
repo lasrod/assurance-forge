@@ -27,8 +27,9 @@ pub struct Removal {
     /// The SACM ids of the nodes it deletes: the node chosen first, then
     /// what goes with it, each after a node it is drawn under.
     pub nodes: Vec<String>,
-    /// Those of them that are the confidence Claim of an ACP on a line that
-    /// stays: the ACP goes with it (W19).
+    /// The confidence Claims of the ACPs it takes, other than descriptions,
+    /// which `nodes` lists: one whose Claim goes from a line that stays, or
+    /// whose line goes while its Claim stays (W19).
     pub acps: Vec<String>,
 }
 
@@ -294,13 +295,21 @@ impl Plan {
             }
         }
         let all: HashSet<&str> = deleted.iter().map(ElementId::as_str).collect();
+        // The ACPs whose line goes and whose Claim stays: a confidence
+        // argument elsewhere, or a goal of the argument, loses its ACP.
+        let mut acps: Vec<String> = view
+            .acps
+            .iter()
+            .filter(|acp| {
+                relationships.deleted.contains(acp.relationship.as_str())
+                    && !all.contains(acp.claim.as_str())
+            })
+            .map(|acp| acp.claim.clone())
+            .collect();
 
         // W19: what refers to what goes. A relationship that stays loses the
         // source; anything else, which the diagram does not draw, refuses.
         let mut scrubbed: Vec<(ElementId, ReferenceEnd, ElementId)> = Vec::new();
-        // The confidence Claims among what goes whose ACP on a line that
-        // stays goes with them.
-        let mut acps: Vec<String> = Vec::new();
         let mut held_within: HashSet<String> = HashSet::new();
         for element_id in &deleted {
             let Some(element) = document.get(element_id.as_str()) else {

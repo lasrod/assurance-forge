@@ -136,7 +136,11 @@ export function useViewport(diagram: DiagramAt | null, opened: number): ViewStat
       });
       if (added) setSelected(added);
       else {
-        const stays = (id: string) => next.diagram.nodes.some((node) => node.id === id) || findEdge(next.diagram, id) !== null;
+        // A node, a line, or the confidence Claim of an ACP, which is no node.
+        const stays = (id: string) =>
+          next.diagram.nodes.some((node) => node.id === id) ||
+          findEdge(next.diagram, id) !== null ||
+          next.diagram.edges.some((edge) => edge.acps.some((acp) => acp.claim === id));
         setSelected((current) => (current && stays(current) ? current : null));
       }
     },

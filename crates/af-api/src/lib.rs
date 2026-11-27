@@ -593,7 +593,7 @@ impl Core {
     pub fn removal(&self, id: &str) -> Option<Removal> {
         let open = self.open.as_ref()?;
         let view = &open.view;
-        let (nodes, refusal) = match commands::removal(open.session.document(), view, id) {
+        let (nodes, acps, refusal) = match commands::removal(open.session.document(), view, id) {
             Ok(removal) => (
                 removal
                     .nodes
@@ -609,7 +609,6 @@ impl Core {
                             .descriptions
                             .iter()
                             .any(|described| described.id == node.id),
-                        acp: removal.acps.contains(&node.id),
                         id: node.id.clone(),
                         kind: convert::node_kind(node.kind),
                         identifier: node.identifier.clone(),
@@ -617,13 +616,21 @@ impl Core {
                         statement: node.statement.clone(),
                     })
                     .collect(),
+                // The ACPs it takes, by their labels.
+                removal
+                    .acps
+                    .iter()
+                    .filter_map(|claim| view.acps.iter().find(|acp| acp.claim == *claim))
+                    .map(|acp| acp.label.clone())
+                    .collect(),
                 None,
             ),
-            Err(refusal) => (Vec::new(), Some(refusal.code().to_owned())),
+            Err(refusal) => (Vec::new(), Vec::new(), Some(refusal.code().to_owned())),
         };
         Some(Removal {
             revision: self.revision,
             nodes,
+            acps,
             refusal,
         })
     }
