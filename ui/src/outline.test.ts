@@ -54,6 +54,12 @@ describe('outlineTree', () => {
     const [blank] = outlineTree([row('g1', 1, { name: '', statement: '' })]).nodes;
     expect(blank?.meta).toMatchObject({ props: { children: 'G1' } });
   });
+
+  it('says an identifier once when the name is the identifier again', () => {
+    const [same] = outlineTree([row('g1', 1, { name: 'G1' })]).nodes;
+    expect(same).toMatchObject({ label: { props: { children: '' } }, textValue: 'G1' });
+    expect(same?.meta).toMatchObject({ props: { children: 'G1' } });
+  });
 });
 
 describe('packageTree', () => {

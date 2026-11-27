@@ -319,7 +319,7 @@ test('a new element’s ID is in the Argument Navigator’s ID column, not where
   await opened(page);
   await (await menuOf(page, 'cl_top')).getByRole('menuitem', { name: 'Add Assumption' }).click();
   await expect(status(page)).toHaveText('Assumption A1 added.');
-  const row = page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem', { name: /A1/ });
+  const row = page.getByRole('tree', { name: 'Argument Navigator' }).getByRole('treeitem', { name: 'A1', exact: true });
   await expect(row.locator('.af-tree-meta')).toHaveText('A1');
   await expect(row.getByText('A1', { exact: true })).toHaveCount(1);
 });

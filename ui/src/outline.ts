@@ -64,7 +64,9 @@ export function outlineLabel(row: Pick<OutlineRow, 'name' | 'statement'>): strin
  */
 export function outlineTree(rows: readonly OutlineRow[]): Built {
   return nest(rows, (row) => {
-    const label = outlineLabel(row);
+    // A name that is the identifier again is said once, in its column.
+    const text = outlineLabel(row);
+    const label = text === row.identifier ? '' : text;
     return { label: named(label), textValue: label ? `${row.identifier} ${label}` : row.identifier, meta: trailing(row.identifier) };
   });
 }
