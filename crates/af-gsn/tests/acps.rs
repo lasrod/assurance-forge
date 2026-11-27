@@ -572,3 +572,29 @@ fn r17_only_a_claim_the_editor_marked_is_a_description() {
             .any(|node| node.id == "c" && node.undeveloped)
     );
 }
+
+#[test]
+fn e11_a_meta_claim_naming_a_claim_the_view_hides_is_no_acp() {
+    // The Claim is inside an interface (R15): no ACP is drawn for it, and
+    // the finding names it.
+    let document = read(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <argumentPackage xmi:id="p">
+    <name content="P" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g"><name content="g" /></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="sub"><name content="sub" /></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentPackageInterface" xmi:id="i1" implements="p">
+      <name content="i1" />
+      <argumentElement xmi:type="sacm:Claim" xmi:id="hidden"><name content="hidden" /></argumentElement>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="r" source="sub" target="g" metaClaim="hidden"><name content="r" /></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>"#,
+    );
+    let shown = view(&document, "en");
+    assert!(shown.acps.is_empty());
+    assert!(shown.findings.iter().any(|finding| finding.element == "r"
+        && finding.code == Code::MetaClaimNotDrawn
+        && finding.end.as_deref() == Some("hidden")));
+}

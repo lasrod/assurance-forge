@@ -406,9 +406,13 @@ pub fn view(document: &Document, language: &str) -> View {
 fn acps(document: &Document, builder: &mut Builder) {
     let mut unnamed: Vec<String> = Vec::new();
     for (relationship, claim) in std::mem::take(&mut builder.acp_links) {
+        // A Claim the view draws, or keeps as a description; one it hides,
+        // such as one inside an interface (R15), has no ACP to open.
+        let shown = builder.nodes.iter().any(|node| node.id == claim)
+            || builder.descriptions.iter().any(|node| node.id == claim);
         let named = document
             .get(claim.as_str())
-            .filter(|element| element.kind() == SacmKind::Claim);
+            .filter(|element| element.kind() == SacmKind::Claim && shown);
         let Some(named) = named else {
             // The one it names, which is not drawn, while others may be.
             if !unnamed.contains(&claim) {
@@ -770,8 +774,8 @@ fn relationship<'a>(
                 .edgeless_challenges
                 .push((id.to_owned(), target.to_owned()));
         }
-        if !element.meta_claims().is_empty() {
-            builder.finding(Code::MetaClaimNotDrawn, id, None);
+        for claim in element.meta_claims() {
+            builder.finding(Code::MetaClaimNotDrawn, id, Some(claim.as_str()));
         }
         builder.unplaced(id, Code::EndNotPlaced);
         return;
@@ -786,7 +790,9 @@ fn relationship<'a>(
                     .push((id.to_owned(), claim.as_str().to_owned()));
             }
         } else {
-            builder.finding(Code::MetaClaimNotDrawn, id, None);
+            for claim in element.meta_claims() {
+                builder.finding(Code::MetaClaimNotDrawn, id, Some(claim.as_str()));
+            }
         }
     }
 

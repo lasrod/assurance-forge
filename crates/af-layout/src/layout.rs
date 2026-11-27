@@ -1788,6 +1788,7 @@ fn place_acps(
             .sum();
         let spacing = line_height.min(length / (count + 1.0));
         let (middle, across) = along(&edge.points, offset * spacing);
+        let (middle_of_all, _) = along(&edge.points, 0.0);
         let centre = middle;
         let square = Rect {
             x: centre.x - ACP_HALF,
@@ -1819,10 +1820,17 @@ fn place_acps(
                 top - ACP_GAP - descent * size - row * line_height,
             )
         } else {
-            // Centred on the square, as a line of a node is in its line height.
+            // Centred on the square, as a line of a node is in its line
+            // height; on a line too short for them, a line height apart.
+            let label_y = middle_of_all.y + offset * line_height.max(spacing);
+            let at = if spacing < line_height {
+                label_y
+            } else {
+                centre.y
+            };
             (
                 square.x + square.width + ACP_GAP,
-                centre.y - (ascent + descent) * size / 2.0 + ascent * size,
+                at - (ascent + descent) * size / 2.0 + ascent * size,
             )
         };
 

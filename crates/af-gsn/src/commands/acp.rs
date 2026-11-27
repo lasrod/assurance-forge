@@ -95,8 +95,9 @@ fn plan(document: &Document, view: &View, line: AcpLine<'_>) -> Result<Plan, Ref
         .ok_or(Refusal::NotANode)?;
     match edge.kind {
         EdgeKind::SupportedBy | EdgeKind::InContextOf => {}
-        EdgeKind::Neutral => return Err(Refusal::KindUnknown),
-        EdgeKind::Challenge => return Err(Refusal::NotAnAcpPlace),
+        // GSN puts none on a challenge, nor on a line drawn as none of its
+        // relationships (a cited or defeated one).
+        EdgeKind::Neutral | EdgeKind::Challenge => return Err(Refusal::NotAnAcpPlace),
     }
     if !std::ptr::eq(edge, first) {
         return Err(Refusal::NotTheFirstLine);

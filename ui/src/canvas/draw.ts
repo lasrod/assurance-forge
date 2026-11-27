@@ -250,7 +250,8 @@ function drawAcps(context: CanvasRenderingContext2D, edge: DiagramEdge, palette:
   const marked = marks.selected === key || marks.move?.lines?.has(key) === true;
   for (const acp of edge.acps) {
     const { square, label } = acp;
-    context.fillStyle = marked ? palette.selectedLine : palette.line;
+    // Its Claim selected, as a description is: the ACP is marked.
+    context.fillStyle = marked || marks.selected === acp.claim ? palette.selectedLine : palette.line;
     context.fillRect(square.x, square.y, square.width, square.height);
     if (label.size * scale < SMALLEST_TEXT_PX) continue;
     context.fillStyle = palette.secondary;

@@ -720,7 +720,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       typeAfter.current = { id: added, field: 'statement' };
       return;
     }
-    void core?.element(added).then((made) => made?.package && showIn(added, made.package, 'name'));
+    void core?.element(added).then((made) => made?.package && showInRef.current(added, made.package, 'name'));
   };
   /** A click on an ACP: its confidence argument, in its package, or its description, in Element Properties. */
   const openAcp = (acp: AcpMark) => {
@@ -732,7 +732,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       void core?.element(acp.claim).then((claim) => {
         if (!claim) return;
         if (claim.acpDescription) setSelected(acp.claim);
-        else showIn(acp.claim, claim.package ?? null);
+        else showInRef.current(acp.claim, claim.package ?? null);
       });
     }
   };
