@@ -33,7 +33,7 @@
 
 pub mod contract;
 
-use af_gsn::commands::{self, Target};
+use af_gsn::commands::{self, Challenged, Target};
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
 use af_session::{ChangeRecord, Session};
@@ -415,6 +415,56 @@ impl Core {
         }
     }
 
+    /// Which challengers, a Goal and a Solution, may challenge `at`: the node
+    /// with that SACM id, or with `line` the line from one node to another of
+    /// the relationship with that id (W29, W30). `None` when nothing is open.
+    pub fn challenge_choices(&self, at: &str, line: Option<(&str, &str)>) -> Option<AddChoices> {
+        let open = self.open.as_ref()?;
+        let choices =
+            commands::challenge_choices(open.session.document(), &open.view, challenged(at, line))
+                .into_iter()
+                .filter_map(|choice| {
+                    Some(AddChoice {
+                        kind: convert::element_kind(choice.kind)?,
+                        refusal: choice.refusal.map(|refusal| refusal.code().to_owned()),
+                        develops: false,
+                    })
+                })
+                .collect();
+        Some(AddChoices {
+            revision: self.revision,
+            choices,
+        })
+    }
+
+    /// Challenges `at`, a node or with `line` a line, with a new element of
+    /// `kind` (W29 to W31), as the menu of `revision` offered: one asked for
+    /// at another revision is refused (AF-EDIT-009). The new challenger is
+    /// the element answered.
+    pub fn challenge(
+        &mut self,
+        at: &str,
+        line: Option<(&str, &str)>,
+        kind: ElementKind,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let kind = convert::gsn_element_kind(kind);
+        match open
+            .session
+            .challenge(&open.view, challenged(at, line), kind)
+        {
+            Ok((added, record)) => self.changed(&record, Some(added.element)),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
     /// What removing the node with SACM id `id` would delete, for the
     /// interface to show before it is made. `None` when nothing is open.
     pub fn removal(&self, id: &str) -> Option<Removal> {
@@ -450,7 +500,7 @@ impl Core {
     pub fn move_targets(&self, id: &str) -> Option<MoveTargets> {
         let open = self.open.as_ref()?;
         let code = |refusal: commands::Refusal| refusal.code().to_owned();
-        let (refusal, canvas, nodes) =
+        let (refusal, canvas, nodes, lines) =
             match commands::move_targets(open.session.document(), &open.view, id) {
                 Ok(targets) => (
                     None,
@@ -464,8 +514,18 @@ impl Core {
                             develops: target.develops,
                         })
                         .collect(),
+                    targets
+                        .lines
+                        .into_iter()
+                        .map(|line| contract::MoveLine {
+                            relationship: line.relationship,
+                            from: line.from,
+                            to: line.to,
+                            refusal: line.refusal.map(code),
+                        })
+                        .collect(),
                 ),
-                Err(refusal) => (Some(code(refusal)), None, Vec::new()),
+                Err(refusal) => (Some(code(refusal)), None, Vec::new(), Vec::new()),
             };
         Some(MoveTargets {
             revision: self.revision,
@@ -473,6 +533,7 @@ impl Core {
             refusal,
             canvas,
             nodes,
+            lines,
         })
     }
 
@@ -488,6 +549,34 @@ impl Core {
             return refused(OUT_OF_DATE);
         }
         match open.session.move_node(&open.view, id, target(to)) {
+            Ok((_, record)) => self.changed(&record, Some(id.to_owned())),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Moves the challenge the node `id` makes onto the line from `from` to
+    /// `to` of `relationship` (W32), as [`Core::move_targets`] said at
+    /// `revision`: one asked for at another revision is refused
+    /// (AF-EDIT-009).
+    pub fn move_to_line(
+        &mut self,
+        id: &str,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open
+            .session
+            .move_to_line(&open.view, id, relationship, from, to)
+        {
             Ok((_, record)) => self.changed(&record, Some(id.to_owned())),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
@@ -892,6 +981,19 @@ fn refused(code: &str) -> EditResult {
 
 fn target(parent: Option<&str>) -> Target<'_> {
     parent.map_or(Target::Canvas, Target::Node)
+}
+
+/// The node `at`, or with `line` the line from one node to another of the
+/// relationship `at`.
+fn challenged<'a>(at: &'a str, line: Option<(&'a str, &'a str)>) -> Challenged<'a> {
+    match line {
+        Some((from, to)) => Challenged::Line {
+            relationship: at,
+            from,
+            to,
+        },
+        None => Challenged::Node(at),
+    }
 }
 
 /// The view's codes about one element or relationship.

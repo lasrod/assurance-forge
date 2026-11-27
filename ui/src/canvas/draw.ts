@@ -47,6 +47,8 @@ export interface Marks {
 export interface MoveMarks {
   source: string;
   allowed: ReadonlySet<string>;
+  /** For a moved challenge: the lines (`edgeKey`) it may go to. */
+  lines?: ReadonlySet<string>;
 }
 
 export interface Badge {
@@ -196,6 +198,23 @@ export function hitEdge(diagram: Diagram, viewport: Viewport, x: number, y: numb
 }
 
 /**
+ * The one line under the canvas point, for what changes the argument there:
+ * where lines of several relationships are as near, as on a trunk sibling
+ * lines share, it is not said which the pointer means, and none is.
+ * `ambiguous` says so. Lines of one relationship, such as a Strategy's
+ * premises, are one relationship to challenge, and the nearest is taken.
+ */
+export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: number): { edge: DiagramEdge | null; ambiguous: boolean } {
+  const found = hitEdge(diagram, viewport, x, y);
+  if (!found) return { edge: null, ambiguous: false };
+  const point = toDiagram(viewport, x, y);
+  // As near within a pixel on screen.
+  const nearest = edgeDistance(found, point) + 1 / viewport.scale;
+  const ambiguous = diagram.edges.some((edge) => edge.relationship !== found.relationship && edgeDistance(edge, point) <= nearest);
+  return ambiguous ? { edge: null, ambiguous } : { edge: found, ambiguous };
+}
+
+/**
  * What is under the canvas point: the id of a node, which is drawn over the
  * lines, or else the key of the edge whose line is there.
  */
@@ -270,12 +289,20 @@ export function draw(
   const visible = visibleArea(viewport, size.width, size.height);
   const drawn = { nodes: 0, edges: 0 };
   // A marked line goes over the others, the selected one last.
-  const rank = (edge: DiagramEdge) => (edgeKey(edge) === marks.selected ? 2 : edgeKey(edge) === marks.hovered ? 1 : 0);
-  const edges = marks.selected || marks.hovered ? [...diagram.edges].sort((a, b) => rank(a) - rank(b)) : diagram.edges;
+  // Drawn last, so over the rest: the selected line, the hovered, and the
+  // lines a moved challenge may go to over the faint ones.
+  const places = marks.move?.lines;
+  const rank = (edge: DiagramEdge) => {
+    const key = edgeKey(edge);
+    return key === marks.selected ? 3 : key === marks.hovered ? 2 : places?.has(key) ? 1 : 0;
+  };
+  const edges = marks.selected || marks.hovered || places ? [...diagram.edges].sort((a, b) => rank(a) - rank(b)) : diagram.edges;
   const move = marks.move ?? null;
   if (move) context.globalAlpha = FAINT;
   for (const edge of edges) {
     if (!overlaps(edge.bounds, visible)) continue;
+    // A line a moved challenge may go to is drawn in full.
+    if (move) context.globalAlpha = move.lines?.has(edgeKey(edge)) ? 1 : FAINT;
     drawEdge(context, edge, palette, scale, marks);
     drawn.edges += 1;
   }
@@ -383,15 +410,19 @@ function polyline(context: CanvasRenderingContext2D, points: Point[]) {
 /** The dashes of each line style, in CSS px: a challenge is dashed, a neutral edge dotted. */
 const DASHES = { solid: [], dashed: [6, 4], dotted: [1.5, 3.5] } as const;
 /** A line's width in CSS px: plain, under the pointer, and selected. */
-const EDGE_WIDTH = { plain: 1, hovered: 2, selected: 2.5 } as const;
+const EDGE_WIDTH = { plain: 1, hovered: 2, selected: 2.5, dropOn: 4 } as const;
 
 function drawEdge(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, scale: number, marks: Marks) {
   // Selected and hovered are told apart by weight as well as colour.
-  const selected = marks.selected === edgeKey(edge);
   const hovered = marks.hovered === edgeKey(edge);
+  // Every line a moved challenge may go to is marked as a place, and the
+  // one under the pointer, where it would be dropped, the more.
+  const place = marks.move?.lines?.has(edgeKey(edge)) === true;
+  const selected = marks.selected === edgeKey(edge) || place;
   const stroke = selected ? palette.selectedLine : palette.line;
   context.strokeStyle = stroke;
-  context.lineWidth = (selected ? EDGE_WIDTH.selected : hovered ? EDGE_WIDTH.hovered : EDGE_WIDTH.plain) / scale;
+  const width = place && hovered ? EDGE_WIDTH.dropOn : selected ? EDGE_WIDTH.selected : hovered ? EDGE_WIDTH.hovered : EDGE_WIDTH.plain;
+  context.lineWidth = width / scale;
   context.lineCap = edge.line === 'dotted' ? 'round' : 'butt';
   context.setLineDash(DASHES[edge.line].map((length) => length / scale));
   polyline(context, edge.points);

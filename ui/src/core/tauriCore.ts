@@ -66,11 +66,16 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     packages: () => invoke<Package[]>('packages'),
     problems: () => invoke<Problems | null>('problems'),
     addChoices: (parent) => invoke<AddChoices | null>('add_choices', { parent }),
+    challengeChoices: (at, line) => invoke<AddChoices | null>('challenge_choices', { at, from: line?.from ?? null, to: line?.to ?? null }),
+    challenge: (at, line, kind, revision) =>
+      invoke<EditResult>('challenge', { at, from: line?.from ?? null, to: line?.to ?? null, kind, revision }),
     add: (parent, kind, revision) => invoke<EditResult>('add', { parent, kind, revision }),
     removal: (id) => invoke<Removal | null>('removal', { id }),
     remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),
     moveTargets: (id) => invoke<MoveTargets | null>('move_targets', { id }),
     moveNode: (id, to, revision) => invoke<EditResult>('move_node', { id, to, revision }),
+    moveToLine: (id, line, revision) =>
+      invoke<EditResult>('move_to_line', { id, relationship: line.relationship, from: line.from, to: line.to, revision }),
     setUndeveloped: (id, undeveloped, revision) => invoke<EditResult>('set_undeveloped', { id, undeveloped, revision }),
     repairJoin: (id, relationship, revision) => invoke<EditResult>('repair_join', { id, relationship, revision }),
     setText: (id, field, text) => invoke<EditResult>('set_text', { id, field, text }),

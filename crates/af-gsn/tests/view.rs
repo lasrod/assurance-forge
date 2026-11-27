@@ -381,8 +381,10 @@ fn r9_to_r11_an_artifact_reference_is_drawn_by_how_it_is_reached() {
 
 #[test]
 fn reached_counts_only_live_relationships() {
-    // A counter AssertedEvidence does not make its source a Solution, and an
-    // AssertedArtifactSupport does not stop one being a Solution.
+    // A counter AssertedEvidence makes its source a Solution, counter-
+    // evidence (R11), and an AssertedArtifactSupport does not stop one being
+    // a Solution. Counter-evidence that is also context is neither, and an
+    // ArtifactReference that challenges by an inference is not evidence.
     let document = case(
         &[
             claim("goal", ""),
@@ -407,13 +409,35 @@ fn reached_counts_only_live_relationships() {
                 r#" source="evidence" target="other""#,
                 "",
             ),
+            reference("both"),
+            element(
+                "AssertedEvidence",
+                "e3",
+                r#" source="both" target="goal" isCounter="true""#,
+                "",
+            ),
+            element(
+                "AssertedContext",
+                "c3",
+                r#" source="both" target="goal""#,
+                "",
+            ),
+            reference("inferred"),
+            element(
+                "AssertedInference",
+                "i4",
+                r#" source="inferred" target="goal" isCounter="true""#,
+                "",
+            ),
         ]
         .concat(),
     );
     let view = view(&document, "en");
     assert_eq!(kind_of(&view, "evidence"), NodeKind::Solution);
-    assert_eq!(kind_of(&view, "counter"), NodeKind::Neutral);
+    assert_eq!(kind_of(&view, "counter"), NodeKind::Solution);
     assert_eq!(kind_of(&view, "other"), NodeKind::Neutral);
+    assert_eq!(kind_of(&view, "both"), NodeKind::Neutral);
+    assert_eq!(kind_of(&view, "inferred"), NodeKind::Neutral);
     assert_eq!(view.unplaced.len(), 1);
     assert_eq!(view.unplaced[0].id, "s1");
     assert_eq!(view.unplaced[0].code, Code::ArtifactRelationshipNotDrawn);

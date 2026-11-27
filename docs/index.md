@@ -22,6 +22,7 @@ added, with undo and redo; saving comes next.
 | The recovery copy | [Milestone 2, step 3: the recovery copy](roadmap/milestone-2-recovery.md) |
 | Moving an element | [Milestone 2, step 4: moving an element](roadmap/milestone-2-move.md) |
 | The undeveloped mark, and a repair | [Milestone 2, step 5: the undeveloped mark, and a repair](roadmap/milestone-2-mark-and-repair.md) |
+| Challenges | [Milestone 2, step 6: challenges](roadmap/milestone-2-challenges.md) |
 | The shape of the new code | [`ARCHITECTURE.md`](https://github.com/lasrod/assurance-forge/blob/main/ARCHITECTURE.md) |
 | How GSN is expressed in SACM | [SACM to GSN mapping](standards/sacm-gsn-mapping.md) |
 | What the C++ version can do | [Capability matrix](reference/cpp-capability-matrix.md) |

@@ -282,10 +282,10 @@ not drawn; an `ArtifactReference` points at them.
 relationships that the view draws as SupportedBy or InContextOf count (E1 to
 E4, with E6's code or without). A relationship drawn neutral, or not drawn,
 reaches nothing, so an `AssertedArtifactSupport` from a piece of evidence does
-not make it less of a Solution. A challenge (E5) reaches nothing either: an
-`ArtifactReference` that is only the source of a counter `AssertedEvidence` is
-neutral by R11. Whether such counter-evidence is drawn as a Solution, as GSN v3
-draws it and the C++ application did, is not decided.
+not make it less of a Solution. A challenge (E5) reaches nothing either, with one
+exception: the source of a counter `AssertedEvidence` the view draws is
+counter-evidence, a Solution (R9). The target of a challenge is not reached by
+it, so a challenged Solution stays a Solution.
 
 **Order.** For a node: R14, R15 and R16 first, since what is not drawn is not
 drawn whatever else it says; then R12, since a citation is neutral; then R1, a
@@ -309,7 +309,7 @@ E10) carries only its own code.
 | R6 | `Claim`, declared `asserted`, reached only by `AssertedContext` | Goal, by R2, with its `InContextOf` edge | Decided in #493 | [R6](#r6-a-goal-reached-as-context-stays-a-goal) below |
 | R7 | `Claim`, declared `defeated` or `asCited` | Neutral, code AF-VIEW-002 | Decided | The declaration has taken the one slot that tells Goal, Assumption and Justification apart, so the GSN type is unknown. Challenges and citations are later steps |
 | R8 | `ArgumentReasoning`, wherever it is: an inference's `reasoning`, the target of an `AssertedContext`, the source or target of an inference, or reached by nothing | Strategy | Decided | Mapping table; "Strategy is a node in GSN" above. A Strategy at an inference's end is drawn there, as the file says (D3), and well-formedness reports it |
-| R9 | `ArtifactReference` reached only as the source of `AssertedEvidence` | Solution | Decided | Mapping table. SACM 2.3 §11.15 allows only an `ArtifactReference` as that source |
+| R9 | `ArtifactReference` reached only as the source of `AssertedEvidence`, for or against (a counter `AssertedEvidence` the view draws, E5) | Solution | Decided; counter-evidence on 27 November 2026 | Mapping table. SACM 2.3 §11.15 allows only an `ArtifactReference` as that source. Counter-evidence: [R9: counter-evidence is a Solution](#r9-counter-evidence-is-a-solution) below |
 | R10 | `ArtifactReference` reached only as the source of `AssertedContext` | Context | Decided | v2.2 §2.1; "Context — undecidable by design" above |
 | R11 | `ArtifactReference` reached as both, as neither, or in any other way | Neutral, code AF-VIEW-003 | Decided in #493 | [R11](#r11-an-artifactreference-that-is-not-plainly-evidence-or-context) below |
 | R12 | Any node element with `isCitation` set | Neutral, code AF-VIEW-004 | Decided | Away elements (GSN3-MOD-003) come with modules |
@@ -376,9 +376,8 @@ element or the relationship it challenges.
 - **AF-VIEW-007 is retired.** It said a challenge was drawn differently from
   what it is, which is no longer so. Its number is kept, so the later codes
   keep theirs.
-- **Not decided.** The source of a counter `AssertedEvidence` is still neutral
-  by R11 (see "Reached"). The defeated decorator (E5a) and the in-doubt state
-  are not drawn.
+- **Counter-evidence is a Solution** (R9, decided 27 November 2026). The
+  defeated decorator (E5a) and the in-doubt state are not drawn.
 
 How the layout places a challenge is not a mapping: it is in `af-layout`.
 
@@ -427,6 +426,26 @@ into the file than it says. Nothing in a SACM 2.3 file can tell such a Goal
 from a Context written as a Claim: under v2.2 both are declared `asserted`, and
 R1 does not accept a Context recorded on a Claim. If a file that needs it turns
 up, that is a new decision. No sample has the case.
+
+#### R9: counter-evidence is a Solution
+
+Decided by the user on 27 November 2026, for milestone 2, step 6. An
+`ArtifactReference` that is the source of a counter `AssertedEvidence` the view
+draws (E5), and is reached in no other way, is a Solution: counter-evidence.
+
+- **GSN v3.** "GSN defines dialectic uses of the following core elements:
+  Goal, Solution" (§1:6.2.2). Table 1:6-1: "A solution, (core element) can be
+  used to present a reference to an evidence item that asserts a challenge to
+  part of the argument", and §1:6.3.5 speaks of "Counter evidence (via a
+  solution)". Counter-evidence is a Solution, not a kind of its own.
+- **SACM.** The pair is the one SACM gives for evidence, `ArtifactReference`
+  and `AssertedEvidence` (R9, §11.15), with `isCounter` set (§11.13): evidence
+  against its target instead of for it. Nothing else in the file is read
+  differently.
+- **The C++ application** drew it as a Solution.
+- **Until then** it was neutral by R11, which said only that it was not
+  plainly evidence. Counter-evidence that is also reached as context, or an
+  `ArtifactReference` that challenges by an `AssertedInference`, stays neutral.
 
 #### R11: an ArtifactReference that is not plainly evidence or context
 
@@ -593,7 +612,7 @@ step 4.
 
 | Rule | Moved | SACM operations | Status | Evidence |
 |---|---|---|---|---|
-| W21 | Which node | A node of a known kind that the diagram draws under one node, by a `SupportedBy` or an `InContextOf` line, or under none. Under several, it is not moved (AF-EDIT-016): there is no one line to move, and the editor makes no second parent. A node that challenges something, a node whose line is neutral (E5a, E9), and a relationship that names the node twice are not moved (AF-EDIT-017). A Context, Assumption or Justification that the file joins by a `SupportedBy` line, which GSN does not allow, is moved with that line as it is: alone in its relationship, and to a Goal only (W23's `SetReferences`), and not to an undeveloped one (AF-EDIT-025), which the line kept would support; the move does not repair the line, which the problem list reports and where its repair belongs, and it develops no Goal (decided 26 November 2026). One of several sources of such a relationship is not moved (AF-EDIT-017): that would make a new line GSN does not allow. A Strategy moves with the one inference it is the `reasoning` of (AF-EDIT-004 otherwise); one that supports no Goal has no line to move it by (AF-EDIT-024) | Decided | The view: the line a node is drawn under is the relationship changed |
+| W21 | Which node | A node of a known kind that the diagram draws under one node, by a `SupportedBy` or an `InContextOf` line, or under none. Under several, it is not moved (AF-EDIT-016): there is no one line to move, and the editor makes no second parent. A node that challenges something moves its challenge instead (W32). A node whose line is neutral (E5a, E9), and a relationship that names the node twice, are not moved (AF-EDIT-017). A Context, Assumption or Justification that the file joins by a `SupportedBy` line, which GSN does not allow, is moved with that line as it is: alone in its relationship, and to a Goal only (W23's `SetReferences`), and not to an undeveloped one (AF-EDIT-025), which the line kept would support; the move does not repair the line, which the problem list reports and where its repair belongs, and it develops no Goal (decided 26 November 2026). One of several sources of such a relationship is not moved (AF-EDIT-017): that would make a new line GSN does not allow. A Strategy moves with the one inference it is the `reasoning` of (AF-EDIT-004 otherwise); one that supports no Goal has no line to move it by (AF-EDIT-024) | Decided | The view: the line a node is drawn under is the relationship changed |
 | W22 | Where | What may be added where (W1 to W8), with the node's join kept: what is reached by `SupportedBy` goes where support may, and what is reached by `InContextOf` goes where context may, whatever its kind (R6: a Goal reached as context stays context). Not under itself or what is drawn under it, challenges included (AF-EDIT-018), not where it is (AF-EDIT-019), and not into another `ArgumentPackage` (AF-EDIT-020). To the top level: a Goal only (AF-EDIT-006) | Decided | GSN v3 Core's permitted connections, as W1 to W8; a relationship across packages is the Modular Extension's, which is not built |
 | W23 | The line it has | Where the node is the only `source` of its relationship and the new parent takes the same kind of relationship, the relationship is kept: `SetReferences` of its `target` to the new parent. A Strategy's inference is always kept so, with its Goals. Otherwise the node leaves the line: `RemoveReference` of it from the `source`, or, when it is the only source, `DeleteElement` of the relationship. A Goal that is the last under a Strategy leaves a placeholder behind, as W20 | Decided | The relationship's identity, name and `xmi:id` are kept where SACM can hold the result in the same element. An `AssertedInference` with a `reasoning` is a different shape from one without (E1, E2), so a Goal moving between a Goal and a Strategy changes relationship |
 | W24 | The line it gets | Where W23 did not keep the relationship: as an add makes it. Under a Goal, `CreateAssertedInference` (a Goal), `CreateAssertedEvidence` (a Solution) or `CreateAssertedContext` (context), from the node to the Goal. A Goal under a Strategy: `AddReference` of it to the `source` of the Strategy's one inference; a placeholder held there (W2) is taken out and deleted, since the Goal moved has its own identity. Support moved under an undeveloped Goal develops it, as W11 | Decided | W1, W3 to W7, W11 |
@@ -653,6 +672,26 @@ Decided on 26 November 2026.
 | W27 | A Context, Assumption or Justification that is a `source` of a relationship drawn as `SupportedBy`, with no `reasoning`, whose `target` is a Goal or a Strategy | The node alone in the relationship: `DeleteElement` of the relationship, then `CreateAssertedContext` from the node to the same `target`, in the relationship's package, with the relationship's `name`. One of several sources: `RemoveReference` of the node from the `source`, then `CreateAssertedContext` with an empty name (W12); the relationship stays for the others. The new relationship has a new `xmi:id`. It then reads by E4 as `InContextOf`, and the node as the kind it was (R4, R5, R10) | Decided | E4, W5 to W7: the form an add writes. SACM cannot change an element's class in place, so the relationship is replaced. The name is kept because it is the one thing of the old relationship a reader may know it by |
 | W28 | What is not repaired, and a context already there | A relationship with a `reasoning` (AF-EDIT-017): the node is then one of a Strategy's premises, and whether it is context of the Strategy or of its Goal is not the editor's to say. A relationship W25 would not delete, when the node is its only source, or would not take a source out of, when it is one of several (AF-EDIT-015). Anything that is not such a join (AF-EDIT-023). When the file already has an `AssertedContext` from the node to the same target that the diagram draws as context, and that is plain (not cited, abstract or declared otherwise, and with no `reasoning`), the repair takes the support line away and makes no second one; one that is not plain is left as it is, and the repair makes a context line of its own | Decided | W25; "Preserve rather than reinterpret" |
 
+### Adding a challenge
+
+How the editor adds a challenge to a node or a line, and moves one
+(milestone 2, step 6). `af-gsn` (`commands::challenge`) applies an add as one
+`sacm::edit::batch`, one undo step; `commands::challenge_choices` answers,
+for the menu, which of the two challengers may be added and why not.
+`commands::move_challenge` moves a challenge onto a line, and
+`commands::move_node` onto a node; `commands::move_targets` answers where it
+may go, a node or a line. Decided on 27 November 2026. The
+GSN Metamodel v2.2 forbids a counter relationship (`self.isCounter = false`,
+Figure 2); GSN v3 requires challenges, and the gap is row 4 of
+[`sacm-gsn-metamodel-gaps.md`](sacm-gsn-metamodel-gaps.md).
+
+| Rule | Challenged, and by what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W29 | What is challenged | A Goal, an Assumption, a Justification, a Solution or a Context node: the element is the `target`. A line drawn as `SupportedBy`, `InContextOf` or a challenge: the relationship is the `target`, since a challenge may point at a relationship and may itself be challenged. Only the relationship's first line offers it, where E5 draws a challenge of that relationship; its other lines, such as a premise's under a Strategy or one of several sources', have no relationship of their own in SACM and are refused (AF-EDIT-027), since the challenge would be drawn on another line than the one chosen. A Strategy: the one inference it is the `reasoning` of and that the view draws through it (AF-EDIT-004 otherwise), which E5 draws at the Strategy when it reads one. A neutral node or line is not challenged (AF-EDIT-002) | Decided | E5. GSN v3 Table 1:6-2: "Permitted connections are: goal-to-any element, solution-to-any element, goal-to-any relationship, solution-to-any relationship"; §1:6.3.5 names "goal, solution, strategy, context, assumption, justification", and §1:6.3.9 "SupportedBy, InContextOf, Challenges". §1:6.3.12: "it is only possible to challenge the inference relationship in its entirety. A challenge cannot be made directly to multiple SupportedBy relationships, so challenges to this inference require a strategy to be inserted", the challenge then applied to the Strategy. SACM 2.3 §11.13 lets the `target` of an `AssertedRelationship` be any `ArgumentAsset`, a relationship among them |
+| W30 | What challenges | A counter goal (a Goal: "an evidenced counter argument (via a goal)") or counter evidence (a Solution); any other kind is refused (AF-EDIT-026). The menu says **Add Counter Goal** and **Add Counter Evidence** | Decided | GSN v3 §1:6.2.2: "GSN defines dialectic uses of the following core elements: Goal, Solution"; §1:6.3.5 and §1:6.3.14 ("a counter claim (via the goal)"); R9 |
+| W31 | The challenge | The challenger as an add makes a node of its kind (W9), in the `ArgumentPackage` of what is challenged, with the next identifier of the prefix `CG` for a counter goal and `CSn` for counter evidence (W10's numbering); then, with `isCounter` set, `CreateAssertedInference` from a Goal or `CreateAssertedEvidence` from a Solution, to the `target` of W29. Nothing that is challenged is changed | Decided (prefixes on 27 November 2026, asked for by the user) | E5 reads it back as a challenge; R9 reads counter-evidence as a Solution. GSN v3's dialectic figures number them so: CSn1 (Figures 1:6-1, 1:6-3, 1:6-4), CG1 and CG2 (Figures 1:6-2, 1:6-5). An example, not a rule: §1:2.1.2 asks only that an identifier be unique in its module |
+| W32 | Moving a challenge | A counter goal or counter evidence that challenges one thing, alone as the source of its counter relationship, and is drawn under nothing else, moves its challenge: the relationship gets the new `target` (`SetReferences`, `ReferenceEnd::Target`), a node or a line by W29's rules, and the challenger, what is under it and the relationship's `isCounter` stay as they are. The menu's Move… and a drag both make it, a drag dropped on a node or on a line. It is not moved onto itself, what is under it, its own line or a line that hangs from a node under it (AF-EDIT-018), onto what it challenges already (AF-EDIT-019), into another argument package (AF-EDIT-020), or to the top level (AF-EDIT-028): with nothing to challenge it is no longer a counter. A counter relationship that something else refers to, such as a challenge of the challenge, or that holds more than its name, stays (W25, AF-EDIT-015); a challenger of several things, or one that is also supported or is context, is not moved (AF-EDIT-017) | Decided (27 November 2026, from the spike) | W25: a challenge of a challenge is about that challenge's target, and is not carried to another one unseen. GSN v3 §1:6.2.2: the dialectic uses of a Goal and a Solution are counters, which have something to challenge. The findings are in [`docs/spikes/challenge-move.md`](../spikes/challenge-move.md) |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -685,3 +724,6 @@ was refused. Nothing changes.
 | AF-EDIT-023 | The element is not joined in a way a repair mends (W28) |
 | AF-EDIT-024 | The Strategy supports no Goal, so there is no line to move it by (W21) |
 | AF-EDIT-025 | The element keeps a support line where GSN has context, and the Goal is undeveloped (W21) |
+| AF-EDIT-026 | Only a Goal or a Solution challenges (W30) |
+| AF-EDIT-027 | The line is not the first of the relationship it is drawn for, where a challenge of it is drawn (W29) |
+| AF-EDIT-028 | A challenge is moved to another node or line, never to the top level (W32) |

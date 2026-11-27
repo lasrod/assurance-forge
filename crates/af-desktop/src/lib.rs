@@ -991,6 +991,44 @@ fn add(
 }
 
 #[tauri::command]
+fn move_to_line(
+    id: String,
+    relationship: String,
+    from: String,
+    to: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .move_to_line(&id, &relationship, &from, &to, revision))
+}
+
+#[tauri::command]
+fn challenge_choices(
+    at: String,
+    from: Option<String>,
+    to: Option<String>,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::AddChoices>, String> {
+    let line = from.as_deref().zip(to.as_deref());
+    Ok(lock(&state)?.core.challenge_choices(&at, line))
+}
+
+#[tauri::command]
+fn challenge(
+    at: String,
+    from: Option<String>,
+    to: Option<String>,
+    kind: af_api::contract::ElementKind,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    let line = from.as_deref().zip(to.as_deref());
+    Ok(lock(&state)?.core.challenge(&at, line, kind, revision))
+}
+
+#[tauri::command]
 fn move_targets(
     id: String,
     state: Shared<'_>,
@@ -1159,6 +1197,9 @@ pub fn run(args: Args) -> i32 {
             move_node,
             set_undeveloped,
             repair_join,
+            challenge_choices,
+            challenge,
+            move_to_line,
             set_text,
             undo,
             redo,

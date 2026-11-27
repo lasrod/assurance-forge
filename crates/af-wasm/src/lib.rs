@@ -103,6 +103,40 @@ impl WasmCore {
         json(&self.core.add(parent.as_deref(), kind, revision))
     }
 
+    /// `AddChoices` as JSON: which challengers may challenge the node `at`,
+    /// or, with `from` and `to`, the line between those nodes of the
+    /// relationship `at`; `None` when nothing is open.
+    #[wasm_bindgen(js_name = challengeChoices)]
+    pub fn challenge_choices(
+        &self,
+        at: &str,
+        from: Option<String>,
+        to: Option<String>,
+    ) -> Result<Option<String>, JsError> {
+        self.core
+            .challenge_choices(at, from.as_deref().zip(to.as_deref()))
+            .map(|choices| json(&choices))
+            .transpose()
+    }
+
+    /// Challenges the node `at`, or, with `from` and `to`, the line between
+    /// those nodes of the relationship `at`, with a new element of `kind`
+    /// (`goal` or `solution`), from the menu of `revision`. `EditResult` as
+    /// JSON.
+    pub fn challenge(
+        &mut self,
+        at: &str,
+        from: Option<String>,
+        to: Option<String>,
+        kind: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        let kind: ElementKind = serde_json::from_value(serde_json::Value::String(kind.to_owned()))
+            .map_err(|_| JsError::new("core-kind"))?;
+        let line = from.as_deref().zip(to.as_deref());
+        json(&self.core.challenge(at, line, kind, revision))
+    }
+
     /// `Removal` as JSON for the node `id`: what removing it would delete;
     /// `None` when nothing is open.
     pub fn removal(&self, id: &str) -> Result<Option<String>, JsError> {
@@ -139,6 +173,21 @@ impl WasmCore {
         revision: u32,
     ) -> Result<String, JsError> {
         json(&self.core.move_node(id, to.as_deref(), revision))
+    }
+
+    /// Moves the challenge the node `id` makes onto the line from `from` to
+    /// `to` of `relationship`, as the targets of `revision` said.
+    /// `EditResult` as JSON.
+    #[wasm_bindgen(js_name = moveToLine)]
+    pub fn move_to_line(
+        &mut self,
+        id: &str,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(&self.core.move_to_line(id, relationship, from, to, revision))
     }
 
     /// Marks the Goal `id` undeveloped, or clears the mark, as asked at

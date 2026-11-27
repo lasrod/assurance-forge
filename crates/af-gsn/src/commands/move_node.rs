@@ -46,6 +46,9 @@ pub struct MoveTargets {
     pub canvas: Option<Refusal>,
     /// Every node of the view, in its order.
     pub nodes: Vec<MoveTarget>,
+    /// For a challenger, every line of the view, in its order (W32); empty
+    /// for any other node, which goes under a node.
+    pub lines: Vec<super::challenge::LineTarget>,
 }
 
 /// What a move made.
@@ -65,6 +68,10 @@ pub struct Moved {
 /// [`Refusal::JoinNotMoved`], [`Refusal::NoOneInference`] or
 /// [`Refusal::StrategyAlone`].
 pub fn move_targets(document: &Document, view: &View, id: &str) -> Result<MoveTargets, Refusal> {
+    // W32: a counter goal or counter evidence moves its challenge.
+    if let Some(counter) = super::challenge::counter_of(document, view, id) {
+        return counter.map(|counter| super::challenge::counter_targets(document, view, &counter));
+    }
     let mover = Mover::of(document, view, id)?;
     let under = mover.under(view);
     let strategies = Strategies::of(document, view);
@@ -95,6 +102,7 @@ pub fn move_targets(document: &Document, view: &View, id: &str) -> Result<MoveTa
     Ok(MoveTargets {
         canvas: answer(Target::Canvas).err(),
         nodes,
+        lines: Vec::new(),
     })
 }
 
@@ -113,6 +121,19 @@ pub fn move_node(
     id: &str,
     target: Target<'_>,
 ) -> Result<Moved, AddError> {
+    // W32: a counter goal or counter evidence moves its challenge, to a node.
+    if let Some(counter) = super::challenge::counter_of(document, view, id) {
+        // One that cannot be moved at all says why, wherever it was asked to go.
+        if let Err(refusal) = counter {
+            return Err(AddError::Refused(refusal));
+        }
+        return match target {
+            Target::Canvas => Err(AddError::Refused(Refusal::ChallengeStays)),
+            Target::Node(to) => {
+                super::challenge::move_challenge(document, view, id, super::Challenged::Node(to))
+            }
+        };
+    }
     let mover = Mover::of(document, view, id).map_err(AddError::Refused)?;
     let under = mover.under(view);
     let strategies = Strategies::of(document, view);
@@ -318,57 +339,7 @@ impl Mover {
     /// The node and every node drawn under it: where it cannot go (W22).
     /// What challenges a node counts as under it, as a removal counts it.
     fn under<'a>(&'a self, view: &'a View) -> HashSet<&'a str> {
-        let mut below: HashMap<&str, Vec<&str>> = HashMap::new();
-        // The node each relationship's line hangs from: a line is drawn
-        // under its conclusion, a challenge under what it challenges.
-        let mut hangs: HashMap<&str, Vec<&str>> = HashMap::new();
-        for edge in &view.edges {
-            if edge.to_relationship {
-                continue;
-            }
-            let (parent, child) = if edge.kind == EdgeKind::Challenge {
-                (edge.to.as_str(), edge.from.as_str())
-            } else {
-                (edge.from.as_str(), edge.to.as_str())
-            };
-            below.entry(parent).or_default().push(child);
-            hangs
-                .entry(edge.relationship.as_str())
-                .or_default()
-                .push(parent);
-        }
-        // A challenge of a line is under the node the line hangs from, as a
-        // removal counts it (W18): a node is not moved under its own
-        // challenger's line. A challenge of such a challenge, in turn.
-        let mut grew = true;
-        while grew {
-            grew = false;
-            for edge in view.edges.iter().filter(|edge| edge.to_relationship) {
-                let parents = hangs.get(edge.to.as_str()).cloned().unwrap_or_default();
-                for parent in parents {
-                    let children = below.entry(parent).or_default();
-                    if !children.contains(&edge.from.as_str()) {
-                        children.push(edge.from.as_str());
-                        grew = true;
-                    }
-                    let held = hangs.entry(edge.relationship.as_str()).or_default();
-                    if !held.contains(&parent) {
-                        held.push(parent);
-                        grew = true;
-                    }
-                }
-            }
-        }
-        let mut under: HashSet<&str> = HashSet::from([self.id.as_str()]);
-        let mut queue: Vec<&str> = vec![self.id.as_str()];
-        while let Some(node) = queue.pop() {
-            for child in below.get(node).into_iter().flatten() {
-                if under.insert(child) {
-                    queue.push(child);
-                }
-            }
-        }
-        under
+        below(view, self.id.as_str()).nodes
     }
 
     /// W22: whether the node may go to `target`, and whether that develops
@@ -615,5 +586,72 @@ impl Strategies {
             })
             .collect();
         Self { one }
+    }
+}
+
+/// What is under a node: the nodes, and the node each relationship's line
+/// hangs from.
+pub(crate) struct Below<'a> {
+    pub(crate) nodes: HashSet<&'a str>,
+    pub(crate) hangs: HashMap<&'a str, Vec<&'a str>>,
+}
+
+/// The node `id` and every node drawn under it, and the node each
+/// relationship's line hangs from (W22). What challenges a node, or a line
+/// under it, counts as under it, as a removal counts it.
+pub(crate) fn below<'a>(view: &'a View, id: &'a str) -> Below<'a> {
+    let mut below: HashMap<&str, Vec<&str>> = HashMap::new();
+    // The node each relationship's line hangs from: a line is drawn
+    // under its conclusion, a challenge under what it challenges.
+    let mut hangs: HashMap<&str, Vec<&str>> = HashMap::new();
+    for edge in &view.edges {
+        if edge.to_relationship {
+            continue;
+        }
+        let (parent, child) = if edge.kind == EdgeKind::Challenge {
+            (edge.to.as_str(), edge.from.as_str())
+        } else {
+            (edge.from.as_str(), edge.to.as_str())
+        };
+        below.entry(parent).or_default().push(child);
+        hangs
+            .entry(edge.relationship.as_str())
+            .or_default()
+            .push(parent);
+    }
+    // A challenge of a line is under the node the line hangs from, as a
+    // removal counts it (W18): a node is not moved under its own
+    // challenger's line. A challenge of such a challenge, in turn.
+    let mut grew = true;
+    while grew {
+        grew = false;
+        for edge in view.edges.iter().filter(|edge| edge.to_relationship) {
+            let parents = hangs.get(edge.to.as_str()).cloned().unwrap_or_default();
+            for parent in parents {
+                let children = below.entry(parent).or_default();
+                if !children.contains(&edge.from.as_str()) {
+                    children.push(edge.from.as_str());
+                    grew = true;
+                }
+                let held = hangs.entry(edge.relationship.as_str()).or_default();
+                if !held.contains(&parent) {
+                    held.push(parent);
+                    grew = true;
+                }
+            }
+        }
+    }
+    let mut under: HashSet<&str> = HashSet::from([id]);
+    let mut queue: Vec<&str> = vec![id];
+    while let Some(node) = queue.pop() {
+        for child in below.get(node).into_iter().flatten() {
+            if under.insert(child) {
+                queue.push(child);
+            }
+        }
+    }
+    Below {
+        nodes: under,
+        hangs,
     }
 }

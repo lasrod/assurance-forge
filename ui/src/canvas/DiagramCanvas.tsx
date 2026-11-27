@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
-import type { DiagramAt, TextStyle } from '../core/Core';
+import type { DiagramAt, DiagramEdge, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { badgeLabel, comesWith, edgePan, HOLD_MS, readableAt, type DragEnd } from './drag';
-import { boundsOf, draw, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, edgeKey, findEdge, fit, hitId, hitOneEdge, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -112,9 +112,11 @@ export function DiagramCanvas({
   onSelect,
   onTextStyle,
   onContextMenu,
+  onLineMenu,
   onRemove,
   move = null,
   onMoveTo,
+  onMoveToLine,
   onMoveCancel,
   onDragStart,
   onDragEnd,
@@ -129,10 +131,14 @@ export function DiagramCanvas({
   onSelect: (id: string | null) => void;
   onTextStyle: (style: TextStyle) => void;
   onContextMenu: (id: string | null, at: { x: number; y: number }, source: ContextMenuSource) => void;
+  /** The menu of a line: it is selected, and the menu asked for at `at`. */
+  onLineMenu?: (edge: DiagramEdge, at: { x: number; y: number }, source: ContextMenuSource) => void;
   onRemove: (id: string) => void;
   move?: MoveMarks | null;
   /** A node was clicked while a move is chosen: one it may go under, or not. */
   onMoveTo?: (id: string) => void;
+  /** A line was clicked while a challenge's move is chosen. */
+  onMoveToLine?: (edge: DiagramEdge) => void;
   onMoveCancel?: () => void;
   /** A drag of a node began: answers whether the node can be moved, having asked where. */
   onDragStart?: (id: string) => Promise<boolean>;
@@ -312,7 +318,13 @@ export function DiagramCanvas({
     const point = local(event);
     const current = gesture.current;
     if (!current) {
-      if (diagram && viewport) setHovered(hitId(diagram.diagram, viewport, point.x, point.y));
+      if (diagram && viewport) {
+        // While a challenge's move is chosen, the line marked is the one a
+        // click would take: none on a trunk several relationships share.
+        const node = move?.lines ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
+        const line = move?.lines && !node ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
+        setHovered(move?.lines ? (node?.id ?? (line ? edgeKey(line) : null)) : hitId(diagram.diagram, viewport, point.x, point.y));
+      }
       return;
     }
     pointers.current.set(event.pointerId, point);
@@ -327,7 +339,13 @@ export function DiagramCanvas({
       // The badge follows the pointer, and the place under it is marked.
       dragPointer.current = point;
       setDrag((held) => (held ? { ...held, pointer: point } : held));
-      if (diagram && viewport) setHovered(hitTest(diagram.diagram, viewport, point.x, point.y)?.id ?? null);
+      if (diagram && viewport) {
+        const node = hitTest(diagram.diagram, viewport, point.x, point.y);
+        // A line, for a challenge that may be dropped on one.
+        // Only one line: on a trunk several share, none is marked.
+        const line = !node && move?.lines ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
+        setHovered(node?.id ?? (line ? edgeKey(line) : null));
+      }
       return;
     }
     if (!current.panning && Math.hypot(point.x - current.start.x, point.y - current.start.y) > DRAG_SLOP) {
@@ -370,7 +388,12 @@ export function DiagramCanvas({
       // Dropped on a node, on itself (given up), or on nothing.
       const point = local(event);
       const node = diagram && viewport ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
-      onDragEnd?.(node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : { on: 'canvas' });
+      // A line, for a challenge, or before the core has said what is moved:
+      // the places it answers decide then.
+      const line = !node && (move === null || move.lines) && diagram && viewport ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
+      onDragEnd?.(
+        node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : line ? { on: 'line', edge: line } : { on: 'canvas' },
+      );
       return;
     }
     if (!current || current.over || current.panning || current.pinch || event.button !== 0 || !diagram || !viewport) return;
@@ -382,6 +405,8 @@ export function DiagramCanvas({
       // click on a line or on the empty canvas changes nothing.
       const node = hitTest(diagram.diagram, viewport, point.x, point.y);
       if (node && node.id !== move.source) onMoveTo?.(node.id);
+      const line = !node && move.lines ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
+      if (line) onMoveToLine?.(line);
       return;
     }
     onSelect(hitId(diagram.diagram, viewport, point.x, point.y));
@@ -409,8 +434,9 @@ export function DiagramCanvas({
     [],
   );
 
-  // A right-click on a node, or on the empty canvas. A line takes no menu:
-  // nothing is added to a line.
+  // A right-click on a node, on a line, or on the empty canvas. A line's
+  // menu challenges it, or, while a challenge's move is chosen, holds the
+  // move.
   const onContext = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     if (!diagram || !viewport) return;
@@ -427,7 +453,15 @@ export function DiagramCanvas({
     event.currentTarget.focus();
     const point = local(event);
     const node = hitTest(diagram.diagram, viewport, point.x, point.y);
-    if (!node && hitEdge(diagram.diagram, viewport, point.x, point.y)) return;
+    // A line's menu challenges it: on a trunk several lines share, it is not
+    // said which, and no menu opens.
+    const hit = node ? null : hitOneEdge(diagram.diagram, viewport, point.x, point.y);
+    if (hit?.ambiguous) return;
+    const line = hit?.edge ?? null;
+    if (line) {
+      onLineMenu?.(line, { x: event.clientX, y: event.clientY }, 'pointer');
+      return;
+    }
     onContextMenu(node?.id ?? null, { x: event.clientX, y: event.clientY }, 'pointer');
   };
 
@@ -445,11 +479,20 @@ export function DiagramCanvas({
     }
     if (isMenuKey(event) && diagram && viewport && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      // The selected node's menu at its centre; with no node selected, the
-      // canvas's at the canvas's centre.
+      // The selected node's menu at its centre, or the selected line's at
+      // the middle of its bounds; with nothing selected, the canvas's at the
+      // canvas's centre.
       const rect = event.currentTarget.getBoundingClientRect();
       const node = selected ? diagram.diagram.nodes.find((candidate) => candidate.id === selected) : undefined;
-      // A selected line takes no menu, as a right-click on it takes none.
+      const line = selected && !node ? findEdge(diagram.diagram, selected) : null;
+      if (line) {
+        const middle = {
+          x: (line.bounds.x + line.bounds.width / 2) * viewport.scale + viewport.offsetX,
+          y: (line.bounds.y + line.bounds.height / 2) * viewport.scale + viewport.offsetY,
+        };
+        onLineMenu?.(line, { x: rect.left + middle.x, y: rect.top + middle.y }, 'keyboard');
+        return;
+      }
       if (selected && !node) return;
       const centre = node
         ? {
@@ -508,13 +551,13 @@ export function DiagramCanvas({
         tabIndex={0}
         style={{
           cursor:
-            panning || (drag && (!shownHover || !move || move.allowed.has(shownHover)))
+            panning || (drag && (!shownHover || !move || move.allowed.has(shownHover) || move.lines?.has(shownHover)))
               ? 'grabbing'
               : armed
                 ? 'grab'
                 : !shownHover
                   ? 'default'
-                  : !move || move.allowed.has(shownHover)
+                  : !move || move.allowed.has(shownHover) || move.lines?.has(shownHover)
                     ? 'pointer'
                     : 'not-allowed',
         }}

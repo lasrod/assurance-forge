@@ -939,3 +939,79 @@ fn the_undeveloped_mark_is_set_where_it_can_be_and_a_wrong_join_is_repaired() {
             .any(|problem| problem.code == "AF-GSN-004")
     );
 }
+
+#[test]
+fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
+    let mut core = core("en");
+    assert!(core.challenge_choices("cl_top", None).is_none());
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let challenges = |core: &mut Core| {
+        core.diagram()
+            .unwrap_or_else(|| panic!("open"))
+            .diagram
+            .edges
+            .iter()
+            .filter(|edge| edge.kind == EdgeKind::Challenge)
+            .count()
+    };
+    let choices = core
+        .challenge_choices("cl_sub_1", None)
+        .unwrap_or_else(|| panic!("open"));
+    let kinds: Vec<_> = choices.choices.iter().map(|choice| choice.kind).collect();
+    assert_eq!(kinds, [ElementKind::Goal, ElementKind::Solution]);
+    assert!(
+        choices
+            .choices
+            .iter()
+            .all(|choice| choice.refusal.is_none())
+    );
+    // A menu of another revision is out of date.
+    assert!(matches!(
+        core.challenge("cl_sub_1", None, ElementKind::Goal, 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let EditResult::Applied {
+        revision, element, ..
+    } = core.challenge("cl_sub_1", None, ElementKind::Goal, 1)
+    else {
+        panic!("not challenged");
+    };
+    assert_eq!(revision, 2);
+    let challenger = element.unwrap_or_else(|| panic!("no challenger"));
+    assert_eq!(
+        core.element(&challenger).map(|details| details.kind),
+        Some(NodeKind::Goal)
+    );
+    assert_eq!(challenges(&mut core), 1);
+    // The line the challenger is drawn by is challenged with evidence.
+    let line = core
+        .diagram()
+        .unwrap_or_else(|| panic!("open"))
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.from == challenger)
+        .map(|edge| {
+            (
+                edge.relationship.clone(),
+                edge.from.clone(),
+                edge.to.clone(),
+            )
+        })
+        .unwrap_or_else(|| panic!("no line"));
+    let EditResult::Applied { element, .. } =
+        core.challenge(&line.0, Some((&line.1, &line.2)), ElementKind::Solution, 2)
+    else {
+        panic!("the line is not challenged");
+    };
+    let evidence = element.unwrap_or_else(|| panic!("no challenger"));
+    assert_eq!(
+        core.element(&evidence).map(|details| details.kind),
+        Some(NodeKind::Solution)
+    );
+    assert_eq!(challenges(&mut core), 2);
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(challenges(&mut core), 1);
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(challenges(&mut core), 0);
+}

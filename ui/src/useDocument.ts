@@ -16,6 +16,7 @@ import type {
   EditResult,
   ElementKind,
   History,
+  LineEnds,
   NodeKind,
   OpenedFile,
   OpenResult,
@@ -51,9 +52,13 @@ export type DocumentState =
   | { kind: 'relayoutFailed' }
   | { kind: 'result'; result: OpenResult }
   | { kind: 'added'; added: NodeKind; identifier: string }
+  /** A counter goal or counter evidence added: a challenge. */
+  | { kind: 'challenged'; added: NodeKind; identifier: string }
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
+  /** A counter goal or counter evidence moved: what it challenges now. */
+  | { kind: 'challengeMoved'; identifier: string; to: string }
   | { kind: 'undevelopedSet'; undeveloped: boolean; identifier: string }
   | { kind: 'repaired'; repaired: NodeKind | null; identifier: string }
   | { kind: 'undone' }
@@ -410,7 +415,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const runEdit = useCallback(
     async (
       run: (on: Core) => Promise<EditResult>,
-      what: 'add' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
+      what: 'add' | 'challenge' | 'undo' | 'redo' | 'remove' | 'move' | 'mark' | 'restore' | TextField,
       anchor: string | null,
       about: NodeKind | null,
       onShown: EditShown,
@@ -483,6 +488,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       if (said) setState(said);
       else if (what === 'add') {
         if (details) setState({ kind: 'added', added: details.kind, identifier: details.identifier });
+      } else if (what === 'challenge') {
+        if (details) setState({ kind: 'challenged', added: details.kind, identifier: details.identifier });
       } else if (history) setState({ kind: what === 'undo' ? 'undone' : 'redone' });
       else if (what !== 'remove' && what !== 'move' && what !== 'mark' && what !== 'restore') setState({ kind: 'textChanged', field: what });
       return 'applied';
@@ -535,6 +542,17 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   const add = useCallback(
     (parent: string | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
       void edit((on) => on.add(parent, kind, revision), 'add', parent, about, onShown),
+    [edit],
+  );
+  /**
+   * Challenges the node `at`, or with `line` that line of the relationship
+   * `at`, with a new element of `kind`, from the menu of `revision`: a
+   * counter goal or counter evidence, which the status names.
+   */
+  const challenge = useCallback(
+    (at: string, line: LineEnds | null, kind: ElementKind, revision: number, about: NodeKind | null, onShown: EditShown) =>
+      // The view keeps what is challenged in place: the node, or the line's upper end.
+      void edit((on) => on.challenge(at, line, kind, revision), 'challenge', line ? line.from : at, about, onShown),
     [edit],
   );
   /**
@@ -635,6 +653,31 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
+   * Moves the challenge `targets` is of to the node `to`, or onto a line;
+   * the status says what it challenges now, `toLabel`. The view keeps
+   * `anchor` in place: by default the node, or the line's upper end.
+   */
+  const moveChallenge = useCallback(
+    (
+      targets: MoveTargets,
+      to: string | ({ relationship: string } & LineEnds),
+      moved: { kind: NodeKind; identifier: string },
+      toLabel: string,
+      onShown: EditShown,
+      anchor: string = typeof to === 'string' ? to : to.from,
+    ) =>
+      void edit(
+        (on) => (typeof to === 'string' ? on.moveNode(targets.id, to, targets.revision) : on.moveToLine(targets.id, to, targets.revision)),
+        'move',
+        // The place it goes to is kept where it is.
+        anchor,
+        moved.kind,
+        onShown,
+        { kind: 'challengeMoved', identifier: moved.identifier, to: toLabel },
+      ),
+    [edit],
+  );
+  /**
    * Marks the Goal `id` undeveloped, or clears the mark, as asked at
    * `revision`; the view keeps the Goal in place. The core refuses it if the
    * revision is not current.
@@ -674,6 +717,22 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       edit((on) => on.setText(id, field, text), field, id, about, onShown),
     [edit],
   );
+  /**
+   * The challenge items of a node's or a line's menu, with the revision they
+   * are of; null if the document changed before they came.
+   */
+  const challengeChoices = useCallback(async (at: string, line: LineEnds | null): Promise<{ revision: number; choices: AddChoice[] } | null> => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return null;
+    try {
+      const answer = await on.challengeChoices(at, line);
+      if (!answer || answer.revision !== revision || shown.current !== revision) return null;
+      return { revision, choices: answer.choices };
+    } catch {
+      return null;
+    }
+  }, []);
   /**
    * The add menu's choices for `parent` (null: the empty canvas), with the
    * revision they are of; null if the document changed before they came.
@@ -842,6 +901,9 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     chooseFile,
     setTextStyle,
     addChoices,
+    moveChallenge,
+    challengeChoices,
+    challenge,
     add,
     removal,
     remove,

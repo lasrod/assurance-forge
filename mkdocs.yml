@@ -49,9 +49,11 @@ nav:
     - "Milestone 2, step 3: the recovery copy": roadmap/milestone-2-recovery.md
     - "Milestone 2, step 4: moving an element": roadmap/milestone-2-move.md
     - "Milestone 2, step 5: the undeveloped mark, and a repair": roadmap/milestone-2-mark-and-repair.md
+    - "Milestone 2, step 6: challenges": roadmap/milestone-2-challenges.md
     - Canvas spike findings: spikes/canvas.md
     - Desktop shell spike findings: spikes/desktop-shell.md
     - Moving by dragging spike findings: spikes/drag-move.md
+    - Moving a challenge spike findings: spikes/challenge-move.md
   - Standards:
     - SACM to GSN mapping: standards/sacm-gsn-mapping.md
     - GSN metamodel gaps: standards/sacm-gsn-metamodel-gaps.md

@@ -29,9 +29,13 @@ use sacm::model::{
 use crate::ElementKind;
 use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, View};
 
+mod challenge;
 mod move_node;
 mod remove;
 mod repair;
+pub use challenge::{
+    CHALLENGERS, Challenged, LineTarget, challenge, challenge_choices, move_challenge,
+};
 pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
 pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
@@ -95,6 +99,14 @@ pub enum Refusal {
     /// AF-EDIT-025: the element keeps a support line where GSN has context,
     /// and the Goal is undeveloped: the move would support it (W22).
     WouldSupportUndeveloped,
+    /// AF-EDIT-026: only a Goal or a Solution challenges (W30).
+    NotAChallenger,
+    /// AF-EDIT-027: the line is not the first of the relationship it is
+    /// drawn for, where a challenge of that relationship is drawn (W29).
+    NotTheFirstLine,
+    /// AF-EDIT-028: a counter goal or counter evidence stays a challenge: it
+    /// is moved onto what it is to challenge, not to the top level (W32).
+    ChallengeStays,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -126,6 +138,9 @@ impl Refusal {
             Refusal::NothingToRepair => "AF-EDIT-023",
             Refusal::StrategyAlone => "AF-EDIT-024",
             Refusal::WouldSupportUndeveloped => "AF-EDIT-025",
+            Refusal::NotAChallenger => "AF-EDIT-026",
+            Refusal::NotTheFirstLine => "AF-EDIT-027",
+            Refusal::ChallengeStays => "AF-EDIT-028",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",
@@ -425,40 +440,7 @@ pub fn add(
             made = Some(claim.as_str().to_owned());
             return Ok(());
         }
-        let mut create =
-            |tx: &mut edit::Batch<'_>, kind: ElementKind| -> Result<ElementId, BatchError> {
-                let created = match kind {
-                    ElementKind::Strategy => tx.apply(CreateArgumentReasoning::new(
-                        package.clone(),
-                        LangString::default(),
-                    ))?,
-                    ElementKind::Solution | ElementKind::Context => tx.apply(
-                        CreateArtifactReference::new(package.clone(), LangString::default()),
-                    )?,
-                    ElementKind::Goal | ElementKind::Assumption | ElementKind::Justification => {
-                        tx.apply(CreateClaim::new(package.clone(), LangString::default()))?
-                    }
-                };
-                let id = created.created_ids()[0].clone();
-                // R4, R5: the declaration tells an Assumption and a Justification from a Goal.
-                let declaration = match kind {
-                    ElementKind::Assumption => Some(AssertionDeclaration::Assumed),
-                    ElementKind::Justification => Some(AssertionDeclaration::Axiomatic),
-                    _ => None,
-                };
-                if let Some(declaration) = declaration {
-                    tx.apply(SetAssertionDeclaration::new(id.clone(), declaration))?;
-                }
-                // W10.
-                tx.apply(CreateTaggedValue::new(
-                    id.clone(),
-                    LangString::new(GSN_IDENTIFIER_KEY),
-                    LangString::new(numbers.next(kind)),
-                ))?;
-                Ok(id)
-            };
-
-        let element = create(tx, kind)?;
+        let element = new_node(tx, &package, kind, numbers.next(kind))?;
         match (&plan.parent, kind) {
             // W8.
             (Parent::Canvas, _) => {}
@@ -534,6 +516,45 @@ pub fn add(
         element: made.unwrap_or_default(),
         mutation,
     })
+}
+
+/// A new node of `kind` in `package`, as an add makes one: the SACM element
+/// its kind is written as, the declaration that tells an Assumption and a
+/// Justification from a Goal (R4, R5), and `identifier` (W10).
+pub(crate) fn new_node(
+    tx: &mut edit::Batch<'_>,
+    package: &ElementId,
+    kind: ElementKind,
+    identifier: String,
+) -> Result<ElementId, BatchError> {
+    let created = match kind {
+        ElementKind::Strategy => tx.apply(CreateArgumentReasoning::new(
+            package.clone(),
+            LangString::default(),
+        ))?,
+        ElementKind::Solution | ElementKind::Context => tx.apply(CreateArtifactReference::new(
+            package.clone(),
+            LangString::default(),
+        ))?,
+        ElementKind::Goal | ElementKind::Assumption | ElementKind::Justification => {
+            tx.apply(CreateClaim::new(package.clone(), LangString::default()))?
+        }
+    };
+    let id = created.created_ids()[0].clone();
+    let declaration = match kind {
+        ElementKind::Assumption => Some(AssertionDeclaration::Assumed),
+        ElementKind::Justification => Some(AssertionDeclaration::Axiomatic),
+        _ => None,
+    };
+    if let Some(declaration) = declaration {
+        tx.apply(SetAssertionDeclaration::new(id.clone(), declaration))?;
+    }
+    tx.apply(CreateTaggedValue::new(
+        id.clone(),
+        LangString::new(GSN_IDENTIFIER_KEY),
+        LangString::new(identifier),
+    ))?;
+    Ok(id)
 }
 
 /// W2: the Claim that holds a Strategy's place for its first Goal, which R16
@@ -737,7 +758,7 @@ pub(crate) fn deletable(document: &Document, id: &ElementId) -> Result<(), Refus
 }
 
 /// The `ArgumentPackage` that holds `element`, at any depth (W9).
-fn argument_package(element: SacmElement<'_>) -> Option<ElementId> {
+pub(crate) fn argument_package(element: SacmElement<'_>) -> Option<ElementId> {
     let mut holder = element.parent();
     while let Some(container) = holder {
         if container.kind() == SacmKind::ArgumentPackage {
@@ -749,7 +770,7 @@ fn argument_package(element: SacmElement<'_>) -> Option<ElementId> {
 }
 
 /// The next free GSN identifier of each kind (W10).
-struct Identifiers {
+pub(crate) struct Identifiers {
     taken: Vec<String>,
 }
 
@@ -757,7 +778,7 @@ impl Identifiers {
     /// Every identifier the file already uses: each drawn node's, and each
     /// element's tagged identifier and SACM id, so that an element the view
     /// does not draw keeps its identifier to itself.
-    fn of(document: &Document, view: &View) -> Self {
+    pub(crate) fn of(document: &Document, view: &View) -> Self {
         let mut taken: Vec<String> = view
             .nodes
             .iter()
@@ -774,8 +795,12 @@ impl Identifiers {
 
     /// The kind's prefix and the lowest number above every identifier of
     /// that prefix; then that one is taken too.
-    fn next(&mut self, kind: ElementKind) -> String {
-        let prefix = kind.identifier_prefix();
+    pub(crate) fn next(&mut self, kind: ElementKind) -> String {
+        self.next_prefixed(kind.identifier_prefix())
+    }
+
+    /// The same, for `prefix`, such as `CG` for a counter goal (W31).
+    pub(crate) fn next_prefixed(&mut self, prefix: &str) -> String {
         let highest = self
             .taken
             .iter()
