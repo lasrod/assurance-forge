@@ -1281,6 +1281,8 @@ fn a_removal_names_the_acps_it_takes() {
         .removal("Sn1")
         .unwrap_or_else(|| panic!("nothing open"));
     assert_eq!(removal.acps, ["ACP2[Confidence]".to_owned()]);
+    // G2 is a premise of I1, which carries ACP1: taking it out would change
+    // what ACP1 is about, so the removal is refused (W25).
     let removal = core.removal("G2").unwrap_or_else(|| panic!("nothing open"));
-    assert!(removal.acps.contains(&"ACP2[Confidence]".to_owned()));
+    assert_eq!(removal.refusal.as_deref(), Some("AF-EDIT-015"));
 }

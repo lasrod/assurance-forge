@@ -404,7 +404,7 @@ pub fn view(document: &Document, language: &str) -> View {
 /// E11: each `metaClaim` of a drawn live relationship that names a `Claim`
 /// is an ACP; one naming anything else is not drawn.
 fn acps(document: &Document, builder: &mut Builder) {
-    let mut unnamed: Vec<String> = Vec::new();
+    let mut unnamed: Vec<(String, String)> = Vec::new();
     for (relationship, claim) in std::mem::take(&mut builder.acp_links) {
         // A Claim the view draws, or keeps as a description; one it hides,
         // such as one inside an interface (R15), has no ACP to open.
@@ -415,9 +415,10 @@ fn acps(document: &Document, builder: &mut Builder) {
             .filter(|element| element.kind() == SacmKind::Claim && shown);
         let Some(named) = named else {
             // The one it names, which is not drawn, while others may be.
-            if !unnamed.contains(&claim) {
+            let pair = (relationship.clone(), claim.clone());
+            if !unnamed.contains(&pair) {
                 builder.finding(Code::MetaClaimNotDrawn, &relationship, Some(&claim));
-                unnamed.push(claim);
+                unnamed.push(pair);
             }
             continue;
         };
@@ -774,8 +775,12 @@ fn relationship<'a>(
                 .edgeless_challenges
                 .push((id.to_owned(), target.to_owned()));
         }
+        let mut named: Vec<&str> = Vec::new();
         for claim in element.meta_claims() {
-            builder.finding(Code::MetaClaimNotDrawn, id, Some(claim.as_str()));
+            if !named.contains(&claim.as_str()) {
+                named.push(claim.as_str());
+                builder.finding(Code::MetaClaimNotDrawn, id, Some(claim.as_str()));
+            }
         }
         builder.unplaced(id, Code::EndNotPlaced);
         return;
@@ -783,15 +788,17 @@ fn relationship<'a>(
     // E11: an ACP on a line GSN puts one on (Table 1:5-1); on a challenge or
     // a line drawn neutral, the link is not drawn.
     if !element.meta_claims().is_empty() {
-        if style == Style::Live {
-            for claim in element.meta_claims() {
-                builder
-                    .acp_links
-                    .push((id.to_owned(), claim.as_str().to_owned()));
+        let mut named: Vec<&str> = Vec::new();
+        for claim in element.meta_claims() {
+            if !named.contains(&claim.as_str()) {
+                named.push(claim.as_str());
             }
-        } else {
-            for claim in element.meta_claims() {
-                builder.finding(Code::MetaClaimNotDrawn, id, Some(claim.as_str()));
+        }
+        for claim in named {
+            if style == Style::Live {
+                builder.acp_links.push((id.to_owned(), claim.to_owned()));
+            } else {
+                builder.finding(Code::MetaClaimNotDrawn, id, Some(claim));
             }
         }
     }

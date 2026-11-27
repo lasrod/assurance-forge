@@ -296,6 +296,22 @@ impl Plan {
             }
         }
         let all: HashSet<&str> = deleted.iter().map(ElementId::as_str).collect();
+        // W19: a relationship that goes takes its metaClaim links; one the
+        // diagram does not draw as an ACP would go unseen: refused.
+        for id in &relationships.deleted {
+            let Some(relationship) = document.get(id.as_str()) else {
+                continue;
+            };
+            for claim in relationship.meta_claims() {
+                let drawn = view
+                    .acps
+                    .iter()
+                    .any(|acp| acp.relationship == id.as_str() && acp.claim == claim.as_str());
+                if !drawn {
+                    return Err(Refusal::Entangled);
+                }
+            }
+        }
         // The ACPs whose line goes and whose Claim stays: a confidence
         // argument elsewhere, or a goal of the argument, loses its ACP.
         let mut acps: Vec<(String, String)> = view
@@ -355,6 +371,15 @@ impl Plan {
                         holder.id().as_str().to_owned(),
                         element_id.as_str().to_owned(),
                     ));
+                }
+                // A source taken out of a relationship with an ACP would
+                // change what the ACP is about (W25): refused.
+                let carries = view
+                    .acps
+                    .iter()
+                    .any(|acp| acp.relationship == holder.id().as_str());
+                if end == ReferenceEnd::Source && carries {
+                    return Err(Refusal::Entangled);
                 }
                 if holder.kind().is_a(AbstractClass::AssertedRelationship)
                     && (end == ReferenceEnd::Source || drawn_acp)

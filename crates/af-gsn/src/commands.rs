@@ -688,10 +688,21 @@ fn plan(
             }
             ElementKind::Goal => {
                 let inference = one_inference(document, view, id).ok_or(Refusal::NoOneInference)?;
+                let placeholder = held_place(document, view, &inference);
+                // W25: a new premise would change what an ACP on the
+                // inference is about, "A and B support C" not being "A
+                // supports C". The first Goal takes a held place, adding none.
+                let carries = view
+                    .acps
+                    .iter()
+                    .any(|acp| acp.relationship == inference.as_str());
+                if placeholder.is_none() && carries {
+                    return Err(Refusal::Entangled);
+                }
                 (
                     Parent::Strategy {
                         node: element.id().clone(),
-                        placeholder: held_place(document, view, &inference),
+                        placeholder,
                         inference: Some(inference),
                     },
                     false,

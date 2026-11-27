@@ -2,6 +2,7 @@
 //! `docs/standards/sacm-gsn-mapping.md`; G2 of
 //! `docs/roadmap/milestone-2-acps.md`).
 
+use af_gsn::ElementKind;
 use af_gsn::commands::{
     AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, add_acp, removal, remove,
 };
@@ -597,4 +598,54 @@ fn e11_a_meta_claim_naming_a_claim_the_view_hides_is_no_acp() {
     assert!(shown.findings.iter().any(|finding| finding.element == "r"
         && finding.code == Code::MetaClaimNotDrawn
         && finding.end.as_deref() == Some("hidden")));
+}
+
+#[test]
+fn w25_an_inference_with_an_acp_keeps_its_premises() {
+    // I1, through S1, carries ACP1: a Goal added under S1, or a premise
+    // removed, would change what the ACP is about.
+    let mut document = sample("acps.sacm.xmi");
+    let shown = view(&document, "en");
+    let offered =
+        af_gsn::commands::choices(&document, &shown, af_gsn::commands::Target::Node("S1"));
+    assert_eq!(
+        offered
+            .iter()
+            .find(|choice| choice.kind == ElementKind::Goal)
+            .and_then(|choice| choice.refusal),
+        Some(Refusal::Entangled)
+    );
+    assert_eq!(
+        removal(&document, &shown, "G2").err(),
+        Some(Refusal::Entangled)
+    );
+    assert!(matches!(
+        remove(&mut document, &shown, "G2"),
+        Err(AddError::Refused(Refusal::Entangled))
+    ));
+}
+
+#[test]
+fn w19_a_relationship_with_a_meta_claim_not_drawn_is_not_deleted() {
+    // A cited line, drawn neutral, names c by metaClaim: removing its source
+    // would delete it and that link unseen.
+    let mut document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g" isCitation="true" metaClaim="c"><name content="i" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="c"><name content="c" /></argumentElement>"#,
+    );
+    let shown = view(&document, "en");
+    assert_eq!(
+        removal(&document, &shown, "sub").err(),
+        Some(Refusal::Entangled)
+    );
+    assert!(matches!(
+        remove(&mut document, &shown, "sub"),
+        Err(AddError::Refused(Refusal::Entangled))
+    ));
+    // And a metaClaim named twice is one ACP.
+    let document = case(
+        r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="sub" target="g" metaClaim="c c"><name content="i" /></argumentElement>"#,
+        r#"<argumentElement xmi:type="sacm:Claim" xmi:id="c"><name content="c" /></argumentElement>"#,
+    );
+    assert_eq!(view(&document, "en").acps.len(), 1);
 }
