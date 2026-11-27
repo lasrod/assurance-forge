@@ -239,6 +239,19 @@ test.describe('moving a challenge by dragging its challenger', () => {
     ]);
   });
 
+  test('while another node is moved, a line opens no menu', async ({ page }) => {
+    await opened(page);
+    const centre = await nodeCentre(page, 'ev_2');
+    await page.mouse.click(centre.x, centre.y, { button: 'right' });
+    await page.getByRole('menu').getByRole('menuitem', { name: 'Move…' }).click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    const { at } = await onLineTo(page, 'ev_1');
+    await page.mouse.click(at.x, at.y, { button: 'right' });
+    // Given time to open, had it been going to.
+    await page.waitForTimeout(300);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+  });
+
   test('a counter goal dropped on a premise line under a Strategy says why it stays', async ({ page }) => {
     await opened(page);
     const challenger = await counterGoal(page, 'cl_sub_1');

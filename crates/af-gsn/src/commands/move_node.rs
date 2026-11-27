@@ -122,7 +122,11 @@ pub fn move_node(
     target: Target<'_>,
 ) -> Result<Moved, AddError> {
     // W32: a counter goal or counter evidence moves its challenge, to a node.
-    if super::challenge::counter_of(document, view, id).is_some() {
+    if let Some(counter) = super::challenge::counter_of(document, view, id) {
+        // One that cannot be moved at all says why, wherever it was asked to go.
+        if let Err(refusal) = counter {
+            return Err(AddError::Refused(refusal));
+        }
         return match target {
             Target::Canvas => Err(AddError::Refused(Refusal::ChallengeStays)),
             Target::Node(to) => {

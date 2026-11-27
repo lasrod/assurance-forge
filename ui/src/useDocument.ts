@@ -653,7 +653,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
   );
   /**
    * Moves the challenge `targets` is of to the node `to`, or onto a line;
-   * the status says what it challenges now, `toLabel`.
+   * the status says what it challenges now, `toLabel`. The view keeps
+   * `anchor` in place: by default the node, or the line's upper end.
    */
   const moveChallenge = useCallback(
     (
@@ -662,12 +663,13 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       moved: { kind: NodeKind; identifier: string },
       toLabel: string,
       onShown: EditShown,
+      anchor: string = typeof to === 'string' ? to : to.from,
     ) =>
       void edit(
         (on) => (typeof to === 'string' ? on.moveNode(targets.id, to, targets.revision) : on.moveToLine(targets.id, to, targets.revision)),
         'move',
-        // The place it goes to is kept where it is: the node, or the line's upper end.
-        typeof to === 'string' ? to : to.from,
+        // The place it goes to is kept where it is.
+        anchor,
         moved.kind,
         onShown,
         { kind: 'challengeMoved', identifier: moved.identifier, to: toLabel },

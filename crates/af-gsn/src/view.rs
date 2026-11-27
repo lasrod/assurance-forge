@@ -316,7 +316,7 @@ struct Reach {
     context_source: bool,
     other: bool,
     /// The source of a counter `AssertedEvidence` the view draws: counter-
-    /// evidence, a Solution (R11, decided 27 November 2026).
+    /// evidence, a Solution (R9, decided 27 November 2026).
     counter_evidence_source: bool,
 }
 
@@ -583,7 +583,7 @@ fn relationship<'a>(
         return;
     }
 
-    // R11: counter-evidence is a Solution. It reaches nothing else: the
+    // R9: counter-evidence is a Solution. It reaches nothing else: the
     // target of a challenge is not reached by it.
     if style == Style::Counter && kind == SacmKind::AssertedEvidence {
         for source in &sources {

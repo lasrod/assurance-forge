@@ -286,8 +286,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         return;
       }
       const name = (id: string) => outline.find((row) => row.id === id)?.identifier ?? id;
-      // A challenge line ends at a relationship, which has no identifier.
-      const ofChallenge = diagram?.diagram.edges.find((drawn) => edgeKey(drawn) === edgeKey(edge))?.toRelationship === true;
+      // A challenge line ends at a relationship, which has no identifier: it
+      // is named by its challenger, and the view keeps in place the node
+      // that challenge is drawn to, not the challenger beside it.
+      const drawn = diagram?.diagram.edges;
+      const ofChallenge = drawn?.find((candidate) => edgeKey(candidate) === edgeKey(edge))?.toRelationship === true;
+      const challenged = ofChallenge ? drawn?.find((candidate) => candidate.relationship === edge.to) : undefined;
+      const anchor = challenged && !challenged.toRelationship ? challenged.to : edge.from;
       setMoving(null);
       moveChallengeWith(
         current.targets,
@@ -295,6 +300,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         current,
         ofChallenge ? t('challengeBy', { from: name(edge.from) }) : t('lineBetween', { from: name(edge.from), to: name(edge.to) }),
         followEdit,
+        anchor,
       );
     },
     [moving, diagram, outline, moveRefused, moveChallengeWith, followEdit, t],
@@ -422,7 +428,9 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       const request = ++menuRequest.current;
       // While a move is chosen the selection stays the node moved, and the
       // menu holds the move: Move here, where the line takes it, and Cancel.
+      // Only a challenge goes onto a line: for another node, nothing opens.
       if (moving) {
+        if (!moving.targets.lines.length) return;
         setAddMenu({
           revision: moving.targets.revision,
           parent: null,

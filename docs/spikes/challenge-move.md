@@ -49,10 +49,12 @@ changed only the gesture and what is marked.
    where it was.
 4. **The view must keep the target in view after a drop.** The first build
    kept the challenger in view and pushed what it now challenges off screen.
-   The view follows the target node, or the upper end of the target line.
+   The view follows the target node, the upper end of the target line, or,
+   for a challenge line, the node that challenge is drawn to.
 5. **A challenge never goes to the top level.** A challenger with nothing to
-   challenge is no longer a counter goal. The drop on the empty canvas is
-   refused (AF-EDIT-028), and the menu's move offers no top level.
+   challenge is no longer a counter goal. The menu's move offers no top
+   level, and the core refuses one (AF-EDIT-028). A drag dropped on the
+   empty canvas is given up, as any drag's is.
 6. **A challenge that is itself challenged stays.** Moving it would change
    what the challenge of it is about. W25's guards refuse it (AF-EDIT-015),
    as they refuse a move of a line something else refers to.

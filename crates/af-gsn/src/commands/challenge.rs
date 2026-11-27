@@ -8,6 +8,8 @@
 use sacm::edit::{
     self, BatchError, CreateAssertedEvidence, CreateAssertedInference, EditError, SetReferences,
 };
+use std::collections::HashMap;
+
 use sacm::model::{Document, ElementId, LangString, ReferenceEnd};
 
 use super::move_node::{MoveTarget, MoveTargets, Moved, below};
@@ -16,7 +18,7 @@ use super::{
     retargetable,
 };
 use crate::ElementKind;
-use crate::view::{EdgeKind, NodeKind, View};
+use crate::view::{Edge, EdgeKind, NodeKind, View};
 
 /// What a challenge is added to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,11 +41,12 @@ pub const CHALLENGERS: [ElementKind; 2] = [ElementKind::Goal, ElementKind::Solut
 /// W29, W30: whether `kind` may challenge `at`, for the menu: the two kinds
 /// of [`CHALLENGERS`], each with why it cannot, or `None` when it can.
 pub fn challenge_choices(document: &Document, view: &View, at: Challenged<'_>) -> Vec<Choice> {
+    let lines = Lines::of(view);
     CHALLENGERS
         .iter()
         .map(|&kind| Choice {
             kind,
-            refusal: plan(document, view, at, kind).err(),
+            refusal: plan(document, view, &lines, at, kind).err(),
             develops: false,
         })
         .collect()
@@ -62,7 +65,7 @@ pub fn challenge(
     at: Challenged<'_>,
     kind: ElementKind,
 ) -> Result<Added, AddError> {
-    let plan = plan(document, view, at, kind).map_err(AddError::Refused)?;
+    let plan = plan(document, view, &Lines::of(view), at, kind).map_err(AddError::Refused)?;
     let mut numbers = Identifiers::of(document, view);
     let mut made: Option<String> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
@@ -120,9 +123,35 @@ struct Plan {
 }
 
 /// W29: what is challenged, and W30: what challenges.
+/// The lines of a view by their ends, and the first line of each
+/// relationship: made once, for the many places a move asks about.
+pub(crate) struct Lines<'a> {
+    by_ends: HashMap<(&'a str, &'a str, &'a str), &'a Edge>,
+    first: HashMap<&'a str, &'a Edge>,
+}
+
+impl<'a> Lines<'a> {
+    pub(crate) fn of(view: &'a View) -> Self {
+        let mut lines = Lines {
+            by_ends: HashMap::with_capacity(view.edges.len()),
+            first: HashMap::new(),
+        };
+        for edge in &view.edges {
+            let relationship = edge.relationship.as_str();
+            lines
+                .by_ends
+                .entry((relationship, edge.from.as_str(), edge.to.as_str()))
+                .or_insert(edge);
+            lines.first.entry(relationship).or_insert(edge);
+        }
+        lines
+    }
+}
+
 fn plan(
     document: &Document,
     view: &View,
+    lines: &Lines<'_>,
     at: Challenged<'_>,
     kind: ElementKind,
 ) -> Result<Plan, Refusal> {
@@ -153,14 +182,10 @@ fn plan(
             from,
             to,
         } => {
-            let mut drawn = view
-                .edges
-                .iter()
-                .filter(|edge| edge.relationship == relationship);
-            let first = drawn.next().ok_or(Refusal::NotANode)?;
-            let line = std::iter::once(first)
-                .chain(drawn)
-                .find(|edge| edge.from == from && edge.to == to)
+            let first = *lines.first.get(relationship).ok_or(Refusal::NotANode)?;
+            let line = *lines
+                .by_ends
+                .get(&(relationship, from, to))
                 .ok_or(Refusal::NotANode)?;
             // A line drawn neutral is of no GSN kind to challenge.
             if line.kind == EdgeKind::Neutral {
@@ -236,7 +261,9 @@ pub(crate) fn counter_of(
         let kind = match node.kind {
             NodeKind::Goal => ElementKind::Goal,
             NodeKind::Solution => ElementKind::Solution,
-            _ => return Err(Refusal::NotAChallenger),
+            // A file's own challenge from another kind: it challenges, and is
+            // joined in a way a move does not carry.
+            _ => return Err(Refusal::JoinNotMoved),
         };
         // One challenge, and nothing else draws the node under anything.
         let supports = view
@@ -266,16 +293,24 @@ pub(crate) fn counter_of(
 /// (AF-EDIT-028).
 pub(crate) fn counter_targets(document: &Document, view: &View, counter: &Counter) -> MoveTargets {
     let under = below(view, counter.id.as_str());
+    let lines = Lines::of(view);
     let nodes = view
         .nodes
         .iter()
         .map(|node| MoveTarget {
             node: node.id.clone(),
-            refusal: place_refusal(document, view, counter, &under, Challenged::Node(&node.id)),
+            refusal: place_refusal(
+                document,
+                view,
+                &lines,
+                counter,
+                &under,
+                Challenged::Node(&node.id),
+            ),
             develops: false,
         })
         .collect();
-    let lines = view
+    let places = view
         .edges
         .iter()
         .map(|edge| LineTarget {
@@ -285,6 +320,7 @@ pub(crate) fn counter_targets(document: &Document, view: &View, counter: &Counte
             refusal: place_refusal(
                 document,
                 view,
+                &lines,
                 counter,
                 &under,
                 Challenged::Line {
@@ -298,7 +334,7 @@ pub(crate) fn counter_targets(document: &Document, view: &View, counter: &Counte
     MoveTargets {
         canvas: Some(Refusal::ChallengeStays),
         nodes,
-        lines,
+        lines: places,
     }
 }
 
@@ -306,11 +342,12 @@ pub(crate) fn counter_targets(document: &Document, view: &View, counter: &Counte
 fn place_refusal(
     document: &Document,
     view: &View,
+    lines: &Lines<'_>,
     counter: &Counter,
     under: &super::move_node::Below<'_>,
     at: Challenged<'_>,
 ) -> Option<Refusal> {
-    let plan = match plan(document, view, at, counter.kind) {
+    let plan = match plan(document, view, lines, at, counter.kind) {
         Ok(plan) => plan,
         Err(refusal) => return Some(refusal),
     };
@@ -354,10 +391,11 @@ pub fn move_challenge(
         .ok_or(AddError::Refused(Refusal::NotAChallenger))?
         .map_err(AddError::Refused)?;
     let under = below(view, counter.id.as_str());
-    if let Some(refusal) = place_refusal(document, view, &counter, &under, to) {
+    let lines = Lines::of(view);
+    if let Some(refusal) = place_refusal(document, view, &lines, &counter, &under, to) {
         return Err(AddError::Refused(refusal));
     }
-    let target = plan(document, view, to, counter.kind)
+    let target = plan(document, view, &lines, to, counter.kind)
         .map_err(AddError::Refused)?
         .target;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {

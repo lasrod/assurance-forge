@@ -444,8 +444,8 @@ fn a_challenge_in_each_sample_keeps_the_file_valid() {
     }
 }
 
-/// `k` challenges `sub`, in [`argument`]; `cg` is a counter goal of its own
-/// under `k`, supported by `ksub`.
+/// [`argument`] with `k`, which challenges `sub`, challenged in turn by a
+/// new counter goal, `CG1`.
 fn challenged_argument() -> Document {
     let mut document = argument();
     let shown = view(&document, "en");
@@ -552,9 +552,74 @@ fn w32_a_counter_goal_moves_its_challenge_to_a_node_or_a_first_line() {
 }
 
 #[test]
-fn w32_a_challenge_is_not_moved_under_itself_and_one_that_is_challenged_stays() {
-    // A counter goal of k's challenge line: it cannot be moved onto k, which
-    // it is under, and k's challenge, now challenged, is not moved (W25).
+fn w32_a_challenge_is_not_moved_under_itself() {
+    // `k` challenges `sub` and is supported by `ksub` (`ks`), which is
+    // supported by the Solution `ke` (`kev`).
+    let document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "sub", ""),
+            element("Claim", "k", ""),
+            element("Claim", "ksub", ""),
+            element("ArtifactReference", "ke", ""),
+            element("AssertedInference", "is", r#" source="sub" target="g""#),
+            element(
+                "AssertedInference",
+                "ch",
+                r#" source="k" target="sub" isCounter="true""#,
+            ),
+            element("AssertedInference", "ks", r#" source="ksub" target="k""#),
+            element("AssertedEvidence", "kev", r#" source="ke" target="ksub""#),
+        ]
+        .concat(),
+    );
+    let shown = view(&document, "en");
+    let targets = move_targets(&document, &shown, "k").unwrap_or_else(|why| panic!("{why:?}"));
+    let node = |id: &str| {
+        targets
+            .nodes
+            .iter()
+            .find(|target| target.node == id)
+            .and_then(|target| target.refusal)
+    };
+    let line = |relationship: &str| {
+        targets
+            .lines
+            .iter()
+            .find(|target| target.relationship == relationship)
+            .and_then(|target| target.refusal)
+    };
+    assert_eq!(node("k"), Some(Refusal::UnderItself));
+    assert_eq!(node("ksub"), Some(Refusal::UnderItself));
+    assert_eq!(node("ke"), Some(Refusal::UnderItself));
+    // Its own line, the line it is supported by, and one further below.
+    assert_eq!(line("ch"), Some(Refusal::UnderItself));
+    assert_eq!(line("ks"), Some(Refusal::UnderItself));
+    assert_eq!(line("kev"), Some(Refusal::UnderItself));
+    assert_eq!(line("is"), None);
+    assert_eq!(node("g"), None);
+    // Moved, what is under it comes with it.
+    let mut moved = document.clone();
+    move_node(&mut moved, &shown, "k", Target::Node("g")).unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&moved, "en");
+    assert!(
+        after
+            .edges
+            .iter()
+            .any(|edge| edge.from == "k" && edge.to == "ksub")
+    );
+    assert!(
+        after
+            .edges
+            .iter()
+            .any(|edge| edge.from == "ksub" && edge.to == "ke")
+    );
+}
+
+#[test]
+fn w32_a_challenge_that_is_challenged_stays_and_says_why_wherever_it_is_asked_to_go() {
+    // A counter goal of k: it cannot be moved onto k, which it challenges
+    // already, and k, challenged as a node, still moves.
     let document = challenged_argument();
     let shown = view(&document, "en");
     let counter = shown
@@ -564,26 +629,18 @@ fn w32_a_challenge_is_not_moved_under_itself_and_one_that_is_challenged_stays() 
         .map(|node| node.id.clone())
         .unwrap_or_else(|| panic!("no CG1"));
     let targets = move_targets(&document, &shown, &counter).unwrap_or_else(|why| panic!("{why:?}"));
-    assert_eq!(
+    let refusal = |id: &str| {
         targets
             .nodes
             .iter()
-            .find(|target| target.node == "k")
-            .and_then(|target| target.refusal),
-        Some(Refusal::AlreadyThere)
-    );
-    assert_eq!(
-        targets
-            .nodes
-            .iter()
-            .find(|target| target.node == "g")
-            .and_then(|target| target.refusal),
-        None
-    );
-    // k challenges sub, and is itself challenged: k's challenge line is not
-    // what is challenged here, k is, so k still moves.
+            .find(|target| target.node == id)
+            .and_then(|target| target.refusal)
+    };
+    assert_eq!(refusal("k"), Some(Refusal::AlreadyThere));
+    assert_eq!(refusal("g"), None);
     assert!(move_targets(&document, &shown, "k").is_ok());
-    // A challenge of the line k draws makes that line entangled.
+    // A challenge of the line k draws makes that line entangled (W25): k
+    // stays, and says so for the top level too, not that it may go elsewhere.
     let mut lined = argument();
     let shown = view(&lined, "en");
     challenge(
@@ -601,5 +658,43 @@ fn w32_a_challenge_is_not_moved_under_itself_and_one_that_is_challenged_stays() 
     assert_eq!(
         move_targets(&lined, &shown, "k").err(),
         Some(Refusal::Entangled)
+    );
+    for target in [Target::Canvas, Target::Node("g")] {
+        match move_node(&mut lined.clone(), &shown, "k", target) {
+            Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::Entangled),
+            other => panic!("{other:?}"),
+        }
+    }
+}
+
+#[test]
+fn w32_a_file_challenge_from_another_kind_is_not_moved() {
+    // An Assumption that challenges, as a file may have it: it challenges,
+    // and a move does not carry it (AF-EDIT-017), not "only a Goal or a
+    // Solution challenges".
+    let document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "a", r#" assertionDeclaration="assumed""#),
+            element(
+                "AssertedInference",
+                "ch",
+                r#" source="a" target="g" isCounter="true""#,
+            ),
+        ]
+        .concat(),
+    );
+    let shown = view(&document, "en");
+    assert_eq!(
+        shown
+            .nodes
+            .iter()
+            .find(|node| node.id == "a")
+            .map(|node| node.kind),
+        Some(NodeKind::Assumption)
+    );
+    assert_eq!(
+        move_targets(&document, &shown, "a").err(),
+        Some(Refusal::JoinNotMoved)
     );
 }
