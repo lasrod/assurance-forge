@@ -697,4 +697,37 @@ fn w32_a_file_challenge_from_another_kind_is_not_moved() {
         move_targets(&document, &shown, "a").err(),
         Some(Refusal::JoinNotMoved)
     );
+    // A neutral challenger, and one under two Goals, say what any such node
+    // says: its kind is not known (AF-EDIT-002), it is under several
+    // (AF-EDIT-016).
+    let document = case(
+        &[
+            element("Claim", "g", ""),
+            element("Claim", "h", ""),
+            element("Claim", "n", r#" assertionDeclaration="asCited""#),
+            element("Claim", "k", ""),
+            element(
+                "AssertedInference",
+                "nch",
+                r#" source="n" target="g" isCounter="true""#,
+            ),
+            element(
+                "AssertedInference",
+                "kch",
+                r#" source="k" target="g" isCounter="true""#,
+            ),
+            element("AssertedInference", "kg", r#" source="k" target="g""#),
+            element("AssertedInference", "kh", r#" source="k" target="h""#),
+        ]
+        .concat(),
+    );
+    let shown = view(&document, "en");
+    assert_eq!(
+        move_targets(&document, &shown, "n").err(),
+        Some(Refusal::KindUnknown)
+    );
+    assert_eq!(
+        move_targets(&document, &shown, "k").err(),
+        Some(Refusal::SeveralParents)
+    );
 }

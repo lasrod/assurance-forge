@@ -198,6 +198,23 @@ export function hitEdge(diagram: Diagram, viewport: Viewport, x: number, y: numb
 }
 
 /**
+ * The one line under the canvas point, for what changes the argument there:
+ * where lines of several relationships are as near, as on a trunk sibling
+ * lines share, it is not said which the pointer means, and none is.
+ * `ambiguous` says so. Lines of one relationship, such as a Strategy's
+ * premises, are one relationship to challenge, and the nearest is taken.
+ */
+export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: number): { edge: DiagramEdge | null; ambiguous: boolean } {
+  const found = hitEdge(diagram, viewport, x, y);
+  if (!found) return { edge: null, ambiguous: false };
+  const point = toDiagram(viewport, x, y);
+  // As near within a pixel on screen.
+  const nearest = edgeDistance(found, point) + 1 / viewport.scale;
+  const ambiguous = diagram.edges.some((edge) => edge.relationship !== found.relationship && edgeDistance(edge, point) <= nearest);
+  return ambiguous ? { edge: null, ambiguous } : { edge: found, ambiguous };
+}
+
+/**
  * What is under the canvas point: the id of a node, which is drawn over the
  * lines, or else the key of the edge whose line is there.
  */

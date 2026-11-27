@@ -12,6 +12,7 @@ import {
   findEdge,
   fit,
   hitEdge,
+  hitOneEdge,
   hitId,
   hitTest,
   insideShape,
@@ -313,6 +314,20 @@ describe('relationships', () => {
     const both: Diagram = { ...withEdges, edges: [bent, close] };
     expect(hitEdge(both, unit, 101, 100)?.relationship).toBe('i1');
     expect(hitEdge(both, unit, 103, 100)?.relationship).toBe('i2');
+  });
+
+  it('names no line where two are as near, as on a trunk they share', () => {
+    // i3 leaves G1 along i1's first segment, then turns away.
+    const sharing = edge('i3', [{ x: 100, y: 80 }, { x: 100, y: 140 }, { x: 0, y: 140 }, { x: 0, y: 190 }], { x: 0, y: 200 });
+    const both: Diagram = { ...withEdges, edges: [bent, sharing] };
+    expect(hitOneEdge(both, unit, 101, 100)).toEqual({ edge: null, ambiguous: true });
+    // On a branch of its own, the line is named.
+    expect(hitOneEdge(both, unit, 200, 141).edge?.relationship).toBe('i1');
+    expect(hitOneEdge(both, unit, 50, 141).edge?.relationship).toBe('i3');
+    expect(hitOneEdge(both, unit, 250, 100)).toEqual({ edge: null, ambiguous: false });
+    // Two lines of one relationship: the one relationship is meant.
+    const premises: Diagram = { ...withEdges, edges: [bent, { ...sharing, relationship: 'i1', to: 'G3' }] };
+    expect(hitOneEdge(premises, unit, 101, 100).edge?.relationship).toBe('i1');
   });
 
   it('puts a node before the line under it', () => {

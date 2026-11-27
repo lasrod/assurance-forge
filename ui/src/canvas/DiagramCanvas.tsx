@@ -4,7 +4,7 @@ import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { badgeLabel, comesWith, edgePan, HOLD_MS, readableAt, type DragEnd } from './drag';
-import { boundsOf, draw, edgeKey, findEdge, fit, hitEdge, hitId, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, edgeKey, findEdge, fit, hitId, hitOneEdge, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -336,7 +336,8 @@ export function DiagramCanvas({
       if (diagram && viewport) {
         const node = hitTest(diagram.diagram, viewport, point.x, point.y);
         // A line, for a challenge that may be dropped on one.
-        const line = !node && move?.lines ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+        // Only one line: on a trunk several share, none is marked.
+        const line = !node && move?.lines ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
         setHovered(node?.id ?? (line ? edgeKey(line) : null));
       }
       return;
@@ -383,7 +384,7 @@ export function DiagramCanvas({
       const node = diagram && viewport ? hitTest(diagram.diagram, viewport, point.x, point.y) : null;
       // A line, for a challenge, or before the core has said what is moved:
       // the places it answers decide then.
-      const line = !node && (move === null || move.lines) && diagram && viewport ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+      const line = !node && (move === null || move.lines) && diagram && viewport ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
       onDragEnd?.(
         node ? (node.id === current.node ? { on: 'cancel' } : { on: 'node', id: node.id }) : line ? { on: 'line', edge: line } : { on: 'canvas' },
       );
@@ -398,7 +399,7 @@ export function DiagramCanvas({
       // click on a line or on the empty canvas changes nothing.
       const node = hitTest(diagram.diagram, viewport, point.x, point.y);
       if (node && node.id !== move.source) onMoveTo?.(node.id);
-      const line = !node && move.lines ? hitEdge(diagram.diagram, viewport, point.x, point.y) : null;
+      const line = !node && move.lines ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
       if (line) onMoveToLine?.(line);
       return;
     }
@@ -428,7 +429,8 @@ export function DiagramCanvas({
   );
 
   // A right-click on a node, on a line, or on the empty canvas. A line's
-  // menu challenges it; not while a move is chosen, which places nodes.
+  // menu challenges it, or, while a challenge's move is chosen, holds the
+  // move.
   const onContext = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     if (!diagram || !viewport) return;
@@ -445,7 +447,11 @@ export function DiagramCanvas({
     event.currentTarget.focus();
     const point = local(event);
     const node = hitTest(diagram.diagram, viewport, point.x, point.y);
-    const line = node ? null : hitEdge(diagram.diagram, viewport, point.x, point.y);
+    // A line's menu challenges it: on a trunk several lines share, it is not
+    // said which, and no menu opens.
+    const hit = node ? null : hitOneEdge(diagram.diagram, viewport, point.x, point.y);
+    if (hit?.ambiguous) return;
+    const line = hit?.edge ?? null;
     if (line) {
       onLineMenu?.(line, { x: event.clientX, y: event.clientY }, 'pointer');
       return;

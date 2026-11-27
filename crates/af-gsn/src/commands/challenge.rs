@@ -122,7 +122,6 @@ struct Plan {
     package: ElementId,
 }
 
-/// W29: what is challenged, and W30: what challenges.
 /// The lines of a view by their ends, and the first line of each
 /// relationship: made once, for the many places a move asks about.
 pub(crate) struct Lines<'a> {
@@ -148,6 +147,7 @@ impl<'a> Lines<'a> {
     }
 }
 
+/// W29: what is challenged, and W30: what challenges.
 fn plan(
     document: &Document,
     view: &View,
@@ -259,18 +259,25 @@ pub(crate) fn counter_of(
             .find(|node| node.id == id)
             .ok_or(Refusal::NotANode)?;
         let kind = match node.kind {
+            NodeKind::Neutral => return Err(Refusal::KindUnknown),
             NodeKind::Goal => ElementKind::Goal,
             NodeKind::Solution => ElementKind::Solution,
             // A file's own challenge from another kind: it challenges, and is
             // joined in a way a move does not carry.
             _ => return Err(Refusal::JoinNotMoved),
         };
-        // One challenge, and nothing else draws the node under anything.
-        let supports = view
+        // Nothing else draws the node under anything: under several, as
+        // any node, there is no one line to move (W21); under one, it is
+        // joined in a way a move does not carry. And one challenge.
+        let parents = view
             .edges
             .iter()
-            .any(|edge| edge.kind != EdgeKind::Challenge && edge.to == id);
-        if made.iter().any(|relationship| *relationship != first) || supports {
+            .filter(|edge| edge.kind != EdgeKind::Challenge && edge.to == id)
+            .count();
+        if parents > 1 {
+            return Err(Refusal::SeveralParents);
+        }
+        if made.iter().any(|relationship| *relationship != first) || parents == 1 {
             return Err(Refusal::JoinNotMoved);
         }
         let relationship = document.get(first).ok_or(Refusal::NotANode)?;

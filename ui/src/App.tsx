@@ -311,6 +311,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
    */
   const startMove = useCallback(
     async (id: string, byDrag: boolean): Promise<boolean> => {
+      // A menu still being asked for does not open into the move.
+      menuRequest.current += 1;
       dragged.current = byDrag ? id : null;
       dragMove.current = null;
       earlyDrop.current = null;
@@ -444,7 +446,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       }
       setSelected(edgeKey(edge));
       void challengeChoices(edge.relationship, { from: edge.from, to: edge.to }).then((answer) => {
-        if (!answer || request !== menuRequest.current || moving) return;
+        // A move begun meanwhile changed the request: the answer is dropped.
+        if (!answer || request !== menuRequest.current) return;
         // Nothing may challenge it: the status says why.
         const refused = answer.choices.find((choice) => choice.refusal !== null);
         if (answer.choices.every((choice) => choice.refusal !== null)) {

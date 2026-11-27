@@ -515,7 +515,8 @@ pub struct MoveLine {
     pub from: String,
     pub to: String,
     /// Why the challenge cannot go there (`AF-EDIT-002`, `AF-EDIT-004`,
-    /// `AF-EDIT-011`, `AF-EDIT-018` to `AF-EDIT-020`, `AF-EDIT-027`), or
+    /// `AF-EDIT-005`, `AF-EDIT-011`, `AF-EDIT-018` to `AF-EDIT-020`,
+    /// `AF-EDIT-027`), or
     /// null when it can.
     pub refusal: Option<String>,
 }
