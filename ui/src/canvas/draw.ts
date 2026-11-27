@@ -244,10 +244,13 @@ export function hitAcp(diagram: Diagram, viewport: Viewport, x: number, y: numbe
  * the line's colour, and its label beside it as an identifier is drawn. Far
  * out, the squares alone.
  */
-function drawAcps(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, families: Families, scale: number) {
+function drawAcps(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, families: Families, scale: number, marks: Marks) {
+  // As drawEdge strokes the line: marked when selected, or a place.
+  const key = edgeKey(edge);
+  const marked = marks.selected === key || marks.move?.lines?.has(key) === true;
   for (const acp of edge.acps) {
     const { square, label } = acp;
-    context.fillStyle = palette.line;
+    context.fillStyle = marked ? palette.selectedLine : palette.line;
     context.fillRect(square.x, square.y, square.width, square.height);
     if (label.size * scale < SMALLEST_TEXT_PX) continue;
     context.fillStyle = palette.secondary;
@@ -366,7 +369,7 @@ export function draw(
     // A line a moved challenge may go to is drawn in full.
     if (move) context.globalAlpha = move.lines?.has(edgeKey(edge)) ? 1 : FAINT;
     drawEdge(context, edge, palette, scale, marks);
-    drawAcps(context, edge, palette, families, scale);
+    drawAcps(context, edge, palette, families, scale, marks);
     drawn.edges += 1;
   }
   for (const node of diagram.nodes) {

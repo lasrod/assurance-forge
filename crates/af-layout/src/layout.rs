@@ -1775,16 +1775,13 @@ fn place_acps(
         }) else {
             continue;
         };
-        let (middle, across) = halfway(&edge.points);
         let row = edge.acps.len() as f32;
         // Beside a line that runs down, above one that runs across, so the
-        // label never lies along the line; several are centred on the
-        // midpoint, so the stack stays on the line.
+        // label never lies along the line; several are spaced along the
+        // line around its midpoint, each on it.
         let offset = row - (count - 1.0) / 2.0;
-        let centre = Point {
-            x: middle.x,
-            y: middle.y + offset * line_height,
-        };
+        let (middle, across) = along(&edge.points, offset * line_height);
+        let centre = middle;
         let square = Rect {
             x: centre.x - ACP_HALF,
             y: centre.y - ACP_HALF,
@@ -1793,10 +1790,9 @@ fn place_acps(
         };
         let width = shaper.width(&acp.label, size, font);
         let (x, baseline) = if across {
-            // Above the square, centred on it; a second ACP to the right of
-            // the first, its label further up. Between two nodes side by
-            // side, which a short line joins, above both, which would cover
-            // it otherwise.
+            // Above the square, centred on it; a second ACP's label further
+            // up. Between two nodes side by side, which a short line joins,
+            // above both, which would cover it otherwise.
             let shape = |id: &str| {
                 nodes
                     .iter()
@@ -1812,7 +1808,7 @@ fn place_acps(
                 _ => middle.y - ACP_HALF,
             };
             (
-                middle.x + offset * (2.0 * ACP_HALF + ACP_GAP) - width / 2.0,
+                middle.x - width / 2.0,
                 top - ACP_GAP - descent * size - row * line_height,
             )
         } else {
@@ -1822,15 +1818,7 @@ fn place_acps(
                 centre.y - (ascent + descent) * size / 2.0 + ascent * size,
             )
         };
-        let square = if across {
-            Rect {
-                x: middle.x - ACP_HALF + offset * (2.0 * ACP_HALF + ACP_GAP),
-                y: middle.y - ACP_HALF,
-                ..square
-            }
-        } else {
-            square
-        };
+
         let label = TextLine {
             text: acp.label.clone(),
             role: TextRole::Acp,
@@ -1856,14 +1844,14 @@ fn place_acps(
     }
 }
 
-/// The point halfway along a line, by its length, and whether the line runs
-/// more across than down there.
-fn halfway(points: &[Point]) -> (Point, bool) {
+/// The point `from_middle` along a line from its midpoint, by its length,
+/// kept on the line, and whether the line runs more across than down there.
+fn along(points: &[Point], from_middle: f32) -> (Point, bool) {
     let length: f32 = points
         .windows(2)
         .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
         .sum();
-    let mut left = length / 2.0;
+    let mut left = (length / 2.0 + from_middle).clamp(0.0, length);
     for pair in points.windows(2) {
         let step = (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
         if step >= left && step > 0.0 {

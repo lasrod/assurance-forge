@@ -408,9 +408,10 @@ fn a_package_diagram_keeps_what_its_challenges_point_at() {
 }
 
 #[test]
-fn a_package_diagram_draws_an_acp_only_with_its_first_edge() {
+fn a_package_diagram_draws_an_acp_with_its_first_edge() {
     // The inference runs from G1 through S1, of A, to G2, of B; its ACP is
-    // on the line into S1, which B's diagram does not draw.
+    // on the line into S1, which B's diagram keeps for it, with G1 and S1
+    // marked as A's.
     let document = two_packages(
         r#"<argumentElement xmi:type="sacm:Claim" xmi:id="G1"><name content="G1" /></argumentElement>
     <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1"><name content="S1" /></argumentElement>
@@ -423,8 +424,18 @@ fn a_package_diagram_draws_an_acp_only_with_its_first_edge() {
     let a = of_package(&document, &whole, "a").unwrap_or_else(|| panic!("a package"));
     assert_eq!(a.acps.len(), 1);
     let b = of_package(&document, &whole, "b").unwrap_or_else(|| panic!("b package"));
-    assert!(b.edges.iter().any(|edge| edge.relationship == "I1"));
-    assert!(b.acps.is_empty());
+    assert!(
+        b.edges
+            .iter()
+            .any(|edge| edge.relationship == "I1" && edge.from == "G1" && edge.to == "S1")
+    );
+    assert_eq!(b.acps.len(), 1);
+    assert!(
+        b.nodes
+            .iter()
+            .filter(|node| node.id == "G1" || node.id == "S1")
+            .all(|node| node.elsewhere.as_ref().is_some_and(|at| at.package == "a"))
+    );
 }
 
 #[test]

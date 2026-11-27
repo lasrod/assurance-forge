@@ -1227,3 +1227,48 @@ fn an_acp_label_on_a_line_that_runs_down_is_beside_its_square() {
     let middle = acp.square.y + acp.square.height / 2.0;
     assert!((acp.label.baseline - acp.label.size / 2.0 - middle).abs() < acp.label.size);
 }
+
+#[test]
+fn every_acp_square_is_on_its_line_however_many_it_carries() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    // Three on the line G2 to Sn1: ACP2, and two more.
+    for (kind, revision) in [(AcpKind::Description, 1), (AcpKind::Description, 2)] {
+        assert!(matches!(
+            core.add_acp("E1", "G2", "Sn1", kind, "x", revision),
+            EditResult::Applied { .. }
+        ));
+    }
+    let at = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let distance = |p: (f32, f32), a: (f32, f32), b: (f32, f32)| {
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let length = dx * dx + dy * dy;
+        let t = if length == 0.0 {
+            0.0
+        } else {
+            (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / length).clamp(0.0, 1.0)
+        };
+        (p.0 - (a.0 + t * dx)).hypot(p.1 - (a.1 + t * dy))
+    };
+    let mut seen = 0;
+    for edge in &at.diagram.edges {
+        for acp in &edge.acps {
+            seen += 1;
+            let centre = (
+                acp.square.x + acp.square.width / 2.0,
+                acp.square.y + acp.square.height / 2.0,
+            );
+            let nearest = edge
+                .points
+                .windows(2)
+                .map(|pair| distance(centre, (pair[0].x, pair[0].y), (pair[1].x, pair[1].y)))
+                .fold(f32::MAX, f32::min);
+            assert!(
+                nearest < 0.5,
+                "{} is {nearest} px off its line",
+                acp.label.text
+            );
+        }
+    }
+    assert_eq!(seen, 5);
+}

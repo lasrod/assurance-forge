@@ -45,8 +45,7 @@ pub enum Command {
     Add {
         parent: Option<String>,
         kind: ElementKind,
-        /// For a top-level Goal: the package it went into, when one was
-        /// shown.
+        /// For a top-level Goal: the package it went into.
         package: Option<String>,
     },
     /// Set the identifier, name or statement of the node `element` to `text`.

@@ -1221,6 +1221,19 @@ pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<Vi
             .filter(|(_, kept)| **kept)
             .map(|(edge, _)| edge.relationship.as_str())
             .collect();
+        // A relationship with an ACP keeps its first edge, which carries it.
+        let carried: HashSet<(&str, &str, &str)> = whole
+            .acps
+            .iter()
+            .filter(|acp| drawn.contains(acp.relationship.as_str()))
+            .map(|acp| {
+                (
+                    acp.relationship.as_str(),
+                    acp.from.as_str(),
+                    acp.to.as_str(),
+                )
+            })
+            .collect();
         // What a kept challenge points at, so it has a line to point at.
         let challenged: HashSet<&str> = whole
             .edges
@@ -1232,7 +1245,13 @@ pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<Vi
         let mut grew = false;
         for (edge, kept) in whole.edges.iter().zip(kept.iter_mut()) {
             let wanted = (edge.to_relationship && drawn.contains(edge.to.as_str()))
-                || challenged.contains(edge.relationship.as_str());
+                || challenged.contains(edge.relationship.as_str())
+                || (drawn.contains(edge.relationship.as_str())
+                    && carried.contains(&(
+                        edge.relationship.as_str(),
+                        edge.from.as_str(),
+                        edge.to.as_str(),
+                    )));
             if !*kept && wanted {
                 *kept = true;
                 grew = true;
