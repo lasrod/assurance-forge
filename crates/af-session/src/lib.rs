@@ -20,7 +20,7 @@
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{
-    self, AddError, Added, Moved, Removed, Repaired, Target, TextField, TextSet,
+    self, AddError, Added, Challenged, Moved, Removed, Repaired, Target, TextField, TextSet,
 };
 use af_gsn::view::View;
 use sacm::model::Document;
@@ -66,6 +66,13 @@ pub enum Command {
     RepairJoin {
         element: String,
         relationship: String,
+    },
+    /// Challenge the node, or the line of the relationship, `at` with a new
+    /// element of `kind`.
+    Challenge {
+        at: String,
+        line: bool,
+        kind: ElementKind,
     },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
@@ -307,6 +314,34 @@ impl Session {
         };
         let record = self.made(before, command, &repaired.mutation);
         Ok((repaired, record))
+    }
+
+    /// Challenges `at` with a new element of `kind`, a Goal or a Solution
+    /// (W29 to W31), as one command.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::challenge`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn challenge(
+        &mut self,
+        view: &View,
+        at: Challenged<'_>,
+        kind: ElementKind,
+    ) -> Result<(Added, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let added = commands::challenge(&mut self.document, view, at, kind)?;
+        let (id, line) = match at {
+            Challenged::Node(id) => (id, false),
+            Challenged::Line(id) => (id, true),
+        };
+        let command = Command::Challenge {
+            at: id.to_owned(),
+            line,
+            kind,
+        };
+        let record = self.made(before, command, &added.mutation);
+        Ok((added, record))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

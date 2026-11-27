@@ -33,7 +33,7 @@
 
 pub mod contract;
 
-use af_gsn::commands::{self, Target};
+use af_gsn::commands::{self, Challenged, Target};
 use af_gsn::view::{self, View};
 use af_layout::{Engine, Fonts, Style};
 use af_session::{ChangeRecord, Session};
@@ -411,6 +411,56 @@ impl Core {
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             // libSACM refused an operation the rules made: a bug in them, not
             // a mapping decision. The document is unchanged.
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Which challengers, a Goal and a Solution, may challenge `at`: the node
+    /// with that SACM id, or with `line` the line of the relationship with
+    /// that id (W29, W30). `None` when nothing is open.
+    pub fn challenge_choices(&self, at: &str, line: bool) -> Option<AddChoices> {
+        let open = self.open.as_ref()?;
+        let choices =
+            commands::challenge_choices(open.session.document(), &open.view, challenged(at, line))
+                .into_iter()
+                .filter_map(|choice| {
+                    Some(AddChoice {
+                        kind: convert::element_kind(choice.kind)?,
+                        refusal: choice.refusal.map(|refusal| refusal.code().to_owned()),
+                        develops: false,
+                    })
+                })
+                .collect();
+        Some(AddChoices {
+            revision: self.revision,
+            choices,
+        })
+    }
+
+    /// Challenges `at`, a node or with `line` a line, with a new element of
+    /// `kind` (W29 to W31), as the menu of `revision` offered: one asked for
+    /// at another revision is refused (AF-EDIT-009). The new challenger is
+    /// the element answered.
+    pub fn challenge(
+        &mut self,
+        at: &str,
+        line: bool,
+        kind: ElementKind,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let kind = convert::gsn_element_kind(kind);
+        match open
+            .session
+            .challenge(&open.view, challenged(at, line), kind)
+        {
+            Ok((added, record)) => self.changed(&record, Some(added.element)),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
         }
     }
@@ -892,6 +942,15 @@ fn refused(code: &str) -> EditResult {
 
 fn target(parent: Option<&str>) -> Target<'_> {
     parent.map_or(Target::Canvas, Target::Node)
+}
+
+/// The node `at`, or with `line` the line of the relationship `at`.
+fn challenged(at: &str, line: bool) -> Challenged<'_> {
+    if line {
+        Challenged::Line(at)
+    } else {
+        Challenged::Node(at)
+    }
 }
 
 /// The view's codes about one element or relationship.

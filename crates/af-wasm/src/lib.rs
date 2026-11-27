@@ -103,6 +103,32 @@ impl WasmCore {
         json(&self.core.add(parent.as_deref(), kind, revision))
     }
 
+    /// `AddChoices` as JSON: which challengers may challenge the node `at`,
+    /// or with `line` the line of the relationship `at`; `None` when nothing
+    /// is open.
+    #[wasm_bindgen(js_name = challengeChoices)]
+    pub fn challenge_choices(&self, at: &str, line: bool) -> Result<Option<String>, JsError> {
+        self.core
+            .challenge_choices(at, line)
+            .map(|choices| json(&choices))
+            .transpose()
+    }
+
+    /// Challenges the node `at`, or with `line` the line of the relationship
+    /// `at`, with a new element of `kind` (`goal` or `solution`), from the
+    /// menu of `revision`. `EditResult` as JSON.
+    pub fn challenge(
+        &mut self,
+        at: &str,
+        line: bool,
+        kind: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        let kind: ElementKind = serde_json::from_value(serde_json::Value::String(kind.to_owned()))
+            .map_err(|_| JsError::new("core-kind"))?;
+        json(&self.core.challenge(at, line, kind, revision))
+    }
+
     /// `Removal` as JSON for the node `id`: what removing it would delete;
     /// `None` when nothing is open.
     pub fn removal(&self, id: &str) -> Result<Option<String>, JsError> {

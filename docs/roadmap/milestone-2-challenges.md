@@ -57,21 +57,23 @@ with its challenger, as a removal already takes it (W18).
 | C3 | A challenge is offered from the node's menu and the line's menu: **Challenge with a Goal** and **Challenge with a Solution**. The new challenger is selected, as an added element is | The menu is where the diagram is edited (step 1). A way that needs no drag (WCAG 2.5.7) |
 | C4 | A line takes a menu, as a node does: a right-click on it, or the menu key with it selected | A line is what a challenge of an inference points at; until now nothing was added to a line |
 
-To be decided in G1, each with its evidence in the mapping record:
+Decided in G1, with the evidence in
+[the mapping record](../standards/sacm-gsn-mapping.md#adding-a-challenge):
 
-- **What may be challenged.** Proposed: a Goal, an Assumption, a
-  Justification, a Solution and a Context node; a `SupportedBy` or
-  `InContextOf` line; and a challenge line, since a challenge may be
-  challenged. A Strategy is challenged through the inference it is the
-  `reasoning` of, the relationship E5 draws at the Strategy when it reads one
-  (GSN v3 §1:6.3.12 puts a challenge of an inference with several premises at
-  its Strategy).
-- **What may challenge.** Proposed: a Goal and a Solution, the counter-argument
-  and the counter-evidence of v3's Dialectic Extension.
-- **The new elements' text and identifiers**, as an add makes them (W10).
-- **How a challenger is moved**: its counter relationship gets a new target
-  (`SetReferences`), with W25's guards, and what is under the challenger comes
-  with it. This lifts AF-EDIT-017 for a node that challenges one thing.
+- **What may be challenged (W29).** A Goal, an Assumption, a Justification,
+  a Solution and a Context node; a `SupportedBy`, `InContextOf` or challenge
+  line. A Strategy is challenged through the one inference it is the
+  `reasoning` of, which E5 draws at the Strategy (GSN v3 §1:6.3.12). A
+  neutral node or line is not.
+- **What challenges (W30).** A Goal or a Solution (AF-EDIT-026 otherwise).
+- **The challenge (W31).** The challenger is made as an add makes a node, in
+  the package of what is challenged, with the next identifier of its kind.
+- **Counter-evidence is a Solution (R9).** R11 no longer makes it neutral.
+
+Still to decide, in G4: **how a challenger is moved.** Proposed: its counter
+relationship gets a new target (`SetReferences`), with W25's guards, and what
+is under the challenger comes with it. This lifts AF-EDIT-017 for a node that
+challenges one thing.
 
 ## Trying it out
 
@@ -98,7 +100,7 @@ What is chosen is built in G4, and the spike's findings are recorded in
 
 ## The goals
 
-- [ ] **G1.** The rules and the commands in the core: adding a challenge, and
+- [x] **G1.** The rules and the commands in the core: adding a challenge, and
       counter-evidence drawn as a Solution, with tests. The decisions above
       recorded with their evidence.
 - [ ] **G2.** The menus: a line's menu, and the two challenge items on nodes

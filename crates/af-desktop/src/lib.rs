@@ -991,6 +991,26 @@ fn add(
 }
 
 #[tauri::command]
+fn challenge_choices(
+    at: String,
+    line: bool,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::AddChoices>, String> {
+    Ok(lock(&state)?.core.challenge_choices(&at, line))
+}
+
+#[tauri::command]
+fn challenge(
+    at: String,
+    line: bool,
+    kind: af_api::contract::ElementKind,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.challenge(&at, line, kind, revision))
+}
+
+#[tauri::command]
 fn move_targets(
     id: String,
     state: Shared<'_>,
@@ -1159,6 +1179,8 @@ pub fn run(args: Args) -> i32 {
             move_node,
             set_undeveloped,
             repair_join,
+            challenge_choices,
+            challenge,
             set_text,
             undo,
             redo,

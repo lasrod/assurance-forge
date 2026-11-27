@@ -315,6 +315,9 @@ struct Reach {
     evidence_source: bool,
     context_source: bool,
     other: bool,
+    /// The source of a counter `AssertedEvidence` the view draws: counter-
+    /// evidence, a Solution (R11, decided 27 November 2026).
+    counter_evidence_source: bool,
 }
 
 /// How a relationship's edges are drawn.
@@ -580,6 +583,13 @@ fn relationship<'a>(
         return;
     }
 
+    // R11: counter-evidence is a Solution. It reaches nothing else: the
+    // target of a challenge is not reached by it.
+    if style == Style::Counter && kind == SacmKind::AssertedEvidence {
+        for source in &sources {
+            reach.entry(source).or_default().counter_evidence_source = true;
+        }
+    }
     // Reached: only live relationships count.
     if style == Style::Live {
         if let Some(target) = target {
@@ -683,9 +693,10 @@ fn by_class(
         },
         // R8.
         SacmKind::ArgumentReasoning => (NodeKind::Strategy, false),
-        // R9, R10, R11.
+        // R9, R10, R11. Evidence for, or against (counter-evidence), is a
+        // Solution.
         _ => match (
-            reached.evidence_source,
+            reached.evidence_source || reached.counter_evidence_source,
             reached.context_source,
             reached.other,
         ) {
