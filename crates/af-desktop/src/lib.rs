@@ -1133,6 +1133,15 @@ fn link_acp(
 }
 
 #[tauri::command]
+fn fold_strategy(
+    id: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.fold_strategy(&id, revision))
+}
+
+#[tauri::command]
 fn renumber(
     elements: Vec<String>,
     revision: u32,
@@ -1314,6 +1323,7 @@ pub fn run(args: Args) -> i32 {
             line_removal,
             remove_line,
             renumber,
+            fold_strategy,
             set_text,
             undo,
             redo,

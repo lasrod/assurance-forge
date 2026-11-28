@@ -4,7 +4,8 @@
 //! leaves the file valid.
 
 use af_gsn::commands::{
-    AddError, Line, Refusal, Repair, remove_line, renumber, repair_join, repairs, set_undeveloped,
+    AddError, Line, Refusal, Repair, fold_strategy, remove_line, renumber, repair_join, repairs,
+    set_undeveloped,
 };
 use af_gsn::view::view;
 use af_gsn::wellformed::{Finding, Rule, check};
@@ -105,6 +106,11 @@ fn make(document: &mut Document, repair: &Repair) {
             refusal: None,
             ..
         } => renumber(document, &now, nodes).map(|_| ()),
+        Repair::FoldStrategy {
+            strategy,
+            refusal: None,
+            ..
+        } => fold_strategy(document, &now, strategy).map(|_| ()),
         refused => panic!("{refused:?} is not offered"),
     };
     made.unwrap_or_else(|error| panic!("{repair:?}: {error}"));
@@ -405,29 +411,19 @@ fn w38_nodes_that_no_longer_share_an_identifier_are_not_renumbered() {
 }
 
 #[test]
-fn rules_with_no_repair_in_this_step_offer_none() {
-    // A Strategy with no Goal (AF-GSN-008), and a Strategy as the source of
-    // an inference (AF-GSN-007).
-    let document = case(&[
-        element("ArgumentReasoning", "alone", ""),
-        goal("a"),
-        element("ArgumentReasoning", "s", ""),
-        element("AssertedInference", "i", r#" source="s" target="a""#),
-    ]);
-    let found = check(&document, &view(&document, "en"));
-    for rule in [Rule::StrategyAtEnd, Rule::StrategyUnsupported] {
-        assert!(
-            found.iter().any(|finding| finding.rule == rule),
-            "setup: no {rule:?}"
-        );
-    }
+fn a_strategy_with_no_goal_offers_no_repair() {
+    // AF-GSN-008: the file does not say which Goal it reasons for.
+    let document = case(&[element("ArgumentReasoning", "alone", "")]);
+    let shown = view(&document, "en");
+    let found = check(&document, &shown);
+    assert!(
+        found
+            .iter()
+            .any(|finding| finding.rule == Rule::StrategyUnsupported),
+        "setup: {found:?}"
+    );
     for finding in &found {
-        if matches!(
-            finding.rule,
-            Rule::StrategyAtEnd | Rule::StrategyUnsupported
-        ) {
-            assert!(repairs(&document, &view(&document, "en"), finding).is_empty());
-        }
+        assert!(repairs(&document, &shown, finding).is_empty());
     }
 }
 
@@ -446,7 +442,8 @@ fn every_repair_offered_on_the_samples_clears_its_problem() {
                 let offered = match &repair {
                     Repair::RemoveLine { refusal, .. }
                     | Repair::ClearUndeveloped { refusal, .. }
-                    | Repair::Renumber { refusal, .. } => refusal.is_none(),
+                    | Repair::Renumber { refusal, .. }
+                    | Repair::FoldStrategy { refusal, .. } => refusal.is_none(),
                     Repair::MakeContext { .. } => true,
                 };
                 if !offered {

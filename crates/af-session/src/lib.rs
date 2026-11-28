@@ -122,6 +122,9 @@ pub enum Command {
     /// Renumber the nodes `elements`, which share one identifier: the first
     /// keeps it (W38).
     Renumber { elements: Vec<String> },
+    /// Make the Strategy `element` the reasoning of the one relationship
+    /// above it (W39).
+    FoldStrategy { element: String },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
     Restore,
@@ -558,6 +561,22 @@ impl Session {
             elements: elements.to_vec(),
         };
         Ok(self.made(before, command, &renumbered.mutation))
+    }
+
+    /// Makes the Strategy `element` the reasoning of the one relationship
+    /// above it (W39). `view` is the view of the document as it is now.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::fold_strategy`] refuses; the document and the
+    /// revision are then unchanged.
+    pub fn fold_strategy(&mut self, view: &View, element: &str) -> Result<ChangeRecord, AddError> {
+        let before = self.document.clone();
+        let folded = commands::fold_strategy(&mut self.document, view, element)?;
+        let command = Command::FoldStrategy {
+            element: element.to_owned(),
+        };
+        Ok(self.made(before, command, &folded.mutation))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

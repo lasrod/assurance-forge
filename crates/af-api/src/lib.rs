@@ -928,6 +928,24 @@ impl Core {
         }
     }
 
+    /// Makes the Strategy `id` the reasoning of the one relationship above
+    /// it (W39), as its problem at `revision` offered: one asked for at
+    /// another revision is refused (AF-EDIT-009). The Strategy is the
+    /// element answered, to select.
+    pub fn fold_strategy(&mut self, id: &str, revision: u32) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open.session.fold_strategy(&open.view, id) {
+            Ok(record) => self.changed(&record, Some(id.to_owned())),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
     /// Sets the identifier, name or statement of the node with SACM id `id`
     /// to `text` (W15 to W17). The statement set is the one shown: the value
     /// in the interface language, as T3 reads it.

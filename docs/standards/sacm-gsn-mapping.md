@@ -676,8 +676,9 @@ edit with its own rule, offered by the problem (F1 of
 lines, and AF-GSN-002, 003, 005 and 006 the line reported, for removal by
 W37; AF-GSN-004 is joined as context by W27 where it can be, and otherwise
 loses its line by W37; AF-GSN-010 clears the mark by W26; and AF-GSN-009
-renumbers every node but the first by W38. A repair that its rule refuses is
-not offered, and the problem says why.
+renumbers every node but the first by W38; and AF-GSN-007 makes the
+Strategy the reasoning of its relationship by W39. A repair that its rule
+refuses is not offered, and the problem says why.
 
 | Rule | Repaired | SACM operations | Status | Evidence |
 |---|---|---|---|---|
@@ -774,6 +775,23 @@ problem shows before it is made.
 |---|---|---|---|---|
 | W38 | The nodes AF-GSN-009 reports, in document order, which the view draws with one identifier | The first keeps it. Each other, in order, is given the next identifier of its own prefix, by W15: its identifier without the digits it ends in (`G` of `G1`, `cl_sub_` of `cl_sub_1`), or the prefix of its kind (W10) when it ends in none or is digits only; numbered as W10 numbers, above every identifier the file uses and those given before it. All in one batch. Refused when the nodes no longer share one identifier, or one is not drawn (AF-EDIT-040), and as W15 refuses (AF-EDIT-014) | Decided | GSN v3 GSN3-CORE-010: every GSN element has exactly one notation identifier, which identifies it. The first in the file is the one a reader most likely knows it by (F5). The prefix kept is the file's own scheme, where W10's would impose the editor's: the C++ application's AF-METH-011 renumbered "under its own prefix". An ACP labelled with a renumbered goal follows it, since the label is the identifier (A4) |
 
+### Making a Strategy at an end its relationship's reasoning
+
+How the editor repairs a Strategy that the file puts at an end of a support
+relationship, where GSN has it as the reasoning between a Goal and its
+premises (AF-GSN-007; milestone 2, step 8, G4; F6 of
+[the plan](../roadmap/milestone-2-repair.md)). `af-gsn`
+(`commands::fold_strategy`) applies it as one `sacm::edit::batch`, one undo
+step; `commands::strategy_fold` answers whether it can be made, and between
+which Goals, for the problem to offer it. Decided by the user on
+28 November 2026 over removing the line: it keeps the structure the author
+drew. No sample has the shape: the fixtures in `crates/af-gsn/tests/repairs.rs`
+fix it.
+
+| Rule | Where, and with what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W39 | A Strategy S, the reasoning of no inference, and the non-counter `AssertedInference` and `AssertedEvidence` that have it at an end. **Above**: exactly one, an `AssertedInference` whose only `source` is S, whose `target` is a node drawn as a Goal, G, with no `reasoning` ("S supports G"). **Below**: any number of `AssertedInference` whose `target` is S, with no `reasoning`, whose sources are nodes drawn as Goals other than G ("these Goals support S") | The inference above is kept, with its id, name and `target`: `SetReferences(source)` to the sources of those below, in document order, each once; `SetReferences(reasoning)` to S; `DeleteElement` of each inference below. With none below, the source is a new placeholder (W2), which R16 does not draw: S is then a Strategy with no Goal yet, as an add leaves it. Refused when S supports no Goal, several, or one together with something else (AF-EDIT-041); when something below is not a Goal, as an `AssertedEvidence`, or is G (AF-EDIT-042); when S is already the reasoning of an inference (AF-EDIT-043); and, as W25, when anything refers to one of those relationships or one has a `metaClaim`, the inference above is not declared asserted or is abstract or cited, or one below holds anything (AF-EDIT-015) | Decided | R8 and E1: a Strategy is an inference's `reasoning`, drawn between its `target` and its sources; SACM 2.3 §11.13 gives an inference one `target` and `reasoning:ArgumentReasoning[0..1]`. GSN v3 GSN3-CORE-002: a Strategy describes the inference between a Goal and its sub-goals. W25: what refers to a relationship, or an ACP on it, is about that relationship and is not carried to another. The C++ application's AF-METH-011 moved a Strategy wired as an end "into its reasoning slot, preserving an argument the author meant to make" |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -821,3 +839,6 @@ was refused. Nothing changes.
 | AF-EDIT-038 | The line is challenged: it is not removed alone (W37) |
 | AF-EDIT-039 | Only a support or context line is removed alone, by a relationship that names its lower end once (W37) |
 | AF-EDIT-040 | The nodes no longer share one identifier, or one is not drawn: there is nothing to renumber (W38) |
+| AF-EDIT-041 | The Strategy supports no Goal, several, or one together with something else: there is no one line above it to make it the reasoning of (W39) |
+| AF-EDIT-042 | Something below the Strategy is not a Goal, or is the Goal above it (W39) |
+| AF-EDIT-043 | The Strategy is already the reasoning of an inference (W39) |

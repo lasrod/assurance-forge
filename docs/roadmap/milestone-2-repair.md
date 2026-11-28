@@ -117,6 +117,6 @@ rows each repair writes are recorded with their evidence in
       AF-GSN-010 by clearing the mark; `Problem.repairs`, and the panel
       offering each (F4).
 - [x] **G3.** Renumbering a duplicated identifier (F5), with its mapping row.
-- [ ] **G4.** Making a Strategy at an end the reasoning (F6): the shapes from
+- [x] **G4.** Making a Strategy at an end the reasoning (F6): the shapes from
       fixtures, the mapping row with its evidence, the command and its
       refusals.

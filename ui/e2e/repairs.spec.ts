@@ -117,3 +117,64 @@ test('a shared identifier is renumbered from its problem, and Undo takes it back
   await page.keyboard.press('ControlOrMeta+z');
   await expect(shared).toHaveCount(1);
 });
+
+/** A case where the Strategy s is at an end: s supports g, and g2 supports s; with `more`. */
+function strategyAtEnd(more = '') {
+  const claim = (id: string) => `<argumentElement xmi:type="sacm:Claim" xmi:id="${id}"><name content="${id}"/></argumentElement>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="Case"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    ${claim('g')}${claim('g2')}${claim('h')}
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="s"><name content="s"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="up" source="s" target="g"><name content="up"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="down" source="g2" target="s"><name content="down"/></argumentElement>
+    ${more}
+  </argumentPackage>
+</sacm:AssuranceCasePackage>`;
+}
+
+async function openXml(page: Page, xml: string, query = '') {
+  await page.goto(`/${query}`);
+  await page.getByTestId('open-file').setInputFiles({ name: 'strategy.sacm.xmi', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await expect.poll(async () => (await hook(page))?.viewport?.scale ?? null).not.toBeNull();
+  await page.getByTestId('problem-counts').getByRole('button').click();
+}
+
+test('a Strategy at an end is made the reasoning between its Goals, and Undo takes it back', async ({ page }) => {
+  await openXml(page, strategyAtEnd());
+  const atEnd = rows(page).filter({ hasText: 'AF-GSN-007' });
+  await expect(atEnd).toHaveCount(2);
+  await atEnd.first().click();
+  await expect(offered(page)).toContainText('Make s the reasoning between g and the Goals under it.');
+  await offered(page).getByRole('button', { name: 'Repair' }).click();
+
+  await expect(status(page)).toHaveText('s is now the reasoning under g.');
+  await expect(atEnd).toHaveCount(0);
+  const lines = (await hook(page)).diagram!.diagram.edges.map((edge) => `${edge.from}>${edge.to}`).sort();
+  expect(lines).toEqual(['g>s', 's>g2']);
+  expect((await hook(page)).selected).toBe('s');
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(atEnd).toHaveCount(2);
+});
+
+test('a Strategy that supports two Goals says why it is not made the reasoning', async ({ page }) => {
+  await openXml(
+    page,
+    strategyAtEnd('<argumentElement xmi:type="sacm:AssertedInference" xmi:id="up2" source="s" target="h"><name content="up2"/></argumentElement>'),
+  );
+  await rows(page).filter({ hasText: 'AF-GSN-007' }).first().click();
+  await expect(offered(page)).toHaveCount(0);
+  await expect(page.getByTestId('problem-repair-refused')).toHaveText(
+    'It cannot be repaired here. This Strategy supports no Goal, several, or one together with something else, so there is no one line above it to make it the reasoning of.',
+  );
+});
+
+test('making a Strategy the reasoning is worded in Japanese', async ({ page }) => {
+  await openXml(page, strategyAtEnd(), '?lang=ja');
+  await page.getByRole('option').filter({ hasText: 'AF-GSN-007' }).first().click();
+  await expect(offered(page)).toContainText('s を、g とその下のゴールのあいだの推論にします。');
+  await offered(page).getByRole('button', { name: '修復' }).click();
+  await expect(status(page)).toHaveText('s を g の下の推論にしました。');
+});

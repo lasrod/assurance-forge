@@ -910,6 +910,15 @@ pub enum ProblemRepair {
         given: Vec<RenumberedNode>,
         refusal: Option<String>,
     },
+    /// Make the Strategy `strategy` the reasoning of the one relationship
+    /// above it, which supports `goal`: `Core::fold_strategy` (W39). `goal`
+    /// is null when it is refused.
+    #[serde(rename_all = "camelCase")]
+    FoldStrategy {
+        strategy: String,
+        goal: Option<String>,
+        refusal: Option<String>,
+    },
 }
 
 /// A node a renumbering gives a new identifier.

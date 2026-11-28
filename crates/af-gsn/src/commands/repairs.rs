@@ -3,8 +3,9 @@
 //!
 //! A repair is an edit the editor already makes, chosen by the rule the
 //! argument breaks: joining an element as context (W27), removing a line
-//! (W37), clearing the undeveloped mark (W26) or renumbering a shared
-//! identifier (W38). [`repairs`] lists those a
+//! (W37), clearing the undeveloped mark (W26), renumbering a shared
+//! identifier (W38) or making a Strategy at an end the reasoning of its
+//! relationship (W39). [`repairs`] lists those a
 //! finding has, each with why it cannot be made here, so the problem list
 //! can offer those that can and say why for the others. Nothing is changed.
 
@@ -12,7 +13,9 @@ use std::collections::HashSet;
 
 use sacm::model::Document;
 
-use super::{Line, Refusal, line_removal, renumbering, repairable, undeveloped_change};
+use super::{
+    Line, Refusal, line_removal, renumbering, repairable, strategy_fold, undeveloped_change,
+};
 use crate::view::{EdgeKind, View};
 use crate::wellformed::{Finding, Rule};
 
@@ -47,12 +50,19 @@ pub enum Repair {
         given: Vec<(String, String)>,
         refusal: Option<Refusal>,
     },
+    /// Make the Strategy `strategy` the reasoning of the one relationship
+    /// above it, which supports `goal` (W39), or why it cannot be.
+    FoldStrategy {
+        strategy: String,
+        goal: Option<String>,
+        refusal: Option<Refusal>,
+    },
 }
 
 /// The repairs of `finding`, where `view` is the view of `document` the
 /// finding was made of (`wellformed::check`), in the order they are offered.
-/// Empty for a rule that has none in this step: a Strategy at an end
-/// (AF-GSN-007) and a Strategy with no Goal (AF-GSN-008).
+/// Empty for a Strategy with no Goal (AF-GSN-008), which has none: the file
+/// does not say which Goal it reasons for.
 pub fn repairs(document: &Document, view: &View, finding: &Finding) -> Vec<Repair> {
     let line = || match (finding.relationship.as_deref(), finding.nodes.as_slice()) {
         (Some(relationship), [from, to]) => {
@@ -119,7 +129,24 @@ pub fn repairs(document: &Document, view: &View, finding: &Finding) -> Vec<Repai
                 refusal,
             }]
         }
-        Rule::StrategyAtEnd | Rule::StrategyUnsupported => Vec::new(),
+        // W39: each Strategy the relationship has at an end.
+        Rule::StrategyAtEnd => finding
+            .nodes
+            .iter()
+            .map(|strategy| match strategy_fold(document, view, strategy) {
+                Ok(fold) => Repair::FoldStrategy {
+                    strategy: strategy.clone(),
+                    goal: Some(fold.goal),
+                    refusal: None,
+                },
+                Err(refusal) => Repair::FoldStrategy {
+                    strategy: strategy.clone(),
+                    goal: None,
+                    refusal: Some(refusal),
+                },
+            })
+            .collect(),
+        Rule::StrategyUnsupported => Vec::new(),
     }
 }
 

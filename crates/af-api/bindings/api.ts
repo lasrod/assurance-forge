@@ -482,7 +482,7 @@ export type RenumberedNode = {
  */
 element: string, identifier: string, };
 
-export type ProblemRepair = { "kind": "makeContext", element: string, relationship: string, } | { "kind": "removeLine", relationship: string, from: string, to: string, refusal: string | null, } | { "kind": "clearUndeveloped", element: string, refusal: string | null, } | { "kind": "renumber", nodes: Array<string>, given: Array<RenumberedNode>, refusal: string | null, };
+export type ProblemRepair = { "kind": "makeContext", element: string, relationship: string, } | { "kind": "removeLine", relationship: string, from: string, to: string, refusal: string | null, } | { "kind": "clearUndeveloped", element: string, refusal: string | null, } | { "kind": "renumber", nodes: Array<string>, given: Array<RenumberedNode>, refusal: string | null, } | { "kind": "foldStrategy", strategy: string, goal: string | null, refusal: string | null, };
 
 export type EditResult = { "result": "applied", revision: number, 
 /**

@@ -75,6 +75,8 @@ export type DocumentState =
   | { kind: 'repaired'; repaired: NodeKind | null; identifier: string }
   /** Nodes that shared an identifier renumbered: the identifiers they were given. */
   | { kind: 'renumbered'; identifiers: string[] }
+  /** A Strategy at an end made the reasoning under its Goal: their identifiers. */
+  | { kind: 'strategyFolded'; strategy: string; goal: string }
   | { kind: 'undone' }
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null }
@@ -851,6 +853,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       }),
     [edit, followingEdits],
   );
+  /**
+   * Makes the Strategy `id` the reasoning of the one relationship above it,
+   * as its problem of `revision` offered; `named` holds the identifiers of
+   * the Strategy and its Goal, for the status.
+   */
+  const foldStrategy = useCallback(
+    (id: string, revision: number, named: { strategy: string; goal: string }, onShown: EditShown) =>
+      void edit(async (on) => on.foldStrategy(id, await followingEdits(revision)), 'mark', id, 'strategy', onShown, {
+        kind: 'strategyFolded',
+        ...named,
+      }),
+    [edit, followingEdits],
+  );
   /** Says why a move cannot be made to the place the user chose. */
   const moveRefused = useCallback((code: string, about: NodeKind | null) => setState({ kind: 'editRefused', code, about }), []);
   /**
@@ -1085,6 +1100,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     setUndeveloped,
     repair,
     renumber,
+    foldStrategy,
     setText,
     undo,
     redo,
