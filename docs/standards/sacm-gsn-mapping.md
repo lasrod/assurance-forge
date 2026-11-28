@@ -669,6 +669,15 @@ can be made, for the problem list to offer it. The repair is asked for by the
 user, from the problem: it is never made by a read, a save or a move (W21).
 Decided on 26 November 2026.
 
+The repairs of the other GSN problems write nothing of their own: each is an
+edit with its own rule, offered by the problem (F1 of
+[the repair plan](../roadmap/milestone-2-repair.md);
+`commands::repairs`). A cycle (AF-GSN-001) offers each of its `SupportedBy`
+lines, and AF-GSN-002, 003, 005 and 006 the line reported, for removal by
+W37; AF-GSN-004 is joined as context by W27 where it can be, and otherwise
+loses its line by W37; AF-GSN-010 clears the mark by W26. A repair that its
+rule refuses is not offered, and the problem says why.
+
 | Rule | Repaired | SACM operations | Status | Evidence |
 |---|---|---|---|---|
 | W27 | A Context, Assumption or Justification that is a `source` of a relationship drawn as `SupportedBy`, with no `reasoning`, whose `target` is a Goal or a Strategy | The node alone in the relationship: `DeleteElement` of the relationship, then `CreateAssertedContext` from the node to the same `target`, in the relationship's package, with the relationship's `name`. One of several sources: `RemoveReference` of the node from the `source`, then `CreateAssertedContext` with an empty name (W12); the relationship stays for the others. The new relationship has a new `xmi:id`. It then reads by E4 as `InContextOf`, and the node as the kind it was (R4, R5, R10) | Decided | E4, W5 to W7: the form an add writes. SACM cannot change an element's class in place, so the relationship is replaced. The name is kept because it is the one thing of the old relationship a reader may know it by |

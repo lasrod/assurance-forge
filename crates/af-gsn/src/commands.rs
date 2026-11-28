@@ -38,6 +38,7 @@ mod remove;
 mod remove_acp;
 mod remove_line;
 mod repair;
+mod repairs;
 pub use acp::{
     ACP_KINDS, ACP_PREFIX, AcpChoices, AcpGoal, AcpKind, acp_choices, acp_node_refusal, add_acp,
     link_acp,
@@ -50,6 +51,7 @@ pub use remove::{Removal, Removed, removal, remove};
 pub use remove_acp::{AcpRemoval, ConfidenceArgument, acp_removal, remove_acp};
 pub use remove_line::{LineRemoval, LineRemoved, line_removal, remove_line};
 pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
+pub use repairs::{Repair, repairs};
 
 /// One line of a relationship, from `from` to `to` as the view draws it:
 /// what an ACP goes on (W33), and what a line's removal takes (W37).

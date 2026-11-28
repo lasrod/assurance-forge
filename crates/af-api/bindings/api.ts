@@ -476,7 +476,7 @@ nodes: Array<MoveTarget>,
  */
 lines: Array<MoveLine>, };
 
-export type ProblemRepair = { element: string, relationship: string, };
+export type ProblemRepair = { "kind": "makeContext", element: string, relationship: string, } | { "kind": "removeLine", relationship: string, from: string, to: string, refusal: string | null, } | { "kind": "clearUndeveloped", element: string, refusal: string | null, };
 
 export type EditResult = { "result": "applied", revision: number, 
 /**
@@ -543,10 +543,11 @@ relationship: string | null,
  */
 line: number | null, column: number | null, 
 /**
- * The repair the editor can make of it, or null: `Core::repair_join`
- * with these. Only `AF-GSN-004` has one so far.
+ * The repairs the editor can make of it, in the order they are
+ * offered (F1 of `docs/roadmap/milestone-2-repair.md`); empty when it
+ * has none.
  */
-repair: ProblemRepair | null, };
+repairs: Array<ProblemRepair>, };
 
 export type ProblemElement = { 
 /**

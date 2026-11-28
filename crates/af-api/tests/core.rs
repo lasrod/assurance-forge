@@ -6,7 +6,7 @@
 use af_api::Core;
 use af_api::contract::{
     AcpGoal, AcpKind, ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult,
-    ProblemSeverity, ProblemSource, Shape, TextRole,
+    ProblemRepair, ProblemSeverity, ProblemSource, Shape, TextRole,
 };
 use af_layout::{Fonts, Style};
 
@@ -900,27 +900,30 @@ fn the_undeveloped_mark_is_set_where_it_can_be_and_a_wrong_join_is_repaired() {
         .filter(|problem| problem.code == "AF-GSN-004")
         .collect();
     assert_eq!(wrong.len(), 1);
-    let repair = wrong[0]
-        .repair
-        .clone()
-        .unwrap_or_else(|| panic!("no repair"));
+    let (element, relationship) = match wrong[0].repairs.as_slice() {
+        [
+            ProblemRepair::MakeContext {
+                element,
+                relationship,
+            },
+        ] => (element.clone(), relationship.clone()),
+        other => panic!("repairs: {other:?}"),
+    };
     assert_eq!(
-        (repair.element.as_str(), repair.relationship.as_str()),
+        (element.as_str(), relationship.as_str()),
         ("cl_assumption_1", "inf_2")
     );
     assert!(
         problems
             .problems
             .iter()
-            .all(|problem| problem.code == "AF-GSN-004" || problem.repair.is_none())
+            .all(|problem| problem.code == "AF-GSN-004" || problem.repairs.is_empty())
     );
     assert!(matches!(
-        core.repair_join(&repair.element, &repair.relationship, 1),
+        core.repair_join(&element, &relationship, 1),
         EditResult::Refused { ref code } if code == "AF-EDIT-009"
     ));
-    let EditResult::Applied { element, .. } =
-        core.repair_join(&repair.element, &repair.relationship, 2)
-    else {
+    let EditResult::Applied { element, .. } = core.repair_join(&element, &relationship, 2) else {
         panic!("not repaired");
     };
     assert_eq!(element.as_deref(), Some("cl_assumption_1"));
@@ -1482,4 +1485,45 @@ fn a_line_is_removed_as_its_removal_said_and_undo_brings_it_back() {
     assert!(core.element("cl_assumption_1").is_some());
     assert!(matches!(core.undo(), EditResult::Applied { .. }));
     assert_eq!(lines(&mut core), before);
+}
+
+#[test]
+fn a_cycle_offers_its_lines_and_one_removed_breaks_it() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/gallery-roots-and-cycle.sacm.xmi"));
+    let cycles = |core: &mut Core| -> Vec<af_api::contract::Problem> {
+        core.problems()
+            .map(|problems| problems.problems)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|problem| problem.code == "AF-GSN-001")
+            .collect()
+    };
+    let found = cycles(&mut core);
+    assert_eq!(found.len(), 2, "setup: {found:?}");
+    // Each cycle offers its support lines, as codes and ids, not sentences.
+    let offered: Vec<(String, String, String)> = found[0]
+        .repairs
+        .iter()
+        .filter_map(|repair| match repair {
+            ProblemRepair::RemoveLine {
+                relationship,
+                from,
+                to,
+                refusal: None,
+            } => Some((relationship.clone(), from.clone(), to.clone())),
+            _ => None,
+        })
+        .collect();
+    assert!(!offered.is_empty(), "{:?}", found[0].repairs);
+    let (relationship, from, to) = &offered[0];
+    let removal = core
+        .line_removal(relationship, from, to)
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(removal.refusal, None);
+    assert!(matches!(
+        core.remove_line(relationship, from, to, removal.revision),
+        EditResult::Applied { .. }
+    ));
+    assert_eq!(cycles(&mut core).len(), 1);
 }

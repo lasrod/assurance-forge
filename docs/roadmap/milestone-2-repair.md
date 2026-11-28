@@ -112,7 +112,7 @@ rows each repair writes are recorded with their evidence in
       command with tests, and Remove Line on a line's menu, with what it
       refuses and why, the ACP it takes listed and asked about. Both
       languages, browser tests.
-- [ ] **G2.** The repairs that reuse a command: AF-GSN-001, 002, 003, 005
+- [x] **G2.** The repairs that reuse a command: AF-GSN-001, 002, 003, 005
       and 006 by removing a line, AF-GSN-004 under a Strategy too, and
       AF-GSN-010 by clearing the mark; `Problem.repairs`, and the panel
       offering each (F4).

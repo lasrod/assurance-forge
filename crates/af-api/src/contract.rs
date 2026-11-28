@@ -865,19 +865,42 @@ pub struct Problem {
     /// Where in the file, for what libSACM reported reading it.
     pub line: Option<u32>,
     pub column: Option<u32>,
-    /// The repair the editor can make of it, or null: `Core::repair_join`
-    /// with these. Only `AF-GSN-004` has one so far.
-    pub repair: Option<ProblemRepair>,
+    /// The repairs the editor can make of it, in the order they are
+    /// offered (F1 of `docs/roadmap/milestone-2-repair.md`); empty when it
+    /// has none.
+    pub repairs: Vec<ProblemRepair>,
 }
 
-/// A repair of a problem: the element joined as GSN does not allow, and the
-/// relationship that joins it.
+/// A repair of a problem: an edit the editor makes, with what it is made
+/// on. One that cannot be made here says why (`refusal`), and is not
+/// offered.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[serde(rename_all = "camelCase")]
-pub struct ProblemRepair {
-    pub element: String,
-    pub relationship: String,
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ProblemRepair {
+    /// Join `element`, which `relationship` joins by a support line, as
+    /// context in its place: `Core::repair_join` (W27).
+    #[serde(rename_all = "camelCase")]
+    MakeContext {
+        element: String,
+        relationship: String,
+    },
+    /// Remove the line from `from` to `to` of `relationship`:
+    /// `Core::line_removal` and `Core::remove_line` (W37).
+    #[serde(rename_all = "camelCase")]
+    RemoveLine {
+        relationship: String,
+        from: String,
+        to: String,
+        refusal: Option<String>,
+    },
+    /// Clear the undeveloped mark of the Goal `element`:
+    /// `Core::set_undeveloped` (W26).
+    #[serde(rename_all = "camelCase")]
+    ClearUndeveloped {
+        element: String,
+        refusal: Option<String>,
+    },
 }
 
 /// An element a problem is about.
