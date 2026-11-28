@@ -52,17 +52,22 @@ const trailing = (text: string): ReactNode => createElement('span', { className:
  */
 const named = (text: string): ReactNode => createElement('span', { title: text }, text);
 
-/** What a node is called in a list: its name, else its statement, else its identifier. */
-export function outlineLabel(row: Pick<OutlineRow, 'name' | 'statement' | 'identifier'>): string {
-  return row.name || row.statement || row.identifier;
+/** What a node says in a list: its name, else its statement, else nothing. */
+export function outlineLabel(row: Pick<OutlineRow, 'name' | 'statement'>): string {
+  return row.name || row.statement || '';
 }
 
-/** The argument's tree: each node by its name, with its GSN identifier after it. */
+/**
+ * The argument's tree: each node by its name, with its GSN identifier after it.
+ * The identifier is always in its column, so a new element with no text yet
+ * reads as an identifier, not as a description.
+ */
 export function outlineTree(rows: readonly OutlineRow[]): Built {
   return nest(rows, (row) => {
-    const label = outlineLabel(row);
-    // An element with neither name nor statement is called by its identifier, once.
-    return { label: named(label), textValue: `${row.identifier} ${label}`, meta: label === row.identifier ? undefined : trailing(row.identifier) };
+    // A name that is the identifier again is said once, in its column.
+    const text = outlineLabel(row);
+    const label = text === row.identifier ? '' : text;
+    return { label: named(label), textValue: label ? `${row.identifier} ${label}` : row.identifier, meta: trailing(row.identifier) };
   });
 }
 
