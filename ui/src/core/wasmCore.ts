@@ -3,6 +3,7 @@
 import init, { WasmCore } from '../wasm/af_wasm';
 import type {
   AcpChoices,
+  AcpRemoval,
   AddChoices,
   Core,
   DiagramAt,
@@ -79,6 +80,9 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     add: async (parent, kind, revision) => JSON.parse(core.add(parent ?? undefined, kind, revision)) as EditResult,
     removal: async (id) => parse<Removal>(core.removal(id)),
     remove: async (id, revision) => JSON.parse(core.remove(id, revision)) as EditResult,
+    acpRemoval: async (relationship, claim) => parse<AcpRemoval>(core.acpRemoval(relationship, claim)),
+    removeAcp: async (relationship, claim, withArgument, revision) =>
+      JSON.parse(core.removeAcp(relationship, claim, withArgument, revision)) as EditResult,
     moveTargets: async (id) => parse<MoveTargets>(core.moveTargets(id)),
     moveNode: async (id, to, revision) => JSON.parse(core.moveNode(id, to ?? undefined, revision)) as EditResult,
     showPackage: async (id) => core.showPackage(id ?? undefined),

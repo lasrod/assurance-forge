@@ -341,6 +341,47 @@ acps: Array<string>,
  */
 refusal: string | null, };
 
+export type ConfidenceArgument = { 
+/**
+ * The SACM id of the package.
+ */
+package: string, 
+/**
+ * The package's name; null when it has none, or a blank one.
+ */
+name: string | null, 
+/**
+ * The nodes deleting it deletes: the confidence goal first.
+ */
+nodes: Array<RemovalNode>, 
+/**
+ * Why it cannot be deleted with the ACP (`AF-EDIT-015`), or null when it
+ * can. The ACP alone may still be removed.
+ */
+refusal: string | null, };
+
+export type AcpRemoval = { revision: number, 
+/**
+ * The ACP's label, such as `ACP1` or `ACP2[Confidence]`.
+ */
+label: string, 
+/**
+ * The description the ACP shows, which goes with it; null for a
+ * confidence argument, a goal of the line's argument, or a description
+ * another ACP also shows.
+ */
+description: RemovalNode | null, 
+/**
+ * The confidence argument in a package of its own, which the user keeps
+ * or deletes with the ACP; null when the Claim is in the line's package.
+ */
+argument: ConfidenceArgument | null, 
+/**
+ * Why it cannot be removed (`AF-EDIT-031`), or null when it can. The
+ * frontend words it.
+ */
+refusal: string | null, };
+
 export type MoveTarget = { 
 /**
  * The SACM id of the node.

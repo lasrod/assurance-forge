@@ -23,6 +23,7 @@ import type {
   RelationshipDetails,
   MoveTargets,
   Removal,
+  AcpRemoval,
   SaveResult,
 } from './Core';
 import { StartError, type FontBytes } from './start';
@@ -77,6 +78,9 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     add: (parent, kind, revision) => invoke<EditResult>('add', { parent, kind, revision }),
     removal: (id) => invoke<Removal | null>('removal', { id }),
     remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),
+    acpRemoval: (relationship, claim) => invoke<AcpRemoval | null>('acp_removal', { relationship, claim }),
+    removeAcp: (relationship, claim, withArgument, revision) =>
+      invoke<EditResult>('remove_acp', { relationship, claim, withArgument, revision }),
     moveTargets: (id) => invoke<MoveTargets | null>('move_targets', { id }),
     moveNode: (id, to, revision) => invoke<EditResult>('move_node', { id, to, revision }),
     showPackage: (id) => invoke<boolean>('show_package', { package: id }),

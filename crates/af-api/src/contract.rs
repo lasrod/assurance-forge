@@ -514,6 +514,44 @@ pub struct Removal {
     pub refusal: Option<String>,
 }
 
+/// What removing an assurance claim point would delete, at `revision`
+/// (W35).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpRemoval {
+    pub revision: u32,
+    /// The ACP's label, such as `ACP1` or `ACP2[Confidence]`.
+    pub label: String,
+    /// The description the ACP shows, which goes with it; null for a
+    /// confidence argument, a goal of the line's argument, or a description
+    /// another ACP also shows.
+    pub description: Option<RemovalNode>,
+    /// The confidence argument in a package of its own, which the user keeps
+    /// or deletes with the ACP; null when the Claim is in the line's package.
+    pub argument: Option<ConfidenceArgument>,
+    /// Why it cannot be removed (`AF-EDIT-031`), or null when it can. The
+    /// frontend words it.
+    pub refusal: Option<String>,
+}
+
+/// A confidence argument in an argument package of its own, as the removal
+/// of its ACP lists it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct ConfidenceArgument {
+    /// The SACM id of the package.
+    pub package: String,
+    /// The package's name; null when it has none, or a blank one.
+    pub name: Option<String>,
+    /// The nodes deleting it deletes: the confidence goal first.
+    pub nodes: Vec<RemovalNode>,
+    /// Why it cannot be deleted with the ACP (`AF-EDIT-015`), or null when it
+    /// can. The ACP alone may still be removed.
+    pub refusal: Option<String>,
+}
+
 /// Whether one node can take a moved one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -890,6 +928,8 @@ pub fn typescript() -> String {
         AddChoices::decl(&cfg),
         RemovalNode::decl(&cfg),
         Removal::decl(&cfg),
+        ConfidenceArgument::decl(&cfg),
+        AcpRemoval::decl(&cfg),
         MoveTarget::decl(&cfg),
         MoveLine::decl(&cfg),
         MoveTargets::decl(&cfg),

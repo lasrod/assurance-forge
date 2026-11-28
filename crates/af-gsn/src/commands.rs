@@ -11,7 +11,8 @@
 //!
 //! [`set_text`] changes a node's identifier, name or statement: the inverse of
 //! the reading rules T1 to T3, as W15 to W17 record. [`removal`] and
-//! [`remove`] answer what removing a node deletes and remove it (W18 to W20).
+//! [`remove`] answer what removing a node deletes and remove it (W18 to W20);
+//! [`acp_removal`] and [`remove_acp`] do the same for an ACP (W35).
 
 use std::fmt;
 
@@ -33,6 +34,7 @@ mod acp;
 mod challenge;
 mod move_node;
 mod remove;
+mod remove_acp;
 mod repair;
 pub use acp::{
     ACP_KINDS, ACP_PREFIX, AcpChoices, AcpKind, AcpLine, acp_choices, acp_node_refusal, add_acp,
@@ -42,6 +44,7 @@ pub use challenge::{
 };
 pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
+pub use remove_acp::{AcpRemoval, ConfidenceArgument, acp_removal, remove_acp};
 pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
 
 /// Where an element is to be added.
@@ -117,6 +120,9 @@ pub enum Refusal {
     /// AF-EDIT-030: an ACP on a Solution or a Context comes with SACM 2.4:
     /// SACM 2.3 cannot hold it (W33, gap row 7).
     AcpNeedsSacm24,
+    /// AF-EDIT-031: the line carries no ACP the diagram draws for that
+    /// Claim (W35).
+    NotAnAcp,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -153,6 +159,7 @@ impl Refusal {
             Refusal::ChallengeStays => "AF-EDIT-028",
             Refusal::NotAnAcpPlace => "AF-EDIT-029",
             Refusal::AcpNeedsSacm24 => "AF-EDIT-030",
+            Refusal::NotAnAcp => "AF-EDIT-031",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

@@ -41,10 +41,11 @@ use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 use contract::{
-    AcpChoice, AcpChoices, AcpKind, AddChoice, AddChoices, ArgumentValue, DiagnosticCounts,
-    DiagramAt, DiagramAtRef, EditResult, ElementDetails, ElementKind, History, MessageArgument,
-    MoveTarget, MoveTargets, OpenResult, Outline, OutlineRow, Package, Refusal,
-    RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode, WriteResult,
+    AcpChoice, AcpChoices, AcpKind, AcpRemoval, AddChoice, AddChoices, ArgumentValue,
+    ConfidenceArgument, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult, ElementDetails,
+    ElementKind, History, MessageArgument, MoveTarget, MoveTargets, OpenResult, Outline,
+    OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode,
+    ViewCode, WriteResult,
 };
 pub use contract::{FoundRecovery, KeepResult, RecoveryCopy};
 
@@ -598,23 +599,7 @@ impl Core {
                 removal
                     .nodes
                     .iter()
-                    .filter_map(|id| {
-                        view.nodes
-                            .iter()
-                            .chain(&view.descriptions)
-                            .find(|node| node.id == *id)
-                    })
-                    .map(|node| RemovalNode {
-                        acp_description: view
-                            .descriptions
-                            .iter()
-                            .any(|described| described.id == node.id),
-                        id: node.id.clone(),
-                        kind: convert::node_kind(node.kind),
-                        identifier: node.identifier.clone(),
-                        name: node.name.clone(),
-                        statement: node.statement.clone(),
-                    })
+                    .filter_map(|id| removal_node(view, id))
                     .collect(),
                 // The ACPs it takes, by their labels.
                 removal
@@ -636,6 +621,56 @@ impl Core {
             nodes,
             acps,
             refusal,
+        })
+    }
+
+    /// What removing the ACP that `relationship` carries for the Claim
+    /// `claim` would delete (W35), for the interface to show before it is
+    /// made. `None` when nothing is open.
+    pub fn acp_removal(&self, relationship: &str, claim: &str) -> Option<AcpRemoval> {
+        let open = self.open.as_ref()?;
+        let view = &open.view;
+        let document = open.session.document();
+        let label = view
+            .acps
+            .iter()
+            .find(|acp| acp.relationship == relationship && acp.claim == claim)
+            .map(|acp| acp.label.clone())
+            .unwrap_or_default();
+        let removal = match commands::acp_removal(document, view, relationship, claim) {
+            Ok(removal) => removal,
+            Err(refusal) => {
+                return Some(AcpRemoval {
+                    revision: self.revision,
+                    label,
+                    description: None,
+                    argument: None,
+                    refusal: Some(refusal.code().to_owned()),
+                });
+            }
+        };
+        Some(AcpRemoval {
+            revision: self.revision,
+            label,
+            description: removal
+                .description
+                .and_then(|id| removal_node(view, id.as_str())),
+            argument: removal.argument.map(|argument| ConfidenceArgument {
+                name: document
+                    .get(argument.package.as_str())
+                    .and_then(|package| package.name())
+                    .and_then(|name| name.content())
+                    .filter(|name| !name.trim().is_empty())
+                    .map(str::to_owned),
+                nodes: argument
+                    .nodes
+                    .iter()
+                    .filter_map(|id| removal_node(view, id))
+                    .collect(),
+                refusal: argument.refusal.map(|refusal| refusal.code().to_owned()),
+                package: argument.package,
+            }),
+            refusal: None,
         })
     }
 
@@ -739,6 +774,33 @@ impl Core {
         }
         match open.session.remove(&open.view, id) {
             Ok((removed, record)) => self.changed(&record, removed.parent),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Removes the ACP that `relationship` carries for the Claim `claim`,
+    /// with its description, and with its confidence argument when
+    /// `with_argument` (W35), as [`Core::acp_removal`] said at `revision`:
+    /// one asked for at another revision is refused (AF-EDIT-009).
+    pub fn remove_acp(
+        &mut self,
+        relationship: &str,
+        claim: &str,
+        with_argument: bool,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open
+            .session
+            .remove_acp(&open.view, relationship, claim, with_argument)
+        {
+            Ok(record) => self.changed(&record, None),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
         }
@@ -1013,6 +1075,26 @@ impl Core {
 const NOTHING_OPEN: &str = "AF-EDIT-007";
 /// AF-EDIT-008: there is nothing to undo, or nothing to redo.
 const NOTHING_TO_DO: &str = "AF-EDIT-008";
+/// A node, or an ACP's description, as a removal lists it.
+fn removal_node(view: &af_gsn::view::View, id: &str) -> Option<RemovalNode> {
+    let node = view
+        .nodes
+        .iter()
+        .chain(&view.descriptions)
+        .find(|node| node.id == id)?;
+    Some(RemovalNode {
+        acp_description: view
+            .descriptions
+            .iter()
+            .any(|described| described.id == node.id),
+        id: node.id.clone(),
+        kind: convert::node_kind(node.kind),
+        identifier: node.identifier.clone(),
+        name: node.name.clone(),
+        statement: node.statement.clone(),
+    })
+}
+
 /// AF-EDIT-009: the document changed after the add menu, or the removal
 /// shown, was made.
 const OUT_OF_DATE: &str = "AF-EDIT-009";

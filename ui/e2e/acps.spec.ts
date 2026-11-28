@@ -2,6 +2,8 @@
 // description or with a confidence argument in a package of its own; a click
 // on one shows its argument; a Solution or a Context says why not yet.
 
+import { readFileSync } from 'node:fs';
+
 import { expect, test, type Page } from '@playwright/test';
 
 const SAMPLE = 'acps.sacm.xmi';
@@ -142,4 +144,108 @@ test('the ACP items are worded in Japanese', async ({ page }) => {
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: '説明付きの ACP を追加' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: '確信論証付きの ACP を追加' })).toBeVisible();
+});
+
+test('an ACP with a description is removed from its line’s menu, or by Delete once selected, and Undo brings it back', async ({ page }) => {
+  await opened(page);
+  // A right-click on the ACP opens its line's menu, which removes it.
+  const square = await onAcp(page, 'ACP1');
+  await page.mouse.click(square.x, square.y, { button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Line' });
+  await menu.getByRole('menuitem', { name: 'Remove ACP1' }).click();
+  await expect(status(page)).toHaveText('ACP1 removed.');
+  expect(await acpsOn(page, 'I1')).toEqual([]);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(async () => acpsOn(page, 'I1')).toEqual(['ACP1']);
+
+  // A click shows its description; Delete removes the ACP with it.
+  const again = await onAcp(page, 'ACP1');
+  await page.mouse.click(again.x, again.y);
+  await expect.poll(async () => (await hook(page)).selected).toBe('ACP1');
+  await canvas(page).focus();
+  await page.keyboard.press('Delete');
+  await expect(status(page)).toHaveText('ACP1 removed.');
+  expect(await acpsOn(page, 'I1')).toEqual([]);
+});
+
+test('an ACP with a confidence argument asks whether the argument stays or goes', async ({ page }) => {
+  await opened(page);
+  const confidence = explorer(page).getByRole('treeitem', { name: /^Confidence/ });
+  await expect(confidence).toHaveCount(1);
+  const ask = async () => {
+    const at = await onLine(page, 'E1', 'Sn1');
+    await page.mouse.click(at.x, at.y, { button: 'right' });
+    await page.getByRole('menu', { name: 'Line' }).getByRole('menuitem', { name: 'Remove ACP2[Confidence]' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Remove ACP2[Confidence]?' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId('remove-acp-list').getByRole('listitem')).toHaveCount(2);
+    return dialog;
+  };
+
+  // Kept: only the ACP goes; the package stays in the Case Explorer.
+  await (await ask()).getByRole('button', { name: 'Remove ACP only' }).click();
+  await expect(status(page)).toHaveText('ACP2[Confidence] removed.');
+  expect(await acpsOn(page, 'E1')).toEqual([]);
+  await expect(confidence).toHaveCount(1);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(async () => acpsOn(page, 'E1')).toEqual(['ACP2[Confidence]']);
+
+  // Deleted: the package goes with it, in one undo step.
+  await (await ask()).getByRole('button', { name: 'Remove with confidence argument' }).click();
+  await expect(status(page)).toHaveText('ACP2[Confidence] and its confidence argument removed.');
+  expect(await acpsOn(page, 'E1')).toEqual([]);
+  await expect(confidence).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(confidence).toHaveCount(1);
+  expect(await acpsOn(page, 'E1')).toEqual(['ACP2[Confidence]']);
+
+  // Cancel changes nothing.
+  const dialog = await ask();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  expect(await acpsOn(page, 'E1')).toEqual(['ACP2[Confidence]']);
+});
+
+test('removing an ACP is worded in Japanese', async ({ page }) => {
+  await opened(page, '&lang=ja');
+  const at = await onLine(page, 'E1', 'Sn1');
+  await page.mouse.click(at.x, at.y, { button: 'right' });
+  await page.getByRole('menuitem', { name: 'ACP2[Confidence] を削除' }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'ACP2[Confidence] を削除しますか？' });
+  await expect(dialog.getByRole('button', { name: 'ACP のみ削除' })).toBeVisible();
+  await dialog.getByRole('button', { name: '確信論証ごと削除' }).click();
+  await expect(status(page)).toHaveText('ACP2[Confidence] とその確信論証を削除しました。');
+});
+
+test('an ACP shared with another line, or tied to it, is removed alone', async ({ page }) => {
+  // E2 also shows ACP1's description and ACP2's confidence argument.
+  const sample = readFileSync('../testdata/sacm/acps.sacm.xmi', 'utf8');
+  const shared = sample.replace('xmi:id="E2" source="Sn2" target="G3"', 'xmi:id="E2" source="Sn2" target="G3" metaClaim="ACP1 ACP2"');
+  expect(shared).not.toBe(sample);
+  await page.goto('/');
+  await page.getByTestId('open-file').setInputFiles({ name: 'shared.sacm.xmi', mimeType: 'application/xml', buffer: Buffer.from(shared) });
+  await expect.poll(async () => (await hook(page))?.viewport?.scale ?? null).not.toBeNull();
+  expect(await acpsOn(page, 'E2')).toEqual(['ACP1', 'ACP2[Confidence]']);
+
+  // Delete does not guess which line's ACP goes.
+  const square = await onAcp(page, 'ACP1');
+  await page.mouse.click(square.x, square.y);
+  await expect.poll(async () => (await hook(page)).selected).toBe('ACP1');
+  await canvas(page).focus();
+  await page.keyboard.press('Delete');
+  await expect(status(page)).toHaveText('Nothing changed. The ACPs of several lines show this description. Remove one from its line’s menu.');
+  expect(await acpsOn(page, 'I1')).toEqual(['ACP1']);
+
+  // The confidence argument stays: only the ACP is offered.
+  const at = await onLine(page, 'E1', 'Sn1');
+  await page.mouse.click(at.x, at.y, { button: 'right' });
+  await page.getByRole('menu', { name: 'Line' }).getByRole('menuitem', { name: 'Remove ACP2[Confidence]' }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Remove ACP2[Confidence]?' });
+  await expect(dialog).toContainText('Its confidence argument, Confidence, stays: something outside it depends on it.');
+  await expect(dialog.getByRole('button', { name: 'Remove with confidence argument' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Remove ACP only' }).click();
+  await expect(status(page)).toHaveText('ACP2[Confidence] removed.');
+  expect(await acpsOn(page, 'E1')).toEqual([]);
+  expect(await acpsOn(page, 'E2')).toEqual(['ACP1', 'ACP2[Confidence]']);
 });

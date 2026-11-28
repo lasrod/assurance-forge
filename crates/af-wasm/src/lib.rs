@@ -152,6 +152,34 @@ impl WasmCore {
         json(&self.core.remove(id, revision))
     }
 
+    /// `AcpRemoval` as JSON for the ACP `relationship` carries for the Claim
+    /// `claim`: what removing it would delete; `None` when nothing is open.
+    #[wasm_bindgen(js_name = acpRemoval)]
+    pub fn acp_removal(&self, relationship: &str, claim: &str) -> Result<Option<String>, JsError> {
+        self.core
+            .acp_removal(relationship, claim)
+            .map(|removal| json(&removal))
+            .transpose()
+    }
+
+    /// Removes the ACP `relationship` carries for the Claim `claim`, with its
+    /// confidence argument when `with_argument`, as the removal of `revision`
+    /// said. `EditResult` as JSON.
+    #[wasm_bindgen(js_name = removeAcp)]
+    pub fn remove_acp(
+        &mut self,
+        relationship: &str,
+        claim: &str,
+        with_argument: bool,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(
+            &self
+                .core
+                .remove_acp(relationship, claim, with_argument, revision),
+        )
+    }
+
     /// `MoveTargets` as JSON for the node `id`: where it may be moved;
     /// `None` when nothing is open.
     #[wasm_bindgen(js_name = moveTargets)]

@@ -87,6 +87,7 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
 | A4 | The confidence `Claim` is numbered `ACP1`, `ACP2`…, and the ACP is labelled with its identifier, with `[package name]` when it is in another package | §1:5.3.2 and §1:5.2.3: the identifier is the reference to the goal, so nothing else is stored, and renaming the goal renames the ACP. Decided by the user on 27 November 2026 |
 | A5 | The whole case is a diagram, as now, and what a file opens on; each argument package is also a diagram of its own. The Case Explorer's file row opens the whole case and a package's row that package; a click on an ACP opens its confidence argument's package with the goal selected | Decided by the user on 27 November 2026: a confidence argument is usually a diagram of its own (§1:5.3.1: "a separate confidence argument module"). The whole case stays because real files split one argument across packages: 8 of the 49 relationships of `oasc-ja` and 23 of the 128 of the large case join nodes of two packages |
 | A6 | A package's diagram draws its nodes and every line with an end among them. A node of another package that such a line reaches is drawn too, marked with its package's name, and the mark opens that package | A line is not cut in two: what the package says about a node elsewhere stays in view, with where that node is. Nothing in the file changes: the mark is of the diagram, not a citation (an away goal is `isCitation`, E9) |
+| A7 | Removing an ACP takes its description with it. A confidence argument in a package of its own is kept or deleted with it as the user chooses each time, in a dialog that lists what deleting it removes; a goal of the line's own argument stays | Decided by the user on 28 November 2026, over always deleting the package or always keeping it: the app has no other way to delete a package, and a confidence argument may be worth keeping without its ACP |
 
 ## The pieces
 
@@ -114,6 +115,11 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
       ACP1" in the interface's language.
 - [x] **G4.** A click on an ACP: the confidence argument's diagram with its
       goal selected, or the description in Element Properties. Both
+      languages, browser tests.
+- [x] **G5.** Removing an ACP from its line's menu, or by Delete with its
+      description selected: a description goes with it; a confidence
+      argument in a package of its own is kept or deleted as the user
+      chooses (decided 28 November 2026; W35). One undo step, both
       languages, browser tests.
 
 Known limits, found in review: a package's diagram decides a relationship's

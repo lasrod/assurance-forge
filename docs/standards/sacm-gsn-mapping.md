@@ -709,6 +709,20 @@ removes `metaClaim` for a Claim's `subject` (SACM24-38, -50, -83).
 | W33 | Where an ACP goes | A line drawn as `SupportedBy` or `InContextOf`, the first of its relationship: an inference through a Strategy takes it on its line into the Strategy, not on a premise's below it (AF-EDIT-027). A challenge, a line drawn neutral, or anything GSN v3 does not name, does not (AF-EDIT-029). A Solution or a Context does in GSN v3 but not in SACM 2.3, and its menu says it comes with SACM 2.4 (AF-EDIT-030) | Decided | GSN v3 Table 1:5-1 and §1:5.3.3; Table 1:5-2 for a Solution or a Context, which are `ArtifactReference`s without `metaClaim` in SACM 2.3 (gap row 7) |
 | W34 | The ACP | A confidence `Claim` made as an add makes a Goal (W9), numbered with the next identifier of the prefix `ACP` (W10's numbering): **a description**, in the line's `ArgumentPackage`, which R17 then shows only as the ACP; or **a confidence argument**, in a new `ArgumentPackage` (`CreateArgumentPackage`) beside the line's, under what holds it, named as the interface words it ("Confidence ACP1"), of which the Claim is the top goal. A description is tagged `assuranceForge.gsn.acp` = `description` (R17). Then `SetReferences(relationship, MetaClaim, …)` adds the Claim to the relationship's `metaClaim`, after any it names. Nothing else changes | Decided | E11 reads it back as the ACP. GSN v3 §1:5.2.3: "Each ACP should have a unique identifier, e.g. 'ACP1'", and the argument is "a paragraph of accompanying text, a goal in the local argument, or a goal in a separate module"; §1:5.3.2: the identifier "may be a reference to a goal" |
 
+### Removing an assurance claim point
+
+How the editor removes an ACP from its line, which stays (milestone 2, step
+7). `af-gsn` (`commands::remove_acp`) applies it as one `sacm::edit::batch`,
+one undo step; `commands::acp_removal` answers what it deletes, which the
+interface shows first. Decided on 28 November 2026 with the user: a
+confidence argument in a package of its own is kept or deleted as the user
+chooses each time. Removing a line, or the node it leaves, takes its ACPs as
+W19 says.
+
+| Rule | Where, and with what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W35 | Removing an ACP | An ACP E11 draws, chosen by its relationship and its confidence `Claim` (else AF-EDIT-031). `RemoveReference(relationship, MetaClaim, Claim)`. Then by what the Claim is: **a description** (R17) that no other relationship's `metaClaim` names is deleted with it (`DeleteElement`), since nothing else would show it, and one another ACP shows stays; **a goal of the line's own package** stays, now drawn by its own rules; **a confidence argument**, a Claim in another `ArgumentPackage` than the relationship's, is kept, or with the user's choice deleted with its package (`DeleteElement`, recursive). The package is deleted only when it holds nothing but what the dialog lists (its nodes and descriptions), the relationships the diagram draws as lines, and what the diagram never shows on its own (the placeholders W20 adds, which a node's removal also takes unlisted, and utility elements), nothing outside it refers into it but this `metaClaim`, and nothing in it refers out but by `citedElement`: otherwise its deletion is refused (AF-EDIT-015) and the ACP alone may still go. What a deletion lists is exactly what goes, or the batch is rolled back | Decided | GSN v3 §1:5.2.3 places the argument behind an ACP in "accompanying text, a goal in the local argument, or a goal in a separate module": the text exists only for the ACP, the local goal is part of the argument, and the module is an argument of its own, which may stand without the ACP. "Never silently change an argument": nothing of the argument goes that the dialog does not list or the diagram does not draw |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -746,3 +760,5 @@ was refused. Nothing changes.
 | AF-EDIT-028 | A challenge is moved to another node or line, never to the top level (W32) |
 | AF-EDIT-029 | GSN puts no ACP there: only on a `SupportedBy` or `InContextOf` line drawn as one, or a Solution or a Context (W33) |
 | AF-EDIT-030 | An ACP on a Solution or a Context comes with SACM 2.4: SACM 2.3 cannot hold it (W33, gap row 7) |
+| AF-EDIT-031 | The line carries no ACP the diagram draws for that Claim (W35) |
+| AF-EDIT-032 | Said by the interface: Delete on a description that the ACPs of several lines show, which does not say which ACP goes; the line's menu does (W35) |

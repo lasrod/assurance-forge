@@ -4,7 +4,8 @@
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{
-    AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, add_acp, removal, remove,
+    AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, acp_removal, add_acp,
+    removal, remove, remove_acp,
 };
 use af_gsn::view::{Acp, Code, argument_package_of, of_package, view};
 use sacm::model::{Document, ElementKind as SacmKind};
@@ -648,4 +649,208 @@ fn w19_a_relationship_with_a_meta_claim_not_drawn_is_not_deleted() {
         r#"<argumentElement xmi:type="sacm:Claim" xmi:id="c"><name content="c" /></argumentElement>"#,
     );
     assert_eq!(view(&document, "en").acps.len(), 1);
+}
+
+// ===== Removing an ACP (W35) =====
+
+/// The fixture with each `from` replaced by its `to`, which must be in it.
+fn changed(replacements: &[(&str, &str)]) -> Document {
+    let path = format!(
+        "{}/../../testdata/sacm/acps.sacm.xmi",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let mut text = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("setup: {error}"));
+    for (from, to) in replacements {
+        assert!(text.contains(from), "setup: {from} is not in the fixture");
+        text = text.replace(from, to);
+    }
+    read(text.as_bytes())
+}
+
+fn meta_claims(document: &Document, relationship: &str) -> Vec<String> {
+    document
+        .get(relationship)
+        .map(|element| {
+            element
+                .meta_claims()
+                .iter()
+                .map(|id| id.as_str().to_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn w35_a_description_goes_with_its_acp() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let plan = acp_removal(&original, &shown, "I1", "ACP1").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(plan.description.as_deref(), Some("ACP1"));
+    assert_eq!(plan.argument, None);
+    let mut document = original.clone();
+    remove_acp(&mut document, &shown, "I1", "ACP1", false)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let read_back = strict(&document);
+    assert!(read_back.get("ACP1").is_none());
+    assert!(meta_claims(&read_back, "I1").is_empty());
+    let after = view(&read_back, "en");
+    assert!(!after.acps.iter().any(|acp| acp.relationship == "I1"));
+    // Not left behind as a Goal of its own, and nothing else changed.
+    assert_eq!(after.nodes, shown.nodes);
+    assert_eq!(after.acps.len(), shown.acps.len() - 1);
+    assert!(after.descriptions.is_empty());
+}
+
+#[test]
+fn w35_a_description_another_acp_shows_stays_for_it() {
+    let original = changed(&[(
+        r#"xmi:id="E2" source="Sn2" target="G3""#,
+        r#"xmi:id="E2" source="Sn2" target="G3" metaClaim="ACP1""#,
+    )]);
+    let shown = view(&original, "en");
+    let plan = acp_removal(&original, &shown, "I1", "ACP1").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(plan.description, None);
+    let mut document = original.clone();
+    remove_acp(&mut document, &shown, "I1", "ACP1", false)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&strict(&document), "en");
+    assert!(meta_claims(&document, "I1").is_empty());
+    assert_eq!(meta_claims(&document, "E2"), ["ACP1".to_owned()]);
+    assert!(after.descriptions.iter().any(|node| node.id == "ACP1"));
+}
+
+#[test]
+fn w35_a_goal_of_the_argument_stays_and_only_its_acp_goes() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let plan = acp_removal(&original, &shown, "X1", "ACP4").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(plan.description, None);
+    assert_eq!(plan.argument, None);
+    let mut document = original.clone();
+    // Asking for a confidence argument it does not have changes nothing more.
+    remove_acp(&mut document, &shown, "X1", "ACP4", true).unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&strict(&document), "en");
+    assert!(meta_claims(&document, "X1").is_empty());
+    assert_eq!(after.nodes, shown.nodes);
+    assert_eq!(after.edges.len(), shown.edges.len());
+    assert!(!after.acps.iter().any(|acp| acp.relationship == "X1"));
+}
+
+#[test]
+fn w35_a_confidence_argument_is_kept_or_deleted_with_its_acp() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let plan = acp_removal(&original, &shown, "E1", "ACP2").unwrap_or_else(|why| panic!("{why:?}"));
+    assert_eq!(plan.description, None);
+    let argument = plan
+        .argument
+        .unwrap_or_else(|| panic!("ACP2 has a confidence argument"));
+    assert_eq!(argument.package, "argpkg_confidence");
+    assert_eq!(argument.nodes, ["ACP2".to_owned(), "Sn3".to_owned()]);
+    assert_eq!(argument.refusal, None);
+
+    // Kept: the package stays, its goal now a top goal of its own.
+    let mut kept = original.clone();
+    remove_acp(&mut kept, &shown, "E1", "ACP2", false).unwrap_or_else(|error| panic!("{error}"));
+    let after = view(&strict(&kept), "en");
+    assert!(meta_claims(&kept, "E1").is_empty());
+    assert!(kept.get("argpkg_confidence").is_some());
+    assert_eq!(after.nodes, shown.nodes);
+    assert!(!after.acps.iter().any(|acp| acp.relationship == "E1"));
+
+    // Deleted: the package goes with all it holds, and nothing else does.
+    let mut deleted = original.clone();
+    remove_acp(&mut deleted, &shown, "E1", "ACP2", true).unwrap_or_else(|error| panic!("{error}"));
+    let read_back = strict(&deleted);
+    for id in ["argpkg_confidence", "ACP2", "Sn3", "E3"] {
+        assert!(read_back.get(id).is_none(), "{id} is deleted");
+    }
+    let after = view(&read_back, "en");
+    let left: Vec<&str> = shown
+        .nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .filter(|id| !["ACP2", "Sn3"].contains(id))
+        .collect();
+    assert_eq!(
+        after
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<Vec<_>>(),
+        left
+    );
+    assert_eq!(after.acps.len(), shown.acps.len() - 1);
+}
+
+#[test]
+fn w35_a_confidence_argument_tied_to_the_rest_is_not_deleted() {
+    let cases: [&[(&str, &str)]; 4] = [
+        // Another line's ACP names its goal.
+        &[(
+            r#"xmi:id="E2" source="Sn2" target="G3""#,
+            r#"xmi:id="E2" source="Sn2" target="G3" metaClaim="ACP2""#,
+        )],
+        // The same line carries a second ACP into it.
+        &[
+            (r#"metaClaim="ACP2""#, r#"metaClaim="ACP2 ACP6""#),
+            (
+                r#"<argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn3">"#,
+                r#"<argumentElement xmi:type="sacm:Claim" xmi:id="ACP6"><name content="Second" /></argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn3">"#,
+            ),
+        ],
+        // One of its lines leaves it.
+        &[(
+            r#"xmi:id="E3" source="Sn3""#,
+            r#"xmi:id="E3" source="Sn3 Sn4""#,
+        )],
+        // It holds a relationship the diagram does not draw.
+        &[(
+            r#"<argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3""#,
+            r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="I9" source="ACP2" target="E3" /><argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3""#,
+        )],
+    ];
+    for case in cases {
+        let original = changed(case);
+        let to = case[0].1;
+        let shown = view(&original, "en");
+        assert!(
+            !shown.edges.iter().any(|edge| edge.relationship == "I9"),
+            "setup: I9 is not drawn"
+        );
+        let plan =
+            acp_removal(&original, &shown, "E1", "ACP2").unwrap_or_else(|why| panic!("{why:?}"));
+        let argument = plan
+            .argument
+            .unwrap_or_else(|| panic!("a confidence argument"));
+        assert_eq!(argument.refusal, Some(Refusal::Entangled), "{to}");
+        let mut document = original.clone();
+        match remove_acp(&mut document, &shown, "E1", "ACP2", true) {
+            Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::Entangled),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(document, original);
+        // The ACP alone still goes.
+        remove_acp(&mut document, &shown, "E1", "ACP2", false)
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert!(!meta_claims(&document, "E1").contains(&"ACP2".to_owned()));
+        assert!(document.get("argpkg_confidence").is_some());
+    }
+}
+
+#[test]
+fn w35_no_such_acp_is_refused_and_changes_nothing() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    assert_eq!(
+        acp_removal(&original, &shown, "E2", "ACP1"),
+        Err(Refusal::NotAnAcp)
+    );
+    let mut document = original.clone();
+    match remove_acp(&mut document, &shown, "I1", "ACP2", true) {
+        Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::NotAnAcp),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(document, original);
 }

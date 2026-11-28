@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { findEdge } from './canvas/draw';
 import type {
   AcpChoices,
+  AcpRemoval,
   AcpKind,
   AddChoice,
   Core,
@@ -58,6 +59,8 @@ export type DocumentState =
   | { kind: 'challenged'; added: NodeKind; identifier: string }
   /** An assurance claim point added: its identifier. */
   | { kind: 'acpAdded'; identifier: string }
+  /** An assurance claim point removed: its label, and whether its confidence argument went too. */
+  | { kind: 'acpRemoved'; label: string; withArgument: boolean }
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
@@ -631,6 +634,46 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
+   * What removing the ACP that `relationship` carries for `claim` would
+   * delete, with the revision it is of; null if the document changed before
+   * it came, or if it cannot be removed, which the status then says.
+   */
+  const acpRemoval = useCallback(async (relationship: string, claim: string): Promise<AcpRemoval | null> => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return null;
+    const request = latest.current;
+    try {
+      const answer = await on.acpRemoval(relationship, claim);
+      if (!answer || request !== latest.current) return null;
+      if (answer.revision !== revision || shown.current !== revision) {
+        setState({ kind: 'editRefused', code: 'AF-EDIT-009', about: null });
+        return null;
+      }
+      if (answer.refusal !== null) {
+        setState({ kind: 'editRefused', code: answer.refusal, about: null });
+        return null;
+      }
+      return answer;
+    } catch {
+      return null;
+    }
+  }, []);
+  /**
+   * Removes the ACP that `relationship` carries for `claim`, with its
+   * confidence argument when `withArgument`, as `shownRemoval` said at its
+   * revision. The view keeps `anchor`, the line's upper end, in place.
+   */
+  const removeAcp = useCallback(
+    (relationship: string, claim: string, shownRemoval: AcpRemoval, withArgument: boolean, anchor: string, onShown: EditShown) =>
+      void edit((on) => on.removeAcp(relationship, claim, withArgument, shownRemoval.revision), 'remove', anchor, null, onShown, {
+        kind: 'acpRemoved',
+        label: shownRemoval.label,
+        withArgument: withArgument && shownRemoval.argument !== null,
+      }),
+    [edit],
+  );
+  /**
    * Where the node `id` may be moved, with the revision it is of; null if
    * the document changed before it came, or if the node cannot be moved,
    * which the status then says.
@@ -957,6 +1000,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     add,
     removal,
     remove,
+    acpRemoval,
+    removeAcp,
     moveTargets,
     move,
     moveRefused,
