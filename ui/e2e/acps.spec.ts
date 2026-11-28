@@ -266,7 +266,8 @@ test('a confidence argument kept by a removal is linked back from the line’s m
   await expect(menu().getByRole('menuitem', { name: 'Link ACP to' })).toHaveCount(0);
   await menu().getByRole('menuitem', { name: 'Remove ACP2[Confidence]' }).click();
   await page.getByRole('alertdialog', { name: 'Remove ACP2[Confidence]?' }).getByRole('button', { name: 'Remove ACP only' }).click();
-  expect(await acpsOn(page, 'E1')).toEqual([]);
+  // Polled: the desktop's core answers after the click returns.
+  await expect.poll(() => acpsOn(page, 'E1')).toEqual([]);
 
   // Its top goal is offered under Link ACP to, labelled as the ACP will be.
   await openMenu();
