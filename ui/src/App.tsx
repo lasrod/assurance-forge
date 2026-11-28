@@ -1129,8 +1129,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                       t={t}
                       onShow={showNode}
                       onRepair={(repair, revision, problem) => {
+                        // Each repair is an edit made elsewhere too: the same command, and the same questions.
+                        if (repair.kind === 'removeLine') {
+                          askRemoveLine({ relationship: repair.relationship, from: repair.from, to: repair.to });
+                          return;
+                        }
                         const element = problem.elements.find((candidate) => candidate.id === repair.element);
-                        repairWith(repair, revision, { kind: element?.kind ?? null, identifier: element?.identifier ?? repair.element }, followEdit);
+                        const identifier = element?.identifier ?? repair.element;
+                        if (repair.kind === 'clearUndeveloped') setUndeveloped(repair.element, false, revision, identifier);
+                        else repairWith(repair, revision, { kind: element?.kind ?? null, identifier }, followEdit);
                       }}
                     />
                   ),

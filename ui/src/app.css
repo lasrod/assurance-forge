@@ -122,6 +122,12 @@
   }
 
   /* The repair of the problem chosen, above the list. */
+  /* A problem's repairs, one row each, above the list. */
+  .af-problem-repairs {
+    display: flex;
+    flex-direction: column;
+  }
+
   .af-problem-repair {
     display: flex;
     align-items: center;

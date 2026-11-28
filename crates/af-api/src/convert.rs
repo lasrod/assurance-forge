@@ -227,6 +227,40 @@ pub(crate) fn problem(
         relationship: problem.relationship,
         line: problem.line,
         column: problem.column,
-        repair: None,
+        repairs: Vec::new(),
+    }
+}
+
+/// A repair of a GSN problem, as the contract offers it.
+pub(crate) fn repair(repair: af_gsn::commands::Repair) -> crate::contract::ProblemRepair {
+    use af_gsn::commands::Repair;
+    let code = |refusal: Option<af_gsn::commands::Refusal>| {
+        refusal.map(|refusal| refusal.code().to_owned())
+    };
+    match repair {
+        Repair::MakeContext {
+            element,
+            relationship,
+        } => crate::contract::ProblemRepair::MakeContext {
+            element,
+            relationship,
+        },
+        Repair::RemoveLine {
+            relationship,
+            from,
+            to,
+            refusal,
+        } => crate::contract::ProblemRepair::RemoveLine {
+            relationship,
+            from,
+            to,
+            refusal: code(refusal),
+        },
+        Repair::ClearUndeveloped { element, refusal } => {
+            crate::contract::ProblemRepair::ClearUndeveloped {
+                element,
+                refusal: code(refusal),
+            }
+        }
     }
 }

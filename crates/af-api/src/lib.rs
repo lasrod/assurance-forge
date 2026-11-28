@@ -35,6 +35,7 @@ pub mod contract;
 
 use af_gsn::commands::{self, Challenged, Target};
 use af_gsn::view::{self, View};
+use af_gsn::wellformed::{Finding, Rule};
 use af_layout::{Engine, Fonts, Style};
 use af_session::{ChangeRecord, Session};
 use sacm::model::AbstractClass;
@@ -1247,22 +1248,25 @@ fn derive_problems(
                     contract::ProblemSeverity::Info
                 }
             };
+            // F1: a GSN problem is its finding, whose repairs the rules say.
+            let finding = (problem.source == af_problems::Source::Gsn)
+                .then(|| {
+                    Rule::ALL
+                        .into_iter()
+                        .find(|rule| rule.code() == problem.code)
+                })
+                .flatten()
+                .map(|rule| Finding {
+                    rule,
+                    nodes: problem.elements.clone(),
+                    relationship: problem.relationship.clone(),
+                });
             let mut problem = convert::problem(problem, severity, view);
-            // AF-GSN-004: a Context, Assumption or Justification joined by
-            // a support line, which W27 can make context.
-            if problem.code == "AF-GSN-004" {
-                if let Some(relationship) = problem.relationship.clone() {
-                    problem.repair = problem
-                        .elements
-                        .iter()
-                        .find(|element| {
-                            commands::repairable(document, view, &element.id, &relationship).is_ok()
-                        })
-                        .map(|element| contract::ProblemRepair {
-                            element: element.id.clone(),
-                            relationship,
-                        });
-                }
+            if let Some(finding) = finding {
+                problem.repairs = commands::repairs(document, view, &finding)
+                    .into_iter()
+                    .map(convert::repair)
+                    .collect();
             }
             problem
         })

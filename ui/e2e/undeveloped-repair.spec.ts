@@ -122,10 +122,10 @@ test('the problem of an assumption joined by a support line offers its repair, w
   const problems = page.getByRole('listbox', { name: 'Problems' });
   const rows = problems.getByRole('option');
   const before = await rows.count();
-  // Nothing is offered until a problem is chosen, and only for one that can be repaired.
+  // Nothing is offered until a problem is chosen; each offers its own repair.
   await expect(page.getByTestId('problem-repair')).toHaveCount(0);
   await rows.filter({ hasText: 'AF-GSN-010' }).click();
-  await expect(page.getByTestId('problem-repair')).toHaveCount(0);
+  await expect(page.getByTestId('problem-repair')).toContainText('Clear the undeveloped mark of cl_sub_2.');
   await rows.filter({ hasText: 'AF-GSN-004' }).click();
   const repair = page.getByTestId('problem-repair');
   await expect(repair).toContainText('Join cl_assumption_1 as context, in place of the support line.');
