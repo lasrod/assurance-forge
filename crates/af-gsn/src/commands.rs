@@ -12,7 +12,8 @@
 //! [`set_text`] changes a node's identifier, name or statement: the inverse of
 //! the reading rules T1 to T3, as W15 to W17 record. [`removal`] and
 //! [`remove`] answer what removing a node deletes and remove it (W18 to W20);
-//! [`acp_removal`] and [`remove_acp`] do the same for an ACP (W35).
+//! [`acp_removal`] and [`remove_acp`] do the same for an ACP (W35), and
+//! [`line_removal`] and [`remove_line`] for one line (W37).
 
 use std::fmt;
 
@@ -35,10 +36,11 @@ mod challenge;
 mod move_node;
 mod remove;
 mod remove_acp;
+mod remove_line;
 mod repair;
 pub use acp::{
-    ACP_KINDS, ACP_PREFIX, AcpChoices, AcpGoal, AcpKind, AcpLine, acp_choices, acp_node_refusal,
-    add_acp, link_acp,
+    ACP_KINDS, ACP_PREFIX, AcpChoices, AcpGoal, AcpKind, acp_choices, acp_node_refusal, add_acp,
+    link_acp,
 };
 pub use challenge::{
     CHALLENGERS, Challenged, LineTarget, challenge, challenge_choices, move_challenge,
@@ -46,7 +48,17 @@ pub use challenge::{
 pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
 pub use remove_acp::{AcpRemoval, ConfidenceArgument, acp_removal, remove_acp};
+pub use remove_line::{LineRemoval, LineRemoved, line_removal, remove_line};
 pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
+
+/// One line of a relationship, from `from` to `to` as the view draws it:
+/// what an ACP goes on (W33), and what a line's removal takes (W37).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Line<'a> {
+    pub relationship: &'a str,
+    pub from: &'a str,
+    pub to: &'a str,
+}
 
 /// Where an element is to be added.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -132,6 +144,19 @@ pub enum Refusal {
     /// AF-EDIT-035: an ACP names a goal that exists only when it is the top
     /// goal of another argument package (W36).
     NotATopGoalElsewhere,
+    /// AF-EDIT-036: the line from a Goal to its Strategy is removed only
+    /// with the Strategy: an inference keeps its target (W37).
+    StrategyLine,
+    /// AF-EDIT-037: removing the line would change what a node at its end
+    /// is drawn as, such as a Solution or a Context known only by its line
+    /// (W37).
+    KindFromLine,
+    /// AF-EDIT-038: the line is challenged, so it is not removed alone
+    /// (W37).
+    LineChallenged,
+    /// AF-EDIT-039: only a support or context line is removed alone, by a
+    /// relationship that names its lower end once (W37).
+    NotARemovableLine,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -172,6 +197,10 @@ impl Refusal {
             Refusal::AlreadyAnAcp => "AF-EDIT-033",
             Refusal::AcpOfItself => "AF-EDIT-034",
             Refusal::NotATopGoalElsewhere => "AF-EDIT-035",
+            Refusal::StrategyLine => "AF-EDIT-036",
+            Refusal::KindFromLine => "AF-EDIT-037",
+            Refusal::LineChallenged => "AF-EDIT-038",
+            Refusal::NotARemovableLine => "AF-EDIT-039",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

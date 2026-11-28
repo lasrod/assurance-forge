@@ -108,7 +108,7 @@ rows each repair writes are recorded with their evidence in
 
 ## The goals
 
-- [ ] **G1.** Removing a line (F2, F3): the rule and its mapping row, the
+- [x] **G1.** Removing a line (F2, F3): the rule and its mapping row, the
       command with tests, and Remove Line on a line's menu, with what it
       refuses and why, the ACP it takes listed and asked about. Both
       languages, browser tests.

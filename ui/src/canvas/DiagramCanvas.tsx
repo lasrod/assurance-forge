@@ -90,9 +90,10 @@ type Gesture = {
  * resolve to, for the layout. `onContextMenu` asks for the add menu of a
  * node, or of the empty canvas (`null`), at a point in client coordinates:
  * from a right-click, or from the context-menu key or Shift+F10 on the
- * selected node. `onRemove` asks to remove the selected node, or the ACP
- * whose description is selected: Delete, or Backspace, which is the key
- * macOS calls delete. A right-click on an ACP opens its line's menu.
+ * selected node. `onRemove` asks to remove the selected node, the ACP
+ * whose description is selected, or the selected support or context line,
+ * by its `edgeKey`: Delete, or Backspace, which is the key macOS calls
+ * delete. A right-click on an ACP opens its line's menu.
  *
  * While a move is being chosen (`move`), the canvas draws where the node may
  * go; a click on a node says so (`onMoveTo`) in place of selecting it, and
@@ -528,11 +529,13 @@ export function DiagramCanvas({
     }
     const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
     if ((event.key === 'Delete' || event.key === 'Backspace') && plain && !event.nativeEvent.isComposing) {
-      // A node is removed, or the ACP whose description is selected: a
-      // selected line is not. Not while a move is chosen.
+      // A node is removed, the ACP whose description is selected, or a
+      // support or context line. Not while a move is chosen.
+      const line = diagram && selected ? findEdge(diagram.diagram, selected) : null;
       const removable =
         diagram?.diagram.nodes.some((node) => node.id === selected) ||
-        diagram?.diagram.edges.some((edge) => edge.acps.some((acp) => acp.claim === selected));
+        diagram?.diagram.edges.some((edge) => edge.acps.some((acp) => acp.claim === selected)) ||
+        (line !== null && (line.kind === 'supportedBy' || line.kind === 'inContextOf'));
       if (!move && selected && removable) {
         event.preventDefault();
         onRemove(selected);

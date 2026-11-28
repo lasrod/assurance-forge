@@ -535,6 +535,20 @@ pub struct AcpRemoval {
     pub refusal: Option<String>,
 }
 
+/// What removing one line would take with it, at `revision` (W37).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct LineRemoval {
+    pub revision: u32,
+    /// The labels of the assurance claim points that go with the line, such
+    /// as `ACP2[Confidence]`, each with its description when it has one.
+    pub acps: Vec<String>,
+    /// Why it cannot be removed (`AF-EDIT-015`, `AF-EDIT-036` to
+    /// `AF-EDIT-039`), or null when it can. The frontend words it.
+    pub refusal: Option<String>,
+}
+
 /// A confidence argument in an argument package of its own, as the removal
 /// of its ACP lists it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -948,6 +962,7 @@ pub fn typescript() -> String {
         Removal::decl(&cfg),
         ConfidenceArgument::decl(&cfg),
         AcpRemoval::decl(&cfg),
+        LineRemoval::decl(&cfg),
         MoveTarget::decl(&cfg),
         MoveLine::decl(&cfg),
         MoveTargets::decl(&cfg),

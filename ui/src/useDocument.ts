@@ -20,6 +20,7 @@ import type {
   ElementKind,
   History,
   LineEnds,
+  LineRemoval,
   NodeKind,
   OpenedFile,
   OpenResult,
@@ -61,6 +62,8 @@ export type DocumentState =
   | { kind: 'acpAdded'; identifier: string }
   /** An assurance claim point removed: its label, and whether its confidence argument went too. */
   | { kind: 'acpRemoved'; label: string; withArgument: boolean }
+  /** A line removed: the identifiers of its ends, and the labels of the ACPs that went with it. */
+  | { kind: 'lineRemoved'; from: string; to: string; acps: string[] }
   /** A goal that exists named as an assurance claim point: the ACP's label. */
   | { kind: 'acpLinked'; label: string }
   | { kind: 'textChanged'; field: TextField }
@@ -689,6 +692,47 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
+   * What removing the line `line` of `relationship` would take with it,
+   * with the revision it is of; null if the document changed before it
+   * came, or if the line cannot be removed, which the status then says.
+   */
+  const lineRemoval = useCallback(async (relationship: string, line: LineEnds): Promise<LineRemoval | null> => {
+    const on = coreRef.current;
+    const revision = shown.current;
+    if (!on || revision === null) return null;
+    const request = latest.current;
+    try {
+      const answer = await on.lineRemoval(relationship, line);
+      if (!answer || request !== latest.current) return null;
+      if (answer.revision !== revision || shown.current !== revision) {
+        setState({ kind: 'editRefused', code: 'AF-EDIT-009', about: null });
+        return null;
+      }
+      if (answer.refusal !== null) {
+        setState({ kind: 'editRefused', code: answer.refusal, about: null });
+        return null;
+      }
+      return answer;
+    } catch {
+      return null;
+    }
+  }, []);
+  /**
+   * Removes the line `line` of `relationship`, as `shownRemoval` said at its
+   * revision; `named` holds the identifiers of its ends, for the status.
+   * The view keeps the line's upper end in place.
+   */
+  const removeLine = useCallback(
+    (relationship: string, line: LineEnds, shownRemoval: LineRemoval, named: LineEnds, onShown: EditShown) =>
+      void edit((on) => on.removeLine(relationship, line, shownRemoval.revision), 'remove', line.from, null, onShown, {
+        kind: 'lineRemoved',
+        from: named.from,
+        to: named.to,
+        acps: shownRemoval.acps,
+      }),
+    [edit],
+  );
+  /**
    * Where the node `id` may be moved, with the revision it is of; null if
    * the document changed before it came, or if the node cannot be moved,
    * which the status then says.
@@ -1017,6 +1061,8 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     remove,
     acpRemoval,
     removeAcp,
+    lineRemoval,
+    removeLine,
     linkAcp,
     moveTargets,
     move,

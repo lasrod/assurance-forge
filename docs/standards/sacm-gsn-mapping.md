@@ -729,12 +729,27 @@ How the editor removes an ACP from its line, which stays (milestone 2, step
 one undo step; `commands::acp_removal` answers what it deletes, which the
 interface shows first. Decided on 28 November 2026 with the user: a
 confidence argument in a package of its own is kept or deleted as the user
-chooses each time. Removing a line, or the node it leaves, takes its ACPs as
-W19 says.
+chooses each time. Removing a line (W37), or the node it leaves, takes its
+ACPs as W19 says.
 
 | Rule | Where, and with what | SACM operations | Status | Evidence |
 |---|---|---|---|---|
 | W35 | Removing an ACP | An ACP E11 draws, chosen by its relationship and its confidence `Claim` (else AF-EDIT-031). `RemoveReference(relationship, MetaClaim, Claim)`. Then by what the Claim is: **a description** (R17) that no other relationship's `metaClaim` names is deleted with it (`DeleteElement`), since nothing else would show it, and one another ACP shows stays; **a goal of the line's own package** stays, now drawn by its own rules; **a confidence argument**, a Claim in another `ArgumentPackage` than the relationship's, is kept, or with the user's choice deleted with its package (`DeleteElement`, recursive). The package is deleted only when it holds nothing but what the dialog lists (its nodes and descriptions), the relationships the diagram draws as lines, and what the diagram never shows on its own (the placeholders W20 adds, which a node's removal also takes unlisted, and utility elements), nothing outside it refers into it but this `metaClaim`, and nothing in it refers out but by `citedElement`: otherwise its deletion is refused (AF-EDIT-015) and the ACP alone may still go. What a deletion lists is exactly what goes, or the batch is rolled back | Decided | GSN v3 §1:5.2.3 places the argument behind an ACP in "accompanying text, a goal in the local argument, or a goal in a separate module": the text exists only for the ACP, the local goal is part of the argument, and the module is an argument of its own, which may stand without the ACP. "Never silently change an argument": nothing of the argument goes that the dialog does not list or the diagram does not draw |
+
+### Removing a line
+
+How the editor removes one line of the diagram and leaves the nodes at its
+ends (milestone 2, step 8, G1; F2 and F3 of
+[the plan](../roadmap/milestone-2-repair.md)). `af-gsn`
+(`commands::remove_line`) applies it as one `sacm::edit::batch`, one undo
+step; `commands::line_removal` answers what it takes, which the interface
+shows first when an ACP goes with it. Decided on 28 November 2026 with the
+user: Remove Line is an item of a line's menu, and the repairs that remove
+a line are this same command.
+
+| Rule | Where, and with what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W37 | Removing a line | A `SupportedBy` or `InContextOf` line E1 to E4 draws, chosen by its relationship and its two ends; a challenge, a neutral line (E5a, E9) or no such line is refused (AF-EDIT-039). **The line from a Goal to its Strategy**, E1's first line, is refused (AF-EDIT-036): the Strategy is removed instead. **Any other line** names one `source` of the relationship, its lower end; a source named twice is refused (AF-EDIT-039). That source alone: `DeleteElement` of the relationship, with what it holds, which must be utility elements only, and with each description (R17) that only its `metaClaim` names; each ACP E11 draws on it goes with it and is listed, as W19 says, and a `metaClaim` E11 does not draw refuses (AF-EDIT-015). Alone under a Strategy: the inference stays with its Strategy, holding the place of the next Goal (W20), and only an inference R16 would hide the placeholder in does so (else AF-EDIT-015). One of several sources: `RemoveReference(relationship, Source, node)`, the relationship staying for the others, only when nothing refers to it and it has no `metaClaim` (W25's rule; AF-EDIT-015). In every case: refused when anything refers to the relationship, a challenge of it (AF-EDIT-038) or anything else (AF-EDIT-015). And refused when a node would be drawn as another kind than it is (AF-EDIT-037), which is checked on the result before it is kept: an `ArtifactReference` drawn as a Solution or a Context by its line alone (R9, R10) reads as neutral without it (R11). No node is removed: one left under nothing is drawn at the top level | Decided | SACM 2.3 §11.13: an asserted relationship has `source:ArgumentAsset[1..*]` and `target:ArgumentAsset[1]`, so the last source takes the relationship with it, and an inference cannot lose its target and keep its premises, which is what keeping a Strategy's Goals without its line would need. W25: taking a source out of "A and B support C" changes what a challenge of it, or an ACP on it, is about. "Never silently change an argument": a node's GSN kind is the meaning the user reads, so a removal that changes it is refused rather than made. The C++ application's AF-METH-011 made removing a relationship an edit of its own, and its removal detached a Strategy and everything under it with only the status message saying so; here no node goes |
 
 ### Codes
 
@@ -778,3 +793,7 @@ was refused. Nothing changes.
 | AF-EDIT-033 | The goal is already an ACP of the line (W36) |
 | AF-EDIT-034 | The line is part of the goal's own argument, which cannot be its confidence argument (W36) |
 | AF-EDIT-035 | An ACP links only to the top goal of another argument package (W36) |
+| AF-EDIT-036 | The line from a Goal to its Strategy is removed only with the Strategy: an inference keeps its target (W37) |
+| AF-EDIT-037 | Removing the line would change what a node at its end is drawn as: a Solution or a Context known only by its line (W37) |
+| AF-EDIT-038 | The line is challenged: it is not removed alone (W37) |
+| AF-EDIT-039 | Only a support or context line is removed alone, by a relationship that names its lower end once (W37) |

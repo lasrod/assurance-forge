@@ -1,7 +1,7 @@
 //! The session's revisions, change records, and undo and redo.
 
 use af_gsn::ElementKind;
-use af_gsn::commands::Target;
+use af_gsn::commands::{Line, Target, line_removal};
 use af_gsn::view::view;
 use af_session::{Command, HISTORY, Origin, Session};
 use sacm::compare;
@@ -100,6 +100,39 @@ fn undo_returns_the_document_to_what_it_was_and_redo_brings_the_add_back() {
     assert_eq!(session.records().len(), 3);
     assert!(session.undo().is_some());
     assert!(session.undo().is_none(), "one add, one undo");
+}
+
+#[test]
+fn a_line_removal_is_one_command_that_undo_takes_back() {
+    let original = sample();
+    let mut session = Session::new(original.clone(), 1);
+    let now = view(session.document(), "en");
+    let line = now
+        .edges
+        .iter()
+        .map(|edge| Line {
+            relationship: &edge.relationship,
+            from: &edge.from,
+            to: &edge.to,
+        })
+        .find(|line| line_removal(session.document(), &now, *line).is_ok())
+        .unwrap_or_else(|| panic!("setup: the sample has no removable line"));
+    let record = session
+        .remove_line(&now, line)
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(record.revision, 2);
+    assert_eq!(
+        record.command,
+        Command::RemoveLine {
+            relationship: line.relationship.to_owned(),
+            from: line.from.to_owned(),
+            to: line.to.to_owned(),
+        }
+    );
+    assert!(!(original == *session.document()));
+    assert!(session.undo().is_some());
+    assert!(original == *session.document());
+    assert!(session.undo().is_none(), "one removal, one undo");
 }
 
 #[test]

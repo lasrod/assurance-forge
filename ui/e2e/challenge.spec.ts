@@ -82,12 +82,14 @@ test('a line is challenged by a Solution from its menu, by a right-click or the 
   await page.mouse.click(at.x, at.y, { button: 'right' });
   const menu = page.getByRole('menu', { name: 'Line' });
   await expect(menu).toBeVisible();
-  // A line's menu challenges it or adds an ACP: nothing is added under a line.
+  // A line's menu challenges it, adds an ACP, or removes it: nothing is
+  // added under a line.
   await expect(menu.getByRole('menuitem')).toHaveText([
     'Add Counter Goal',
     'Add Counter Evidence',
     'Add ACP with Description',
     'Add ACP with Confidence Argument',
+    /^Remove Line/,
   ]);
   expect((await hook(page)).selected).toBe(`${edge.relationship} ${edge.from} ${edge.to}`);
   await menu.getByRole('menuitem', { name: 'Add Counter Evidence' }).click();
@@ -108,14 +110,16 @@ test('a line is challenged by a Solution from its menu, by a right-click or the 
   await page.keyboard.press('Escape');
 });
 
-test('a premise line under a Strategy says why it is not challenged on its own', async ({ page }) => {
+test('a premise line under a Strategy is not challenged on its own: its menu only removes it', async ({ page }) => {
   await opened(page);
   // The inference from cl_sub_1 and cl_sub_2 to cl_top through ar_1 is one
   // relationship, challenged on its first line, into the Strategy.
   const { at } = await onLineTo(page, 'cl_sub_2');
   await page.mouse.click(at.x, at.y, { button: 'right' });
-  await expect(status(page)).toHaveText(/^Nothing changed\. This line has no relationship of its own/);
-  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.getByRole('menu', { name: 'Line' }).getByRole('menuitem')).toHaveText([/^Remove Line/]);
+  // A menu that opens is no refusal: the status does not say one.
+  await expect(status(page)).not.toHaveText(/^Nothing changed/);
+  await page.keyboard.press('Escape');
   const first = await onLineTo(page, 'ar_1');
   await page.mouse.click(first.at.x, first.at.y, { button: 'right' });
   await expect(page.getByRole('menu', { name: 'Line' })).toBeVisible();
