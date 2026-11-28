@@ -3,7 +3,9 @@
 // out: GSN does not allow it there, and the menu does not explain what it
 // does not offer.
 
-import type { AddChoice, ElementKind, NodeKind } from './core/Core';
+import type {
+  AcpChoice,
+  AcpKind, AddChoice, ElementKind, NodeKind } from './core/Core';
 import type { MessageKey } from './i18n/messages';
 
 type T = (key: MessageKey, values?: Record<string, string | number>) => string;
@@ -25,7 +27,7 @@ export interface AddItem {
 
 /** The words for an `AF-EDIT-*` code, about a node of `kind` (null for the canvas). */
 export function refusalText(code: string, kind: NodeKind | null, t: T): string {
-  const known = /^AF-EDIT-0(0[1-9]|1[0-9]|2[0-8])$/.test(code);
+  const known = /^AF-EDIT-0(0[1-9]|1[0-9]|2[0-9]|30)$/.test(code);
   return known ? t(code as MessageKey, { kind: kind ? t(KINDS[kind]) : '' }) : code;
 }
 
@@ -38,6 +40,13 @@ export function challengeItems(choices: readonly AddChoice[], t: T): AddItem[] {
   return choices
     .filter((choice) => choice.refusal === null)
     .map((choice) => ({ kind: choice.kind, label: t(choice.kind === 'solution' ? 'addCounterEvidence' : 'addCounterGoal') }));
+}
+
+/** The line menu's ACP items: the kinds of argument an ACP may be added with there. */
+export function acpItems(choices: readonly AcpChoice[], t: T): { kind: AcpKind; label: string }[] {
+  return choices
+    .filter((choice) => choice.refusal === null)
+    .map((choice) => ({ kind: choice.kind, label: t(choice.kind === 'description' ? 'addAcpDescription' : 'addAcpArgument') }));
 }
 
 /** The menu's items for `choices`: the kinds that can be added, in the core's order. */

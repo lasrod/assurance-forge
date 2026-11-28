@@ -5,6 +5,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type {
+  AcpChoices,
   AddChoices,
   Core,
   DiagramAt,
@@ -69,11 +70,16 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     challengeChoices: (at, line) => invoke<AddChoices | null>('challenge_choices', { at, from: line?.from ?? null, to: line?.to ?? null }),
     challenge: (at, line, kind, revision) =>
       invoke<EditResult>('challenge', { at, from: line?.from ?? null, to: line?.to ?? null, kind, revision }),
+    acpChoices: (relationship, line) => invoke<AcpChoices | null>('acp_choices', { relationship, from: line.from, to: line.to }),
+    acpNodeRefusal: (id) => invoke<string | null>('acp_node_refusal', { id }),
+    addAcp: (relationship, line, kind, packageName, revision) =>
+      invoke<EditResult>('add_acp', { relationship, from: line.from, to: line.to, kind, packageName, revision }),
     add: (parent, kind, revision) => invoke<EditResult>('add', { parent, kind, revision }),
     removal: (id) => invoke<Removal | null>('removal', { id }),
     remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),
     moveTargets: (id) => invoke<MoveTargets | null>('move_targets', { id }),
     moveNode: (id, to, revision) => invoke<EditResult>('move_node', { id, to, revision }),
+    showPackage: (id) => invoke<boolean>('show_package', { package: id }),
     moveToLine: (id, line, revision) =>
       invoke<EditResult>('move_to_line', { id, relationship: line.relationship, from: line.from, to: line.to, revision }),
     setUndeveloped: (id, undeveloped, revision) => invoke<EditResult>('set_undeveloped', { id, undeveloped, revision }),

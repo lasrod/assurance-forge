@@ -41,10 +41,10 @@ use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 use contract::{
-    AddChoice, AddChoices, ArgumentValue, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult,
-    ElementDetails, ElementKind, History, MessageArgument, MoveTarget, MoveTargets, OpenResult,
-    Outline, OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal,
-    RemovalNode, ViewCode, WriteResult,
+    AcpChoice, AcpChoices, AcpKind, AddChoice, AddChoices, ArgumentValue, DiagnosticCounts,
+    DiagramAt, DiagramAtRef, EditResult, ElementDetails, ElementKind, History, MessageArgument,
+    MoveTarget, MoveTargets, OpenResult, Outline, OutlineRow, Package, Refusal,
+    RelationshipDetails, RelationshipEnd, Removal, RemovalNode, ViewCode, WriteResult,
 };
 pub use contract::{FoundRecovery, KeepResult, RecoveryCopy};
 
@@ -68,8 +68,11 @@ struct Open {
     session: Session,
     view: View,
     /// Laid out on first request, and again after the language or text size
-    /// changes.
+    /// changes, or another package is shown.
     diagram: Option<contract::Diagram>,
+    /// The argument package the diagram is of, or `None` for the whole case
+    /// (A5 of the ACP plan).
+    package: Option<String>,
     /// A digest of what the file held when it was opened or last saved.
     base: String,
     /// The revision [`Core::write`] last wrote, and a digest of what it gave:
@@ -161,7 +164,12 @@ impl Core {
                     + view
                         .unplaced
                         .iter()
-                        .filter(|item| item.code != view::Code::Placeholder)
+                        .filter(|item| {
+                            !matches!(
+                                item.code,
+                                view::Code::Placeholder | view::Code::AcpDescription
+                            )
+                        })
                         .count(),
             ),
         };
@@ -169,6 +177,7 @@ impl Core {
             session: Session::new(document, self.revision),
             view,
             diagram: None,
+            package: None,
             base: recovery::digest(bytes),
             written: None,
             read,
@@ -203,6 +212,7 @@ impl Core {
         self.diagram_ref().map(|at| DiagramAt {
             revision: at.revision,
             layout: at.layout,
+            package: at.package.map(str::to_owned),
             diagram: at.diagram.clone(),
         })
     }
@@ -212,21 +222,57 @@ impl Core {
     pub fn diagram_ref(&mut self) -> Option<DiagramAtRef<'_>> {
         let open = self.open.as_mut()?;
         let engine = self.engine.as_mut()?;
-        let diagram = open
-            .diagram
-            .get_or_insert_with(|| convert::diagram(&engine.layout(&open.view)));
+        let diagram = open.diagram.get_or_insert_with(|| {
+            let shown = open
+                .package
+                .as_deref()
+                .and_then(|package| view::of_package(open.session.document(), &open.view, package));
+            convert::diagram(&engine.layout(shown.as_ref().unwrap_or(&open.view)))
+        });
         Some(DiagramAtRef {
             revision: self.revision,
             layout: self.layout,
+            package: open.package.as_deref(),
             diagram,
         })
     }
 
+    /// Shows the argument package with SACM id `package` as the diagram, or
+    /// the whole case when `None` (A5 of the ACP plan). Answers whether it is
+    /// shown: `false` when nothing is open or `package` is no argument
+    /// package, and the diagram is then as it was. Another package than the
+    /// one shown is a new layout of the same revision.
+    pub fn show_package(&mut self, package: Option<&str>) -> bool {
+        let Some(open) = self.open.as_mut() else {
+            return false;
+        };
+        if let Some(id) = package {
+            let is_package =
+                open.session.document().get(id).is_some_and(|element| {
+                    element.kind() == sacm::model::ElementKind::ArgumentPackage
+                });
+            if !is_package {
+                return false;
+            }
+        }
+        if open.package.as_deref() != package {
+            open.package = package.map(str::to_owned);
+            open.diagram = None;
+            self.layout += 1;
+        }
+        true
+    }
+
     /// What the details panel shows for the node with SACM id `id`.
     pub fn element(&self, id: &str) -> Option<ElementDetails> {
-        let view = &self.open.as_ref()?.view;
-        let node = view.nodes.iter().find(|node| node.id == id)?;
+        let open = self.open.as_ref()?;
+        let view = &open.view;
+        // A node, or a confidence Claim an ACP shows (R17).
+        let described = view.descriptions.iter().find(|node| node.id == id);
+        let node = view.nodes.iter().find(|node| node.id == id).or(described)?;
         Some(ElementDetails {
+            package: view::argument_package_of(open.session.document(), id),
+            acp_description: described.is_some(),
             id: node.id.clone(),
             kind: convert::node_kind(node.kind),
             undeveloped: node.undeveloped,
@@ -406,7 +452,12 @@ impl Core {
             return refused(OUT_OF_DATE);
         }
         let kind = convert::gsn_element_kind(kind);
-        match open.session.add(&open.view, target(parent), kind) {
+        // A top-level Goal goes into the package shown (W9).
+        let home = open.package.clone();
+        match open
+            .session
+            .add_in(&open.view, target(parent), kind, home.as_deref())
+        {
             Ok((added, record)) => self.changed(&record, Some(added.element)),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             // libSACM refused an operation the rules made: a bug in them, not
@@ -435,6 +486,78 @@ impl Core {
             revision: self.revision,
             choices,
         })
+    }
+
+    /// The ACPs the line from `from` to `to` of `relationship` may take
+    /// (W33), and the identifier the next one takes. `None` when nothing is
+    /// open.
+    pub fn acp_choices(&self, relationship: &str, from: &str, to: &str) -> Option<AcpChoices> {
+        let open = self.open.as_ref()?;
+        let line = commands::AcpLine {
+            relationship,
+            from,
+            to,
+        };
+        let answer = commands::acp_choices(open.session.document(), &open.view, line);
+        Some(AcpChoices {
+            revision: self.revision,
+            identifier: answer.identifier,
+            choices: answer
+                .choices
+                .into_iter()
+                .map(|(kind, refusal)| AcpChoice {
+                    kind: match kind {
+                        commands::AcpKind::Description => AcpKind::Description,
+                        commands::AcpKind::Argument => AcpKind::Argument,
+                    },
+                    refusal: refusal.map(|refusal| refusal.code().to_owned()),
+                })
+                .collect(),
+        })
+    }
+
+    /// Why the node `id` cannot take an ACP (W33): `AF-EDIT-030` for a
+    /// Solution or a Context, which comes with SACM 2.4; `AF-EDIT-029` for
+    /// another kind. `None` when nothing is open.
+    pub fn acp_node_refusal(&self, id: &str) -> Option<String> {
+        let open = self.open.as_ref()?;
+        Some(commands::acp_node_refusal(&open.view, id).code().to_owned())
+    }
+
+    /// Adds an ACP of `kind` to the line from `from` to `to` of
+    /// `relationship` (W34), as the menu of `revision` offered: one asked
+    /// for at another revision is refused (AF-EDIT-009). A confidence
+    /// argument's package is named `package_name`. The confidence Claim is
+    /// the element answered.
+    pub fn add_acp(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        kind: AcpKind,
+        package_name: &str,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let line = commands::AcpLine {
+            relationship,
+            from,
+            to,
+        };
+        let kind = match kind {
+            AcpKind::Description => commands::AcpKind::Description,
+            AcpKind::Argument => commands::AcpKind::Argument,
+        };
+        match open.session.add_acp(&open.view, line, kind, package_name) {
+            Ok((added, record)) => self.changed(&record, Some(added.element)),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
     }
 
     /// Challenges `at`, a node or with `line` a line, with a new element of
@@ -470,13 +593,22 @@ impl Core {
     pub fn removal(&self, id: &str) -> Option<Removal> {
         let open = self.open.as_ref()?;
         let view = &open.view;
-        let (nodes, refusal) = match commands::removal(open.session.document(), view, id) {
+        let (nodes, acps, refusal) = match commands::removal(open.session.document(), view, id) {
             Ok(removal) => (
                 removal
                     .nodes
                     .iter()
-                    .filter_map(|id| view.nodes.iter().find(|node| node.id == *id))
+                    .filter_map(|id| {
+                        view.nodes
+                            .iter()
+                            .chain(&view.descriptions)
+                            .find(|node| node.id == *id)
+                    })
                     .map(|node| RemovalNode {
+                        acp_description: view
+                            .descriptions
+                            .iter()
+                            .any(|described| described.id == node.id),
                         id: node.id.clone(),
                         kind: convert::node_kind(node.kind),
                         identifier: node.identifier.clone(),
@@ -484,13 +616,25 @@ impl Core {
                         statement: node.statement.clone(),
                     })
                     .collect(),
+                // The ACPs it takes, by their labels.
+                removal
+                    .acps
+                    .iter()
+                    .filter_map(|(relationship, claim)| {
+                        view.acps
+                            .iter()
+                            .find(|acp| acp.relationship == *relationship && acp.claim == *claim)
+                    })
+                    .map(|acp| acp.label.clone())
+                    .collect(),
                 None,
             ),
-            Err(refusal) => (Vec::new(), Some(refusal.code().to_owned())),
+            Err(refusal) => (Vec::new(), Vec::new(), Some(refusal.code().to_owned())),
         };
         Some(Removal {
             revision: self.revision,
             nodes,
+            acps,
             refusal,
         })
     }
@@ -827,6 +971,16 @@ impl Core {
             open.view = view::view(open.session.document(), &self.language);
             open.diagram = None;
             open.problems = None;
+            // A package the command took away, as an undo of the add that
+            // made it: the whole case is shown.
+            let gone = open.package.as_deref().is_some_and(|package| {
+                open.session.document().get(package).is_none_or(|element| {
+                    element.kind() != sacm::model::ElementKind::ArgumentPackage
+                })
+            });
+            if gone {
+                open.package = None;
+            }
         }
         EditResult::Applied {
             revision: record.revision,

@@ -30,8 +30,8 @@ use std::collections::HashMap;
 pub use check::{Report, check};
 pub use layout::{OutlineRow, outline};
 pub use model::{
-    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
-    Shape, ShapeKind, TextLine, TextRole,
+    AcpMark, Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point,
+    Rect, Shape, ShapeKind, TextLine, TextRole,
 };
 pub use text::{FaceName, Font, FontError, Fonts, Line, Weight};
 

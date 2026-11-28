@@ -29,10 +29,14 @@ use sacm::model::{
 use crate::ElementKind;
 use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, View};
 
+mod acp;
 mod challenge;
 mod move_node;
 mod remove;
 mod repair;
+pub use acp::{
+    ACP_KINDS, ACP_PREFIX, AcpChoices, AcpKind, AcpLine, acp_choices, acp_node_refusal, add_acp,
+};
 pub use challenge::{
     CHALLENGERS, Challenged, LineTarget, challenge, challenge_choices, move_challenge,
 };
@@ -107,6 +111,12 @@ pub enum Refusal {
     /// AF-EDIT-028: a counter goal or counter evidence stays a challenge: it
     /// is moved onto what it is to challenge, not to the top level (W32).
     ChallengeStays,
+    /// AF-EDIT-029: an ACP goes on a `SupportedBy` or `InContextOf` line, or
+    /// a Solution or a Context; GSN v3 puts none elsewhere (W33).
+    NotAnAcpPlace,
+    /// AF-EDIT-030: an ACP on a Solution or a Context comes with SACM 2.4:
+    /// SACM 2.3 cannot hold it (W33, gap row 7).
+    AcpNeedsSacm24,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -141,6 +151,8 @@ impl Refusal {
             Refusal::NotAChallenger => "AF-EDIT-026",
             Refusal::NotTheFirstLine => "AF-EDIT-027",
             Refusal::ChallengeStays => "AF-EDIT-028",
+            Refusal::NotAnAcpPlace => "AF-EDIT-029",
+            Refusal::AcpNeedsSacm24 => "AF-EDIT-030",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",
@@ -240,7 +252,13 @@ pub fn set_text(
     text: &str,
     language: &str,
 ) -> Result<TextSet, AddError> {
-    if !view.nodes.iter().any(|node| node.id == id) {
+    // A node, or a confidence Claim an ACP shows (R17).
+    if !view
+        .nodes
+        .iter()
+        .chain(&view.descriptions)
+        .any(|node| node.id == id)
+    {
         return Err(AddError::Refused(Refusal::NotANode));
     }
     let element = document
@@ -398,7 +416,7 @@ pub fn choices(document: &Document, view: &View, target: Target<'_>) -> Vec<Choi
     ElementKind::ALL
         .iter()
         .map(|&kind| {
-            let plan = plan(document, view, target, kind);
+            let plan = plan(document, view, target, kind, None);
             Choice {
                 kind,
                 refusal: plan.as_ref().err().copied(),
@@ -420,7 +438,23 @@ pub fn add(
     target: Target<'_>,
     kind: ElementKind,
 ) -> Result<Added, AddError> {
-    let plan = plan(document, view, target, kind).map_err(AddError::Refused)?;
+    add_in(document, view, target, kind, None)
+}
+
+/// [`add`], with a top-level Goal going into the argument package `home`
+/// when it is one: the package whose diagram is shown (W9).
+///
+/// # Errors
+///
+/// As [`add`].
+pub fn add_in(
+    document: &mut Document,
+    view: &View,
+    target: Target<'_>,
+    kind: ElementKind,
+    home: Option<&str>,
+) -> Result<Added, AddError> {
+    let plan = plan(document, view, target, kind, home).map_err(AddError::Refused)?;
     let mut numbers = Identifiers::of(document, view);
     let mut made: Option<String> = None;
     let mutation = edit::batch(document, |tx| -> Result<(), BatchError> {
@@ -604,15 +638,23 @@ fn plan(
     view: &View,
     target: Target<'_>,
     kind: ElementKind,
+    home: Option<&str>,
 ) -> Result<Plan, Refusal> {
     let Target::Node(id) = target else {
         if kind != ElementKind::Goal {
             return Err(Refusal::TopLevelGoalOnly);
         }
-        // W9: the first ArgumentPackage in document order.
-        let package = document
-            .elements()
-            .find(|element| element.kind() == SacmKind::ArgumentPackage)
+        // W9: the package whose diagram is shown, or else the first
+        // ArgumentPackage in document order.
+        let shown = home
+            .and_then(|home| document.get(home))
+            .filter(|element| element.kind() == SacmKind::ArgumentPackage);
+        let package = shown
+            .or_else(|| {
+                document
+                    .elements()
+                    .find(|element| element.kind() == SacmKind::ArgumentPackage)
+            })
             .ok_or(Refusal::NoPackage)?;
         return Ok(Plan {
             parent: Parent::Canvas,
@@ -646,10 +688,21 @@ fn plan(
             }
             ElementKind::Goal => {
                 let inference = one_inference(document, view, id).ok_or(Refusal::NoOneInference)?;
+                let placeholder = held_place(document, view, &inference);
+                // W25: a new premise would change what an ACP on the
+                // inference is about, "A and B support C" not being "A
+                // supports C". The first Goal takes a held place, adding none.
+                let carries = view
+                    .acps
+                    .iter()
+                    .any(|acp| acp.relationship == inference.as_str());
+                if placeholder.is_none() && carries {
+                    return Err(Refusal::Entangled);
+                }
                 (
                     Parent::Strategy {
                         node: element.id().clone(),
-                        placeholder: held_place(document, view, &inference),
+                        placeholder,
                         inference: Some(inference),
                     },
                     false,

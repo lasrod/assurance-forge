@@ -28,7 +28,7 @@ mod svg;
 
 /// The gallery: file in `testdata/sacm`, the language its text is shown in,
 /// and what it is there to show.
-const FIXTURES: [(&str, &str, &str); 9] = [
+const FIXTURES: [(&str, &str, &str); 10] = [
     (
         "sacm_example_core_argument.sacm.xmi",
         "en",
@@ -58,6 +58,11 @@ const FIXTURES: [(&str, &str, &str); 9] = [
         "challenges.sacm.xmi",
         "en",
         "challenges of nodes and of relationships",
+    ),
+    (
+        "acps.sacm.xmi",
+        "en",
+        "assurance claim points: a description, a confidence argument elsewhere, a local confidence goal",
     ),
     (
         "gallery-roots-and-cycle.sacm.xmi",

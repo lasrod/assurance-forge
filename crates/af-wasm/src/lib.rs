@@ -175,6 +175,59 @@ impl WasmCore {
         json(&self.core.move_node(id, to.as_deref(), revision))
     }
 
+    /// `AcpChoices` as JSON for the line from `from` to `to` of
+    /// `relationship`; `None` when nothing is open.
+    #[wasm_bindgen(js_name = acpChoices)]
+    pub fn acp_choices(
+        &self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+    ) -> Result<Option<String>, JsError> {
+        self.core
+            .acp_choices(relationship, from, to)
+            .map(|choices| json(&choices))
+            .transpose()
+    }
+
+    /// Why the node `id` cannot take an ACP: a code, or `None` when nothing
+    /// is open.
+    #[wasm_bindgen(js_name = acpNodeRefusal)]
+    pub fn acp_node_refusal(&self, id: &str) -> Option<String> {
+        self.core.acp_node_refusal(id)
+    }
+
+    /// Adds an ACP of `kind` (`description` or `argument`) to the line from
+    /// `from` to `to` of `relationship`, from the menu of `revision`; a
+    /// confidence argument's package is named `package_name`. `EditResult`
+    /// as JSON.
+    #[wasm_bindgen(js_name = addAcp)]
+    pub fn add_acp(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        kind: &str,
+        package_name: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        let kind: af_api::contract::AcpKind =
+            serde_json::from_value(serde_json::Value::String(kind.to_owned()))
+                .map_err(|_| JsError::new("core-kind"))?;
+        json(
+            &self
+                .core
+                .add_acp(relationship, from, to, kind, package_name, revision),
+        )
+    }
+
+    /// Shows the argument package `package` as the diagram, or the whole
+    /// case without one. Whether it is shown.
+    #[wasm_bindgen(js_name = showPackage)]
+    pub fn show_package(&mut self, package: Option<String>) -> bool {
+        self.core.show_package(package.as_deref())
+    }
+
     /// Moves the challenge the node `id` makes onto the line from `from` to
     /// `to` of `relationship`, as the targets of `revision` said.
     /// `EditResult` as JSON.

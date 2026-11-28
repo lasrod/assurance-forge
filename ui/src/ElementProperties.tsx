@@ -43,7 +43,9 @@ const RELATIONSHIPS: Record<EdgeKind, MessageKey> = {
 };
 
 /** The GSN kind in words, and whether it is undeveloped. */
-export function kindLabel(details: Pick<ElementDetails, 'kind' | 'undeveloped'>, t: T): string {
+export function kindLabel(details: Pick<ElementDetails, 'kind' | 'undeveloped' | 'acpDescription'>, t: T): string {
+  // A confidence Claim an ACP shows: not a node of the argument.
+  if (details.acpDescription) return t('acpDescription');
   const kind = t(KINDS[details.kind]);
   return details.undeveloped ? t('kindUndeveloped', { kind }) : kind;
 }
@@ -117,7 +119,7 @@ function ElementSection({
           />
           {/* Only a Goal is undeveloped. One that is supported cannot be
               marked, and says why; a mark the file left on one is cleared. */}
-          {details.kind === 'goal' && details.undevelopedRefusal !== 'AF-EDIT-021' && (
+          {details.kind === 'goal' && !details.acpDescription && details.undevelopedRefusal !== 'AF-EDIT-021' && (
             <div className="af-text-property" data-testid="element-undeveloped">
               <Checkbox
                 label={t('undeveloped')}

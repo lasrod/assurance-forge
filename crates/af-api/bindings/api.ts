@@ -42,9 +42,15 @@ export type DiagramAt = {
 revision: number, 
 /**
  * Which layout of it: it changes when the language or the text sizes
- * do, which change the diagram but not the document.
+ * do, or another package is shown, which change the diagram but not the
+ * document.
  */
-layout: number, diagram: Diagram, };
+layout: number, 
+/**
+ * The SACM id of the argument package the diagram is of, or null for
+ * the whole case.
+ */
+package: string | null, diagram: Diagram, };
 
 export type ElementDetails = { 
 /**
@@ -65,7 +71,16 @@ supported: boolean, identifier: string, name: string | null, statement: string |
 /**
  * The view's codes about this element.
  */
-codes: Array<ViewCode>, };
+codes: Array<ViewCode>, 
+/**
+ * The SACM id of the argument package it is held in, or null.
+ */
+package: string | null, 
+/**
+ * A confidence Claim an ACP shows as its description (R17): it is not
+ * drawn as a node, and its text is the ACP's.
+ */
+acpDescription: boolean, };
 
 export type RelationshipDetails = { 
 /**
@@ -170,7 +185,38 @@ export type Rect = { x: number, y: number, width: number, height: number, };
 
 export type Shape = { "type": "rectangle", rect: Rect, } | { "type": "parallelogram", rect: Rect, skew: number, } | { "type": "roundedRectangle", rect: Rect, radius: number, } | { "type": "ellipse", rect: Rect, } | { "type": "circle", rect: Rect, } | { "type": "neutral", rect: Rect, };
 
-export type TextRole = "identifier" | "name" | "statement";
+export type TextRole = "identifier" | "name" | "statement" | "package" | "acp";
+
+export type AcpMark = { 
+/**
+ * The SACM id of the confidence Claim.
+ */
+claim: string, 
+/**
+ * The SACM id of its argument package when another than the edge's:
+ * what a click opens. Null for a description.
+ */
+package: string | null, 
+/**
+ * The square, centred on the line.
+ */
+square: Rect, label: TextLine, };
+
+export type AcpKind = "description" | "argument";
+
+export type AcpChoice = { kind: AcpKind, 
+/**
+ * Why it cannot be added (`AF-EDIT-002`, `AF-EDIT-005`, `AF-EDIT-011`,
+ * `AF-EDIT-027`, `AF-EDIT-029`), or null when it can.
+ */
+refusal: string | null, };
+
+export type AcpChoices = { revision: number, 
+/**
+ * The identifier the next ACP takes, such as `ACP1`: what the interface
+ * names a confidence argument's package after.
+ */
+identifier: string, choices: Array<AcpChoice>, };
 
 export type TextLine = { text: string, role: TextRole, x: number, baseline: number, 
 /**
@@ -188,7 +234,12 @@ export type DiagramNode = {
 /**
  * The SACM id.
  */
-id: string, kind: NodeKind, shape: Shape, text: Array<TextLine>, decorators: Array<Decorator>, 
+id: string, 
+/**
+ * In a package's diagram, the SACM id of the other argument package the
+ * node belongs to, whose name its `package` lines show; null otherwise.
+ */
+package: string | null, kind: NodeKind, shape: Shape, text: Array<TextLine>, decorators: Array<Decorator>, 
 /**
  * Everything drawn for the node. No two nodes' bounds overlap.
  */
@@ -224,6 +275,11 @@ points: Array<Point>, arrowhead: Arrowhead,
  */
 head: Array<Point>, 
 /**
+ * The assurance claim points on the line, each a solid square with its
+ * label beside it; on a relationship's first edge only.
+ */
+acps: Array<AcpMark>, 
+/**
  * Everything drawn for the edge, for culling.
  */
 bounds: Rect, };
@@ -254,6 +310,11 @@ choices: Array<AddChoice>, };
 
 export type RemovalNode = { 
 /**
+ * A confidence Claim an ACP shows as its description, which is not
+ * drawn: it goes with the line that carries the ACP.
+ */
+acpDescription: boolean, 
+/**
  * The SACM id.
  */
 id: string, kind: NodeKind, 
@@ -268,6 +329,11 @@ export type Removal = { revision: number,
  * Empty when it is refused.
  */
 nodes: Array<RemovalNode>, 
+/**
+ * The labels of the assurance claim points it takes, such as
+ * `ACP2[Confidence]`, other than descriptions, which `nodes` lists.
+ */
+acps: Array<string>, 
 /**
  * Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
  * `AF-EDIT-005` when a Strategy kept has no package to hold the place

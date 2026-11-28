@@ -4,6 +4,8 @@
 // Rust contract in crates/af-api.
 
 import type {
+  AcpChoices,
+  AcpKind,
   AddChoices,
   DiagramAt,
   EditResult,
@@ -152,6 +154,16 @@ export interface Core {
    * since. The element answered is the new challenger.
    */
   challenge(at: string, line: LineEnds | null, kind: ElementKind, revision: number): Promise<EditResult>;
+  /** The assurance claim points the line `line` of `relationship` may take, and the identifier the next one takes; null when nothing is open. */
+  acpChoices(relationship: string, line: LineEnds): Promise<AcpChoices | null>;
+  /** Why the node `id` cannot take an ACP: `AF-EDIT-030` for a Solution or a Context, `AF-EDIT-029` otherwise. */
+  acpNodeRefusal(id: string): Promise<string | null>;
+  /**
+   * Adds an ACP of `kind` to the line `line` of `relationship`, from the
+   * menu of `revision`; a confidence argument's package is named
+   * `packageName`. The confidence Claim is the element answered.
+   */
+  addAcp(relationship: string, line: LineEnds, kind: AcpKind, packageName: string, revision: number): Promise<EditResult>;
   /**
    * What removing the node with this SACM id would delete: the node, then
    * what goes with it; or the code of why it cannot be removed. Null when
@@ -177,6 +189,8 @@ export interface Core {
    * the node moved.
    */
   moveNode(id: string, to: string | null, revision: number): Promise<EditResult>;
+  /** Shows the argument package `id` as the diagram, or the whole case for null. Whether it is shown. */
+  showPackage(id: string | null): Promise<boolean>;
   /** Moves the challenge the node `id` makes onto the line `line` of a relationship, as the targets of `revision` said. */
   moveToLine(id: string, line: { relationship: string } & LineEnds, revision: number): Promise<EditResult>;
   /**

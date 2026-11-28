@@ -5,8 +5,8 @@
 
 use af_api::Core;
 use af_api::contract::{
-    ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult, ProblemSeverity,
-    ProblemSource, Shape,
+    AcpKind, ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult,
+    ProblemSeverity, ProblemSource, Shape, TextRole,
 };
 use af_layout::{Fonts, Style};
 
@@ -1014,4 +1014,275 @@ fn a_node_and_a_line_are_challenged_each_in_one_undo_step() {
     assert_eq!(challenges(&mut core), 1);
     assert!(matches!(core.undo(), EditResult::Applied { .. }));
     assert_eq!(challenges(&mut core), 0);
+}
+
+#[test]
+fn a_package_is_shown_as_its_own_diagram_and_the_whole_case_again_without_one() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/oasc-ja.sacm.xmi"));
+    let whole = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    assert_eq!(whole.package, None);
+
+    assert!(core.show_package(Some("ARG_VehicleSafety")));
+    let vehicle = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    // A new layout of the same revision, of the package.
+    assert_eq!(vehicle.revision, whole.revision);
+    assert!(vehicle.layout > whole.layout);
+    assert_eq!(vehicle.package.as_deref(), Some("ARG_VehicleSafety"));
+    assert!(vehicle.diagram.nodes.len() < whole.diagram.nodes.len());
+    // G4 of the main argument is drawn, marked with its package.
+    let g4 = vehicle
+        .diagram
+        .nodes
+        .iter()
+        .find(|node| node.id == "G4")
+        .unwrap_or_else(|| panic!("no G4"));
+    // The package it belongs to, which a click on the mark opens.
+    assert_eq!(g4.package.as_deref(), Some("ARG_Main"));
+    // Wrapped as any text is: the lines, read together, are the name.
+    let package: Vec<&str> = g4
+        .text
+        .iter()
+        .filter(|line| line.role == TextRole::Package)
+        .map(|line| line.text.trim())
+        .collect();
+    assert_eq!(
+        package.join(" "),
+        "[Open Autonomy Safety Case - Main Argument]"
+    );
+
+    // Not a package: the diagram stays as it was.
+    assert!(!core.show_package(Some("G4")));
+    assert_eq!(core.diagram().map(|at| at.layout), Some(vehicle.layout));
+
+    assert!(core.show_package(None));
+    let again = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    assert_eq!(again.package, None);
+    assert_eq!(again.diagram.nodes.len(), whole.diagram.nodes.len());
+}
+
+#[test]
+fn an_acp_is_added_in_one_undo_step_and_its_package_shown_until_undone() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let choices = core
+        .acp_choices("E2", "G3", "Sn2")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(choices.identifier, "ACP5");
+    assert!(
+        choices
+            .choices
+            .iter()
+            .all(|choice| choice.refusal.is_none())
+    );
+    assert_eq!(core.acp_node_refusal("Sn1").as_deref(), Some("AF-EDIT-030"));
+
+    // A description: the Claim is answered, and shown in the details panel.
+    let EditResult::Applied {
+        element: Some(claim),
+        ..
+    } = core.add_acp("E2", "G3", "Sn2", AcpKind::Description, "x", 1)
+    else {
+        panic!("not added");
+    };
+    let details = core.element(&claim).unwrap_or_else(|| panic!("no details"));
+    assert!(details.acp_description);
+    assert_eq!(details.identifier, "ACP5");
+    assert_eq!(details.package.as_deref(), Some("argpkg_main"));
+    let drawn = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let on = drawn
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == "E2")
+        .unwrap_or_else(|| panic!("no E2"));
+    assert_eq!(on.acps.len(), 1);
+    assert_eq!(on.acps[0].label.text, "ACP5");
+
+    // A confidence argument, at a later revision: a stale menu is refused.
+    assert!(matches!(
+        core.add_acp("X1", "G1", "C1", AcpKind::Argument, "Confidence ACP6", 1),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let EditResult::Applied {
+        element: Some(goal),
+        revision,
+        ..
+    } = core.add_acp("X1", "G1", "C1", AcpKind::Argument, "Confidence ACP6", 2)
+    else {
+        panic!("not added");
+    };
+    assert_eq!(revision, 3);
+    let package = core
+        .element(&goal)
+        .and_then(|details| details.package)
+        .unwrap_or_else(|| panic!("no package"));
+    assert!(core.show_package(Some(&package)));
+    assert_eq!(
+        core.diagram().map(|at| at.diagram.nodes.len()),
+        Some(1),
+        "the confidence argument's diagram holds its goal"
+    );
+    // Undone in one step: the package goes, and the whole case is shown.
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert!(core.element(&goal).is_none());
+    assert_eq!(core.diagram().map(|at| at.package), Some(None));
+}
+
+#[test]
+fn a_top_level_goal_goes_into_the_package_shown() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    assert!(core.show_package(Some("argpkg_confidence")));
+    let EditResult::Applied {
+        element: Some(goal),
+        ..
+    } = core.add(None, ElementKind::Goal, 1)
+    else {
+        panic!("not added");
+    };
+    assert_eq!(
+        core.element(&goal)
+            .and_then(|details| details.package)
+            .as_deref(),
+        Some("argpkg_confidence")
+    );
+    assert!(
+        core.diagram()
+            .is_some_and(|at| at.diagram.nodes.iter().any(|node| node.id == goal)),
+        "drawn in the diagram shown"
+    );
+}
+
+#[test]
+fn a_removal_lists_an_acp_description_as_one() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let EditResult::Applied {
+        element: Some(claim),
+        ..
+    } = core.add_acp("E2", "G3", "Sn2", AcpKind::Description, "x", 1)
+    else {
+        panic!("not added");
+    };
+    let removal = core
+        .removal("Sn2")
+        .unwrap_or_else(|| panic!("nothing open"));
+    let listed: Vec<(String, bool)> = removal
+        .nodes
+        .iter()
+        .map(|node| (node.id.clone(), node.acp_description))
+        .collect();
+    assert_eq!(listed, [("Sn2".to_owned(), false), (claim, true)]);
+}
+
+#[test]
+fn an_acp_label_on_a_line_that_runs_across_is_clear_of_its_nodes() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    // A long label, on the short context line from G1 to C1.
+    assert!(matches!(
+        core.add_acp("X1", "G1", "C1", AcpKind::Argument, "Confidence ACP5", 1),
+        EditResult::Applied { .. }
+    ));
+    let at = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let x1 = at
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == "X1")
+        .unwrap_or_else(|| panic!("no X1"));
+    assert_eq!(x1.acps.len(), 2);
+    for acp in &x1.acps {
+        let label = &acp.label;
+        let (left, right) = (label.x, label.x + label.width);
+        let (top, bottom) = (
+            label.baseline - label.size,
+            label.baseline + label.size * 0.3,
+        );
+        for node in &at.diagram.nodes {
+            let shape = node.bounds;
+            let apart = right <= shape.x
+                || left >= shape.x + shape.width
+                || bottom <= shape.y
+                || top >= shape.y + shape.height;
+            assert!(apart, "{} lies on {}", label.text, node.id);
+        }
+    }
+}
+
+#[test]
+fn an_acp_label_on_a_line_that_runs_down_is_beside_its_square() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let at = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let e1 = at
+        .diagram
+        .edges
+        .iter()
+        .find(|edge| edge.relationship == "E1")
+        .unwrap_or_else(|| panic!("no E1"));
+    let acp = &e1.acps[0];
+    assert!(acp.label.x > acp.square.x + acp.square.width);
+    let middle = acp.square.y + acp.square.height / 2.0;
+    assert!((acp.label.baseline - acp.label.size / 2.0 - middle).abs() < acp.label.size);
+}
+
+#[test]
+fn every_acp_square_is_on_its_line_however_many_it_carries() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    // Three on the line G2 to Sn1: ACP2, and two more.
+    for (kind, revision) in [(AcpKind::Description, 1), (AcpKind::Description, 2)] {
+        assert!(matches!(
+            core.add_acp("E1", "G2", "Sn1", kind, "x", revision),
+            EditResult::Applied { .. }
+        ));
+    }
+    let at = core.diagram().unwrap_or_else(|| panic!("no diagram"));
+    let distance = |p: (f32, f32), a: (f32, f32), b: (f32, f32)| {
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let length = dx * dx + dy * dy;
+        let t = if length == 0.0 {
+            0.0
+        } else {
+            (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / length).clamp(0.0, 1.0)
+        };
+        (p.0 - (a.0 + t * dx)).hypot(p.1 - (a.1 + t * dy))
+    };
+    let mut seen = 0;
+    for edge in &at.diagram.edges {
+        for acp in &edge.acps {
+            seen += 1;
+            let centre = (
+                acp.square.x + acp.square.width / 2.0,
+                acp.square.y + acp.square.height / 2.0,
+            );
+            let nearest = edge
+                .points
+                .windows(2)
+                .map(|pair| distance(centre, (pair[0].x, pair[0].y), (pair[1].x, pair[1].y)))
+                .fold(f32::MAX, f32::min);
+            assert!(
+                nearest < 0.5,
+                "{} is {nearest} px off its line",
+                acp.label.text
+            );
+        }
+    }
+    assert_eq!(seen, 5);
+}
+
+#[test]
+fn a_removal_names_the_acps_it_takes() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let removal = core
+        .removal("Sn1")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(removal.acps, ["ACP2[Confidence]".to_owned()]);
+    // G2 is a premise of I1, which carries ACP1: taking it out would change
+    // what ACP1 is about, so the removal is refused (W25).
+    let removal = core.removal("G2").unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(removal.refusal.as_deref(), Some("AF-EDIT-015"));
 }

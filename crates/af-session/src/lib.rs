@@ -20,7 +20,8 @@
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{
-    self, AddError, Added, Challenged, Moved, Removed, Repaired, Target, TextField, TextSet,
+    self, AcpKind, AcpLine, AddError, Added, Challenged, Moved, Removed, Repaired, Target,
+    TextField, TextSet,
 };
 use af_gsn::view::View;
 use sacm::model::Document;
@@ -44,6 +45,8 @@ pub enum Command {
     Add {
         parent: Option<String>,
         kind: ElementKind,
+        /// For a top-level Goal: the package it went into.
+        package: Option<String>,
     },
     /// Set the identifier, name or statement of the node `element` to `text`.
     SetText {
@@ -82,6 +85,16 @@ pub enum Command {
         /// For a line: the nodes it runs from and to.
         line: Option<(String, String)>,
         kind: ElementKind,
+    },
+    /// Add an assurance claim point of `kind` to the line from `from` to
+    /// `to` of `relationship`; a confidence argument's package is named
+    /// `package_name`.
+    AddAcp {
+        relationship: String,
+        from: String,
+        to: String,
+        kind: AcpKind,
+        package_name: String,
     },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
@@ -186,14 +199,35 @@ impl Session {
         target: Target<'_>,
         kind: ElementKind,
     ) -> Result<(Added, ChangeRecord), AddError> {
+        self.add_in(view, target, kind, None)
+    }
+
+    /// [`Session::add`], with a top-level Goal going into the argument
+    /// package `home`, the one whose diagram is shown (W9).
+    ///
+    /// # Errors
+    ///
+    /// As [`Session::add`].
+    pub fn add_in(
+        &mut self,
+        view: &View,
+        target: Target<'_>,
+        kind: ElementKind,
+        home: Option<&str>,
+    ) -> Result<(Added, ChangeRecord), AddError> {
         let before = self.document.clone();
-        let added = commands::add(&mut self.document, view, target, kind)?;
+        let added = commands::add_in(&mut self.document, view, target, kind, home)?;
         let command = Command::Add {
             parent: match target {
                 Target::Canvas => None,
                 Target::Node(id) => Some(id.to_owned()),
             },
             kind,
+            // The package a top-level Goal went into, as made.
+            package: match target {
+                Target::Canvas => af_gsn::view::argument_package_of(&self.document, &added.element),
+                Target::Node(_) => None,
+            },
         };
         let record = self.made(before, command, &added.mutation);
         Ok((added, record))
@@ -384,6 +418,33 @@ impl Session {
             at: id.to_owned(),
             line,
             kind,
+        };
+        let record = self.made(before, command, &added.mutation);
+        Ok((added, record))
+    }
+
+    /// Adds an assurance claim point of `kind` to `line` (W33, W34), as one
+    /// command.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::add_acp`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn add_acp(
+        &mut self,
+        view: &View,
+        line: AcpLine<'_>,
+        kind: AcpKind,
+        package_name: &str,
+    ) -> Result<(Added, ChangeRecord), AddError> {
+        let before = self.document.clone();
+        let added = commands::add_acp(&mut self.document, view, line, kind, package_name)?;
+        let command = Command::AddAcp {
+            relationship: line.relationship.to_owned(),
+            from: line.from.to_owned(),
+            to: line.to.to_owned(),
+            kind,
+            package_name: package_name.to_owned(),
         };
         let record = self.made(before, command, &added.mutation);
         Ok((added, record))

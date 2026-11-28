@@ -97,10 +97,11 @@ test('a right-click on a goal lists the six kinds, the two counters, Move and Re
   await page.keyboard.press('Escape');
 });
 
-test('a leaf offers nothing to add, only its counters, Move and Remove', async ({ page }) => {
+test('a leaf offers nothing to add, only its counters, an ACP, Move and Remove', async ({ page }) => {
   await opened(page);
   const menu = await menuOf(page, 'ev_1');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Add Counter Goal/, /^Add Counter Evidence/, /^Move…/, /^Remove/]);
+  // A Solution's Add ACP says why not yet (W33).
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Add Counter Goal/, /^Add Counter Evidence/, /^Add ACP$/, /^Move…/, /^Remove/]);
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   expect((await hook(page)).revision).toBe(1);
@@ -318,7 +319,7 @@ test('an edit keeps the Argument Navigator’s closed branches closed', async ({
 test('the menu and the edits are worded in Japanese', async ({ page }) => {
   await opened(page, '&lang=ja');
   const menu = await menuOf(page, 'ev_1');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^反論ゴールを追加/, /^反証を追加/, /^移動…/, /^削除/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^反論ゴールを追加/, /^反証を追加/, /^ACP を追加$/, /^移動…/, /^削除/]);
   await page.keyboard.press('Escape');
   await (await menuOf(page, 'cl_top')).getByRole('menuitem', { name: '仮定を追加' }).click();
   await expect(status(page)).toHaveText('仮定 A1 を追加しました。');

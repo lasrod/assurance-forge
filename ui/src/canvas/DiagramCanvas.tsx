@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
-import type { DiagramAt, DiagramEdge, TextStyle } from '../core/Core';
+import type {
+  AcpMark, DiagramAt, DiagramEdge, TextStyle } from '../core/Core';
 import type { ContextMenuSource } from '../design';
 import { measuredFamilies, watchCanvasStyle, type CanvasStyle } from '../design';
 import { report } from '../testHook';
 import { badgeLabel, comesWith, edgePan, HOLD_MS, readableAt, type DragEnd } from './drag';
-import { boundsOf, draw, edgeKey, findEdge, fit, hitId, hitOneEdge, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
+import { boundsOf, draw, edgeKey, findEdge, fit, hitAcp, hitId, hitOneEdge, hitPackage, hitTest, pan, zoomAbout, type Badge, type MoveMarks, type Palette, type Viewport } from './draw';
 
 /**
  * The diagram's colours, as app.css gives them to the canvas for the theme it
@@ -117,6 +118,8 @@ export function DiagramCanvas({
   move = null,
   onMoveTo,
   onMoveToLine,
+  onOpenPackage,
+  onAcp,
   onMoveCancel,
   onDragStart,
   onDragEnd,
@@ -137,6 +140,10 @@ export function DiagramCanvas({
   move?: MoveMarks | null;
   /** A node was clicked while a move is chosen: one it may go under, or not. */
   onMoveTo?: (id: string) => void;
+  /** An assurance claim point was clicked: its argument is to be shown. */
+  onAcp?: (acp: AcpMark) => void;
+  /** The name of another package was clicked, on a node of it: that package is to be shown. */
+  onOpenPackage?: (id: string) => void;
   /** A line was clicked while a challenge's move is chosen. */
   onMoveToLine?: (edge: DiagramEdge) => void;
   onMoveCancel?: () => void;
@@ -407,6 +414,18 @@ export function DiagramCanvas({
       if (node && node.id !== move.source) onMoveTo?.(node.id);
       const line = !node && move.lines ? hitOneEdge(diagram.diagram, viewport, point.x, point.y).edge : null;
       if (line) onMoveToLine?.(line);
+      return;
+    }
+    // An ACP: its argument is shown.
+    const acp = hitTest(diagram.diagram, viewport, point.x, point.y) ? null : hitAcp(diagram.diagram, viewport, point.x, point.y);
+    if (acp && onAcp) {
+      onAcp(acp);
+      return;
+    }
+    // A node of another package: its name opens that package.
+    const elsewhere = hitPackage(diagram.diagram, viewport, point.x, point.y);
+    if (elsewhere && onOpenPackage) {
+      onOpenPackage(elsewhere);
       return;
     }
     onSelect(hitId(diagram.diagram, viewport, point.x, point.y));

@@ -13,7 +13,8 @@
 use std::collections::{HashMap, HashSet};
 
 use sacm::model::{
-    AssertionDeclaration, Document, ElementKind as SacmKind, MetamodelPackage, SacmElement,
+    AssertionDeclaration, Document, ElementKind as SacmKind, MetamodelPackage, ReferenceEnd,
+    SacmElement,
 };
 
 use crate::ElementKind;
@@ -53,11 +54,14 @@ pub enum Code {
     /// AF-VIEW-014: the place a Strategy's first Goal will take, held for
     /// SACM and not drawn (R16).
     Placeholder,
+    /// AF-VIEW-015: a confidence Claim an ACP shows as its description, not
+    /// drawn as a node (R17).
+    AcpDescription,
 }
 
 impl Code {
     /// Every code, in the order of the mapping record's table.
-    pub const ALL: [Code; 14] = [
+    pub const ALL: [Code; 15] = [
         Code::RecordedTypeNotUsed,
         Code::DeclarationHasNoShape,
         Code::ArtifactReferenceNotPlaced,
@@ -72,6 +76,7 @@ impl Code {
         Code::MetaClaimNotDrawn,
         Code::StructureNotDrawn,
         Code::Placeholder,
+        Code::AcpDescription,
     ];
 
     /// The code as the mapping record writes it, such as `AF-VIEW-001`.
@@ -91,6 +96,7 @@ impl Code {
             Code::MetaClaimNotDrawn => "AF-VIEW-012",
             Code::StructureNotDrawn => "AF-VIEW-013",
             Code::Placeholder => "AF-VIEW-014",
+            Code::AcpDescription => "AF-VIEW-015",
         }
     }
 }
@@ -160,6 +166,19 @@ pub struct Node {
     pub name: Option<String>,
     /// The statement (T3).
     pub statement: Option<String>,
+    /// In a package's diagram, the other argument package a node drawn
+    /// there belongs to (A6 of the ACP plan); `None` for a node of the
+    /// package shown, and in the whole case.
+    pub elsewhere: Option<Elsewhere>,
+}
+
+/// The argument package a node of another package's diagram belongs to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Elsewhere {
+    /// Its SACM id.
+    pub package: String,
+    /// Its name, or its id when it has none.
+    pub name: String,
 }
 
 /// How an edge is drawn.
@@ -193,6 +212,29 @@ pub struct Edge {
     pub relationship: String,
 }
 
+/// An assurance claim point: a `metaClaim` of a relationship the view draws
+/// as `SupportedBy` or `InContextOf`, naming a confidence `Claim` (E11; A1
+/// of `docs/roadmap/milestone-2-acps.md`). Drawn on the relationship's first
+/// edge.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Acp {
+    /// The SACM id of the relationship.
+    pub relationship: String,
+    /// The ends of the relationship's first edge, which carries it: a
+    /// package's diagram that does not draw that edge does not draw it.
+    pub from: String,
+    pub to: String,
+    /// The SACM id of the confidence `Claim`.
+    pub claim: String,
+    /// The label: the Claim's GSN identifier, with `[package name]` when it
+    /// is in another argument package than the relationship (GSN v3
+    /// §1:5.2.3).
+    pub label: String,
+    /// The SACM id of the Claim's argument package when it is another than
+    /// the relationship's: what the ACP opens.
+    pub package: Option<String>,
+}
+
 /// An argument element the view does not place.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unplaced {
@@ -211,6 +253,13 @@ pub struct View {
     pub unplaced: Vec<Unplaced>,
     /// In document order of their elements.
     pub findings: Vec<Finding>,
+    /// In document order of their relationships, then of each one's
+    /// `metaClaim` references.
+    pub acps: Vec<Acp>,
+    /// The confidence Claims ACPs show as their description (R17), as a
+    /// Goal would be drawn, though they are not: their text is edited as a
+    /// node's is. In document order.
+    pub descriptions: Vec<Node>,
 }
 
 /// The tagged value that records an element's GSN type on import.
@@ -225,6 +274,10 @@ const GSN_IDENTIFIER_KEY: &str = "assuranceForge.gsn.identifier";
 /// (W2, R16), and its value.
 pub(crate) const PLACEHOLDER_KEY: &str = "assuranceForge.gsn.placeholder";
 pub(crate) const PLACEHOLDER_VALUE: &str = "subGoal";
+/// R17: the tag of a confidence Claim the editor made as an ACP's
+/// description (W34).
+pub const ACP_KEY: &str = "assuranceForge.gsn.acp";
+pub const ACP_DESCRIPTION: &str = "description";
 /// The GSN namespaces a recorded type may name (mapping record, Namespaces).
 const GSN_NAMESPACES: [&str; 3] = [
     "http://scsc.acwg.gsn/2.0",
@@ -266,6 +319,15 @@ pub fn view(document: &Document, language: &str) -> View {
         })
         .map(|element| element.id().as_str())
         .collect();
+    // R17: the confidence Claims an ACP may show as its description. Only
+    // those an ACP is drawn for are, which the relationships decide below.
+    let candidates: HashSet<&str> = elements
+        .iter()
+        .filter(|element| {
+            !hidden.contains(element.id().as_str()) && is_acp_description(document, **element)
+        })
+        .map(|element| element.id().as_str())
+        .collect();
     // The elements a node is drawn for, and their SACM kind.
     let placeable: HashMap<&str, SacmKind> = elements
         .iter()
@@ -297,15 +359,145 @@ pub fn view(document: &Document, language: &str) -> View {
         }
     }
     builder.drop_challenges_of_nothing();
+    // R17: a candidate is a description when an ACP is drawn for it, and
+    // every relationship that names it draws one.
+    let linked: HashSet<&str> = builder
+        .acp_links
+        .iter()
+        .map(|(relationship, _)| relationship.as_str())
+        .collect();
+    let descriptions: HashSet<&str> = candidates
+        .iter()
+        .copied()
+        .filter(|id| {
+            document
+                .referrers(*id)
+                .iter()
+                .all(|referrer| linked.contains(referrer.holder().id().as_str()))
+        })
+        .collect();
     for element in &elements {
         let id = element.id().as_str();
-        if placeable.contains_key(id) {
-            let reached = reach.get(id).copied().unwrap_or_default();
-            node(*element, reached, language, &mut builder);
+        if descriptions.contains(id) {
+            builder.unplaced(id, Code::AcpDescription);
         }
     }
+    for element in &elements {
+        let id = element.id().as_str();
+        if placeable.contains_key(id) && !descriptions.contains(id) {
+            let reached = reach.get(id).copied().unwrap_or_default();
+            node(*element, reached, language, &mut builder);
+        } else if descriptions.contains(id) {
+            // R17: built as a Goal is, and kept apart, not drawn. What the
+            // building finds is said: it is about the element.
+            node(*element, Reach::default(), language, &mut builder);
+            if let Some(described) = builder.nodes.pop() {
+                builder.descriptions.push(described);
+            }
+        }
+    }
+    acps(document, &mut builder);
 
     builder.finish(&order)
+}
+
+/// E11: each `metaClaim` of a drawn live relationship that names a `Claim`
+/// is an ACP; one naming anything else is not drawn.
+fn acps(document: &Document, builder: &mut Builder) {
+    let mut unnamed: Vec<(String, String)> = Vec::new();
+    for (relationship, claim) in std::mem::take(&mut builder.acp_links) {
+        // A Claim the view draws, or keeps as a description; one it hides,
+        // such as one inside an interface (R15), has no ACP to open.
+        let shown = builder.nodes.iter().any(|node| node.id == claim)
+            || builder.descriptions.iter().any(|node| node.id == claim);
+        let named = document
+            .get(claim.as_str())
+            .filter(|element| element.kind() == SacmKind::Claim && shown);
+        let Some(named) = named else {
+            // The one it names, which is not drawn, while others may be.
+            let pair = (relationship.clone(), claim.clone());
+            if !unnamed.contains(&pair) {
+                builder.finding(Code::MetaClaimNotDrawn, &relationship, Some(&claim));
+                unnamed.push(pair);
+            }
+            continue;
+        };
+        let identifier = tagged_value(named, GSN_IDENTIFIER_KEY)
+            .filter(|identifier| !identifier.is_empty())
+            .unwrap_or(named.id().as_str());
+        let held = |id: &str| document.get(id).and_then(package_of);
+        let elsewhere = match (held(&claim), held(&relationship)) {
+            (Some(claims), Some(lines)) if claims.id() != lines.id() => Some(claims),
+            (Some(claims), None) => Some(claims),
+            _ => None,
+        };
+        let label = match elsewhere {
+            Some(package) => {
+                let name = package
+                    .name()
+                    .and_then(|name| name.content())
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or(package.id().as_str());
+                format!("{identifier}[{name}]")
+            }
+            None => identifier.to_owned(),
+        };
+        let Some((from, to)) = builder
+            .edges
+            .iter()
+            .find(|edge| edge.relationship == relationship)
+            .map(|edge| (edge.from.clone(), edge.to.clone()))
+        else {
+            continue;
+        };
+        builder.acps.push(Acp {
+            relationship,
+            from,
+            to,
+            claim,
+            label,
+            package: elsewhere.map(|package| package.id().as_str().to_owned()),
+        });
+    }
+}
+
+/// R17: a `Claim` an ACP may show as its description, and the diagram not as
+/// a node. The editor made it so (W34), tagged `assuranceForge.gsn.acp` =
+/// `description`; it is declared asserted or not at all, not cited, not
+/// abstract, and makes no claim about anything itself; and only `metaClaim`
+/// references name it, each from a relationship of its own argument package
+/// that is not a counter or a citation. The view
+/// then keeps those an ACP is drawn for: E11 draws one only on a live line. Anything that also supports it, or that it
+/// supports, makes it a Goal of the argument, drawn as R2 says.
+fn is_acp_description(document: &Document, element: SacmElement<'_>) -> bool {
+    if element.kind() != SacmKind::Claim
+        || tagged_value(element, ACP_KEY) != Some(ACP_DESCRIPTION)
+        || !matches!(
+            element.assertion_declaration(),
+            None | Some(AssertionDeclaration::Asserted)
+        )
+        || element.is_citation()
+        || element.is_abstract()
+        || !element.meta_claims().is_empty()
+    {
+        return false;
+    }
+    let home = package_of(element).map(|package| package.id().clone());
+    let referrers = document.referrers(element.id().as_str());
+    !referrers.is_empty()
+        && referrers.iter().all(|referrer| {
+            let holder = referrer.holder();
+            referrer.end() == ReferenceEnd::MetaClaim
+                && matches!(
+                    holder.kind(),
+                    SacmKind::AssertedInference
+                        | SacmKind::AssertedEvidence
+                        | SacmKind::AssertedContext
+                )
+                && !holder.is_counter()
+                && !holder.is_citation()
+                && package_of(holder).map(|package| package.id().clone()) == home
+        })
 }
 
 /// How the live relationships reach an element: only these count (the
@@ -341,6 +533,11 @@ struct Builder {
     /// can be placed), and the relationship each challenges: whether that is
     /// drawn is known only once every edge is.
     edgeless_challenges: Vec<(String, String)>,
+    /// A drawn live relationship and a `metaClaim` it names: an ACP once the
+    /// named element is known to be a `Claim` (E11).
+    acp_links: Vec<(String, String)>,
+    acps: Vec<Acp>,
+    descriptions: Vec<Node>,
 }
 
 impl Builder {
@@ -436,6 +633,8 @@ impl Builder {
             edges: self.edges,
             unplaced: self.unplaced,
             findings: self.findings,
+            acps: self.acps,
+            descriptions: self.descriptions,
         }
     }
 }
@@ -486,9 +685,6 @@ fn relationship<'a>(
     // R13, E11.
     if element.is_abstract() {
         builder.finding(Code::UninstantiatedNotDrawn, id, None);
-    }
-    if !element.meta_claims().is_empty() {
-        builder.finding(Code::MetaClaimNotDrawn, id, None);
     }
 
     // E7: the ends that can be placed. E5: a challenge may point at another
@@ -579,8 +775,32 @@ fn relationship<'a>(
                 .edgeless_challenges
                 .push((id.to_owned(), target.to_owned()));
         }
+        let mut named: Vec<&str> = Vec::new();
+        for claim in element.meta_claims() {
+            if !named.contains(&claim.as_str()) {
+                named.push(claim.as_str());
+                builder.finding(Code::MetaClaimNotDrawn, id, Some(claim.as_str()));
+            }
+        }
         builder.unplaced(id, Code::EndNotPlaced);
         return;
+    }
+    // E11: an ACP on a line GSN puts one on (Table 1:5-1); on a challenge or
+    // a line drawn neutral, the link is not drawn.
+    if !element.meta_claims().is_empty() {
+        let mut named: Vec<&str> = Vec::new();
+        for claim in element.meta_claims() {
+            if !named.contains(&claim.as_str()) {
+                named.push(claim.as_str());
+            }
+        }
+        for claim in named {
+            if style == Style::Live {
+                builder.acp_links.push((id.to_owned(), claim.to_owned()));
+            } else {
+                builder.finding(Code::MetaClaimNotDrawn, id, Some(claim));
+            }
+        }
     }
 
     // R9: counter-evidence is a Solution. It reaches nothing else: the
@@ -648,6 +868,7 @@ fn node(element: SacmElement<'_>, reached: Reach, language: &str, builder: &mut 
 
     builder.nodes.push(Node {
         id: id.to_owned(),
+        elsewhere: None,
         kind,
         undeveloped,
         identifier: tagged_value(element, GSN_IDENTIFIER_KEY)
@@ -961,6 +1182,181 @@ fn is_hidden(element: SacmElement<'_>) -> bool {
         parent = ancestor.parent();
     }
     false
+}
+
+/// The SACM id of the argument package the element `id` is held in,
+/// nearest first; `None` when it is in none.
+pub fn argument_package_of(document: &Document, id: &str) -> Option<String> {
+    document
+        .get(id)
+        .and_then(package_of)
+        .map(|package| package.id().as_str().to_owned())
+}
+
+/// The argument package an element is held in, nearest first.
+fn package_of(element: SacmElement<'_>) -> Option<SacmElement<'_>> {
+    let mut holder = element.parent();
+    while let Some(container) = holder {
+        if container.kind() == SacmKind::ArgumentPackage {
+            return Some(container);
+        }
+        holder = container.parent();
+    }
+    None
+}
+
+/// The diagram of the argument package `package` (A5 and A6 of the ACP
+/// plan, `docs/roadmap/milestone-2-acps.md`): its nodes, every edge with an
+/// end among them, and the nodes of other packages those edges reach, each
+/// with the name of its package. A challenge of a relationship comes with
+/// that relationship's edges. `None` when `package` is no argument package
+/// of `document`.
+///
+/// Nothing is placed that the whole view does not place, and nothing of the
+/// document changes: the package's name on a node is of the diagram.
+pub fn of_package(document: &Document, whole: &View, package: &str) -> Option<View> {
+    let shown = document.get(package)?;
+    if shown.kind() != SacmKind::ArgumentPackage {
+        return None;
+    }
+    let holder = |id: &str| document.get(id).and_then(package_of);
+    let own: HashSet<&str> = whole
+        .nodes
+        .iter()
+        .filter(|node| holder(&node.id).is_some_and(|found| found.id().as_str() == package))
+        .map(|node| node.id.as_str())
+        .collect();
+    // The edges with an end among the package's nodes, then the challenges
+    // of the relationships those edges draw, and of those, to any depth.
+    let mut kept: Vec<bool> = whole
+        .edges
+        .iter()
+        .map(|edge| {
+            own.contains(edge.from.as_str())
+                || (!edge.to_relationship && own.contains(edge.to.as_str()))
+        })
+        .collect();
+    loop {
+        let drawn: HashSet<&str> = whole
+            .edges
+            .iter()
+            .zip(&kept)
+            .filter(|(_, kept)| **kept)
+            .map(|(edge, _)| edge.relationship.as_str())
+            .collect();
+        // A relationship with an ACP keeps its first edge, which carries it.
+        let carried: HashSet<(&str, &str, &str)> = whole
+            .acps
+            .iter()
+            .filter(|acp| drawn.contains(acp.relationship.as_str()))
+            .map(|acp| {
+                (
+                    acp.relationship.as_str(),
+                    acp.from.as_str(),
+                    acp.to.as_str(),
+                )
+            })
+            .collect();
+        // What a kept challenge points at, so it has a line to point at.
+        let challenged: HashSet<&str> = whole
+            .edges
+            .iter()
+            .zip(&kept)
+            .filter(|(edge, kept)| **kept && edge.to_relationship)
+            .map(|(edge, _)| edge.to.as_str())
+            .collect();
+        let mut grew = false;
+        for (edge, kept) in whole.edges.iter().zip(kept.iter_mut()) {
+            let wanted = (edge.to_relationship && drawn.contains(edge.to.as_str()))
+                || challenged.contains(edge.relationship.as_str())
+                || (drawn.contains(edge.relationship.as_str())
+                    && carried.contains(&(
+                        edge.relationship.as_str(),
+                        edge.from.as_str(),
+                        edge.to.as_str(),
+                    )));
+            if !*kept && wanted {
+                *kept = true;
+                grew = true;
+            }
+        }
+        if !grew {
+            break;
+        }
+    }
+    let edges: Vec<Edge> = whole
+        .edges
+        .iter()
+        .zip(&kept)
+        .filter(|(_, kept)| **kept)
+        .map(|(edge, _)| edge.clone())
+        .collect();
+    let reached: HashSet<&str> = edges
+        .iter()
+        .flat_map(|edge| {
+            let to = (!edge.to_relationship).then_some(edge.to.as_str());
+            std::iter::once(edge.from.as_str()).chain(to)
+        })
+        .collect();
+    let nodes = whole
+        .nodes
+        .iter()
+        .filter(|node| own.contains(node.id.as_str()) || reached.contains(node.id.as_str()))
+        .map(|node| {
+            let mut node = node.clone();
+            if !own.contains(node.id.as_str()) {
+                node.elsewhere = holder(&node.id).map(|found| Elsewhere {
+                    package: found.id().as_str().to_owned(),
+                    name: found
+                        .name()
+                        .and_then(|name| name.content())
+                        .filter(|name| !name.trim().is_empty())
+                        .unwrap_or(found.id().as_str())
+                        .to_owned(),
+                });
+            }
+            node
+        })
+        .collect::<Vec<_>>();
+    let ids: HashSet<&str> = nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .chain(edges.iter().map(|edge| edge.relationship.as_str()))
+        .collect();
+    let acps: Vec<Acp> = whole
+        .acps
+        .iter()
+        .filter(|acp| {
+            edges.iter().any(|edge| {
+                edge.relationship == acp.relationship && edge.from == acp.from && edge.to == acp.to
+            })
+        })
+        .cloned()
+        .collect();
+    let descriptions = whole
+        .descriptions
+        .iter()
+        .filter(|node| acps.iter().any(|acp: &Acp| acp.claim == node.id))
+        .cloned()
+        .collect();
+    Some(View {
+        acps,
+        descriptions,
+        findings: whole
+            .findings
+            .iter()
+            .filter(|finding| ids.contains(finding.element.as_str()))
+            .cloned()
+            .collect(),
+        unplaced: whole
+            .unplaced
+            .iter()
+            .filter(|item| holder(&item.id).is_some_and(|found| found.id().as_str() == package))
+            .cloned()
+            .collect(),
+        nodes,
+        edges,
+    })
 }
 
 #[cfg(test)]

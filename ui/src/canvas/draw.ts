@@ -2,7 +2,8 @@
 // (af-layout); this only paints it. Lines keep 1 CSS px at every zoom, and
 // shapes, text and arrowheads scale (DATUM's rule for a diagram canvas).
 
-import type { Diagram, DiagramEdge, DiagramNode, Point, Rect } from '../core/Core';
+import type {
+  AcpMark, Diagram, DiagramEdge, DiagramNode, Point, Rect } from '../core/Core';
 
 /**
  * The diagram's own colours (`--af-diagram-*` in app.css): a ground apart
@@ -215,6 +216,71 @@ export function hitOneEdge(diagram: Diagram, viewport: Viewport, x: number, y: n
 }
 
 /**
+ * The assurance claim point under the canvas point: on its square, with a
+ * margin of 2 px on screen, or on its label. Null anywhere else.
+ */
+export function hitAcp(diagram: Diagram, viewport: Viewport, x: number, y: number): AcpMark | null {
+  const point = toDiagram(viewport, x, y);
+  // A small margin on screen, so a click on the line beside it is the line's.
+  const reach = 2 / viewport.scale;
+  for (const edge of diagram.edges) {
+    for (const acp of edge.acps) {
+      const { square, label } = acp;
+      const onSquare =
+        point.x >= square.x - reach &&
+        point.x <= square.x + square.width + reach &&
+        point.y >= square.y - reach &&
+        point.y <= square.y + square.height + reach;
+      const onLabel =
+        point.x >= label.x && point.x <= label.x + label.width && point.y >= label.baseline - label.size && point.y <= label.baseline + label.size * 0.3;
+      if (onSquare || onLabel) return acp;
+    }
+  }
+  return null;
+}
+
+/**
+ * The assurance claim points on `edge`: each a solid square on the line, in
+ * the line's colour, and its label beside it as an identifier is drawn. Far
+ * out, the squares alone.
+ */
+function drawAcps(context: CanvasRenderingContext2D, edge: DiagramEdge, palette: Palette, families: Families, scale: number, marks: Marks) {
+  // As drawEdge strokes the line: marked when selected, or a place.
+  const key = edgeKey(edge);
+  const marked = marks.selected === key || marks.move?.lines?.has(key) === true;
+  for (const acp of edge.acps) {
+    const { square, label } = acp;
+    // Its Claim selected, as a description is: the ACP is marked.
+    context.fillStyle = marked || marks.selected === acp.claim ? palette.selectedLine : palette.line;
+    context.fillRect(square.x, square.y, square.width, square.height);
+    if (label.size * scale < SMALLEST_TEXT_PX) continue;
+    context.fillStyle = palette.secondary;
+    context.font = `${label.weight} ${label.size}px ${families.identifier}`;
+    context.fillText(label.text, label.x, label.baseline);
+  }
+}
+
+/**
+ * The other argument package whose name is under the canvas point: a node of
+ * another package, in a package's diagram, shows it in its `package` lines,
+ * and a click there opens that package. Null anywhere else.
+ */
+export function hitPackage(diagram: Diagram, viewport: Viewport, x: number, y: number): string | null {
+  const node = hitTest(diagram, viewport, x, y);
+  if (!node?.package) return null;
+  const point = toDiagram(viewport, x, y);
+  const on = node.text.some(
+    (line) =>
+      line.role === 'package' &&
+      point.x >= line.x &&
+      point.x <= line.x + line.width &&
+      point.y >= line.baseline - line.size &&
+      point.y <= line.baseline + line.size * 0.3,
+  );
+  return on ? node.package : null;
+}
+
+/**
  * What is under the canvas point: the id of a node, which is drawn over the
  * lines, or else the key of the edge whose line is there.
  */
@@ -304,6 +370,7 @@ export function draw(
     // A line a moved challenge may go to is drawn in full.
     if (move) context.globalAlpha = move.lines?.has(edgeKey(edge)) ? 1 : FAINT;
     drawEdge(context, edge, palette, scale, marks);
+    drawAcps(context, edge, palette, families, scale, marks);
     drawn.edges += 1;
   }
   for (const node of diagram.nodes) {
@@ -496,7 +563,7 @@ function drawNode(
 
   // Zoomed far out the text is not drawn, the A and J included: only the
   // identifier, at metadata size (DATUM's canvas rule 5).
-  const sized = node.text.find((line) => line.role !== 'identifier') ?? node.text[0];
+  const sized = node.text.find((line) => line.role !== 'identifier' && line.role !== 'package') ?? node.text[0];
   const far = sized !== undefined && sized.size * scale < SMALLEST_TEXT_PX;
 
   for (const decorator of node.decorators) {
@@ -524,9 +591,14 @@ function drawNode(
     return;
   }
   for (const line of node.text) {
-    context.fillStyle = line.role === 'identifier' ? palette.secondary : palette.text;
-    context.font = `${line.weight} ${line.size}px ${line.role === 'identifier' ? families.identifier : families.text}`;
+    const metadata = line.role === 'identifier' || line.role === 'package';
+    context.fillStyle = metadata ? palette.secondary : palette.text;
+    context.font = `${line.weight} ${line.size}px ${metadata ? families.identifier : families.text}`;
     context.fillText(line.text, line.x, line.baseline);
+    // The other package's name opens it: drawn as a link is.
+    if (line.role === 'package') {
+      context.fillRect(line.x, line.baseline + 2 / scale, line.width, 1 / scale);
+    }
   }
 }
 

@@ -27,6 +27,11 @@ pub struct Removal {
     /// The SACM ids of the nodes it deletes: the node chosen first, then
     /// what goes with it, each after a node it is drawn under.
     pub nodes: Vec<String>,
+    /// The ACPs it takes, as the relationship and the confidence Claim,
+    /// other than descriptions, which `nodes` lists: one whose Claim goes
+    /// from a line that stays, or whose line goes while its Claim stays
+    /// (W19).
+    pub acps: Vec<(String, String)>,
 }
 
 /// What a removal made.
@@ -48,7 +53,10 @@ pub struct Removed {
 /// [`Refusal::Entangled`] when something the diagram does not draw refers to
 /// what would be deleted, or a node holds more than its text (W19).
 pub fn removal(document: &Document, view: &View, id: &str) -> Result<Removal, Refusal> {
-    Plan::of(document, view, id).map(|plan| Removal { nodes: plan.nodes })
+    Plan::of(document, view, id).map(|plan| Removal {
+        nodes: plan.nodes,
+        acps: plan.acps,
+    })
 }
 
 /// Removes the node `id` and what goes with it (W18 to W20), as
@@ -73,11 +81,11 @@ pub fn remove(document: &mut Document, view: &View, id: &str) -> Result<Removed,
             ))?;
         }
         // W18: a relationship that stays loses only the sources that go.
-        for (relationship, source) in &plan.scrubbed {
+        for (relationship, end, element) in &plan.scrubbed {
             tx.apply(RemoveReference::new(
                 relationship.clone(),
-                ReferenceEnd::Source,
-                source.clone(),
+                *end,
+                element.clone(),
             ))?;
         }
         // Relationships first, so that what they name is no longer referred
@@ -143,7 +151,9 @@ struct Plan {
     /// may delete.
     held_within: HashSet<String>,
     /// A relationship that stays, and a source of it that goes.
-    scrubbed: Vec<(ElementId, ElementId)>,
+    scrubbed: Vec<(ElementId, ReferenceEnd, ElementId)>,
+    /// The ACPs that go, as the relationship and the confidence Claim.
+    acps: Vec<(String, String)>,
     /// An inference that stays with its Strategy and loses every Goal, and
     /// the package its placeholder goes into.
     held: Vec<(ElementId, ElementId)>,
@@ -267,11 +277,56 @@ impl Plan {
             }
         }
         deleted.extend(placeholders_going);
+        // R17: a description only the deleted relationships named goes with
+        // them, and is listed: it would otherwise be drawn as a Goal of its
+        // own, which nobody asked for.
+        let mut described: Vec<&str> = Vec::new();
+        for description in &view.descriptions {
+            let referrers = document.referrers(description.id.as_str());
+            let only_ours = !referrers.is_empty()
+                && referrers.iter().all(|referrer| {
+                    referrer.end() == ReferenceEnd::MetaClaim
+                        && relationships
+                            .deleted
+                            .contains(referrer.holder().id().as_str())
+                });
+            if let (true, Some(element)) = (only_ours, document.get(description.id.as_str())) {
+                deleted.push(element.id().clone());
+                described.push(description.id.as_str());
+            }
+        }
         let all: HashSet<&str> = deleted.iter().map(ElementId::as_str).collect();
+        // W19: a relationship that goes takes its metaClaim links; one the
+        // diagram does not draw as an ACP would go unseen: refused.
+        for id in &relationships.deleted {
+            let Some(relationship) = document.get(id.as_str()) else {
+                continue;
+            };
+            for claim in relationship.meta_claims() {
+                let drawn = view
+                    .acps
+                    .iter()
+                    .any(|acp| acp.relationship == id.as_str() && acp.claim == claim.as_str());
+                if !drawn {
+                    return Err(Refusal::Entangled);
+                }
+            }
+        }
+        // The ACPs whose line goes and whose Claim stays: a confidence
+        // argument elsewhere, or a goal of the argument, loses its ACP.
+        let mut acps: Vec<(String, String)> = view
+            .acps
+            .iter()
+            .filter(|acp| {
+                relationships.deleted.contains(acp.relationship.as_str())
+                    && !all.contains(acp.claim.as_str())
+            })
+            .map(|acp| (acp.relationship.clone(), acp.claim.clone()))
+            .collect();
 
         // W19: what refers to what goes. A relationship that stays loses the
         // source; anything else, which the diagram does not draw, refuses.
-        let mut scrubbed: Vec<(ElementId, ElementId)> = Vec::new();
+        let mut scrubbed: Vec<(ElementId, ReferenceEnd, ElementId)> = Vec::new();
         let mut held_within: HashSet<String> = HashSet::new();
         for element_id in &deleted {
             let Some(element) = document.get(element_id.as_str()) else {
@@ -302,12 +357,36 @@ impl Plan {
                 if goes {
                     continue;
                 }
+                // A relationship that stays loses the source, or the ACP
+                // the diagram draws for this confidence Claim (E11), which
+                // goes with it and is listed. A metaClaim the diagram does
+                // not draw is not changed for the user: refused.
+                let end = referrer.end();
+                let drawn_acp = end == ReferenceEnd::MetaClaim
+                    && view.acps.iter().any(|acp| {
+                        acp.relationship == holder.id().as_str() && acp.claim == element_id.as_str()
+                    });
+                if drawn_acp {
+                    acps.push((
+                        holder.id().as_str().to_owned(),
+                        element_id.as_str().to_owned(),
+                    ));
+                }
+                // A source taken out of a relationship with an ACP would
+                // change what the ACP is about (W25): refused.
+                let carries = view
+                    .acps
+                    .iter()
+                    .any(|acp| acp.relationship == holder.id().as_str());
+                if end == ReferenceEnd::Source && carries {
+                    return Err(Refusal::Entangled);
+                }
                 if holder.kind().is_a(AbstractClass::AssertedRelationship)
-                    && referrer.end() == ReferenceEnd::Source
+                    && (end == ReferenceEnd::Source || drawn_acp)
                 {
-                    let pair = (holder.id().clone(), element_id.clone());
-                    if !scrubbed.contains(&pair) {
-                        scrubbed.push(pair);
+                    let held = (holder.id().clone(), end, element_id.clone());
+                    if !scrubbed.contains(&held) {
+                        scrubbed.push(held);
                     }
                 } else {
                     return Err(Refusal::Entangled);
@@ -332,10 +411,19 @@ impl Plan {
         });
 
         Ok(Plan {
-            nodes: nodes.into_iter().map(str::to_owned).collect(),
+            nodes: nodes
+                .into_iter()
+                .chain(described)
+                .map(str::to_owned)
+                .collect(),
             deleted,
             held_within,
             scrubbed,
+            acps: {
+                acps.sort();
+                acps.dedup();
+                acps
+            },
             held,
             parent,
         })

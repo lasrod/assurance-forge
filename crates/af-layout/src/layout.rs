@@ -13,14 +13,15 @@
 //! Spacing and placement follow the C++ application's `gsn_layout.cpp` where
 //! they fit; it is a reference, not code that was ported.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::f32::consts::SQRT_2;
 
 use af_gsn::view::{EdgeKind, Node, NodeKind, View};
 
 use crate::model::{
-    Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point, Rect,
-    Shape, ShapeKind, TextLine, TextRole,
+    AcpMark, Arrowhead, Decorator, Diagram, DiagramEdge, DiagramNode, LineStyle, Placement, Point,
+    Rect, Shape, ShapeKind, TextLine, TextRole,
 };
 use crate::route::{self, Dir, Port, Run};
 use crate::text::{Font, Line, Shaper};
@@ -124,7 +125,7 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
         })
         .collect();
 
-    let diagram_edges: Vec<DiagramEdge> = links
+    let mut diagram_edges: Vec<DiagramEdge> = links
         .iter()
         .zip(paths(view, &links, &tree, &nodes, &placed.band_top))
         .enumerate()
@@ -150,6 +151,8 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
             edge_geometry(edge, path, placement)
         })
         .collect();
+
+    place_acps(view, &nodes, &mut diagram_edges, shaper, style);
 
     // Everything drawn: the nodes, and the edges, which a loop takes outside
     // its node.
@@ -182,25 +185,33 @@ pub(crate) fn layout(view: &View, shaper: &Shaper<'_>, style: Style, cache: &mut
 
 // ===== Sizing =====
 
-/// The texts a node shows, in order: identifier, name, statement (T1 to T3).
-/// A statement that repeats the name is shown once.
-fn texts(node: &Node) -> Vec<(TextRole, &str)> {
-    let mut texts = vec![(TextRole::Identifier, node.identifier.as_str())];
+/// The texts a node shows, in order: identifier, name, statement (T1 to T3),
+/// and in a package's diagram the other package it belongs to. A statement
+/// that repeats the name is shown once.
+fn texts(node: &Node) -> Vec<(TextRole, Cow<'_, str>)> {
+    let mut texts = vec![(TextRole::Identifier, Cow::from(node.identifier.as_str()))];
     let name = node.name.as_deref().filter(|name| !name.trim().is_empty());
     if let Some(name) = name {
-        texts.push((TextRole::Name, name));
+        texts.push((TextRole::Name, Cow::from(name)));
     }
     if let Some(statement) = node.statement.as_deref() {
         if !statement.trim().is_empty() && Some(statement) != name {
-            texts.push((TextRole::Statement, statement));
+            texts.push((TextRole::Statement, Cow::from(statement)));
         }
+    }
+    if let Some(elsewhere) = node.elsewhere.as_ref() {
+        // GSN's module identifier, as §1:5.2.3 delimits it.
+        texts.push((
+            TextRole::Package,
+            Cow::from(format!("[{}]", elsewhere.name)),
+        ));
     }
     texts
 }
 
 fn role_style(role: TextRole, style: Style) -> (f32, f32, Font) {
     match role {
-        TextRole::Identifier => (
+        TextRole::Identifier | TextRole::Package | TextRole::Acp => (
             style.identifier_size,
             style.identifier_line_height,
             Font::Mono,
@@ -225,7 +236,7 @@ fn content(
     for (role, text) in &texts {
         let (size, line_height, font) = role_style(*role, style);
         let wrapped = cache
-            .entry(((*text).to_owned(), *role, width.to_bits()))
+            .entry((text.to_string(), *role, width.to_bits()))
             .or_insert_with(|| shaper.wrap(text, size, font, width));
         // A gap between groups that have lines, as `size` places them.
         if wrapped.is_empty() {
@@ -382,6 +393,10 @@ fn translate(node: &Node, sized: &Sized, origin: Point) -> DiagramNode {
     };
     DiagramNode {
         id: node.id.clone(),
+        package: node
+            .elsewhere
+            .as_ref()
+            .map(|elsewhere| elsewhere.package.clone()),
         kind: node.kind,
         shape: Shape {
             kind: sized.shape.kind,
@@ -1712,6 +1727,165 @@ fn edge_geometry(
         arrowhead,
         head,
         placement,
+        acps: Vec::new(),
         bounds,
     }
+}
+
+/// Half the side of an ACP's square.
+const ACP_HALF: f32 = 5.0;
+/// Between an ACP's square and its label.
+const ACP_GAP: f32 = 4.0;
+
+/// E11: each ACP on its relationship's first edge, halfway along its line,
+/// with its label to the right; a second ACP of the same relationship below
+/// the first.
+fn place_acps(
+    view: &View,
+    nodes: &[DiagramNode],
+    edges: &mut [DiagramEdge],
+    shaper: &Shaper<'_>,
+    style: Style,
+) {
+    let (size, line_height, font) = role_style(TextRole::Acp, style);
+    let (ascent, descent) = shaper.ascent_descent();
+    // How many ACPs each line carries: they are centred on its midpoint.
+    let mut carried: HashMap<(&str, &str, &str), usize> = HashMap::new();
+    for acp in &view.acps {
+        *carried
+            .entry((
+                acp.relationship.as_str(),
+                acp.from.as_str(),
+                acp.to.as_str(),
+            ))
+            .or_default() += 1;
+    }
+    for acp in &view.acps {
+        let count = carried
+            .get(&(
+                acp.relationship.as_str(),
+                acp.from.as_str(),
+                acp.to.as_str(),
+            ))
+            .copied()
+            .unwrap_or(1) as f32;
+        // On the relationship's first edge only (GSN v3 §1:5.3.3).
+        let Some(edge) = edges.iter_mut().find(|edge| {
+            edge.relationship == acp.relationship && edge.from == acp.from && edge.to == acp.to
+        }) else {
+            continue;
+        };
+        let row = edge.acps.len() as f32;
+        // Beside a line that runs down, above one that runs across, so the
+        // label never lies along the line; several are spaced along the
+        // line around its midpoint, each on it.
+        let offset = row - (count - 1.0) / 2.0;
+        // Closer together on a line too short for them, kept off its ends.
+        let length: f32 = edge
+            .points
+            .windows(2)
+            .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+            .sum();
+        let spacing = line_height.min(length / (count + 1.0));
+        let (middle, across) = along(&edge.points, offset * spacing);
+        let (middle_of_all, _) = along(&edge.points, 0.0);
+        let centre = middle;
+        let square = Rect {
+            x: centre.x - ACP_HALF,
+            y: centre.y - ACP_HALF,
+            width: 2.0 * ACP_HALF,
+            height: 2.0 * ACP_HALF,
+        };
+        let width = shaper.width(&acp.label, size, font);
+        let (x, baseline) = if across {
+            // Above the square, centred on it; a second ACP's label further
+            // up. Between two nodes side by side, which a short line joins,
+            // above both, which would cover it otherwise.
+            let shape = |id: &str| {
+                nodes
+                    .iter()
+                    .find(|node| node.id == id)
+                    .map(|node| node.shape.rect)
+            };
+            let side_by_side = match (shape(&edge.from), shape(&edge.to)) {
+                (Some(a), Some(b)) => a.y < b.y + b.height && b.y < a.y + a.height,
+                _ => false,
+            };
+            let top = match (side_by_side, shape(&edge.from), shape(&edge.to)) {
+                (true, Some(a), Some(b)) => a.y.min(b.y).min(middle.y - ACP_HALF),
+                _ => middle.y - ACP_HALF,
+            };
+            (
+                middle.x - width / 2.0,
+                top - ACP_GAP - descent * size - row * line_height,
+            )
+        } else {
+            // Centred on the square, as a line of a node is in its line
+            // height; on a line too short for them, a line height apart.
+            let label_y = middle_of_all.y + offset * line_height.max(spacing);
+            let at = if spacing < line_height {
+                label_y
+            } else {
+                centre.y
+            };
+            (
+                square.x + square.width + ACP_GAP,
+                at - (ascent + descent) * size / 2.0 + ascent * size,
+            )
+        };
+
+        let label = TextLine {
+            text: acp.label.clone(),
+            role: TextRole::Acp,
+            x,
+            baseline,
+            width,
+            size,
+            weight: font.weight(),
+        };
+        let drawn = Rect {
+            x: label.x,
+            y: baseline - ascent * size,
+            width,
+            height: (ascent + descent) * size,
+        };
+        edge.bounds = edge.bounds.union(&square).union(&drawn);
+        edge.acps.push(AcpMark {
+            claim: acp.claim.clone(),
+            package: acp.package.clone(),
+            square,
+            label,
+        });
+    }
+}
+
+/// The point `from_middle` along a line from its midpoint, by its length,
+/// kept on the line, and whether the line runs more across than down there.
+fn along(points: &[Point], from_middle: f32) -> (Point, bool) {
+    let length: f32 = points
+        .windows(2)
+        .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+        .sum();
+    let mut left = (length / 2.0 + from_middle).clamp(0.0, length);
+    let last = points.len().saturating_sub(2);
+    for (index, pair) in points.windows(2).enumerate() {
+        let step = (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
+        // The last segment takes what rounding leaves past its end.
+        if step > 0.0 && (step >= left || index == last) {
+            let t = (left / step).min(1.0);
+            let across = (pair[1].x - pair[0].x).abs() > (pair[1].y - pair[0].y).abs();
+            return (
+                Point {
+                    x: pair[0].x + (pair[1].x - pair[0].x) * t,
+                    y: pair[0].y + (pair[1].y - pair[0].y) * t,
+                },
+                across,
+            );
+        }
+        left -= step;
+    }
+    (
+        points.last().copied().unwrap_or(Point { x: 0.0, y: 0.0 }),
+        false,
+    )
 }

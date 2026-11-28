@@ -42,10 +42,11 @@ export function useViewport(diagram: DiagramAt | null, opened: number): ViewStat
   // canvas has a size) with nothing selected.
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  // A new file on screen, or none: the view and the selection start again.
-  // Done while rendering, so the fit below never sees the old view.
-  const file = diagram ? opened : null;
-  const [viewFor, setViewFor] = useState<number | null>(file);
+  // A new file on screen, or another package of it, or none: the view and
+  // the selection start again. Done while rendering, so the fit below never
+  // sees the old view.
+  const file = diagram ? `${opened} ${diagram.package ?? ''}` : null;
+  const [viewFor, setViewFor] = useState<string | null>(file);
   if (viewFor !== file) {
     setViewFor(file);
     setViewport(null);
@@ -135,7 +136,11 @@ export function useViewport(diagram: DiagramAt | null, opened: number): ViewStat
       });
       if (added) setSelected(added);
       else {
-        const stays = (id: string) => next.diagram.nodes.some((node) => node.id === id) || findEdge(next.diagram, id) !== null;
+        // A node, a line, or the confidence Claim of an ACP, which is no node.
+        const stays = (id: string) =>
+          next.diagram.nodes.some((node) => node.id === id) ||
+          findEdge(next.diagram, id) !== null ||
+          next.diagram.edges.some((edge) => edge.acps.some((acp) => acp.claim === id));
         setSelected((current) => (current && stays(current) ? current : null));
       }
     },

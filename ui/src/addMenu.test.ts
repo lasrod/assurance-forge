@@ -33,8 +33,8 @@ describe('the add menu', () => {
   });
 
   it('words every code in both languages, and leaves an unknown one as it is', () => {
-    // To the last code the core sends (AF-EDIT-028, W32).
-    for (let n = 1; n <= 28; n += 1) {
+    // To the last code the core sends (AF-EDIT-030, W33).
+    for (let n = 1; n <= 30; n += 1) {
       const code = `AF-EDIT-${String(n).padStart(3, '0')}`;
       expect(refusalText(code, 'goal', en)).not.toBe(code);
       expect(refusalText(code, 'goal', ja)).not.toBe(code);

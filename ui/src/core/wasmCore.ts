@@ -2,6 +2,7 @@
 
 import init, { WasmCore } from '../wasm/af_wasm';
 import type {
+  AcpChoices,
   AddChoices,
   Core,
   DiagramAt,
@@ -71,11 +72,16 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     addChoices: async (parent) => parse<AddChoices>(core.addChoices(parent ?? undefined)),
     challengeChoices: async (at, line) => parse<AddChoices>(core.challengeChoices(at, line?.from, line?.to)),
     challenge: async (at, line, kind, revision) => JSON.parse(core.challenge(at, line?.from, line?.to, kind, revision)) as EditResult,
+    acpChoices: async (relationship, line) => parse<AcpChoices>(core.acpChoices(relationship, line.from, line.to)),
+    acpNodeRefusal: async (id) => core.acpNodeRefusal(id) ?? null,
+    addAcp: async (relationship, line, kind, packageName, revision) =>
+      JSON.parse(core.addAcp(relationship, line.from, line.to, kind, packageName, revision)) as EditResult,
     add: async (parent, kind, revision) => JSON.parse(core.add(parent ?? undefined, kind, revision)) as EditResult,
     removal: async (id) => parse<Removal>(core.removal(id)),
     remove: async (id, revision) => JSON.parse(core.remove(id, revision)) as EditResult,
     moveTargets: async (id) => parse<MoveTargets>(core.moveTargets(id)),
     moveNode: async (id, to, revision) => JSON.parse(core.moveNode(id, to ?? undefined, revision)) as EditResult,
+    showPackage: async (id) => core.showPackage(id ?? undefined),
     moveToLine: async (id, line, revision) => JSON.parse(core.moveToLine(id, line.relationship, line.from, line.to, revision)) as EditResult,
     setUndeveloped: async (id, undeveloped, revision) => JSON.parse(core.setUndeveloped(id, undeveloped, revision)) as EditResult,
     repairJoin: async (id, relationship, revision) => JSON.parse(core.repairJoin(id, relationship, revision)) as EditResult,

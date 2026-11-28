@@ -91,8 +91,12 @@ pub struct DiagramAt {
     /// The document's revision.
     pub revision: u32,
     /// Which layout of it: it changes when the language or the text sizes
-    /// do, which change the diagram but not the document.
+    /// do, or another package is shown, which change the diagram but not the
+    /// document.
     pub layout: u32,
+    /// The SACM id of the argument package the diagram is of, or null for
+    /// the whole case.
+    pub package: Option<String>,
     pub diagram: Diagram,
 }
 
@@ -103,6 +107,7 @@ pub struct DiagramAt {
 pub struct DiagramAtRef<'a> {
     pub revision: u32,
     pub layout: u32,
+    pub package: Option<&'a str>,
     pub diagram: &'a Diagram,
 }
 
@@ -127,6 +132,11 @@ pub struct ElementDetails {
     pub statement: Option<String>,
     /// The view's codes about this element.
     pub codes: Vec<ViewCode>,
+    /// The SACM id of the argument package it is held in, or null.
+    pub package: Option<String>,
+    /// A confidence Claim an ACP shows as its description (R17): it is not
+    /// drawn as a node, and its text is the ACP's.
+    pub acp_description: bool,
 }
 
 /// What the details panel shows for a relationship: one the diagram draws an
@@ -294,6 +304,11 @@ pub enum TextRole {
     Identifier,
     Name,
     Statement,
+    /// In a package's diagram, `[name]` of the other package a node belongs
+    /// to.
+    Package,
+    /// An assurance claim point's label.
+    Acp,
 }
 
 /// One line of text, drawn with the measured faces in their order:
@@ -334,6 +349,9 @@ pub enum Decorator {
 pub struct DiagramNode {
     /// The SACM id.
     pub id: String,
+    /// In a package's diagram, the SACM id of the other argument package the
+    /// node belongs to, whose name its `package` lines show; null otherwise.
+    pub package: Option<String>,
     pub kind: NodeKind,
     pub shape: Shape,
     pub text: Vec<TextLine>,
@@ -396,6 +414,9 @@ pub struct DiagramEdge {
     pub arrowhead: Arrowhead,
     /// The tip, on what the arrow points at, then the other two corners.
     pub head: Vec<Point>,
+    /// The assurance claim points on the line, each a solid square with its
+    /// label beside it; on a relationship's first edge only.
+    pub acps: Vec<AcpMark>,
     /// Everything drawn for the edge, for culling.
     pub bounds: Rect,
 }
@@ -463,6 +484,9 @@ pub struct AddChoices {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RemovalNode {
+    /// A confidence Claim an ACP shows as its description, which is not
+    /// drawn: it goes with the line that carries the ACP.
+    pub acp_description: bool,
     /// The SACM id.
     pub id: String,
     pub kind: NodeKind,
@@ -481,6 +505,9 @@ pub struct Removal {
     /// The nodes it deletes: the node chosen first, then what goes with it.
     /// Empty when it is refused.
     pub nodes: Vec<RemovalNode>,
+    /// The labels of the assurance claim points it takes, such as
+    /// `ACP2[Confidence]`, other than descriptions, which `nodes` lists.
+    pub acps: Vec<String>,
     /// Why it cannot be removed (`AF-EDIT-011`, `AF-EDIT-015`, or
     /// `AF-EDIT-005` when a Strategy kept has no package to hold the place
     /// of its next Goal), or null when it can. The frontend words it.
@@ -519,6 +546,55 @@ pub struct MoveLine {
     /// `AF-EDIT-027`), or
     /// null when it can.
     pub refusal: Option<String>,
+}
+
+/// What an assurance claim point's argument is (A3 of the ACP plan).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum AcpKind {
+    /// A text, drawn only as the ACP.
+    Description,
+    /// A confidence argument in a new argument package.
+    Argument,
+}
+
+/// One ACP a line's menu may offer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpChoice {
+    pub kind: AcpKind,
+    /// Why it cannot be added (`AF-EDIT-002`, `AF-EDIT-005`, `AF-EDIT-011`,
+    /// `AF-EDIT-027`, `AF-EDIT-029`), or null when it can.
+    pub refusal: Option<String>,
+}
+
+/// The ACPs a line's menu may offer, at `revision`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpChoices {
+    pub revision: u32,
+    /// The identifier the next ACP takes, such as `ACP1`: what the interface
+    /// names a confidence argument's package after.
+    pub identifier: String,
+    pub choices: Vec<AcpChoice>,
+}
+
+/// An assurance claim point on an edge (GSN v3 Table 1:5-1).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpMark {
+    /// The SACM id of the confidence Claim.
+    pub claim: String,
+    /// The SACM id of its argument package when another than the edge's:
+    /// what a click opens. Null for a description.
+    pub package: Option<String>,
+    /// The square, centred on the line.
+    pub square: Rect,
+    pub label: TextLine,
 }
 
 /// Where the node `id` may be moved, at `revision`.
@@ -796,6 +872,10 @@ pub fn typescript() -> String {
         Rect::decl(&cfg),
         Shape::decl(&cfg),
         TextRole::decl(&cfg),
+        AcpMark::decl(&cfg),
+        AcpKind::decl(&cfg),
+        AcpChoice::decl(&cfg),
+        AcpChoices::decl(&cfg),
         TextLine::decl(&cfg),
         Decorator::decl(&cfg),
         DiagramNode::decl(&cfg),
