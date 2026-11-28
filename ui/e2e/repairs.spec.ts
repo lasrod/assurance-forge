@@ -22,14 +22,20 @@ test('a cycle offers each of its lines, and one removed breaks it', async ({ pag
   await opened(page, 'gallery-roots-and-cycle.sacm.xmi');
   const cycles = rows(page).filter({ hasText: 'AF-GSN-001' });
   await expect(cycles).toHaveCount(2);
-  // Ca, Cb and Cc support each other in a circle.
+  // Ca, Cb and Cc support each other in a circle: one row, and a menu of
+  // its lines.
   await cycles.first().click();
-  await expect(offered(page).locator('.af-problem-repair')).toHaveText([
-    /^Remove the line from Ca to Cb\./,
-    /^Remove the line from Cb to Cc\./,
-    /^Remove the line from Cc to Ca\./,
+  await expect(offered(page)).toContainText('Choose one of 3 repairs.');
+  await offered(page).getByRole('button', { name: 'Repair…' }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Remove the line from Ca to Cb.',
+    'Remove the line from Cb to Cc.',
+    'Remove the line from Cc to Ca.',
   ]);
-  await offered(page).locator('.af-problem-repair').nth(1).getByRole('button', { name: 'Repair' }).click();
+  // The list stays in view.
+  await expect(cycles.first()).toBeInViewport();
+  await menu.getByRole('menuitem', { name: 'Remove the line from Cb to Cc.' }).click();
 
   await expect.poll(async () => (await hook(page)).revision).toBe(2);
   await expect(status(page)).toHaveText('Line from Cb to Cc removed.');
@@ -77,6 +83,7 @@ test('the repairs are worded in Japanese', async ({ page }) => {
   await opened(page, 'gallery-roots-and-cycle.sacm.xmi', '&lang=ja');
   // The list is named in Japanese too.
   await page.getByRole('option').filter({ hasText: 'AF-GSN-001' }).first().click();
-  await expect(offered(page).locator('.af-problem-repair').first()).toContainText('Ca から Cb への線を削除します。');
-  await expect(offered(page).getByRole('button', { name: '修復' })).toHaveCount(3);
+  await expect(offered(page)).toContainText('3 通りの修復から選んでください。');
+  await offered(page).getByRole('button', { name: '修復…' }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem').first()).toHaveText('Ca から Cb への線を削除します。');
 });

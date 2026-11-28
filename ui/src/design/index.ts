@@ -14,6 +14,7 @@ export {
   DatumRoot,
   Dialog,
   ListBox,
+  Menu,
   MenuBar,
   MenuBarMenu,
   MenuItem,

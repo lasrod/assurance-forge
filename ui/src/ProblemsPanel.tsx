@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Problem, ProblemRepair, ProblemSeverity, Problems } from './core/Core';
 import { refusalText } from './addMenu';
-import { Button, CircleX, Info, ListBox, TriangleAlert } from './design';
+import { Button, CircleX, Info, ListBox, Menu, MenuItem, TriangleAlert } from './design';
 import type { Language, MessageKey } from './i18n/messages';
 import { problemMeta, wordProblem } from './i18n/problems';
 
@@ -39,11 +39,10 @@ export function ProblemsPanel({
 }) {
   // The row chosen, by its place in the list of the revision it was chosen in.
   const [chosen, setChosen] = useState<{ revision: number; row: string } | null>(null);
-  // The repair asked for, by its problem's row and its place among the
-  // problem's repairs, in the revision it was asked at: its button is off
-  // until the list of the repaired revision comes, so a second click does
-  // not ask again. Other repairs keep theirs.
-  const [repairing, setRepairing] = useState<{ revision: number; row: string; repair: number } | null>(null);
+  // The problem a repair was asked for, by its row in the revision it was
+  // asked at: its repairs are off until the list of the repaired revision
+  // comes, so a second click does not ask again. Other problems keep theirs.
+  const [repairing, setRepairing] = useState<{ revision: number; row: string } | null>(null);
   if (!problems || problems.problems.length === 0) {
     return <p className="datum-meta af-dock-empty">{t('problemsNone')}</p>;
   }
@@ -60,24 +59,42 @@ export function ProblemsPanel({
   // None can be made here: why, from the first.
   const refused = offered.length === 0 ? repairs.map(refusalOf).find((code) => code !== null) : undefined;
   const named = (id: string) => picked?.elements.find((element) => element.id === id)?.identifier ?? id;
+  // Off once asked, until the list of the repaired revision comes.
+  const busy = repairing?.revision === problems.revision && repairing.row === value;
+  const make = (repair: ProblemRepair) => {
+    if (!picked || value === null) return;
+    setRepairing({ revision: problems.revision, row: value });
+    onRepair(repair, problems.revision, picked);
+  };
   return (
     <>
-      {picked && offered.length > 0 && (
-        <div className="af-problem-repairs" data-testid="problem-repair">
-          {offered.map(({ repair, index }) => (
-            <div className="af-problem-repair" key={index}>
-              <span>{repairText(repair, named, t)}</span>
-              <Button
-                disabled={repairing?.revision === problems.revision && repairing.row === value && repairing.repair === index}
-                onClick={() => {
-                  if (value !== null) setRepairing({ revision: problems.revision, row: value, repair: index });
-                  onRepair(repair, problems.revision, picked);
-                }}
-              >
-                {t('repair')}
-              </Button>
-            </div>
-          ))}
+      {picked && offered.length === 1 && (
+        <div className="af-problem-repair" data-testid="problem-repair">
+          <span>{repairText(offered[0].repair, named, t)}</span>
+          <Button disabled={busy} onClick={() => make(offered[0].repair)}>
+            {t('repair')}
+          </Button>
+        </div>
+      )}
+      {picked && offered.length > 1 && (
+        // Several, as a cycle's lines: one row, and a menu of them, so the
+        // list stays in view.
+        <div className="af-problem-repair" data-testid="problem-repair">
+          <span>{t('repairChoose', { count: offered.length })}</span>
+          <Menu
+            label={t('repairs')}
+            trigger={<Button disabled={busy}>{t('repairMenu')}</Button>}
+            onAction={(id) => {
+              const chosen = offered[Number(id)];
+              if (chosen) make(chosen.repair);
+            }}
+          >
+            {offered.map(({ repair }, index) => (
+              <MenuItem key={index} id={String(index)}>
+                {repairText(repair, named, t)}
+              </MenuItem>
+            ))}
+          </Menu>
         </div>
       )}
       {picked && refused && (
