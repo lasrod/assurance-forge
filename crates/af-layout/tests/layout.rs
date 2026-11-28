@@ -10,7 +10,7 @@ use af_layout::{
 };
 use sacm::xmi::{self, Mode, ReadOptions};
 
-const SAMPLES: [&str; 11] = [
+const SAMPLES: [&str; 12] = [
     "challenges.sacm.xmi",
     "sacm_example_core_argument.sacm.xmi",
     "sample.sacm.xmi",
@@ -23,6 +23,8 @@ const SAMPLES: [&str; 11] = [
     "gallery-long-text.sacm.xmi",
     "gallery-japanese.sacm.xmi",
     "gallery-roots-and-cycle.sacm.xmi",
+    // The welcome page's example.
+    "example.sacm.xmi",
 ];
 
 fn testdata(path: &str) -> Vec<u8> {

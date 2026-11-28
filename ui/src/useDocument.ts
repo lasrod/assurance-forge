@@ -39,10 +39,10 @@ import type { OfferedRecovery } from './RecoveryDialog';
 import { newerDiagram } from './freshness';
 import type { Language } from './i18n/messages';
 import type { TextOutcome } from './textDraft';
-import exampleUrl from '../../testdata/sacm/sacm_example_core_argument.sacm.xmi?url';
+import exampleUrl from '../../testdata/sacm/example.sacm.xmi?url';
 
 /** The example the welcome page opens: its name, as a file would have one. */
-const EXAMPLE_NAME = 'sacm_example_core_argument.sacm.xmi';
+const EXAMPLE_NAME = 'example.sacm.xmi';
 
 /** How long after the last change a recovery copy is kept, in milliseconds (R2). */
 export const RECOVERY_DELAY = 1000;
