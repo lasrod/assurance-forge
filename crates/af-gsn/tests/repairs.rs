@@ -3,7 +3,9 @@
 //! repair offered clears the problem it was offered for, adds no error, and
 //! leaves the file valid.
 
-use af_gsn::commands::{Line, Refusal, Repair, remove_line, repair_join, repairs, set_undeveloped};
+use af_gsn::commands::{
+    AddError, Line, Refusal, Repair, remove_line, renumber, repair_join, repairs, set_undeveloped,
+};
 use af_gsn::view::view;
 use af_gsn::wellformed::{Finding, Rule, check};
 use sacm::model::Document;
@@ -98,6 +100,11 @@ fn make(document: &mut Document, repair: &Repair) {
             element,
             refusal: None,
         } => set_undeveloped(document, &now, element, false).map(|_| ()),
+        Repair::Renumber {
+            nodes,
+            refusal: None,
+            ..
+        } => renumber(document, &now, nodes).map(|_| ()),
         refused => panic!("{refused:?} is not offered"),
     };
     made.unwrap_or_else(|error| panic!("{repair:?}: {error}"));
@@ -298,28 +305,117 @@ fn a_line_that_cannot_go_is_offered_with_why() {
     );
 }
 
+/// An element `id` of `kind` with the identifier `identifier` (T1).
+fn identified(kind: &str, id: &str, identifier: &str, attributes: &str) -> String {
+    format!(
+        r#"<argumentElement xmi:type="sacm:{kind}" xmi:id="{id}"{attributes}><name content="{id}"/><taggedValue xmi:id="t{id}"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="{identifier}"/></content></taggedValue></argumentElement>"#
+    )
+}
+
+#[test]
+fn af_gsn_009_the_first_keeps_the_identifier_and_the_others_are_renumbered() {
+    // G1 three times, and G4 taken already: the others get G5 and G6.
+    let document = case(&[
+        identified("Claim", "a", "G1", ""),
+        identified("Claim", "b", "G1", ""),
+        identified("Claim", "c", "G1", ""),
+        identified("Claim", "d", "G4", ""),
+    ]);
+    let offered = clears(&document, Rule::DuplicateIdentifier);
+    assert_eq!(
+        offered,
+        [Repair::Renumber {
+            nodes: vec!["a".to_owned(), "b".to_owned(), "c".to_owned()],
+            given: vec![
+                ("b".to_owned(), "G5".to_owned()),
+                ("c".to_owned(), "G6".to_owned()),
+            ],
+            refusal: None,
+        }]
+    );
+    let mut repaired = document.clone();
+    make(&mut repaired, &offered[0]);
+    let identifiers: Vec<(String, String)> = view(&repaired, "en")
+        .nodes
+        .iter()
+        .map(|node| (node.id.clone(), node.identifier.clone()))
+        .collect();
+    assert_eq!(
+        identifiers,
+        [
+            ("a".to_owned(), "G1".to_owned()),
+            ("b".to_owned(), "G5".to_owned()),
+            ("c".to_owned(), "G6".to_owned()),
+            ("d".to_owned(), "G4".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn w38_a_node_keeps_the_prefix_of_its_identifier_or_takes_its_kinds() {
+    // The file's own scheme stays: cl_sub_ for cl_sub_1. An identifier that
+    // ends in no digits, or is only digits, takes the kind's prefix (W10).
+    for (shared, kind, attributes, wanted) in [
+        ("cl_sub_1", "Claim", "", "cl_sub_2"),
+        ("TopGoal", "Claim", "", "G1"),
+        ("7", "Claim", r#" assertionDeclaration="assumed""#, "A1"),
+        ("Sn3", "ArtifactReference", "", "Sn4"),
+    ] {
+        let mut body = vec![
+            identified(kind, "a", shared, attributes),
+            identified(kind, "b", shared, attributes),
+        ];
+        if kind == "ArtifactReference" {
+            // Drawn as Solutions by their evidence (R9).
+            body.push(element("Claim", "g", ""));
+            body.push(element(
+                "AssertedEvidence",
+                "e",
+                r#" source="a b" target="g""#,
+            ));
+        }
+        let document = case(&body);
+        let reported = finding(&document, Rule::DuplicateIdentifier);
+        let offered = repairs(&document, &view(&document, "en"), &reported);
+        let Some(Repair::Renumber { given, .. }) = offered.first() else {
+            panic!("{shared}: {offered:?}");
+        };
+        assert_eq!(given, &[("b".to_owned(), wanted.to_owned())], "{shared}");
+    }
+}
+
+#[test]
+fn w38_nodes_that_no_longer_share_an_identifier_are_not_renumbered() {
+    let document = case(&[
+        identified("Claim", "a", "G1", ""),
+        identified("Claim", "b", "G2", ""),
+    ]);
+    let shown = view(&document, "en");
+    let mut edited = document.clone();
+    let nodes = ["a".to_owned(), "b".to_owned()];
+    assert!(matches!(
+        renumber(&mut edited, &shown, &nodes),
+        Err(AddError::Refused(Refusal::NothingToRenumber))
+    ));
+    assert!(edited == document);
+    assert!(matches!(
+        renumber(&mut edited, &shown, &nodes[..1]),
+        Err(AddError::Refused(Refusal::NothingToRenumber))
+    ));
+}
+
 #[test]
 fn rules_with_no_repair_in_this_step_offer_none() {
-    // A Strategy with no Goal (AF-GSN-008), two Goals with one identifier
-    // (AF-GSN-009), and a Strategy as the source of an inference (AF-GSN-007).
-    let tagged = |id: &str| {
-        format!(
-            r#"<argumentElement xmi:type="sacm:Claim" xmi:id="{id}"><name content="{id}"/><taggedValue xmi:id="t{id}"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="G1"/></content></taggedValue></argumentElement>"#
-        )
-    };
+    // A Strategy with no Goal (AF-GSN-008), and a Strategy as the source of
+    // an inference (AF-GSN-007).
     let document = case(&[
         element("ArgumentReasoning", "alone", ""),
-        tagged("a"),
-        tagged("b"),
+        goal("a"),
         element("ArgumentReasoning", "s", ""),
         element("AssertedInference", "i", r#" source="s" target="a""#),
     ]);
     let found = check(&document, &view(&document, "en"));
-    for rule in [
-        Rule::StrategyAtEnd,
-        Rule::StrategyUnsupported,
-        Rule::DuplicateIdentifier,
-    ] {
+    for rule in [Rule::StrategyAtEnd, Rule::StrategyUnsupported] {
         assert!(
             found.iter().any(|finding| finding.rule == rule),
             "setup: no {rule:?}"
@@ -328,7 +424,7 @@ fn rules_with_no_repair_in_this_step_offer_none() {
     for finding in &found {
         if matches!(
             finding.rule,
-            Rule::StrategyAtEnd | Rule::StrategyUnsupported | Rule::DuplicateIdentifier
+            Rule::StrategyAtEnd | Rule::StrategyUnsupported
         ) {
             assert!(repairs(&document, &view(&document, "en"), finding).is_empty());
         }
@@ -349,7 +445,8 @@ fn every_repair_offered_on_the_samples_clears_its_problem() {
                 let what = format!("{name} {repair:?}");
                 let offered = match &repair {
                     Repair::RemoveLine { refusal, .. }
-                    | Repair::ClearUndeveloped { refusal, .. } => refusal.is_none(),
+                    | Repair::ClearUndeveloped { refusal, .. }
+                    | Repair::Renumber { refusal, .. } => refusal.is_none(),
                     Repair::MakeContext { .. } => true,
                 };
                 if !offered {

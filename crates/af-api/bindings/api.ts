@@ -476,7 +476,13 @@ nodes: Array<MoveTarget>,
  */
 lines: Array<MoveLine>, };
 
-export type ProblemRepair = { "kind": "makeContext", element: string, relationship: string, } | { "kind": "removeLine", relationship: string, from: string, to: string, refusal: string | null, } | { "kind": "clearUndeveloped", element: string, refusal: string | null, };
+export type RenumberedNode = { 
+/**
+ * The SACM id.
+ */
+element: string, identifier: string, };
+
+export type ProblemRepair = { "kind": "makeContext", element: string, relationship: string, } | { "kind": "removeLine", relationship: string, from: string, to: string, refusal: string | null, } | { "kind": "clearUndeveloped", element: string, refusal: string | null, } | { "kind": "renumber", nodes: Array<string>, given: Array<RenumberedNode>, refusal: string | null, };
 
 export type EditResult = { "result": "applied", revision: number, 
 /**

@@ -1133,6 +1133,15 @@ fn link_acp(
 }
 
 #[tauri::command]
+fn renumber(
+    elements: Vec<String>,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?.core.renumber(&elements, revision))
+}
+
+#[tauri::command]
 fn line_removal(
     relationship: String,
     from: String,
@@ -1304,6 +1313,7 @@ pub fn run(args: Args) -> i32 {
             remove_acp,
             line_removal,
             remove_line,
+            renumber,
             set_text,
             undo,
             redo,

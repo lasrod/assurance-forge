@@ -140,5 +140,10 @@ function repairText(repair: ProblemRepair, named: (id: string) => string, t: T):
       return t('repairRemoveLine', { from: named(repair.from), to: named(repair.to) });
     case 'clearUndeveloped':
       return t('repairClearUndeveloped', { identifier: named(repair.element) });
+    case 'renumber':
+      return t('repairRenumber', {
+        identifier: named(repair.nodes[0] ?? ''),
+        identifiers: repair.given.map((node) => node.identifier).join(', '),
+      });
   }
 }

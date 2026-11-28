@@ -119,6 +119,9 @@ pub enum Command {
         from: String,
         to: String,
     },
+    /// Renumber the nodes `elements`, which share one identifier: the first
+    /// keeps it (W38).
+    Renumber { elements: Vec<String> },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
     Restore,
@@ -539,6 +542,22 @@ impl Session {
             to: line.to.to_owned(),
         };
         Ok(self.made(before, command, &removed.mutation))
+    }
+
+    /// Renumbers the nodes `elements`, which share one identifier, the first
+    /// keeping it (W38). `view` is the view of the document as it is now.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::renumber`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn renumber(&mut self, view: &View, elements: &[String]) -> Result<ChangeRecord, AddError> {
+        let before = self.document.clone();
+        let renumbered = commands::renumber(&mut self.document, view, elements)?;
+        let command = Command::Renumber {
+            elements: elements.to_vec(),
+        };
+        Ok(self.made(before, command, &renumbered.mutation))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

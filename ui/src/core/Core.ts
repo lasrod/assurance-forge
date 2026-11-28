@@ -210,6 +210,12 @@ export interface Core {
    */
   removeLine(relationship: string, line: LineEnds, revision: number): Promise<EditResult>;
   /**
+   * Renumbers the nodes `elements`, which share one identifier, the first
+   * keeping it (W38), as their problem of `revision` offered: refused
+   * (AF-EDIT-009) when the document has changed since.
+   */
+  renumber(elements: string[], revision: number): Promise<EditResult>;
+  /**
    * Where the node with this SACM id may be moved: for every node of the
    * diagram, and for the top level, the code of why not, or null; or the
    * code of why it cannot be moved at all. Null when nothing is open.

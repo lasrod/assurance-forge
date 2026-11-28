@@ -87,3 +87,33 @@ test('the repairs are worded in Japanese', async ({ page }) => {
   await offered(page).getByRole('button', { name: '修復…' }).click();
   await expect(page.getByRole('menu').getByRole('menuitem').first()).toHaveText('Ca から Cb への線を削除します。');
 });
+
+test('a shared identifier is renumbered from its problem, and Undo takes it back', async ({ page }) => {
+  // a and b are both G1, and b is drawn under a.
+  const tagged = (id: string) =>
+    `<argumentElement xmi:type="sacm:Claim" xmi:id="${id}"><name content="${id}"/><taggedValue xmi:id="t${id}"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="G1"/></content></taggedValue></argumentElement>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="Case"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    ${tagged('a')}${tagged('b')}
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="i" source="b" target="a"><name content="i"/></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>`;
+  await page.goto('/');
+  await page.getByTestId('open-file').setInputFiles({ name: 'shared.sacm.xmi', mimeType: 'application/xml', buffer: Buffer.from(xml) });
+  await expect.poll(async () => (await hook(page))?.viewport?.scale ?? null).not.toBeNull();
+  await page.getByTestId('problem-counts').getByRole('button').click();
+  const shared = rows(page).filter({ hasText: 'AF-GSN-009' });
+  await shared.click();
+  await expect(offered(page)).toContainText('Keep G1 on the first in the file, and renumber the others as G2.');
+  await offered(page).getByRole('button', { name: 'Repair' }).click();
+
+  await expect(status(page)).toHaveText('Renumbered as G2.');
+  await expect(shared).toHaveCount(0);
+  const identifiers = (await hook(page)).diagram!.diagram.nodes.map((node) => node.text.find((line) => line.role === 'identifier')?.text);
+  expect(identifiers.sort()).toEqual(['G1', 'G2']);
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(shared).toHaveCount(1);
+});

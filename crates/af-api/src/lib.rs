@@ -910,6 +910,24 @@ impl Core {
         }
     }
 
+    /// Renumbers the nodes `elements`, which share one identifier, the
+    /// first keeping it (W38), as their problem at `revision` offered: one
+    /// asked for at another revision is refused (AF-EDIT-009). The first
+    /// node renumbered is the element answered, to select.
+    pub fn renumber(&mut self, elements: &[String], revision: u32) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        match open.session.renumber(&open.view, elements) {
+            Ok(record) => self.changed(&record, elements.get(1).cloned()),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
     /// Sets the identifier, name or statement of the node with SACM id `id`
     /// to `text` (W15 to W17). The statement set is the one shown: the value
     /// in the interface language, as T3 reads it.
