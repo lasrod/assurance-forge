@@ -75,6 +75,8 @@ export async function createTauriCore(fonts: FontBytes, language: string): Promi
     acpNodeRefusal: (id) => invoke<string | null>('acp_node_refusal', { id }),
     addAcp: (relationship, line, kind, packageName, revision) =>
       invoke<EditResult>('add_acp', { relationship, from: line.from, to: line.to, kind, packageName, revision }),
+    linkAcp: (relationship, line, claim, revision) =>
+      invoke<EditResult>('link_acp', { relationship, from: line.from, to: line.to, claim, revision }),
     add: (parent, kind, revision) => invoke<EditResult>('add', { parent, kind, revision }),
     removal: (id) => invoke<Removal | null>('removal', { id }),
     remove: (id, revision) => invoke<EditResult>('remove', { id, revision }),

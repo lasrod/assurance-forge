@@ -77,6 +77,8 @@ export async function createWasmCore(fonts: FontBytes, language: string): Promis
     acpNodeRefusal: async (id) => core.acpNodeRefusal(id) ?? null,
     addAcp: async (relationship, line, kind, packageName, revision) =>
       JSON.parse(core.addAcp(relationship, line.from, line.to, kind, packageName, revision)) as EditResult,
+    linkAcp: async (relationship, line, claim, revision) =>
+      JSON.parse(core.linkAcp(relationship, line.from, line.to, claim, revision)) as EditResult,
     add: async (parent, kind, revision) => JSON.parse(core.add(parent ?? undefined, kind, revision)) as EditResult,
     removal: async (id) => parse<Removal>(core.removal(id)),
     remove: async (id, revision) => JSON.parse(core.remove(id, revision)) as EditResult,

@@ -41,8 +41,9 @@ It is the seventh step of milestone 2 (Edit) in the
 ACPs on a Solution or a Context (decided 27 November 2026: SACM 2.3 cannot
 hold them, gap row 7; SACM 2.4 can, through a Claim's `subject`, and they come
 with the move to 2.4). ACPs on a Goal, an Assumption, a Justification or a
-Strategy, which GSN v3 does not define. Linking an ACP to a goal that already
-exists. Turning a description into a confidence argument. An ACP across
+Strategy, which GSN v3 does not define. Linking an ACP to a goal of the
+line's own argument package (A8 links one to the top goal of another).
+Turning a description into a confidence argument. An ACP across
 several lines of one Goal as one mark (§1:5.3.5): each relationship carries
 its own.
 
@@ -88,6 +89,7 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
 | A5 | The whole case is a diagram, as now, and what a file opens on; each argument package is also a diagram of its own. The Case Explorer's file row opens the whole case and a package's row that package; a click on an ACP opens its confidence argument's package with the goal selected | Decided by the user on 27 November 2026: a confidence argument is usually a diagram of its own (§1:5.3.1: "a separate confidence argument module"). The whole case stays because real files split one argument across packages: 8 of the 49 relationships of `oasc-ja` and 23 of the 128 of the large case join nodes of two packages |
 | A6 | A package's diagram draws its nodes and every line with an end among them. A node of another package that such a line reaches is drawn too, marked with its package's name, and the mark opens that package | A line is not cut in two: what the package says about a node elsewhere stays in view, with where that node is. Nothing in the file changes: the mark is of the diagram, not a citation (an away goal is `isCitation`, E9) |
 | A7 | Removing an ACP takes its description with it. A confidence argument in a package of its own is kept or deleted with it as the user chooses each time, in a dialog that lists what deleting it removes; a goal of the line's own argument stays | Decided by the user on 28 November 2026, over always deleting the package or always keeping it: the app has no other way to delete a package, and a confidence argument may be worth keeping without its ACP |
+| A8 | A line's menu links an ACP to a goal that exists, under Link ACP to: the top goal of each argument package other than the line's, labelled as the ACP will be. A goal already the line's ACP, or one whose argument holds the line, is not offered | Decided by the user on 28 November 2026, after A7 kept confidence arguments with no way to attach them again: top goals of other packages over any goal, and a submenu over a dialog or a click on the goal. §1:5.2.3's "goal in a separate module" |
 
 ## The pieces
 
@@ -121,6 +123,10 @@ Read on 27 November 2026, from GSN v3 §1:5 and SACM 2.3, with the gap report
       argument in a package of its own is kept or deleted as the user
       chooses (decided 28 November 2026; W35). One undo step, both
       languages, browser tests.
+- [x] **G6.** Linking an ACP to the top goal of another argument package
+      from the line's menu (decided 28 November 2026; A8, W36), such as a
+      confidence argument G5 kept. One undo step, both languages, browser
+      tests.
 
 Known limits, found in review: a package's diagram decides a relationship's
 first line against the whole case, so a line whose relationship begins in

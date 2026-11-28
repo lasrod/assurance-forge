@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
-import type { AcpChoice, AcpKind, AcpMark, AcpRemoval, AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
-import { acpItems, addItems, challengeItems, kindName, refusalText } from './addMenu';
+import type { AcpChoice, AcpGoal, AcpKind, AcpMark, AcpRemoval, AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
+import { acpGoalItems, acpItems, addItems, challengeItems, kindName, refusalText } from './addMenu';
 import { boundsOf, edgeKey } from './canvas/draw';
 import { ElementProperties } from './ElementProperties';
 import { AcpRemoveDialog } from './AcpRemoveDialog';
@@ -26,6 +26,7 @@ import {
   Status,
   StatusBar,
   StatusBarSpacer,
+  Submenu,
   Tree,
   Workspace,
   type ContextMenuSource,
@@ -56,6 +57,8 @@ const FILE_ROW = ':file';
 const REMOVE = 'remove';
 /** Remove an ACP of the line, by its Claim's SACM id. */
 const REMOVE_ACP = 'removeAcp:';
+/** Link an ACP of the line to a goal that exists, by its Claim's SACM id. */
+const LINK_ACP = 'linkAcp:';
 /** The menu items of a move: start one, make it here, give it up. */
 const MOVE = 'move';
 const MOVE_HERE = 'moveHere';
@@ -109,6 +112,8 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('added', { kind: kindName(state.added, t), identifier: state.identifier }) };
     case 'acpAdded':
       return { text: t('acpAdded', { identifier: state.identifier }) };
+    case 'acpLinked':
+      return { text: t('acpLinked', { label: state.label }) };
     case 'acpRemoved':
       return { text: t(state.withArgument ? 'acpRemovedWithArgument' : 'acpRemoved', { label: state.label }) };
     case 'challenged':
@@ -189,7 +194,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
-  const { acpChoices, addAcp: addAcpWith, acpRemoval, removeAcp: removeAcpWith } = doc;
+  const { acpChoices, addAcp: addAcpWith, acpRemoval, removeAcp: removeAcpWith, linkAcp: linkAcpWith } = doc;
   const { challengeChoices, challenge: challengeWith, moveChallenge: moveChallengeWith } = doc;
   /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
   const setUndeveloped = useCallback(
@@ -222,7 +227,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     /** The challengers that may challenge the node or the line. */
     challenges?: AddChoice[];
     /** A line's ACPs, and the identifier the next one takes. */
-    acps?: { identifier: string; choices: AcpChoice[] } | null;
+    acps?: { identifier: string; choices: AcpChoice[]; goals: AcpGoal[] } | null;
     /** A Solution's or a Context's menu offers Add ACP, which says why not yet. */
     acpNode?: boolean;
     /** A line's menu: the ACPs it carries, which it offers to remove. */
@@ -494,7 +499,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           choices: [],
           line: { relationship: edge.relationship, from: edge.from, to: edge.to },
           challenges: answer.choices,
-          acps: acpChoices && { identifier: acpChoices.identifier, choices: acpChoices.choices },
+          acps: acpChoices && { identifier: acpChoices.identifier, choices: acpChoices.choices, goals: acpChoices.goals },
           acpsOn,
         });
       });
@@ -616,6 +621,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       const kind = id.slice(ACP.length) as AcpKind;
       const { relationship, ...ends } = menu.line;
       addAcpWith(relationship, ends, kind, t('confidencePackage', { identifier: menu.acps.identifier }), menu.revision, acpAdded(kind));
+      return;
+    }
+    if (id.startsWith(LINK_ACP) && menu.line && menu.acps) {
+      const claim = id.slice(LINK_ACP.length);
+      const goal = menu.acps.goals.find((each) => each.claim === claim);
+      const { relationship, ...ends } = menu.line;
+      if (goal) linkAcpWith(relationship, ends, claim, goal.label, menu.revision, followEdit);
       return;
     }
     if (id.startsWith(REMOVE_ACP)) {
@@ -1137,6 +1149,15 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                   {item.label}
                 </MenuItem>
               ))}
+            {addMenu?.line && !moving && acpGoalItems(addMenu.acps?.goals ?? []).length > 0 && (
+              <Submenu id={LINK_ACP} label={t('linkAcp')}>
+                {acpGoalItems(addMenu.acps?.goals ?? []).map((goal) => (
+                  <MenuItem key={`${LINK_ACP}${goal.claim}`} id={`${LINK_ACP}${goal.claim}`}>
+                    {goal.label}
+                  </MenuItem>
+                ))}
+              </Submenu>
+            )}
             {addMenu?.line && !moving && (addMenu.acpsOn ?? []).length > 0 && (
               challengeItems(addMenu.challenges ?? [], t).length > 0 || acpItems(addMenu.acps?.choices ?? [], t).length > 0
             ) && <MenuSeparator />}

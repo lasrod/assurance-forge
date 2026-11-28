@@ -37,7 +37,8 @@ mod remove;
 mod remove_acp;
 mod repair;
 pub use acp::{
-    ACP_KINDS, ACP_PREFIX, AcpChoices, AcpKind, AcpLine, acp_choices, acp_node_refusal, add_acp,
+    ACP_KINDS, ACP_PREFIX, AcpChoices, AcpGoal, AcpKind, AcpLine, acp_choices, acp_node_refusal,
+    add_acp, link_acp,
 };
 pub use challenge::{
     CHALLENGERS, Challenged, LineTarget, challenge, challenge_choices, move_challenge,
@@ -123,6 +124,14 @@ pub enum Refusal {
     /// AF-EDIT-031: the line carries no ACP the diagram draws for that
     /// Claim (W35).
     NotAnAcp,
+    /// AF-EDIT-033: the goal is already an ACP of the line (W36).
+    AlreadyAnAcp,
+    /// AF-EDIT-034: the line is part of the goal's own argument, which
+    /// cannot be its own confidence argument (W36).
+    AcpOfItself,
+    /// AF-EDIT-035: an ACP names a goal that exists only when it is the top
+    /// goal of another argument package (W36).
+    NotATopGoalElsewhere,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -160,6 +169,9 @@ impl Refusal {
             Refusal::NotAnAcpPlace => "AF-EDIT-029",
             Refusal::AcpNeedsSacm24 => "AF-EDIT-030",
             Refusal::NotAnAcp => "AF-EDIT-031",
+            Refusal::AlreadyAnAcp => "AF-EDIT-033",
+            Refusal::AcpOfItself => "AF-EDIT-034",
+            Refusal::NotATopGoalElsewhere => "AF-EDIT-035",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

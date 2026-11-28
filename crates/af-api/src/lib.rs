@@ -41,7 +41,7 @@ use sacm::model::AbstractClass;
 use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 
 use contract::{
-    AcpChoice, AcpChoices, AcpKind, AcpRemoval, AddChoice, AddChoices, ArgumentValue,
+    AcpChoice, AcpChoices, AcpGoal, AcpKind, AcpRemoval, AddChoice, AddChoices, ArgumentValue,
     ConfidenceArgument, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult, ElementDetails,
     ElementKind, History, MessageArgument, MoveTarget, MoveTargets, OpenResult, Outline,
     OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode,
@@ -514,6 +514,15 @@ impl Core {
                     refusal: refusal.map(|refusal| refusal.code().to_owned()),
                 })
                 .collect(),
+            goals: answer
+                .goals
+                .into_iter()
+                .map(|goal| AcpGoal {
+                    claim: goal.claim,
+                    label: goal.label,
+                    refusal: goal.refusal.map(|refusal| refusal.code().to_owned()),
+                })
+                .collect(),
         })
     }
 
@@ -556,6 +565,37 @@ impl Core {
         };
         match open.session.add_acp(&open.view, line, kind, package_name) {
             Ok((added, record)) => self.changed(&record, Some(added.element)),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// Names the goal `claim`, the top goal of another argument package, as
+    /// an ACP of the line from `from` to `to` of `relationship` (W36), as
+    /// the menu of `revision` offered: one asked for at another revision is
+    /// refused (AF-EDIT-009). Nothing is selected: the goal stays where it
+    /// is.
+    pub fn link_acp(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        claim: &str,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let line = commands::AcpLine {
+            relationship,
+            from,
+            to,
+        };
+        match open.session.link_acp(&open.view, line, claim) {
+            Ok(record) => self.changed(&record, None),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
         }

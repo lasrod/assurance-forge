@@ -608,6 +608,21 @@ pub struct AcpChoice {
     pub refusal: Option<String>,
 }
 
+/// A goal that exists, which an ACP of the line may name (W36): the top
+/// goal of another argument package.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AcpGoal {
+    /// The SACM id of its Claim.
+    pub claim: String,
+    /// The label the ACP would have, such as `ACP1[Confidence ACP1]`.
+    pub label: String,
+    /// Why the line's ACP cannot name it (`AF-EDIT-033`, `AF-EDIT-034`, or
+    /// what refuses the line), or null when it can.
+    pub refusal: Option<String>,
+}
+
 /// The ACPs a line's menu may offer, at `revision`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
@@ -618,6 +633,8 @@ pub struct AcpChoices {
     /// names a confidence argument's package after.
     pub identifier: String,
     pub choices: Vec<AcpChoice>,
+    /// The goals that exist an ACP of the line may name, in document order.
+    pub goals: Vec<AcpGoal>,
 }
 
 /// An assurance claim point on an edge (GSN v3 Table 1:5-1).
@@ -913,6 +930,7 @@ pub fn typescript() -> String {
         AcpMark::decl(&cfg),
         AcpKind::decl(&cfg),
         AcpChoice::decl(&cfg),
+        AcpGoal::decl(&cfg),
         AcpChoices::decl(&cfg),
         TextLine::decl(&cfg),
         Decorator::decl(&cfg),

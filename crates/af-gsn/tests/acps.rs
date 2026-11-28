@@ -5,7 +5,7 @@
 use af_gsn::ElementKind;
 use af_gsn::commands::{
     AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, acp_removal, add_acp,
-    removal, remove, remove_acp,
+    link_acp, removal, remove, remove_acp,
 };
 use af_gsn::view::{Acp, Code, argument_package_of, of_package, view};
 use sacm::model::{Document, ElementKind as SacmKind};
@@ -850,6 +850,159 @@ fn w35_no_such_acp_is_refused_and_changes_nothing() {
     let mut document = original.clone();
     match remove_acp(&mut document, &shown, "I1", "ACP2", true) {
         Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::NotAnAcp),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(document, original);
+}
+
+fn goals(document: &Document, at: AcpLine<'_>) -> Vec<(String, String, Option<Refusal>)> {
+    let shown = view(document, "en");
+    acp_choices(document, &shown, at)
+        .goals
+        .into_iter()
+        .map(|goal| (goal.claim, goal.label, goal.refusal))
+        .collect()
+}
+
+fn goal(claim: &str, label: &str, refusal: Option<Refusal>) -> (String, String, Option<Refusal>) {
+    (claim.to_owned(), label.to_owned(), refusal)
+}
+
+#[test]
+fn w36_a_line_may_name_the_top_goal_of_another_package() {
+    let document = sample("acps.sacm.xmi");
+    // The confidence package's top goal, labelled as its ACP would be. G1
+    // and ACP4 are top goals of the line's own package, and not offered.
+    assert_eq!(
+        goals(&document, line("E2", "G3", "Sn2")),
+        [goal("ACP2", "ACP2[Confidence]", None)]
+    );
+    // Already this line's ACP.
+    assert_eq!(
+        goals(&document, line("E1", "G2", "Sn1")),
+        [goal(
+            "ACP2",
+            "ACP2[Confidence]",
+            Some(Refusal::AlreadyAnAcp)
+        )]
+    );
+    // What refuses the line refuses each goal.
+    assert_eq!(
+        goals(&document, line("I1", "S1", "G2")),
+        [goal(
+            "ACP2",
+            "ACP2[Confidence]",
+            Some(Refusal::NotTheFirstLine)
+        )]
+    );
+    // From the confidence package, the main package's top goals: the
+    // argument's, and the one of the confidence argument it holds itself.
+    assert_eq!(
+        goals(&document, line("E3", "ACP2", "Sn3")),
+        [
+            goal("G1", "G1[MainArgument]", None),
+            goal("ACP4", "ACP4[MainArgument]", None)
+        ]
+    );
+    assert_eq!(Refusal::AlreadyAnAcp.code(), "AF-EDIT-033");
+    assert_eq!(Refusal::AcpOfItself.code(), "AF-EDIT-034");
+    assert_eq!(Refusal::NotATopGoalElsewhere.code(), "AF-EDIT-035");
+}
+
+#[test]
+fn w36_a_goal_whose_argument_holds_the_line_is_not_its_confidence_argument() {
+    // ACP2 is now above G1: the main argument is part of its own.
+    let document = changed(&[(
+        r#"    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3""#,
+        r#"    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="I9" source="G1" target="ACP2" />
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3""#,
+    )]);
+    assert_eq!(
+        goals(&document, line("X1", "G1", "C1")),
+        [goal("ACP2", "ACP2[Confidence]", Some(Refusal::AcpOfItself))]
+    );
+    let shown = view(&document, "en");
+    let mut edited = document.clone();
+    match link_acp(&mut edited, &shown, line("X1", "G1", "C1"), "ACP2") {
+        Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::AcpOfItself),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(edited, document);
+}
+
+#[test]
+fn w36_linking_a_goal_adds_it_to_the_meta_claim_and_nothing_else() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let mut document = original.clone();
+    link_acp(&mut document, &shown, line("X1", "G1", "C1"), "ACP2")
+        .unwrap_or_else(|error| panic!("{error}"));
+    let read_back = strict(&document);
+    // After the ACP X1 named already.
+    assert_eq!(
+        meta_claims(&read_back, "X1"),
+        ["ACP4".to_owned(), "ACP2".to_owned()]
+    );
+    let after = view(&read_back, "en");
+    assert!(after.acps.contains(&acp(
+        "X1",
+        "ACP2",
+        "ACP2[Confidence]",
+        Some("argpkg_confidence")
+    )));
+    // One ACP more; the same elements, nodes and lines.
+    assert_eq!(after.acps.len(), shown.acps.len() + 1);
+    assert_eq!(after.nodes, shown.nodes);
+    assert_eq!(after.edges, shown.edges);
+    assert_eq!(read_back.elements().count(), original.elements().count());
+    // Now it is this line's: offered again, refused.
+    assert_eq!(
+        goals(&read_back, line("X1", "G1", "C1")),
+        [goal(
+            "ACP2",
+            "ACP2[Confidence]",
+            Some(Refusal::AlreadyAnAcp)
+        )]
+    );
+}
+
+#[test]
+fn w36_a_confidence_argument_kept_by_a_removal_is_linked_back() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    let mut document = original.clone();
+    remove_acp(&mut document, &shown, "E1", "ACP2", false)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let kept = view(&document, "en");
+    assert_eq!(
+        goals(&document, line("E1", "G2", "Sn1")),
+        [goal("ACP2", "ACP2[Confidence]", None)]
+    );
+    link_acp(&mut document, &kept, line("E1", "G2", "Sn1"), "ACP2")
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(view(&strict(&document), "en"), shown);
+}
+
+#[test]
+fn w36_only_a_goal_offered_is_linked() {
+    let original = sample("acps.sacm.xmi");
+    let shown = view(&original, "en");
+    // A top goal of the line's own package, a goal below the top, a
+    // Solution, and no element.
+    for claim in ["G1", "G2", "Sn3", "nothing"] {
+        let mut document = original.clone();
+        match link_acp(&mut document, &shown, line("E2", "G3", "Sn2"), claim) {
+            Err(AddError::Refused(refusal)) => {
+                assert_eq!(refusal, Refusal::NotATopGoalElsewhere, "{claim}");
+            }
+            other => panic!("{claim}: {other:?}"),
+        }
+        assert_eq!(document, original);
+    }
+    // Nor on a line that takes no ACP.
+    let mut document = original.clone();
+    match link_acp(&mut document, &shown, line("I1", "S1", "G2"), "ACP2") {
+        Err(AddError::Refused(refusal)) => assert_eq!(refusal, Refusal::NotTheFirstLine),
         other => panic!("{other:?}"),
     }
     assert_eq!(document, original);

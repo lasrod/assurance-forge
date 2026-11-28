@@ -422,26 +422,7 @@ fn acps(document: &Document, builder: &mut Builder) {
             }
             continue;
         };
-        let identifier = tagged_value(named, GSN_IDENTIFIER_KEY)
-            .filter(|identifier| !identifier.is_empty())
-            .unwrap_or(named.id().as_str());
-        let held = |id: &str| document.get(id).and_then(package_of);
-        let elsewhere = match (held(&claim), held(&relationship)) {
-            (Some(claims), Some(lines)) if claims.id() != lines.id() => Some(claims),
-            (Some(claims), None) => Some(claims),
-            _ => None,
-        };
-        let label = match elsewhere {
-            Some(package) => {
-                let name = package
-                    .name()
-                    .and_then(|name| name.content())
-                    .filter(|name| !name.trim().is_empty())
-                    .unwrap_or(package.id().as_str());
-                format!("{identifier}[{name}]")
-            }
-            None => identifier.to_owned(),
-        };
+        let (label, elsewhere) = label_of(document, &relationship, named);
         let Some((from, to)) = builder
             .edges
             .iter()
@@ -459,6 +440,48 @@ fn acps(document: &Document, builder: &mut Builder) {
             package: elsewhere.map(|package| package.id().as_str().to_owned()),
         });
     }
+}
+
+/// The label of an ACP of `relationship` naming `claim`, and the Claim's
+/// argument package when it is another than the relationship's: the
+/// Claim's GSN identifier, with `[package name]` then (GSN v3 §1:5.2.3).
+fn label_of<'d>(
+    document: &'d Document,
+    relationship: &str,
+    claim: SacmElement<'d>,
+) -> (String, Option<SacmElement<'d>>) {
+    let identifier = tagged_value(claim, GSN_IDENTIFIER_KEY)
+        .filter(|identifier| !identifier.is_empty())
+        .unwrap_or(claim.id().as_str());
+    let elsewhere = match (
+        package_of(claim),
+        document.get(relationship).and_then(package_of),
+    ) {
+        (Some(claims), Some(lines)) if claims.id() != lines.id() => Some(claims),
+        (Some(claims), None) => Some(claims),
+        _ => None,
+    };
+    let label = match elsewhere {
+        Some(package) => {
+            let name = package
+                .name()
+                .and_then(|name| name.content())
+                .filter(|name| !name.trim().is_empty())
+                .unwrap_or(package.id().as_str());
+            format!("{identifier}[{name}]")
+        }
+        None => identifier.to_owned(),
+    };
+    (label, elsewhere)
+}
+
+/// The label an ACP of `relationship` naming the Claim `claim` has, as E11
+/// draws it: `ACP1`, or `ACP1[Confidence ACP1]` when the Claim is in another
+/// argument package. `None` when `claim` names no element.
+pub fn acp_label(document: &Document, relationship: &str, claim: &str) -> Option<String> {
+    document
+        .get(claim)
+        .map(|named| label_of(document, relationship, named).0)
 }
 
 /// R17: a `Claim` an ACP may show as its description, and the diagram not as

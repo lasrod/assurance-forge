@@ -7,13 +7,21 @@
 //! `ACP2`…, made as an add makes a Goal (W9, W10), in the line's argument
 //! package or in a new one beside it; and the relationship's `metaClaim`
 //! gains it, which E11 reads back as the ACP.
+//!
+//! An ACP may also name a goal that exists: the top goal of another argument
+//! package, such as a confidence argument kept when its ACP was removed
+//! (W36; A8). Then only the relationship's `metaClaim` changes.
 
-use sacm::edit::{self, BatchError, CreateArgumentPackage, CreateTaggedValue, SetReferences};
+use std::collections::HashSet;
+
+use sacm::edit::{
+    self, BatchError, BatchMutation, CreateArgumentPackage, CreateTaggedValue, SetReferences,
+};
 use sacm::model::{Document, ElementId, ElementKind as SacmKind, LangString, ReferenceEnd};
 
 use super::{AddError, Added, Identifiers, Refusal, argument_package, new_node};
 use crate::ElementKind;
-use crate::view::{ACP_DESCRIPTION, ACP_KEY, EdgeKind, NodeKind, View};
+use crate::view::{ACP_DESCRIPTION, ACP_KEY, EdgeKind, NodeKind, View, acp_label};
 
 /// The prefix of a confidence Claim's identifier (A4).
 pub const ACP_PREFIX: &str = "ACP";
@@ -41,22 +49,125 @@ pub struct AcpLine<'a> {
     pub to: &'a str,
 }
 
-/// What the line's menu offers: the identifier the next ACP takes, and each
-/// kind with why it cannot be added, or `None`.
+/// What the line's menu offers: the identifier the next ACP takes, each
+/// kind with why it cannot be added, or `None`, and the goals that exist an
+/// ACP of it may name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AcpChoices {
     pub identifier: String,
     pub choices: Vec<(AcpKind, Option<Refusal>)>,
+    pub goals: Vec<AcpGoal>,
 }
 
-/// W33: the ACPs the line may take. Either both kinds may, or neither, for
-/// the same reason.
+/// A goal that exists, which an ACP of the line may name (W36): the top
+/// goal of another argument package.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AcpGoal {
+    /// The SACM id of its `Claim`.
+    pub claim: String,
+    /// The label the ACP would have, as E11 draws it: `ACP1[Confidence ACP1]`.
+    pub label: String,
+    /// Why the line's ACP cannot name it, or `None`.
+    pub refusal: Option<Refusal>,
+}
+
+/// W33 and W36: the ACPs the line may take. Either both new kinds may, or
+/// neither, for the same reason, which every goal then also carries.
 pub fn acp_choices(document: &Document, view: &View, line: AcpLine<'_>) -> AcpChoices {
     let refusal = plan(document, view, line).err();
     AcpChoices {
         identifier: Identifiers::of(document, view).next_prefixed(ACP_PREFIX),
         choices: ACP_KINDS.iter().map(|kind| (*kind, refusal)).collect(),
+        goals: acp_goals(document, view, line, refusal),
     }
+}
+
+/// W36: the top goals of the argument packages other than the line's, in
+/// document order, with why the line's ACP cannot name one: what refuses
+/// the line (`refusal`), the goal already being an ACP of it
+/// (AF-EDIT-033), or the line being part of the goal's own argument
+/// (AF-EDIT-034), which would make that argument its own confidence
+/// argument.
+///
+/// A top goal is a Goal the view draws that no `SupportedBy`, `InContextOf`
+/// or neutral line reaches, that challenges nothing, and that is not a
+/// citation. `view` is the whole case.
+fn acp_goals(
+    document: &Document,
+    view: &View,
+    line: AcpLine<'_>,
+    refusal: Option<Refusal>,
+) -> Vec<AcpGoal> {
+    let Some(relationship) = document.get(line.relationship) else {
+        return Vec::new();
+    };
+    let home = argument_package(relationship);
+    let named: HashSet<&str> = relationship
+        .meta_claims()
+        .iter()
+        .map(ElementId::as_str)
+        .collect();
+    // Reached by a line: not a top goal. A challenger is a counter argument.
+    let reached: HashSet<&str> = view
+        .edges
+        .iter()
+        .filter(|edge| edge.kind != EdgeKind::Challenge)
+        .map(|edge| edge.to.as_str())
+        .collect();
+    let challengers: HashSet<&str> = view
+        .edges
+        .iter()
+        .filter(|edge| edge.kind == EdgeKind::Challenge)
+        .map(|edge| edge.from.as_str())
+        .collect();
+    let above = above(view, line.from);
+    view.nodes
+        .iter()
+        .filter(|node| {
+            node.kind == NodeKind::Goal
+                && !reached.contains(node.id.as_str())
+                && !challengers.contains(node.id.as_str())
+        })
+        .filter_map(|node| {
+            let claim = document
+                .get(node.id.as_str())
+                .filter(|claim| claim.kind() == SacmKind::Claim && !claim.is_citation())?;
+            let package = argument_package(claim)?;
+            if home.as_ref() == Some(&package) {
+                return None;
+            }
+            let refusal = refusal.or_else(|| {
+                if named.contains(node.id.as_str()) {
+                    Some(Refusal::AlreadyAnAcp)
+                } else if above.contains(node.id.as_str()) {
+                    Some(Refusal::AcpOfItself)
+                } else {
+                    None
+                }
+            });
+            Some(AcpGoal {
+                claim: node.id.clone(),
+                label: acp_label(document, line.relationship, node.id.as_str())?,
+                refusal,
+            })
+        })
+        .collect()
+}
+
+/// The node `id` and every node above it by `SupportedBy`, `InContextOf` or
+/// neutral lines: the argument it is part of.
+fn above<'v>(view: &'v View, id: &'v str) -> HashSet<&'v str> {
+    let mut found: HashSet<&str> = HashSet::from([id]);
+    let mut todo = vec![id];
+    while let Some(at) = todo.pop() {
+        for edge in &view.edges {
+            if edge.kind != EdgeKind::Challenge && edge.to == at && found.insert(edge.from.as_str())
+            {
+                todo.push(edge.from.as_str());
+            }
+        }
+    }
+    found
 }
 
 /// W33: why a node cannot take an ACP. A Solution or a Context can in GSN v3
@@ -177,4 +288,48 @@ pub fn add_acp(
             .is_some_and(|claim| claim.kind() == SacmKind::Claim)
     );
     Ok(Added { element, mutation })
+}
+
+/// W36: names the goal `claim`, the top goal of another argument package, as
+/// an ACP of `line`: the relationship's `metaClaim` gains it, after any it
+/// names. Nothing else changes.
+///
+/// # Errors
+///
+/// What [`acp_choices`] refuses for the goal, and AF-EDIT-035 for a `claim`
+/// it does not list, as [`AddError::Refused`]; [`AddError::Edit`] when
+/// libSACM refused the operation, which is a fault in these rules. The
+/// document is then unchanged.
+pub fn link_acp(
+    document: &mut Document,
+    view: &View,
+    line: AcpLine<'_>,
+    claim: &str,
+) -> Result<BatchMutation, AddError> {
+    let plan = plan(document, view, line).map_err(AddError::Refused)?;
+    let goal = acp_goals(document, view, line, None)
+        .into_iter()
+        .find(|goal| goal.claim == claim)
+        .ok_or(AddError::Refused(Refusal::NotATopGoalElsewhere))?;
+    if let Some(refusal) = goal.refusal {
+        return Err(AddError::Refused(refusal));
+    }
+    let mut claims: Vec<ElementId> = document
+        .get(plan.relationship.as_str())
+        .map(|relationship| relationship.meta_claims().to_vec())
+        .unwrap_or_default();
+    let named = document
+        .get(claim)
+        .map(|element| element.id().clone())
+        .ok_or(AddError::Refused(Refusal::NotATopGoalElsewhere))?;
+    claims.push(named);
+    edit::batch(document, |tx| -> Result<(), BatchError> {
+        tx.apply(SetReferences::new(
+            plan.relationship.clone(),
+            ReferenceEnd::MetaClaim,
+            claims,
+        ))?;
+        Ok(())
+    })
+    .map_err(AddError::Edit)
 }

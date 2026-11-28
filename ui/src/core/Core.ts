@@ -166,6 +166,12 @@ export interface Core {
    */
   addAcp(relationship: string, line: LineEnds, kind: AcpKind, packageName: string, revision: number): Promise<EditResult>;
   /**
+   * Names the goal `claim`, the top goal of another argument package, as an
+   * ACP of the line `line` of `relationship` (W36), from the menu of
+   * `revision`. Nothing is answered as made: the goal stays where it is.
+   */
+  linkAcp(relationship: string, line: LineEnds, claim: string, revision: number): Promise<EditResult>;
+  /**
    * What removing the node with this SACM id would delete: the node, then
    * what goes with it; or the code of why it cannot be removed. Null when
    * nothing is open.
