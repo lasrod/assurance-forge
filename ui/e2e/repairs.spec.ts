@@ -106,7 +106,7 @@ test('a shared identifier is renumbered from its problem, and Undo takes it back
   await page.getByTestId('problem-counts').getByRole('button').click();
   const shared = rows(page).filter({ hasText: 'AF-GSN-009' });
   await shared.click();
-  await expect(offered(page)).toContainText('Keep G1 on the first, and renumber the others as G2.');
+  await expect(offered(page)).toContainText('Keep G1 on the first in the file, and renumber the others as G2.');
   await offered(page).getByRole('button', { name: 'Repair' }).click();
 
   await expect(status(page)).toHaveText('Renumbered as G2.');
