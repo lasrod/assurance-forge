@@ -20,8 +20,8 @@
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{
-    self, AcpKind, AcpLine, AddError, Added, Challenged, Moved, Removed, Repaired, Target,
-    TextField, TextSet,
+    self, AcpKind, AddError, Added, Challenged, Line, Moved, Removed, Repaired, Target, TextField,
+    TextSet,
 };
 use af_gsn::view::View;
 use sacm::model::Document;
@@ -111,6 +111,13 @@ pub enum Command {
         relationship: String,
         claim: String,
         with_argument: bool,
+    },
+    /// Remove the line from `from` to `to` of `relationship`, the nodes at
+    /// its ends staying (W37).
+    RemoveLine {
+        relationship: String,
+        from: String,
+        to: String,
     },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
@@ -449,7 +456,7 @@ impl Session {
     pub fn add_acp(
         &mut self,
         view: &View,
-        line: AcpLine<'_>,
+        line: Line<'_>,
         kind: AcpKind,
         package_name: &str,
     ) -> Result<(Added, ChangeRecord), AddError> {
@@ -476,7 +483,7 @@ impl Session {
     pub fn link_acp(
         &mut self,
         view: &View,
-        line: AcpLine<'_>,
+        line: Line<'_>,
         claim: &str,
     ) -> Result<ChangeRecord, AddError> {
         let before = self.document.clone();
@@ -514,6 +521,24 @@ impl Session {
             with_argument,
         };
         Ok(self.made(before, command, &mutation))
+    }
+
+    /// Removes `line`, the nodes at its ends staying (W37). `view` is the
+    /// view of the document as it is now.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::remove_line`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn remove_line(&mut self, view: &View, line: Line<'_>) -> Result<ChangeRecord, AddError> {
+        let before = self.document.clone();
+        let removed = commands::remove_line(&mut self.document, view, line)?;
+        let command = Command::RemoveLine {
+            relationship: line.relationship.to_owned(),
+            from: line.from.to_owned(),
+            to: line.to.to_owned(),
+        };
+        Ok(self.made(before, command, &removed.mutation))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

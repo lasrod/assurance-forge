@@ -82,12 +82,14 @@ test('a line is challenged by a Solution from its menu, by a right-click or the 
   await page.mouse.click(at.x, at.y, { button: 'right' });
   const menu = page.getByRole('menu', { name: 'Line' });
   await expect(menu).toBeVisible();
-  // A line's menu challenges it or adds an ACP: nothing is added under a line.
+  // A line's menu challenges it, adds an ACP, or removes it: nothing is
+  // added under a line.
   await expect(menu.getByRole('menuitem')).toHaveText([
     'Add Counter Goal',
     'Add Counter Evidence',
     'Add ACP with Description',
     'Add ACP with Confidence Argument',
+    /^Remove Line/,
   ]);
   expect((await hook(page)).selected).toBe(`${edge.relationship} ${edge.from} ${edge.to}`);
   await menu.getByRole('menuitem', { name: 'Add Counter Evidence' }).click();
@@ -115,7 +117,9 @@ test('a premise line under a Strategy says why it is not challenged on its own',
   const { at } = await onLineTo(page, 'cl_sub_2');
   await page.mouse.click(at.x, at.y, { button: 'right' });
   await expect(status(page)).toHaveText(/^Nothing changed\. This line has no relationship of its own/);
-  await expect(page.getByRole('menu')).toHaveCount(0);
+  // The line may still be removed: that is all its menu offers.
+  await expect(page.getByRole('menu', { name: 'Line' }).getByRole('menuitem')).toHaveText([/^Remove Line/]);
+  await page.keyboard.press('Escape');
   const first = await onLineTo(page, 'ar_1');
   await page.mouse.click(first.at.x, first.at.y, { button: 'right' });
   await expect(page.getByRole('menu', { name: 'Line' })).toBeVisible();

@@ -1438,3 +1438,48 @@ fn a_removal_names_the_acps_it_takes() {
     let removal = core.removal("G2").unwrap_or_else(|| panic!("nothing open"));
     assert_eq!(removal.refusal.as_deref(), Some("AF-EDIT-015"));
 }
+
+#[test]
+fn a_line_is_removed_as_its_removal_said_and_undo_brings_it_back() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/sacm_example_core_argument.sacm.xmi"));
+    let lines = |core: &mut Core| -> usize {
+        core.diagram()
+            .map(|at| at.diagram.edges.len())
+            .unwrap_or_default()
+    };
+    let before = lines(&mut core);
+    let refusal = |core: &Core, relationship: &str, from: &str, to: &str| {
+        core.line_removal(relationship, from, to)
+            .and_then(|removal| removal.refusal)
+    };
+    // Codes, not sentences: the Strategy's first line, and a Solution known
+    // only by its line.
+    assert_eq!(
+        refusal(&core, "inf_1", "cl_top", "ar_1").as_deref(),
+        Some("AF-EDIT-036")
+    );
+    assert_eq!(
+        refusal(&core, "ae_1", "cl_sub_1", "ev_1").as_deref(),
+        Some("AF-EDIT-037")
+    );
+    // The assumption a support line joins (AF-GSN-004): it goes, and the
+    // assumption stays.
+    let removal = core
+        .line_removal("inf_2", "cl_sub_1", "cl_assumption_1")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!((removal.refusal, removal.acps.len()), (None, 0));
+    assert!(matches!(
+        core.remove_line("inf_2", "cl_sub_1", "cl_assumption_1", 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let made = core.remove_line("inf_2", "cl_sub_1", "cl_assumption_1", removal.revision);
+    assert!(
+        matches!(made, EditResult::Applied { ref element, .. } if element.as_deref() == Some("cl_sub_1")),
+        "{made:?}"
+    );
+    assert_eq!(lines(&mut core), before - 1);
+    assert!(core.element("cl_assumption_1").is_some());
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(lines(&mut core), before);
+}

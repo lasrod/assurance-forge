@@ -43,9 +43,9 @@ use sacm::xmi::{self, Mode, ReadOptions, WriteOptions};
 use contract::{
     AcpChoice, AcpChoices, AcpGoal, AcpKind, AcpRemoval, AddChoice, AddChoices, ArgumentValue,
     ConfidenceArgument, DiagnosticCounts, DiagramAt, DiagramAtRef, EditResult, ElementDetails,
-    ElementKind, History, MessageArgument, MoveTarget, MoveTargets, OpenResult, Outline,
-    OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal, RemovalNode,
-    ViewCode, WriteResult,
+    ElementKind, History, LineRemoval, MessageArgument, MoveTarget, MoveTargets, OpenResult,
+    Outline, OutlineRow, Package, Refusal, RelationshipDetails, RelationshipEnd, Removal,
+    RemovalNode, ViewCode, WriteResult,
 };
 pub use contract::{FoundRecovery, KeepResult, RecoveryCopy};
 
@@ -494,7 +494,7 @@ impl Core {
     /// open.
     pub fn acp_choices(&self, relationship: &str, from: &str, to: &str) -> Option<AcpChoices> {
         let open = self.open.as_ref()?;
-        let line = commands::AcpLine {
+        let line = commands::Line {
             relationship,
             from,
             to,
@@ -554,7 +554,7 @@ impl Core {
         if revision != self.revision {
             return refused(OUT_OF_DATE);
         }
-        let line = commands::AcpLine {
+        let line = commands::Line {
             relationship,
             from,
             to,
@@ -589,7 +589,7 @@ impl Core {
         if revision != self.revision {
             return refused(OUT_OF_DATE);
         }
-        let line = commands::AcpLine {
+        let line = commands::Line {
             relationship,
             from,
             to,
@@ -841,6 +841,69 @@ impl Core {
             .remove_acp(&open.view, relationship, claim, with_argument)
         {
             Ok(record) => self.changed(&record, None),
+            Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
+            Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
+        }
+    }
+
+    /// What removing the line from `from` to `to` of `relationship` would
+    /// take with it, or why it cannot be removed (W37); `None` when nothing
+    /// is open.
+    pub fn line_removal(&self, relationship: &str, from: &str, to: &str) -> Option<LineRemoval> {
+        let open = self.open.as_ref()?;
+        let view = &open.view;
+        let line = commands::Line {
+            relationship,
+            from,
+            to,
+        };
+        let (acps, refusal) = match commands::line_removal(open.session.document(), view, line) {
+            Ok(removal) => (
+                removal
+                    .acps
+                    .iter()
+                    .filter_map(|(relationship, claim)| {
+                        view.acps
+                            .iter()
+                            .find(|acp| acp.relationship == *relationship && acp.claim == *claim)
+                    })
+                    .map(|acp| acp.label.clone())
+                    .collect(),
+                None,
+            ),
+            Err(refusal) => (Vec::new(), Some(refusal.code().to_owned())),
+        };
+        Some(LineRemoval {
+            revision: self.revision,
+            acps,
+            refusal,
+        })
+    }
+
+    /// Removes the line from `from` to `to` of `relationship`, the nodes at
+    /// its ends staying (W37), as [`Core::line_removal`] said at `revision`:
+    /// one asked for at another revision is refused (AF-EDIT-009). The
+    /// line's upper end is the element answered, to select.
+    pub fn remove_line(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        revision: u32,
+    ) -> EditResult {
+        let Some(open) = self.open.as_mut() else {
+            return refused(NOTHING_OPEN);
+        };
+        if revision != self.revision {
+            return refused(OUT_OF_DATE);
+        }
+        let line = commands::Line {
+            relationship,
+            from,
+            to,
+        };
+        match open.session.remove_line(&open.view, line) {
+            Ok(record) => self.changed(&record, Some(from.to_owned())),
             Err(commands::AddError::Refused(refusal)) => refused(refusal.code()),
             Err(commands::AddError::Edit(_)) => refused(NOT_MADE),
         }

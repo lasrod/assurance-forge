@@ -23,6 +23,7 @@ import type {
   RelationshipDetails,
   Removal,
   AcpRemoval,
+  LineRemoval,
   SaveResult,
   TextField,
 } from '../../../crates/af-api/bindings/api';
@@ -196,6 +197,18 @@ export interface Core {
    * has changed since.
    */
   removeAcp(relationship: string, claim: string, withArgument: boolean, revision: number): Promise<EditResult>;
+  /**
+   * What removing the line `line` of `relationship` would take with it: the
+   * labels of its ACPs; or the code of why it cannot be removed (W37). Null
+   * when nothing is open.
+   */
+  lineRemoval(relationship: string, line: LineEnds): Promise<LineRemoval | null>;
+  /**
+   * Removes the line `line` of `relationship`, the nodes at its ends
+   * staying, as the removal of `revision` said: refused (AF-EDIT-009) when
+   * the document has changed since. `element` is the line's upper end.
+   */
+  removeLine(relationship: string, line: LineEnds, revision: number): Promise<EditResult>;
   /**
    * Where the node with this SACM id may be moved: for every node of the
    * diagram, and for the top level, the code of why not, or null; or the

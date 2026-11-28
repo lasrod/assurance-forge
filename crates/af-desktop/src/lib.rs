@@ -1133,6 +1133,29 @@ fn link_acp(
 }
 
 #[tauri::command]
+fn line_removal(
+    relationship: String,
+    from: String,
+    to: String,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::LineRemoval>, String> {
+    Ok(lock(&state)?.core.line_removal(&relationship, &from, &to))
+}
+
+#[tauri::command]
+fn remove_line(
+    relationship: String,
+    from: String,
+    to: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .remove_line(&relationship, &from, &to, revision))
+}
+
+#[tauri::command]
 fn acp_removal(
     relationship: String,
     claim: String,
@@ -1279,6 +1302,8 @@ pub fn run(args: Args) -> i32 {
             link_acp,
             acp_removal,
             remove_acp,
+            line_removal,
+            remove_line,
             set_text,
             undo,
             redo,

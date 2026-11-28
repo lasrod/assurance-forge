@@ -401,6 +401,18 @@ argument: ConfidenceArgument | null,
  */
 refusal: string | null, };
 
+export type LineRemoval = { revision: number, 
+/**
+ * The labels of the assurance claim points that go with the line, such
+ * as `ACP2[Confidence]`, each with its description when it has one.
+ */
+acps: Array<string>, 
+/**
+ * Why it cannot be removed (`AF-EDIT-015`, `AF-EDIT-036` to
+ * `AF-EDIT-039`), or null when it can. The frontend words it.
+ */
+refusal: string | null, };
+
 export type MoveTarget = { 
 /**
  * The SACM id of the node.

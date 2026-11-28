@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { DiagramCanvas, ZOOM_STEP } from './canvas/DiagramCanvas';
 import type { DragEnd } from './canvas/drag';
 import { useViewport } from './canvas/useViewport';
-import type { AcpChoice, AcpGoal, AcpKind, AcpMark, AcpRemoval, AddChoice, Core, DiagramEdge, ElementKind, LineEnds, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
+import type { AcpChoice, AcpGoal, AcpKind, AcpMark, AcpRemoval, AddChoice, Core, DiagramEdge, ElementKind, LineEnds, LineRemoval, MoveTargets, NodeKind, Removal, TextField, TextStyle } from './core/Core';
 import { acpGoalItems, acpItems, addItems, challengeItems, kindName, refusalText } from './addMenu';
-import { boundsOf, edgeKey } from './canvas/draw';
+import { boundsOf, edgeKey, findEdge } from './canvas/draw';
 import { ElementProperties } from './ElementProperties';
 import { AcpRemoveDialog } from './AcpRemoveDialog';
-import { RemoveDialog } from './RemoveDialog';
+import { LineRemoveDialog, RemoveDialog } from './RemoveDialog';
 import { ProblemsPanel } from './ProblemsPanel';
 import { RecoveryDialog } from './RecoveryDialog';
 import { UnsavedDialog } from './UnsavedDialog';
@@ -57,6 +57,8 @@ const FILE_ROW = ':file';
 const REMOVE = 'remove';
 /** Remove an ACP of the line, by its Claim's SACM id. */
 const REMOVE_ACP = 'removeAcp:';
+/** Remove the line itself (W37). */
+const REMOVE_LINE = 'removeLine';
 /** Link an ACP of the line to a goal that exists, by its Claim's SACM id. */
 const LINK_ACP = 'linkAcp:';
 /** The menu items of a move: start one, make it here, give it up. */
@@ -116,6 +118,13 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('acpLinked', { label: state.label }) };
     case 'acpRemoved':
       return { text: t(state.withArgument ? 'acpRemovedWithArgument' : 'acpRemoved', { label: state.label }) };
+    case 'lineRemoved':
+      return {
+        text:
+          state.acps.length > 0
+            ? t('lineRemovedWithAcps', { from: state.from, to: state.to, acps: state.acps.join(', ') })
+            : t('lineRemoved', { from: state.from, to: state.to }),
+      };
     case 'challenged':
       return { text: t(state.added === 'solution' ? 'counterEvidenceAdded' : 'counterGoalAdded', { identifier: state.identifier }) };
     case 'textChanged':
@@ -195,6 +204,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith } = doc;
   const { acpChoices, addAcp: addAcpWith, acpRemoval, removeAcp: removeAcpWith, linkAcp: linkAcpWith } = doc;
+  const { lineRemoval, removeLine: removeLineWith } = doc;
   const { challengeChoices, challenge: challengeWith, moveChallenge: moveChallengeWith } = doc;
   /** The undeveloped mark of a Goal set or cleared; the view keeps the Goal in place. */
   const setUndeveloped = useCallback(
@@ -232,6 +242,8 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     acpNode?: boolean;
     /** A line's menu: the ACPs it carries, which it offers to remove. */
     acpsOn?: { claim: string; label: string }[];
+    /** A support or context line's menu offers Remove Line, which says why when it cannot. */
+    removable?: boolean;
   } | null>(null);
   const noDiagram = diagram === null;
   useEffect(() => {
@@ -484,11 +496,13 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         const acpChoices = acps && acps.revision === answer.revision ? acps : null;
         const all = [...answer.choices, ...(acpChoices?.choices ?? [])];
         const acpsOn = edge.acps.map((acp) => ({ claim: acp.claim, label: acp.label.text }));
-        // Nothing may go on it, and nothing on it to remove: the status says why.
+        const removable = edge.kind === 'supportedBy' || edge.kind === 'inContextOf';
+        // Nothing may go on it: the status says why. With nothing to remove
+        // either, no menu opens; a line that may be removed still offers that.
         const refused = all.find((choice) => choice.refusal !== null);
         if (all.every((choice) => choice.refusal !== null) && acpsOn.length === 0) {
           if (refused?.refusal) moveRefused(refused.refusal, null);
-          return;
+          if (!removable) return;
         }
         setAddMenu({
           revision: answer.revision,
@@ -501,6 +515,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
           challenges: answer.choices,
           acps: acpChoices && { identifier: acpChoices.identifier, choices: acpChoices.choices, goals: acpChoices.goals },
           acpsOn,
+          removable,
         });
       });
     },
@@ -545,19 +560,47 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
     },
     [acpRemoval, removeAcpWith, followEdit],
   );
-  /** Delete on the canvas: a node, or the ACP whose description is selected. */
+  // A line's removal that waits for the user: ACPs go with it.
+  const [confirmLine, setConfirmLine] = useState<{
+    removal: LineRemoval;
+    line: { relationship: string } & LineEnds;
+    named: LineEnds;
+  } | null>(null);
+  useEffect(() => {
+    setConfirmLine(null);
+  }, [opened]);
+  /**
+   * Removes a line (W37): at once, or once the user has seen the ACPs that
+   * go with it. Why it cannot be removed, the status says.
+   */
+  const askRemoveLine = useCallback(
+    (line: { relationship: string } & LineEnds) => {
+      const identifier = (id: string) => outline.find((row) => row.id === id)?.identifier ?? id;
+      const named = { from: identifier(line.from), to: identifier(line.to) };
+      const { relationship, ...ends } = line;
+      void lineRemoval(relationship, ends).then((answer) => {
+        if (!answer) return;
+        if (answer.acps.length > 0) setConfirmLine({ removal: answer, line, named });
+        else removeLineWith(relationship, ends, answer, named, followEdit);
+      });
+    },
+    [outline, lineRemoval, removeLineWith, followEdit],
+  );
+  /** Delete on the canvas: a node, the ACP whose description is selected, or a line. */
   const removeSelected = useCallback(
     (id: string) => {
       const lines = diagram?.diagram.nodes.some((node) => node.id === id)
         ? []
         : (diagram?.diagram.edges.filter((edge) => edge.acps.some((acp) => acp.claim === id)) ?? []);
       const [line] = lines;
+      const selectedLine = diagram ? findEdge(diagram.diagram, id) : null;
       // Shown by the ACPs of several lines: which goes is chosen from a line's menu.
       if (lines.length > 1) moveRefused('AF-EDIT-032', null);
       else if (line) askRemoveAcp(line.relationship, id, line.from);
+      else if (selectedLine) askRemoveLine(selectedLine);
       else askRemove(id);
     },
-    [diagram, askRemove, askRemoveAcp, moveRefused],
+    [diagram, askRemove, askRemoveAcp, askRemoveLine, moveRefused],
   );
   // A counter goal, counter evidence or confidence Claim just added, whose
   // name, or an ACP description's text, is to be ready to type once its
@@ -628,6 +671,10 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
       const goal = menu.acps.goals.find((each) => each.claim === claim);
       const { relationship, ...ends } = menu.line;
       if (goal) linkAcpWith(relationship, ends, claim, goal.label, menu.revision, followEdit);
+      return;
+    }
+    if (id === REMOVE_LINE) {
+      if (menu.line) askRemoveLine(menu.line);
       return;
     }
     if (id.startsWith(REMOVE_ACP)) {
@@ -1168,6 +1215,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                   {t('removeAcp', { label: acp.label })}
                 </MenuItem>
               ))}
+            {addMenu?.line &&
+              !moving &&
+              addMenu.removable &&
+              (addMenu.acpsOn ?? []).length === 0 &&
+              (challengeItems(addMenu.challenges ?? [], t).length > 0 || acpItems(addMenu.acps?.choices ?? [], t).length > 0) && <MenuSeparator />}
+            {addMenu?.line && !moving && addMenu.removable && (
+              <MenuItem id={REMOVE_LINE} danger shortcut={t('removeKey')}>
+                {t('removeLine')}
+              </MenuItem>
+            )}
             {addMenu?.parent && !moving && addMenu.acpNode && <MenuItem id={ACP_NODE}>{t('addAcp')}</MenuItem>}
             {addMenu?.parent && !moving && (challengeItems(addMenu.challenges ?? [], t).length > 0 || addMenu.acpNode) && <MenuSeparator />}
             {addMenu?.parent && !moving && addMenu.undeveloped && (
@@ -1232,6 +1289,20 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
               const asked = confirmAcp;
               setConfirmAcp(null);
               if (asked) removeAcpWith(asked.relationship, asked.claim, answer, withArgument, asked.anchor, followEdit);
+            }}
+          />
+        )}
+        {hasFile && (
+          <LineRemoveDialog
+            asked={confirmLine && { removal: confirmLine.removal, named: confirmLine.named }}
+            t={t}
+            onCancel={() => setConfirmLine(null)}
+            onRemove={() => {
+              const asked = confirmLine;
+              setConfirmLine(null);
+              if (!asked) return;
+              const { relationship, ...ends } = asked.line;
+              removeLineWith(relationship, ends, asked.removal, asked.named, followEdit);
             }}
           />
         )}

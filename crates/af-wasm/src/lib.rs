@@ -195,6 +195,35 @@ impl WasmCore {
         )
     }
 
+    /// `LineRemoval` as JSON for the line from `from` to `to` of
+    /// `relationship`: what removing it would take, or why not; `None` when
+    /// nothing is open.
+    #[wasm_bindgen(js_name = lineRemoval)]
+    pub fn line_removal(
+        &self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+    ) -> Result<Option<String>, JsError> {
+        self.core
+            .line_removal(relationship, from, to)
+            .map(|removal| json(&removal))
+            .transpose()
+    }
+
+    /// Removes the line from `from` to `to` of `relationship`, as the
+    /// removal of `revision` said. `EditResult` as JSON.
+    #[wasm_bindgen(js_name = removeLine)]
+    pub fn remove_line(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(&self.core.remove_line(relationship, from, to, revision))
+    }
+
     /// `MoveTargets` as JSON for the node `id`: where it may be moved;
     /// `None` when nothing is open.
     #[wasm_bindgen(js_name = moveTargets)]

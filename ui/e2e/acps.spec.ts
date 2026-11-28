@@ -58,6 +58,7 @@ test('a line takes an ACP with a description, whose text is ready to type, and U
     'Add ACP with Confidence Argument',
     // The confidence package's top goal, ACP2, is another package's.
     'Link ACP to',
+    /^Remove Line/,
   ]);
   await menu.getByRole('menuitem', { name: 'Add ACP with Description' }).click();
 

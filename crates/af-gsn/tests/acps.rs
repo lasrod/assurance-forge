@@ -4,7 +4,7 @@
 
 use af_gsn::ElementKind;
 use af_gsn::commands::{
-    AcpKind, AcpLine, AddError, Refusal, acp_choices, acp_node_refusal, acp_removal, add_acp,
+    AcpKind, AddError, Line, Refusal, acp_choices, acp_node_refusal, acp_removal, add_acp,
     link_acp, removal, remove, remove_acp,
 };
 use af_gsn::view::{Acp, Code, argument_package_of, of_package, view};
@@ -148,15 +148,15 @@ fn r17_a_claim_also_named_by_a_claim_is_drawn() {
     assert!(shown.nodes.iter().any(|node| node.id == "c"));
 }
 
-fn line<'a>(relationship: &'a str, from: &'a str, to: &'a str) -> AcpLine<'a> {
-    AcpLine {
+fn line<'a>(relationship: &'a str, from: &'a str, to: &'a str) -> Line<'a> {
+    Line {
         relationship,
         from,
         to,
     }
 }
 
-fn refusals(document: &Document, at: AcpLine<'_>) -> Vec<Option<Refusal>> {
+fn refusals(document: &Document, at: Line<'_>) -> Vec<Option<Refusal>> {
     let shown = view(document, "en");
     acp_choices(document, &shown, at)
         .choices
@@ -855,7 +855,7 @@ fn w35_no_such_acp_is_refused_and_changes_nothing() {
     assert_eq!(document, original);
 }
 
-fn goals(document: &Document, at: AcpLine<'_>) -> Vec<(String, String, Option<Refusal>)> {
+fn goals(document: &Document, at: Line<'_>) -> Vec<(String, String, Option<Refusal>)> {
     let shown = view(document, "en");
     acp_choices(document, &shown, at)
         .goals

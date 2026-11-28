@@ -19,7 +19,7 @@ use sacm::edit::{
 };
 use sacm::model::{Document, ElementId, ElementKind as SacmKind, LangString, ReferenceEnd};
 
-use super::{AddError, Added, Identifiers, Refusal, argument_package, new_node};
+use super::{AddError, Added, Identifiers, Line, Refusal, argument_package, new_node};
 use crate::ElementKind;
 use crate::view::{ACP_DESCRIPTION, ACP_KEY, EdgeKind, NodeKind, View, acp_label};
 
@@ -39,15 +39,6 @@ pub enum AcpKind {
 
 /// The two kinds, in the menu's order.
 pub const ACP_KINDS: [AcpKind; 2] = [AcpKind::Description, AcpKind::Argument];
-
-/// The line an ACP goes on: one line of a relationship, from `from` to `to`
-/// as the view draws it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AcpLine<'a> {
-    pub relationship: &'a str,
-    pub from: &'a str,
-    pub to: &'a str,
-}
 
 /// What the line's menu offers: the identifier the next ACP takes, each
 /// kind with why it cannot be added, or `None`, and the goals that exist an
@@ -73,7 +64,7 @@ pub struct AcpGoal {
 
 /// W33 and W36: the ACPs the line may take. Either both new kinds may, or
 /// neither, for the same reason, which every goal then also carries.
-pub fn acp_choices(document: &Document, view: &View, line: AcpLine<'_>) -> AcpChoices {
+pub fn acp_choices(document: &Document, view: &View, line: Line<'_>) -> AcpChoices {
     let refusal = plan(document, view, line).err();
     AcpChoices {
         identifier: Identifiers::of(document, view).next_prefixed(ACP_PREFIX),
@@ -95,7 +86,7 @@ pub fn acp_choices(document: &Document, view: &View, line: AcpLine<'_>) -> AcpCh
 fn acp_goals(
     document: &Document,
     view: &View,
-    line: AcpLine<'_>,
+    line: Line<'_>,
     refusal: Option<Refusal>,
 ) -> Vec<AcpGoal> {
     let Some(relationship) = document.get(line.relationship) else {
@@ -194,7 +185,7 @@ struct Plan {
 
 /// W33: a `SupportedBy` or `InContextOf` line (GSN v3 Table 1:5-1), the
 /// first of its relationship (§1:5.3.3), in an argument package.
-fn plan(document: &Document, view: &View, line: AcpLine<'_>) -> Result<Plan, Refusal> {
+fn plan(document: &Document, view: &View, line: Line<'_>) -> Result<Plan, Refusal> {
     let mut drawn = view
         .edges
         .iter()
@@ -232,7 +223,7 @@ fn plan(document: &Document, view: &View, line: AcpLine<'_>) -> Result<Plan, Ref
 pub fn add_acp(
     document: &mut Document,
     view: &View,
-    line: AcpLine<'_>,
+    line: Line<'_>,
     kind: AcpKind,
     package_name: &str,
 ) -> Result<Added, AddError> {
@@ -303,7 +294,7 @@ pub fn add_acp(
 pub fn link_acp(
     document: &mut Document,
     view: &View,
-    line: AcpLine<'_>,
+    line: Line<'_>,
     claim: &str,
 ) -> Result<BatchMutation, AddError> {
     let plan = plan(document, view, line).map_err(AddError::Refused)?;
