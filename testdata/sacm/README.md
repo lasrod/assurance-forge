@@ -6,6 +6,7 @@ Assurance cases in SACM 2.3 XMI, for tests and for trying the application.
 |---|---:|---|
 | `sample.sacm.xmi` | 24 | A minimal case with a terminology package and an artifact package. |
 | `sacm_example_core_argument.sacm.xmi` | 24 | A small braking argument with one argument package and nothing else. |
+| `example.sacm.xmi` | 47 | The welcome page's example: a braking argument with every GSN element and mark the editor supports (each node kind, an undeveloped Goal, a counter goal of a line and counter evidence of a Goal, an ACP with a description and one with a confidence argument in a second package), with descriptions in English and Japanese. Written by hand on 2026-11-28; `crates/af-gsn/tests/example.rs` holds it to that. |
 | `open-autonomy-safety-case.updated.v2.sacm.xmi` | 465 | The Open Autonomy Safety Case, in English. |
 | `oasc-ja.sacm.xmi` | 581 | A variant of the same case, with English and Japanese text. |
 | `safety-case-sanitized-strict.sacm.xmi` | 1,090 | The largest case: 15 argument packages. |

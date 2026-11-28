@@ -161,6 +161,7 @@ test('6 the dark theme', async ({ page }) => {
 // The gallery fixtures, as the application draws them (af-layout's gallery example lists the same).
 const FIXTURES: [string, string][] = [
   ['sacm_example_core_argument.sacm.xmi', 'en'],
+  ['example.sacm.xmi', 'en'],
   ['gallery-shared-support.sacm.xmi', 'en'],
   ['gallery-attachments.sacm.xmi', 'en'],
   ['gallery-long-text.sacm.xmi', 'en'],

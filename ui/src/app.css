@@ -283,60 +283,128 @@
     overflow-wrap: anywhere;
   }
 
-  /* The welcome page: one block of panel on the frame, sized to its content. */
+  /* The welcome page: one block of panel on the frame, sized to its content.
+     It is a page to read, not a dense panel: its text and its controls keep
+     DATUM's own sizes, as the diagram's text does. */
   .af-welcome {
     display: grid;
     place-items: start center;
     overflow: auto;
-    padding: var(--datum-space-48) var(--datum-space-16) var(--datum-space-16);
+    padding: clamp(var(--datum-space-24), 8vh, var(--datum-space-64)) var(--datum-space-16) var(--datum-space-24);
+    --datum-type-control-size: 0.875rem;
+    --datum-type-control-line-height: 1.25rem;
+    --datum-type-metadata-size: 0.75rem;
+    --datum-type-metadata-line-height: 1rem;
+    --datum-control-height: var(--datum-control-min-height-compact);
+    --datum-control-pad-inline: var(--datum-space-12);
+    --datum-list-row-height: var(--datum-control-min-height-compact);
+    /* The root set its text size from the dense tokens; this is the page's. */
+    font-size: var(--datum-type-control-size);
+    line-height: var(--datum-type-control-line-height);
   }
 
   .af-welcome-block {
     display: grid;
-    gap: var(--datum-space-24);
-    inline-size: min(100%, 60rem);
-    padding: var(--datum-space-24);
+    gap: var(--datum-space-32);
+    inline-size: min(100%, 56rem);
+    padding: var(--datum-space-32);
     background: var(--datum-surface-panel);
     border-radius: var(--datum-radius-structural);
+    /* The columns below ask how wide this block is. */
+    container-type: inline-size;
+  }
+
+  /* The product's name, with its mark, over a line that closes the header. */
+  .af-welcome-header {
+    display: flex;
+    align-items: center;
+    gap: var(--datum-space-16);
+    padding-block-end: var(--datum-space-24);
+    border-block-end: var(--datum-stroke-structural) solid var(--datum-line-divider);
+  }
+
+  .af-welcome-mark {
+    flex: none;
+    inline-size: 3rem;
+    block-size: auto;
+  }
+
+  .af-welcome-name {
+    display: grid;
+    gap: var(--datum-space-4);
+    min-inline-size: 0;
   }
 
   .af-welcome-title {
     margin: 0;
-    font-size: var(--datum-type-reading-size);
-    line-height: var(--datum-type-reading-line-height);
-    font-weight: 600;
+    font-size: var(--datum-type-hero-size);
+    line-height: var(--datum-type-hero-line-height);
+    font-weight: var(--datum-font-weight-semibold);
+    overflow-wrap: anywhere;
   }
 
-  .af-welcome-tagline,
-  .af-welcome-actions p,
-  .af-welcome-note {
+  .af-welcome-tagline {
     margin: 0;
+    font-size: var(--datum-type-prose-size);
+    line-height: var(--datum-type-prose-line-height);
+    color: var(--datum-text-secondary);
   }
 
+  /* Start, and beside it the recent files, which get the wider column: a
+     path is longer than a button. */
   .af-welcome-columns {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-    gap: var(--datum-space-24) var(--datum-space-32);
-    align-items: start;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   }
 
+  /* Each as tall as the taller, so the line between them runs their height. */
   .af-welcome-columns > section {
     display: grid;
-    gap: var(--datum-space-12);
+    align-content: start;
+    gap: var(--datum-space-16);
     min-inline-size: 0;
+  }
+
+  .af-welcome-start {
+    padding-inline-end: var(--datum-space-32);
+  }
+
+  .af-welcome-files {
+    padding-inline-start: var(--datum-space-32);
+    border-inline-start: var(--datum-stroke-structural) solid var(--datum-line-divider);
+  }
+
+  /* One column where two would be narrow: in a small window, and in a wider
+     one when the text is large (the width is in rem). */
+  @container (width < 44rem) {
+    .af-welcome-columns {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--datum-space-24);
+    }
+
+    .af-welcome-start {
+      padding-inline-end: 0;
+    }
+
+    .af-welcome-files {
+      padding-inline-start: 0;
+      padding-block-start: var(--datum-space-24);
+      border-inline-start: 0;
+      border-block-start: var(--datum-stroke-structural) solid var(--datum-line-divider);
+    }
   }
 
   .af-welcome-heading {
     margin: 0;
     font-size: var(--datum-type-control-size);
     line-height: var(--datum-type-control-line-height);
-    font-weight: 500;
+    font-weight: var(--datum-font-weight-semibold);
     color: var(--datum-text-secondary);
   }
 
   .af-welcome-actions {
     display: grid;
-    gap: var(--datum-space-16);
+    gap: var(--datum-space-24);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -344,8 +412,48 @@
 
   .af-welcome-actions > li {
     display: grid;
-    gap: var(--datum-space-4);
+    gap: var(--datum-space-8);
     justify-items: start;
+  }
+
+  /* The two actions are one width, so they read as a pair. */
+  .af-welcome-action {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--datum-space-8) var(--datum-space-12);
+  }
+
+  .af-welcome-action > .datum-button {
+    min-inline-size: 12rem;
+    justify-content: start;
+  }
+
+  .af-welcome-shortcut {
+    font: inherit;
+    font-size: var(--datum-type-metadata-size);
+    color: var(--datum-text-secondary);
+  }
+
+  .af-welcome-hint,
+  .af-welcome-note,
+  .af-welcome-empty {
+    margin: 0;
+    color: var(--datum-text-secondary);
+  }
+
+  .af-welcome-hint {
+    max-inline-size: 24rem;
+  }
+
+  /* The rows' text starts under the heading; their hover reaches past it. */
+  .af-welcome-recent {
+    margin-inline: calc(-1 * var(--datum-space-12));
+    padding: 0;
+  }
+
+  .af-welcome-recent > .datum-list-item {
+    border-radius: var(--datum-radius-control);
   }
 
   /* A recent file: its name, and under it where it is or when it was opened. */
@@ -355,16 +463,36 @@
     padding-block: var(--datum-space-4);
   }
 
-  .af-recent-name,
+  /* The name wraps, as DATUM's names do: cut short, two files could read
+     the same. The path gives way instead. */
+  .af-recent-name {
+    overflow-wrap: anywhere;
+  }
+
   .af-recent-where {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .af-welcome-clear {
+  /* What the list is, and the way to empty it, on one line when there is room. */
+  .af-welcome-foot {
     display: flex;
+    flex-wrap: wrap;
+    align-items: start;
     justify-content: end;
+    gap: var(--datum-space-8) var(--datum-space-16);
+  }
+
+  .af-welcome-note {
+    flex: 1 1 16rem;
+    font-size: var(--datum-type-metadata-size);
+    line-height: var(--datum-type-metadata-line-height);
+  }
+
+  .af-welcome-foot > .datum-button {
+    flex: none;
+    margin-inline-end: calc(-1 * var(--datum-control-pad-inline));
   }
 
   /* The diagram is not dense: its text keeps DATUM's sizes, which the

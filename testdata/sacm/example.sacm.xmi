@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case_braking">
+  <name content="BrakingAssuranceCase" />
+  <description xmi:id="d_case"><content><value lang="en" content="The example of the welcome page: a braking-function argument with every GSN element the editor supports." /><value lang="ja" content="ようこそページの例: エディターが扱うすべての GSN 要素を使った、制動機能の論証。" /></content></description>
+  <argumentPackage xmi:id="pkg_braking">
+    <name content="BrakingArgument" />
+    <!-- The top goal, its context and an assumption. -->
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G1">
+      <name content="BrakingSafe" />
+      <description xmi:id="d_G1"><content><value lang="en" content="The braking function is acceptably safe in its operational design domain." /><value lang="ja" content="制動機能は、運用設計領域において許容できる程度に安全である。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="C1">
+      <name content="OperationalDesignDomain" />
+      <description xmi:id="d_C1"><content><value lang="en" content="Urban roads up to 60 km/h, on dry and wet asphalt." /><value lang="ja" content="時速 60 km までの市街地道路、乾燥および湿潤アスファルト。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="A1" assertionDeclaration="assumed">
+      <name content="RoadFriction" />
+      <description xmi:id="d_A1"><content><value lang="en" content="Road friction stays within the range the operational design domain defines." /><value lang="ja" content="路面摩擦は、運用設計領域が定める範囲内にとどまる。" /></content></description>
+    </argumentElement>
+    <!-- The strategy, with its justification. -->
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="S1">
+      <name content="OverHazards" />
+      <description xmi:id="d_S1"><content><value lang="en" content="Argument over each identified braking hazard." /><value lang="ja" content="特定された各制動ハザードについての論証。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="J1" assertionDeclaration="axiomatic">
+      <name content="HazardDecomposition" />
+      <description xmi:id="d_J1"><content><value lang="en" content="Arguing over each hazard is accepted practice in functional safety." /><value lang="ja" content="ハザードごとに論じることは、機能安全で認められた方法である。" /></content></description>
+    </argumentElement>
+    <!-- The goals under the strategy: two with evidence, one undeveloped. -->
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G2">
+      <name content="LossOfBrakingControlled" />
+      <description xmi:id="d_G2"><content><value lang="en" content="Loss of braking is detected and controlled." /><value lang="ja" content="制動の喪失は検出され、制御される。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G3">
+      <name content="UnintendedBrakingControlled" />
+      <description xmi:id="d_G3"><content><value lang="en" content="Unintended braking is detected and controlled." /><value lang="ja" content="意図しない制動は検出され、制御される。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="G4" assertionDeclaration="needsSupport">
+      <name content="WetStoppingDistance" />
+      <description xmi:id="d_G4"><content><value lang="en" content="The stopping distance on wet asphalt meets its requirement." /><value lang="ja" content="湿潤アスファルトでの停止距離は要求を満たす。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn1">
+      <name content="BrakeFmea" />
+      <description xmi:id="d_Sn1"><content><value lang="en" content="FMEA of the brake system, revision 4." /><value lang="ja" content="ブレーキシステムの FMEA、第 4 版。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn2">
+      <name content="HilTests" />
+      <description xmi:id="d_Sn2"><content><value lang="en" content="Hardware-in-the-loop tests of brake failure detection." /><value lang="ja" content="ブレーキ故障検出の HIL 試験。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn3">
+      <name content="VehicleTests" />
+      <description xmi:id="d_Sn3"><content><value lang="en" content="Vehicle test campaign for unintended braking, 2,000 km." /><value lang="ja" content="意図しない制動についての車両試験、2,000 km。" /></content></description>
+    </argumentElement>
+    <!-- What speaks against the argument: a counter goal and counter evidence. -->
+    <argumentElement xmi:type="sacm:Claim" xmi:id="CG1">
+      <name content="ColdNotTested" />
+      <description xmi:id="d_CG1"><content><value lang="en" content="The test campaign did not cover temperatures below 0 °C." /><value lang="ja" content="試験では 0 °C 未満の温度を扱っていない。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="CSn1">
+      <name content="FieldReport" />
+      <description xmi:id="d_CSn1"><content><value lang="en" content="Field report of one unintended braking event, under review." /><value lang="ja" content="意図しない制動 1 件の市場報告 (調査中)。" /></content></description>
+    </argumentElement>
+    <!-- An assurance claim point described in place. -->
+    <argumentElement xmi:type="sacm:Claim" xmi:id="ACP1">
+      <name content="HazardsIdentified" />
+      <taggedValue xmi:id="tv_ACP1"><key><value content="assuranceForge.gsn.acp" /></key><content><value content="description" /></content></taggedValue>
+      <description xmi:id="d_ACP1"><content><value lang="en" content="The hazards come from a HAZOP of the final design, reviewed by an independent assessor." /><value lang="ja" content="ハザードは最終設計の HAZOP によるもので、独立した評価者がレビューした。" /></content></description>
+    </argumentElement>
+    <!-- The relationships. -->
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="X1" source="C1" target="G1">
+      <name content="X1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="X2" source="A1" target="G1">
+      <name content="X2" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedContext" xmi:id="X3" source="J1" target="S1">
+      <name content="X3" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="I1" source="G2 G3 G4" target="G1" reasoning="S1" metaClaim="ACP1">
+      <name content="I1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E1" source="Sn1" target="G2" metaClaim="ACP2">
+      <name content="E1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E2" source="Sn2" target="G2">
+      <name content="E2" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3" source="Sn3" target="G3">
+      <name content="E3" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="CH1" source="CG1" target="E3" isCounter="true">
+      <name content="CH1" />
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="CH2" source="CSn1" target="G3" isCounter="true">
+      <name content="CH2" />
+    </argumentElement>
+  </argumentPackage>
+  <!-- The confidence argument behind ACP2, in a package of its own. -->
+  <argumentPackage xmi:id="pkg_confidence">
+    <name content="FmeaConfidence" />
+    <argumentElement xmi:type="sacm:Claim" xmi:id="ACP2">
+      <name content="FmeaTrustworthy" />
+      <description xmi:id="d_ACP2"><content><value lang="en" content="The FMEA is complete and its ratings are sound." /><value lang="ja" content="FMEA は完全で、その評価は妥当である。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:ArtifactReference" xmi:id="Sn4">
+      <name content="FmeaReview" />
+      <description xmi:id="d_Sn4"><content><value lang="en" content="Independent review of the FMEA, signed off." /><value lang="ja" content="FMEA の独立レビュー (承認済み)。" /></content></description>
+    </argumentElement>
+    <argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E4" source="Sn4" target="ACP2">
+      <name content="E4" />
+    </argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>

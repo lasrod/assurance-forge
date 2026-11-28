@@ -28,11 +28,16 @@ mod svg;
 
 /// The gallery: file in `testdata/sacm`, the language its text is shown in,
 /// and what it is there to show.
-const FIXTURES: [(&str, &str, &str); 10] = [
+const FIXTURES: [(&str, &str, &str); 11] = [
     (
         "sacm_example_core_argument.sacm.xmi",
         "en",
         "an ordinary, readable argument",
+    ),
+    (
+        "example.sacm.xmi",
+        "en",
+        "the welcome page's example: every element and mark the editor supports",
     ),
     (
         "gallery-shared-support.sacm.xmi",

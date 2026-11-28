@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const SAMPLE = 'sacm_example_core_argument.sacm.xmi';
+/** The example the welcome page opens (testdata/sacm/example.sacm.xmi). */
+const EXAMPLE = 'example.sacm.xmi';
 
 const hook = (page: Page) => page.evaluate(() => window.__assuranceForge);
 const welcome = (page: Page) => page.getByTestId('welcome');
@@ -51,15 +53,15 @@ test('the welcome page opens a file from the chooser', async ({ page }) => {
 test('the example opens, File ▸ Close returns to the welcome page, and the file is recent', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open the example' }).click();
-  await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
+  await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 15, edges: 13 });
 
   await fileMenu(page, 'Close');
   await expect(welcome(page)).toBeVisible();
   await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 0, edges: 0 });
   await expect(page).toHaveTitle('Assurance Forge');
   await expect(recent(page).getByRole('option')).toHaveCount(1);
-  await expect(recent(page).getByRole('option')).toContainText(SAMPLE);
-  await expect(recent(page).getByRole('option')).toContainText('8 nodes, 7 edges');
+  await expect(recent(page).getByRole('option')).toContainText(EXAMPLE);
+  await expect(recent(page).getByRole('option')).toContainText('15 nodes, 13 edges');
   // The browser keeps a copy, and says so.
   await expect(welcome(page)).toContainText('This browser keeps a copy');
 });
@@ -154,7 +156,7 @@ test('a recent file still being read does not replace a file chosen after it', a
 test('Clear recent files empties the list, and it stays empty', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open the example' }).click();
-  await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 8, edges: 7 });
+  await expect.poll(async () => (await hook(page))?.drawn).toEqual({ nodes: 15, edges: 13 });
   await fileMenu(page, 'Close');
   await page.getByRole('button', { name: 'Clear recent files' }).click();
   await expect(welcome(page)).toContainText('No recent files');
