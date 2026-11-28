@@ -231,6 +231,13 @@ impl WasmCore {
         json(&self.core.renumber(&elements, revision))
     }
 
+    /// Makes the Strategy `id` the reasoning of the one relationship above
+    /// it, as its problem at `revision` offered. `EditResult` as JSON.
+    #[wasm_bindgen(js_name = foldStrategy)]
+    pub fn fold_strategy(&mut self, id: &str, revision: u32) -> Result<String, JsError> {
+        json(&self.core.fold_strategy(id, revision))
+    }
+
     /// `MoveTargets` as JSON for the node `id`: where it may be moved;
     /// `None` when nothing is open.
     #[wasm_bindgen(js_name = moveTargets)]

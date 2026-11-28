@@ -271,6 +271,15 @@ pub(crate) fn repair(repair: af_gsn::commands::Repair) -> crate::contract::Probl
                 .collect(),
             refusal: code(refusal),
         },
+        Repair::FoldStrategy {
+            strategy,
+            goal,
+            refusal,
+        } => crate::contract::ProblemRepair::FoldStrategy {
+            strategy,
+            goal,
+            refusal: code(refusal),
+        },
         Repair::ClearUndeveloped { element, refusal } => {
             crate::contract::ProblemRepair::ClearUndeveloped {
                 element,

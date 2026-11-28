@@ -33,6 +33,7 @@ use crate::view::{Code, EdgeKind, NodeKind, PLACEHOLDER_KEY, PLACEHOLDER_VALUE, 
 
 mod acp;
 mod challenge;
+mod fold;
 mod move_node;
 mod remove;
 mod remove_acp;
@@ -47,6 +48,7 @@ pub use acp::{
 pub use challenge::{
     CHALLENGERS, Challenged, LineTarget, challenge, challenge_choices, move_challenge,
 };
+pub use fold::{Fold, Folded, fold_strategy, strategy_fold};
 pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
 pub use remove_acp::{AcpRemoval, ConfidenceArgument, acp_removal, remove_acp};
@@ -164,6 +166,16 @@ pub enum Refusal {
     /// AF-EDIT-040: the nodes no longer share one identifier, or one is not
     /// drawn: there is nothing to renumber (W38).
     NothingToRenumber,
+    /// AF-EDIT-041: the Strategy supports no Goal, several, or one together
+    /// with something else: there is no one line above it to make it the
+    /// reasoning of (W39).
+    StrategyNotAtOneGoal,
+    /// AF-EDIT-042: something below the Strategy is not a Goal, or is the
+    /// Goal above it (W39).
+    NotOnlyGoalsBelow,
+    /// AF-EDIT-043: the Strategy is already the reasoning of an inference
+    /// (W39).
+    AlreadyReasoning,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -209,6 +221,9 @@ impl Refusal {
             Refusal::LineChallenged => "AF-EDIT-038",
             Refusal::NotARemovableLine => "AF-EDIT-039",
             Refusal::NothingToRenumber => "AF-EDIT-040",
+            Refusal::StrategyNotAtOneGoal => "AF-EDIT-041",
+            Refusal::NotOnlyGoalsBelow => "AF-EDIT-042",
+            Refusal::AlreadyReasoning => "AF-EDIT-043",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

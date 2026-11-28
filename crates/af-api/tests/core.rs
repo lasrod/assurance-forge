@@ -1595,3 +1595,55 @@ fn a_shared_identifier_is_renumbered_as_its_problem_offered_and_undo_takes_it_ba
     assert!(matches!(core.undo(), EditResult::Applied { .. }));
     assert_eq!(shared(&mut core).len(), 1);
 }
+
+#[test]
+fn a_strategy_at_an_end_is_made_the_reasoning_as_its_problem_offered() {
+    let mut core = core("en");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="Case"/>
+  <argumentPackage xmi:id="p"><name content="P"/>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g"><name content="g"/></argumentElement>
+    <argumentElement xmi:type="sacm:Claim" xmi:id="g2"><name content="g2"/></argumentElement>
+    <argumentElement xmi:type="sacm:ArgumentReasoning" xmi:id="s"><name content="s"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="up" source="s" target="g"><name content="up"/></argumentElement>
+    <argumentElement xmi:type="sacm:AssertedInference" xmi:id="down" source="g2" target="s"><name content="down"/></argumentElement>
+  </argumentPackage>
+</sacm:AssuranceCasePackage>"#;
+    assert!(matches!(
+        core.open(xml.as_bytes()),
+        OpenResult::Opened { .. }
+    ));
+    let at_end = |core: &mut Core| -> Vec<af_api::contract::Problem> {
+        core.problems()
+            .map(|problems| problems.problems)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|problem| problem.code == "AF-GSN-007")
+            .collect()
+    };
+    let found = at_end(&mut core);
+    assert_eq!(found.len(), 2, "setup: {found:?}");
+    for problem in &found {
+        assert_eq!(
+            problem.repairs,
+            [ProblemRepair::FoldStrategy {
+                strategy: "s".to_owned(),
+                goal: Some("g".to_owned()),
+                refusal: None,
+            }]
+        );
+    }
+    assert!(matches!(
+        core.fold_strategy("s", 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let made = core.fold_strategy("s", 1);
+    assert!(
+        matches!(made, EditResult::Applied { ref element, .. } if element.as_deref() == Some("s")),
+        "{made:?}"
+    );
+    assert!(at_end(&mut core).is_empty());
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(at_end(&mut core).len(), 2);
+}

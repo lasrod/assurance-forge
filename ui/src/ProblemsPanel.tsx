@@ -140,6 +140,8 @@ function repairText(repair: ProblemRepair, named: (id: string) => string, t: T):
       return t('repairRemoveLine', { from: named(repair.from), to: named(repair.to) });
     case 'clearUndeveloped':
       return t('repairClearUndeveloped', { identifier: named(repair.element) });
+    case 'foldStrategy':
+      return t('repairFoldStrategy', { strategy: named(repair.strategy), goal: named(repair.goal ?? '') });
     case 'renumber':
       return t('repairRenumber', {
         identifier: named(repair.nodes[0] ?? ''),

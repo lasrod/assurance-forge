@@ -147,6 +147,8 @@ function message(state: DocumentState, t: T, language: Language): { text: string
       return { text: t('challengeMoved', { identifier: state.identifier, to: state.to }) };
     case 'undevelopedSet':
       return { text: t(state.undeveloped ? 'markedUndeveloped' : 'clearedUndeveloped', { identifier: state.identifier }) };
+    case 'strategyFolded':
+      return { text: t('strategyFolded', { strategy: state.strategy, goal: state.goal }) };
     case 'renumbered':
       return { text: t('renumbered', { identifiers: state.identifiers.join(', ') }) };
     case 'repaired':
@@ -205,6 +207,7 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   // Edit ▸ Undo and Redo, with the view following each.
   const { undo: undoWith, redo: redoWith, addChoices, add, removal, remove: removeWith, setText: setTextWith } = doc;
   const { moveTargets, move: moveWith, moveRefused, setUndeveloped: setUndevelopedWith, repair: repairWith, renumber: renumberWith } = doc;
+  const { foldStrategy: foldStrategyWith } = doc;
   const { acpChoices, addAcp: addAcpWith, acpRemoval, removeAcp: removeAcpWith, linkAcp: linkAcpWith } = doc;
   const { lineRemoval, removeLine: removeLineWith } = doc;
   const { challengeChoices, challenge: challengeWith, moveChallenge: moveChallengeWith } = doc;
@@ -1134,6 +1137,11 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
                         // Each repair is an edit made elsewhere too: the same command, and the same questions.
                         if (repair.kind === 'removeLine') {
                           askRemoveLine({ relationship: repair.relationship, from: repair.from, to: repair.to });
+                          return;
+                        }
+                        if (repair.kind === 'foldStrategy') {
+                          const name = (id: string) => outline.find((row) => row.id === id)?.identifier ?? id;
+                          foldStrategyWith(repair.strategy, revision, { strategy: name(repair.strategy), goal: name(repair.goal ?? '') }, followEdit);
                           return;
                         }
                         if (repair.kind === 'renumber') {
