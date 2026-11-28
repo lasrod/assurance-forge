@@ -634,6 +634,15 @@ milestone 2, step 5.
 |---|---|---|---|---|
 | W26 | The undeveloped mark of a Goal | `SetAssertionDeclaration` on the Claim: `needsSupport` to mark it, `asserted` to clear the mark. Only a Claim drawn as a Goal whose declaration is `asserted` or `needsSupport` (AF-EDIT-021 otherwise): the declaration is the one slot, and on an Assumption or a Justification it says what the element is. A Goal that a `SupportedBy` line leaves is not marked (AF-EDIT-022); clearing is always allowed, so a mark the file left on a supported Goal (AF-GSN-010) is cleared. A Strategy is not marked: SACM 2.3 has no place for it (below) | Decided | R3; "`undeveloped` occupies the declaration" above; GSN well-formedness: an undeveloped element has no `SupportedBy` children; W11 clears the mark the same way when support is added |
 
+**Which elements may be undeveloped.** GSN v3 Table 1:2-1 (page 18): the
+undeveloped decorator "indicates that a line of argument has not been
+developed. It can apply to goals (as below) and strategies." The combined
+undeveloped-and-uninstantiated decorator "can be applied to any GSN element
+that the undeveloped decorator can be applied to" (Table 1:3-2, page 28), and
+a counter goal is a Goal (§1:6.2.6). A Solution, a Context, an Assumption or
+a Justification is never undeveloped: it is not a line of argument. Traced on
+28 November 2026.
+
 **A Strategy is not marked undeveloped: SACM 2.3 cannot hold it.** Decided
 on 26 November 2026, from the GSN Metamodel Specification v2.2 (July 2021),
 §2.1, Figure 2:

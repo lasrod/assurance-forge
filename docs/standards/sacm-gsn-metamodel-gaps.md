@@ -97,7 +97,10 @@ Rows 1–9 are verified against **GSN Community Standard v3 (May 2021)** directl
 Rows 10–14 derive from the public v2→v3 changes deck and the v3 contents; they are
 sound but were not traced to a specific normative clause. Row 15 is verified
 against the GSN Metamodel Specification v2.2, Figure 2 and page 6, on
-2026-11-26; the v3 clause for an undeveloped Strategy was not traced.
+2026-11-26, and against GSN v3 on 2026-11-28: Table 1:2-1 (page 18) says the
+undeveloped decorator "indicates that a line of argument has not been
+developed. It can apply to goals … and strategies", so the v3 requirement is
+normative and the gap is the SACM carrier alone.
 
 The two strongest items are rows 3 and 7, because in both cases GSN v3 *normatively
 requires* a decoration on an element that SACM 2.3 structurally cannot carry. These
