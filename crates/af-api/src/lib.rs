@@ -660,6 +660,7 @@ impl Core {
                     .get(argument.package.as_str())
                     .and_then(|package| package.name())
                     .and_then(|name| name.content())
+                    .filter(|name| !name.trim().is_empty())
                     .map(str::to_owned),
                 nodes: argument
                     .nodes

@@ -1,5 +1,5 @@
 import type { AcpRemoval } from './core/Core';
-import { kindName, refusalText } from './addMenu';
+import { kindName } from './addMenu';
 import { Button, Dialog } from './design';
 import type { MessageKey } from './i18n/messages';
 
@@ -24,7 +24,9 @@ export function AcpRemoveDialog({
   onCancel: () => void;
 }) {
   const argument = removal?.argument ?? null;
-  const name = argument?.name ?? argument?.package ?? '';
+  const name = argument?.name || argument?.package || '';
+  // Something outside it depends on it: only the ACP may go.
+  const tied = argument?.refusal != null;
   return (
     <Dialog
       role="alertdialog"
@@ -44,21 +46,22 @@ export function AcpRemoveDialog({
           >
             {t('removeAcpKeep')}
           </Button>
-          <Button
-            variant="danger"
-            data-testid="remove-acp-delete"
-            disabled={argument?.refusal != null}
-            onClick={() => {
-              if (removal) onRemove(removal, true);
-            }}
-          >
-            {t('removeAcpDelete')}
-          </Button>
+          {!tied && (
+            <Button
+              variant="danger"
+              data-testid="remove-acp-delete"
+              onClick={() => {
+                if (removal) onRemove(removal, true);
+              }}
+            >
+              {t('removeAcpDelete')}
+            </Button>
+          )}
         </>
       )}
     >
-      <p>{t('removeAcpIntro', { name, count: argument?.nodes.length ?? 0 })}</p>
-      <ul className="af-remove-list" data-testid="remove-acp-list">
+      <p>{t(tied ? 'removeAcpIntroTied' : 'removeAcpIntro', { name, count: argument?.nodes.length ?? 0 })}</p>
+      <ul className="af-remove-list" data-testid="remove-acp-list" hidden={tied}>
         {argument?.nodes.map((node) => {
           const text = node.name || node.statement;
           return (
@@ -71,7 +74,7 @@ export function AcpRemoveDialog({
           );
         })}
       </ul>
-      {argument?.refusal ? <p data-testid="remove-acp-refused">{refusalText(argument.refusal, null, t)}</p> : <p>{t('removeAcpUndo')}</p>}
+      <p>{t(tied ? 'removeAcpUndoTied' : 'removeAcpUndo')}</p>
     </Dialog>
   );
 }

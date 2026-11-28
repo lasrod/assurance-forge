@@ -347,7 +347,7 @@ export type ConfidenceArgument = {
  */
 package: string, 
 /**
- * The package's name.
+ * The package's name; null when it has none, or a blank one.
  */
 name: string | null, 
 /**

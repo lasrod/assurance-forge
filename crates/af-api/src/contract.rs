@@ -543,7 +543,7 @@ pub struct AcpRemoval {
 pub struct ConfidenceArgument {
     /// The SACM id of the package.
     pub package: String,
-    /// The package's name.
+    /// The package's name; null when it has none, or a blank one.
     pub name: Option<String>,
     /// The nodes deleting it deletes: the confidence goal first.
     pub nodes: Vec<RemovalNode>,

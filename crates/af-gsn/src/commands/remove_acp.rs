@@ -212,9 +212,18 @@ fn confidence_argument(
             .map(|node| node.id.clone()),
     );
 
+    // What the dialog lists, the lines between them, and what the diagram
+    // never shows on its own: the placeholders W20 adds (which a node's
+    // removal takes unlisted too) and utility elements. A relationship the
+    // diagram does not draw would go unseen: refused.
+    let lines: HashSet<&str> = view
+        .edges
+        .iter()
+        .map(|edge| edge.relationship.as_str())
+        .collect();
     let shown = |element: SacmElement<'_>| {
         drawn.contains(element.id().as_str())
-            || element.kind().is_a(AbstractClass::AssertedRelationship)
+            || lines.contains(element.id().as_str())
             || element.kind().is_a(AbstractClass::UtilityElement)
     };
     let contents = element.children().all(shown);

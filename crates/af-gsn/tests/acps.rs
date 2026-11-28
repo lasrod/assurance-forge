@@ -785,7 +785,7 @@ fn w35_a_confidence_argument_is_kept_or_deleted_with_its_acp() {
 
 #[test]
 fn w35_a_confidence_argument_tied_to_the_rest_is_not_deleted() {
-    let cases: [&[(&str, &str)]; 3] = [
+    let cases: [&[(&str, &str)]; 4] = [
         // Another line's ACP names its goal.
         &[(
             r#"xmi:id="E2" source="Sn2" target="G3""#,
@@ -805,11 +805,20 @@ fn w35_a_confidence_argument_tied_to_the_rest_is_not_deleted() {
             r#"xmi:id="E3" source="Sn3""#,
             r#"xmi:id="E3" source="Sn3 Sn4""#,
         )],
+        // It holds a relationship the diagram does not draw.
+        &[(
+            r#"<argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3""#,
+            r#"<argumentElement xmi:type="sacm:AssertedInference" xmi:id="I9" source="ACP2" target="E3" /><argumentElement xmi:type="sacm:AssertedEvidence" xmi:id="E3""#,
+        )],
     ];
     for case in cases {
         let original = changed(case);
         let to = case[0].1;
         let shown = view(&original, "en");
+        assert!(
+            !shown.edges.iter().any(|edge| edge.relationship == "I9"),
+            "setup: I9 is not drawn"
+        );
         let plan =
             acp_removal(&original, &shown, "E1", "ACP2").unwrap_or_else(|why| panic!("{why:?}"));
         let argument = plan

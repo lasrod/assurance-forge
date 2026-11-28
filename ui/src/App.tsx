@@ -543,13 +543,16 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
   /** Delete on the canvas: a node, or the ACP whose description is selected. */
   const removeSelected = useCallback(
     (id: string) => {
-      const line = diagram?.diagram.nodes.some((node) => node.id === id)
-        ? undefined
-        : diagram?.diagram.edges.find((edge) => edge.acps.some((acp) => acp.claim === id));
-      if (line) askRemoveAcp(line.relationship, id, line.from);
+      const lines = diagram?.diagram.nodes.some((node) => node.id === id)
+        ? []
+        : (diagram?.diagram.edges.filter((edge) => edge.acps.some((acp) => acp.claim === id)) ?? []);
+      const [line] = lines;
+      // Shown by the ACPs of several lines: which goes is chosen from a line's menu.
+      if (lines.length > 1) moveRefused('AF-EDIT-032', null);
+      else if (line) askRemoveAcp(line.relationship, id, line.from);
       else askRemove(id);
     },
-    [diagram, askRemove, askRemoveAcp],
+    [diagram, askRemove, askRemoveAcp, moveRefused],
   );
   // A counter goal, counter evidence or confidence Claim just added, whose
   // name, or an ACP description's text, is to be ready to type once its
