@@ -1119,6 +1119,20 @@ fn remove(
 }
 
 #[tauri::command]
+fn link_acp(
+    relationship: String,
+    from: String,
+    to: String,
+    claim: String,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .link_acp(&relationship, &from, &to, &claim, revision))
+}
+
+#[tauri::command]
 fn acp_removal(
     relationship: String,
     claim: String,
@@ -1262,6 +1276,7 @@ pub fn run(args: Args) -> i32 {
             acp_choices,
             acp_node_refusal,
             add_acp,
+            link_acp,
             acp_removal,
             remove_acp,
             set_text,

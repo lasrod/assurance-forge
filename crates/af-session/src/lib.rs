@@ -96,6 +96,15 @@ pub enum Command {
         kind: AcpKind,
         package_name: String,
     },
+    /// Name the goal `claim`, the top goal of another argument package, as
+    /// an assurance claim point of the line from `from` to `to` of
+    /// `relationship`.
+    LinkAcp {
+        relationship: String,
+        from: String,
+        to: String,
+        claim: String,
+    },
     /// Remove the assurance claim point that `relationship` carries for the
     /// Claim `claim`, with its confidence argument when `with_argument`.
     RemoveAcp {
@@ -455,6 +464,30 @@ impl Session {
         };
         let record = self.made(before, command, &added.mutation);
         Ok((added, record))
+    }
+
+    /// Names the goal `claim`, the top goal of another argument package, as
+    /// an assurance claim point of `line` (W36), as one command.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::link_acp`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn link_acp(
+        &mut self,
+        view: &View,
+        line: AcpLine<'_>,
+        claim: &str,
+    ) -> Result<ChangeRecord, AddError> {
+        let before = self.document.clone();
+        let mutation = commands::link_acp(&mut self.document, view, line, claim)?;
+        let command = Command::LinkAcp {
+            relationship: line.relationship.to_owned(),
+            from: line.from.to_owned(),
+            to: line.to.to_owned(),
+            claim: claim.to_owned(),
+        };
+        Ok(self.made(before, command, &mutation))
     }
 
     /// Removes the ACP that `relationship` carries for the Claim `claim`,

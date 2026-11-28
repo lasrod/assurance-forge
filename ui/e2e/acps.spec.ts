@@ -1,6 +1,7 @@
 // Assurance claim points (milestone 2, step 7): a line's menu adds one with a
 // description or with a confidence argument in a package of its own; a click
-// on one shows its argument; a Solution or a Context says why not yet.
+// on one shows its argument; a line's menu also links one to the top goal of
+// another package; a Solution or a Context says why not yet.
 
 import { readFileSync } from 'node:fs';
 
@@ -55,6 +56,8 @@ test('a line takes an ACP with a description, whose text is ready to type, and U
     'Add Counter Evidence',
     'Add ACP with Description',
     'Add ACP with Confidence Argument',
+    // The confidence package's top goal, ACP2, is another package's.
+    'Link ACP to',
   ]);
   await menu.getByRole('menuitem', { name: 'Add ACP with Description' }).click();
 
@@ -248,4 +251,40 @@ test('an ACP shared with another line, or tied to it, is removed alone', async (
   await expect(status(page)).toHaveText('ACP2[Confidence] removed.');
   expect(await acpsOn(page, 'E1')).toEqual([]);
   expect(await acpsOn(page, 'E2')).toEqual(['ACP1', 'ACP2[Confidence]']);
+});
+
+test('a confidence argument kept by a removal is linked back from the line’s menu, and Undo takes it away', async ({ page }) => {
+  await opened(page);
+  const menu = () => page.getByRole('menu', { name: 'Line' });
+  const openMenu = async () => {
+    const at = await onLine(page, 'E1', 'Sn1');
+    await page.mouse.click(at.x, at.y, { button: 'right' });
+    await expect(menu()).toBeVisible();
+  };
+  // On the line, it is this line's already: not offered.
+  await openMenu();
+  await expect(menu().getByRole('menuitem', { name: 'Link ACP to' })).toHaveCount(0);
+  await menu().getByRole('menuitem', { name: 'Remove ACP2[Confidence]' }).click();
+  await page.getByRole('alertdialog', { name: 'Remove ACP2[Confidence]?' }).getByRole('button', { name: 'Remove ACP only' }).click();
+  expect(await acpsOn(page, 'E1')).toEqual([]);
+
+  // Its top goal is offered under Link ACP to, labelled as the ACP will be.
+  await openMenu();
+  await menu().getByRole('menuitem', { name: 'Link ACP to' }).click();
+  await page.getByRole('menuitem', { name: 'ACP2[Confidence]' }).click();
+  await expect(status(page)).toHaveText('ACP2[Confidence] linked.');
+  expect(await acpsOn(page, 'E1')).toEqual(['ACP2[Confidence]']);
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(async () => acpsOn(page, 'E1')).toEqual([]);
+});
+
+test('linking an ACP is worded in Japanese', async ({ page }) => {
+  await opened(page, '&lang=ja');
+  const at = await onLine(page, 'E2', 'Sn2');
+  await page.mouse.click(at.x, at.y, { button: 'right' });
+  await page.getByRole('menuitem', { name: 'ACP のリンク先' }).click();
+  await page.getByRole('menuitem', { name: 'ACP2[Confidence]' }).click();
+  await expect(status(page)).toHaveText('ACP2[Confidence] をリンクしました。');
+  expect(await acpsOn(page, 'E2')).toEqual(['ACP2[Confidence]']);
 });

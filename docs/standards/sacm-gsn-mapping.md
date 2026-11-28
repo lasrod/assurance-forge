@@ -709,6 +709,19 @@ removes `metaClaim` for a Claim's `subject` (SACM24-38, -50, -83).
 | W33 | Where an ACP goes | A line drawn as `SupportedBy` or `InContextOf`, the first of its relationship: an inference through a Strategy takes it on its line into the Strategy, not on a premise's below it (AF-EDIT-027). A challenge, a line drawn neutral, or anything GSN v3 does not name, does not (AF-EDIT-029). A Solution or a Context does in GSN v3 but not in SACM 2.3, and its menu says it comes with SACM 2.4 (AF-EDIT-030) | Decided | GSN v3 Table 1:5-1 and §1:5.3.3; Table 1:5-2 for a Solution or a Context, which are `ArtifactReference`s without `metaClaim` in SACM 2.3 (gap row 7) |
 | W34 | The ACP | A confidence `Claim` made as an add makes a Goal (W9), numbered with the next identifier of the prefix `ACP` (W10's numbering): **a description**, in the line's `ArgumentPackage`, which R17 then shows only as the ACP; or **a confidence argument**, in a new `ArgumentPackage` (`CreateArgumentPackage`) beside the line's, under what holds it, named as the interface words it ("Confidence ACP1"), of which the Claim is the top goal. A description is tagged `assuranceForge.gsn.acp` = `description` (R17). Then `SetReferences(relationship, MetaClaim, …)` adds the Claim to the relationship's `metaClaim`, after any it names. Nothing else changes | Decided | E11 reads it back as the ACP. GSN v3 §1:5.2.3: "Each ACP should have a unique identifier, e.g. 'ACP1'", and the argument is "a paragraph of accompanying text, a goal in the local argument, or a goal in a separate module"; §1:5.3.2: the identifier "may be a reference to a goal" |
 
+### Linking an assurance claim point to a goal that exists
+
+How the editor names a goal that already exists as an ACP of a line
+(milestone 2, A8). `af-gsn` (`commands::link_acp`) applies it as one
+`sacm::edit::batch`, one undo step; `commands::acp_choices` lists the goals a
+line may name, which the line's menu offers under Link ACP to. Decided on 28
+November 2026 with the user: the top goals of the other argument packages,
+such as a confidence argument kept when its ACP was removed (W35).
+
+| Rule | Where, and with what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W36 | Linking an ACP to a goal that exists | A line that takes an ACP (W33), and a top goal of an argument package other than the line's: a `Claim` the view draws as a Goal, not a citation, that no `SupportedBy`, `InContextOf` or neutral line reaches and that challenges nothing. Refused when the relationship's `metaClaim` names it already (AF-EDIT-033); when the line is part of the goal's own argument, the goal or a node below it by those lines, which would make the argument its own confidence argument (AF-EDIT-034); and for any other element (AF-EDIT-035). `SetReferences(relationship, MetaClaim, …)` adds the Claim after any it names. Nothing else changes: no element is made, and the goal keeps its identifier, so the ACP is labelled with it as E11 reads it (A4) | Decided | GSN v3 §1:5.2.3: the argument behind an ACP may be "a goal in a separate module"; §1:5.3.2: the identifier "may be a reference to a goal". SACM 2.3 `Assertion.metaClaim : Claim[0..*]` names a Claim wherever it is (gap row 5), as W34 already writes it. Goals of the line's own package are not offered: decided with the user, who chose the top goals of other packages |
+
 ### Removing an assurance claim point
 
 How the editor removes an ACP from its line, which stays (milestone 2, step
@@ -762,3 +775,6 @@ was refused. Nothing changes.
 | AF-EDIT-030 | An ACP on a Solution or a Context comes with SACM 2.4: SACM 2.3 cannot hold it (W33, gap row 7) |
 | AF-EDIT-031 | The line carries no ACP the diagram draws for that Claim (W35) |
 | AF-EDIT-032 | Said by the interface: Delete on a description that the ACPs of several lines show, which does not say which ACP goes; the line's menu does (W35) |
+| AF-EDIT-033 | The goal is already an ACP of the line (W36) |
+| AF-EDIT-034 | The line is part of the goal's own argument, which cannot be its confidence argument (W36) |
+| AF-EDIT-035 | An ACP links only to the top goal of another argument package (W36) |

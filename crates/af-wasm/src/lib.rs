@@ -152,6 +152,21 @@ impl WasmCore {
         json(&self.core.remove(id, revision))
     }
 
+    /// Names the goal `claim` as an ACP of the line from `from` to `to` of
+    /// `relationship`, as the menu of `revision` offered. `EditResult` as
+    /// JSON.
+    #[wasm_bindgen(js_name = linkAcp)]
+    pub fn link_acp(
+        &mut self,
+        relationship: &str,
+        from: &str,
+        to: &str,
+        claim: &str,
+        revision: u32,
+    ) -> Result<String, JsError> {
+        json(&self.core.link_acp(relationship, from, to, claim, revision))
+    }
+
     /// `AcpRemoval` as JSON for the ACP `relationship` carries for the Claim
     /// `claim`: what removing it would delete; `None` when nothing is open.
     #[wasm_bindgen(js_name = acpRemoval)]

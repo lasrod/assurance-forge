@@ -5,7 +5,7 @@
 
 use af_api::Core;
 use af_api::contract::{
-    AcpKind, ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult,
+    AcpGoal, AcpKind, ArgumentValue, EdgeKind, EditResult, ElementKind, NodeKind, OpenResult,
     ProblemSeverity, ProblemSource, Shape, TextRole,
 };
 use af_layout::{Fonts, Style};
@@ -1216,6 +1216,69 @@ fn an_acp_is_removed_with_or_without_its_confidence_argument_in_one_undo_step() 
             .iter()
             .any(|package| package.id == "argpkg_confidence")
     );
+}
+
+#[test]
+fn a_kept_confidence_argument_is_linked_back_in_one_undo_step() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let acps = |core: &mut Core| -> Vec<String> {
+        core.diagram()
+            .map(|at| {
+                at.diagram
+                    .edges
+                    .iter()
+                    .flat_map(|edge| edge.acps.iter().map(|acp| acp.label.text.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    // Its ACP removed, the argument kept.
+    assert!(matches!(
+        core.remove_acp("E1", "ACP2", false, 1),
+        EditResult::Applied { revision: 2, .. }
+    ));
+    assert_eq!(acps(&mut core), ["ACP1", "ACP4"]);
+
+    // The line's menu offers its top goal, labelled as the ACP would be.
+    let choices = core
+        .acp_choices("E1", "G2", "Sn1")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(choices.revision, 2);
+    assert_eq!(
+        choices.goals,
+        [AcpGoal {
+            claim: "ACP2".to_owned(),
+            label: "ACP2[Confidence]".to_owned(),
+            refusal: None,
+        }]
+    );
+
+    // Linked as the menu of its revision offered, in one undo step.
+    assert!(matches!(
+        core.link_acp("E1", "G2", "Sn1", "ACP2", 1),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    assert!(matches!(
+        core.link_acp("E1", "G2", "Sn1", "ACP2", 2),
+        EditResult::Applied {
+            revision: 3,
+            element: None,
+            ..
+        }
+    ));
+    assert_eq!(acps(&mut core), ["ACP1", "ACP2[Confidence]", "ACP4"]);
+    // Now this line's: refused, with a code.
+    let again = core
+        .acp_choices("E1", "G2", "Sn1")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(again.goals[0].refusal.as_deref(), Some("AF-EDIT-033"));
+    assert!(matches!(
+        core.link_acp("E1", "G2", "Sn1", "ACP2", 3),
+        EditResult::Refused { ref code } if code == "AF-EDIT-033"
+    ));
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(acps(&mut core), ["ACP1", "ACP4"]);
 }
 
 #[test]

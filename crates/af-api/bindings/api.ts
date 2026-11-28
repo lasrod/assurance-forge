@@ -211,12 +211,31 @@ export type AcpChoice = { kind: AcpKind,
  */
 refusal: string | null, };
 
+export type AcpGoal = { 
+/**
+ * The SACM id of its Claim.
+ */
+claim: string, 
+/**
+ * The label the ACP would have, such as `ACP1[Confidence ACP1]`.
+ */
+label: string, 
+/**
+ * Why the line's ACP cannot name it (`AF-EDIT-033`, `AF-EDIT-034`, or
+ * what refuses the line), or null when it can.
+ */
+refusal: string | null, };
+
 export type AcpChoices = { revision: number, 
 /**
  * The identifier the next ACP takes, such as `ACP1`: what the interface
  * names a confidence argument's package after.
  */
-identifier: string, choices: Array<AcpChoice>, };
+identifier: string, choices: Array<AcpChoice>, 
+/**
+ * The goals that exist an ACP of the line may name, in document order.
+ */
+goals: Array<AcpGoal>, };
 
 export type TextLine = { text: string, role: TextRole, x: number, baseline: number, 
 /**

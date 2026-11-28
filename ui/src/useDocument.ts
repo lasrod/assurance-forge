@@ -61,6 +61,8 @@ export type DocumentState =
   | { kind: 'acpAdded'; identifier: string }
   /** An assurance claim point removed: its label, and whether its confidence argument went too. */
   | { kind: 'acpRemoved'; label: string; withArgument: boolean }
+  /** A goal that exists named as an assurance claim point: the ACP's label. */
+  | { kind: 'acpLinked'; label: string }
   | { kind: 'textChanged'; field: TextField }
   | { kind: 'removed'; removed: NodeKind; identifier: string; more: number }
   | { kind: 'moved'; moved: NodeKind; identifier: string; to: string | null }
@@ -576,6 +578,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     [edit],
   );
   /**
+   * Names the goal `claim` as an ACP of the line `line` of `relationship`,
+   * from the menu of `revision`; the status says `label`. The view keeps the
+   * line's upper end in place.
+   */
+  const linkAcp = useCallback(
+    (relationship: string, line: LineEnds, claim: string, label: string, revision: number, onShown: EditShown) =>
+      void edit((on) => on.linkAcp(relationship, line, claim, revision), 'acp', line.from, null, onShown, {
+        kind: 'acpLinked',
+        label,
+      }),
+    [edit],
+  );
+  /**
    * Challenges the node `at`, or with `line` that line of the relationship
    * `at`, with a new element of `kind`, from the menu of `revision`: a
    * counter goal or counter evidence, which the status names.
@@ -1002,6 +1017,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     remove,
     acpRemoval,
     removeAcp,
+    linkAcp,
     moveTargets,
     move,
     moveRefused,
