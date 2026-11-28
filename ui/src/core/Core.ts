@@ -22,6 +22,7 @@ import type {
   Problems,
   RelationshipDetails,
   Removal,
+  AcpRemoval,
   SaveResult,
   TextField,
 } from '../../../crates/af-api/bindings/api';
@@ -176,6 +177,19 @@ export interface Core {
    * changed since. `element` is the node it was drawn under, to select.
    */
   remove(id: string, revision: number): Promise<EditResult>;
+  /**
+   * What removing the ACP that `relationship` carries for the Claim `claim`
+   * would delete: its description, or its confidence argument, which the
+   * user keeps or deletes; or the code of why it cannot be removed. Null
+   * when nothing is open.
+   */
+  acpRemoval(relationship: string, claim: string): Promise<AcpRemoval | null>;
+  /**
+   * Removes that ACP, with its confidence argument when `withArgument`, as
+   * the removal of `revision` said: refused (AF-EDIT-009) when the document
+   * has changed since.
+   */
+  removeAcp(relationship: string, claim: string, withArgument: boolean, revision: number): Promise<EditResult>;
   /**
    * Where the node with this SACM id may be moved: for every node of the
    * diagram, and for the top level, the code of why not, or null; or the

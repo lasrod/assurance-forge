@@ -90,8 +90,9 @@ type Gesture = {
  * resolve to, for the layout. `onContextMenu` asks for the add menu of a
  * node, or of the empty canvas (`null`), at a point in client coordinates:
  * from a right-click, or from the context-menu key or Shift+F10 on the
- * selected node. `onRemove` asks to remove the selected node: Delete, or
- * Backspace, which is the key macOS calls delete.
+ * selected node. `onRemove` asks to remove the selected node, or the ACP
+ * whose description is selected: Delete, or Backspace, which is the key
+ * macOS calls delete. A right-click on an ACP opens its line's menu.
  *
  * While a move is being chosen (`move`), the canvas draws where the node may
  * go; a click on a node says so (`onMoveTo`) in place of selecting it, and
@@ -474,9 +475,12 @@ export function DiagramCanvas({
     const node = hitTest(diagram.diagram, viewport, point.x, point.y);
     // A line's menu challenges it: on a trunk several lines share, it is not
     // said which, and no menu opens.
-    const hit = node ? null : hitOneEdge(diagram.diagram, viewport, point.x, point.y);
+    // An ACP, square or label, is of its line: the line's menu opens.
+    const acp = node ? null : hitAcp(diagram.diagram, viewport, point.x, point.y);
+    const carrier = acp ? diagram.diagram.edges.find((edge) => edge.acps.includes(acp)) : undefined;
+    const hit = node || carrier ? null : hitOneEdge(diagram.diagram, viewport, point.x, point.y);
     if (hit?.ambiguous) return;
-    const line = hit?.edge ?? null;
+    const line = carrier ?? hit?.edge ?? null;
     if (line) {
       onLineMenu?.(line, { x: event.clientX, y: event.clientY }, 'pointer');
       return;
@@ -524,8 +528,12 @@ export function DiagramCanvas({
     }
     const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
     if ((event.key === 'Delete' || event.key === 'Backspace') && plain && !event.nativeEvent.isComposing) {
-      // Only a node is removed: a selected line is not. Not while a move is chosen.
-      if (!move && selected && diagram?.diagram.nodes.some((node) => node.id === selected)) {
+      // A node is removed, or the ACP whose description is selected: a
+      // selected line is not. Not while a move is chosen.
+      const removable =
+        diagram?.diagram.nodes.some((node) => node.id === selected) ||
+        diagram?.diagram.edges.some((edge) => edge.acps.some((acp) => acp.claim === selected));
+      if (!move && selected && removable) {
         event.preventDefault();
         onRemove(selected);
       }

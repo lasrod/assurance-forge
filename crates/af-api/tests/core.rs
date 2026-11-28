@@ -1130,6 +1130,95 @@ fn an_acp_is_added_in_one_undo_step_and_its_package_shown_until_undone() {
 }
 
 #[test]
+fn an_acp_is_removed_with_or_without_its_confidence_argument_in_one_undo_step() {
+    let mut core = core("en");
+    core.open(&testdata("sacm/acps.sacm.xmi"));
+    let acps = |core: &mut Core| -> Vec<String> {
+        core.diagram()
+            .map(|at| {
+                at.diagram
+                    .edges
+                    .iter()
+                    .flat_map(|edge| edge.acps.iter().map(|acp| acp.label.text.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    assert_eq!(acps(&mut core), ["ACP1", "ACP2[Confidence]", "ACP4"]);
+
+    // A description is listed, and goes with its ACP.
+    let removal = core
+        .acp_removal("I1", "ACP1")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(removal.label, "ACP1");
+    assert_eq!(removal.refusal, None);
+    assert!(
+        removal
+            .description
+            .as_ref()
+            .is_some_and(|node| node.acp_description)
+    );
+    assert_eq!(removal.argument, None);
+
+    // A confidence argument is listed with its package and nodes.
+    let removal = core
+        .acp_removal("E1", "ACP2")
+        .unwrap_or_else(|| panic!("nothing open"));
+    assert_eq!(removal.label, "ACP2[Confidence]");
+    assert_eq!(removal.description, None);
+    let argument = removal.argument.unwrap_or_else(|| panic!("no argument"));
+    assert_eq!(argument.name.as_deref(), Some("Confidence"));
+    let identifiers: Vec<&str> = argument
+        .nodes
+        .iter()
+        .map(|node| node.identifier.as_str())
+        .collect();
+    assert_eq!(identifiers.first().copied(), Some("ACP2"));
+    assert_eq!(argument.nodes.len(), 2);
+    assert_eq!(argument.refusal, None);
+
+    // No such ACP: a code, not a sentence.
+    assert_eq!(
+        core.acp_removal("E2", "ACP1")
+            .and_then(|removal| removal.refusal)
+            .as_deref(),
+        Some("AF-EDIT-031")
+    );
+
+    // Deleted with its argument, in one undo step.
+    assert!(matches!(
+        core.remove_acp("E1", "ACP2", true, 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    assert!(matches!(
+        core.remove_acp("E1", "ACP2", true, 1),
+        EditResult::Applied { revision: 2, .. }
+    ));
+    assert_eq!(acps(&mut core), ["ACP1", "ACP4"]);
+    assert!(core.element("ACP2").is_none());
+    assert!(
+        core.packages()
+            .iter()
+            .all(|package| package.id != "argpkg_confidence")
+    );
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(acps(&mut core), ["ACP1", "ACP2[Confidence]", "ACP4"]);
+
+    // Kept: the package stays, and only the ACP goes.
+    assert!(matches!(
+        core.remove_acp("E1", "ACP2", false, 3),
+        EditResult::Applied { .. }
+    ));
+    assert_eq!(acps(&mut core), ["ACP1", "ACP4"]);
+    assert!(core.element("ACP2").is_some());
+    assert!(
+        core.packages()
+            .iter()
+            .any(|package| package.id == "argpkg_confidence")
+    );
+}
+
+#[test]
 fn a_top_level_goal_goes_into_the_package_shown() {
     let mut core = core("en");
     core.open(&testdata("sacm/acps.sacm.xmi"));

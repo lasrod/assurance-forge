@@ -1119,6 +1119,28 @@ fn remove(
 }
 
 #[tauri::command]
+fn acp_removal(
+    relationship: String,
+    claim: String,
+    state: Shared<'_>,
+) -> Result<Option<af_api::contract::AcpRemoval>, String> {
+    Ok(lock(&state)?.core.acp_removal(&relationship, &claim))
+}
+
+#[tauri::command]
+fn remove_acp(
+    relationship: String,
+    claim: String,
+    with_argument: bool,
+    revision: u32,
+    state: Shared<'_>,
+) -> Result<af_api::contract::EditResult, String> {
+    Ok(lock(&state)?
+        .core
+        .remove_acp(&relationship, &claim, with_argument, revision))
+}
+
+#[tauri::command]
 fn set_text(
     id: String,
     field: af_api::contract::TextField,
@@ -1240,6 +1262,8 @@ pub fn run(args: Args) -> i32 {
             acp_choices,
             acp_node_refusal,
             add_acp,
+            acp_removal,
+            remove_acp,
             set_text,
             undo,
             redo,

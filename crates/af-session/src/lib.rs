@@ -96,6 +96,13 @@ pub enum Command {
         kind: AcpKind,
         package_name: String,
     },
+    /// Remove the assurance claim point that `relationship` carries for the
+    /// Claim `claim`, with its confidence argument when `with_argument`.
+    RemoveAcp {
+        relationship: String,
+        claim: String,
+        with_argument: bool,
+    },
     /// Replace the document by one kept in a recovery copy (plan decision
     /// R5).
     Restore,
@@ -448,6 +455,32 @@ impl Session {
         };
         let record = self.made(before, command, &added.mutation);
         Ok((added, record))
+    }
+
+    /// Removes the ACP that `relationship` carries for the Claim `claim`,
+    /// with its description, and with its confidence argument when
+    /// `with_argument` (W35). `view` is the view of the document as it is.
+    ///
+    /// # Errors
+    ///
+    /// What [`commands::remove_acp`] refuses; the document and the revision
+    /// are then unchanged.
+    pub fn remove_acp(
+        &mut self,
+        view: &View,
+        relationship: &str,
+        claim: &str,
+        with_argument: bool,
+    ) -> Result<ChangeRecord, AddError> {
+        let before = self.document.clone();
+        let mutation =
+            commands::remove_acp(&mut self.document, view, relationship, claim, with_argument)?;
+        let command = Command::RemoveAcp {
+            relationship: relationship.to_owned(),
+            claim: claim.to_owned(),
+            with_argument,
+        };
+        Ok(self.made(before, command, &mutation))
     }
 
     /// Replaces the document by `document`, the one a recovery copy kept, as

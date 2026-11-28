@@ -27,7 +27,7 @@ export interface AddItem {
 
 /** The words for an `AF-EDIT-*` code, about a node of `kind` (null for the canvas). */
 export function refusalText(code: string, kind: NodeKind | null, t: T): string {
-  const known = /^AF-EDIT-0(0[1-9]|1[0-9]|2[0-9]|30)$/.test(code);
+  const known = /^AF-EDIT-0(0[1-9]|1[0-9]|2[0-9]|3[01])$/.test(code);
   return known ? t(code as MessageKey, { kind: kind ? t(KINDS[kind]) : '' }) : code;
 }
 
