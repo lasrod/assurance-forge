@@ -256,6 +256,21 @@ pub(crate) fn repair(repair: af_gsn::commands::Repair) -> crate::contract::Probl
             to,
             refusal: code(refusal),
         },
+        Repair::Renumber {
+            nodes,
+            given,
+            refusal,
+        } => crate::contract::ProblemRepair::Renumber {
+            nodes,
+            given: given
+                .into_iter()
+                .map(|(element, identifier)| crate::contract::RenumberedNode {
+                    element,
+                    identifier,
+                })
+                .collect(),
+            refusal: code(refusal),
+        },
         Repair::ClearUndeveloped { element, refusal } => {
             crate::contract::ProblemRepair::ClearUndeveloped {
                 element,

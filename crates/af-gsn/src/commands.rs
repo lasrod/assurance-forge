@@ -37,6 +37,7 @@ mod move_node;
 mod remove;
 mod remove_acp;
 mod remove_line;
+mod renumber;
 mod repair;
 mod repairs;
 pub use acp::{
@@ -50,6 +51,7 @@ pub use move_node::{MoveTarget, MoveTargets, Moved, move_node, move_targets};
 pub use remove::{Removal, Removed, removal, remove};
 pub use remove_acp::{AcpRemoval, ConfidenceArgument, acp_removal, remove_acp};
 pub use remove_line::{LineRemoval, LineRemoved, line_removal, remove_line};
+pub use renumber::{Renumbered, renumber, renumbering};
 pub use repair::{Repaired, repair_join, repairable, set_undeveloped, undeveloped_change};
 pub use repairs::{Repair, repairs};
 
@@ -159,6 +161,9 @@ pub enum Refusal {
     /// AF-EDIT-039: only a support or context line is removed alone, by a
     /// relationship that names its lower end once (W37).
     NotARemovableLine,
+    /// AF-EDIT-040: the nodes no longer share one identifier, or one is not
+    /// drawn: there is nothing to renumber (W38).
+    NothingToRenumber,
     /// AF-EDIT-012: an identifier cannot be empty.
     IdentifierEmpty,
     /// AF-EDIT-013: another element of the file has the identifier.
@@ -203,6 +208,7 @@ impl Refusal {
             Refusal::KindFromLine => "AF-EDIT-037",
             Refusal::LineChallenged => "AF-EDIT-038",
             Refusal::NotARemovableLine => "AF-EDIT-039",
+            Refusal::NothingToRenumber => "AF-EDIT-040",
             Refusal::IdentifierEmpty => "AF-EDIT-012",
             Refusal::IdentifierTaken => "AF-EDIT-013",
             Refusal::TextIsExpression => "AF-EDIT-014",

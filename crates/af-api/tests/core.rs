@@ -1527,3 +1527,71 @@ fn a_cycle_offers_its_lines_and_one_removed_breaks_it() {
     ));
     assert_eq!(cycles(&mut core).len(), 1);
 }
+
+#[test]
+fn a_shared_identifier_is_renumbered_as_its_problem_offered_and_undo_takes_it_back() {
+    let mut core = core("en");
+    let tagged = |id: &str| {
+        format!(
+            r#"<argumentElement xmi:type="sacm:Claim" xmi:id="{id}"><name content="{id}"/><taggedValue xmi:id="t{id}"><key><value content="assuranceForge.gsn.identifier"/></key><content><value content="G1"/></content></taggedValue></argumentElement>"#
+        )
+    };
+    let xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<sacm:AssuranceCasePackage xmlns:sacm="http://www.omg.org/spec/SACM/20220301" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmi:id="case">
+  <name content="Case"/>
+  <argumentPackage xmi:id="p"><name content="P"/>{}{}</argumentPackage>
+</sacm:AssuranceCasePackage>"#,
+        tagged("a"),
+        tagged("b")
+    );
+    assert!(matches!(
+        core.open(xml.as_bytes()),
+        OpenResult::Opened { .. }
+    ));
+    let shared = |core: &mut Core| -> Vec<af_api::contract::Problem> {
+        core.problems()
+            .map(|problems| problems.problems)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|problem| problem.code == "AF-GSN-009")
+            .collect()
+    };
+    let found = shared(&mut core);
+    let nodes = match found.as_slice() {
+        [problem] => match problem.repairs.as_slice() {
+            [
+                ProblemRepair::Renumber {
+                    nodes,
+                    given,
+                    refusal: None,
+                },
+            ] => {
+                let given: Vec<(&str, &str)> = given
+                    .iter()
+                    .map(|node| (node.element.as_str(), node.identifier.as_str()))
+                    .collect();
+                assert_eq!(given, [("b", "G2")]);
+                nodes.clone()
+            }
+            other => panic!("repairs: {other:?}"),
+        },
+        other => panic!("problems: {other:?}"),
+    };
+    assert!(matches!(
+        core.renumber(&nodes, 0),
+        EditResult::Refused { ref code } if code == "AF-EDIT-009"
+    ));
+    let made = core.renumber(&nodes, 1);
+    assert!(
+        matches!(made, EditResult::Applied { ref element, .. } if element.as_deref() == Some("b")),
+        "{made:?}"
+    );
+    assert!(shared(&mut core).is_empty());
+    assert_eq!(
+        core.element("b").map(|details| details.identifier),
+        Some("G2".to_owned())
+    );
+    assert!(matches!(core.undo(), EditResult::Applied { .. }));
+    assert_eq!(shared(&mut core).len(), 1);
+}

@@ -224,6 +224,13 @@ impl WasmCore {
         json(&self.core.remove_line(relationship, from, to, revision))
     }
 
+    /// Renumbers the nodes `elements`, which share one identifier, the first
+    /// keeping it, as their problem at `revision` offered. `EditResult` as
+    /// JSON.
+    pub fn renumber(&mut self, elements: Vec<String>, revision: u32) -> Result<String, JsError> {
+        json(&self.core.renumber(&elements, revision))
+    }
+
     /// `MoveTargets` as JSON for the node `id`: where it may be moved;
     /// `None` when nothing is open.
     #[wasm_bindgen(js_name = moveTargets)]

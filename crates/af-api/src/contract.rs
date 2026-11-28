@@ -901,6 +901,25 @@ pub enum ProblemRepair {
         element: String,
         refusal: Option<String>,
     },
+    /// Renumber `nodes`, which share one identifier, the first keeping it:
+    /// `Core::renumber` with `nodes` (W38). `given` is each other node with
+    /// the identifier it would get.
+    #[serde(rename_all = "camelCase")]
+    Renumber {
+        nodes: Vec<String>,
+        given: Vec<RenumberedNode>,
+        refusal: Option<String>,
+    },
+}
+
+/// A node a renumbering gives a new identifier.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typescript", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct RenumberedNode {
+    /// The SACM id.
+    pub element: String,
+    pub identifier: String,
 }
 
 /// An element a problem is about.
@@ -989,6 +1008,7 @@ pub fn typescript() -> String {
         MoveTarget::decl(&cfg),
         MoveLine::decl(&cfg),
         MoveTargets::decl(&cfg),
+        RenumberedNode::decl(&cfg),
         ProblemRepair::decl(&cfg),
         EditResult::decl(&cfg),
         History::decl(&cfg),

@@ -73,6 +73,8 @@ export type DocumentState =
   | { kind: 'challengeMoved'; identifier: string; to: string }
   | { kind: 'undevelopedSet'; undeveloped: boolean; identifier: string }
   | { kind: 'repaired'; repaired: NodeKind | null; identifier: string }
+  /** Nodes that shared an identifier renumbered: the identifiers they were given. */
+  | { kind: 'renumbered'; identifiers: string[] }
   | { kind: 'undone' }
   | { kind: 'redone' }
   | { kind: 'editRefused'; code: string; about: NodeKind | null }
@@ -836,6 +838,19 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
       }),
     [edit, followingEdits],
   );
+  /**
+   * Renumbers the nodes `nodes`, which share one identifier, the first
+   * keeping it, as their problem of `revision` offered; `identifiers` are
+   * those the others are given, for the status.
+   */
+  const renumber = useCallback(
+    (nodes: string[], revision: number, identifiers: string[], onShown: EditShown) =>
+      void edit(async (on) => on.renumber(nodes, await followingEdits(revision)), 'mark', nodes[1] ?? null, null, onShown, {
+        kind: 'renumbered',
+        identifiers,
+      }),
+    [edit, followingEdits],
+  );
   /** Says why a move cannot be made to the place the user chose. */
   const moveRefused = useCallback((code: string, about: NodeKind | null) => setState({ kind: 'editRefused', code, about }), []);
   /**
@@ -1069,6 +1084,7 @@ export function useDocument(start: (language: Language) => Promise<Core>, initia
     moveRefused,
     setUndeveloped,
     repair,
+    renumber,
     setText,
     undo,
     redo,

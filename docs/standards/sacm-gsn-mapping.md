@@ -675,8 +675,9 @@ edit with its own rule, offered by the problem (F1 of
 `commands::repairs`). A cycle (AF-GSN-001) offers each of its `SupportedBy`
 lines, and AF-GSN-002, 003, 005 and 006 the line reported, for removal by
 W37; AF-GSN-004 is joined as context by W27 where it can be, and otherwise
-loses its line by W37; AF-GSN-010 clears the mark by W26. A repair that its
-rule refuses is not offered, and the problem says why.
+loses its line by W37; AF-GSN-010 clears the mark by W26; and AF-GSN-009
+renumbers every node but the first by W38. A repair that its rule refuses is
+not offered, and the problem says why.
 
 | Rule | Repaired | SACM operations | Status | Evidence |
 |---|---|---|---|---|
@@ -760,6 +761,19 @@ a line are this same command.
 |---|---|---|---|---|
 | W37 | Removing a line | A `SupportedBy` or `InContextOf` line E1 to E4 draws, chosen by its relationship and its two ends; a challenge, a neutral line (E5a, E9) or no such line is refused (AF-EDIT-039). **The line from a Goal to its Strategy**, E1's first line, is refused (AF-EDIT-036): the Strategy is removed instead. **Any other line** names one `source` of the relationship, its lower end; a source named twice is refused (AF-EDIT-039). That source alone: `DeleteElement` of the relationship, with what it holds, which must be utility elements only, and with each description (R17) that only its `metaClaim` names; each ACP E11 draws on it goes with it and is listed, as W19 says, and a `metaClaim` E11 does not draw refuses (AF-EDIT-015). Alone under a Strategy: the inference stays with its Strategy, holding the place of the next Goal (W20), and only an inference R16 would hide the placeholder in does so (else AF-EDIT-015). One of several sources: `RemoveReference(relationship, Source, node)`, the relationship staying for the others, only when nothing refers to it and it has no `metaClaim` (W25's rule; AF-EDIT-015). In every case: refused when anything refers to the relationship, a challenge of it (AF-EDIT-038) or anything else (AF-EDIT-015). And refused when a node would be drawn as another kind than it is (AF-EDIT-037), which is checked on the result before it is kept: an `ArtifactReference` drawn as a Solution or a Context by its line alone (R9, R10) reads as neutral without it (R11). No node is removed: one left under nothing is drawn at the top level | Decided | SACM 2.3 §11.13: an asserted relationship has `source:ArgumentAsset[1..*]` and `target:ArgumentAsset[1]`, so the last source takes the relationship with it, and an inference cannot lose its target and keep its premises, which is what keeping a Strategy's Goals without its line would need. W25: taking a source out of "A and B support C" changes what a challenge of it, or an ACP on it, is about. "Never silently change an argument": a node's GSN kind is the meaning the user reads, so a removal that changes it is refused rather than made. The C++ application's AF-METH-011 made removing a relationship an edit of its own, and its removal detached a Strategy and everything under it with only the status message saying so; here no node goes |
 
+### Renumbering a shared identifier
+
+How the editor repairs two or more nodes that share one identifier
+(AF-GSN-009; milestone 2, step 8, G3; F5 of
+[the plan](../roadmap/milestone-2-repair.md)). `af-gsn`
+(`commands::renumber`) applies it as one `sacm::edit::batch`, one undo step;
+`commands::renumbering` answers the identifiers it would give, which the
+problem shows before it is made.
+
+| Rule | Where, and with what | SACM operations | Status | Evidence |
+|---|---|---|---|---|
+| W38 | The nodes AF-GSN-009 reports, in document order, which the view draws with one identifier | The first keeps it. Each other, in order, is given the next identifier of its own prefix, by W15: its identifier without the digits it ends in (`G` of `G1`, `cl_sub_` of `cl_sub_1`), or the prefix of its kind (W10) when it ends in none or is digits only; numbered as W10 numbers, above every identifier the file uses and those given before it. All in one batch. Refused when the nodes no longer share one identifier, or one is not drawn (AF-EDIT-040), and as W15 refuses (AF-EDIT-014) | Decided | GSN v3 GSN3-CORE-010: every GSN element has exactly one notation identifier, which identifies it. The first in the file is the one a reader most likely knows it by (F5). The prefix kept is the file's own scheme, where W10's would impose the editor's: the C++ application's AF-METH-011 renumbered "under its own prefix". An ACP labelled with a renumbered goal follows it, since the label is the identifier (A4) |
+
 ### Codes
 
 Sent with a choice of the add menu that cannot be made, or with an edit that
@@ -806,3 +820,4 @@ was refused. Nothing changes.
 | AF-EDIT-037 | Removing the line would change what a node at its end is drawn as: a Solution or a Context known only by its line (W37) |
 | AF-EDIT-038 | The line is challenged: it is not removed alone (W37) |
 | AF-EDIT-039 | Only a support or context line is removed alone, by a relationship that names its lower end once (W37) |
+| AF-EDIT-040 | The nodes no longer share one identifier, or one is not drawn: there is nothing to renumber (W38) |

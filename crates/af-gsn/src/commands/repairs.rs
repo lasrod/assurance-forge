@@ -3,7 +3,8 @@
 //!
 //! A repair is an edit the editor already makes, chosen by the rule the
 //! argument breaks: joining an element as context (W27), removing a line
-//! (W37) or clearing the undeveloped mark (W26). [`repairs`] lists those a
+//! (W37), clearing the undeveloped mark (W26) or renumbering a shared
+//! identifier (W38). [`repairs`] lists those a
 //! finding has, each with why it cannot be made here, so the problem list
 //! can offer those that can and say why for the others. Nothing is changed.
 
@@ -11,7 +12,7 @@ use std::collections::HashSet;
 
 use sacm::model::Document;
 
-use super::{Line, Refusal, line_removal, repairable, undeveloped_change};
+use super::{Line, Refusal, line_removal, renumbering, repairable, undeveloped_change};
 use crate::view::{EdgeKind, View};
 use crate::wellformed::{Finding, Rule};
 
@@ -38,13 +39,20 @@ pub enum Repair {
         element: String,
         refusal: Option<Refusal>,
     },
+    /// Renumber `nodes`, which share one identifier, the first keeping it
+    /// (W38): `given` is each other node with the identifier it would get,
+    /// or why they cannot be renumbered.
+    Renumber {
+        nodes: Vec<String>,
+        given: Vec<(String, String)>,
+        refusal: Option<Refusal>,
+    },
 }
 
 /// The repairs of `finding`, where `view` is the view of `document` the
 /// finding was made of (`wellformed::check`), in the order they are offered.
 /// Empty for a rule that has none in this step: a Strategy at an end
-/// (AF-GSN-007), a Strategy with no Goal (AF-GSN-008) and a shared
-/// identifier (AF-GSN-009).
+/// (AF-GSN-007) and a Strategy with no Goal (AF-GSN-008).
 pub fn repairs(document: &Document, view: &View, finding: &Finding) -> Vec<Repair> {
     let line = || match (finding.relationship.as_deref(), finding.nodes.as_slice()) {
         (Some(relationship), [from, to]) => {
@@ -100,7 +108,18 @@ pub fn repairs(document: &Document, view: &View, finding: &Finding) -> Vec<Repai
             })
             .into_iter()
             .collect(),
-        Rule::StrategyAtEnd | Rule::StrategyUnsupported | Rule::DuplicateIdentifier => Vec::new(),
+        Rule::DuplicateIdentifier => {
+            let (given, refusal) = match renumbering(document, view, &finding.nodes) {
+                Ok(given) => (given, None),
+                Err(refusal) => (Vec::new(), Some(refusal)),
+            };
+            vec![Repair::Renumber {
+                nodes: finding.nodes.clone(),
+                given,
+                refusal,
+            }]
+        }
+        Rule::StrategyAtEnd | Rule::StrategyUnsupported => Vec::new(),
     }
 }
 
