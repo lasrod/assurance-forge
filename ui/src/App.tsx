@@ -497,12 +497,12 @@ export function App({ start, initialLanguage }: { start: (language: Language) =>
         const all = [...answer.choices, ...(acpChoices?.choices ?? [])];
         const acpsOn = edge.acps.map((acp) => ({ claim: acp.claim, label: acp.label.text }));
         const removable = edge.kind === 'supportedBy' || edge.kind === 'inContextOf';
-        // Nothing may go on it: the status says why. With nothing to remove
-        // either, no menu opens; a line that may be removed still offers that.
+        // Nothing may go on it, and nothing to remove: no menu opens, and the
+        // status says why. A line that may be removed offers that alone.
         const refused = all.find((choice) => choice.refusal !== null);
-        if (all.every((choice) => choice.refusal !== null) && acpsOn.length === 0) {
+        if (all.every((choice) => choice.refusal !== null) && acpsOn.length === 0 && !removable) {
           if (refused?.refusal) moveRefused(refused.refusal, null);
-          if (!removable) return;
+          return;
         }
         setAddMenu({
           revision: answer.revision,
